@@ -114,8 +114,7 @@ static config_value_t *config_value_alloc(config_value_type_t type)
 static char *duplicate_string(const char *str)
 {
     if (!str) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     size_t len = strlen(str) + 1;
@@ -223,8 +222,7 @@ config_value_t *config_value_create_string(const char *value)
         val->data.string_value.str = duplicate_string(value);
         if (!val->data.string_value.str) {
             AGENTOS_FREE(val);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
         val->data.string_value.len = strlen(value);
     }
@@ -240,8 +238,7 @@ config_value_t *config_value_create_array(size_t capacity)
             val->data.array_value.capacity, sizeof(config_value_t *));
         if (!val->data.array_value.items) {
             AGENTOS_FREE(val);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
         val->data.array_value.count = 0;
     }
@@ -257,8 +254,7 @@ config_value_t *config_value_create_object(size_t capacity)
                                                       sizeof(val->data.object_value.items[0]));
         if (!val->data.object_value.items) {
             AGENTOS_FREE(val);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
         val->data.object_value.count = 0;
     }
@@ -268,8 +264,7 @@ config_value_t *config_value_create_object(size_t capacity)
 config_value_t *config_value_clone(const config_value_t *value)
 {
     if (!value) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     config_value_t *copy = NULL;
@@ -506,8 +501,7 @@ config_context_t *config_context_create(const char *name)
 {
     config_context_t *ctx = (config_context_t *)AGENTOS_CALLOC(1, sizeof(config_context_t));
     if (!ctx) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     if (name) {
@@ -518,8 +512,7 @@ config_context_t *config_context_create(const char *name)
 
     if (!ctx->name) {
         AGENTOS_FREE(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     ctx->capacity = 16;
@@ -528,8 +521,7 @@ config_context_t *config_context_create(const char *name)
     if (!ctx->items) {
         AGENTOS_FREE(ctx->name);
         AGENTOS_FREE(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     ctx->count = 0;
@@ -566,6 +558,14 @@ config_error_t config_context_set(config_context_t *ctx, const char *key, config
         return CONFIG_ERROR_INVALID_ARG;
     }
 
+    /* v0.1.1 修复（并发安全 Bug E）：config_context_set 缺少 mutex 保护。
+     * 此前 config_context_get/delete/foreach 等操作均持有 mutex，唯独 set 未加锁，
+     * 导致多线程并发调用 config_source_load 写入同一 context 时，
+     * find_item_index + config_value_destroy + 赋值之间存在 TOCTOU 竞争，
+     * 产生 double-free（ASAN 检测到 config_value_destroy 对同一指针被两个线程
+     * 同时调用）。修复：对 set 操作加 mutex，与 get/delete 保持一致。 */
+    agentos_mutex_lock(&ctx->mutex);
+
     // 查找现有项
     int index = find_item_index(ctx, key);
 
@@ -573,6 +573,7 @@ config_error_t config_context_set(config_context_t *ctx, const char *key, config
         // 替换现有项
         config_value_destroy(ctx->items[index].value);
         ctx->items[index].value = value;
+        agentos_mutex_unlock(&ctx->mutex);
         return CONFIG_SUCCESS;
     } else {
         // 添加新项
@@ -580,6 +581,7 @@ config_error_t config_context_set(config_context_t *ctx, const char *key, config
             config_error_t err = expand_context_capacity(ctx);
             if (err != CONFIG_SUCCESS) {
                 config_value_destroy(value);
+                agentos_mutex_unlock(&ctx->mutex);
                 return err;
             }
         }
@@ -587,6 +589,7 @@ config_error_t config_context_set(config_context_t *ctx, const char *key, config
         char *key_copy = duplicate_string(key);
         if (!key_copy) {
             config_value_destroy(value);
+            agentos_mutex_unlock(&ctx->mutex);
             return CONFIG_ERROR_OUT_OF_MEMORY;
         }
 
@@ -594,6 +597,7 @@ config_error_t config_context_set(config_context_t *ctx, const char *key, config
         ctx->items[ctx->count].value = value;
         ctx->count++;
 
+        agentos_mutex_unlock(&ctx->mutex);
         return CONFIG_SUCCESS;
     }
 }
@@ -601,8 +605,7 @@ config_error_t config_context_set(config_context_t *ctx, const char *key, config
 const config_value_t *config_context_get(const config_context_t *ctx, const char *key)
 {
     if (!ctx || !key) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     agentos_mutex_lock((agentos_mutex_t *)&ctx->mutex);
@@ -712,15 +715,13 @@ config_context_t *config_context_clone(const config_context_t *ctx)
         char *key_copy = duplicate_string(ctx->items[i].key);
         if (!key_copy) {
             config_context_destroy(clone);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
         config_value_t *val_copy = config_value_clone(ctx->items[i].value);
         if (!val_copy) {
             AGENTOS_FREE(key_copy);
             config_context_destroy(clone);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
         if (clone->count >= clone->capacity) {
             config_error_t err = expand_context_capacity(clone);
@@ -728,8 +729,7 @@ config_context_t *config_context_clone(const config_context_t *ctx)
                 AGENTOS_FREE(key_copy);
                 config_value_destroy(val_copy);
                 config_context_destroy(clone);
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-                return NULL;
+                AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
             }
         }
         clone->items[clone->count].key = key_copy;

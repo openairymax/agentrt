@@ -62,6 +62,14 @@ target_include_directories(agentos_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+# P3.20: heapstore 集成 — core_init.c 调用 heapstore_integration_init/shutdown
+# heapstore 仅依赖 commons + threads，无循环依赖
+# CMake 在生成阶段解析目标引用，atoms 先于 heapstore 配置但可前向引用
+target_include_directories(agentos_core PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../heapstore/include
+)
+target_link_libraries(agentos_core PUBLIC agentos_heapstore)
+
 # 安全编译选项（基于AgentRT C编码风格指南附录A）
 if(MSVC)
     target_compile_options(agentos_core PRIVATE /W4 /std:c11 /wd4819 /wd4117 /wd4273)

@@ -1,4 +1,4 @@
-message(STATUS "[HEAPSTORE] Configuring heapstore module (SQLite3: ${AGENTOS_HAS_SQLITE3})")
+agentos_print_info("[HEAPSTORE] Configuring heapstore module (SQLite3: ${AGENTOS_HAS_SQLITE3})")
 
 set(heapstore_SOURCES
     src/heapstore_core.c
@@ -65,9 +65,9 @@ if(AGENTOS_HAS_SQLITE3)
         target_include_directories(agentos_heapstore PRIVATE ${SQLITE3_INCLUDE_DIRS})
         target_link_libraries(agentos_heapstore PRIVATE ${SQLITE3_LIBRARIES})
     endif()
-    message(STATUS "heapstore: SQLite3 registry backend enabled")
+    agentos_print_ok("heapstore: SQLite3 registry backend enabled")
 else()
-    message(STATUS "heapstore: using in-memory registry backend (no SQLite3)")
+    agentos_print_info("heapstore: using in-memory registry backend (no SQLite3)")
 endif()
 
 install(TARGETS agentos_heapstore
@@ -86,4 +86,4 @@ if(BUILD_TESTS)
     endif()
 endif()
 
-message(STATUS "AgentRT heapstore v${PROJECT_VERSION}")
+agentos_print_info("AgentRT heapstore v${PROJECT_VERSION}")

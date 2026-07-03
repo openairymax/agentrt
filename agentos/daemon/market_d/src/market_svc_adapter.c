@@ -30,9 +30,7 @@ typedef struct {
 static market_adapter_ctx_t *market_get_ctx(agentos_service_t service)
 {
     if (!service) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     return (market_adapter_ctx_t *)agentos_service_get_user_data(service);
 }
@@ -257,9 +255,7 @@ agentos_error_t market_service_adapter_wrap(agentos_service_t *out_service,
 market_service_t *market_service_adapter_get_original(agentos_service_t service)
 {
     if (!service) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     market_adapter_ctx_t *ctx = market_get_ctx(service);
     return ctx ? ctx->market_svc : NULL;

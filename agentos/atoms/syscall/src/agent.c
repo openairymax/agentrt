@@ -62,8 +62,7 @@ static agentos_cognition_engine_t *ensure_cognition_engine(void)
     agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &g_cognition_engine);
     if (err != AGENTOS_SUCCESS || !g_cognition_engine) {
         g_cognition_engine = NULL;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     return g_cognition_engine;
 }
@@ -80,16 +79,14 @@ static char *build_memory_context(const char *input)
             agentos_sys_free(record_ids);
         if (scores)
             agentos_sys_free(scores);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     }
     size_t ctx_max = count * 256 + 64;
     char *ctx = (char *)AGENTOS_MALLOC(ctx_max);
     if (!ctx) {
         agentos_sys_free(record_ids);
         agentos_sys_free(scores);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     size_t pos = 0;
     pos += snprintf(ctx + pos, ctx_max - pos, "{\"memory_refs\":[");

@@ -79,8 +79,7 @@ static agentos_coordinator_strategy_t *wrap_base_to_strategy(agentos_coordinator
     if (!strategy) {
         if (base->destroy)
             base->destroy(base);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     strategy_adapter_data_t *adapter =
@@ -89,8 +88,7 @@ static agentos_coordinator_strategy_t *wrap_base_to_strategy(agentos_coordinator
         if (base->destroy)
             base->destroy(base);
         AGENTOS_FREE(strategy);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     adapter->base = base;
@@ -166,6 +164,13 @@ agentos_coordinator_strategy_t *agentos_arbiter_model_create(const char *arbiter
     agentos_coordinator_base_t *base = NULL;
     agentos_error_t err = agentos_coordinator_arbiter_create(arbiter_model, NULL, &base);
     if (err != AGENTOS_SUCCESS || !base) return NULL;
+
+    /* P2.7: 注入 LLM 句柄到 base->llm，使 arbiter_coordinate 可调用 LLM 仲裁。
+     * 类型说明：strategy.h 的 agentos_llm_service_t typedef 为 struct llm_service，
+     * 但 base->llm 字段类型为 struct agentos_llm_service*（planner LLM client）。
+     * 调用方应传入 llm_client.h 的 agentos_llm_service_t* (struct agentos_llm_service*)，
+     * 此处 cast 与 agentos_dual_model_coordinator_create 等保持一致。 */
+    base->llm = (struct agentos_llm_service *)llm;
 
     return wrap_base_to_strategy(base);
 }

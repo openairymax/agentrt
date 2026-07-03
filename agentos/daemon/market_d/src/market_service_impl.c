@@ -12,20 +12,75 @@
 #include "svc_logger.h"
 
 #include <errno.h>
-#include <ftw.h>
-#include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <time.h>
-#include <unistd.h>
+
+#ifndef _WIN32
+#include <ftw.h>       /* nftw 递归删除目录树（仅 POSIX） */
+#include <unistd.h>    /* rmdir 等 POSIX 文件操作 */
+#include <sys/wait.h>  /* fork/execlp/waitpid/WIFEXITED 仅 POSIX 可用 */
+#else
+#include <windows.h>   /* CreateProcess / FindFirstFile / RemoveDirectory 等 Windows API */
+#endif
 
 #define MAX_AGENTS 256
 #define MAX_SKILLS 256
 
+#ifdef _WIN32
+/**
+ * @brief Windows 等价的同步外部命令执行（替代 POSIX fork/execlp/waitpid）。
+ *
+ * 语义对齐原 curl/tar 调用：
+ *   - 不经过 shell：lpApplicationName=NULL，命令行首 token 为可执行文件名，
+ *     CreateProcess 按 PATH 搜索（等价 execlp），无命令注入风险；
+ *   - 输出继承父进程控制台句柄（对齐 POSIX 版本未重定向的行为）；
+ *   - 阻塞等待子进程退出并返回退出码；CreateProcess 失败返回 -1
+ *     （等价 POSIX fork 失败 / execlp 失败 _exit(127) 的非零语义）。
+ *
+ * 局限：Windows 命令行经 CreateProcess 重新解析为 argv，含空格的参数已加
+ * 双引号转义；本上下文参数为受控的 URL/路径/flag，可安全处理。
+ */
+static int win_run_command(const char *prog, const char *const args[])
+{
+    char cmdline[2048];
+    size_t off = 0;
+    int n = snprintf(cmdline, sizeof(cmdline), "\"%s\"", prog);
+    if (n < 0) return -1;
+    off = (size_t)n;
+    for (size_t i = 0; args && args[i] && off < sizeof(cmdline) - 1; i++) {
+        const char *a = args[i];
+        int quote = (strpbrk(a, " \t\"") != NULL);
+        n = quote
+                ? snprintf(cmdline + off, sizeof(cmdline) - off, " \"%s\"", a)
+                : snprintf(cmdline + off, sizeof(cmdline) - off, " %s", a);
+        if (n < 0) break;
+        off += (size_t)n;
+    }
+    cmdline[sizeof(cmdline) - 1] = '\0';
+
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory(&pi, sizeof(pi));
+
+    if (!CreateProcessA(NULL, cmdline, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+        return -1;
+    }
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    DWORD code = 1;
+    GetExitCodeProcess(pi.hProcess, &code);
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    return (int)code;
+}
+#endif /* _WIN32 */
+
+#ifndef _WIN32
 static int nftw_remove_cb(const char *fpath, const struct stat *sb, int typeflag,
                           struct FTW *ftwbuf)
 {
@@ -36,10 +91,52 @@ static int nftw_remove_cb(const char *fpath, const struct stat *sb, int typeflag
     }
     return remove(fpath);
 }
+#endif
 
+/**
+ * @brief 递归删除目录树（跨平台）
+ *
+ * POSIX: 使用 nftw 深度优先遍历删除。
+ * Windows: 使用 FindFirstFile/FindNextFile 递归下降删除，
+ *          清除只读属性后删除文件，最后 RemoveDirectory 删除空目录。
+ *          行为对齐 POSIX 版本，无 shell 调用，无命令注入风险。
+ */
 static int recursive_remove(const char *path)
 {
+#ifdef _WIN32
+    DWORD attr = GetFileAttributesA(path);
+    if (attr == INVALID_FILE_ATTRIBUTES) {
+        return -1; /* 路径不存在 */
+    }
+    if (!(attr & FILE_ATTRIBUTE_DIRECTORY)) {
+        /* 文件：清除只读属性后直接删除 */
+        SetFileAttributesA(path, FILE_ATTRIBUTE_NORMAL);
+        return DeleteFileA(path) ? 0 : -1;
+    }
+    /* 目录：递归删除内容后删除目录本身 */
+    char pattern[MAX_PATH];
+    WIN32_FIND_DATAA fd;
+    snprintf(pattern, sizeof(pattern), "%s\\*", path);
+    HANDLE h = FindFirstFileA(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE) {
+        return RemoveDirectoryA(path) ? 0 : -1;
+    }
+    do {
+        if (fd.cFileName[0] == '.') continue;
+        char child[MAX_PATH];
+        snprintf(child, sizeof(child), "%s\\%s", path, fd.cFileName);
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            recursive_remove(child);
+        } else {
+            SetFileAttributesA(child, FILE_ATTRIBUTE_NORMAL);
+            DeleteFileA(child);
+        }
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+    return RemoveDirectoryA(path) ? 0 : -1;
+#else
     return nftw(path, nftw_remove_cb, 64, FTW_DEPTH | FTW_PHYS);
+#endif
 }
 
 static int is_safe_for_shell(const char *str)
@@ -494,6 +591,24 @@ int market_service_install_agent(market_service_t *service, const install_reques
         snprintf(download_path, sizeof(download_path), "%s/package.tar.gz", install_dir);
 #pragma GCC diagnostic pop
 
+#ifdef _WIN32
+        /* Windows 等价：用 win_run_command（CreateProcess）替代 fork/execlp/waitpid。
+         * 行为对齐：curl 失败则仅元数据安装；成功则解压 tar 并清理下载文件。 */
+        {
+            const char *const curl_args[] = {"-sfL", "-o", download_path,
+                                             target->repository, NULL};
+            int curl_ret = win_run_command("curl", curl_args);
+            if (curl_ret != 0) {
+                SVC_LOG_WARN(
+                    "Download failed for agent %s from %s (curl_ret=%d), metadata only install",
+                    request->id, target->repository, curl_ret);
+            } else {
+                const char *const tar_args[] = {"-xzf", download_path, "-C", install_dir, NULL};
+                win_run_command("tar", tar_args);
+                remove(download_path);
+            }
+        }
+#else
         pid_t curl_pid = fork();
         if (curl_pid == 0) {
             execlp("curl", "curl", "-sfL", "-o", download_path, target->repository, (char *)NULL);
@@ -520,6 +635,7 @@ int market_service_install_agent(market_service_t *service, const install_reques
         } else {
             SVC_LOG_WARN("fork failed for agent %s download: %s", request->id, strerror(errno));
         }
+#endif
     }
 
     target->status = AGENT_STATUS_AVAILABLE;
@@ -821,6 +937,19 @@ AGENTOS_STRNCPY_TERM(tmp, storage, sizeof(tmp));
         snprintf(url, sizeof(url), "https://%s/index.json", service->config.registry_url);
     }
 
+#ifdef _WIN32
+    /* Windows 等价：用 win_run_command（CreateProcess）替代 fork/execlp/waitpid。
+     * 行为对齐：curl 失败（含 CreateProcess 找不到 curl）则告警并返回 0。 */
+    {
+        const char *const curl_args[] = {"-sfL", "-o", index_path, url,
+                                         "--connect-timeout", "10", "--max-time", "60", NULL};
+        int curl_ret = win_run_command("curl", curl_args);
+        if (curl_ret != 0) {
+            SVC_LOG_WARN("Sync registry: download failed from %s (curl_ret=%d)", url, curl_ret);
+            return 0;
+        }
+    }
+#else
     pid_t curl_pid = fork();
     if (curl_pid == 0) {
         execlp("curl", "curl", "-sfL", "-o", index_path, url, "--connect-timeout", "10",
@@ -838,6 +967,7 @@ AGENTOS_STRNCPY_TERM(tmp, storage, sizeof(tmp));
         SVC_LOG_WARN("Sync registry: fork failed: %s", strerror(errno));
         AGENTOS_ERROR(AGENTOS_ERR_IO, "fork failed during sync");
     }
+#endif
 
     FILE *idx_fp = fopen(index_path, "r");
     if (!idx_fp) {

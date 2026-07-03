@@ -39,8 +39,7 @@ static inline agentos_mutex_t *agentos_mutex_create_compat(void)
     if (m && agentos_mutex_init(m) != 0) {
         AGENTOS_FREE(m);
         AGENTOS_LOG_ERROR("agentos_mutex_create_compat: mutex init failed");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     return m;
 }
@@ -59,8 +58,7 @@ static inline agentos_cond_t *agentos_cond_create_compat(void)
     if (c && agentos_cond_init(c) != 0) {
         AGENTOS_FREE(c);
         AGENTOS_LOG_ERROR("agentos_cond_create_compat: cond init failed");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     return c;
 }
@@ -285,8 +283,7 @@ static binder_node_t *find_node_locked(const char *name)
             return node;
         node = node->next;
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 static pending_call_t *find_pending_call_locked(agentos_ipc_channel_t *ch, uint64_t msg_id)
@@ -298,8 +295,7 @@ static pending_call_t *find_pending_call_locked(agentos_ipc_channel_t *ch, uint6
         pc = pc->next;
     }
     AGENTOS_LOG_WARN("find_pending_call_locked: pending call not found, msg_id=%llu", (unsigned long long)msg_id);
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 static void remove_pending_call_locked(agentos_ipc_channel_t *ch, pending_call_t *pc)
@@ -327,16 +323,14 @@ static pending_call_t *pending_call_create(void)
     if (agentos_mutex_init(&pc->cond_lock) != 0) {
         AGENTOS_LOG_ERROR("pending_call_create: mutex init failed");
         AGENTOS_FREE(pc);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     if (agentos_cond_init(&pc->cond) != 0) {
         AGENTOS_LOG_ERROR("pending_call_create: cond init failed");
         agentos_mutex_destroy(&pc->cond_lock);
         AGENTOS_FREE(pc);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     return pc;

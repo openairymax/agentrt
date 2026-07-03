@@ -244,8 +244,7 @@ void *agentos_mem_alloc_ex(size_t size, const char *file, int line)
 {
     void *ptr = AGENTOS_MALLOC(size);
     if (!ptr) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     /* 确保初始化 */
@@ -297,8 +296,7 @@ void *agentos_mem_aligned_alloc_ex(size_t size, size_t alignment, const char *fi
         ptr = NULL;
 #endif
     if (!ptr) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     if (ensure_initialized() != 0) {
@@ -394,8 +392,7 @@ void *agentos_mem_realloc_ex(void *ptr, size_t new_size, const char *file, int l
         return agentos_mem_alloc_ex(new_size, file, line);
     if (new_size == 0) {
         agentos_mem_free(ptr);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     size_t old_size = 0;

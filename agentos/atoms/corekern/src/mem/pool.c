@@ -56,42 +56,36 @@ static inline int32_t pool_block_index(agentos_mem_pool_t *pool, void *ptr)
 agentos_mem_pool_t *agentos_mem_pool_create(size_t block_size, uint32_t block_count)
 {
     if (block_size < sizeof(void *) || block_count == 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     }
 
     if (block_size > SIZE_MAX - 7) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     }
     size_t actual_block_size = (block_size + 7) & ~(size_t)7;
 
     if (block_count > SIZE_MAX / actual_block_size) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     }
     size_t total_size = actual_block_size * block_count;
 
     void *raw = agentos_mem_aligned_alloc(total_size, 8);
     if (!raw) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     agentos_mem_pool_t *pool =
         (agentos_mem_pool_t *)AGENTOS_CALLOC(1, sizeof(struct agentos_mem_pool));
     if (!pool) {
         agentos_mem_aligned_free(raw);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     pool->block_tags = (uint32_t *)AGENTOS_CALLOC(block_count, sizeof(uint32_t));
     if (!pool->block_tags) {
         AGENTOS_FREE(pool);
         agentos_mem_aligned_free(raw);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     pool->magic = POOL_MAGIC;
@@ -121,13 +115,11 @@ agentos_mem_pool_t *agentos_mem_pool_create(size_t block_size, uint32_t block_co
 void *agentos_mem_pool_alloc(agentos_mem_pool_t *pool_handle)
 {
     if (!pool_handle) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     agentos_mem_pool_t *pool = pool_handle;
     if (pool->magic != POOL_MAGIC) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     if (pool->lock) {
@@ -140,8 +132,7 @@ void *agentos_mem_pool_alloc(agentos_mem_pool_t *pool_handle)
         }
         AGENTOS_LOG_WARN("P3.15: Pool: EXHAUSTED (block_size=%zu, block_count=%u)",
                          pool->block_size, pool->block_count);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     pool_block_t *block = pool->free_list;

@@ -80,8 +80,7 @@ static observe_metric_t *observe_d_find_or_create_metric(observe_d_service_t *sv
     }
 
     if (svc->metric_count >= OBSERVE_D_MAX_METRICS) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
         }
 
     observe_metric_t *m = &svc->metrics[svc->metric_count];
@@ -99,16 +98,14 @@ static int observe_d_record_metric(observe_d_service_t *svc, const char *name, d
                                    const char *unit, observe_metric_type_t type)
 {
     if (!svc || !name) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null svc or name");
-        return AGENTOS_ERR_INVALID_PARAM;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "null svc or name");
     }
 
     agentos_mutex_lock(&svc->lock);
     observe_metric_t *m = observe_d_find_or_create_metric(svc, name);
     if (!m) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "metric slot exhausted");
         agentos_mutex_unlock(&svc->lock);
-        return AGENTOS_ERR_UNKNOWN;
+        AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "metric slot exhausted");
     }
 
     if (type == OBSERVE_METRIC_COUNTER)
@@ -129,8 +126,7 @@ static int observe_d_record_metric(observe_d_service_t *svc, const char *name, d
 static int observe_d_format_prometheus(observe_d_service_t *svc, char *buffer, size_t buffer_size)
 {
     if (!svc || !buffer || buffer_size < 128) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null param or buffer too small");
-        return AGENTOS_ERR_INVALID_PARAM;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "null param or buffer too small");
     }
 
     int off = 0;
@@ -162,9 +158,8 @@ static int observe_d_handle_http_request(observe_d_service_t *svc, agentos_socke
     char buffer[OBSERVE_D_MAX_BUFFER];
     ssize_t n = agentos_socket_recv(client_fd, buffer, sizeof(buffer) - 1);
     if (n <= 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "recv failed or connection closed");
         agentos_socket_close(client_fd);
-        return AGENTOS_ERR_UNKNOWN;
+        AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "recv failed or connection closed");
     }
     buffer[n] = '\0';
 
@@ -252,8 +247,7 @@ static void *observe_d_http_loop(void *arg)
 #ifdef _WIN32
         return 1;
 #else
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
 #endif
     }
 
@@ -267,8 +261,7 @@ static void *observe_d_http_loop(void *arg)
 #ifdef _WIN32
     return 0;
 #else
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 #endif
 }
 
@@ -307,8 +300,7 @@ static int observe_d_start_http_server(observe_d_service_t *svc)
     svc->http_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (svc->http_fd == AGENTOS_INVALID_SOCKET) {
         SVC_LOG_ERROR("observe_d: failed to create HTTP socket");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to create HTTP socket");
-        return AGENTOS_ERR_UNKNOWN;
+        AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "failed to create HTTP socket");
     }
 
     int reuse = 1;
@@ -322,18 +314,16 @@ static int observe_d_start_http_server(observe_d_service_t *svc)
 
     if (bind(svc->http_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         SVC_LOG_ERROR("observe_d: failed to bind HTTP port %d", svc->metrics_port);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to bind HTTP port");
         agentos_socket_close(svc->http_fd);
         svc->http_fd = AGENTOS_INVALID_SOCKET;
-        return AGENTOS_ERR_UNKNOWN;
+        AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "failed to bind HTTP port");
     }
 
     if (listen(svc->http_fd, OBSERVE_D_HTTP_BACKLOG) < 0) {
         SVC_LOG_ERROR("observe_d: failed to listen on HTTP port %d", svc->metrics_port);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to listen on HTTP port");
         agentos_socket_close(svc->http_fd);
         svc->http_fd = AGENTOS_INVALID_SOCKET;
-        return AGENTOS_ERR_UNKNOWN;
+        AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "failed to listen on HTTP port");
     }
 
     svc->http_running = 1;
@@ -368,23 +358,20 @@ static int observe_d_stop_http_server(observe_d_service_t *svc, int force)
 static int observe_d_start(observe_d_service_t *svc)
 {
     if (!svc) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_EINVAL, "null svc");
-        return AGENTOS_EINVAL;
+        AGENTOS_ERROR(AGENTOS_EINVAL, "null svc");
     }
 
 #ifndef _WIN32
     svc->server_fd = agentos_socket_create_unix_server(svc->socket_path);
     if (svc->server_fd < 0) {
         SVC_LOG_ERROR("observe_d: failed to create socket at %s", svc->socket_path);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to create unix socket");
-        return AGENTOS_ERR_UNKNOWN;
+        AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "failed to create unix socket");
     }
 #else
     svc->server_fd = agentos_socket_create_tcp_server("127.0.0.1", (uint16_t)svc->tcp_port);
     if (svc->server_fd < 0) {
         SVC_LOG_ERROR("observe_d: failed to create TCP server");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "failed to create TCP server");
-        return AGENTOS_ERR_UNKNOWN;
+        AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "failed to create TCP server");
     }
 #endif
 

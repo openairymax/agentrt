@@ -15,12 +15,17 @@
 #include "memory_compat.h"
 #include "string_compat.h"
 
-#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
+#ifndef _WIN32
+#include <dirent.h>   /* opendir/readdir/closedir（仅 POSIX） */
+#else
+#include <windows.h>  /* FindFirstFile/FindNextFile/FindClose（Windows 目录扫描） */
+#endif
 
 /* ==================== 默认配置 ==================== */
 
@@ -275,32 +280,62 @@ int plugin_discovery_scan(plugin_discovery_result_t **out_results,
 
     AGENTOS_LOG_INFO("PluginDiscovery: scanning '%s'...", plugins_dir);
 
+    /* 跨平台目录遍历初始化：
+     * POSIX: opendir/readdir/closedir
+     * Windows: FindFirstFile/FindNextFile/FindClose */
+#ifndef _WIN32
     DIR *dir = opendir(plugins_dir);
     if (!dir) {
         AGENTOS_LOG_ERROR("PluginDiscovery: cannot open dir '%s'", plugins_dir);
         return -1;
     }
+#else
+    char win_pattern[PLUGIN_DISCOVERY_MAX_PATH];
+    snprintf(win_pattern, sizeof(win_pattern), "%s\\*", plugins_dir);
+    WIN32_FIND_DATAA fd;
+    HANDLE hFind = FindFirstFileA(win_pattern, &fd);
+    if (hFind == INVALID_HANDLE_VALUE) {
+        AGENTOS_LOG_ERROR("PluginDiscovery: cannot open dir '%s'", plugins_dir);
+        return -1;
+    }
+#endif
 
     /* 先分配结果数组（最大数量） */
     plugin_discovery_result_t *results = (plugin_discovery_result_t *)
         AGENTOS_CALLOC(PLUGIN_DISCOVERY_MAX_PLUGINS,
                        sizeof(plugin_discovery_result_t));
     if (!results) {
+#ifndef _WIN32
         closedir(dir);
+#else
+        FindClose(hFind);
+#endif
         return -1;
     }
 
     size_t found = 0;
-    struct dirent *entry;
+    int first_entry = 1; /* Windows: FindFirstFile 已获取第一个条目，首次迭代不调 FindNextFile */
 
-    while ((entry = readdir(dir)) != NULL && found < PLUGIN_DISCOVERY_MAX_PLUGINS) {
+    while (found < PLUGIN_DISCOVERY_MAX_PLUGINS) {
+        const char *d_name;
+#ifndef _WIN32
+        struct dirent *entry = readdir(dir);
+        if (!entry) break;
+        d_name = entry->d_name;
+#else
+        if (!first_entry) {
+            if (!FindNextFileA(hFind, &fd)) break;
+        }
+        first_entry = 0;
+        d_name = fd.cFileName;
+#endif
         /* 跳过 . 和 .. */
-        if (entry->d_name[0] == '.') continue;
+        if (d_name[0] == '.') continue;
 
         /* 构建插件目录路径 */
         char plugin_dir_path[PLUGIN_DISCOVERY_MAX_PATH];
         snprintf(plugin_dir_path, sizeof(plugin_dir_path),
-                 "%s/%s", plugins_dir, entry->d_name);
+                 "%s/%s", plugins_dir, d_name);
 
         /* 检查是否为目录 */
         struct stat st;
@@ -315,7 +350,7 @@ int plugin_discovery_scan(plugin_discovery_result_t **out_results,
 
         if (!file_exists(manifest_path)) {
             AGENTOS_LOG_DEBUG("PluginDiscovery: skipping '%s' (no manifest.yaml)",
-                              entry->d_name);
+                              d_name);
             continue;
         }
 
@@ -330,11 +365,15 @@ int plugin_discovery_scan(plugin_discovery_result_t **out_results,
                              result->name, result->version, result->type);
         } else if (g_discovery.config.fail_on_invalid) {
             AGENTOS_LOG_ERROR("PluginDiscovery: invalid plugin '%s' in '%s'",
-                              entry->d_name, plugin_dir_path);
+                              d_name, plugin_dir_path);
         }
     }
 
+#ifndef _WIN32
     closedir(dir);
+#else
+    FindClose(hFind);
+#endif
 
     *out_results = results;
     *out_count = found;

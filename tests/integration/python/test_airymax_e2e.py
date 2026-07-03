@@ -126,9 +126,9 @@ def start_gateway(gateway_binary, port):
     """启动网关守护进程"""
     print(f"\n  {INFO} 启动网关: {gateway_binary} -p {port}")
     env = os.environ.copy()
-    # 添加 conda libuuid 路径（如果存在）
-    conda_lib = "/home/spharx/.local/share/mamba/pkgs/https/conda.anaconda.org/conda-forge/linux-64/libuuid-2.42.2-h5347b49_0/lib"
-    if os.path.exists(conda_lib):
+    # 添加 conda libuuid 路径（如果存在）— v3.1: 改为环境变量注入，消除硬编码本地路径
+    conda_lib = os.environ.get("AGENTOS_CONDA_LIBUUID", "")
+    if conda_lib and os.path.exists(conda_lib):
         env["LD_LIBRARY_PATH"] = conda_lib + ":" + env.get("LD_LIBRARY_PATH", "")
     try:
         proc = subprocess.Popen(
@@ -353,8 +353,8 @@ def main():
     parser.add_argument("--health-only", action="store_true", help="Only test gateway health")
     parser.add_argument("--start-gateway", action="store_true", help="Auto-start gateway daemon")
     parser.add_argument("--gateway-binary",
-                        default="/home/spharx/SpharxWorks/OpenAirymax/build-art-check/bin/gateway_d",
-                        help="Path to gateway binary (default: %(default)s)")
+                        default=os.environ.get("AGENTOS_GATEWAY_BINARY", "gateway_d"),
+                        help="Path to gateway binary (default: %(default)s, env: AGENTOS_GATEWAY_BINARY)")
     parser.add_argument("--no-color", action="store_true", help="Disable ANSI color output")
     args = parser.parse_args()
 

@@ -10,7 +10,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # PkgConfig found by root CMakeLists.txt
 # cJSON found by root CMakeLists.txt (AGENTOS_HAS_CJSON)
 if(NOT AGENTOS_HAS_CJSON)
-    message(STATUS "libcjson not found, JSON features may be limited")
+    agentos_print_warn("libcjson not found, JSON features may be limited")
 endif()
 
 # ==================== 路径设置 ====================
@@ -22,9 +22,12 @@ set(DAEMON_COMMON_INCLUDE_DIR ${DAEMON_COMMON_DIR}/include)
 set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../commons)
 set(COMMONS_INCLUDE_DIR ${COMMONS_DIR})
 
-# Market 服务源文件
-set(MARKET_D_SOURCES
-    src/main.c
+# ==================== Market 服务静态库 ====================
+# 提取 agent_registry/skill_registry/installer/publisher/market_service_impl/
+# market_svc_adapter/agent_registry_core 为独立静态库，
+# 供 agentos-market-d 可执行文件和集成测试共用，消除桩函数依赖。
+# 排除 main.c（含 main()）。
+set(MARKET_SERVICE_SOURCES
     src/agent_registry.c
     src/skill_registry.c
     src/installer.c
@@ -34,33 +37,27 @@ set(MARKET_D_SOURCES
     src/agent_registry_core.c
 )
 
-# 创建可执行文件
-add_executable(agentos-market-d ${MARKET_D_SOURCES})
+add_library(agentos_market_service STATIC ${MARKET_SERVICE_SOURCES})
 
 # 平台特定配置
 if(WIN32)
-    target_compile_definitions(agentos-market-d PRIVATE
+    target_compile_definitions(agentos_market_service PRIVATE
         AGENTOS_PLATFORM_WINDOWS=1
         WIN32_LEAN_AND_MEAN
         NOMINMAX
         _CRT_SECURE_NO_WARNINGS
     )
-    target_link_libraries(agentos-market-d PRIVATE
-        agentos_common
-        ws2_32
-        bcrypt
-    )
 elseif(UNIX)
-    target_link_libraries(agentos-market-d PRIVATE
-        agentos_common
-        Threads::Threads
-        agentos_platform_libs
+    target_compile_definitions(agentos_market_service PRIVATE
+        AGENTOS_PLATFORM_LINUX=1
+        _GNU_SOURCE
     )
 endif()
 
 # 包含目录 - 兼容层和 commons
-target_include_directories(agentos-market-d PRIVATE
+target_include_directories(agentos_market_service PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${DAEMON_COMMON_INCLUDE_DIR}
     ${COMMONS_INCLUDE_DIR}
     ${COMMONS_INCLUDE_DIR}/platform/include
@@ -72,26 +69,94 @@ target_include_directories(agentos-market-d PRIVATE
     ${COMMONS_INCLUDE_DIR}/utils/sync/include
     ${COMMONS_INCLUDE_DIR}/utils/cache/include
     ${COMMONS_INCLUDE_DIR}/utils/compat/include
-    # 新增网络和IPC模块
+    ${COMMONS_INCLUDE_DIR}/utils/network/include
+    ${COMMONS_INCLUDE_DIR}/utils/ipc/include
+)
+
+target_include_directories(agentos_market_service PRIVATE
+    ${CJSON_INCLUDE_DIRS}
+    ${YAML_INCLUDE_DIRS}
+)
+
+# 链接库：svc_common 提供 daemon 公共层 + commons 传递依赖
+target_link_libraries(agentos_market_service PUBLIC svc_common)
+
+if(AGENTOS_HAS_CJSON)
+    if(cJSON_FOUND)
+        target_link_libraries(agentos_market_service PUBLIC cjson)
+    elseif(CJSON_FOUND AND CJSON_LIBRARIES)
+        target_link_libraries(agentos_market_service PUBLIC ${CJSON_LIBRARIES})
+    endif()
+endif()
+if(AGENTOS_HAS_YAML AND YAML_FOUND AND YAML_LIBRARIES)
+    target_link_libraries(agentos_market_service PUBLIC ${YAML_LIBRARIES})
+endif()
+
+if(UNIX)
+    target_link_libraries(agentos_market_service PUBLIC Threads::Threads agentos_platform_libs)
+endif()
+
+# 编译选项
+target_compile_options(agentos_market_service PRIVATE
+    -Wall -Wextra -Wpedantic
+    -Werror=implicit-function-declaration
+    -Werror=return-type
+    $<$<CONFIG:Debug>:-g -O0>
+    $<$<CONFIG:Release>:-O3 -DNDEBUG>
+)
+
+# ==================== Market daemon 可执行文件 ====================
+# main.c 仅属于 daemon 可执行文件；服务代码已纳入 agentos_market_service 库
+add_executable(agentos-market-d
+    src/main.c
+)
+
+if(WIN32)
+    target_compile_definitions(agentos-market-d PRIVATE
+        AGENTOS_PLATFORM_WINDOWS=1
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+        _CRT_SECURE_NO_WARNINGS
+    )
+    target_link_libraries(agentos-market-d PRIVATE ws2_32 bcrypt)
+elseif(UNIX)
+    target_link_libraries(agentos-market-d PRIVATE Threads::Threads agentos_platform_libs)
+endif()
+
+target_include_directories(agentos-market-d PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${DAEMON_COMMON_INCLUDE_DIR}
+    ${COMMONS_INCLUDE_DIR}
+    ${COMMONS_INCLUDE_DIR}/platform/include
+    ${COMMONS_INCLUDE_DIR}/utils/error/include
+    ${COMMONS_INCLUDE_DIR}/utils/logging/include
+    ${COMMONS_INCLUDE_DIR}/utils/config_unified/include
+    ${COMMONS_INCLUDE_DIR}/utils/memory/include
+    ${COMMONS_INCLUDE_DIR}/utils/string/include
+    ${COMMONS_INCLUDE_DIR}/utils/sync/include
+    ${COMMONS_INCLUDE_DIR}/utils/cache/include
+    ${COMMONS_INCLUDE_DIR}/utils/compat/include
     ${COMMONS_INCLUDE_DIR}/utils/network/include
     ${COMMONS_INCLUDE_DIR}/utils/ipc/include
     ${CJSON_INCLUDE_DIRS}
     ${YAML_INCLUDE_DIRS}
 )
 
-# 链接库
-target_link_libraries(agentos-market-d PRIVATE
-    svc_common
-    Threads::Threads
-    ${CJSON_LIBRARIES}
-    ${YAML_LIBRARIES}
-)
+# 链接策略：LTO + ASan 下使用 --start-group/--end-group 避免符号扫描遗漏
+if(NOT MSVC AND NOT APPLE)
+    target_link_libraries(agentos-market-d PRIVATE
+        "-Wl,--start-group"
+        agentos_market_service
+        "-Wl,--end-group"
+        Threads::Threads
+    )
+else()
+    target_link_libraries(agentos-market-d PRIVATE agentos_market_service Threads::Threads)
+endif()
 
-# 编译选项
 target_compile_options(agentos-market-d PRIVATE
-    -Wall
-    -Wextra
-    -Wpedantic
+    -Wall -Wextra -Wpedantic
     -Werror=implicit-function-declaration
     -Werror=return-type
     $<$<CONFIG:Debug>:-g -O0>

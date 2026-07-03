@@ -47,7 +47,6 @@ set(SOURCES
     utils/compat/src/compat.c
     utils/compat/src/compat2.c
     utils/cognition/src/cognition_common.c
-    utils/execution/src/execution_common.c
     utils/strategy/src/strategy_common.c
     utils/network/src/network_common.c
     utils/uuid/src/uuid_generator.c
@@ -63,29 +62,28 @@ endif()
 add_library(agentos_common STATIC ${SOURCES})
 
 # 验证源文件存在性
-message(STATUS "[COMMONS] Verifying source files...")
+agentos_print_info("[COMMONS] Verifying source files...")
 set(_missing_count 0)
 foreach(_src ${SOURCES})
     if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_src}")
-        message(WARNING "[COMMONS]   [MISSING] ${_src}")
+        agentos_print_warn("[COMMONS]   [MISSING] ${_src}")
         math(EXPR _missing_count "${_missing_count} + 1")
     endif()
 endforeach()
 if(_missing_count EQUAL 0)
-    message(STATUS "[COMMONS]   All source files verified OK")
+    agentos_print_info("[COMMONS]   All source files verified OK")
 else()
-    message(WARNING "[COMMONS]   ${_missing_count} source file(s) MISSING!")
+    agentos_print_warn("[COMMONS]   ${_missing_count} source file(s) MISSING!")
 endif()
 
 # 验证 include 目录存在性
-message(STATUS "[COMMONS] Verifying include directories...")
+agentos_print_info("[COMMONS] Verifying include directories...")
 set(_inc_dirs
     platform/include
     utils/types/include
     utils/logging/include
     utils/error/include
     utils/sync/include
-    utils/execution/include
     utils/include
     utils/memory
     utils/string
@@ -110,14 +108,14 @@ set(_inc_dirs
 set(_inc_missing 0)
 foreach(_inc ${_inc_dirs})
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_inc}")
-        message(STATUS "[COMMONS]   [OK] ${_inc}")
+        agentos_print_ok("[COMMONS]   [OK] ${_inc}")
     else()
-        message(WARNING "[COMMONS]   [MISSING] ${_inc}")
+        agentos_print_warn("[COMMONS]   [MISSING] ${_inc}")
         math(EXPR _inc_missing "${_inc_missing} + 1")
     endif()
 endforeach()
 if(_inc_missing GREATER 0)
-    message(WARNING "[COMMONS]   ${_inc_missing} include directory(ies) MISSING!")
+    agentos_print_warn("[COMMONS]   ${_inc_missing} include directory(ies) MISSING!")
 endif()
 
 set_source_files_properties(
@@ -146,7 +144,6 @@ target_include_directories(agentos_common PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/logging/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/error/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/sync/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/utils/execution/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/memory
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/string
@@ -220,7 +217,6 @@ install(DIRECTORY utils/network/include/ DESTINATION include/agentos/utils/netwo
 install(DIRECTORY utils/ipc/include/ DESTINATION include/agentos/utils/ipc)
 install(DIRECTORY utils/platform/include/ DESTINATION include/agentos/utils/platform)
 install(DIRECTORY utils/cognition/include/ DESTINATION include/agentos/utils/cognition)
-install(DIRECTORY utils/execution/include/ DESTINATION include/agentos/utils/execution)
 install(DIRECTORY utils/strategy/include/ DESTINATION include/agentos/utils/strategy)
 
 option(BUILD_TESTS "Build unit tests" ON)
