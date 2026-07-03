@@ -197,6 +197,14 @@ configure_real_lib_test(test_c_link_12_memoryrovol_bridge
     LIBS agentos_coreloopthree agentos_memory agentos_core svc_common
 )
 
+# C2: L3 公共 API 测试需要 memoryrovol.h — 通过 agentos_memoryrovol_bridge
+# 接口库的 include 路径获取（或直接指向 MemoryRovol include 目录）
+if(TARGET agentos_memoryrovol_bridge)
+    target_link_libraries(test_c_link_12_memoryrovol_bridge PRIVATE agentos_memoryrovol_bridge)
+elseif(DEFINED MEMORYROVOL_DIR AND EXISTS "${MEMORYROVOL_DIR}/include")
+    target_include_directories(test_c_link_12_memoryrovol_bridge PRIVATE ${MEMORYROVOL_DIR}/include)
+endif()
+
 # ============================================================================
 # 已有测试 (保留)
 # ============================================================================
