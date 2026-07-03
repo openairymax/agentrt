@@ -91,9 +91,8 @@ static agentos_checkpoint_state_t string_to_state(const char *s)
 
 static char *safe_strdup(const char *src)
 {
+    /* 参数校验：调用者通过 NULL 返回值处理，无需推入 error chain。 */
     if (!src) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
         return NULL;
     }
     size_t len = strlen(src);
@@ -107,38 +106,179 @@ static char *safe_strdup(const char *src)
 
 static char **safe_str_array_dup(char **src, size_t count)
 {
+    /* 参数校验：调用者通过 NULL 返回值处理。 */
     if (!src || count == 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-
         return NULL;
     }
     char **dst = (char **)AGENTOS_CALLOC(count, sizeof(char *));
     if (!dst) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
+        SVC_LOG_ERROR("C-L07: Checkpoint: ARRAY-DUP-FAIL — OOM for count=%zu", count);
         return NULL;
     }
     __builtin_memset(dst, 0, sizeof(char *) * count);
     for (size_t i = 0; i < count; i++) {
         dst[i] = safe_strdup(src[i]);
         if (!dst[i] && src[i]) {
+            SVC_LOG_ERROR("C-L07: Checkpoint: ARRAY-DUP-FAIL — OOM at index=%zu", i);
             for (size_t j = 0; j < i; j++)
                 AGENTOS_FREE(dst[j]);
             AGENTOS_FREE(dst);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             return NULL;
         }
     }
     return dst;
 }
 
-static int build_filepath(const char *task_id, char *buf, size_t size)
+/* 构建包含 sequence_num 的检查点文件路径。
+ *
+ * v0.1.1 变更：文件名从 checkpoint_{task_id}.json 改为
+ * checkpoint_{task_id}_{seq}.json，使每个序列号的检查点独立落盘，
+ * 不再相互覆盖。这是 list/restore_seq 的正确性基础 —— 旧格式每次
+ * save 覆盖同一文件，导致 per-task 只能保留 1 个检查点。 */
+static int build_filepath_with_seq(const char *task_id, uint64_t seq,
+                                   char *buf, size_t size)
 {
     if (!task_id || !buf || size == 0)
         return AGENTOS_ERR_INVALID_PARAM;
-    int n = snprintf(buf, size, "%s/%s%s%s", g_checkpoint_storage_path, CHECKPOINT_FILE_PREFIX,
-                     task_id, CHECKPOINT_FILE_EXTENSION);
+    int n = snprintf(buf, size, "%s/%s%s_%llu%s", g_checkpoint_storage_path,
+                     CHECKPOINT_FILE_PREFIX, task_id,
+                     (unsigned long long)seq, CHECKPOINT_FILE_EXTENSION);
     return (n > 0 && (size_t)n < size) ? 0 : AGENTOS_ERR_OVERFLOW;
+}
+
+/* 从文件名解析属于 task_id 的 sequence_num。
+ * 文件名格式：checkpoint_{task_id}_{seq}.json
+ *   prefix = "checkpoint_" + task_id + "_"
+ *   suffix = ".json"
+ *   middle = 全数字 seq
+ * 返回 true 并设置 *out_seq；不匹配返回 false。
+ *
+ * 健壮性：task_id 中若含 '_'，prefix 仍能精确匹配完整 task_id 段，
+ * 因为 middle 必须全数字且紧接 .json，可排除 task_id 前缀重叠的误匹配
+ * （如 task_id="a" 不会匹配 task_id="a_b" 的文件，因为 "b_3" 非全数字）。 */
+static bool parse_seq_from_filename(const char *filename, const char *task_id,
+                                    uint64_t *out_seq)
+{
+    if (!filename || !task_id || !out_seq)
+        return false;
+
+    char prefix[MAX_CHECKPOINT_PATH];
+    int pn = snprintf(prefix, sizeof(prefix), "%s%s%s",
+                      CHECKPOINT_FILE_PREFIX, task_id, "_");
+    if (pn <= 0 || (size_t)pn >= sizeof(prefix))
+        return false;
+
+    size_t prefix_len = (size_t)pn;
+    if (strncmp(filename, prefix, prefix_len) != 0)
+        return false;
+
+    const char *suffix = CHECKPOINT_FILE_EXTENSION;
+    size_t suffix_len = strlen(suffix);
+    size_t flen = strlen(filename);
+    if (flen < prefix_len + suffix_len + 1)
+        return false;
+    if (strcmp(filename + flen - suffix_len, suffix) != 0)
+        return false;
+
+    const char *mid = filename + prefix_len;
+    size_t mid_len = flen - prefix_len - suffix_len;
+    if (mid_len == 0)
+        return false;
+    for (size_t i = 0; i < mid_len; i++) {
+        if (mid[i] < '0' || mid[i] > '9')
+            return false;
+    }
+
+    uint64_t seq = 0;
+    for (size_t i = 0; i < mid_len; i++) {
+        seq = seq * 10 + (uint64_t)(mid[i] - '0');
+    }
+    *out_seq = seq;
+    return true;
+}
+
+/* 扫描存储目录，收集 task_id 的全部 sequence_num。
+ * 返回 AGENTOS_MALLOC 分配的数组（调用者 AGENTOS_FREE），*out_count 为数量；
+ * 无匹配时返回 NULL 且 *out_count=0。
+ * 不加锁：仅读目录，stats 由调用方在加锁区更新。 */
+static uint64_t *collect_task_seqs(const char *task_id, size_t *out_count)
+{
+    *out_count = 0;
+    if (!task_id)
+        return NULL;
+
+    size_t cap = 16;
+    size_t cnt = 0;
+    uint64_t *seqs = (uint64_t *)AGENTOS_MALLOC(cap * sizeof(uint64_t));
+    if (!seqs)
+        return NULL;
+
+#ifdef _WIN32
+    char pattern[MAX_CHECKPOINT_PATH];
+    snprintf(pattern, sizeof(pattern), "%s/%s*.json",
+             g_checkpoint_storage_path, CHECKPOINT_FILE_PREFIX);
+    WIN32_FIND_DATAA find_data;
+    HANDLE hFind = FindFirstFileA(pattern, &find_data);
+    if (hFind != INVALID_HANDLE_VALUE) {
+        do {
+            uint64_t seq;
+            if (parse_seq_from_filename(find_data.cFileName, task_id, &seq)) {
+                if (cnt >= cap) {
+                    cap *= 2;
+                    uint64_t *ns = (uint64_t *)AGENTOS_REALLOC(seqs, cap * sizeof(uint64_t));
+                    if (!ns) { AGENTOS_FREE(seqs); FindClose(hFind); return NULL; }
+                    seqs = ns;
+                }
+                seqs[cnt++] = seq;
+            }
+        } while (FindNextFile(hFind, &find_data));
+        FindClose(hFind);
+    }
+#else
+    DIR *dir = opendir(g_checkpoint_storage_path);
+    if (dir) {
+        struct dirent *entry;
+        while ((entry = readdir(dir)) != NULL) {
+            uint64_t seq;
+            if (parse_seq_from_filename(entry->d_name, task_id, &seq)) {
+                if (cnt >= cap) {
+                    cap *= 2;
+                    uint64_t *ns = (uint64_t *)AGENTOS_REALLOC(seqs, cap * sizeof(uint64_t));
+                    if (!ns) { AGENTOS_FREE(seqs); closedir(dir); return NULL; }
+                    seqs = ns;
+                }
+                seqs[cnt++] = seq;
+            }
+        }
+        closedir(dir);
+    }
+#endif
+
+    if (cnt == 0) {
+        AGENTOS_FREE(seqs);
+        return NULL;
+    }
+    *out_count = cnt;
+    return seqs;
+}
+
+/* 查找 task_id 的最高 sequence_num。返回 0 表示无检查点。
+ * 注：生产代码（adapter/loop/engine）保存时 sequence_num 恒 > 0，
+ * 故 0 可安全作为"未找到"哨兵。 */
+static uint64_t find_latest_seq(const char *task_id)
+{
+    size_t cnt = 0;
+    uint64_t *seqs = collect_task_seqs(task_id, &cnt);
+    if (!seqs)
+        return 0;
+
+    uint64_t max_seq = 0;
+    for (size_t i = 0; i < cnt; i++) {
+        if (seqs[i] > max_seq)
+            max_seq = seqs[i];
+    }
+    AGENTOS_FREE(seqs);
+    return max_seq;
 }
 
 static void init_fields(agentos_task_checkpoint_t *cp, const char *task_id, const char *session_id,
@@ -186,33 +326,29 @@ static agentos_error_t copy_nodes(agentos_task_checkpoint_t *cp, char **complete
 
 static char *json_extract_string(const char *json, const char *key)
 {
+    /* 参数校验：调用者通过 NULL 返回值处理。 */
     if (!json || !key) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
         return NULL;
     }
     char search[256];
     snprintf(search, sizeof(search), "\"%s\"", key);
     const char *p = strstr(json, search);
+    /* 键未找到：JSON 解析的正常控制流（如非必填字段），返回 NULL 即可。 */
     if (!p) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
         return NULL;
     }
     p += strlen(search);
     while (*p && isspace((unsigned char)*p))
         p++;
+    /* 缺少冒号：JSON 格式异常但属解析分支，返回 NULL 让上层判断。 */
     if (*p != ':') {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
         return NULL;
     }
     p++;
     while (*p && isspace((unsigned char)*p))
         p++;
+    /* 缺少起始引号：JSON 格式异常但属解析分支，返回 NULL 让上层判断。 */
     if (*p != '"') {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
         return NULL;
     }
     p++;
@@ -220,8 +356,7 @@ static char *json_extract_string(const char *json, const char *key)
     size_t cap = 512;
     char *val = (char *)AGENTOS_MALLOC(cap);
     if (!val) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
+        SVC_LOG_ERROR("C-L07: Checkpoint: JSON-EXTRACT-FAIL — OOM (malloc) for key=%s", key);
         return NULL;
     }
     size_t len = 0;
@@ -250,8 +385,8 @@ static char *json_extract_string(const char *json, const char *key)
                 cap *= 2;
                 val = (char *)AGENTOS_REALLOC(val, cap);
                 if (!val) {
-                    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
+                    SVC_LOG_ERROR("C-L07: Checkpoint: JSON-EXTRACT-FAIL — OOM (realloc escape) for key=%s",
+                                  key);
                     return NULL;
                 }
             }
@@ -262,8 +397,8 @@ static char *json_extract_string(const char *json, const char *key)
                 cap *= 2;
                 val = (char *)AGENTOS_REALLOC(val, cap);
                 if (!val) {
-                    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
+                    SVC_LOG_ERROR("C-L07: Checkpoint: JSON-EXTRACT-FAIL — OOM (realloc char) for key=%s",
+                                  key);
                     return NULL;
                 }
             }
@@ -439,7 +574,8 @@ agentos_error_t agentos_checkpoint_save(agentos_task_checkpoint_t *cp)
         return AGENTOS_EINVAL;
 
     char filepath[MAX_CHECKPOINT_PATH];
-    if (build_filepath(cp->task_id, filepath, sizeof(filepath)) != 0)
+    if (build_filepath_with_seq(cp->task_id, cp->sequence_num,
+                                filepath, sizeof(filepath)) != 0)
         return AGENTOS_EINVAL;
 
     char tmppath[MAX_CHECKPOINT_PATH];
@@ -559,14 +695,27 @@ agentos_error_t agentos_checkpoint_restore(const char *task_id, uint64_t sequenc
     if (!task_id || !out_cp)
         return AGENTOS_EINVAL;
 
+    /* sequence_num == 0 表示恢复最新检查点：扫描目录取最高 seq。
+     * sequence_num > 0 表示恢复指定序列号的检查点。 */
+    uint64_t actual_seq = sequence_num;
+    if (sequence_num == 0) {
+        actual_seq = find_latest_seq(task_id);
+        if (actual_seq == 0) {
+            SVC_LOG_WARN("C-L07: Checkpoint: RESTORE-FAIL — no checkpoint found "
+                         "task_id=%s", task_id);
+            return AGENTOS_ENOENT;
+        }
+    }
+
     char filepath[MAX_CHECKPOINT_PATH];
-    if (build_filepath(task_id, filepath, sizeof(filepath)) != 0)
+    if (build_filepath_with_seq(task_id, actual_seq, filepath, sizeof(filepath)) != 0)
         return AGENTOS_EINVAL;
 
     FILE *fp = fopen(filepath, "r");
     if (!fp) {
         SVC_LOG_WARN("C-L07: Checkpoint: RESTORE-FAIL — file not found "
-                     "path=%s task_id=%s errno=%d", filepath, task_id, errno);
+                     "path=%s task_id=%s seq=%llu errno=%d",
+                     filepath, task_id, (unsigned long long)actual_seq, errno);
         return AGENTOS_ENOENT;
     }
 
@@ -650,32 +799,61 @@ agentos_error_t agentos_checkpoint_delete(const char *task_id, uint64_t seq_num)
     if (!task_id)
         return AGENTOS_EINVAL;
 
-    char filepath[MAX_CHECKPOINT_PATH];
-    if (build_filepath(task_id, filepath, sizeof(filepath)) != 0)
-        return AGENTOS_EINVAL;
+    /* seq_num > 0: 删除指定序列号的检查点文件 */
+    if (seq_num > 0) {
+        char filepath[MAX_CHECKPOINT_PATH];
+        if (build_filepath_with_seq(task_id, seq_num, filepath, sizeof(filepath)) != 0)
+            return AGENTOS_EINVAL;
 
+        agentos_mutex_lock(&g_checkpoint_mutex);
+        int result = unlink(filepath);
+        if (result == 0) {
+            if (g_checkpoint_stats.total_checkpoints > 0)
+                g_checkpoint_stats.total_checkpoints--;
+            SVC_LOG_INFO("C-L07: Checkpoint: DELETE-OK task_id=%s seq=%llu",
+                         task_id, (unsigned long long)seq_num);
+        } else {
+            SVC_LOG_WARN("C-L07: Checkpoint: DELETE-FAIL — unlink failed "
+                         "task_id=%s seq=%llu errno=%d",
+                         task_id, (unsigned long long)seq_num, errno);
+        }
+        agentos_mutex_unlock(&g_checkpoint_mutex);
+
+        return (result == 0) ? AGENTOS_SUCCESS : AGENTOS_ENOENT;
+    }
+
+    /* seq_num == 0: 删除该 task_id 的全部检查点文件 */
+    size_t cnt = 0;
+    uint64_t *seqs = collect_task_seqs(task_id, &cnt);
+    if (!seqs) {
+        SVC_LOG_INFO("C-L07: Checkpoint: DELETE-ALL — no checkpoints for task_id=%s",
+                     task_id);
+        return AGENTOS_ENOENT;
+    }
+
+    size_t deleted = 0;
     agentos_mutex_lock(&g_checkpoint_mutex);
-    int result = unlink(filepath);
-    if (result == 0) {
-        g_checkpoint_stats.total_checkpoints--;
-        SVC_LOG_INFO("C-L07: Checkpoint: DELETE-OK task_id=%s seq=%llu",
-                     task_id, (unsigned long long)seq_num);
-    } else {
-        SVC_LOG_WARN("C-L07: Checkpoint: DELETE-FAIL — unlink failed "
-                     "task_id=%s seq=%llu errno=%d",
-                     task_id, (unsigned long long)seq_num, errno);
+    for (size_t i = 0; i < cnt; i++) {
+        char filepath[MAX_CHECKPOINT_PATH];
+        if (build_filepath_with_seq(task_id, seqs[i], filepath, sizeof(filepath)) == 0) {
+            if (unlink(filepath) == 0) {
+                deleted++;
+                if (g_checkpoint_stats.total_checkpoints > 0)
+                    g_checkpoint_stats.total_checkpoints--;
+            }
+        }
     }
     agentos_mutex_unlock(&g_checkpoint_mutex);
+    AGENTOS_FREE(seqs);
 
-    if (result == 0)
-        return AGENTOS_SUCCESS;
-    return AGENTOS_ENOENT;
+    SVC_LOG_INFO("C-L07: Checkpoint: DELETE-ALL task_id=%s deleted=%zu/%zu",
+                 task_id, deleted, cnt);
+    return (deleted > 0) ? AGENTOS_SUCCESS : AGENTOS_ENOENT;
 }
 
 agentos_error_t agentos_checkpoint_list(const char *task_id, agentos_task_checkpoint_t ***out_cps,
                                         size_t *out_count)
 {
-
     if (!g_checkpoint_initialized)
         return AGENTOS_ENOTINIT;
     if (!task_id || !out_cps || !out_count)
@@ -684,18 +862,52 @@ agentos_error_t agentos_checkpoint_list(const char *task_id, agentos_task_checkp
     *out_cps = NULL;
     *out_count = 0;
 
-    agentos_task_checkpoint_t *cp = NULL;
-    agentos_error_t err = agentos_checkpoint_restore(task_id, 0, &cp);
-    if (err != AGENTOS_SUCCESS)
-        return err;
+    /* 扫描目录，收集 task_id 的全部 sequence_num */
+    size_t cnt = 0;
+    uint64_t *seqs = collect_task_seqs(task_id, &cnt);
+    if (!seqs || cnt == 0) {
+        if (seqs) AGENTOS_FREE(seqs);
+        return AGENTOS_ENOENT;
+    }
 
-    *out_cps = (agentos_task_checkpoint_t **)AGENTOS_MALLOC(sizeof(agentos_task_checkpoint_t *));
-    if (!*out_cps) {
-        agentos_checkpoint_destroy(cp);
+    /* 按 seq 升序排序（插入排序，cnt 通常很小） */
+    for (size_t i = 1; i < cnt; i++) {
+        uint64_t key = seqs[i];
+        size_t j = i;
+        while (j > 0 && seqs[j - 1] > key) {
+            seqs[j] = seqs[j - 1];
+            j--;
+        }
+        seqs[j] = key;
+    }
+
+    /* 逐个恢复检查点。collect_task_seqs 给出目录扫描时的快照，
+     * 其间文件可能被并发删除；restore 失败时跳过该条目而非整体失败，
+     * 保证返回的是实际可恢复的检查点集合。 */
+    agentos_task_checkpoint_t **arr =
+        (agentos_task_checkpoint_t **)AGENTOS_CALLOC(cnt, sizeof(agentos_task_checkpoint_t *));
+    if (!arr) {
+        AGENTOS_FREE(seqs);
         return AGENTOS_ENOMEM;
     }
-    (*out_cps)[0] = cp;
-    *out_count = 1;
+
+    size_t restored_count = 0;
+    for (size_t i = 0; i < cnt; i++) {
+        agentos_task_checkpoint_t *cp = NULL;
+        agentos_error_t err = agentos_checkpoint_restore(task_id, seqs[i], &cp);
+        if (err == AGENTOS_SUCCESS && cp) {
+            arr[restored_count++] = cp;
+        }
+    }
+    AGENTOS_FREE(seqs);
+
+    if (restored_count == 0) {
+        AGENTOS_FREE(arr);
+        return AGENTOS_ENOENT;
+    }
+
+    *out_cps = arr;
+    *out_count = restored_count;
     return AGENTOS_SUCCESS;
 }
 
@@ -756,7 +968,11 @@ agentos_error_t agentos_checkpoint_cleanup(uint64_t max_age_sec, size_t max_cnt)
         return AGENTOS_ENOTINIT;
 
     agentos_mutex_lock(&g_checkpoint_mutex);
-    uint64_t now_sec = agentos_time_ms() / 1000ULL;
+    /* 注意：必须使用 CLOCK_REALTIME 基准（time(NULL)）与文件 st_mtime 比较。
+     * 之前误用 agentos_time_ms()（CLOCK_MONOTONIC，系统启动以来的毫秒数），
+     * 与 st_mtime（CLOCK_REALTIME，自 1970 年以来的秒数）基准不一致，
+     * 导致 uint64_t 减法下溢，所有文件被误判为过期而删除。 */
+    uint64_t now_sec = (uint64_t)time(NULL);
 
     if (max_age_sec > 0) {
         char pattern[MAX_CHECKPOINT_PATH];

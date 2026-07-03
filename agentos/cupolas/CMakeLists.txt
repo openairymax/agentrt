@@ -3,7 +3,7 @@
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
 
-message(STATUS "[CUPOLAS] Configuring cupolas security module")
+agentos_print_info("[CUPOLAS] Configuring cupolas security module")
 
 option(BUILD_TESTS "Build tests" ON)
 option(BUILD_WITH_SANITIZERS "Enable sanitizers (ASAN/MSAN/TSAN)" OFF)
@@ -18,25 +18,25 @@ if(PkgConfig_FOUND)
 endif()
 
 if(AGENTOS_HAS_OPENSSL)
-    message(STATUS "Found OpenSSL: ${OpenSSL_VERSION}")
+    agentos_print_ok("Found OpenSSL: ${OpenSSL_VERSION}")
 else()
-    message(WARNING "OpenSSL not found, some security features may be limited")
+    agentos_print_warn("OpenSSL not found, some security features may be limited")
 endif()
 
 if(YAML_FOUND OR YAML_LIBRARIES)
     set(HAVE_YAML 1)
-    message(STATUS "Found libyaml: ${YAML_LIBRARIES}")
+    agentos_print_ok("Found libyaml: ${YAML_LIBRARIES}")
 else()
     set(HAVE_YAML 0)
-    message(STATUS "libyaml not found, YAML manager support disabled")
+    agentos_print_warn("libyaml not found, YAML manager support disabled")
 endif()
 
 if(CJSON_FOUND OR CJSON_LIBRARIES)
     set(HAVE_CJSON 1)
-    message(STATUS "Found libcjson: ${CJSON_LIBRARIES}")
+    agentos_print_ok("Found libcjson: ${CJSON_LIBRARIES}")
 else()
     set(HAVE_CJSON 0)
-    message(STATUS "libcjson not found, JSON support disabled")
+    agentos_print_warn("libcjson not found, JSON support disabled")
 endif()
 
 set(CUPOLAS_SOURCES

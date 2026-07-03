@@ -30,16 +30,14 @@ token_counter_t *token_counter_create(const char *encoding_name)
     token_counter_t *tc = AGENTOS_CALLOC(1, sizeof(token_counter_t));
     if (!tc) {
         SVC_LOG_ERROR("C-L02: TOKEN-COUNTER: CREATE-FAIL — OOM allocating struct");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     tc->enc = tiktoken_get_encoding(encoding_name);
     if (!tc->enc) {
         SVC_LOG_ERROR("C-L02: TOKEN-COUNTER: CREATE-FAIL — "
                       "tiktoken_get_encoding failed encoding=%s", encoding_name);
         AGENTOS_FREE(tc);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     tc->encoding_name = AGENTOS_STRDUP(encoding_name);
     SVC_LOG_INFO("C-L02: TOKEN-COUNTER: CREATE encoding=%s (tiktoken native)", encoding_name);
@@ -91,8 +89,7 @@ token_counter_t *token_counter_create(const char *encoding_name)
     token_counter_t *tc = AGENTOS_CALLOC(1, sizeof(token_counter_t));
     if (!tc) {
         SVC_LOG_ERROR("C-L02: TOKEN-COUNTER: CREATE-FAIL — OOM allocating struct");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     tc->encoding_name = AGENTOS_STRDUP(encoding_name ? encoding_name : "cl100k_base");

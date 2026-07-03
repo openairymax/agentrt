@@ -50,8 +50,7 @@ static guard_block_t *create_guarded_block(size_t size)
     size_t total = sizeof(guard_block_t) + size + GUARD_SIZE;
     guard_block_t *block = (guard_block_t *)AGENTOS_MALLOC(total);
     if (!block) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     fill_guard(block->front);

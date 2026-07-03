@@ -266,7 +266,6 @@ int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault
 {
     if (!vault_id || !vault) {
         AGENTOS_LOG_ERROR("cupolas_vault_open: NULL parameter - vault_id=%p, vault=%p", (void *)vault_id, (void *)vault);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "cupolas_vault_init: config validation failed");
         return AGENTOS_ERR_UNKNOWN;
     }
 
@@ -276,14 +275,14 @@ int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault
 
     cupolas_vault_t *v = (cupolas_vault_t *)AGENTOS_CALLOC(1, sizeof(cupolas_vault_t));
     if (!v) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "cupolas_vault_init: storage dir create failed");
+        AGENTOS_LOG_ERROR("cupolas_vault_open: CALLOC vault failed for vault_id=%s", vault_id);
         return AGENTOS_ERR_UNKNOWN;
     }
 
     v->vault_id = AGENTOS_STRDUP(vault_id);
     if (!v->vault_id) {
         AGENTOS_FREE(v);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "cupolas_vault_init: vault file open failed");
+        AGENTOS_LOG_ERROR("cupolas_vault_open: STRDUP vault_id failed for vault_id=%s", vault_id);
         return AGENTOS_ERR_UNKNOWN;
     }
     v->is_locked = (password == NULL);
@@ -293,7 +292,7 @@ int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault
     if (!v->entries) {
         AGENTOS_FREE(v->vault_id);
         AGENTOS_FREE(v);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "cupolas_vault_init: mutex init failed");
+        AGENTOS_LOG_ERROR("cupolas_vault_open: CALLOC entries failed for vault_id=%s", vault_id);
         return AGENTOS_ERR_UNKNOWN;
     }
     v->entry_count = 0;
@@ -313,7 +312,7 @@ int cupolas_vault_open(const char *vault_id, const char *password, cupolas_vault
             AGENTOS_FREE(v->entries);
             AGENTOS_FREE(v->vault_id);
             AGENTOS_FREE(v);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "cupolas_vault_init: key derivation failed");
+            AGENTOS_LOG_ERROR("cupolas_vault_open: PBKDF2 key derivation failed for vault_id=%s", vault_id);
             return AGENTOS_ERR_UNKNOWN;
         }
 #else
@@ -366,7 +365,6 @@ int cupolas_vault_lock(cupolas_vault_t *vault)
 {
     if (!vault) {
         AGENTOS_LOG_ERROR("cupolas_vault_lock: NULL vault parameter");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "cupolas_vault_store: not initialized");
         return AGENTOS_ERR_UNKNOWN;
     }
 
@@ -382,7 +380,6 @@ int cupolas_vault_unlock(cupolas_vault_t *vault, const char *password)
 {
     if (!vault || !password) {
         AGENTOS_LOG_ERROR("cupolas_vault_unlock: NULL parameter - vault=%p, password=%p", (void *)vault, (void *)password);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "cupolas_vault_store: encryption failed");
         return AGENTOS_ERR_UNKNOWN;
     }
 
@@ -397,7 +394,6 @@ int cupolas_vault_unlock(cupolas_vault_t *vault, const char *password)
                           AES_KEY_SIZE, vault->master_key) != 1) {
         cupolas_rwlock_unlock(&vault->lock);
         AGENTOS_LOG_ERROR("cupolas_vault_unlock: key derivation failed for vault_id=%s", vault->vault_id ? vault->vault_id : "(null)");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "cupolas_vault_store: write failed");
         return AGENTOS_ERR_UNKNOWN;
     }
 #else
@@ -444,7 +440,6 @@ int cupolas_vault_store(cupolas_vault_t *vault, const char *cred_id, cupolas_vau
 {
     if (!vault || !cred_id || !data || data_len == 0) {
         AGENTOS_LOG_ERROR("cupolas_vault_store: NULL/invalid parameter - vault=%p, cred_id=%p, data=%p, data_len=%zu", (void *)vault, (void *)cred_id, (void *)data, data_len);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "cupolas_vault_retrieve: not initialized");
         return AGENTOS_ERR_UNKNOWN;
     }
 

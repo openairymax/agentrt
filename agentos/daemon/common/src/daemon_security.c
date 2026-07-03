@@ -240,7 +240,6 @@ int daemon_sanitize_llm_input(const char *input, char *output, size_t output_siz
 {
     if (!input || !output || output_size == 0) {
         return AGENTOS_ERR_INVALID_PARAM;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "sanitize_llm_input: null parameter");
     }
 
     ensure_mutex_initialized();
@@ -259,8 +258,6 @@ int daemon_sanitize_llm_input(const char *input, char *output, size_t output_siz
             "SEC-011 VIOLATION: LLM input contains shell injection pattern - REJECTED");
         snprintf(output, output_size, "[SANITIZED: input rejected - security violation]");
         return AGENTOS_ERR_PERMISSION_DENIED;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_PERMISSION_DENIED,
-                             "sanitize_llm_input: shell injection pattern detected");
     }
 
     sanitize_string(output, input, output_size);
@@ -281,7 +278,6 @@ int daemon_sanitize_tool_params(const char *tool_name, const char *params, char 
 {
     if (!tool_name || !params || !sanitized_tool || !sanitized_params) {
         return AGENTOS_ERR_INVALID_PARAM;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "sanitize_tool_params: null parameter");
     }
 
     ensure_mutex_initialized();
@@ -299,8 +295,6 @@ int daemon_sanitize_tool_params(const char *tool_name, const char *params, char 
         SVC_LOG_SECURITY("SEC-014 VIOLATION: Tool params contain dangerous pattern - REJECTED");
         snprintf(sanitized_params, param_buf_size, "[SANITIZED: params rejected]");
         return AGENTOS_ERR_PERMISSION_DENIED;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_PERMISSION_DENIED,
-                             "sanitize_tool_params: dangerous pattern detected");
     }
 
     sanitize_string(sanitized_params, params, param_buf_size);
@@ -316,7 +310,6 @@ int daemon_check_tool_permission(const char *agent_id, const char *tool_name, co
 {
     if (!agent_id || !tool_name || !action) {
         return AGENTOS_ERR_INVALID_PARAM;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "check_tool_permission: null parameter");
     }
 
     ensure_mutex_initialized();
@@ -332,8 +325,6 @@ int daemon_check_tool_permission(const char *agent_id, const char *tool_name, co
         SVC_LOG_WARN("Permission check: disabled by configuration, DENYING %s/%s (fail-closed)",
                      agent_id, tool_name);
         return AGENTOS_EPERM;
-        AGENTOS_ERROR_HANDLE(AGENTOS_EPERM,
-                             "check_tool_permission: permission disabled, deny by default");
     }
 
     int result = AGENTOS_ERR_PERMISSION_DENIED;
@@ -363,7 +354,6 @@ int daemon_check_llm_permission(const char *agent_id, const char *model_name, co
 {
     if (!agent_id || !model_name || !action) {
         return AGENTOS_ERR_INVALID_PARAM;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "check_llm_permission: null parameter");
     }
 
     ensure_mutex_initialized();
@@ -379,8 +369,6 @@ int daemon_check_llm_permission(const char *agent_id, const char *model_name, co
         SVC_LOG_WARN("LLM permission check: disabled by configuration, DENYING %s/%s (fail-closed)",
                      agent_id, model_name);
         return AGENTOS_EPERM;
-        AGENTOS_ERROR_HANDLE(AGENTOS_EPERM,
-                             "check_llm_permission: permission disabled, deny by default");
     }
 
     char resource[256];
@@ -414,7 +402,6 @@ int daemon_verify_package_signature(const char *package_path, bool *is_valid,
 {
     if (!package_path || !is_valid) {
         return AGENTOS_ERR_INVALID_PARAM;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "verify_package_signature: null parameter");
     }
     if (signer_info)
         __builtin_memset(signer_info, 0, sizeof(cupolas_signer_info_t));
@@ -441,14 +428,11 @@ int daemon_verify_package_signature(const char *package_path, bool *is_valid,
     if (stat(package_path, &st) != 0) {
         SVC_LOG_ERROR("Package not found: %s", package_path);
         return AGENTOS_ERR_NOT_FOUND;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_NOT_FOUND, "verify_package_signature: package not found");
     }
 
     if (st.st_size == 0) {
         SVC_LOG_ERROR("Package is empty: %s", package_path);
         return AGENTOS_ERR_INVALID_PARAM;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM,
-                             "verify_package_signature: package is empty");
     }
 
     if (st.st_size > 512 * 1024 * 1024) {
@@ -609,7 +593,6 @@ int daemon_store_credential(const char *cred_id, cupolas_vault_cred_type_t cred_
 {
     if (!cred_id || !data || data_len == 0) {
         return AGENTOS_ERR_INVALID_PARAM;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "store_credential: null parameter");
     }
 
     ensure_mutex_initialized();
@@ -629,7 +612,6 @@ int daemon_store_credential(const char *cred_id, cupolas_vault_cred_type_t cred_
         agentos_mutex_unlock(&g_security_mutex);
         SVC_LOG_ERROR("Credential storage full (max=%d)", MAX_CREDENTIALS);
         return AGENTOS_ERR_OUT_OF_MEMORY;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "store_credential: vault storage full");
     }
 
     for (size_t i = 0; i < g_security_ctx.cred_count; i++) {
@@ -673,7 +655,6 @@ int daemon_retrieve_credential(const char *cred_id, const char *agent_id, uint8_
 {
     if (!cred_id || !data || !data_len) {
         return AGENTOS_ERR_INVALID_PARAM;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "retrieve_credential: null parameter");
     }
 
     ensure_mutex_initialized();
@@ -699,8 +680,6 @@ int daemon_retrieve_credential(const char *cred_id, const char *agent_id, uint8_
                 SVC_LOG_SECURITY("Credential access DENIED: %s (agent=%s not owner=%s)", cred_id,
                                  agent_id, g_security_ctx.credentials[i].owner_agent_id);
                 return AGENTOS_ERR_PERMISSION_DENIED;
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_PERMISSION_DENIED,
-                                     "retrieve_credential: access denied");
             }
 
             size_t copy_len = g_security_ctx.credentials[i].data_len;
@@ -718,7 +697,6 @@ int daemon_retrieve_credential(const char *cred_id, const char *agent_id, uint8_
     agentos_mutex_unlock(&g_security_mutex);
     SVC_LOG_WARN("Credential not found: %s", cred_id);
     return AGENTOS_ERR_NOT_FOUND;
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_NOT_FOUND, "retrieve_credential: credential not found");
 }
 
 int daemon_audit_log_event(const char *service_name, const char *operation, const char *resource,
@@ -726,7 +704,6 @@ int daemon_audit_log_event(const char *service_name, const char *operation, cons
 {
     if (!service_name || !operation) {
         return AGENTOS_ERR_INVALID_PARAM;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "audit_log_event: null parameter");
     }
 
     if (!g_security_ctx.initialized) {
@@ -775,7 +752,6 @@ int daemon_security_get_status(int *sanitizer_status, int *permission_status, in
     if (!sanitizer_status || !permission_status || !signature_status || !vault_status ||
         !audit_status) {
         return AGENTOS_ERR_INVALID_PARAM;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "security_get_status: null parameter");
     }
 
     ensure_mutex_initialized();
@@ -787,6 +763,58 @@ int daemon_security_get_status(int *sanitizer_status, int *permission_status, in
     *audit_status = g_security_ctx.audit_enabled ? 1 : 0;
     agentos_mutex_unlock(&g_security_mutex);
 
+    return AGENTOS_OK;
+}
+
+int daemon_security_add_acl_rule(const char *agent_id, const char *resource, bool allowed)
+{
+    if (!agent_id || !resource || agent_id[0] == '\0' || resource[0] == '\0') {
+        return AGENTOS_ERR_INVALID_PARAM;
+    }
+    if (strlen(agent_id) >= sizeof(g_security_ctx.acl_table[0].agent_id) ||
+        strlen(resource) >= sizeof(g_security_ctx.acl_table[0].resource)) {
+        SVC_LOG_ERROR("ACL rule rejected: agent_id or resource too long (agent=%s resource=%s)",
+                      agent_id, resource);
+        return AGENTOS_ERR_INVALID_PARAM;
+    }
+
+    ensure_mutex_initialized();
+    agentos_mutex_lock(&g_security_mutex);
+    if (!g_security_ctx.initialized) {
+        agentos_mutex_unlock(&g_security_mutex);
+        daemon_security_init(NULL, NULL);
+        agentos_mutex_lock(&g_security_mutex);
+    }
+
+    /* 查找已有的同 (agent_id, resource) 条目，覆盖其 allowed 状态 */
+    for (size_t i = 0; i < g_security_ctx.acl_count; i++) {
+        if (strcmp(g_security_ctx.acl_table[i].agent_id, agent_id) == 0 &&
+            strcmp(g_security_ctx.acl_table[i].resource, resource) == 0) {
+            g_security_ctx.acl_table[i].allowed = allowed;
+            agentos_mutex_unlock(&g_security_mutex);
+            SVC_LOG_DEBUG("ACL rule updated: agent=%s resource=%s allowed=%d",
+                          agent_id, resource, allowed ? 1 : 0);
+            return AGENTOS_OK;
+        }
+    }
+
+    if (g_security_ctx.acl_count >= MAX_ACL_ENTRIES) {
+        agentos_mutex_unlock(&g_security_mutex);
+        SVC_LOG_ERROR("ACL table full (max=%d), cannot add rule for agent=%s resource=%s",
+                      MAX_ACL_ENTRIES, agent_id, resource);
+        return AGENTOS_ERR_OUT_OF_MEMORY;
+    }
+
+    acl_entry_t *entry = &g_security_ctx.acl_table[g_security_ctx.acl_count];
+    snprintf(entry->agent_id, sizeof(entry->agent_id), "%s", agent_id);
+    snprintf(entry->resource, sizeof(entry->resource), "%s", resource);
+    entry->operations = 0xFFFFFFFF; /* 所有操作（execute/read/write） */
+    entry->allowed = allowed;
+    g_security_ctx.acl_count++;
+    agentos_mutex_unlock(&g_security_mutex);
+
+    SVC_LOG_INFO("ACL rule added: agent=%s resource=%s allowed=%d (count=%zu/%d)",
+                 agent_id, resource, allowed ? 1 : 0, g_security_ctx.acl_count, MAX_ACL_ENTRIES);
     return AGENTOS_OK;
 }
 

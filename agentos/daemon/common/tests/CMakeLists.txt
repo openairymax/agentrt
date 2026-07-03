@@ -78,10 +78,10 @@ foreach(TEST_SRC ${TEST_SOURCES})
     add_test(NAME ${TARGET_NAME} COMMAND ${TARGET_NAME}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     
-    message(STATUS "  [test] ${TARGET_NAME}: configured")
+    agentos_print_ok("  [test] ${TARGET_NAME}: configured")
 endforeach()
 
-message(STATUS "  svc_common_tests: ${TEST_SOURCES}")
+agentos_print_info("  svc_common_tests: ${TEST_SOURCES}")
 
 # ===== P1-C06 深度单元测试 (test_daemon_common.c) =====
 add_executable(svc_test_daemon_common test_daemon_common.c)
@@ -120,7 +120,7 @@ target_compile_options(svc_test_daemon_common PRIVATE
 add_test(NAME svc_test_daemon_common COMMAND svc_test_daemon_common
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-message(STATUS "  [test] svc_test_daemon_common: P1-C06 deep unit tests configured")
+agentos_print_ok("  [test] svc_test_daemon_common: P1-C06 deep unit tests configured")
 
 # ===== Checkpoint Unit Tests (test_checkpoint.c) =====
 add_executable(svc_test_checkpoint test_checkpoint.c)
@@ -161,7 +161,7 @@ target_compile_options(svc_test_checkpoint PRIVATE
 add_test(NAME svc_test_checkpoint COMMAND svc_test_checkpoint
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-message(STATUS "  [test] svc_test_checkpoint: configured")
+agentos_print_ok("  [test] svc_test_checkpoint: configured")
 
 # ===== P1.24.4 IPC Backpressure Unit Tests (test_ipc_backpressure.c) =====
 add_executable(svc_test_ipc_backpressure test_ipc_backpressure.c)
@@ -202,4 +202,4 @@ target_compile_options(svc_test_ipc_backpressure PRIVATE
 add_test(NAME svc_test_ipc_backpressure COMMAND svc_test_ipc_backpressure
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-message(STATUS "  [test] svc_test_ipc_backpressure: P1.24.4 configured")
+agentos_print_ok("  [test] svc_test_ipc_backpressure: P1.24.4 configured")
