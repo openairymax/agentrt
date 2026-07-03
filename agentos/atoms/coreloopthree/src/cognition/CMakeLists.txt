@@ -12,11 +12,13 @@ add_library(agentos_cognition STATIC
     critique/confidence_calibrator.c
     ext/cognitive_evolution.c
     critique/triple_coordinator.c
+    critique/tc3_llm_callbacks.c
     foundation/metacognition.c
     foundation/semantic_unit.c
     foundation/thinking_chain.c
     critique/stream_critic.c
     dispatch/parallel_dispatcher.c
+    planner/llm_client.c
     planner/reactive.c
     planner/hierarchical.c
     planner/reflective.c

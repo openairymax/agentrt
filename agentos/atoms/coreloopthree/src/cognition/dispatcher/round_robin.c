@@ -109,15 +109,13 @@ agentos_dispatching_round_robin_create(void *registry_ctx,
                                        agent_registry_get_agents_func get_agents_func)
 {
     if (!registry_ctx || !get_agents_func) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     struct agentos_round_robin_dispatch *rr =
         (struct agentos_round_robin_dispatch *)AGENTOS_CALLOC(1, sizeof(*rr));
     if (!rr) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     rr->registry_ctx = registry_ctx;
@@ -126,16 +124,14 @@ agentos_dispatching_round_robin_create(void *registry_ctx,
     rr->lock = agentos_mutex_create();
     if (!rr->lock) {
         AGENTOS_FREE(rr);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     agentos_dispatching_strategy_t *strategy =
         (agentos_dispatching_strategy_t *)AGENTOS_CALLOC(1, sizeof(*strategy));
     if (!strategy) {
         AGENTOS_FREE(rr);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     strategy->data = rr;

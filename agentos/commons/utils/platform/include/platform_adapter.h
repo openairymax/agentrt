@@ -13,10 +13,10 @@
  * |------|------------------------|---------------------|
  * | **位置** | utils/platform/ | platform/ |
  * | **抽象层级** | 应用层 (High-Level) | 系统层 (Low-Level) |
- * | **核心功能** | 文件系统、环境变量、进程管理 | 线程原语、Socket、时间 |
+ * | **核心功能** | 文件系统、环境变量、路径操作 | 线程原语、Socket、时间 |
  * | **使用场景** | 业务逻辑代码 | 基础设施代码 |
  * | **性能要求** | 一般 | 关键路径优化 |
- * | **典型用户** | cognition, execution 等业务模块 | sync, ipc 等底层模块 |
+ * | **典型用户** | cognition, strategy 等业务模块 | sync, ipc 等底层模块 |
  *
  * ## 设计理念
  *
@@ -27,21 +27,23 @@
  *
  * ## 主要功能分类
  *
- * ### 1. 进程管理
- * - platform_exec() - 跨平台命令执行
- * - 支持超时控制和输出捕获
- *
- * ### 2. 文件系统操作
+ * ### 1. 文件系统操作
  * - platform_mkdir(), platform_unlink(), platform_copy_file()
  * - 递归目录创建、文件信息查询
  *
- * ### 3. 环境与路径
+ * ### 2. 环境与路径
  * - platform_get_env(), platform_set_env()
  * - platform_path_join(), platform_path_normalize()
  *
- * ### 4. 系统服务
+ * ### 3. 系统服务
  * - platform_get_timestamp_ms/us()
  * - platform_sleep_ms()
+ *
+ * ## 子进程执行
+ *
+ * 子进程执行统一使用顶层 platform.h 的 agentos_process_run_capture()
+ * （fork+execvp，不经 shell），消除命令注入风险。
+ * platform_exec()/platform_free_exec_result() 已移除（BAN-211/235 安全合规）。
  *
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
  * @see platform.h (顶层系统抽象层)
@@ -71,16 +73,6 @@ typedef enum {
 } platform_type_t;
 
 /**
- * @brief 命令执行结果
- */
-typedef struct platform_exec_result {
-    int exit_code;        /**< 退出码 */
-    char *output;         /**< 命令输出 */
-    size_t output_length; /**< 输出长度 */
-    bool success;         /**< 是否成功 */
-} platform_exec_result_t;
-
-/**
  * @brief 文件信息
  */
 typedef struct platform_file_info {
@@ -102,20 +94,6 @@ platform_type_t platform_get_type(void);
  * @return 平台名称字符串
  */
 const char *platform_get_name(void);
-
-/**
- * @brief 执行系统命令
- * @param command 命令字符串
- * @param timeout_ms 超时时间（毫秒，0表示无超时）
- * @return 执行结果
- */
-platform_exec_result_t platform_exec(const char *command, unsigned int timeout_ms);
-
-/**
- * @brief 释放执行结果
- * @param result 执行结果
- */
-void platform_free_exec_result(platform_exec_result_t *result);
 
 /**
  * @brief 获取文件信息

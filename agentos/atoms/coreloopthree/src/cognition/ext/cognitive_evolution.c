@@ -55,8 +55,7 @@ cog_evolution_t *cog_evolution_create(cog_level_t initial_level)
         (cog_experience_t *)AGENTOS_CALLOC(evo->experience_capacity, sizeof(cog_experience_t));
     if (!evo->experiences) {
         AGENTOS_FREE(evo);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     evo->strategy_capacity = 64;
@@ -64,8 +63,7 @@ cog_evolution_t *cog_evolution_create(cog_level_t initial_level)
     if (!evo->strategies) {
         AGENTOS_FREE(evo->experiences);
         AGENTOS_FREE(evo);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     evo->pattern_capacity = 256;
@@ -74,8 +72,7 @@ cog_evolution_t *cog_evolution_create(cog_level_t initial_level)
         AGENTOS_FREE(evo->strategies);
         AGENTOS_FREE(evo->experiences);
         AGENTOS_FREE(evo);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     evo->knowledge_capacity = 128;
@@ -85,8 +82,7 @@ cog_evolution_t *cog_evolution_create(cog_level_t initial_level)
         AGENTOS_FREE(evo->strategies);
         AGENTOS_FREE(evo->experiences);
         AGENTOS_FREE(evo);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     evo->level_thresholds[COG_LEVEL_PERCEPTION] = 0.0;

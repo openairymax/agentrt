@@ -278,9 +278,7 @@ orch_pipeline_t *orchestrator_pipeline_create(orchestrator_t *orch, const char *
 {
     if (!orch) {
         SVC_LOG_ERROR("orchestrator_pipeline_create: NULL orchestrator handle");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     orch_pipeline_t *p = (orch_pipeline_t *)AGENTOS_CALLOC(1, sizeof(orch_pipeline_t));
@@ -368,15 +366,11 @@ static char *memory_query_context(agentos_memory_provider_t *mem, const char *qu
 {
     if (!mem || !query) {
         SVC_LOG_ERROR("memory_query_context: NULL mem=%p or query=%p", (void *)mem, (void *)query);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     if (!mem->query || !mem->get_raw) {
         SVC_LOG_ERROR("memory_query_context: memory provider missing query/get_raw methods");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     char **ids = NULL;
     float *scores = NULL;
@@ -395,8 +389,7 @@ static char *memory_query_context(agentos_memory_provider_t *mem, const char *qu
         }
         SVC_LOG_WARN("memory_query_context: query returned no results (err=%d, count=%zu)",
                      err, count);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     }
     size_t buf_sz = count * 256 + 64;
     char *context = (char *)AGENTOS_MALLOC(buf_sz);
@@ -482,9 +475,7 @@ static char *memory_retrieve_for_generation(agentos_memory_provider_t *mem, cons
     if (!mem || !topic || !mem->retrieve) {
         SVC_LOG_ERROR("memory_retrieve_for_generation: NULL mem=%p, topic=%p, or missing retrieve method",
                       (void *)mem, (void *)topic);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     char **ids = NULL;
     float *scores = NULL;
@@ -503,8 +494,7 @@ static char *memory_retrieve_for_generation(agentos_memory_provider_t *mem, cons
         }
         SVC_LOG_WARN("memory_retrieve_for_generation: retrieve returned no results (err=%d, count=%zu)",
                      err, count);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     }
     size_t buf_sz = count * 256 + 64;
     char *context = (char *)AGENTOS_MALLOC(buf_sz);
@@ -541,9 +531,7 @@ static char *call_llm_service(const char *prompt, const char *system_role)
 {
     if (!prompt) {
         SVC_LOG_ERROR("call_llm_service: NULL prompt");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     ensure_orch_bus_mutex();
@@ -609,9 +597,7 @@ static char *build_decomposition_prompt(const char *input)
     char *prompt = (char *)AGENTOS_MALLOC(len);
     if (!prompt) {
         SVC_LOG_ERROR("build_decomposition_prompt: allocation failed (len=%zu)", len);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     snprintf(prompt, len,
              "Decompose the following task into subtasks. "
@@ -627,9 +613,7 @@ static char *build_planning_prompt(const char *decomposed)
     char *prompt = (char *)AGENTOS_MALLOC(len);
     if (!prompt) {
         SVC_LOG_ERROR("build_planning_prompt: allocation failed (len=%zu)", len);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     snprintf(prompt, len,
              "Create an execution plan for these subtasks. "
@@ -646,9 +630,7 @@ static char *build_generation_prompt(const char *plan)
     char *prompt = (char *)AGENTOS_MALLOC(len);
     if (!prompt) {
         SVC_LOG_ERROR("build_generation_prompt: allocation failed (len=%zu)", len);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     snprintf(prompt, len,
              "Execute the following plan and produce the final output. "
@@ -664,9 +646,7 @@ static char *build_verification_prompt(const char *original, const char *generat
     char *prompt = (char *)AGENTOS_MALLOC(len);
     if (!prompt) {
         SVC_LOG_ERROR("build_verification_prompt: allocation failed (len=%zu)", len);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     snprintf(prompt, len,
              "Verify the following output against the original task. "
@@ -683,9 +663,7 @@ static char *build_audit_prompt(const char *output, const char *verification)
     char *prompt = (char *)AGENTOS_MALLOC(len);
     if (!prompt) {
         SVC_LOG_ERROR("build_audit_prompt: allocation failed (len=%zu)", len);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     snprintf(prompt, len,
              "Audit this output for correctness, completeness, and safety. "
@@ -702,9 +680,7 @@ static char *build_correction_prompt(const char *output, const char *critique)
     char *prompt = (char *)AGENTOS_MALLOC(len);
     if (!prompt) {
         SVC_LOG_ERROR("build_correction_prompt: allocation failed (len=%zu)", len);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     snprintf(prompt, len,
              "Improve the following output based on the critique. "
@@ -771,17 +747,13 @@ static char *extract_field_string(const char *json, const char *field)
 {
     if (!json || !field) {
         SVC_LOG_ERROR("extract_field_string: NULL json=%p or field=%p", (void *)json, (void *)field);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     size_t flen = strlen(field) + 4;
     char *key = (char *)AGENTOS_MALLOC(flen);
     if (!key) {
         SVC_LOG_ERROR("extract_field_string: key allocation failed for field (len=%zu)", flen);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     snprintf(key, flen, "\"%s\"", field);
     const char *p = strstr(json, key);
@@ -789,35 +761,27 @@ static char *extract_field_string(const char *json, const char *field)
     key = NULL;
     if (!p) {
         SVC_LOG_WARN("extract_field_string: field '%s' not found in JSON", field);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     p += strlen(field) + 3;
     while (*p && (*p == ' ' || *p == ':' || *p == '\t'))
         p++;
     if (*p != '"') {
         SVC_LOG_WARN("extract_field_string: field '%s' value is not a string", field);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     p++;
     const char *end = strchr(p, '"');
     if (!end) {
         SVC_LOG_WARN("extract_field_string: field '%s' has unterminated string value", field);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     size_t len = (size_t)(end - p);
     char *val = (char *)AGENTOS_MALLOC(len + 1);
     if (!val) {
         SVC_LOG_ERROR("extract_field_string: value allocation failed for field '%s' (len=%zu)",
                       field, len);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     __builtin_memcpy(val, p, len);
     val[len] = '\0';
@@ -1970,9 +1934,7 @@ orch_result_t *orchestrator_get_result(orchestrator_t *orch, const char *task_id
     if (!orch || !task_id) {
         SVC_LOG_ERROR("orchestrator_get_result: NULL orch=%p or task_id=%p",
                       (void *)orch, (void *)task_id);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     for (uint32_t i = 0; i < orch->task_count; i++) {

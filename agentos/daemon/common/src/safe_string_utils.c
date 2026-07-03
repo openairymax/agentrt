@@ -16,16 +16,14 @@
 int safe_strcpy(char *dest, const char *src, size_t dest_size)
 {
     if (!dest || !src || dest_size == 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "safe_strcpy: null parameter");
-        return AGENTOS_ERR_INVALID_PARAM;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "safe_strcpy: null parameter");
     }
 
     size_t src_len = strlen(src);
     if (src_len >= dest_size) {
         __builtin_memcpy(dest, src, dest_size - 1);
         dest[dest_size - 1] = '\0';
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "safe_strcpy: buffer overflow");
-        return AGENTOS_ERR_OVERFLOW;
+        AGENTOS_ERROR(AGENTOS_ERR_OVERFLOW, "safe_strcpy: buffer overflow");
     }
 
     __builtin_memcpy(dest, src, src_len + 1);
@@ -35,8 +33,7 @@ int safe_strcpy(char *dest, const char *src, size_t dest_size)
 int safe_strcat(char *dest, const char *src, size_t dest_size)
 {
     if (!dest || !src || dest_size == 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "safe_strncpy: null parameter");
-        return AGENTOS_ERR_INVALID_PARAM;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "safe_strncpy: null parameter");
     }
 
     size_t dest_len = strlen(dest);
@@ -46,8 +43,7 @@ int safe_strcat(char *dest, const char *src, size_t dest_size)
         size_t remaining = dest_size - dest_len - 1;
         __builtin_memcpy(dest + dest_len, src, remaining);
         dest[dest_len + remaining] = '\0';
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "safe_strncpy: buffer overflow");
-        return AGENTOS_ERR_OVERFLOW;
+        AGENTOS_ERROR(AGENTOS_ERR_OVERFLOW, "safe_strncpy: buffer overflow");
     }
 
     __builtin_memcpy(dest + dest_len, src, src_len + 1);
@@ -57,8 +53,7 @@ int safe_strcat(char *dest, const char *src, size_t dest_size)
 int safe_sprintf(char *dest, size_t dest_size, const char *fmt, ...)
 {
     if (!dest || !fmt || dest_size == 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "safe_strcat: null parameter");
-        return AGENTOS_ERR_INVALID_PARAM;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "safe_strcat: null parameter");
     }
 
     va_list args;
@@ -70,8 +65,7 @@ int safe_sprintf(char *dest, size_t dest_size, const char *fmt, ...)
 
     if (written < 0 || (size_t)written >= dest_size) {
         dest[dest_size - 1] = '\0';
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_PARSE_ERROR, "safe_strcat: buffer overflow");
-        return AGENTOS_ERR_PARSE_ERROR;
+        AGENTOS_ERROR(AGENTOS_ERR_PARSE_ERROR, "safe_strcat: buffer overflow");
     }
 
     return written;
@@ -93,8 +87,7 @@ int safe_strcmp(const char *str1, const char *str2, size_t max_len)
     if (!str1 && !str2)
         return 0;
     if (!str1) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "safe_strcmp: null str1");
-        return AGENTOS_ERR_INVALID_PARAM;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "safe_strcmp: null str1");
     }
     if (!str2)
         return 1;
@@ -103,8 +96,7 @@ int safe_strcmp(const char *str1, const char *str2, size_t max_len)
         if (str1[i] == '\0' && str2[i] == '\0')
             return 0;
         if (str1[i] == '\0') {
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_PARSE_ERROR, "safe_strcmp: premature end of str1");
-            return AGENTOS_ERR_PARSE_ERROR;
+            AGENTOS_ERROR(AGENTOS_ERR_PARSE_ERROR, "safe_strcmp: premature end of str1");
         }
         if (str2[i] == '\0')
             return 1;
@@ -118,9 +110,7 @@ int safe_strcmp(const char *str1, const char *str2, size_t max_len)
 char *safe_strdup_with_limit(const char *str, size_t max_copy_len)
 {
     if (!str) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     size_t len = strlen(str);
@@ -129,9 +119,7 @@ char *safe_strdup_with_limit(const char *str, size_t max_copy_len)
 
     char *copy = (char *)AGENTOS_MALLOC(len + 1);
     if (!copy) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     __builtin_memcpy(copy, str, len);
@@ -202,8 +190,7 @@ void *safe_malloc(size_t size, const char *purpose)
     if (purpose && !purpose[0]) { /* 目的字符串有效性 */
     }
     if (size == 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     void *ptr = AGENTOS_MALLOC(size);
     return ptr;
@@ -215,12 +202,10 @@ void *safe_calloc(size_t count, size_t size, const char *purpose)
     if (purpose && !purpose[0]) { /* 目的字符串有效性 */
     }
     if (count == 0 || size == 0) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     if (count > SIZE_MAX / size) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     void *ptr = AGENTOS_CALLOC(count, size);
     return ptr;
@@ -233,8 +218,7 @@ void *safe_realloc(void *ptr, size_t new_size, const char *purpose)
     }
     if (new_size == 0) {
         AGENTOS_FREE(ptr);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     void *new_ptr = AGENTOS_REALLOC(ptr, new_size);
     return new_ptr;

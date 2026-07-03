@@ -17,9 +17,9 @@ if(AGENTRT_HAS_CJSON)
         set(AGENTOS_CJSON_INCLUDE_DIRS "${CJSON_INCLUDE_DIRS}" CACHE INTERNAL "")
         set(AGENTOS_CJSON_LIBRARIES "${CJSON_LIBRARIES}" CACHE INTERNAL "")
     endif()
-    message(STATUS "coreloopthree: cJSON available")
+    agentos_print_ok("coreloopthree: cJSON available")
 else()
-    message(STATUS "coreloopthree: cJSON not found, some features disabled")
+    agentos_print_warn("coreloopthree: cJSON not found, some features disabled")
 endif()
 
 add_subdirectory(src/cognition)
@@ -58,22 +58,22 @@ target_link_libraries(agentos_coreloopthree PUBLIC agentos_atoms)
 if(NOT DEFINED AGENTOS_MEMORY_MODE)
     set(AGENTOS_MEMORY_MODE "HYBRID" CACHE STRING "Memory provider mode: BUILTIN, MEMORYROVOL, HYBRID")
 endif()
-message(STATUS "coreloopthree: AGENTOS_MEMORY_MODE=${AGENTOS_MEMORY_MODE}")
+agentos_print_info("coreloopthree: AGENTOS_MEMORY_MODE=${AGENTOS_MEMORY_MODE}")
 
 if(AGENTOS_MEMORY_MODE STREQUAL "BUILTIN")
     target_compile_definitions(agentos_coreloopthree PRIVATE
         AGENTOS_MEMORY_BUILTIN=1
     )
-    message(STATUS "coreloopthree: Memory mode = BUILTIN (free provider only)")
+    agentos_print_info("coreloopthree: Memory mode = BUILTIN (free provider only)")
 elseif(AGENTOS_MEMORY_MODE STREQUAL "MEMORYROVOL")
     target_compile_definitions(agentos_coreloopthree PRIVATE
         AGENTOS_MEMORY_MEMORYROVOL=1
     )
     if(TARGET agentos_memoryrovol)
         target_link_libraries(agentos_coreloopthree PRIVATE agentos_memoryrovol)
-        message(STATUS "coreloopthree: Memory mode = MEMORYROVOL (commercial provider)")
+        agentos_print_info("coreloopthree: Memory mode = MEMORYROVOL (commercial provider)")
     else()
-        message(WARNING "coreloopthree: MEMORYROVOL mode but agentos_memoryrovol target not found, falling back to BUILTIN")
+        agentos_print_warn("coreloopthree: MEMORYROVOL mode but agentos_memoryrovol target not found, falling back to BUILTIN")
         target_compile_definitions(agentos_coreloopthree PRIVATE AGENTOS_MEMORY_BUILTIN=1)
     endif()
 else()
@@ -83,10 +83,27 @@ else()
     )
     if(TARGET agentos_memoryrovol)
         target_link_libraries(agentos_coreloopthree PRIVATE agentos_memoryrovol)
-        message(STATUS "coreloopthree: Memory mode = HYBRID (builtin + MemoryRovol)")
+        agentos_print_info("coreloopthree: Memory mode = HYBRID (builtin + MemoryRovol)")
     else()
-        message(STATUS "coreloopthree: Memory mode = HYBRID (MemoryRovol not found, builtin fallback available)")
+        agentos_print_warn("coreloopthree: Memory mode = HYBRID (MemoryRovol not found, builtin fallback available)")
     endif()
+endif()
+
+# 静态库 + 弱符号语义修复：memoryrovol_bridge.c 用 __attribute__((weak)) 引用
+# memoryrovol_init 等 16 个符号。弱未定义引用不会触发归档成员抽取，因此即使
+# agentos_memoryrovol 被链接，memoryrovol_bridge_api.c（提供强符号）也不会被
+# 从 libagentos_memoryrovol.a 中抽取，弱符号恒为 NULL，bridge 永远降级 builtin。
+# 修复：将 memoryrovol_bridge_api.c 直接编译进 agentos_coreloopthree（条件式），
+# 使强符号与弱引用同在一个静态库内，链接器在归档内部即可解析弱→强覆盖。
+# 该文件内部转调 agentos_memoryrov_* API（强引用），正常触发 memoryrovol.a 抽取。
+if(TARGET agentos_memoryrovol AND DEFINED MEMORYROVOL_DIR)
+    target_sources(agentos_coreloopthree PRIVATE
+        "${MEMORYROVOL_DIR}/src/memoryrovol_bridge_api.c")
+    target_include_directories(agentos_coreloopthree PRIVATE
+        "${MEMORYROVOL_DIR}/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../commons/platform/include")
+    agentos_print_ok("coreloopthree: memoryrovol_bridge_api.c compiled in (weak→strong symbol fix)")
 endif()
 
 target_include_directories(agentos_coreloopthree PUBLIC

@@ -54,10 +54,8 @@ static cJSON *build_name_to_index_map(agentos_task_plan_t *plan, size_t n)
 {
     cJSON *name_to_idx = cJSON_CreateObject();
     if (!name_to_idx) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
-        return NULL;
 
     for (size_t i = 0; i < n; i++) {
         char idx_str[24];
@@ -74,10 +72,8 @@ static int *calculate_indegrees(cJSON *name_to_idx, agentos_task_plan_t *plan, s
 {
     int *indeg = (int *)AGENTOS_CALLOC(n, sizeof(int));
     if (!indeg) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
-        return NULL;
 
     for (size_t i = 0; i < n; i++) {
         agentos_task_node_t *node = plan->task_plan_nodes[i];
@@ -105,10 +101,8 @@ static int *kahn_algorithm(cJSON *name_to_idx, int *indeg, agentos_task_plan_t *
     int *queue;
     SAFE_MALLOC_ARRAY(queue, n, sizeof(int));
     if (!queue) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
-        return NULL;
 
     int qhead = 0, qtail = 0;
     for (size_t i = 0; i < n; i++) {
@@ -134,8 +128,7 @@ static int *kahn_algorithm(cJSON *name_to_idx, int *indeg, agentos_task_plan_t *
                         if (qtail >= (int)n) {
                             AGENTOS_LOG_ERROR("Topological sort queue overflow during processing");
                             AGENTOS_FREE(queue);
-                            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-                            return NULL;
+                            AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
                         }
                         queue[qtail++] = v;
                     }
@@ -158,24 +151,20 @@ static int *topological_sort(agentos_task_plan_t *plan, size_t *out_count)
     int *order;
     SAFE_MALLOC_ARRAY(order, n, sizeof(int));
     if (!order) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
-        return NULL;
 
     cJSON *name_to_idx = build_name_to_index_map(plan, n);
     if (!name_to_idx) {
         AGENTOS_FREE(order);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     int *indeg = calculate_indegrees(name_to_idx, plan, n);
     if (!indeg) {
         cJSON_Delete(name_to_idx);
         AGENTOS_FREE(order);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     size_t pos = 0;
@@ -184,8 +173,7 @@ static int *topological_sort(agentos_task_plan_t *plan, size_t *out_count)
         cJSON_Delete(name_to_idx);
         AGENTOS_FREE(indeg);
         AGENTOS_FREE(order);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     AGENTOS_FREE(queue);
@@ -195,8 +183,7 @@ static int *topological_sort(agentos_task_plan_t *plan, size_t *out_count)
     if (pos != n) {
         // 有环
         AGENTOS_FREE(order);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     *out_count = n;
     return order;
@@ -217,8 +204,7 @@ static char *execute_node(agentos_task_node_t *node, uint32_t timeout_ms)
     agentos_error_t err = agentos_execution_submit(g_execution, &task, &task_id);
     if (err != AGENTOS_SUCCESS) {
         AGENTOS_LOG_ERROR("Failed to submit node %s", node->task_node_id);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     agentos_task_t *result_task = NULL;
@@ -226,8 +212,7 @@ static char *execute_node(agentos_task_node_t *node, uint32_t timeout_ms)
     AGENTOS_FREE(task_id);
     if (err != AGENTOS_SUCCESS || !result_task) {
         AGENTOS_LOG_ERROR("Node %s execution failed", node->task_node_id);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     char *output = NULL;
@@ -238,8 +223,7 @@ static char *execute_node(agentos_task_node_t *node, uint32_t timeout_ms)
     }
     if (!output) {
         agentos_task_free(result_task);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     agentos_task_free(result_task);
     return output;

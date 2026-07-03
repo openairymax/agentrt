@@ -56,16 +56,13 @@ cost_tracker_t *cost_tracker_create(const pricing_rule_t *rules, int rule_count)
 {
     cost_tracker_t *ct = AGENTOS_CALLOC(1, sizeof(cost_tracker_t));
     if (!ct) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     if (rule_count > 0) {
         SAFE_MALLOC_ARRAY(ct->rules, rule_count, sizeof(pricing_rule_t));
         if (!ct->rules) {
             AGENTOS_FREE(ct);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
         __builtin_memcpy(ct->rules, rules, rule_count * sizeof(pricing_rule_t));
         ct->rule_count = rule_count;
