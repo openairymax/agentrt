@@ -35,13 +35,15 @@
 #include <errno.h>
 #include <signal.h>
 #include <ctype.h>
+#include <sys/resource.h>
+#include <dirent.h>
 
 #ifdef AGENTRT_HAS_CURL
 #include <curl/curl.h>
 #endif
 
 #ifdef AGENTOS_HAS_CJSON
-#include <cJSON.h>
+#include <cjson/cJSON.h>
 #endif
 
 /* ==================== 数据结构 ==================== */
@@ -539,9 +541,9 @@ static agentos_error_t skill_execute_web_search(const char *skill_id, const char
         size_t move_start = results_start + placeholder_len;
         size_t move_len = pos - move_start;
         if (count_len > placeholder_len) {
-            memmove(result + results_start + count_len, result + move_start, move_len);
+            __builtin_memmove(result + results_start + count_len, result + move_start, move_len);
         } else {
-            memmove(result + results_start + count_len, result + move_start, move_len);
+            __builtin_memmove(result + results_start + count_len, result + move_start, move_len);
         }
         pos += (count_len - placeholder_len);
     }
@@ -953,11 +955,11 @@ static agentos_error_t skill_execute_data_transform(const char *skill_id, const 
     size_t result_len = strlen(result_str);
     char *result = (char *)AGENTOS_MALLOC(result_len + 1);
     if (!result) {
-        free(result_str);
+        AGENTOS_FREE(result_str);
         return AGENTOS_ENOMEM;
     }
     __builtin_memcpy(result, result_str, result_len + 1);
-    free(result_str);
+    AGENTOS_FREE(result_str);
 
     *out_output = result;
     return AGENTOS_SUCCESS;
@@ -1031,7 +1033,7 @@ static agentos_error_t skill_execute_file_io(const char *skill_id, const char *i
                 char *r = (char *)AGENTOS_MALLOC(rl + 1);
                 if (r)
                     __builtin_memcpy(r, rs, rl + 1);
-                free(rs);
+                AGENTOS_FREE(rs);
                 *out_output = r;
                 return AGENTOS_SUCCESS;
             }
@@ -1057,7 +1059,7 @@ static agentos_error_t skill_execute_file_io(const char *skill_id, const char *i
         char *r = (char *)AGENTOS_MALLOC(rl + 1);
         if (r)
             __builtin_memcpy(r, rs, rl + 1);
-        free(rs);
+        AGENTOS_FREE(rs);
         *out_output = r;
         return AGENTOS_SUCCESS;
     }
@@ -1140,11 +1142,11 @@ static agentos_error_t skill_execute_file_io(const char *skill_id, const char *i
     size_t result_len = strlen(result_str);
     char *result = (char *)AGENTOS_MALLOC(result_len + 1);
     if (!result) {
-        free(result_str);
+        AGENTOS_FREE(result_str);
         return AGENTOS_ENOMEM;
     }
     __builtin_memcpy(result, result_str, result_len + 1);
-    free(result_str);
+    AGENTOS_FREE(result_str);
 
     *out_output = result;
     return AGENTOS_SUCCESS;
@@ -1200,7 +1202,7 @@ static agentos_error_t skill_execute_image_gen(const char *skill_id, const char 
 
     http_response_buffer_t response = {0};
     agentos_error_t err = http_post_json(endpoint, request_body, api_key, &response, 60000);
-    free(request_body);
+    AGENTOS_FREE(request_body);
 
     if (err != AGENTOS_SUCCESS) {
         char *result = (char *)AGENTOS_MALLOC(512);
@@ -1290,7 +1292,7 @@ static agentos_error_t skill_execute_audio_process(const char *skill_id, const c
 
     http_response_buffer_t response = {0};
     agentos_error_t err = http_post_json(endpoint, request_body, api_key, &response, 60000);
-    free(request_body);
+    AGENTOS_FREE(request_body);
 
     if (err != AGENTOS_SUCCESS) {
         char *result = (char *)AGENTOS_MALLOC(512);

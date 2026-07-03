@@ -141,8 +141,7 @@ static void *posix_thread_create(task_info_core_t *info, size_t stack_size)
     /* 分配平台特定数据 */
     data = (posix_task_data_t *)AGENTOS_CALLOC(1, sizeof(posix_task_data_t));
     if (!data) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     /* CROSS-01: 使用平台抽象层创建线程 */
@@ -157,8 +156,7 @@ static void *posix_thread_create(task_info_core_t *info, size_t stack_size)
 
     if (ret != 0) {
         AGENTOS_FREE(data);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     /* 设置线程优先级（如果支持）*/

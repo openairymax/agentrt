@@ -36,13 +36,34 @@ static void svc_log_toggle_handler(int sig)
     log_set_module_level("*", debug_mode ? LOG_LEVEL_DEBUG : LOG_LEVEL_INFO);
 }
 
+#ifdef _WIN32
+/**
+ * @brief Windows 控制台事件处理函数（对齐 gateway_d/src/main.c 模式）
+ *
+ * Windows 无 POSIX signal() 语义，用 SetConsoleCtrlHandler 接收控制台事件
+ * 并复用现有 signal_handler 触发优雅停机。SIGUSR1 在 Windows 无等价控制台
+ * 事件，故日志级别热切换在 Windows 暂不可用。
+ */
+static BOOL WINAPI console_handler(DWORD fdwCtrlType)
+{
+    switch (fdwCtrlType) {
+    case CTRL_C_EVENT:
+    case CTRL_CLOSE_EVENT:
+    case CTRL_SHUTDOWN_EVENT:
+        signal_handler((int)fdwCtrlType);
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+#endif
+
 __attribute__((used)) static int handle_service_request(const char *method, const char *params_json,
                                                         char **response_json, void *user_data)
 {
     channel_service_t *svc = (channel_service_t *)user_data;
     if (!svc || !method || !response_json) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return AGENTOS_ERR_INVALID_PARAM;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     if (strcmp(method, "ping") == 0) {
@@ -73,8 +94,7 @@ __attribute__((used)) static int handle_service_request(const char *method, cons
             snprintf(err, sizeof(err), "{\"error\":\"ping failed: %d\",\"latency_ms\":%lld}", rc,
                      (long long)latency_ms);
             *response_json = AGENTOS_STRDUP(err);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "channel_service_ping failed");
-            return AGENTOS_ERR_UNKNOWN;
+            AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "channel_service_ping failed");
         }
         size_t sz =
             snprintf(NULL, 0, "{\"status\":\"ok\",\"channel_id\":\"%s\",\"latency_ms\":%lld}", id,
@@ -82,8 +102,7 @@ __attribute__((used)) static int handle_service_request(const char *method, cons
             1;
         char *buf = (char *)AGENTOS_MALLOC(sz);
         if (!buf) {
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "malloc failed for ping response buffer");
-            return AGENTOS_ERR_UNKNOWN;
+            AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "malloc failed for ping response buffer");
         }
         snprintf(buf, sz, "{\"status\":\"ok\",\"channel_id\":\"%s\",\"latency_ms\":%lld}", id,
                  (long long)latency_ms);
@@ -97,15 +116,13 @@ __attribute__((used)) static int handle_service_request(const char *method, cons
         int rc = channel_service_list(svc, info_list, CHANNEL_MAX_CHANNELS, &count);
         if (rc != 0) {
             *response_json = AGENTOS_STRDUP("{\"error\":\"list failed\"}");
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "channel_service_list failed");
-            return AGENTOS_ERR_UNKNOWN;
+            AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "channel_service_list failed");
         }
 
         size_t buf_size = 4096 + count * 1024;
         char *buf = (char *)AGENTOS_MALLOC(buf_size);
         if (!buf) {
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "malloc failed for list response buffer");
-            return AGENTOS_ERR_UNKNOWN;
+            AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "malloc failed for list response buffer");
         }
 
         size_t pos = 0;
@@ -132,8 +149,7 @@ __attribute__((used)) static int handle_service_request(const char *method, cons
 
         if (!id_start || !name_start) {
             *response_json = AGENTOS_STRDUP("{\"error\":\"missing id or name\"}");
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "missing id or name in open request");
-            return AGENTOS_ERR_UNKNOWN;
+            AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "missing id or name in open request");
         }
 
         char id[128] = {0}, name[256] = {0};
@@ -176,8 +192,7 @@ __attribute__((used)) static int handle_service_request(const char *method, cons
             char err[256];
             snprintf(err, sizeof(err), "{\"error\":\"open failed: %d\"}", rc);
             *response_json = AGENTOS_STRDUP(err);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "channel_service_open failed");
-            return AGENTOS_ERR_UNKNOWN;
+            AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "channel_service_open failed");
         }
 
         *response_json = AGENTOS_STRDUP("{\"status\":\"opened\"}");
@@ -188,8 +203,7 @@ __attribute__((used)) static int handle_service_request(const char *method, cons
         const char *id_start = strstr(params_json, "\"id\"");
         if (!id_start) {
             *response_json = AGENTOS_STRDUP("{\"error\":\"missing id\"}");
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "missing id in close request");
-            return AGENTOS_ERR_UNKNOWN;
+            AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "missing id in close request");
         }
         char id[128] = {0};
         const char *p = strchr(id_start + 4, '"');
@@ -207,8 +221,7 @@ __attribute__((used)) static int handle_service_request(const char *method, cons
         int rc = channel_service_close(svc, id);
         if (rc != 0) {
             *response_json = AGENTOS_STRDUP("{\"error\":\"close failed\"}");
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "channel_service_close failed");
-            return AGENTOS_ERR_UNKNOWN;
+            AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "channel_service_close failed");
         }
         *response_json = AGENTOS_STRDUP("{\"status\":\"closed\"}");
         return 0;
@@ -219,8 +232,7 @@ __attribute__((used)) static int handle_service_request(const char *method, cons
         const char *data_start = strstr(params_json, "\"data\"");
         if (!id_start || !data_start) {
             *response_json = AGENTOS_STRDUP("{\"error\":\"missing id or data\"}");
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "missing id or data in send request");
-            return AGENTOS_ERR_UNKNOWN;
+            AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "missing id or data in send request");
         }
         char id[128] = {0};
         const char *p = strchr(id_start + 4, '"');
@@ -245,8 +257,7 @@ __attribute__((used)) static int handle_service_request(const char *method, cons
                 char err[256];
                 snprintf(err, sizeof(err), "{\"error\":\"send failed: %d\"}", rc);
                 *response_json = AGENTOS_STRDUP(err);
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "channel_service_send failed");
-                return AGENTOS_ERR_UNKNOWN;
+                AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "channel_service_send failed");
             }
         }
         *response_json = AGENTOS_STRDUP("{\"status\":\"sent\"}");
@@ -260,8 +271,7 @@ __attribute__((used)) static int handle_service_request(const char *method, cons
     }
 
     *response_json = AGENTOS_STRDUP("{\"error\":\"unknown method\"}");
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "unknown method");
-    return AGENTOS_ERR_UNKNOWN;
+    AGENTOS_ERROR(AGENTOS_ERR_UNKNOWN, "unknown method");
 }
 
 int main(int argc, char *argv[])
@@ -282,9 +292,14 @@ int main(int argc, char *argv[])
         }
     }
 
+    /* 跨平台信号处理 */
+#ifdef _WIN32
+    SetConsoleCtrlHandler(console_handler, TRUE);
+#else
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
     signal(SIGUSR1, svc_log_toggle_handler);
+#endif
 
     agentos_log_init(NULL);
     atexit(log_cleanup);

@@ -63,55 +63,17 @@ extern "C" {
  * 日志级别：DEBUG=0, INFO=1, WARN=2, ERROR=3, FATAL=4
  */
 
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-
-/**
- * @brief 输出调试日志
- * @param fmt 格式字符串
- * @param ... 可变参数
- */
-#ifndef AGENTOS_LOG_DEBUG
-#define AGENTOS_LOG_DEBUG(fmt, ...)              \
-    do {                                         \
-        OutputDebugStringA("[DEBUG] " fmt "\n"); \
-    } while (0)
-#endif
-
-#ifndef AGENTOS_LOG_INFO
-#define AGENTOS_LOG_INFO(fmt, ...)              \
-    do {                                        \
-        OutputDebugStringA("[INFO] " fmt "\n"); \
-    } while (0)
-#endif
-
-#ifndef AGENTOS_LOG_WARN
-#define AGENTOS_LOG_WARN(fmt, ...)              \
-    do {                                        \
-        OutputDebugStringA("[WARN] " fmt "\n"); \
-    } while (0)
-#endif
-
-#ifndef AGENTOS_LOG_ERROR
-#define AGENTOS_LOG_ERROR(fmt, ...)              \
-    do {                                         \
-        OutputDebugStringA("[ERROR] " fmt "\n"); \
-    } while (0)
-#endif
-
-#else /* POSIX */
-
-#include <stdio.h>
-
-/* ── AGENTOS_LOG_* 宏 (POSIX 路径) ──
- * POSIX 路径已自动委托给统一日志系统（G2.4 替换原 no-op 桩宏）。
+/* 统一日志系统委托：Windows 和 POSIX 均通过 logging_compat.h 接入
+ * 统一日志系统（彩色输出 + CLOCK_REALTIME 时间戳）。
+ *
+ * Task #121 修复: 原 Windows 分支使用 OutputDebugStringA 绕过统一日志系统，
+ * 导致 Windows 平台日志无彩色、无时间戳、不经过 log_write() 管线。现统一
+ * 委托 logging_compat.h，与 POSIX 路径完全一致。
+ *
  * logging_compat.h 的 #ifndef 保护会跳过已由 logging.h/svc_logger.h
  * 先行定义的 AGENTOS_LOG_* 宏，避免重复定义；若未先行包含，则提供
  * 委托到 agentos_log_write() 的真实实现（彩色输出 + CLOCK_REALTIME 时间戳）。 */
 #include "../../../commons/utils/logging/include/logging_compat.h"
-
-#endif /* _WIN32 */
 
 /* agentos_strerror 现在由 platform.h 提供（见commons/platform/include/platform.h） */
 

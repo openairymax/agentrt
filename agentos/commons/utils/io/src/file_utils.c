@@ -34,34 +34,29 @@
 char *agentos_io_read_file(const char *path, size_t *out_len)
 {
     if (!path) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
     FILE *f = fopen(path, "rb");
     if (!f) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
     fseek(f, 0, SEEK_END);
     long size = ftell(f);
     fseek(f, 0, SEEK_SET);
     if (size < 0) {
         fclose(f);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     char *buf = (char *)memory_alloc(size + 1, "file_read_buffer");
     if (!buf) {
         fclose(f);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     size_t read = fread(buf, 1, size, f);
     fclose(f);
     if (read != (size_t)size) {
         memory_free(buf);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_IO, "io operation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_IO, "io operation failed");
     }
     buf[size] = '\0';
     if (out_len)

@@ -14,15 +14,11 @@
 char *response_to_json(const llm_response_t *resp)
 {
     if (!resp) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     cJSON *root = cJSON_CreateObject();
     if (!root) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     if (resp->id)
@@ -53,22 +49,17 @@ char *response_to_json(const llm_response_t *resp)
 llm_response_t *response_from_json(const char *json)
 {
     if (!json) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     cJSON *root = cJSON_Parse(json);
     if (!root) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     llm_response_t *resp = AGENTOS_CALLOC(1, sizeof(llm_response_t));
     if (!resp) {
         cJSON_Delete(root);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     cJSON *id = cJSON_GetObjectItem(root, "id");

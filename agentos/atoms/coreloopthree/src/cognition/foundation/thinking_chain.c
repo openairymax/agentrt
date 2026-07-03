@@ -935,6 +935,9 @@ agentos_error_t agentos_tc_context_window_prepopulate(agentos_thinking_chain_t *
     query.memory_query_text = (char *)query_text;
     query.memory_query_text_len = query_len;
     query.memory_query_limit = limit > 0 ? limit : 5;
+    /* P3.11-C1: 要求 query 填充 memory_result_item_record（含记录内容），
+     * 否则 prepopulate 拿不到 rec->memory_record_data，记忆内容无法注入 context window。 */
+    query.memory_query_include_raw = 1;
 
     agentos_memory_result_ext_t *result = NULL;
     agentos_error_t err = agentos_memory_query(chain->memory, &query, &result);

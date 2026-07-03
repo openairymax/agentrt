@@ -89,8 +89,7 @@ static const domain_rule_t *match_domain(const char *goal)
             return &g_domain_rules[i];
         }
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
 }
 
 static agentos_error_t hierarchical_plan_func(const agentos_intent_t __attribute__((unused)) *
@@ -163,8 +162,7 @@ agentos_plan_hierarchical_create(agentos_llm_service_t __attribute__((unused)) *
         (agentos_plan_strategy_t *)AGENTOS_CALLOC(1, sizeof(agentos_plan_strategy_t));
     if (!strategy) {
         AGENTOS_FREE(data);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     strategy->plan = hierarchical_plan_func;

@@ -26,9 +26,7 @@ agent_registry_t *agent_registry_core_create(void)
 {
     agent_registry_t *reg = (agent_registry_t *)AGENTOS_CALLOC(1, sizeof(agent_registry_t));
     if (!reg) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     agentos_mutex_init(&reg->lock);
     reg->initialized = 0;
@@ -123,9 +121,7 @@ int agent_registry_core_remove(agent_registry_t *registry, const char *agent_id)
 const agent_entry_t *agent_registry_core_get(agent_registry_t *registry, const char *agent_id)
 {
     if (!registry || !registry->initialized || !agent_id) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     agentos_mutex_lock(&registry->lock);
     for (size_t i = 0; i < registry->entry_count; i++) {
@@ -135,8 +131,7 @@ const agent_entry_t *agent_registry_core_get(agent_registry_t *registry, const c
         }
     }
     agentos_mutex_unlock(&registry->lock);
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
 }
 
 size_t agent_registry_core_list(agent_registry_t *registry, const agent_entry_t **out_entries,
@@ -197,9 +192,7 @@ AGENTOS_STRNCPY_TERM(registry->entries[i].latest_version, version->version, size
 const char *agent_registry_core_get_latest_version(agent_registry_t *registry, const char *agent_id)
 {
     if (!registry || !registry->initialized || !agent_id) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     agentos_mutex_lock(&registry->lock);
     for (size_t i = 0; i < registry->entry_count; i++) {
@@ -209,8 +202,7 @@ const char *agent_registry_core_get_latest_version(agent_registry_t *registry, c
         }
     }
     agentos_mutex_unlock(&registry->lock);
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
 }
 
 size_t agent_registry_core_search_by_tag(agent_registry_t *registry, const char *tag,

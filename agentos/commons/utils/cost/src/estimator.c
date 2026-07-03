@@ -74,8 +74,7 @@ static const model_cost_config_t *find_model_config(agentos_cost_estimator_t *es
                                                     const char *model_name)
 {
     if (!estimator || !model_name) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     for (int i = 0; i < estimator->config_count; i++) {
@@ -178,16 +177,14 @@ agentos_cost_estimator_t *agentos_cost_estimator_create(const char *config_path)
     agentos_cost_estimator_t *estimator =
         (agentos_cost_estimator_t *)AGENTOS_MALLOC(sizeof(agentos_cost_estimator_t));
     if (!estimator) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     AGENTOS_MEMSET(estimator, 0, sizeof(agentos_cost_estimator_t));
 
     if (agentos_mutex_init(&estimator->mutex) != 0) {
         AGENTOS_FREE(estimator);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     estimator->config_count = 0;

@@ -29,6 +29,8 @@ extern "C" {
 typedef struct agentos_memory_engine agentos_memory_engine_t;
 typedef struct agentos_memory_record agentos_memory_record_t;
 typedef struct agentos_memory_query agentos_memory_query_t;
+/* P3.11-C9: 前向声明，避免引入完整 memory_provider.h（完整定义在 atoms/memory/src/memory_provider.h） */
+typedef struct agentos_memory_provider agentos_memory_provider_t;
 
 /**
  * @brief 记忆记录
@@ -106,6 +108,26 @@ AGENTOS_API agentos_error_t agentos_memory_create(const char *config_path,
  * @see agentos_memory_create()
  */
 AGENTOS_API void agentos_memory_destroy(agentos_memory_engine_t *engine);
+
+/**
+ * @brief 切换记忆引擎的底层提供商（P3.11-C9: 统一 memory engine + bridge provider）
+ *
+ * engine 在 create 时通过 agentos_memory_provider_get_active() 获取全局 active
+ * provider（通常为 builtin）。loop.c 在创建 memoryrovol_bridge 后调用此函数将
+ * bridge provider 注入到 engine，使 thinking_chain prepopulate 等通过 memory engine
+ * 路径的调用方也能用到 bridge 的 L2 向量/L3 关系检索能力。
+ *
+ * @param engine [in] 记忆引擎（非NULL）
+ * @param provider [in] 新提供商（非NULL，borrowed — 调用方负责生命周期）
+ * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
+ *
+ * @ownership provider 为 borrowed 语义，engine 不负责销毁。旧 provider 也不销毁
+ *           （可能被全局 registry 或其他引擎引用）。
+ * @threadsafe 是（内部使用互斥锁保护）
+ * @reentrant 否
+ */
+AGENTOS_API agentos_error_t agentos_memory_set_provider(agentos_memory_engine_t *engine,
+                                                        agentos_memory_provider_t *provider);
 
 /**
  * @brief 写入记忆记录

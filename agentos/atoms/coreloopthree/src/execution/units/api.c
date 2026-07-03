@@ -1,7 +1,15 @@
 /**
  * @file api.c
- * @brief API Call Execution Unit Implementation
+ * @brief API Call Execution Unit Implementation - 真实 HTTPS 实现（零技术债）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ *
+ * @details
+ * 使用 libcurl 实现真实 HTTPS/HTTP 请求，消除伪 HTTPS 致命漏洞：
+ * - 真实 TLS 握手（OpenSSL/mbedTLS/GnuTLS 由 libcurl 自动协商）
+ * - API Key 通过 HTTPS 加密传输（不再明文）
+ * - 支持 GET/POST/PUT/DELETE 方法
+ * - 支持自定义请求体和超时
+ * - libcurl 不可用时返回 AGENTOS_ENOTSUP（非桩函数）
  */
 
 #include "agentos.h"
@@ -18,32 +26,24 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#pragma comment(lib, "ws2_32.lib")
-typedef int socklen_t;
+#include "error_compat.h"
 #else
-#include <arpa/inet.h>
 #include <errno.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
 #include <unistd.h>
 #include "error_compat.h"
+#endif
 
-#define ATM_RET_ERR(c) \
-    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
-
-#define SOCKET int
-#define INVALID_SOCKET (-1)
-#define SOCKET_ERROR (-1)
-#define closesocket close
+#ifdef AGENTRT_HAS_CURL
+#include <curl/curl.h>
 #endif
 
 #define MAX_URL_LENGTH 2048
 #define MAX_HEADERS 16
 #define MAX_BODY_SIZE 4096
 #define DEFAULT_TIMEOUT_MS 30000
+
+#define ATM_RET_ERR(c) \
+    do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
 
 typedef struct api_config {
     char base_url[256];
@@ -62,6 +62,15 @@ typedef struct api_unit_data {
     size_t cache_capacity;
     agentos_mutex_t *lock;
 } api_unit_data_t;
+
+/* HTTP 响应缓冲区（用于 libcurl） */
+typedef struct {
+    char *data;
+    size_t size;
+    size_t capacity;
+} http_response_buffer_t;
+
+/* ==================== URL 验证 ==================== */
 
 static int parse_url(const char *url, char *host, size_t host_size, int *port, char *path,
                      size_t path_size)
@@ -108,154 +117,143 @@ static int parse_url(const char *url, char *host, size_t host_size, int *port, c
     return 0;
 }
 
-static SOCKET connect_to_host(const char *host, int port, int timeout_ms)
+/* ==================== libcurl HTTP 实现 ==================== */
+
+#ifdef AGENTRT_HAS_CURL
+
+static size_t http_write_callback(void *contents, size_t size, size_t nmemb, void *userp)
 {
-    struct addrinfo hints, *result, *rp;
-    __builtin_memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
+    http_response_buffer_t *buf = (http_response_buffer_t *)userp;
+    size_t realsize = size * nmemb;
 
-    char port_str[16];
-    snprintf(port_str, sizeof(port_str), "%d", port);
-
-    int rc = getaddrinfo(host, port_str, &hints, &result);
-    if (rc != 0)
-        return INVALID_SOCKET;
-
-    SOCKET sock = INVALID_SOCKET;
-    for (rp = result; rp != NULL; rp = rp->ai_next) {
-        sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-        if (sock == INVALID_SOCKET)
-            continue;
-
-        struct timeval tv;
-        tv.tv_sec = timeout_ms / 1000;
-        tv.tv_usec = (timeout_ms % 1000) * 1000;
-        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof(tv));
-        setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (const char *)&tv, sizeof(tv));
-
-        if (connect(sock, rp->ai_addr, (socklen_t)rp->ai_addrlen) == 0) {
-            break;
-        }
-        closesocket(sock);
-        sock = INVALID_SOCKET;
+    if (buf->size + realsize + 1 > buf->capacity) {
+        size_t new_capacity = buf->capacity * 2;
+        if (new_capacity < buf->size + realsize + 1)
+            new_capacity = buf->size + realsize + 1;
+        char *new_data = (char *)AGENTOS_REALLOC(buf->data, new_capacity);
+        if (!new_data)
+            return 0;
+        buf->data = new_data;
+        buf->capacity = new_capacity;
     }
 
-    freeaddrinfo(result);
-    return sock;
+    __builtin_memcpy(&(buf->data[buf->size]), contents, realsize);
+    buf->size += realsize;
+    buf->data[buf->size] = '\0';
+    return realsize;
 }
 
-static char *http_request(SOCKET sock, const char *method, const char *host, const char *path,
-                          const char *api_key, const char *body)
+/**
+ * @brief 使用 libcurl 执行真实 HTTP/HTTPS 请求
+ * @param url 完整 URL（含 http:// 或 https://）
+ * @param method HTTP 方法（GET/POST/PUT/DELETE）
+ * @param api_key API Key（可为 NULL，通过 Authorization: Bearer 头传输）
+ * @param body 请求体（可为 NULL）
+ * @param timeout_ms 超时（毫秒）
+ * @param out_buf 输出响应缓冲区
+ * @return agentos_error_t
+ */
+static agentos_error_t http_execute_curl(const char *url, const char *method,
+                                          const char *api_key, const char *body,
+                                          long timeout_ms, http_response_buffer_t *out_buf)
 {
-    size_t req_cap = 4096;
-    char *request = (char *)AGENTOS_MALLOC(req_cap);
-    if (!request) return NULL;
+    CURL *curl = curl_easy_init();
+    if (!curl)
+        return AGENTOS_ENOMEM;
 
-    int len = snprintf(request, req_cap,
-                       "%s %s HTTP/1.1\r\n"
-                       "Host: %s\r\n"
-                       "Connection: close\r\n"
-                       "Accept: application/json\r\n",
-                       method, path, host);
-
-    if (api_key && api_key[0]) {
-        len += snprintf(request + len, req_cap - len, "Authorization: Bearer %s\r\n", api_key);
+    /* 初始化响应缓冲区 */
+    out_buf->data = (char *)AGENTOS_MALLOC(8192);
+    if (!out_buf->data) {
+        curl_easy_cleanup(curl);
+        return AGENTOS_ENOMEM;
     }
+    out_buf->size = 0;
+    out_buf->capacity = 8192;
+    out_buf->data[0] = '\0';
 
-    if (body && body[0]) {
-        size_t body_len = strlen(body);
-        len += snprintf(request + len, req_cap - len,
-                        "Content-Type: application/json\r\n"
-                        "Content-Length: %zu\r\n",
-                        body_len);
-        if ((size_t)len + body_len + 4 >= req_cap) {
-            req_cap = (size_t)len + body_len + 64;
-            char *new_req = (char *)AGENTOS_REALLOC(request, req_cap);
-            if (!new_req) {
-                AGENTOS_FREE(request);
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-                return NULL;
-            }
-            request = new_req;
+    /* 设置 URL（libcurl 自动处理 HTTPS/TLS） */
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, http_write_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, out_buf);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, timeout_ms);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 5000);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "Airymax/0.1.1 AgentRT");
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+
+    /* TLS 安全配置：强制证书验证（不绕过） */
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+
+    /* 设置 HTTP 方法 */
+    if (strcmp(method, "GET") == 0) {
+        curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+    } else if (strcmp(method, "POST") == 0) {
+        curl_easy_setopt(curl, CURLOPT_POST, 1L);
+        if (body) {
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body);
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(body));
         }
-        __builtin_memcpy(request + len, "\r\n", 2);
-        len += 2;
-        __builtin_memcpy(request + len, body, body_len);
-        len += (int)body_len;
-        __builtin_memcpy(request + len, "\r\n", 2);
-        len += 2;
+    } else if (strcmp(method, "PUT") == 0) {
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
+        if (body) {
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body);
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(body));
+        }
+    } else if (strcmp(method, "DELETE") == 0) {
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
     } else {
-        len += snprintf(request + len, req_cap - len, "\r\n");
-    }
-
-    size_t total_sent = 0;
-    while (total_sent < (size_t)len) {
-        int sent = send(sock, request + total_sent, (int)((size_t)len - total_sent), 0);
-        if (sent <= 0) {
-            AGENTOS_FREE(request);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_IO, "io operation failed");
-            return NULL;
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, method);
+        if (body) {
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body);
+            curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)strlen(body));
         }
-        total_sent += (size_t)sent;
     }
-    AGENTOS_FREE(request);
 
-    size_t resp_cap = 8192;
-    char *response = (char *)AGENTOS_MALLOC(resp_cap);
-    if (!response) return NULL;
-
-    size_t total_recv = 0;
-    for (;;) {
-        if (total_recv + 1024 > resp_cap) {
-            resp_cap *= 2;
-            char *new_resp = (char *)AGENTOS_REALLOC(response, resp_cap);
-            if (!new_resp) {
-                AGENTOS_FREE(response);
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-                return NULL;
-            }
-            response = new_resp;
-        }
-        int n = recv(sock, response + total_recv, 1024, 0);
-        if (n <= 0)
-            break;
-        total_recv += (size_t)n;
+    /* 设置请求头 */
+    struct curl_slist *headers = NULL;
+    headers = curl_slist_append(headers, "Accept: application/json");
+    if (body) {
+        headers = curl_slist_append(headers, "Content-Type: application/json");
     }
-    response[total_recv] = '\0';
+    if (api_key && api_key[0]) {
+        static char auth_header[512];
+        snprintf(auth_header, sizeof(auth_header), "Authorization: Bearer %s", api_key);
+        headers = curl_slist_append(headers, auth_header);
+    }
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
-    return response;
+    CURLcode res = curl_easy_perform(curl);
+    long http_code = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) {
+        return AGENTOS_EIO;
+    }
+    if (http_code != 200 && http_code != 201 && http_code != 202 && http_code != 204) {
+        return AGENTOS_EIO;
+    }
+
+    return AGENTOS_SUCCESS;
 }
 
-static char *extract_body(const char *response)
+static void http_response_free(http_response_buffer_t *buf)
 {
-    if (!response) return NULL;
-
-    const char *header_end = strstr(response, "\r\n\r\n");
-    if (!header_end)
-        header_end = strstr(response, "\n\n");
-    if (!header_end)
-        return AGENTOS_STRDUP(response);
-
-    const char *body = header_end + 4;
-
-    const char *cl = strstr(response, "Content-Length:");
-    if (!cl)
-        cl = strstr(response, "content-length:");
-    if (cl) {
-        size_t content_len = (size_t)atol(cl + 15);
-        if (content_len > 0) {
-            char *result = (char *)AGENTOS_MALLOC(content_len + 1);
-            if (result) {
-                __builtin_memcpy(result, body, content_len);
-                result[content_len] = '\0';
-            }
-            return result;
-        }
+    if (buf->data) {
+        AGENTOS_FREE(buf->data);
+        buf->data = NULL;
     }
-
-    return AGENTOS_STRDUP(body);
+    buf->size = 0;
+    buf->capacity = 0;
 }
+
+#endif /* AGENTRT_HAS_CURL */
+
+/* ==================== API 执行单元 ==================== */
 
 static agentos_error_t api_execute(agentos_execution_unit_t *unit, const void *input,
                                    void **out_output)
@@ -271,6 +269,7 @@ static agentos_error_t api_execute(agentos_execution_unit_t *unit, const void *i
     char url[MAX_URL_LENGTH] = {0};
     char body[MAX_BODY_SIZE] = {0};
 
+    /* 解析输入：格式为 "method=XXX&url=YYY&body=ZZZ" 或纯 URL */
     int parsed_fields = 0;
     const char *method_start = request_str + 7;
     const char *method_end = strchr(method_start, '&');
@@ -305,10 +304,11 @@ static agentos_error_t api_execute(agentos_execution_unit_t *unit, const void *i
         if (url[0] == '\0') {
             ATM_RET_ERR(AGENTOS_EINVAL);
         }
-AGENTOS_STRNCPY_TERM(method, "GET", sizeof(method));
+        AGENTOS_STRNCPY_TERM(method, "GET", sizeof(method));
         method[sizeof(method) - 1] = '\0';
     }
 
+    /* URL 验证 */
     char host[256] = {0};
     int port = 80;
     char path[MAX_URL_LENGTH] = {0};
@@ -317,8 +317,8 @@ AGENTOS_STRNCPY_TERM(method, "GET", sizeof(method));
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
+    /* 检查缓存 */
     agentos_mutex_lock(data->lock);
-
     for (size_t i = 0; i < data->cached_count; i++) {
         if (data->cached_responses[i] && strstr(data->cached_responses[i], url)) {
             *out_output = AGENTOS_STRDUP(data->cached_responses[i]);
@@ -328,41 +328,41 @@ AGENTOS_STRNCPY_TERM(method, "GET", sizeof(method));
     }
     agentos_mutex_unlock(data->lock);
 
-    SOCKET sock = connect_to_host(
-        host, port, data->config.timeout_ms > 0 ? data->config.timeout_ms : DEFAULT_TIMEOUT_MS);
-    if (sock == INVALID_SOCKET) {
-        ATM_RET_ERR(AGENTOS_ECONNREFUSED);
+#ifdef AGENTRT_HAS_CURL
+    /* 使用 libcurl 执行真实 HTTPS/HTTP 请求 */
+    http_response_buffer_t response = {0};
+    long timeout = data->config.timeout_ms > 0 ? (long)data->config.timeout_ms : DEFAULT_TIMEOUT_MS;
+
+    agentos_error_t err = http_execute_curl(url, method,
+                                             data->config.api_key[0] ? data->config.api_key : NULL,
+                                             body[0] ? body : NULL, timeout, &response);
+    if (err != AGENTOS_SUCCESS) {
+        http_response_free(&response);
+        ATM_RET_ERR(err);
     }
 
-    char *raw_response =
-        http_request(sock, method, host, path,
-                     data->config.api_key[0] ? data->config.api_key : NULL, body[0] ? body : NULL);
-    closesocket(sock);
-
-    if (!raw_response) {
-        ATM_RET_ERR(AGENTOS_EIO);
-    }
-
-    char *response_body = extract_body(raw_response);
-    AGENTOS_FREE(raw_response);
-
-    if (!response_body) {
-        ATM_RET_ERR(AGENTOS_EIO);
-    }
-
+    /* 缓存响应 */
     agentos_mutex_lock(data->lock);
     if (data->cached_count < data->cache_capacity) {
-        size_t entry_size = strlen(url) + strlen(response_body) + 4;
+        size_t entry_size = strlen(url) + response.size + 4;
         char *cache_entry = (char *)AGENTOS_MALLOC(entry_size);
         if (cache_entry) {
-            snprintf(cache_entry, entry_size, "%s\n%s", url, response_body);
+            snprintf(cache_entry, entry_size, "%s\n%s", url, response.data ? response.data : "");
             data->cached_responses[data->cached_count++] = cache_entry;
         }
     }
     agentos_mutex_unlock(data->lock);
 
-    *out_output = response_body;
-    return AGENTOS_SUCCESS;
+    *out_output = response.data ? AGENTOS_STRDUP(response.data) : AGENTOS_STRDUP("");
+    http_response_free(&response);
+
+    return *out_output ? AGENTOS_SUCCESS : AGENTOS_ENOMEM;
+#else
+    /* libcurl 不可用时，返回明确的错误（非桩函数） */
+    (void)port;
+    (void)path;
+    ATM_RET_ERR(AGENTOS_ENOTSUP);
+#endif
 }
 
 static void api_destroy(agentos_execution_unit_t *unit)
@@ -422,7 +422,7 @@ agentos_error_t agentos_unit_api_create(const api_config_t *config,
     }
 
     data->id = AGENTOS_STRDUP("api");
-    data->description = AGENTOS_STRDUP("Execute HTTP/HTTPS API calls");
+    data->description = AGENTOS_STRDUP("Execute HTTP/HTTPS API calls via libcurl");
     if (!data->id || !data->description) {
         if (data->id)
             AGENTOS_FREE(data->id);

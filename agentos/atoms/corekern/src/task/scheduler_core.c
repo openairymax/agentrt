@@ -44,8 +44,7 @@ static scheduler_core_ctx_t *create_core_ctx(void)
     ctx->task_table_lock = agentos_mutex_create();
     if (!ctx->task_table_lock) {
         AGENTOS_FREE(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     /* 初始化原子状态 */
@@ -196,8 +195,7 @@ task_info_core_t *scheduler_core_hash_find(agentos_task_id_t id)
         node = node->next;
     }
 
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 void scheduler_core_hash_remove(agentos_task_id_t id)
@@ -305,6 +303,5 @@ task_info_core_t *scheduler_core_find_by_platform_handle(void *platform_handle)
         }
     }
 
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
 }

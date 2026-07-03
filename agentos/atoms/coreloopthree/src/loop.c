@@ -58,6 +58,10 @@ struct agentos_core_loop {
     /* C-L02: llm_d → CoreLoopThree — IPC adapter for LLM requests */
     llm_svc_adapter_t *llm_adapter;
 
+    /* P2.7: agentos_llm_service_t — 注入到 reactive/reflective planner，
+     * LLM 可用时激活 LLM 规划路径，不可用时走规则降级。borrowed adapter 来自 llm_adapter。 */
+    struct agentos_llm_service *llm_svc;
+
     /* C-L04: tool_d → CoreLoopThree — IPC adapter for tool execution */
     tool_svc_adapter_t *tool_adapter;
 
@@ -95,6 +99,20 @@ static agentos_error_t initialize_loop_resources(agentos_core_loop_t *loop,
 static agentos_error_t create_loop_engines(agentos_core_loop_t *loop);
 static void cleanup_loop_resources(agentos_core_loop_t *loop);
 static void free_loop_memory(agentos_core_loop_t *loop);
+
+/* P1.14/P2.7: 前向声明 reactive 规划器工厂 + LLM service 生命周期 —
+ * 不直接包含 planner/strategy.h 以避免 llm_client.h 中的
+ * agentos_llm_config_t 与 yaml_loader.h 类型冲突。
+ * 使用 create_default 规避 config 类型冲突。
+ * reactive 规划器接受 agentos_llm_service_t* 参数（planner 侧类型 struct agentos_llm_service），
+ * 传 NULL 走 REACTIVE_RULES 关键词匹配降级路径；
+ * P2.7 注入真实 LLM service 后，LLM 可用时走 LLM 规划路径。 */
+struct agentos_llm_service;
+agentos_plan_strategy_t *agentos_plan_reactive_create(struct agentos_llm_service *llm);
+agentos_error_t agentos_llm_service_create_default(struct agentos_llm_service **out_service);
+void agentos_llm_service_destroy(struct agentos_llm_service *service);
+agentos_error_t agentos_llm_service_set_adapter(struct agentos_llm_service *service,
+                                                void *adapter);
 
 /* 提取的辅助函数 - 降低 agentos_loop_submit 圈复杂度 */
 static char *build_enhanced_input(const char *input, size_t input_len,
@@ -217,21 +235,7 @@ static agentos_error_t create_loop_engines(agentos_core_loop_t *loop)
     if (err != AGENTOS_SUCCESS)
         return err;
 
-    err = agentos_execution_create(loop->manager.loop_config_execution_threads > 0
-                                       ? loop->manager.loop_config_execution_threads
-                                       : 8,
-                                   &loop->execution);
-
-    if (err != AGENTOS_SUCCESS)
-        return err;
-
-    err = agentos_memory_create(NULL, &loop->memory);
-    if (err != AGENTOS_SUCCESS)
-        return err;
-
-    agentos_cognition_set_memory(loop->cognition, loop->memory);
-
-    /* C-L02: Create and wire LLM IPC adapter if configured */
+    /* C-L02: Create and wire LLM IPC adapter (moved before planner creation for P2.7) */
     {
         llm_svc_adapter_config_t adapter_cfg;
         __builtin_memset(&adapter_cfg, 0, sizeof(adapter_cfg));
@@ -251,6 +255,54 @@ static agentos_error_t create_loop_engines(agentos_core_loop_t *loop)
                              "cognition will use direct LLM service if available");
         }
     }
+
+    /* P2.7: 创建 agentos_llm_service_t 并注入 IPC adapter，激活 LLM 调用路径。
+     * llm_svc 传给 reactive/reflective planner：LLM 可用时走 LLM 规划路径，
+     * 不可用时（adapter 未连接 / llm_d 未运行）走 REACTIVE_RULES 关键词匹配降级路径。
+     * llm_svc 所有权由 loop 管理，在 cleanup 时 destroy。 */
+    if (loop->llm_adapter) {
+        agentos_error_t svc_err = agentos_llm_service_create_default(&loop->llm_svc);
+        if (svc_err == AGENTOS_SUCCESS && loop->llm_svc) {
+            agentos_llm_service_set_adapter(loop->llm_svc, (void *)loop->llm_adapter);
+            AGENTOS_LOG_INFO("P2.7: LLM service created and adapter injected "
+                             "(svc=%p)", (void *)loop->llm_svc);
+        } else {
+            AGENTOS_LOG_WARN("P2.7: Failed to create LLM service (err=%d), "
+                             "planner will use rule-based fallback", (int)svc_err);
+            loop->llm_svc = NULL;
+        }
+    }
+
+    /* P1.14/P2.7: 注入 plan_strategy — reactive 规划器。
+     * P2.7: 传入 llm_svc（非 NULL 时激活 LLM 规划路径），NULL 时走规则降级。
+     * 注意：set_plan_strategy 是 TRANSFER 语义，引擎在 destroy 时会调用 strategy->destroy。 */
+    {
+        agentos_plan_strategy_t *plan_strat = agentos_plan_reactive_create(loop->llm_svc);
+        if (plan_strat) {
+            agentos_cognition_set_plan_strategy(loop->cognition, plan_strat);
+            AGENTOS_LOG_INFO("P1.14/P2.7: reactive plan_strategy injected "
+                             "(llm_svc=%p available=%d)",
+                             (void *)loop->llm_svc,
+                             loop->llm_svc ? 1 : 0);
+        } else {
+            AGENTOS_LOG_ERROR("P1.14: Failed to create reactive plan_strategy, "
+                              "cognition pipeline will fall back to no planning");
+        }
+    }
+
+    err = agentos_execution_create(loop->manager.loop_config_execution_threads > 0
+                                       ? loop->manager.loop_config_execution_threads
+                                       : 8,
+                                   &loop->execution);
+
+    if (err != AGENTOS_SUCCESS)
+        return err;
+
+    err = agentos_memory_create(NULL, &loop->memory);
+    if (err != AGENTOS_SUCCESS)
+        return err;
+
+    agentos_cognition_set_memory(loop->cognition, loop->memory);
 
     /* C-L04: Create and wire tool IPC adapter */
     {
@@ -298,6 +350,27 @@ static agentos_error_t create_loop_engines(agentos_core_loop_t *loop)
                 memoryrovol_bridge_get_provider(loop->memory_bridge);
             if (provider) {
                 agentos_cognition_set_memory_provider(loop->cognition, provider);
+
+                /* P3.11-C9: 将 bridge provider 注入到 memory engine。
+                 * 此前 memory engine 在 create 时通过 agentos_memory_provider_get_active()
+                 * 获取 builtin provider，bridge 的 L2 向量/L3 关系检索能力从未被
+                 * thinking_chain prepopulate（走 memory engine 路径）使用。
+                 * 注入后，memory engine 与 cognition engine 共用同一 bridge provider，
+                 * 消除双 memory 接口的数据流断裂。provider 为 borrowed 语义，
+                 * memory engine destroy 时不销毁（由 bridge 管理生命周期）。 */
+                if (loop->memory) {
+                    agentos_error_t sp_err = agentos_memory_set_provider(loop->memory, provider);
+                    if (sp_err == AGENTOS_SUCCESS) {
+                        AGENTOS_LOG_INFO("P3.11-C9: bridge provider injected into "
+                                         "memory engine (unified memory path)");
+                    } else {
+                        AGENTOS_LOG_WARN("P3.11-C9: Failed to inject bridge provider "
+                                         "into memory engine (err=%d), thinking_chain "
+                                         "prepopulate will use builtin provider",
+                                         (int)sp_err);
+                    }
+                }
+
                 AGENTOS_LOG_INFO("C-L12: MemoryRovol bridge wired to cognition engine "
                                  "(provider=%s v%s, L1=%d L2=%d L3=%d L4=%d)",
                                  provider->name ? provider->name : "?",
@@ -360,6 +433,12 @@ static void cleanup_loop_resources(agentos_core_loop_t *loop)
     if (loop->llm_adapter) {
         llm_svc_adapter_destroy(loop->llm_adapter);
         loop->llm_adapter = NULL;
+    }
+
+    /* P2.7: Clean up LLM service (adapter is borrowed, not destroyed here) */
+    if (loop->llm_svc) {
+        agentos_llm_service_destroy(loop->llm_svc);
+        loop->llm_svc = NULL;
     }
 
     /* C-L04: Clean up tool IPC adapter */
@@ -570,6 +649,12 @@ AGENTOS_API void agentos_loop_destroy(agentos_core_loop_t *loop)
     if (loop->llm_adapter) {
         llm_svc_adapter_destroy(loop->llm_adapter);
         loop->llm_adapter = NULL;
+    }
+
+    /* P2.7: 销毁 LLM service（adapter 为 borrowed，不在此销毁） */
+    if (loop->llm_svc) {
+        agentos_llm_service_destroy(loop->llm_svc);
+        loop->llm_svc = NULL;
     }
 
     /* C-L04: 销毁工具 IPC 适配器 */

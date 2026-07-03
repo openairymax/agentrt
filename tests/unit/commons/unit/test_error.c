@@ -90,9 +90,10 @@ static int test_error_strings(void) {
 static int test_error_macros(void) {
     agentos_error_t err;
     
-    /* 测试 AGENTOS_ERROR_HANDLE */
-    err = AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "Test error");
-    TEST_ASSERT(err == AGENTOS_ERR_INVALID_PARAM, "Error handle should return error code");
+    /* 测试 error push（原 AGENTOS_ERROR_HANDLE 已废弃，改用 agentos_error_push_ex） */
+    err = AGENTOS_ERR_INVALID_PARAM;
+    agentos_error_push_ex(err, __FILE__, __LINE__, __func__, "%s", "Test error");
+    TEST_ASSERT(err == AGENTOS_ERR_INVALID_PARAM, "Error push should preserve error code");
     
     /* 测试 AGENTOS_ERROR_RETURN */
     err = AGENTOS_ERROR_RETURN(AGENTOS_ERR_INVALID_PARAM);

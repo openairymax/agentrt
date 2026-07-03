@@ -118,17 +118,14 @@ static request_context_t *request_context_create(void)
 {
     request_context_t *ctx = (request_context_t *)AGENTOS_CALLOC(1, sizeof(request_context_t));
     if (!ctx) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     ctx->response_capacity = MAX_BUFFER;
     ctx->response_buffer = (char *)AGENTOS_MALLOC(ctx->response_capacity);
     if (!ctx->response_buffer) {
         AGENTOS_FREE(ctx);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     ctx->response_buffer[0] = '\0';
     ctx->response_size = 0;
@@ -181,13 +178,11 @@ static int parse_params(cJSON *params, request_context_t *ctx, llm_request_confi
 
     cJSON *model = cJSON_GetObjectItem(params, "model");
     if (!cJSON_IsString(model)) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "model parameter is not a string");
-        return AGENTOS_ERR_INVALID_PARAM;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "model parameter is not a string");
     }
     cfg->model = AGENTOS_STRDUP(model->valuestring);
     if (!cfg->model) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate model string");
-        return AGENTOS_ERR_OUT_OF_MEMORY;
+        AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate model string");
     }
 
     cJSON *messages = cJSON_GetObjectItem(params, "messages");
@@ -195,8 +190,7 @@ static int parse_params(cJSON *params, request_context_t *ctx, llm_request_confi
         size_t count = cJSON_GetArraySize(messages);
         if (count > MAX_MESSAGES_PER_REQUEST) {
             parse_params_cleanup(ctx, cfg);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "too many messages");
-            return AGENTOS_ERR_OVERFLOW;
+            AGENTOS_ERROR(AGENTOS_ERR_OVERFLOW, "too many messages");
         }
 
         ctx->message_count = count;
@@ -210,9 +204,7 @@ static int parse_params(cJSON *params, request_context_t *ctx, llm_request_confi
 
             if (!cJSON_IsString(role) || !cJSON_IsString(content)) {
                 parse_params_cleanup(ctx, cfg);
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM,
-                                     "message role or content is not a string");
-                return AGENTOS_ERR_INVALID_PARAM;
+                AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "message role or content is not a string");
             }
 
             ctx->messages[i].role = AGENTOS_STRDUP(role->valuestring);
@@ -221,9 +213,7 @@ static int parse_params(cJSON *params, request_context_t *ctx, llm_request_confi
             if (!ctx->messages[i].role || !ctx->messages[i].content) {
                 ctx->message_count = i;
                 parse_params_cleanup(ctx, cfg);
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY,
-                                     "failed to duplicate message role or content");
-                return AGENTOS_ERR_OUT_OF_MEMORY;
+                AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "failed to duplicate message role or content");
             }
         }
     }
@@ -415,8 +405,7 @@ static char *handle_complete_stream(cJSON *params, int id, agentos_socket_t clie
 
     AGENTOS_FREE((void *)cfg.model);
     request_context_destroy(ctx);
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 /* ==================== 客户端处理 ==================== */

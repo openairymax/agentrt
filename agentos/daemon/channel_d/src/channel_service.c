@@ -57,8 +57,7 @@ static channel_entry_t *find_channel(channel_service_t *svc, const char *channel
             return &svc->channels[i];
         }
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
 }
 
 static int create_socket_channel(channel_entry_t *entry, const char *endpoint)
@@ -170,9 +169,7 @@ channel_service_t *channel_service_create(const channel_config_t *config)
 {
     channel_service_t *svc = (channel_service_t *)AGENTOS_CALLOC(1, sizeof(channel_service_t));
     if (!svc) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     if (config) {

@@ -50,9 +50,7 @@ gw_mcp_server_t *gw_mcp_server_create(const gw_mcp_server_config_t *config)
     gw_mcp_server_t *server = (gw_mcp_server_t *)AGENTOS_CALLOC(1, sizeof(gw_mcp_server_t));
     if (!server) {
         AGENTOS_LOG_ERROR("server allocation failed, size=%zu", sizeof(gw_mcp_server_t));
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     if (config) {
         server->config = *config;
@@ -160,8 +158,7 @@ static gw_mcp_tool_entry_t *find_tool(gw_mcp_server_t *server, const char *name)
             return &server->tools[i];
         }
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
 }
 
 static gw_mcp_resource_entry_t *find_resource(gw_mcp_server_t *server, const char *uri)
@@ -171,8 +168,7 @@ static gw_mcp_resource_entry_t *find_resource(gw_mcp_server_t *server, const cha
             return &server->resources[i];
         }
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
 }
 
 static char *build_tools_list_json(gw_mcp_server_t *server)
@@ -180,9 +176,7 @@ static char *build_tools_list_json(gw_mcp_server_t *server)
     size_t buf_size = 4096 + server->tool_count * 1024;
     char *buf = (char *)AGENTOS_MALLOC(buf_size);
     if (!buf) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null buffer");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null buffer");
     }
 
     size_t pos = 0;
@@ -203,9 +197,7 @@ static char *build_resources_list_json(gw_mcp_server_t *server)
     size_t buf_size = 4096 + server->resource_count * 1024;
     char *buf = (char *)AGENTOS_MALLOC(buf_size);
     if (!buf) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null buffer");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null buffer");
     }
 
     size_t pos = 0;
@@ -226,38 +218,28 @@ static char *build_resources_list_json(gw_mcp_server_t *server)
 static char *extract_jsonrpc_method(const char *body)
 {
     if (!body) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     const char *key = "\"method\"";
     const char *p = strstr(body, key);
     if (!p) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     p += strlen(key);
     while (*p && (*p == ' ' || *p == ':' || *p == '\t'))
         p++;
     if (*p != '"') {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     p++;
     const char *end = strchr(p, '"');
     if (!end) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     size_t len = (size_t)(end - p);
     char *method = (char *)AGENTOS_MALLOC(len + 1);
     if (!method) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     __builtin_memcpy(method, p, len);
     method[len] = '\0';
@@ -267,16 +249,12 @@ static char *extract_jsonrpc_method(const char *body)
 static char *__attribute__((used)) extract_jsonrpc_id(const char *body)
 {
     if (!body) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     const char *key = "\"id\"";
     const char *p = strstr(body, key);
     if (!p) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     p += strlen(key);
     while (*p && (*p == ' ' || *p == ':' || *p == '\t'))
@@ -285,16 +263,12 @@ static char *__attribute__((used)) extract_jsonrpc_id(const char *body)
         p++;
         const char *end = strchr(p, '"');
         if (!end) {
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
         }
         size_t len = (size_t)(end - p);
         char *id = (char *)AGENTOS_MALLOC(len + 1);
         if (!id) {
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
         }
         __builtin_memcpy(id, p, len);
         id[len] = '\0';
@@ -303,14 +277,11 @@ static char *__attribute__((used)) extract_jsonrpc_id(const char *body)
     char *endptr = NULL;
     long val = strtol(p, &endptr, 10);
     if (endptr == p) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
     }
     char *id = (char *)AGENTOS_MALLOC(32);
     if (!id) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     snprintf(id, 32, "%ld", val);
     return id;
@@ -319,9 +290,7 @@ static char *__attribute__((used)) extract_jsonrpc_id(const char *body)
 static char *extract_jsonrpc_params(const char *body)
 {
     if (!body) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     const char *key = "\"params\"";
     const char *p = strstr(body, key);
@@ -360,38 +329,28 @@ static char *extract_jsonrpc_params(const char *body)
 static char *extract_tool_name_from_params(const char *params_json)
 {
     if (!params_json) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     const char *key = "\"name\"";
     const char *p = strstr(params_json, key);
     if (!p) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     p += strlen(key);
     while (*p && (*p == ' ' || *p == ':' || *p == '\t'))
         p++;
     if (*p != '"') {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     p++;
     const char *end = strchr(p, '"');
     if (!end) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     size_t len = (size_t)(end - p);
     char *name = (char *)AGENTOS_MALLOC(len + 1);
     if (!name) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     __builtin_memcpy(name, p, len);
     name[len] = '\0';
@@ -439,38 +398,28 @@ static char *extract_tool_args_from_params(const char *params_json)
 static char *extract_resource_uri_from_params(const char *params_json)
 {
     if (!params_json) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     const char *key = "\"uri\"";
     const char *p = strstr(params_json, key);
     if (!p) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     p += strlen(key);
     while (*p && (*p == ' ' || *p == ':' || *p == '\t'))
         p++;
     if (*p != '"') {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     p++;
     const char *end = strchr(p, '"');
     if (!end) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     size_t len = (size_t)(end - p);
     char *uri = (char *)AGENTOS_MALLOC(len + 1);
     if (!uri) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     __builtin_memcpy(uri, p, len);
     uri[len] = '\0';
@@ -649,9 +598,7 @@ static int handle_mcp_request(const char *method, const char *path, const char *
 gw_proto_request_handler_t gw_mcp_server_get_handler(gw_mcp_server_t *server)
 {
     if (!server) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     return handle_mcp_request;
 }

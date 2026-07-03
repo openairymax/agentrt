@@ -18,9 +18,7 @@ validation_result_t *validator_create(void)
 {
     validation_result_t *v = (validation_result_t *)AGENTOS_CALLOC(1, sizeof(validation_result_t));
     if (!v) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     v->valid = 1;
     v->rule_count = 0;
@@ -42,12 +40,10 @@ void validator_destroy(validation_result_t *v)
 int validator_add_rule(validation_result_t *validator, const validation_rule_t *rule)
 {
     if (!validator || !rule) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "input_validator: null input");
-        return AGENTOS_ERR_INVALID_PARAM;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "input_validator: null input");
     }
     if (validator->rule_count >= MAX_RULES) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "input_validator: input too long");
-        return AGENTOS_ERR_OVERFLOW;
+        AGENTOS_ERROR(AGENTOS_ERR_OVERFLOW, "input_validator: input too long");
     }
 
     validation_rule_t *r = &validator->rules[validator->rule_count];
@@ -59,8 +55,7 @@ int validator_add_rule(validation_result_t *validator, const validation_rule_t *
     if (rule->field_name) {
         r->field_name = AGENTOS_STRDUP(rule->field_name);
         if (!r->field_name) {
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OUT_OF_MEMORY, "input_validator: malloc failed");
-            return AGENTOS_ERR_OUT_OF_MEMORY;
+            AGENTOS_ERROR(AGENTOS_ERR_OUT_OF_MEMORY, "input_validator: malloc failed");
         }
     }
     r->pattern = rule->pattern;
@@ -74,16 +69,14 @@ int security_check_string(const char *input, unsigned int flags, char **out_viol
     if (!input) {
         if (out_violation)
             *out_violation = AGENTOS_STRDUP("NULL input");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_NULL_POINTER, "input_validator: null pointer");
-        return AGENTOS_ERR_NULL_POINTER;
+        AGENTOS_ERROR(AGENTOS_ERR_NULL_POINTER, "input_validator: null pointer");
     }
 
     size_t len = strlen(input);
     if (len == 0) {
         if (out_violation)
             *out_violation = AGENTOS_STRDUP("Empty string");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "input_validator: invalid length");
-        return AGENTOS_ERR_INVALID_PARAM;
+        AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "input_validator: invalid length");
     }
 
     if (flags & 0x01) {
@@ -96,9 +89,7 @@ int security_check_string(const char *input, unsigned int flags, char **out_viol
                     snprintf(err, sizeof(err), "SQL injection pattern: %s", sql_patterns[i]);
                     *out_violation = AGENTOS_STRDUP(err);
                 }
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM,
-                                     "input_validator: contains null byte");
-                return AGENTOS_ERR_INVALID_PARAM;
+                AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "input_validator: contains null byte");
             }
         }
     }
@@ -108,9 +99,7 @@ int security_check_string(const char *input, unsigned int flags, char **out_viol
             strstr(input, "onload=")) {
             if (out_violation)
                 *out_violation = AGENTOS_STRDUP("XSS pattern detected");
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM,
-                                 "input_validator: contains control chars");
-            return AGENTOS_ERR_INVALID_PARAM;
+            AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "input_validator: contains control chars");
         }
     }
 
@@ -120,9 +109,7 @@ int security_check_string(const char *input, unsigned int flags, char **out_viol
             if (c < 0x20 && c != '\t' && c != '\n' && c != '\r') {
                 if (out_violation)
                     *out_violation = AGENTOS_STRDUP("Control character detected");
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM,
-                                     "input_validator: SQL injection pattern");
-                return AGENTOS_ERR_INVALID_PARAM;
+                AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "input_validator: SQL injection pattern");
             }
         }
     }
@@ -131,8 +118,7 @@ int security_check_string(const char *input, unsigned int flags, char **out_viol
         if (strstr(input, "../") || strstr(input, "..\\") || strstr(input, "%2e%2e")) {
             if (out_violation)
                 *out_violation = AGENTOS_STRDUP("Path traversal pattern");
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "input_validator: XSS pattern");
-            return AGENTOS_ERR_INVALID_PARAM;
+            AGENTOS_ERROR(AGENTOS_ERR_INVALID_PARAM, "input_validator: XSS pattern");
         }
     }
 
@@ -156,8 +142,7 @@ static int apply_single_rule(const validation_rule_t *rule, const cJSON *data, c
                     snprintf(*out_error, len, "Missing required field: %s",
                              rule->field_name ? rule->field_name : "?");
             }
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_NOT_FOUND, "input_validator: string not valid");
-            return AGENTOS_ERR_NOT_FOUND;
+            AGENTOS_ERROR(AGENTOS_ERR_NOT_FOUND, "input_validator: string not valid");
         }
         break;
 
@@ -248,9 +233,7 @@ static int apply_single_rule(const validation_rule_t *rule, const cJSON *data, c
 validation_result_t *validator_validate(validation_result_t *v, const cJSON *data)
 {
     if (!v) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     if (!data) {
         v->valid = 0;

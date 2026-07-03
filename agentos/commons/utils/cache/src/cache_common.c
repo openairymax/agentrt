@@ -95,8 +95,7 @@ int cache_string_compare(const void *a, const void *b)
 void *cache_string_copy(const void *data)
 {
     if (!data) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     return memory_safe_strdup((const char *)data);
 }
@@ -119,23 +118,20 @@ static cache_entry_t *cache_entry_create(const cache_config_t *manager, const vo
 {
     cache_entry_t *entry = memory_safe_alloc(sizeof(cache_entry_t));
     if (!entry) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     entry->key = manager->key_copy_func(key);
     if (!entry->key) {
         memory_safe_free(entry);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     entry->value = manager->value_copy_func(value);
     if (!entry->value) {
         manager->key_free_func(entry->key);
         memory_safe_free(entry);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     entry->timestamp = time(NULL);
@@ -236,8 +232,7 @@ cache_t cache_create(const cache_config_t *manager)
 {
     cache_impl_t *cache = memory_safe_alloc(sizeof(cache_impl_t));
     if (!cache) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     __builtin_memset(cache, 0, sizeof(cache_impl_t));

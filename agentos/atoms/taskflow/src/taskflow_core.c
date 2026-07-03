@@ -16,6 +16,7 @@
 #include "error.h"
 
 #include <errno.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -96,6 +97,47 @@ struct taskflow_partition_s {
 static void (*g_taskflow_log_callback)(const char *, void *) = NULL;
 static void *g_taskflow_log_user_data = NULL;
 
+/* 日志回调静态互斥锁（跨平台，参照 agentos_frameworks.c 模式）。
+ * 用于线程安全地读写全局回调指针，避免 setter 与发射点竞争。 */
+#ifdef _WIN32
+static CRITICAL_SECTION g_taskflow_log_mutex;
+static bool g_taskflow_log_mutex_init = false;
+#define TASKFLOW_LOG_LOCK()   do { \
+    if (!g_taskflow_log_mutex_init) { \
+        InitializeCriticalSection(&g_taskflow_log_mutex); \
+        g_taskflow_log_mutex_init = true; \
+    } \
+    EnterCriticalSection(&g_taskflow_log_mutex); \
+} while(0)
+#define TASKFLOW_LOG_UNLOCK() LeaveCriticalSection(&g_taskflow_log_mutex)
+#else
+#include <pthread.h>
+static pthread_mutex_t g_taskflow_log_mutex = PTHREAD_MUTEX_INITIALIZER;
+#define TASKFLOW_LOG_LOCK()   pthread_mutex_lock(&g_taskflow_log_mutex)
+#define TASKFLOW_LOG_UNLOCK() pthread_mutex_unlock(&g_taskflow_log_mutex)
+#endif
+
+/* 内部日志发射辅助函数：线程安全地快照回调指针，在锁外格式化并调用，
+ * 避免回调重入 taskflow API 时死锁。回调未设置时为空操作。 */
+static void taskflow_log(const char *fmt, ...)
+{
+    void (*cb)(const char *, void *) = NULL;
+    void *ud = NULL;
+    TASKFLOW_LOG_LOCK();
+    cb = g_taskflow_log_callback;
+    ud = g_taskflow_log_user_data;
+    TASKFLOW_LOG_UNLOCK();
+    if (!cb || !fmt) return;
+
+    char buf[512];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    buf[sizeof(buf) - 1] = '\0';
+    cb(buf, ud);
+}
+
 // ============================================================================
 // 静态函数声明
 // ============================================================================
@@ -111,23 +153,20 @@ static taskflow_error_t taskflow_engine_stop_core(taskflow_handle_t engine);
 taskflow_handle_t taskflow_engine_create_core(const taskflow_config_t *config)
 {
     if (!config) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // 验证配置
     taskflow_error_t valid = taskflow_engine_validate_config(config);
     if (valid != TASKFLOW_SUCCESS) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     // 分配引擎结构
     struct taskflow_engine_s *engine =
         (struct taskflow_engine_s *)AGENTOS_CALLOC(1, sizeof(struct taskflow_engine_s));
     if (!engine) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "engine allocation failed");
     }
 
     // 复制配置
@@ -140,8 +179,8 @@ taskflow_handle_t taskflow_engine_create_core(const taskflow_config_t *config)
     engine->graph_engine = graph_engine_create(config);
     if (!engine->graph_engine) {
         AGENTOS_FREE(engine);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        taskflow_log("taskflow: engine create failed (graph_engine_create returned NULL)");
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "graph_engine_create failed");
     }
 
     // 初始化统计信息
@@ -177,6 +216,8 @@ taskflow_handle_t taskflow_engine_create_core(const taskflow_config_t *config)
     engine->log_callback = NULL;
     engine->log_user_data = NULL;
 
+    taskflow_log("taskflow: engine created (worker_threads=%zu, partition_count=%zu)",
+                 engine->config.worker_threads, engine->config.partition_count);
     return (taskflow_handle_t)engine;
 }
 
@@ -216,6 +257,8 @@ void taskflow_engine_destroy_core(taskflow_handle_t engine)
     agentos_cond_destroy(&e->pause_cond);
     agentos_cond_destroy(&e->async_complete_cond);
 
+    taskflow_log("taskflow: engine destroyed (last_checkpoint=%llu)",
+                 (unsigned long long)e->last_checkpoint_id);
     AGENTOS_FREE(e);
 }
 
@@ -277,8 +320,7 @@ static void *engine_worker_thread(void *arg)
 {
     struct taskflow_engine_s *e = (struct taskflow_engine_s *)arg;
     if (!e) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     while (e->worker_active) {
@@ -338,10 +380,12 @@ taskflow_error_t taskflow_engine_start_core(taskflow_handle_t engine)
     int ret = agentos_thread_create(&e->worker_thread, engine_worker_thread, e);
     if (ret != 0) {
         e->worker_active = false;
+        taskflow_log("taskflow: engine start failed (thread create ret=%d)", ret);
         return TASKFLOW_ERROR_INTERNAL;
     }
 
     e->running = true;
+    taskflow_log("taskflow: engine started");
     return TASKFLOW_SUCCESS;
 }
 
@@ -371,6 +415,7 @@ taskflow_error_t taskflow_engine_stop_core(taskflow_handle_t engine)
     agentos_thread_join(e->worker_thread, NULL);
 
     e->running = false;
+    taskflow_log("taskflow: engine stopped");
     return TASKFLOW_SUCCESS;
 }
 
@@ -432,8 +477,7 @@ taskflow_error_t taskflow_engine_resume_core(taskflow_handle_t engine)
 taskflow_graph_handle_t taskflow_graph_create(taskflow_handle_t engine)
 {
     if (!engine) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     struct taskflow_engine_s *e = (struct taskflow_engine_s *)engine;
@@ -441,8 +485,7 @@ taskflow_graph_handle_t taskflow_graph_create(taskflow_handle_t engine)
     struct taskflow_graph_s *graph =
         (struct taskflow_graph_s *)AGENTOS_CALLOC(1, sizeof(struct taskflow_graph_s));
     if (!graph) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     graph->engine = engine;
@@ -557,7 +600,7 @@ size_t taskflow_graph_get_edge_count(taskflow_graph_handle_t graph)
 }
 
 // ============================================================================
-// 其他API实现（存根）
+// 其他辅助 API 实现（均为完整真实实现）
 // ============================================================================
 
 taskflow_error_t taskflow_execute_sync(taskflow_handle_t engine, taskflow_graph_handle_t graph,
@@ -613,8 +656,7 @@ static void *async_execute_worker(void *arg)
 {
     struct taskflow_engine_s *e = (struct taskflow_engine_s *)arg;
     if (!e) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // 执行同步计算
@@ -631,8 +673,7 @@ static void *async_execute_worker(void *arg)
         e->async_callback(e->async_result, e->async_user_data);
     }
 
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 taskflow_error_t taskflow_execute_async(taskflow_handle_t engine, taskflow_graph_handle_t graph,
@@ -1108,9 +1149,11 @@ size_t taskflow_graph_get_partitions(taskflow_graph_handle_t graph,
 void taskflow_set_log_callback(void (*callback)(const char *message, void *user_data),
                                void *user_data)
 {
-    // 全局日志回调暂存（线程安全版本需使用读写锁）
+    /* 线程安全地更新全局日志回调指针 */
+    TASKFLOW_LOG_LOCK();
     g_taskflow_log_callback = callback;
     g_taskflow_log_user_data = user_data;
+    TASKFLOW_LOG_UNLOCK();
 }
 
 // ============================================================================

@@ -114,8 +114,7 @@ agentos_dispatching_weighted_create(const weighted_config_t *manager, void *regi
     weighted_data_t *data = (weighted_data_t *)AGENTOS_MALLOC(sizeof(weighted_data_t));
     if (!data) {
         AGENTOS_FREE(strat);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     __builtin_memset(data, 0, sizeof(*data));
 
@@ -133,8 +132,7 @@ agentos_dispatching_weighted_create(const weighted_config_t *manager, void *regi
     if (!data->lock) {
         AGENTOS_FREE(data);
         AGENTOS_FREE(strat);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     strat->dispatch = weighted_dispatch;

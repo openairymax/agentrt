@@ -106,7 +106,7 @@ static void test_cache_clear(void)
     tool_cache_put(cache, "key2", "value2");
     tool_cache_put(cache, "key3", "value3");
 
-    cache_clear(cache);
+    tool_cache_clear(cache);
 
     char *retrieved __attribute__((unused)) = NULL;
     assert(tool_cache_get(cache, "key1", &retrieved) == 0);

@@ -103,8 +103,7 @@ static thread_error_state_t *get_thread_error_state(void)
     if (g_tls_index == TLS_OUT_OF_INDEXES) {
         g_tls_index = TlsAlloc();
         if (g_tls_index == TLS_OUT_OF_INDEXES) {
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
         }
     }
 
@@ -369,8 +368,7 @@ agentos_error_chain_t *agentos_error_get_chain(void)
 {
     thread_error_state_t *state = get_thread_error_state();
     if (state == NULL || !state->initialized) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     return &state->chain;
 }
@@ -709,8 +707,7 @@ char *agentos_error_chain_to_json_i18n(const agentos_error_chain_t *chain, agent
     size_t buf_size = 4096;
     char *buf = (char *)AGENTOS_MALLOC(buf_size);
     if (!buf) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     size_t offset = snprintf(
@@ -770,13 +767,11 @@ agentos_error_chain_iter_next(agentos_error_chain_iterator_t *iter)
 {
 
     if (!iter || !iter->chain) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     if ((size_t)iter->current_index >= (size_t)iter->chain->depth) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     const agentos_error_context_entry_t *ctx = &iter->chain->contexts[iter->current_index];
@@ -852,8 +847,7 @@ char *agentos_error_chain_format(const agentos_error_chain_t *chain, agentos_lan
     size_t buf_size = 4096;
     char *buf = (char *)AGENTOS_MALLOC(buf_size);
     if (buf == NULL) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
     }
 
     size_t offset = 0;

@@ -230,15 +230,13 @@ network_config_t network_create_default_config(void)
 network_connection_t *network_connection_create(const network_config_t *config)
 {
     if (!config) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     network_connection_t *conn =
         (network_connection_t *)AGENTOS_CALLOC(1, sizeof(network_connection_t));
     if (!conn) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     conn->config = *config;
@@ -1024,14 +1022,12 @@ void network_http_response_free(network_http_response_t *response)
 network_pool_t *network_pool_create(const network_config_t *config, size_t pool_size)
 {
     if (!config || pool_size == 0 || pool_size > NETWORK_MAX_POOL_SIZE) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     }
 
     network_pool_t *pool = (network_pool_t *)AGENTOS_CALLOC(1, sizeof(network_pool_t));
     if (!pool) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     pool->base_config = *config;
@@ -1042,8 +1038,7 @@ network_pool_t *network_pool_create(const network_config_t *config, size_t pool_
 
     if (!pool->connections) {
         AGENTOS_FREE(pool);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     return pool;
@@ -1078,8 +1073,7 @@ void network_pool_destroy(network_pool_t *pool)
 network_connection_t *network_pool_acquire(network_pool_t *pool, int timeout_ms)
 {
     if (!pool) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     (void)timeout_ms;
@@ -1096,15 +1090,13 @@ network_connection_t *network_pool_acquire(network_pool_t *pool, int timeout_ms)
     if (pool->current_size < pool->max_size) {
         network_connection_t *conn = network_connection_create(&pool->base_config);
         if (!conn) {
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
         agentos_error_t err = network_connect(conn);
         if (err != AGENTOS_SUCCESS) {
             network_connection_destroy(conn);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
         pool->connections[pool->current_size] = conn;

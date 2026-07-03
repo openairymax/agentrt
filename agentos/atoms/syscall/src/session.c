@@ -20,7 +20,7 @@
 
 /* heapstore 集成接口（heapstore模块可选） */
 #ifdef BUILD_HEAPSTORE
-#include "heapstore/include/heapstore_integration.h"
+#include "heapstore_integration.h"
 #else
 static agentos_error_t heapstore_syscall_session_save(const char *sid, const char *meta, uint64_t c,
                                                       uint64_t la)
