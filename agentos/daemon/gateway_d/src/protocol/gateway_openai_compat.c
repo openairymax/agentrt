@@ -33,9 +33,7 @@ gw_openai_compat_t *gw_openai_compat_create(const gw_openai_compat_config_t *con
     gw_openai_compat_t *compat =
         (gw_openai_compat_t *)AGENTOS_CALLOC(1, sizeof(gw_openai_compat_t));
     if (!compat) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     if (config) {
         compat->config = *config;
@@ -118,46 +116,34 @@ static bool check_rate_limit(gw_openai_compat_t *compat)
 static char *extract_json_field_string(const char *json, const char *field)
 {
     if (!json || !field) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     size_t flen = strlen(field) + 4;
     char *key = (char *)AGENTOS_MALLOC(flen);
     if (!key) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     snprintf(key, flen, "\"%s\"", field);
     const char *p = strstr(json, key);
     AGENTOS_FREE(key);
     if (!p) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     p += strlen(field) + 3;
     while (*p && (*p == ' ' || *p == ':' || *p == '\t'))
         p++;
     if (*p != '"') {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     p++;
     const char *end = strchr(p, '"');
     if (!end) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     size_t len = (size_t)(end - p);
     char *val = (char *)AGENTOS_MALLOC(len + 1);
     if (!val) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     __builtin_memcpy(val, p, len);
     val[len] = '\0';
@@ -214,24 +200,18 @@ static int extract_json_field_int(const char *json, const char *field, int defau
 static char *extract_messages_array(const char *json)
 {
     if (!json) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     const char *key = "\"messages\"";
     const char *p = strstr(json, key);
     if (!p) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     p += strlen(key);
     while (*p && (*p == ' ' || *p == ':' || *p == '\t'))
         p++;
     if (*p != '[') {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     const char *start = p;
     int depth = 0;
@@ -245,9 +225,7 @@ static char *extract_messages_array(const char *json)
                 size_t len = (size_t)(p - start);
                 char *arr = (char *)AGENTOS_MALLOC(len + 1);
                 if (!arr) {
-                    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-                    return NULL;
+                    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
                 }
                 __builtin_memcpy(arr, start, len);
                 arr[len] = '\0';
@@ -262,9 +240,7 @@ static char *extract_messages_array(const char *json)
 static char *extract_functions_array(const char *json)
 {
     if (!json) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     const char *key = "\"functions\"";
     const char *p = strstr(json, key);
@@ -273,17 +249,13 @@ static char *extract_functions_array(const char *json)
         p = strstr(json, key);
     }
     if (!p) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     p += strlen(key);
     while (*p && (*p == ' ' || *p == ':' || *p == '\t'))
         p++;
     if (*p != '[') {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     const char *start = p;
     int depth = 0;
@@ -297,9 +269,7 @@ static char *extract_functions_array(const char *json)
                 size_t len = (size_t)(p - start);
                 char *arr = (char *)AGENTOS_MALLOC(len + 1);
                 if (!arr) {
-                    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-                    return NULL;
+                    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
                 }
                 __builtin_memcpy(arr, start, len);
                 arr[len] = '\0';
@@ -508,9 +478,7 @@ static int handle_openai_request(const char *method, const char *path, const cha
 gw_proto_request_handler_t gw_openai_compat_get_handler(gw_openai_compat_t *compat)
 {
     if (!compat) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     return handle_openai_request;
 }

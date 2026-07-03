@@ -51,18 +51,14 @@ static char *json_extract_field(const char *json, const char *key)
 {
     if (!json || !key) {
         SVC_LOG_ERROR("json_extract_field: null parameter json=%p key=%p", (void *)json, (void *)key);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     char search[256];
     snprintf(search, sizeof(search), "\"%s\"", key);
     const char *pos = strstr(json, search);
     if (!pos) {
         SVC_LOG_WARN("json_extract_field: key '%s' not found in JSON", key);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     pos += strlen(search);
     while (*pos && (*pos == ' ' || *pos == ':' || *pos == '\t'))
@@ -72,9 +68,7 @@ static char *json_extract_field(const char *json, const char *key)
         const char *end = strchr(pos, '"');
         if (!end) {
             SVC_LOG_ERROR("json_extract_field: unterminated string for key '%s'", key);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
         }
         size_t len = (size_t)(end - pos);
         char *val = (char *)AGENTOS_MALLOC(len + 1);
@@ -85,8 +79,7 @@ static char *json_extract_field(const char *json, const char *key)
         return val;
     }
     SVC_LOG_WARN("json_extract_field: value is not a string for key '%s'", key);
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 static void session_release(dispatch_session_t *session)
@@ -232,18 +225,14 @@ parallel_dispatcher_t *parallel_dispatcher_create(thread_pool_t *pool,
 {
     if (!pool) {
         SVC_LOG_ERROR("parallel_dispatcher_create: null pool parameter");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     parallel_dispatcher_t *disp =
         (parallel_dispatcher_t *)AGENTOS_CALLOC(1, sizeof(parallel_dispatcher_t));
     if (!disp) {
         SVC_LOG_ERROR("parallel_dispatcher_create: memory allocation failed");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     disp->pool = pool;
@@ -296,9 +285,7 @@ static dispatch_session_t *session_create(parallel_dispatcher_t *dispatcher,
         (dispatch_session_t *)AGENTOS_CALLOC(1, sizeof(dispatch_session_t));
     if (!session) {
         SVC_LOG_ERROR("session_create: memory allocation failed for session");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     agentos_mutex_init(&session->lock);
@@ -319,8 +306,7 @@ static dispatch_session_t *session_create(parallel_dispatcher_t *dispatcher,
         agentos_mutex_destroy(&session->lock);
         agentos_cond_destroy(&session->cond);
         AGENTOS_FREE(session);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     for (size_t i = 0; i < task_count; i++) {

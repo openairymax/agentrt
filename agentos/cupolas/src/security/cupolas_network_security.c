@@ -18,6 +18,7 @@
 #include "cupolas_network_security.h"
 
 #include "../platform/platform.h"
+#include <platform.h> /* agentos_process_run_capture (BAN-211/235 安全子进程) */
 #include "memory_compat.h"
 #include "utils/cupolas_utils.h"
 
@@ -930,27 +931,16 @@ int cupolas_dns_verify_dnssec(const char *domain)
         }
         p++;
     }
-    if (!valid) return 0;
-
-    char cmd[512];
-    snprintf(cmd, sizeof(cmd), "dig +dnssec +short %s DNSKEY 2>/dev/null", domain);
-
-    FILE *fp = popen(cmd, "r");
-    if (!fp)
+    if (!valid)
         return 0;
 
-    char line[256];
-    int found_dnskey = 0;
-    int found_rrsig = 0;
-    while (fgets(line, sizeof(line), fp)) {
-        if (strstr(line, "DNSKEY"))
-            found_dnskey = 1;
-        if (strstr(line, "RRSIG"))
-            found_rrsig = 1;
-    }
-    int status = pclose(fp);
-
-    if (WIFEXITED(status) && WEXITSTATUS(status) == 0 && (found_dnskey || found_rrsig)) {
+    /* BAN-211/235: 直接 execvp dig（不经 shell），消除命令注入风险。
+     * domain 已通过上面的白名单校验，仅含 alnum/-/./_ 。 */
+    const char *const argv[] = {"dig", "+dnssec", "+short", domain, "DNSKEY", NULL};
+    char output[4096];
+    int exit_code = agentos_process_run_capture("dig", (char *const *)argv, NULL, 5000,
+                                                output, sizeof(output));
+    if (exit_code == 0 && (strstr(output, "DNSKEY") || strstr(output, "RRSIG"))) {
         return 1;
     }
     return 0;

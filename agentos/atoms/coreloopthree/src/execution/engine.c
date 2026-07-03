@@ -108,24 +108,21 @@ static task_hash_table_t *task_hash_table_create(size_t size)
 {
     task_hash_table_t *table = (task_hash_table_t *)AGENTOS_CALLOC(1, sizeof(task_hash_table_t));
     if (!table) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     table->size = size;
     table->buckets = (task_tcb_t **)AGENTOS_CALLOC(size, sizeof(task_tcb_t *));
     if (!table->buckets) {
         AGENTOS_FREE(table);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     table->lock = agentos_mutex_create();
     if (!table->lock) {
         AGENTOS_FREE(table->buckets);
         AGENTOS_FREE(table);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     return table;
@@ -180,8 +177,7 @@ static void task_hash_table_insert(task_hash_table_t *table, task_tcb_t *tcb)
 static task_tcb_t *task_hash_table_find(task_hash_table_t *table, const char *task_id)
 {
     if (!table || !task_id) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     size_t index = task_hash(task_id, table->size);
@@ -198,8 +194,7 @@ static task_tcb_t *task_hash_table_find(task_hash_table_t *table, const char *ta
     }
 
     agentos_mutex_unlock(table->lock);
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 /**
@@ -305,8 +300,7 @@ static agentos_task_t *task_desc_deep_copy(const agentos_task_t *task)
 {
     agentos_task_t *copy = (agentos_task_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_t));
     if (!copy) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     if (task->task_id) {
@@ -337,8 +331,7 @@ fail:
     if (copy->task_input)
         AGENTOS_FREE(copy->task_input);
     AGENTOS_FREE(copy);
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 /**
@@ -348,8 +341,7 @@ static agentos_task_t *task_result_deep_copy(const task_tcb_t *tcb)
 {
     agentos_task_t *result = (agentos_task_t *)AGENTOS_CALLOC(1, sizeof(agentos_task_t));
     if (!result) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
     if (tcb->task_desc->task_id) {
@@ -376,8 +368,7 @@ fail:
     if (result->task_agent_id)
         AGENTOS_FREE(result->task_agent_id);
     AGENTOS_FREE(result);
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 /**
@@ -691,7 +682,7 @@ agentos_error_t agentos_execution_register_unit(agentos_execution_engine_t *engi
         AGENTOS_LOG_ERROR("ExecutionEngine: failed to allocate unit name '%s'", name);
         return AGENTOS_ENOMEM;
     }
-    memcpy(name_copy, name, name_len + 1);
+    __builtin_memcpy(name_copy, name, name_len + 1);
 
     /* 存储单元 */
     uint32_t slot = engine->registered_unit_count;

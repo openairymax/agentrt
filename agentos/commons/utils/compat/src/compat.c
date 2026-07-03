@@ -263,7 +263,6 @@ struct tm *localtime_r(const time_t *timer, struct tm *buf)
 {
     if (localtime_s(buf, timer) == 0)
         return buf;
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 #endif

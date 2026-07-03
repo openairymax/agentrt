@@ -24,7 +24,7 @@ target_link_libraries(test_kernel_state
 )
 
 add_test(NAME kernel_state COMMAND test_kernel_state)
-message(STATUS "corekern test: test_kernel_state (links agentos_core.a)")
+agentos_print_info("corekern test: test_kernel_state (links agentos_core.a)")
 
 add_executable(test_corekern test_corekern.c)
 
@@ -44,7 +44,7 @@ target_link_libraries(test_corekern
 )
 
 add_test(NAME corekern_deep COMMAND test_corekern)
-message(STATUS "corekern test: test_corekern (deep unit tests)")
+agentos_print_info("corekern test: test_corekern (deep unit tests)")
 
 add_executable(test_memory_engine test_memory_engine.c)
 
@@ -68,7 +68,7 @@ target_link_libraries(test_memory_engine
 )
 
 add_test(NAME memory_engine COMMAND test_memory_engine)
-message(STATUS "corekern test: test_memory_engine (memory/engine/scheduler/strategy)")
+agentos_print_info("corekern test: test_memory_engine (memory/engine/scheduler/strategy)")
 
 add_executable(test_oom_handler test_oom_handler.c)
 
@@ -92,4 +92,4 @@ target_link_libraries(test_oom_handler
 )
 
 add_test(NAME oom_handler COMMAND test_oom_handler)
-message(STATUS "corekern test: test_oom_handler (OOM trigger→degrade→restore)")
+agentos_print_info("corekern test: test_oom_handler (OOM trigger→degrade→restore)")

@@ -26,9 +26,7 @@
 static const char *resolve_api_key(const char *api_key)
 {
     if (!api_key || api_key[0] == '\0') {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     if (strncmp(api_key, "env:", 4) == 0) {
@@ -38,8 +36,7 @@ static const char *resolve_api_key(const char *api_key)
             return env_val;
         }
         SVC_LOG_WARN("Environment variable '%s' not set or empty", env_name);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
     }
 
     return api_key;
@@ -48,9 +45,7 @@ static const char *resolve_api_key(const char *api_key)
 static const char *fallback_env_key(const char *provider_name)
 {
     if (!provider_name) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     if (strcmp(provider_name, "openai") == 0)
         return getenv("OPENAI_API_KEY");
@@ -60,16 +55,13 @@ static const char *fallback_env_key(const char *provider_name)
         return getenv("DEEPSEEK_API_KEY");
     if (strcmp(provider_name, "google") == 0)
         return getenv("GOOGLE_AI_API_KEY");
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 static const char *guess_provider_from_url(const char *url)
 {
     if (!url) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     if (strstr(url, "openai.com"))
         return "openai";
@@ -79,8 +71,7 @@ static const char *guess_provider_from_url(const char *url)
         return "deepseek";
     if (strstr(url, "googleapis.com"))
         return "google";
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "operation failed");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
 
 void provider_base_init(provider_base_ctx_t *base_ctx, const char *api_key, const char *api_base,
@@ -249,18 +240,14 @@ int provider_http_post(const char *url, struct curl_slist *headers, const char *
 char *provider_build_openai_request(const llm_request_config_t *manager, const char *default_model)
 {
     if (!manager) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     cJSON *root = cJSON_CreateObject();
     if (!root) {
         SVC_LOG_ERROR("C-L02: PROVIDER: REQUEST-BUILD-FAIL reason=oom_root "
                       "STACK: provider_build_openai_request");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     const char *model = manager->model && manager->model[0] ? manager->model : default_model;

@@ -170,6 +170,16 @@ static void test_normal_progress_callback(void) {
     /* May succeed or fail depending on backend availability */
     (void)ret;
 
+    /* 释放 results 数组（契约：调用者拥有所有权）
+     * 需先对每个 result 调用 orchestrator_result_free，再释放数组本身 */
+    if (results) {
+        for (size_t i = 0; i < result_count; i++) {
+            orchestrator_result_free(&results[i]);
+        }
+        free(results);
+        results = NULL;
+    }
+
     orchestrator_pipeline_destroy(pipeline);
     orchestrator_destroy(orch);
     PASS();

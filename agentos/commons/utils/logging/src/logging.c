@@ -824,6 +824,39 @@ int log_set_module_level(const char *module_pattern, log_level_t level)
     return AGENTOS_ERR_NOT_FOUND;  // 表已?
 }
 
+size_t log_get_module_count(void)
+{
+    if (!g_logging_state.initialized) {
+        return 0;
+    }
+
+    agentos_mutex_lock(&g_logging_state.mutex);
+    size_t count = g_logging_state.module_level_count;
+    agentos_mutex_unlock(&g_logging_state.mutex);
+    return count;
+}
+
+size_t log_get_module_info(log_module_info_t *out_info, size_t max_count)
+{
+    if (!g_logging_state.initialized || out_info == NULL || max_count == 0) {
+        return 0;
+    }
+
+    agentos_mutex_lock(&g_logging_state.mutex);
+    size_t copy_count = g_logging_state.module_level_count;
+    if (copy_count > max_count) {
+        copy_count = max_count;
+    }
+    for (size_t i = 0; i < copy_count; i++) {
+        AGENTOS_STRNCPY_TERM(out_info[i].pattern, g_logging_state.module_levels[i].pattern,
+                             sizeof(out_info[i].pattern));
+        out_info[i].pattern[sizeof(out_info[i].pattern) - 1] = '\0';
+        out_info[i].level = g_logging_state.module_levels[i].level;
+    }
+    agentos_mutex_unlock(&g_logging_state.mutex);
+    return copy_count;
+}
+
 int log_reload_config(const char *config_path)
 {
     if (!config_path) {

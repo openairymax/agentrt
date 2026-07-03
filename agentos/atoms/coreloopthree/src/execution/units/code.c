@@ -16,6 +16,8 @@
 #ifdef _WIN32
 #include <windows.h>
 #else
+#include <signal.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #include "error.h"
 #include "error_compat.h"
@@ -156,9 +158,46 @@ static void remove_temp_file(const char *path)
 #endif
 }
 
-static agentos_error_t execute_command_capture(const char *cmd, char **out_output)
+/**
+ * @brief 直接通过 argv 执行子进程并捕获 stdout/stderr（不经过 shell）
+ * @param argv 以 NULL 结尾的参数数组（argv[0] 为可执行程序，由 execvp 按 PATH 解析）
+ * @param out_output 输出缓冲区（调用者负责释放，包含 stdout+stderr 合并内容）
+ * @return AGENTOS_SUCCESS 或错误码
+ * @note 安全：直接 execvp，消除 popen/system 命令注入风险（BAN-211/235）；
+ *       stderr 通过 dup2 重定向到与 stdout 相同的管道，等价于 `2>&1` 但无需 shell 介入
+ */
+static agentos_error_t execute_command_capture_argv(char *const argv[], char **out_output)
 {
+    if (!argv || !argv[0] || !out_output)
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to execute: null argv or out_output");
+    *out_output = NULL;
+
 #ifdef _WIN32
+    /* Windows: CreateProcessA 需要命令行字符串，按 Windows 命令行规则转义 argv */
+    char cmd_line[8192];
+    size_t pos = 0;
+    for (int i = 0; argv[i] != NULL; i++) {
+        if (i > 0 && pos < sizeof(cmd_line) - 1)
+            cmd_line[pos++] = ' ';
+        if (pos < sizeof(cmd_line) - 1)
+            cmd_line[pos++] = '"';
+        for (size_t j = 0; argv[i][j] != '\0'; j++) {
+            /* Windows 命令行双引号转义：连续两个双引号 */
+            if (argv[i][j] == '"') {
+                if (pos < sizeof(cmd_line) - 2) {
+                    cmd_line[pos++] = '"';
+                    cmd_line[pos++] = '"';
+                }
+                continue;
+            }
+            if (pos < sizeof(cmd_line) - 1)
+                cmd_line[pos++] = argv[i][j];
+        }
+        if (pos < sizeof(cmd_line) - 1)
+            cmd_line[pos++] = '"';
+    }
+    cmd_line[pos] = '\0';
+
     HANDLE hReadPipe, hWritePipe;
     SECURITY_ATTRIBUTES sa = {sizeof(SECURITY_ATTRIBUTES), NULL, TRUE};
     if (!CreatePipe(&hReadPipe, &hWritePipe, &sa, 0))
@@ -172,7 +211,7 @@ static agentos_error_t execute_command_capture(const char *cmd, char **out_outpu
     si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
 
     PROCESS_INFORMATION pi = {0};
-    if (!CreateProcessA(NULL, (LPSTR)cmd, NULL, NULL, TRUE,
+    if (!CreateProcessA(NULL, (LPSTR)cmd_line, NULL, NULL, TRUE,
                         CREATE_NO_WINDOW | NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi)) {
         CloseHandle(hReadPipe);
         CloseHandle(hWritePipe);
@@ -224,29 +263,54 @@ static agentos_error_t execute_command_capture(const char *cmd, char **out_outpu
     *out_output = output;
     return (exitCode == 0) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 #else
-    /* flawfinder: ignore - cmd is built by build_command with escape_shell_arg */
-    FILE *pipe = popen(cmd, "r");
-    if (!pipe)
+    /* POSIX: fork + execvp + pipe，直接执行不经过 shell（消除命令注入风险 BAN-211/235） */
+    int pipe_out[2];
+    if (pipe(pipe_out) == -1)
         ATM_RET_ERR(AGENTOS_EIO);
+
+    pid_t pid = fork();
+    if (pid == -1) {
+        close(pipe_out[0]);
+        close(pipe_out[1]);
+        ATM_RET_ERR(AGENTOS_EIO);
+    }
+
+    if (pid == 0) {
+        /* 子进程：stdout 和 stderr 都重定向到同一管道（等价于 2>&1，但无需 shell 介入） */
+        close(pipe_out[0]);
+        dup2(pipe_out[1], STDOUT_FILENO);
+        dup2(pipe_out[1], STDERR_FILENO);
+        close(pipe_out[1]);
+        execvp(argv[0], (char *const *)argv);
+        _exit(127);
+    }
+
+    close(pipe_out[1]);
 
     size_t cap = 4096;
     size_t total = 0;
     char *output = (char *)AGENTOS_MALLOC(cap);
     if (!output) {
-        pclose(pipe);
+        close(pipe_out[0]);
+        kill(pid, SIGKILL);
+        waitpid(pid, NULL, 0);
         ATM_RET_ERR(AGENTOS_ENOMEM);
     }
     output[0] = '\0';
 
     char buffer[4096];
-    while (fgets(buffer, sizeof(buffer), pipe) != NULL) {
-        size_t len = strlen(buffer);
+    ssize_t bytes_read;
+    while ((bytes_read = read(pipe_out[0], buffer, sizeof(buffer) - 1)) > 0) {
+        buffer[bytes_read] = '\0';
+        size_t len = (size_t)bytes_read;
         if (total + len + 1 > cap) {
             cap *= 2;
             char *new_out = (char *)AGENTOS_REALLOC(output, cap);
             if (!new_out) {
                 AGENTOS_FREE(output);
-                pclose(pipe);
+                close(pipe_out[0]);
+                kill(pid, SIGKILL);
+                waitpid(pid, NULL, 0);
                 ATM_RET_ERR(AGENTOS_ENOMEM);
             }
             output = new_out;
@@ -254,32 +318,14 @@ static agentos_error_t execute_command_capture(const char *cmd, char **out_outpu
         __builtin_memcpy(output + total, buffer, len + 1);
         total += len;
     }
+    close(pipe_out[0]);
 
-    int status = pclose(pipe);
+    int wstatus = 0;
+    waitpid(pid, &wstatus, 0);
+
     *out_output = output;
-    return (status == 0) ? AGENTOS_SUCCESS : AGENTOS_EIO;
+    return (WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0) ? AGENTOS_SUCCESS : AGENTOS_EIO;
 #endif
-}
-
-static agentos_error_t escape_shell_arg(const char *arg, char *out, size_t out_size)
-{
-    if (!arg || !out || out_size < 4)
-        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to escape shell arg: null arg, null out, or insufficient size");
-    size_t j = 0;
-    out[j++] = '\'';
-    for (size_t i = 0; arg[i] && j < out_size - 4; i++) {
-        if (arg[i] == '\'') {
-            out[j++] = '\'';
-            out[j++] = '\\';
-            out[j++] = '\'';
-            out[j++] = '\'';
-        } else {
-            out[j++] = arg[i];
-        }
-    }
-    out[j++] = '\'';
-    out[j] = '\0';
-    return AGENTOS_SUCCESS;
 }
 
 static agentos_error_t code_execute(agentos_execution_unit_t *unit, const void *input,
@@ -316,40 +362,26 @@ static agentos_error_t code_execute(agentos_execution_unit_t *unit, const void *
     if (err != AGENTOS_SUCCESS)
         return err;
 
-    char *cmd = (char *)AGENTOS_MALLOC(8192);
-    if (!cmd) {
-        remove_temp_file(temp_path);
-        AGENTOS_FREE(temp_path);
-        ATM_RET_ERR(AGENTOS_ENOMEM);
-    }
-#ifdef _WIN32
-    snprintf(cmd, 8192, "\"%s\" \"%s\"", interpreter, temp_path);
-#else
-    char escaped_path[4096];
-    if (escape_shell_arg(temp_path, escaped_path, sizeof(escaped_path)) != AGENTOS_SUCCESS) {
-        remove_temp_file(temp_path);
-        AGENTOS_FREE(temp_path);
-        AGENTOS_FREE(cmd);
-        ATM_RET_ERR(AGENTOS_EINVAL);
-    }
-    snprintf(cmd, 8192, "%s %s 2>&1", interpreter, escaped_path);
-#endif
+    /* 直接构建 argv 数组：["interpreter", "temp_path", NULL]
+     * 不经过 shell，无需 escape_shell_arg，无命令注入风险（BAN-211/235）
+     * stderr 合并由 execute_command_capture_argv 内部 dup2 完成（等价于 2>&1，但无 shell 介入） */
+    char *argv[3];
+    argv[0] = (char *)interpreter;
+    argv[1] = temp_path;
+    argv[2] = NULL;
 
     char *output = NULL;
-    err = execute_command_capture(cmd, &output);
+    err = execute_command_capture_argv(argv, &output);
     remove_temp_file(temp_path);
     AGENTOS_FREE(temp_path);
 
     if (err != AGENTOS_SUCCESS) {
-        if (output) {
+        if (output)
             *out_output = output;
-        }
-        AGENTOS_FREE(cmd);
         return err;
     }
 
     *out_output = output;
-    AGENTOS_FREE(cmd);
     return AGENTOS_SUCCESS;
 }
 
@@ -372,8 +404,7 @@ agentos_execution_unit_t *agentos_code_unit_create(const char *language)
 {
     if (!language) return NULL;
     if (strlen(language) > 32) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     agentos_execution_unit_t *unit =
@@ -384,8 +415,7 @@ agentos_execution_unit_t *agentos_code_unit_create(const char *language)
     code_unit_data_t *data = (code_unit_data_t *)AGENTOS_MALLOC(sizeof(code_unit_data_t));
     if (!data) {
         AGENTOS_FREE(unit);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     data->language = AGENTOS_STRDUP(language);
@@ -413,8 +443,7 @@ agentos_execution_unit_t *agentos_code_unit_create(const char *language)
             AGENTOS_FREE(data->metadata_json);
         AGENTOS_FREE(data);
         AGENTOS_FREE(unit);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     unit->execution_unit_data = data;

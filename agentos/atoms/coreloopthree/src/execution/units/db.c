@@ -233,8 +233,7 @@ agentos_execution_unit_t *agentos_db_unit_create(const char *connection_string)
     db_unit_data_t *data = (db_unit_data_t *)AGENTOS_MALLOC(sizeof(db_unit_data_t));
     if (!data) {
         AGENTOS_FREE(unit);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     data->connection_string = connection_string ? AGENTOS_STRDUP(connection_string) : NULL;
@@ -271,8 +270,7 @@ agentos_execution_unit_t *agentos_db_unit_create(const char *connection_string)
             AGENTOS_FREE(data->metadata_json);
         AGENTOS_FREE(data);
         AGENTOS_FREE(unit);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     unit->execution_unit_data = data;

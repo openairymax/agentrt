@@ -41,8 +41,7 @@ agentos_event_t *agentos_event_create(void)
         if (ev->cond)
             agentos_cond_free(ev->cond);
         AGENTOS_FREE(ev);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     return ev;
 }

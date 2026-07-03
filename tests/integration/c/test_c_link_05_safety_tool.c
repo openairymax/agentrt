@@ -23,7 +23,7 @@
 
 #include "memory_compat.h"
 #include "safety_guard_bridge.h"
-#include "tool_approval.h"
+#include "daemon_security.h"
 #include "agentos_types.h"
 
 /* ============================================================================
@@ -291,9 +291,10 @@ static void *concurrent_safety_thread(void *arg) {
 
     for (int i = 0; i < SAFETY_CHECKS_PER_THREAD; i++) {
         tool_metadata_t meta = {0};
-        char name_buf[64];
-        snprintf(name_buf, sizeof(name_buf), "tool_%d_%d", args->thread_id, i);
-        meta.name = name_buf;
+        /* v0.1.1 BEHAVIOR_DIFF 修正：真实 daemon_check_tool_permission
+         * 使用精确 agent_id+tool_name 匹配 ACL 表（fail-closed），
+         * 不支持通配符。并发测试使用固定 tool_name 并预注册 ACL 条目。 */
+        meta.name = "concurrent_tool";
         meta.description = "test tool";
 
         char params[256];
@@ -406,6 +407,20 @@ static void test_audit_log_recording(void) {
 
 int main(void) {
     printf("=== C-L05 Integration Tests: Cupolas SafetyGuard → tool_d ===\n\n");
+
+    /* v0.1.1 BEHAVIOR_DIFF 修正：真实 daemon_security 采用 fail-closed 策略，
+     * daemon_check_tool_permission() 在 ACL 表为空时默认拒绝所有请求。
+     * 桩函数则默认全部通过。迁移到真实库需预注册 ACL 条目，为测试中
+     * 使用的 (agent_id, tool_name) 组合授权。
+     * 注意："restricted-agent" + "shell_exec" 不注册（保留 fail-closed 拒绝），
+     * 以验证 P1.16e-3 的权限拒绝路径。 */
+    daemon_security_init(NULL, NULL);
+    daemon_security_add_acl_rule("test-agent-001", "file_read", true);
+    daemon_security_add_acl_rule("agent-001", "file_read", true);
+    daemon_security_add_acl_rule("test-agent", "quick_tool", true);
+    daemon_security_add_acl_rule("concurrent-agent", "concurrent_tool", true);
+    daemon_security_add_acl_rule("audit-agent", "shell_exec", true);
+    daemon_security_add_acl_rule("audit-agent", "file_read", true);
 
     test_normal_all_guards_pass();
     test_normal_individual_guards();

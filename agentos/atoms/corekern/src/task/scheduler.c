@@ -118,8 +118,7 @@ static task_info_core_t *__attribute__((used)) find_task_by_platform_handle(void
     (void)platform_handle;
     scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
     if (!ctx) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     /* 使用核心层提供的查找函数 */
@@ -139,8 +138,7 @@ static task_info_core_t *find_task_by_id(agentos_task_id_t tid)
     scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
     if (!ctx) {
         AGENTOS_LOG_ERROR("find_task_by_id: null scheduler context");
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     agentos_mutex_lock(ctx->task_table_lock);
@@ -885,22 +883,38 @@ void agentos_scheduler_dep_result_free(agentos_dep_result_t *result)
 agentos_error_t agentos_scheduler_priority_inherit(agentos_task_id_t blocking_task_id,
                                                    agentos_task_id_t blocked_task_id)
 {
-
     if (blocking_task_id == 0 || blocked_task_id == 0) {
         AGENTOS_LOG_ERROR("agentos_scheduler_priority_inherit: null task id, blocking=%llu blocked=%llu", (unsigned long long)blocking_task_id, (unsigned long long)blocked_task_id);
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
-    task_info_core_t *blocking_task = find_task_by_id(blocking_task_id);
-    if (!blocking_task) {
-        AGENTOS_LOG_ERROR("agentos_scheduler_priority_inherit: blocking task not found, tid=%llu", (unsigned long long)blocking_task_id);
+    /* task_table_lock 由 agentos_mutex_create() 创建，是默认非递归锁
+     * （pthread_mutex_init(NULL)），不能重入加锁。本函数只加锁一次，
+     * 在锁内通过 scheduler_core_hash_find（纯查找，不加锁）查找两个任务，
+     * 避免旧实现两次调用 find_task_by_id 对同一非递归锁重入加锁：
+     *   - 成功路径：第二次 find_task_by_id 重入加锁 → 死锁/UB
+     *   - blocked_task 未找到的错误路径：只释放一次锁，blocking_task 的锁泄漏
+     * 旧实现末尾两次 release_task_lock() 是对上述错误假设的补偿，但无法
+     * 掩盖重入死锁的根本问题。 */
+    scheduler_core_ctx_t *ctx = scheduler_core_get_ctx();
+    if (!ctx) {
+        AGENTOS_LOG_ERROR("agentos_scheduler_priority_inherit: null scheduler context");
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
-    task_info_core_t *blocked_task = find_task_by_id(blocked_task_id);
+    agentos_mutex_lock(ctx->task_table_lock);
+
+    task_info_core_t *blocking_task = scheduler_core_hash_find(blocking_task_id);
+    if (!blocking_task) {
+        AGENTOS_LOG_ERROR("agentos_scheduler_priority_inherit: blocking task not found, tid=%llu", (unsigned long long)blocking_task_id);
+        agentos_mutex_unlock(ctx->task_table_lock);
+        ATM_RET_ERR(AGENTOS_EINVAL);
+    }
+
+    task_info_core_t *blocked_task = scheduler_core_hash_find(blocked_task_id);
     if (!blocked_task) {
         AGENTOS_LOG_ERROR("agentos_scheduler_priority_inherit: blocked task not found, tid=%llu", (unsigned long long)blocked_task_id);
-        release_task_lock();
+        agentos_mutex_unlock(ctx->task_table_lock);
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
@@ -920,8 +934,7 @@ agentos_error_t agentos_scheduler_priority_inherit(agentos_task_id_t blocking_ta
         blocking_task->priority = new_priority;
     }
 
-    release_task_lock();
-    release_task_lock();
+    agentos_mutex_unlock(ctx->task_table_lock);
     return AGENTOS_SUCCESS;
 }
 

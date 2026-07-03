@@ -40,14 +40,42 @@ static void svc_log_toggle_handler(int sig)
     log_set_module_level("*", debug_mode ? LOG_LEVEL_DEBUG : LOG_LEVEL_INFO);
 }
 
+#ifdef _WIN32
+/**
+ * @brief Windows 控制台事件处理函数（对齐 gateway_d/src/main.c 模式）
+ *
+ * Windows 无 POSIX signal() 语义，用 SetConsoleCtrlHandler 接收控制台事件
+ * 并复用现有 signal_handler 触发优雅停机。SIGPIPE/SIGUSR1 在 Windows 无
+ * 等价控制台事件，故不注册（SIGPIPE 由 socket 层独立处理；日志级别热
+ * 切换在 Windows 暂不可用）。
+ */
+static BOOL WINAPI console_handler(DWORD fdwCtrlType)
+{
+    switch (fdwCtrlType) {
+    case CTRL_C_EVENT:
+    case CTRL_CLOSE_EVENT:
+    case CTRL_SHUTDOWN_EVENT:
+        signal_handler((int)fdwCtrlType);
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+#endif
+
 int main(int argc, char *argv[]) {
     (void)argc;
     (void)argv;
 
+    /* 跨平台信号处理 */
+#ifdef _WIN32
+    SetConsoleCtrlHandler(console_handler, TRUE);
+#else
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
     signal(SIGPIPE, SIG_IGN);
     signal(SIGUSR1, svc_log_toggle_handler);
+#endif
 
     agentos_log_init(NULL);
     atexit(log_cleanup);

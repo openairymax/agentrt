@@ -35,9 +35,7 @@ gw_a2a_handler_t *gw_a2a_handler_create(const gw_a2a_handler_config_t *config)
     gw_a2a_handler_t *handler = (gw_a2a_handler_t *)AGENTOS_CALLOC(1, sizeof(gw_a2a_handler_t));
     if (!handler) {
         AGENTOS_LOG_ERROR("handler allocation failed, size=%zu", sizeof(gw_a2a_handler_t));
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     if (config) {
         handler->config = *config;
@@ -141,53 +139,40 @@ static gw_a2a_task_type_entry_t *find_task_type(gw_a2a_handler_t *handler, const
             return &handler->task_types[i];
         }
     }
-    AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-    return NULL;
+    AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
 }
 
 static char *extract_a2a_field(const char *json, const char *field_name)
 {
     if (!json || !field_name) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     size_t flen = strlen(field_name) + 4;
     char *key = (char *)AGENTOS_MALLOC(flen);
     if (!key) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     snprintf(key, flen, "\"%s\"", field_name);
     const char *p = strstr(json, key);
     AGENTOS_FREE(key);
     if (!p) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     p += strlen(field_name) + 3;
     while (*p && (*p == ' ' || *p == ':' || *p == '\t'))
         p++;
     if (*p != '"') {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     p++;
     const char *end = strchr(p, '"');
     if (!end) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     size_t len = (size_t)(end - p);
     char *val = (char *)AGENTOS_MALLOC(len + 1);
     if (!val) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     __builtin_memcpy(val, p, len);
     val[len] = '\0';
@@ -282,9 +267,7 @@ static int handle_a2a_request(const char *method, const char *path, const char *
 gw_proto_request_handler_t gw_a2a_handler_get_handler(gw_a2a_handler_t *handler)
 {
     if (!handler) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     return handle_a2a_request;
 }

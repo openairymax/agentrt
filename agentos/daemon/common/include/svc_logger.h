@@ -36,24 +36,16 @@ extern "C" {
 typedef log_level_t agentos_log_level_t;
 #endif
 
-/* 兼容旧日志级别名称 */
+/* 兼容旧日志级别名称
+ *
+ * 注意：AGENTOS_LOG_DEBUG / INFO / WARN / ERROR / FATAL 已移除值宏定义，
+ * 因为它们与 logging_compat.h 和 observability/logger.h 的函数式宏同名冲突。
+ * 文件中需要日志级别常量时，请直接使用 LOG_LEVEL_* 枚举值。
+ * 文件中需要日志打印时，请使用 AGENTOS_LOG_*("fmt", ...) 函数式宏
+ * （来自 logging_compat.h 或 observability/logger.h）或 SVC_LOG_* 宏。
+ */
 #ifndef AGENTOS_LOG_TRACE
 #define AGENTOS_LOG_TRACE LOG_LEVEL_DEBUG
-#endif
-#ifndef AGENTOS_LOG_DEBUG
-#define AGENTOS_LOG_DEBUG LOG_LEVEL_DEBUG
-#endif
-#ifndef AGENTOS_LOG_INFO
-#define AGENTOS_LOG_INFO LOG_LEVEL_INFO
-#endif
-#ifndef AGENTOS_LOG_WARN
-#define AGENTOS_LOG_WARN LOG_LEVEL_WARN
-#endif
-#ifndef AGENTOS_LOG_ERROR
-#define AGENTOS_LOG_ERROR LOG_LEVEL_ERROR
-#endif
-#ifndef AGENTOS_LOG_FATAL
-#define AGENTOS_LOG_FATAL LOG_LEVEL_FATAL
 #endif
 #ifndef AGENTOS_LOG_OFF
 #define AGENTOS_LOG_OFF LOG_LEVEL_COUNT

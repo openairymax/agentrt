@@ -44,14 +44,12 @@ static char **delegate_deep_copy_tools(const char **src, size_t count, size_t *o
 {
     if (!src || count == 0) {
         *out_count = 0;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_OVERFLOW, "limit exceeded");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_OVERFLOW, "limit exceeded");
     }
     char **dst = (char **)AGENTOS_CALLOC(count, sizeof(char *));
     if (!dst) {
         *out_count = 0;
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     size_t copied = 0;
     for (size_t i = 0; i < count; i++) {
@@ -63,8 +61,7 @@ static char **delegate_deep_copy_tools(const char **src, size_t count, size_t *o
                 }
                 AGENTOS_FREE(dst);
                 *out_count = 0;
-                AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-                return NULL;
+                AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
             }
             copied++;
         }
@@ -92,8 +89,7 @@ agentos_delegate_task_t *agentos_delegate_create(const char *task_description,
     agentos_mutex_lock(&g_delegate_mutex);
     if (g_delegate_depth >= 2) {
         agentos_mutex_unlock(&g_delegate_mutex);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     agentos_mutex_unlock(&g_delegate_mutex);
 
@@ -108,8 +104,7 @@ agentos_delegate_task_t *agentos_delegate_create(const char *task_description,
     task->task_id = (char *)AGENTOS_MALLOC(64);
     if (!task->task_id) {
         AGENTOS_FREE(task);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
     snprintf(task->task_id, 64, "delegate_%lu", (unsigned long)my_id);
 
@@ -117,8 +112,7 @@ agentos_delegate_task_t *agentos_delegate_create(const char *task_description,
     if (!task->description) {
         AGENTOS_FREE(task->task_id);
         AGENTOS_FREE(task);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     task->status = AGENTOS_SUCCESS;
@@ -134,8 +128,7 @@ agentos_delegate_task_t *agentos_delegate_create(const char *task_description,
             AGENTOS_FREE(task->task_id);
             AGENTOS_FREE(task->description);
             AGENTOS_FREE(task);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
         task->config.allowed_tool_count = config->allowed_tool_count;
         task->config.allowed_tools = config->allowed_tools;

@@ -65,9 +65,7 @@ static void free_agent_entry(agent_entry_t *entry)
 static char *safe_strdup(const char *str)
 {
     if (!str) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
     size_t len = strlen(str);
     char *copy = (char *)AGENTOS_MALLOC(len + 1);

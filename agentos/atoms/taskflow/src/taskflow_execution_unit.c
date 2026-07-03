@@ -200,8 +200,7 @@ agentos_execution_unit_t *taskflow_unit_create(const taskflow_unit_config_t *con
     private->taskflow_engine = taskflow_engine_create(&config->taskflow_config);
     if (!private->taskflow_engine) {
         AGENTOS_FREE(private);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // 初始化TaskFlow引擎
@@ -209,8 +208,7 @@ agentos_execution_unit_t *taskflow_unit_create(const taskflow_unit_config_t *con
     if (result != TASKFLOW_SUCCESS) {
         taskflow_engine_destroy(private->taskflow_engine);
         AGENTOS_FREE(private);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_UNKNOWN, "validation failed");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }
 
     // 设置执行单元接口
@@ -226,8 +224,7 @@ agentos_execution_unit_t *taskflow_unit_create(const taskflow_unit_config_t *con
         (agentos_execution_unit_t *)AGENTOS_CALLOC(1, sizeof(agentos_execution_unit_t));
     if (!unit) {
         taskflow_unit_destroy_impl(&private->unit);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     *unit = private->unit;
@@ -262,8 +259,7 @@ taskflow_task_input_t *taskflow_task_input_create(taskflow_graph_handle_t graph,
         SAFE_MALLOC_ARRAY(input->vertices, vertex_count, sizeof(graph_vertex_t));
         if (!input->vertices) {
             AGENTOS_FREE(input);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
         __builtin_memcpy(input->vertices, vertices, vertex_count * sizeof(graph_vertex_t));
     }
@@ -276,8 +272,7 @@ taskflow_task_input_t *taskflow_task_input_create(taskflow_graph_handle_t graph,
             if (input->vertices)
                 AGENTOS_FREE(input->vertices);
             AGENTOS_FREE(input);
-            AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-            return NULL;
+            AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
         __builtin_memcpy(input->edges, edges, edge_count * sizeof(graph_edge_t));
     }

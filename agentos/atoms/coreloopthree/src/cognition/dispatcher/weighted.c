@@ -158,8 +158,7 @@ agentos_dispatching_weighted_create(const weighted_config_t *config, void *regis
                                     agent_registry_get_agents_func get_agents_func)
 {
     if (!registry_ctx || !get_agents_func) {
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     weighted_data_t *data = (weighted_data_t *)AGENTOS_CALLOC(1, sizeof(weighted_data_t));
@@ -178,8 +177,7 @@ agentos_dispatching_weighted_create(const weighted_config_t *config, void *regis
     data->lock = agentos_mutex_create();
     if (!data->lock) {
         AGENTOS_FREE(data);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     agentos_dispatching_strategy_t *strategy =
@@ -188,8 +186,7 @@ agentos_dispatching_weighted_create(const weighted_config_t *config, void *regis
         if (data->lock)
             agentos_mutex_free(data->lock);
         AGENTOS_FREE(data);
-        AGENTOS_ERROR_HANDLE(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-        return NULL;
+        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     strategy->data = data;
