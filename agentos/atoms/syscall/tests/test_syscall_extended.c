@@ -52,27 +52,8 @@ static int g_fail = 0;
         fn();                    \
     } while (0)
 
-enum {
-    SYS_TASK_SUBMIT = 1,
-    SYS_TASK_QUERY,
-    SYS_TASK_WAIT,
-    SYS_TASK_CANCEL,
-    SYS_MEMORY_WRITE,
-    SYS_MEMORY_SEARCH,
-    SYS_MEMORY_GET,
-    SYS_MEMORY_DELETE,
-    SYS_SESSION_CREATE,
-    SYS_SESSION_GET,
-    SYS_SESSION_CLOSE,
-    SYS_SESSION_LIST,
-    SYS_TELEMETRY_METRICS,
-    SYS_TELEMETRY_TRACES,
-    SYS_AGENT_SPAWN,
-    SYS_AGENT_TERMINATE,
-    SYS_AGENT_INVOKE,
-    SYS_AGENT_LIST,
-    SYS_MAX
-};
+/* 系统调用号来自 syscalls.h 的公共 agentos_syscall_num_t 枚举（单一真值源）。
+ * P3.18 (ACC-DT27): 消除本地重复 enum 定义，避免值漂移。 */
 
 /* ==================== Task 管理 ==================== */
 
@@ -286,7 +267,7 @@ static void test_sandbox_invoke_null_args(void)
     ASSERT((intptr_t)r == AGENTOS_EINVAL, "NULL args with argc>0 -> EINVAL");
 }
 
-static void test_sandbox_all_18_syscalls(void)
+static void test_sandbox_all_syscalls_reachable(void)
 {
     int reachable = 0;
     for (int n = 1; n < SYS_MAX; n++) {
@@ -294,7 +275,8 @@ static void test_sandbox_all_18_syscalls(void)
         if ((intptr_t)r == AGENTOS_EINVAL)
             reachable++;
     }
-    ASSERT(reachable == 18, "all 18 syscalls reachable");
+    /* P3.18 (ACC-DT27): 用 SYS_MAX-1 动态计算代替硬编码 18，未来扩展无需改测试 */
+    ASSERT(reachable == SYS_MAX - 1, "all syscalls reachable");
 }
 
 static void test_sandbox_init_cleanup_cycle(void)
@@ -438,7 +420,7 @@ int main(void)
     RUN(test_sandbox_invoke_dispatch);
     RUN(test_sandbox_invoke_einval_range);
     RUN(test_sandbox_invoke_null_args);
-    RUN(test_sandbox_all_18_syscalls);
+    RUN(test_sandbox_all_syscalls_reachable);
     RUN(test_sandbox_init_cleanup_cycle);
 
     RUN(test_sys_free_null);

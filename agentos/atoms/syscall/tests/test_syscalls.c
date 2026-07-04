@@ -43,28 +43,8 @@ static int g_tests_failed = 0;
         }                     \
     } while (0)
 
-/* ========== 系统调用号 (与 syscall_table.c 同步) ========== */
-enum {
-    SYS_TASK_SUBMIT = 1,
-    SYS_TASK_QUERY,
-    SYS_TASK_WAIT,
-    SYS_TASK_CANCEL,
-    SYS_MEMORY_WRITE,
-    SYS_MEMORY_SEARCH,
-    SYS_MEMORY_GET,
-    SYS_MEMORY_DELETE,
-    SYS_SESSION_CREATE,
-    SYS_SESSION_GET,
-    SYS_SESSION_CLOSE,
-    SYS_SESSION_LIST,
-    SYS_TELEMETRY_METRICS,
-    SYS_TELEMETRY_TRACES,
-    SYS_AGENT_SPAWN,
-    SYS_AGENT_TERMINATE,
-    SYS_AGENT_INVOKE,
-    SYS_AGENT_LIST,
-    SYS_MAX
-};
+/* 系统调用号来自 syscalls.h 的公共 agentos_syscall_num_t 枚举（单一真值源）。
+ * P3.18 (ACC-DT27): 消除本地重复 enum 定义，避免值漂移。 */
 
 /* ========== 测试用例 ========== */
 
@@ -202,7 +182,9 @@ int test_sys_invoke_valid_dispatch(void)
 }
 
 /**
- * T5: 全部18个syscall号可达性检查
+ * T5: 全部 syscall 号可达性检查（动态：SYS_MAX-1 个，P3.18 后 = 23）
+ * @note P3.18 (ACC-DT27) 新增 SYS_TOOL_EXECUTE，syscall 总数从 22 增至 23。
+ *       用 SYS_MAX-1 动态计算代替硬编码，未来扩展无需改测试（零债务）。
  */
 int test_sys_all_syscalls_reachable(void)
 {
@@ -220,8 +202,8 @@ int test_sys_all_syscalls_reachable(void)
         }
     }
 
-    TEST_ASSERT(total == 18, "should have 18 syscalls");
-    TEST_ASSERT(reachable == 18, "all 18 should reject with EINVAL on wrong argc");
+    TEST_ASSERT(total == SYS_MAX - 1, "should have SYS_MAX-1 syscalls");
+    TEST_ASSERT(reachable == SYS_MAX - 1, "all syscalls should reject with EINVAL on wrong argc");
 
     printf("    (checked %d syscalls)\n", total);
     agentos_syscalls_cleanup();

@@ -3,7 +3,7 @@ name = "agentrt-cli"
 version = "0.1.1"
 edition = "2021"
 description = "AgentRT CLI - Command-line interface for AgentRT intelligent agent runtime"
-license = "MIT"
+license = "AGPL-3.0-or-later OR Apache-2.0"
 repository = "https://github.com/spharx/agentrt"
 authors = ["SPHARX Ltd."]
 

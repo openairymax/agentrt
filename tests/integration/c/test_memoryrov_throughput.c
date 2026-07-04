@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  *
  * @file test_memoryrov_throughput.c
  * @brief INT-07: MemoryRovol L1 Write Throughput Benchmark

@@ -15,6 +15,7 @@
 #include "error.h"
 #include "platform.h"
 #include "response.h"
+#include "router/llm_router.h"
 #include "service.h"
 #include "svc_logger.h"
 
@@ -198,6 +199,86 @@ static void free_pricing_rules(pricing_rule_t *rules, int count)
     AGENTOS_FREE(rules);
 }
 
+/* ---------- P3.16 (ACC-DT17): llm_router 端点注册辅助 ---------- */
+
+/* 默认模型元数据 — 与 llm_router_init 的 cost_tracker 默认定价规则保持一致。
+ * 用于在端点注册时填充 cost/latency/caps 字段；未来版本可通过配置文件覆盖。 */
+typedef struct {
+    const char *prefix;             /* 模型名前缀匹配（大小写敏感） */
+    double cost_per_1k_input;
+    double cost_per_1k_output;
+    uint32_t avg_latency_ms;
+    uint32_t capabilities;
+} model_default_meta_t;
+
+static const model_default_meta_t MODEL_DEFAULT_META[] = {
+    {"gpt-4",    0.03,    0.06,    1200, LLM_CAP_CHAT | LLM_CAP_COMPLETION | LLM_CAP_STREAMING | LLM_CAP_FUNCTION_CALL},
+    {"gpt-3.5",  0.001,   0.002,   1000, LLM_CAP_CHAT | LLM_CAP_COMPLETION | LLM_CAP_STREAMING},
+    {"claude",   0.015,   0.075,   1100, LLM_CAP_CHAT | LLM_CAP_COMPLETION | LLM_CAP_STREAMING | LLM_CAP_FUNCTION_CALL},
+    {"deepseek", 0.00014, 0.00028,  900, LLM_CAP_CHAT | LLM_CAP_COMPLETION | LLM_CAP_STREAMING | LLM_CAP_FUNCTION_CALL},
+    {"gemini",   0.0005,  0.0015,  1000, LLM_CAP_CHAT | LLM_CAP_COMPLETION | LLM_CAP_STREAMING | LLM_CAP_VISION},
+};
+
+static const model_default_meta_t *lookup_model_meta(const char *model_name)
+{
+    if (!model_name)
+        return NULL;
+    for (size_t i = 0; i < sizeof(MODEL_DEFAULT_META) / sizeof(MODEL_DEFAULT_META[0]); i++) {
+        size_t plen = strlen(MODEL_DEFAULT_META[i].prefix);
+        if (strncmp(model_name, MODEL_DEFAULT_META[i].prefix, plen) == 0) {
+            return &MODEL_DEFAULT_META[i];
+        }
+    }
+    return NULL;
+}
+
+/* provider_registry_enumerate 回调：将每个 (provider, model) 注册为 router 端点 */
+static int register_endpoint_cb(const char *provider_name, const char *model_name,
+                                void *user_data)
+{
+    int *registered_count = (int *)user_data;
+
+    llm_endpoint_t ep;
+    __builtin_memset(&ep, 0, sizeof(ep));
+    snprintf(ep.provider_name, sizeof(ep.provider_name), "%s", provider_name);
+    snprintf(ep.model_name, sizeof(ep.model_name), "%s", model_name);
+    /* endpoint/api_key_env 留空：实际凭证由 provider ctx 内部持有，路由器无需感知 */
+    ep.enabled = true;
+    ep.priority = 0;
+    ep.context_window = 8192; /* 保守默认；未来可按模型精确化 */
+
+    const model_default_meta_t *meta = lookup_model_meta(model_name);
+    if (meta) {
+        ep.cost_per_1k_input  = meta->cost_per_1k_input;
+        ep.cost_per_1k_output = meta->cost_per_1k_output;
+        ep.avg_latency_ms     = meta->avg_latency_ms;
+        ep.capabilities       = meta->capabilities;
+    } else {
+        /* 未知模型：保守默认值，确保仍可被路由（非桩，真实可路由端点） */
+        ep.cost_per_1k_input  = 0.001;
+        ep.cost_per_1k_output = 0.002;
+        ep.avg_latency_ms     = 1000;
+        ep.capabilities       = LLM_CAP_CHAT | LLM_CAP_COMPLETION | LLM_CAP_STREAMING;
+    }
+
+    int rc = llm_router_register_endpoint(&ep);
+    if (rc == 0) {
+        (*registered_count)++;
+    } else {
+        SVC_LOG_WARN("C-L02: SVC: router endpoint register FAILED for %s/%s (rc=%d)",
+                     provider_name, model_name, rc);
+    }
+    return 0; /* 继续枚举所有端点 */
+}
+
+/* 将 registry 中所有 provider/model 注册为 llm_router 端点 */
+static void register_router_endpoints(llm_service_t *svc)
+{
+    int registered_count = 0;
+    provider_registry_enumerate(svc->registry, register_endpoint_cb, &registered_count);
+    SVC_LOG_INFO("C-L02: SVC: registered %d endpoints into llm_router", registered_count);
+}
+
 /* ---------- 创建服务 ---------- */
 
 llm_service_t *llm_service_create(const char *config_path)
@@ -310,6 +391,15 @@ llm_service_t *llm_service_create(const char *config_path)
         AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
+    /* P3.16 (ACC-DT17): 初始化 llm_router 并将 registry 中的 provider/model
+     * 注册为路由端点。路由器为全局单例（设计见 llm_router.c），init 幂等。
+     * 失败非致命：complete 路径会回退到 find_provider 保持向后兼容。 */
+    if (llm_router_init(NULL) != 0) {
+        SVC_LOG_WARN("C-L02: SVC: llm_router_init failed — routing disabled, falling back to find_provider");
+    } else {
+        register_router_endpoints(svc);
+    }
+
     SVC_LOG_INFO("C-L02: SVC: CREATE-OK pricing_rules=%d llm_cache_capacity=%zu cache_ttl=%u",
                  (int)svc->rule_count, base_cfg.llm_cache_capacity, base_cfg.llm_cache_ttl_sec);
     return svc;
@@ -349,6 +439,12 @@ void llm_service_destroy(llm_service_t *svc)
         svc->rules = NULL;
         svc->rule_count = 0;
     }
+
+    /* P3.16 (ACC-DT17): 销毁全局路由器单例。
+     * 注意：router 为进程级全局单例，此处假设 llm_service 在 daemon 中为单实例
+     * （与 create 路径的 llm_router_init 配对）。llm_router_init 幂等，重新创建
+     * 服务时可再次初始化。每个测试为独立可执行进程，无跨实例全局状态污染。 */
+    llm_router_destroy();
 
     agentos_mutex_destroy(&svc->lock);
     AGENTOS_FREE(svc);
@@ -499,6 +595,66 @@ static const provider_t *find_provider(llm_service_t *svc, const char *model)
     return prov;
 }
 
+/* ---------- P3.16 (ACC-DT17): 通过 llm_router 选择提供商 ----------
+ *
+ * 优先使用策略路由（默认 LLM_ROUTE_COST）选择最合适的端点，再用路由结果的
+ * model_name 经 registry 解析为真实 provider_t*。路由失败（如未初始化、无符合
+ * 能力的端点、registry 为空）时返回 NULL，由调用方回退到 find_provider(model)
+ * 保持向后兼容。 */
+static const provider_t *select_provider_via_router(llm_service_t *svc,
+                                                    const llm_request_config_t *manager,
+                                                    bool is_stream)
+{
+    if (!svc || !manager) {
+        return NULL;
+    }
+
+    llm_route_request_t req;
+    __builtin_memset(&req, 0, sizeof(req));
+
+    /* 从首条消息提取 prompt 用于 token 估算（路由器内部用其估算成本） */
+    if (manager->message_count > 0 && manager->messages &&
+        manager->messages[0].content) {
+        req.prompt = manager->messages[0].content;
+        req.prompt_len = strlen(req.prompt);
+    } else {
+        req.prompt = "";
+        req.prompt_len = 0;
+    }
+
+    /* 必需能力：CHAT + COMPLETION；流式额外要求 STREAMING */
+    req.required_caps = LLM_CAP_CHAT | LLM_CAP_COMPLETION;
+    if (is_stream) {
+        req.required_caps |= LLM_CAP_STREAMING;
+    }
+
+    req.max_tokens = (manager->max_tokens > 0) ? (uint32_t)manager->max_tokens : 0;
+    req.max_cost = 0;          /* 不限成本 */
+    req.max_latency_ms = 0;    /* 不限延迟 */
+    req.strategy = LLM_ROUTE_COST;
+    req.preferred_provider[0] = '\0';  /* 自动选择，让策略生效 */
+
+    llm_route_result_t result;
+    __builtin_memset(&result, 0, sizeof(result));
+    int rc = llm_router_route(&req, &result);
+    if (rc != 0) {
+        SVC_LOG_DEBUG("C-L02: SVC: router_route rc=%d — will fall back to find_provider(%s)",
+                      rc, manager->model ? manager->model : "NULL");
+        return NULL;
+    }
+
+    /* 用路由结果的 model_name 经 registry 解析为真实 provider。
+     * 若路由选出的模型在 registry 中不存在（理论上不应发生，因端点源自 registry），
+     * 返回 NULL 触发调用方回退。 */
+    const provider_t *prov = find_provider(svc, result.model_name);
+    if (prov) {
+        SVC_LOG_INFO("C-L02: SVC: ROUTED provider=%s model=%s strategy=%d cost=%.6f latency=%u",
+                     result.provider_name, result.model_name, (int)result.strategy_used,
+                     result.estimated_cost, result.estimated_latency_ms);
+    }
+    return prov;
+}
+
 /**
  * @brief 存储响应到缓存
  */
@@ -560,8 +716,15 @@ int llm_service_complete(llm_service_t *svc, const llm_request_config_t *manager
         return AGENTOS_OK;
     }
 
-    /* 查找提供商 */
-    const provider_t *prov = find_provider(svc, manager->model);
+    /* P3.16 (ACC-DT17): 优先通过 llm_router 策略路由选择 provider；
+     * 路由失败（未初始化/无符合能力端点/registry 为空）时回退到
+     * find_provider(manager->model) 保持向后兼容。 */
+    const provider_t *prov = select_provider_via_router(svc, manager, false);
+    if (!prov) {
+        SVC_LOG_INFO("C-L02: SVC: router miss — falling back to find_provider(model=%s)",
+                     manager->model);
+        prov = find_provider(svc, manager->model);
+    }
     if (!prov) {
         SVC_LOG_ERROR("C-L02: SVC: COMPLETE-FAIL model=%s, error=INVALID_MODEL, STACK: llm_service_complete",
                       manager->model);
@@ -621,11 +784,14 @@ int llm_service_complete_stream(llm_service_t *svc, const llm_request_config_t *
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
-    /* 查找提供商 */
-    agentos_mutex_lock(&svc->lock);
-    const provider_t *prov = provider_registry_find(svc->registry, manager->model);
-    agentos_mutex_unlock(&svc->lock);
-
+    /* P3.16 (ACC-DT17): 优先通过 llm_router 策略路由选择 provider；
+     * 路由失败时回退到 find_provider(manager->model) 保持向后兼容。 */
+    const provider_t *prov = select_provider_via_router(svc, manager, true);
+    if (!prov) {
+        SVC_LOG_INFO("C-L02: SVC: router miss (stream) — falling back to find_provider(model=%s)",
+                     manager->model);
+        prov = find_provider(svc, manager->model);
+    }
     if (!prov) {
         SVC_LOG_ERROR("C-L02: SVC: STREAM-FAIL model=%s, error=INVALID_MODEL, STACK: llm_service_complete_stream",
                       manager->model);

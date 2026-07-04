@@ -6,7 +6,7 @@
  * 回调在独立线程中执行，超时后通过 pthread_cancel 终止。
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  */
 
 #include "hook_timeout.h"

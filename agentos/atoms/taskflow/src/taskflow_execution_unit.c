@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 SPHARX.
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 /**
  * @file taskflow_execution_unit.c
  * @brief TaskFlow执行单元实现
@@ -148,7 +148,14 @@ cleanup:
     context->output->result_data = context;
     context->output->result_data_size = sizeof(taskflow_execution_context_t);
 
-    return TASKFLOW_SUCCESS;
+    /* P3.21 (ACC-DT25)：返回 tf_result 而非总返回 SUCCESS。
+     * 原代码无论 taskflow_execute_sync 成功失败都返回 TASKFLOW_SUCCESS，
+     * 导致调用方（execution engine callback）误判失败为成功。
+     * 失败码同时存入 context->output->result 供查询，但函数返回值
+     * 必须反映真实执行结果以触发上层错误处理流程。
+     * 注：taskflow_error_t 与 agentos_error_t 数值兼容
+     * （TASKFLOW_SUCCESS = 0 = AGENTOS_ERR_OK），现有代码已混用此约定。 */
+    return tf_result;
 }
 
 // 执行单元销毁方法（接口实现）
@@ -163,7 +170,7 @@ static void taskflow_unit_destroy_impl(agentos_execution_unit_t *unit)
 
     // 销毁TaskFlow引擎
     if (private->taskflow_engine) {
-        taskflow_engine_destroy(private->taskflow_engine);
+        taskflow_engine_destroy_core(private->taskflow_engine);
     }
 
     AGENTOS_FREE(private);
@@ -196,17 +203,17 @@ agentos_execution_unit_t *taskflow_unit_create(const taskflow_unit_config_t *con
     // 复制配置
     private->config = *config;
 
-    // 创建TaskFlow引擎
-    private->taskflow_engine = taskflow_engine_create(&config->taskflow_config);
+    // 创建TaskFlow引擎（P3.21 ACC-DT24：改用 _core 后缀，避免链接到 taskflow_advanced 的无参版本导致配置丢失）
+    private->taskflow_engine = taskflow_engine_create_core(&config->taskflow_config);
     if (!private->taskflow_engine) {
         AGENTOS_FREE(private);
         AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
     // 初始化TaskFlow引擎
-    taskflow_error_t result = taskflow_engine_init(private->taskflow_engine);
+    taskflow_error_t result = taskflow_engine_init_core(private->taskflow_engine);
     if (result != TASKFLOW_SUCCESS) {
-        taskflow_engine_destroy(private->taskflow_engine);
+        taskflow_engine_destroy_core(private->taskflow_engine);
         AGENTOS_FREE(private);
         AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "validation failed");
     }

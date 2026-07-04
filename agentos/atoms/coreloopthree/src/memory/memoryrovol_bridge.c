@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  *
  * @file memoryrovol_bridge.c
  * @brief C-L12: CoreLoopThree → MemoryRovol 提供商桥接实现

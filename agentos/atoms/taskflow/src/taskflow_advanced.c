@@ -31,7 +31,12 @@ typedef struct {
     char *variables_json;
 } execution_entry_t;
 
-struct taskflow_engine_s {
+/* P3.21 (ACC-DT24)：struct tag 改为 taskflow_adv_engine_s，与 taskflow_core.c
+ * 的 struct taskflow_engine_s（Pregel 核心引擎，30+ 字段）分离，消除 ODR 违反。
+ * 本结构为高级工作流引擎（11 字段），两者字段布局完全不同。
+ * sizeof(taskflow_engine_t) 通过 typedef 名引用，不受 tag 名影响；
+ * 字段访问通过 taskflow_engine_t * 指针，同样不受影响。 */
+struct taskflow_adv_engine_s {
     handler_entry_t handlers[TASKFLOW_MAX_PARALLEL];
     size_t handler_count;
     workflow_entry_t workflows[TASKFLOW_MAX_SUBFLOWS];
@@ -231,6 +236,11 @@ static handler_entry_t *find_handler(taskflow_engine_t *engine, const char *name
 int taskflow_engine_start(taskflow_engine_t *engine, const char *workflow_id,
                           const char *input_json, char **execution_id)
 {
+    /* P3.21/W13.1 (ACC-DT25)：记录 handler 返回码，避免返回码恒 SUCCESS。
+     * 原代码无论 handler 成功失败都返回 0，调用方无法通过返回码感知执行失败，
+     * 违反 BAN-334（禁止 taskflow_advanced 调用方未检查返回码）。
+     * 修复：handler 失败时返回其错误码，调用方可通过返回码感知执行失败。 */
+    int handler_ret = 0;
     if (!engine || !workflow_id || !execution_id)
         AGENTOS_ERROR(AGENTOS_EINVAL, "failed to start execution: null engine, workflow_id, or execution_id");
     taskflow_workflow_t *wf = find_workflow(engine, workflow_id);
@@ -290,6 +300,8 @@ AGENTOS_STRNCPY_TERM(ee->execution.workflow_id, workflow_id, sizeof(ee->executio
                             ? (double)ee->execution.completed_nodes / (double)wf->node_count
                             : 1.0;
                 } else {
+                    /* P3.21/W13.1：记录 handler 失败码，函数返回时反映真实结果 */
+                    handler_ret = ret;
                     ee->execution.state = TASKFLOW_STATE_FAILED;
                     ee->execution.error_message = (char *)AGENTOS_MALLOC(128);
                     if (ee->execution.error_message)
@@ -314,7 +326,10 @@ AGENTOS_STRNCPY_TERM(ee->execution.workflow_id, workflow_id, sizeof(ee->executio
                             engine->progress_user_data);
     }
 
-    return 0;
+    /* P3.21/W13.1：返回 handler 真实结果，而非总返回 SUCCESS。
+     * handler 成功时 handler_ret=0；handler 失败时 handler_ret=ret（非 0）。
+     * 调用方可通过返回码感知执行失败，符合 BAN-334 要求。 */
+    return handler_ret;
 }
 
 int taskflow_engine_cancel(taskflow_engine_t *engine, const char *execution_id)

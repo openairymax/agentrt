@@ -25,6 +25,7 @@ set(CL3_TEST_SOURCES
     unit/test_multi_agent.c
     unit/test_browser.c
     unit/test_triple_coordinator.c
+    unit/test_hook_integration.c
 )
 
 set(CL3_BENCH_SOURCES
@@ -42,6 +43,8 @@ set(CL3_COMMON_INCLUDES
     ${CORELOOPTHREE_DIR}/../../daemon/common/include
     ${CORELOOPTHREE_DIR}/../../daemon/llm_d/include
     ${CORELOOPTHREE_DIR}/../../daemon/tool_d/include
+    # P3.18 (ACC-DT26): hook_d — test_hook_integration.c 引用 agentos_hook.h
+    ${CORELOOPTHREE_DIR}/../../daemon/hook_d/include
     ${CORELOOPTHREE_DIR}/../../commons/utils/quality
     ${CORELOOPTHREE_DIR}/../../cupolas/src
     ${COREKERN_INCLUDE_DIR}

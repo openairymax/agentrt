@@ -46,6 +46,12 @@ add_library(agentos_coreloopthree STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/src/checkpoint.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/src/orchestrator.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../cupolas/src/yaml_minimal.c
+    # P3.18 (ACC-DT26): hook_d → CoreLoopThree — 关键事件 hook 触发
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/hook_d/src/service.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/hook_d/src/hook_executor.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/hook_d/src/hook_registry.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/hook_d/src/hook_interceptor.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/hook_d/src/hook_timeout.c
 )
 
 target_link_libraries(agentos_coreloopthree PUBLIC agentos_atoms)
@@ -143,6 +149,7 @@ target_include_directories(agentos_coreloopthree PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/llm_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/tool_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/hook_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/quality
     ${CMAKE_CURRENT_SOURCE_DIR}/../../cupolas/src
 )

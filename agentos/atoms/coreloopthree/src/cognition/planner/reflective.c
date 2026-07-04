@@ -27,6 +27,7 @@
 #include "llm_client.h"
 #include "error.h"
 #include "error_compat.h"
+#include "strategy.h"  /* P4.8.1: agentos_plan_reflective_create 声明 + agentos_memory_engine_t 前向声明 */
 
 #define ATM_RET_ERR(c) \
     do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
@@ -36,6 +37,7 @@ typedef struct {
     agentos_thinking_chain_t *chain;
     agentos_metacognition_t *meta;
     agentos_llm_service_t *llm;
+    agentos_memory_engine_t *memory_engine;  /* P4.8.1: 记忆引擎（用于获取历史经验） */
     int initialized;
     uint64_t session_count;
     char *last_goal;
@@ -143,7 +145,8 @@ static int real_s1_verify(const char *content, size_t len, float confidence, voi
  * 反思式规划实现
  * ============================================================================ */
 
-static __attribute__((unused)) agentos_error_t reflective_plan_init(void **out_context)
+/* P4.8.1: 移除 __attribute__((unused))，此函数现在被 agentos_plan_reflective_create 调用 */
+static agentos_error_t reflective_plan_init(void **out_context)
 {
     if (!out_context)
         ATM_RET_ERR(AGENTOS_EINVAL);
@@ -156,6 +159,7 @@ static __attribute__((unused)) agentos_error_t reflective_plan_init(void **out_c
     ctx->chain = NULL;
     ctx->meta = NULL;
     ctx->llm = NULL;
+    ctx->memory_engine = NULL;  /* P4.8.1: 初始化 memory_engine */
     ctx->initialized = 0;
     ctx->session_count = 0;
     ctx->last_goal = NULL;
@@ -863,5 +867,43 @@ static agentos_task_plan_t *build_fallback_plan(const agentos_intent_t *intent,
     return plan;
 }
 
-const agentos_plan_strategy_t g_reflective_strategy = {
-    .plan = reflective_plan, .destroy = reflective_plan_cleanup, .data = NULL};
+/* P4.8.1 (ACC-DT32): 实现 agentos_plan_reflective_create 工厂函数，
+ * 将 reflective 规划策略接入主流程，消除死代码。
+ * 原 g_reflective_strategy 全局变量未被任何代码引用，属于死代码，已删除。
+ *
+ * 使用方式（参照 agentos_plan_reactive_create）：
+ *   agentos_plan_strategy_t *strat = agentos_plan_reflective_create(llm, memory_engine);
+ *   agentos_cognition_set_plan_strategy(cognition, strat);
+ *
+ * 参数:
+ *   llm - LLM 服务客户端句柄（用于 S2 内容生成）
+ *   memory_engine - 记忆引擎句柄（用于获取历史经验，0.1.1 暂不深度集成，仅存储）
+ *
+ * 返回:
+ *   策略对象指针，失败返回 NULL */
+agentos_plan_strategy_t *agentos_plan_reflective_create(agentos_llm_service_t *llm,
+                                                        agentos_memory_engine_t *memory_engine)
+{
+    agentos_plan_strategy_t *strat =
+        (agentos_plan_strategy_t *)AGENTOS_CALLOC(1, sizeof(agentos_plan_strategy_t));
+    if (!strat)
+        return NULL;
+
+    reflective_context_t *ctx = NULL;
+    if (reflective_plan_init((void **)&ctx) != AGENTOS_SUCCESS) {
+        AGENTOS_FREE(strat);
+        AGENTOS_LOG_ERROR("reflective: reflective_plan_init failed");
+        return NULL;
+    }
+
+    ctx->llm = llm;
+    ctx->memory_engine = memory_engine;
+
+    strat->plan = reflective_plan;
+    strat->destroy = reflective_plan_cleanup;
+    strat->data = ctx;
+
+    AGENTOS_LOG_INFO("reflective: strategy created (llm=%p, memory_engine=%p)",
+                     (void *)llm, (void *)memory_engine);
+    return strat;
+}

@@ -8,6 +8,7 @@
 #include "hook_service.h"
 #include "daemon_bootstrap_sd.h"
 #include "daemon_bootstrap_ipc.h"
+#include "daemon_cupolas_bootstrap.h"
 #include "logging.h"
 #include "platform.h"
 #include "svc_logger.h"
@@ -80,6 +81,9 @@ int main(int argc, char *argv[]) {
     agentos_log_init(NULL);
     atexit(log_cleanup);
 
+    /* P3.14 ACC-DT15: 初始化 cupolas 安全穹顶（permission_engine + sanitizer + audit_logger）*/
+    daemon_cupolas_init("hook_d");
+
     SVC_LOG_INFO("hook_d: starting");
 
     /* 创建 Unix Socket 服务器 */
@@ -118,6 +122,7 @@ int main(int argc, char *argv[]) {
     }
     SVC_LOG_INFO("P2.1: HookD: shutting down (sd=%s ipc=%s)",
                  g_bsd ? "stopped" : "n/a", g_bipc ? "stopped" : "n/a");
+    daemon_cupolas_cleanup(); /* P3.14 ACC-DT15: 清理 cupolas 安全穹顶 */
     log_cleanup();
     return EXIT_SUCCESS;
 }

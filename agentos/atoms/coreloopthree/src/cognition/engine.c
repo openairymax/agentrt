@@ -50,6 +50,9 @@
 /* C-L12: MemoryRovol → CoreLoopThree */
 #include "memoryrovol_bridge.h"
 
+/* P3.18 (ACC-DT26): hook_d → CoreLoopThree — 关键事件 hook 触发 */
+#include "agentos_hook.h"
+
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -124,6 +127,11 @@ static void trigger_feedback(agentos_cognition_engine_t *engine, int level, cons
     }
 }
 
+/* P3.18 (ACC-DT26): 前向声明 — cognition_fire_hook 定义在 L664，
+ * 此处提前声明以供 cognition_provider_write 内的 ON_MEMORY_EVOLVE 触发使用。 */
+static hook_decision_t cognition_fire_hook(hook_type_t type, const char *operation,
+                                           const void *input_data, size_t input_data_len);
+
 /* C-L12: Write a memory record to the provider (if available) */
 static int cognition_provider_write(agentos_cognition_engine_t *engine, const char *phase,
                                     const char *content, size_t content_len)
@@ -133,6 +141,25 @@ static int cognition_provider_write(agentos_cognition_engine_t *engine, const ch
 
     if (!engine->memory_provider->write_raw)
         return 0;
+
+    /* P3.18 (ACC-DT26): ON_MEMORY_EVOLVE hook — 记忆写入前触发。
+     * ABORT → 跳过本次写入（非致命，记忆是增强功能）；
+     * 其他决策 → 正常写入（仅记录/审计）。 */
+    {
+        char op_buf[64];
+        snprintf(op_buf, sizeof(op_buf), "memory_evolve:%s",
+                 phase ? phase : "unknown");
+        hook_decision_t hd = cognition_fire_hook(HOOK_TYPE_ON_MEMORY_EVOLVE, op_buf,
+                                                  content, content_len);
+        if (hd == HOOK_DECISION_ABORT) {
+            AGENTOS_LOG_INFO("C-L09: ON_MEMORY_EVOLVE hook ABORT — skipping memory write (phase=%s)",
+                             phase ? phase : "unknown");
+            return 0;
+        }
+        if (hd == HOOK_DECISION_RETRY) {
+            AGENTOS_LOG_DEBUG("C-L09: ON_MEMORY_EVOLVE hook RETRY — degraded to CONTINUE (P4)");
+        }
+    }
 
     char metadata[256];
     snprintf(metadata, sizeof(metadata),
@@ -267,6 +294,16 @@ agentos_error_t agentos_cognition_create_ex_take(const agentos_cognition_config_
     }
 
     *out_engine = engine;
+
+    /* P3.18 (ACC-DT26): 初始化 hook 系统（幂等 — 多次调用安全）。
+     * hook 是增强功能（审计/拦截/修改），初始化失败不阻止 cognition engine 运行，
+     * 仅记录警告。hook_trigger 在未初始化时返回 CONTINUE（no-op）。 */
+    if (agentos_hook_init() != 0) {
+        AGENTOS_LOG_WARN("C-L09: hook_init failed — hooks disabled (non-fatal)");
+    } else {
+        AGENTOS_LOG_INFO("C-L09: hook system initialized for cognition engine");
+    }
+
     trigger_feedback(engine, 2, "engine_created", "{\"status\":\"initialized\"}");
     return AGENTOS_SUCCESS;
 }
@@ -275,6 +312,11 @@ void agentos_cognition_destroy(agentos_cognition_engine_t *engine)
 {
     if (!engine)
         return;
+
+    /* P3.18 (ACC-DT26): 销毁 hook 系统 — 与 create 中的 agentos_hook_init 配对。
+     * hook_shutdown 幂等，重复调用安全。 */
+    agentos_hook_shutdown();
+
     if (engine->chain) {
         agentos_tc_chain_stop(engine->chain);
         agentos_tc_chain_destroy(engine->chain);
@@ -632,6 +674,33 @@ int agentos_cognition_save_checkpoint(agentos_cognition_engine_t *engine,
     }
 }
 
+/* P3.18 (ACC-DT26): cognition_fire_hook — 在关键事件点触发 hook 链
+ *
+ * 构造 hook_context_t 并调用 agentos_hook_trigger，返回聚合决策。
+ * 用于 PRE_EXEC/POST_EXEC/PRE_LLM/POST_LLM/PRE_TOOL/POST_TOOL/ON_ERROR/ON_MEMORY_EVOLVE。
+ *
+ * 决策处理由调用点负责：
+ *   CONTINUE — 正常继续
+ *   SKIP     — 跳过当前步骤
+ *   ABORT    — 终止当前阶段
+ *   MODIFY   — 使用 ctx.output_data 替换输入
+ *   RETRY    — 降级为 CONTINUE（完整重试需循环计数，P4 增强） */
+static hook_decision_t cognition_fire_hook(hook_type_t type,
+                                           const char *operation,
+                                           const void *input_data,
+                                           size_t input_data_len)
+{
+    hook_context_t ctx;
+    AGENTOS_MEMSET(&ctx, 0, sizeof(ctx));
+    ctx.type = type;
+    ctx.source_daemon = "coreloopthree";
+    ctx.operation = operation ? operation : "unknown";
+    ctx.input_data = input_data;
+    ctx.input_data_len = input_data_len;
+    ctx.timestamp_ns = agentos_time_monotonic_ns();
+    return agentos_hook_trigger(&ctx);
+}
+
 agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, const char *input,
                                           size_t input_len, agentos_task_plan_t **out_plan)
 {
@@ -643,6 +712,26 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
     }
     if (input_len == 0)
         return AGENTOS_EINVAL;
+
+    /* P3.18 fix: plan/err 提前声明至函数顶部 — PRE_EXEC ABORT 在原 L920/L921 声明
+     * 之前 goto process_fail，process_fail 路径读取 plan/err 未初始化值（UB）。
+     * 提前声明确保所有 goto process_fail 路径变量已初始化（plan=NULL, err=EUNKNOWN）。 */
+    agentos_task_plan_t *plan = NULL;
+    agentos_error_t err = AGENTOS_EUNKNOWN;
+
+    /* P3.18 (ACC-DT26): PRE_EXEC hook — 认知处理开始前触发。
+     * ABORT → 直接进入失败路径；CONTINUE/MODIFY/RETRY → 正常继续。 */
+    {
+        hook_decision_t hd = cognition_fire_hook(HOOK_TYPE_PRE_EXEC, "cognition_process",
+                                                  input, input_len);
+        if (hd == HOOK_DECISION_ABORT) {
+            AGENTOS_LOG_WARN("C-L09: PRE_EXEC hook ABORT — skipping cognition process");
+            goto process_fail;
+        }
+        if (hd == HOOK_DECISION_RETRY) {
+            AGENTOS_LOG_DEBUG("C-L09: PRE_EXEC hook RETRY — degraded to CONTINUE (P4 enhancement)");
+        }
+    }
 
     agentos_intent_t intent;
     __builtin_memset(&intent, 0, sizeof(intent));
@@ -834,8 +923,8 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
     }
 
     /* ========== Phase 1: Planning (S2 + S1 pre-validation) ========== */
-    agentos_task_plan_t *plan = NULL;
-    agentos_error_t err = AGENTOS_EUNKNOWN;
+    plan = NULL;                /* P3.18 fix: 重置 — 已在函数顶部声明 */
+    err = AGENTOS_EUNKNOWN;     /* P3.18 fix: 重置 — 已在函数顶部声明 */
 
     agentos_plan_strategy_t *plan_strat = NULL;
     agentos_plan_strategy_t *fallback_strat = NULL;
@@ -988,8 +1077,25 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
             stream_cb_data = engine->llm_stream_user_data;
             agentos_mutex_unlock(engine->lock);
 
+            /* P3.18 (ACC-DT26): PRE_LLM hook — LLM 调用前触发。
+             * ABORT/SKIP → 跳过 LLM 调用（llm_ret 保持 -1）；
+             * MODIFY → 降级 CONTINUE（修改请求需重建 msgs，P4 增强）；
+             * CONTINUE/RETRY → 正常继续。 */
+            int skip_llm_call = 0;
+            {
+                hook_decision_t hd = cognition_fire_hook(HOOK_TYPE_PRE_LLM, "llm_complete",
+                                                          input, input_len);
+                if (hd == HOOK_DECISION_ABORT || hd == HOOK_DECISION_SKIP) {
+                    AGENTOS_LOG_INFO("C-L09: PRE_LLM hook %s — skipping LLM call",
+                                     hd == HOOK_DECISION_ABORT ? "ABORT" : "SKIP");
+                    skip_llm_call = 1;
+                } else if (hd == HOOK_DECISION_MODIFY) {
+                    AGENTOS_LOG_DEBUG("C-L09: PRE_LLM hook MODIFY — degraded to CONTINUE (P4)");
+                }
+            }
+
             /* P1.2.1: Prefer IPC adapter path over direct LLM service */
-            if (llm_adapter) {
+            if (!skip_llm_call && llm_adapter) {
                 AGENTOS_LOG_DEBUG("C-L02: Using IPC adapter for LLM request"
                                   " (streaming=%s)",
                                   (use_streaming && stream_cb) ? "on" : "off");
@@ -1007,7 +1113,7 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                         llm_adapter, &llm_cfg, &llm_resp);
                     AGENTOS_LOG_DEBUG("C-L02: IPC sync complete: ret=%d", llm_ret);
                 }
-            } else if (llm_svc) {
+            } else if (!skip_llm_call && llm_svc) {
                 AGENTOS_LOG_DEBUG("C-L02: Using direct LLM service (no IPC adapter)"
                                   " streaming=%s",
                                   (use_streaming && stream_cb) ? "on" : "off");
@@ -1048,6 +1154,22 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
             if (llm_resp) {
                 llm_response_free(llm_resp);
                 llm_resp = NULL;
+            }
+
+            /* P3.18 (ACC-DT26): POST_LLM hook — LLM 响应提取后触发（仅记录/审计）。
+             * ABORT → 终止当前阶段（释放 llm_response_text 避免泄漏，因 process_fail
+             *          路径不释放该指针）；其他决策 → 正常继续。 */
+            {
+                hook_decision_t hd = cognition_fire_hook(HOOK_TYPE_POST_LLM, "llm_complete",
+                                                          llm_response_text, llm_response_len);
+                if (hd == HOOK_DECISION_ABORT) {
+                    AGENTOS_LOG_WARN("C-L09: POST_LLM hook ABORT — terminating phase");
+                    if (llm_response_text) {
+                        AGENTOS_FREE(llm_response_text);
+                        llm_response_text = NULL;
+                    }
+                    goto process_fail;
+                }
             }
         }
 
@@ -1264,6 +1386,25 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                 tool_result_t *result = NULL;
                 int tool_err = -1;
 
+                /* P3.18 (ACC-DT26): PRE_TOOL hook — 工具执行前触发。
+                 * ABORT/SKIP → 跳过该工具；MODIFY → 修改 params_json；CONTINUE/RETRY → 继续。 */
+                {
+                    hook_decision_t hd = cognition_fire_hook(HOOK_TYPE_PRE_TOOL,
+                                                              node->task_node_handler_name,
+                                                              tool_req.params_json,
+                                                              tool_req.params_json
+                                                                  ? strlen(tool_req.params_json) : 0);
+                    if (hd == HOOK_DECISION_ABORT || hd == HOOK_DECISION_SKIP) {
+                        AGENTOS_LOG_INFO("C-L09: PRE_TOOL hook %s — skipping tool '%s'",
+                                         hd == HOOK_DECISION_ABORT ? "ABORT" : "SKIP",
+                                         node->task_node_handler_name);
+                        continue;
+                    }
+                    if (hd == HOOK_DECISION_RETRY) {
+                        AGENTOS_LOG_DEBUG("C-L09: PRE_TOOL hook RETRY — degraded to CONTINUE (P4)");
+                    }
+                }
+
                 /* P1.3.1: Prefer IPC adapter path over direct tool service */
                 if (tool_adapter) {
                     tool_err = tool_svc_adapter_execute(
@@ -1275,6 +1416,24 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
                     AGENTOS_LOG_DEBUG("C-L04: Direct tool '%s' execute: ret=%d",
                                       node->task_node_handler_name, tool_err);
                 }
+
+                /* P3.18 (ACC-DT26): POST_TOOL hook — 工具执行后触发。
+                 * ABORT → 跳出工具循环；其他决策 → 正常继续（仅记录/审计）。 */
+                {
+                    hook_decision_t hd = cognition_fire_hook(HOOK_TYPE_POST_TOOL,
+                                                              node->task_node_handler_name,
+                                                              result && result->output
+                                                                  ? result->output : NULL,
+                                                              result && result->output
+                                                                  ? strlen(result->output) : 0);
+                    if (hd == HOOK_DECISION_ABORT) {
+                        AGENTOS_LOG_WARN("C-L09: POST_TOOL hook ABORT — breaking tool loop at '%s'",
+                                         node->task_node_handler_name);
+                        if (result) tool_result_free(result);
+                        break;
+                    }
+                }
+
                 if (tool_err == 0 && result && result->success == 0) {
                     AGENTOS_LOG_DEBUG("C-L04: Tool '%s' executed successfully"
                                       " (duration=%llums)",
@@ -1594,6 +1753,10 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
              (unsigned long long)engine->dual_think_corrections);
     trigger_feedback(engine, 0, "process_complete", feedback_buf);
 
+    /* P3.18 (ACC-DT26): POST_EXEC hook — 认知处理成功完成后触发（仅记录/审计）。 */
+    cognition_fire_hook(HOOK_TYPE_POST_EXEC, "cognition_process_complete",
+                        input, input_len);
+
     /* C-L07: Clear current plan reference before returning ownership to caller */
     engine->current_plan = NULL;
 
@@ -1601,6 +1764,9 @@ agentos_error_t agentos_cognition_process(agentos_cognition_engine_t *engine, co
     return AGENTOS_SUCCESS;
 
 process_fail:
+    /* P3.18 (ACC-DT26): ON_ERROR hook — 认知处理失败时触发（仅记录/审计）。 */
+    cognition_fire_hook(HOOK_TYPE_ON_ERROR, "cognition_process_fail",
+                        input, input_len);
     /* P1.14: 释放已生成的 plan（plan_strat->plan 返回错误但仍设置了 plan 的防御性释放） */
     if (plan) {
         agentos_task_plan_free(plan);
