@@ -215,10 +215,18 @@ int tool_approval_check(tool_approval_ctx_t *ctx, const tool_metadata_t *meta,
         }
     }
 
-    /* ── 步骤 2: 权限检查 (Cupolas) ── */
+    /* ── 步骤 2: 权限检查 (Cupolas) ──
+     * P3.17 (ACC-DT18) 返回码反转修复：
+     * daemon_check_tool_permission 返回 0=允许，非 0=拒绝（fail-closed）。
+     * 历史代码 `if (!perm_ret)` 在 perm_ret==0（允许）时进入拒绝路径，
+     * 在 perm_ret<0（拒绝）时放行——逻辑完全反转，导致：
+     *   - 无 ACL 条目的工具被错误放行（应 fail-closed 拒绝）
+     *   - 有 ACL 授权的工具被错误拒绝
+     * 修正为 `if (perm_ret != 0)` 与 safety_guard_bridge.c L218 保持一致。*/
     int perm_ret = daemon_check_tool_permission(agent_id, tool_name, "execute");
-    if (!perm_ret) {
-        AGENTOS_LOG_WARN("C-L05: Permission denied for agent='%s' tool='%s'", agent_id, tool_name);
+    if (perm_ret != 0) {
+        AGENTOS_LOG_WARN("C-L05: Permission denied for agent='%s' tool='%s' (perm_ret=%d)",
+                         agent_id, tool_name, perm_ret);
         if (detail) {
             detail->permission_check_passed = 0;
             snprintf(detail->reason, sizeof(detail->reason),

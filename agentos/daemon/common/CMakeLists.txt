@@ -56,6 +56,7 @@ set(SVC_COMMON_SOURCES
     src/ipc_backpressure.c    # P1.24: IPC Bus 背压控制
     src/daemon_bootstrap_sd.c    # P1.7 C-L08: daemon ServiceDiscovery 一键引导
     src/daemon_bootstrap_ipc.c   # P1.7 C-L09: daemon IPC Bus 一键引导
+    src/daemon_cupolas_bootstrap.c # P3.14 ACC-DT15: daemon 统一 cupolas 安全穹顶引导
 )
 
 # 创建静态库
@@ -66,6 +67,17 @@ target_link_libraries(svc_common PUBLIC
     agentos_common
     agentos_compile_defs
 )
+
+# P3.14 ACC-DT15: cupolas 安全穹顶（PUBLIC 使得所有链接 svc_common 的 daemon 自动获得 cupolas）
+if(TARGET cupolas)
+    target_link_libraries(svc_common PUBLIC cupolas)
+    target_include_directories(svc_common PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../cupolas/include>
+    )
+else()
+    message(WARNING "cupolas target not found — daemon_cupolas_bootstrap will fail to link. "
+                    "Ensure cupolas module is built (agentos/cupolas/CMakeLists.txt).")
+endif()
 if(AGENTOS_HAS_OPENSSL)
     target_link_libraries(svc_common PUBLIC ${OPENSSL_CRYPTO_LIBRARY})
 endif()
@@ -247,5 +259,6 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ipc_backpressure.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_startup.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_event_driver.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_cupolas_bootstrap.h
     DESTINATION include/agentos
 )

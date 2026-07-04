@@ -10,7 +10,7 @@
  *   - 分配时优先从当前 CPU 的 partial 页获取，失败时从全局 partial 链 steal
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  */
 
 #include "slab.h"

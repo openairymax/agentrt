@@ -2,7 +2,7 @@
  * @file daemon_errors.h
  * @brief 守护进程统一错误码定义
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  *
  * 统一所有守护进程的 JSON-RPC 错误码和服务特有错误码，
  * 消除各 daemon main.c 中的重复定义。

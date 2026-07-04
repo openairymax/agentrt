@@ -11,11 +11,13 @@
  */
 
 #include "daemon_defaults.h"
+#include "daemon_security.h"
 #include "error.h"
 #include "executor.h"
 #include "platform.h"
 #include "service.h"
 #include "svc_logger.h"
+#include "tool_approval.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -58,6 +60,27 @@ tool_service_t *tool_service_create(const char *config_path __attribute__((unuse
         agentos_mutex_destroy(&svc->lock);
         AGENTOS_FREE(svc);
         AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
+    }
+
+    /* P3.17 (ACC-DT18): 默认启用工具审批（enable_approval=true）。
+     * 创建 approval_ctx 并注入 executor，使所有工具执行必须通过 Cupolas 安全穹顶审批。
+     * executor.c 已改为 fail-closed：未注入 approval_ctx 时拒绝执行。
+     * daemon_security 采用 fail-closed ACL：无 ACL 条目 = 拒绝。
+     * 部署时需通过 daemon_security_add_acl_rule() 注册授权的工具。*/
+    daemon_security_init(NULL, NULL);
+    tool_approval_config_t approval_cfg;
+    __builtin_memset(&approval_cfg, 0, sizeof(approval_cfg));
+    approval_cfg.agent_id = "tool_d";
+    approval_cfg.enable_safety_guard_chain = true;
+    approval_cfg.enable_audit_logging = true;
+    approval_cfg.permission_rules = NULL;
+    tool_approval_ctx_t *approval_ctx = tool_approval_create(&approval_cfg);
+    if (approval_ctx) {
+        tool_executor_set_approval_ctx(svc->executor, approval_ctx);
+        SVC_LOG_INFO("C-L05: Default tool approval context attached (enable_approval=true)");
+    } else {
+        SVC_LOG_ERROR("C-L05: Failed to create default approval context — "
+                      "executor will fail-closed on all tool executions");
     }
 
     /* 创建验证器 */

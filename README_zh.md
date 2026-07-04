@@ -9,7 +9,7 @@ Powered by OpenAirymax
 [![GitHub stars](https://img.shields.io/github/stars/SpharxTeam/AgentRT)](https://github.com/SpharxTeam/AgentRT/stargazers)
 
 [![Version](https://img.shields.io/badge/version-0.1.0-5a6b7e)](https://atomgit.com/openairymax/agentos)
-[![License](https://img.shields.io/badge/license-Apache--2.0-4a90d9)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![Build](https://img.shields.io/badge/build-passing-2ea44f)](https://atomgit.com/openairymax/agentos)
 
 [![C/C++](https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-00599C?logo=c%2B%2B&logoColor=white)](https://isocpp.org)
@@ -80,7 +80,7 @@ Powered by OpenAirymax
 从内核到应用的完整架构：
 ```
 ⬇️ 生态层 (ecosystem) — 应用/配置/Prompt/Hook/技能
-⇅ 服务层 (daemon) — 10+ 守护进程服务
+⇅ 服务层 (daemon) — 12 个守护进程服务
 ⇅ 协议层 (protocols) — 5 层统一协议栈
 ⇅ 网关层 (gateway) — HTTP/WS/Stdio → JSON-RPC 2.0
 ⇅ 存储层 (heapstore) — 运行时数据持久化
@@ -278,7 +278,7 @@ Fork 项目 → 创建分支 → 开发测试 → 提交 PR → 代码审查 →
 
 ## 7️⃣ 许可证
 
-本项目采用 **Apache License 2.0** 开源许可，详情参阅 [LICENSE](LICENSE) 文件。
+本项目采用 **AGPL v3 + Apache 2.0** 双许可证（SPDX: `AGPL-3.0-or-later OR Apache-2.0`），可任选其一使用。详情参阅 [LICENSE](LICENSE) 文件。版权所有 (c) 2025-2026 SPHARX Ltd.
 
 ***
 

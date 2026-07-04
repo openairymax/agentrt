@@ -395,11 +395,14 @@ static void test_enum_values(void)
     assert(TASKFLOW_STATE_COMPLETED == 4);
     assert(TASKFLOW_STATE_FAILED == 5);
 
-    assert(TASKFLOW_ERROR_RETRY == 0);
-    assert(TASKFLOW_ERROR_ROLLBACK == 1);
-    assert(TASKFLOW_ERROR_SKIP == 2);
-    assert(TASKFLOW_ERROR_ABORT == 3);
-    assert(TASKFLOW_ERROR_FALLBACK == 4);
+    /* P3.21 (ACC-DT25)：枚举首项改为 TASKFLOW_ERROR_STRATEGY_NONE=0，
+     * 避免 TASKFLOW_ERROR_RETRY=0 与 TASKFLOW_SUCCESS=0 数值碰撞。 */
+    assert(TASKFLOW_ERROR_STRATEGY_NONE == 0);
+    assert(TASKFLOW_ERROR_RETRY == 1);
+    assert(TASKFLOW_ERROR_ROLLBACK == 2);
+    assert(TASKFLOW_ERROR_SKIP == 3);
+    assert(TASKFLOW_ERROR_ABORT == 4);
+    assert(TASKFLOW_ERROR_FALLBACK == 5);
 
     assert(TASKFLOW_LOOP_COUNT == 0);
     assert(TASKFLOW_LOOP_CONDITION == 1);

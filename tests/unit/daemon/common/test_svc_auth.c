@@ -2,7 +2,7 @@
  * @file test_svc_auth.c
  * @brief 认证中间件单元测试
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  */
 
 #include <stdio.h>

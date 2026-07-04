@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 SPHARX.
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 /**
  * @file taskflow_types.h
  * @brief TaskFlow Graph Execution System Type Definitions

@@ -45,6 +45,8 @@ target_include_directories(agentos_syscall PUBLIC
 target_include_directories(agentos_syscall PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/llm_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../memory/src
+    # P3.18 (ACC-DT27): syscall_entry.c 的 sys_tool_execute 调用 agentos_process_run_capture
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/platform/include
 )
 
 # 安全编译选项（基于 AgentRT C 编码风格指南附录 A）
@@ -105,6 +107,8 @@ endif()
 
 install(TARGETS agentos_syscall DESTINATION lib)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/syscalls.h DESTINATION include/agentos)
+# P3.18 (ACC-DT27): sandbox 公共 API 头文件
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/include/agentos_sandbox.h DESTINATION include/agentos)
 
 # 测试配置
 if(BUILD_TESTS)

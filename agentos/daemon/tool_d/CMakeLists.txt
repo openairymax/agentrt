@@ -74,6 +74,8 @@ target_include_directories(agentos_tool_service PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../cupolas/include
     ${COMMONS_INCLUDE_DIR}/utils/network/include
     ${COMMONS_INCLUDE_DIR}/utils/ipc/include
+    # P3.18 (ACC-DT27): sandbox 公共 API（agentos_sandbox.h）和 syscall 号（syscalls.h）
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/syscall/include
 )
 
 target_include_directories(agentos_tool_service PRIVATE
@@ -82,7 +84,10 @@ target_include_directories(agentos_tool_service PRIVATE
 )
 
 # 链接库：svc_common 提供 daemon 公共层，cupolas 提供 SafetyGuard
-target_link_libraries(agentos_tool_service PUBLIC svc_common cupolas)
+# P3.18 (ACC-DT27): agentos_syscall 提供 sandbox 公共 API（agentos_sandbox_invoke 等）
+# 依赖链：agentos_tool_service → agentos_syscall → agentos_coreloopthree → agentos_core
+# 无循环依赖（coreloopthree 不链接 tool_service，仅 include 头文件）
+target_link_libraries(agentos_tool_service PUBLIC svc_common cupolas agentos_syscall)
 
 if(AGENTOS_HAS_CJSON)
     if(cJSON_FOUND)
@@ -155,7 +160,22 @@ target_include_directories(agentos-tool-d PRIVATE
 
 target_link_libraries(agentos-tool-d PRIVATE
     agentos_tool_service
+    # P3.18 (ACC-DT27): agentos_tool_service → agentos_syscall → agentos_coreloopthree
+    # 传递依赖。coreloopthree 引用 cognition/llm/checkpoint/hook_d 等符号，
+    # 需 whole-archive 强制包含 coreloopthree 全部 .o + 完整传递依赖库。
+    -Wl,--whole-archive
+    agentos_coreloopthree
+    -Wl,--no-whole-archive
+    agentos_cognition
+    agentos_execution
+    agentos_core
+    agentos_memory
+    agentos_atoms
+    agentos_common
+    agentos_llm_service
     Threads::Threads
+    uuid
+    m
 )
 
 target_compile_options(agentos-tool-d PRIVATE

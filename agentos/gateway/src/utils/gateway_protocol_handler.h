@@ -2,7 +2,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 // SPDX-FileCopyrightText: 2026 SPHARX.
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 /**
  * @file gateway_protocol_handler.h
  * @brief 多协议网关请求处理器

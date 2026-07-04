@@ -233,7 +233,7 @@ int daemon_sanitize_tool_params(const char *tool_name, const char *params, char 
  *
  * Example usage:
  * @code
- * if (!daemon_check_tool_permission("agent-001", "file_read", "execute")) {
+ * if (daemon_check_tool_permission("agent-001", "file_read", "execute") != 0) {
  *     return AGENTOS_ERR_PERMISSION_DENIED;
  * }
  * // Proceed with tool execution

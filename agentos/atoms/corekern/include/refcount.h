@@ -4,7 +4,7 @@
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  *
  * P1.21: 引用计数用于 IPC 共享缓冲区等跨模块共享对象。
  * 基于 _Atomic uint32_t 实现线程安全的引用计数。

@@ -3,7 +3,7 @@
  * @brief heapstore 模糊测试 (Fuzz Testing) 和并发压力测试
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  *
  * "From data intelligence emerges."
  *

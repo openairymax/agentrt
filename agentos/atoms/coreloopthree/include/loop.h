@@ -288,6 +288,89 @@ AGENTOS_API void agentos_loop_set_manager_adapter(agentos_core_loop_t *loop,
 AGENTOS_API void agentos_loop_set_orch_adapter(agentos_core_loop_t *loop,
                                                 orch_adapter_t *adapter);
 
+/* ================================================================
+ * W18: taskflow_advanced DAG 工作流集成
+ * ================================================================ */
+
+/**
+ * @brief W18: 提交 DAG 工作流任务（基于 taskflow_advanced 引擎编排）
+ *
+ * 与 agentos_loop_submit（自然语言单任务）不同，此函数接受结构化的
+ * taskflow_workflow_t 工作流定义，通过内部 taskflow_advanced 引擎执行
+ * DAG 编排。适用于需要条件分支、并行汇聚、循环迭代等复杂工作流的场景。
+ *
+ * 工作流定义中的节点 task_handler_name 必须预先通过
+ * agentos_loop_dag_register_handler() 注册对应的处理器。
+ *
+ * @param loop [in] 循环句柄（非NULL）
+ * @param workflow [in] 工作流定义（非NULL，调用者负责管理生命周期，内部会复制）
+ * @param input_json [in] 输入数据（JSON字符串，可为NULL）
+ * @param out_execution_id [out] 输出执行实例ID（调用者负责释放）
+ * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
+ *
+ * @ownership out_execution_id 由调用者负责释放
+ * @threadsafe 是（内部使用 taskflow_engine 内部同步）
+ * @reentrant 否
+ * @see agentos_loop_dag_wait(), agentos_loop_dag_register_handler()
+ */
+AGENTOS_API agentos_error_t agentos_loop_submit_dag(agentos_core_loop_t *loop,
+                                                     const taskflow_workflow_t *workflow,
+                                                     const char *input_json,
+                                                     char **out_execution_id);
+
+/**
+ * @brief W18: 注册 DAG 任务处理器
+ *
+ * 为 DAG 工作流中的节点注册任务处理器回调。节点的 task_handler_name
+ * 与此处的 name 匹配以路由执行。
+ *
+ * @param loop [in] 循环句柄（非NULL）
+ * @param name [in] 处理器名称（非NULL，与节点 task_handler_name 匹配）
+ * @param handler [in] 处理器回调函数（非NULL）
+ * @param user_data [in] 用户自定义数据（可为NULL）
+ * @return agentos_error_t AGENTOS_SUCCESS 成功，其他为错误码
+ *
+ * @threadsafe 是
+ * @see agentos_loop_submit_dag()
+ */
+AGENTOS_API agentos_error_t agentos_loop_dag_register_handler(
+    agentos_core_loop_t *loop, const char *name, taskflow_task_handler_t handler,
+    void *user_data);
+
+/**
+ * @brief W18: 等待 DAG 工作流执行完成并获取结果
+ *
+ * @param loop [in] 循环句柄（非NULL）
+ * @param execution_id [in] 执行实例ID（非NULL）
+ * @param timeout_ms [in] 超时毫秒（0无限等待）
+ * @param out_result_json [out] 输出结果JSON（调用者负责释放，可为NULL表示不获取结果）
+ * @return agentos_error_t AGENTOS_SUCCESS 成功，AGENTOS_ETIMEOUT 超时
+ *
+ * @threadsafe 是
+ * @see agentos_loop_submit_dag()
+ */
+AGENTOS_API agentos_error_t agentos_loop_dag_wait(agentos_core_loop_t *loop,
+                                                   const char *execution_id,
+                                                   uint32_t timeout_ms,
+                                                   char **out_result_json);
+
+/**
+ * @brief W18: 获取 DAG 工作流执行状态
+ *
+ * @param loop [in] 循环句柄（非NULL）
+ * @param execution_id [in] 执行实例ID（非NULL）
+ * @param out_state [out] 输出状态字符串（"pending"/"running"/"completed"/"failed"/"canceled"，
+ *                        调用者负责释放，可为NULL）
+ * @param out_progress [out] 输出进度 0.0~1.0（可为NULL）
+ * @return agentos_error_t AGENTOS_SUCCESS 成功，AGENTOS_ENOENT 执行实例不存在
+ *
+ * @threadsafe 是
+ */
+AGENTOS_API agentos_error_t agentos_loop_dag_status(agentos_core_loop_t *loop,
+                                                     const char *execution_id,
+                                                     char **out_state,
+                                                     double *out_progress);
+
 #ifdef __cplusplus
 }
 #endif

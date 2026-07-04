@@ -2,7 +2,7 @@
  * @file param_validator.h
  * @brief JSON-RPC 参数验证工具（统一验证逻辑，消除重复代码）
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  */
 
 #ifndef AGENTOS_PARAM_VALIDATOR_H

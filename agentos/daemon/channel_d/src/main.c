@@ -2,6 +2,7 @@
 #include "channel_service.h"
 #include "daemon_bootstrap_sd.h"
 #include "daemon_bootstrap_ipc.h"
+#include "daemon_cupolas_bootstrap.h"
 #include "logging.h"
 #include "memory_compat.h"
 #include "platform.h"
@@ -304,6 +305,9 @@ int main(int argc, char *argv[])
     agentos_log_init(NULL);
     atexit(log_cleanup);
 
+    /* P3.14 ACC-DT15: 初始化 cupolas 安全穹顶（permission_engine + sanitizer + audit_logger）*/
+    daemon_cupolas_init("channel_d");
+
     channel_config_t config = CHANNEL_CONFIG_DEFAULTS;
     config.max_channels = max_channels;
     if (socket_dir) {
@@ -356,6 +360,7 @@ AGENTOS_STRNCPY_TERM(config.socket_dir, socket_dir, sizeof(config.socket_dir));
     SVC_LOG_INFO("channel_d shutting down");
     channel_service_stop(svc);
     channel_service_destroy(svc);
+    daemon_cupolas_cleanup(); /* P3.14 ACC-DT15: 清理 cupolas 安全穹顶 */
     log_cleanup();
     return 0;
 }

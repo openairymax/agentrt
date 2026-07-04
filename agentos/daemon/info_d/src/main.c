@@ -8,6 +8,7 @@
 #include "atomic_compat.h"
 #include "daemon_bootstrap_sd.h"
 #include "daemon_bootstrap_ipc.h"
+#include "daemon_cupolas_bootstrap.h"
 #include "logging.h"
 #include "platform.h"
 #include "svc_logger.h"
@@ -424,6 +425,9 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
     agentos_log_init(NULL);
     atexit(log_cleanup);
 
+    /* P3.14 ACC-DT15: 初始化 cupolas 安全穹顶（permission_engine + sanitizer + audit_logger）*/
+    daemon_cupolas_init("info_d");
+
     if (info_d_init(&g_service, INFO_D_DEFAULT_PORT, INFO_D_DEFAULT_SOCKET) != AGENTOS_SUCCESS)
         return 1;
     if (info_d_start(&g_service) != AGENTOS_SUCCESS) {
@@ -457,6 +461,7 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
     daemon_bootstrap_sd_stop(g_bsd);
     info_d_stop(&g_service, g_shutdown ? 1 : 0);
     info_d_destroy(&g_service);
+    daemon_cupolas_cleanup(); /* P3.14 ACC-DT15: 清理 cupolas 安全穹顶 */
     log_cleanup();
     return 0;
 }

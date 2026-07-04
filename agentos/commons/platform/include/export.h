@@ -3,7 +3,7 @@
  * @brief AgentRT 符号导出管理（commons平台层副本）
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  *
  * @note 定义了跨平台符号导出宏，支持 Windows 和 POSIX 系统
  *       这是 AGENTOS_API 的权威定义源之一

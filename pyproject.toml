@@ -3,7 +3,7 @@ name = "agentrt"
 version = "0.1.0"
 description = "AgentRT - Agent Runtime Platform"
 authors = ["Spharx AgentRT Team"]
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later OR Apache-2.0"
 readme = "README.md"
 homepage = "https://spharx.cn"
 repository = "https://gitee.com/spharx/agentrt"
@@ -20,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Environment :: Console",

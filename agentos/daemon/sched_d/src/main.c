@@ -3,7 +3,7 @@
 /*
  * Copyright (C) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  *
  * @file main.c
  * @brief 调度服务守护进程主入口（遵循 daemon 模块统一规范）
@@ -19,6 +19,7 @@
 #include "atomic_compat.h"
 #include "daemon_bootstrap_sd.h"
 #include "daemon_bootstrap_ipc.h"
+#include "daemon_cupolas_bootstrap.h"
 #include "daemon_event_driver.h"
 #include "jsonrpc_helpers.h"
 #include "logging.h"
@@ -389,6 +390,9 @@ int main(int argc, char **argv)
     agentos_log_init(NULL);
     atexit(log_cleanup);
 
+    /* P3.14 ACC-DT15: 初始化 cupolas 安全穹顶（permission_engine + sanitizer + audit_logger）*/
+    daemon_cupolas_init("sched_d");
+
     SVC_LOG_INFO("Scheduler service starting, manager=%s", config_path);
 
     /* 创建配置 */
@@ -500,6 +504,7 @@ int main(int argc, char **argv)
     agentos_socket_cleanup();
 
     SVC_LOG_INFO("Scheduler service stopped");
+    daemon_cupolas_cleanup(); /* P3.14 ACC-DT15: 清理 cupolas 安全穹顶 */
     log_cleanup();
     return 0;
 }

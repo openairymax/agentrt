@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 SPHARX.
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 /**
  * @file workflow_patterns.c
  * @brief 基础工作流模式实现
@@ -314,7 +314,7 @@ workflow_context_t *workflow_context_create(const workflow_pattern_config_t *con
             .enable_fault_tolerance = config->enable_checkpoint,
         };
 
-        context->taskflow_engine = taskflow_engine_create(&tf_config);
+        context->taskflow_engine = taskflow_engine_create_core(&tf_config); /* P3.21 (ACC-DT24): 改用 _core 后缀避免符号冲突 */
         if (!context->taskflow_engine) {
             if (context->edges)
                 AGENTOS_FREE(context->edges);
@@ -324,14 +324,14 @@ workflow_context_t *workflow_context_create(const workflow_pattern_config_t *con
             AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
         }
 
-        taskflow_engine_init(context->taskflow_engine);
+        taskflow_engine_init_core(context->taskflow_engine);
     }
 
     // 创建工作流图
     context->workflow_graph = taskflow_graph_create(context->taskflow_engine);
     if (!context->workflow_graph) {
         if (!taskflow_engine) {
-            taskflow_engine_destroy(context->taskflow_engine);
+            taskflow_engine_destroy_core(context->taskflow_engine);
         }
         if (context->edges)
             AGENTOS_FREE(context->edges);
@@ -356,7 +356,7 @@ void workflow_context_destroy(workflow_context_t *context)
 
     // 如果内部创建了TaskFlow引擎，销毁它
     if (context->owns_engine && context->taskflow_engine) {
-        taskflow_engine_destroy(context->taskflow_engine);
+        taskflow_engine_destroy_core(context->taskflow_engine);
     }
 
     // 释放节点数组

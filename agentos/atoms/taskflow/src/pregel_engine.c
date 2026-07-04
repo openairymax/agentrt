@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 SPHARX.
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 /**
  * @file pregel_engine.c
  * @brief Pregel Engine Implementation
@@ -356,8 +356,14 @@ pregel_engine_handle_t pregel_engine_create(const pregel_config_t *config)
     engine->config = *config;
 
     // 设置默认值
+    /* BAN-333: 0.1.1 强制 pregel_engine max_workers=1 串行降级。
+     * 默认 1 个工作线程；若调用方传入 >1 则强制降级为 1。
+     * 0.1.1 的 pregel_engine 并发路径尚未经过多线程验证，
+     * 强制串行模式以确保正确性优先于性能。 */
     if (engine->config.max_workers == 0) {
-        engine->config.max_workers = 4;
+        engine->config.max_workers = 1;
+    } else if (engine->config.max_workers > 1) {
+        engine->config.max_workers = 1;  // 强制降级
     }
 
     if (engine->config.message_buffer_size == 0) {
@@ -404,18 +410,10 @@ pregel_engine_handle_t pregel_engine_create(const pregel_config_t *config)
         AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
     }
 
-    // 初始化工作线程数组
-    engine->workers =
-        (worker_context_t *)AGENTOS_CALLOC(engine->config.max_workers, sizeof(worker_context_t));
-    if (!engine->workers) {
-        message_queue_destroy(engine->next_step_queue);
-        for (size_t i = 0; i < engine->config.max_workers; i++) {
-            message_queue_destroy(engine->message_queues[i]);
-        }
-        AGENTOS_FREE(engine->message_queues);
-        AGENTOS_FREE(engine);
-        AGENTOS_ERROR_NULL(AGENTOS_ERR_INVALID_PARAM, "null parameter");
-    }
+    /* workers 数组延迟到 pregel_engine_init 中分配。
+     * 原实现在此处预分配 workers，随后 pregel_engine_init (L536) 会再次分配并覆盖指针，
+     * 导致此处分配的 32 字节内存泄漏（ASan 检测到的 12 处 32B 泄漏根因）。
+     * CALLOC 已将 workers 清零为 NULL，destroy 会对 NULL 安全跳过。 */
 
     // 初始化检查点数组
     engine->checkpoints = NULL;
@@ -525,7 +523,8 @@ taskflow_error_t pregel_engine_init(pregel_engine_handle_t engine,
     agentos_cond_init(&e->cond_var);
     agentos_cond_init(&e->pause_cond);
 
-    size_t num_workers = e->config.max_workers > 0 ? e->config.max_workers : 4;
+    /* BAN-333: 0.1.1 强制 max_workers=1 串行降级，默认 1 */
+    size_t num_workers = e->config.max_workers > 0 ? e->config.max_workers : 1;
     e->workers = (worker_context_t *)AGENTOS_CALLOC(num_workers, sizeof(worker_context_t));
     if (!e->workers) {
         agentos_mutex_destroy(&e->mutex);

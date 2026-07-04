@@ -3,7 +3,7 @@
  * @brief P2.1.3 / P2.1a: 拦截型 Hook 实现 — SafetyGuard 安全链集成
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  */
 
 #include "hook_interceptor.h"

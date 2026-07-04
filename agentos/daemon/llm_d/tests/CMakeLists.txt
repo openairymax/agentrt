@@ -23,6 +23,12 @@ set(LLM_IMPL_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/providers/deepseek.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/providers/google.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/providers/local.c
+    # P3.16 (ACC-DT17): llm_router 集成 — 5 个路由器实现源码
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/router/llm_router.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/router/cost_aware_router.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/router/round_robin_router.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/router/least_latency_router.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/router/quality_first_router.c
 )
 
 set(LLM_TEST_SOURCES
@@ -34,6 +40,8 @@ set(LLM_TEST_SOURCES
     test_complexity_routing.c
     bench_routing_latency.c
     test_cost_tracker.c
+    # P3.16 (ACC-DT17): 路由器集成测试
+    test_router_integration.c
 )
 
 set(LLM_COMMON_INCLUDES

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 /**
  * @file taskflow_advanced.h
  * @brief TaskFlow Advanced Workflow Engine for AgentRT
@@ -79,13 +79,19 @@ typedef enum {
 
 /**
  * @brief 错误处理策略枚举
+ *
+ * @note P3.21 (ACC-DT25)：新增 TASKFLOW_ERROR_STRATEGY_NONE = 0 占首项，
+ *       避免 TASKFLOW_ERROR_RETRY = 0 与 taskflow.h 的 TASKFLOW_SUCCESS = 0
+ *       数值碰撞。AGENTOS_CALLOC 零初始化的结构体字段默认值为 NONE
+ *       （未配置策略），语义合理。
  */
 typedef enum {
-    TASKFLOW_ERROR_RETRY = 0, /**< 重试执行 */
-    TASKFLOW_ERROR_ROLLBACK,  /**< 回滚到上一个检查点 */
-    TASKFLOW_ERROR_SKIP,      /**< 跳过当前节点 */
-    TASKFLOW_ERROR_ABORT,     /**< 终止整个工作流 */
-    TASKFLOW_ERROR_FALLBACK   /**< 降级到备用处理器 */
+    TASKFLOW_ERROR_STRATEGY_NONE = 0, /**< 未配置策略（显式空值，避免与 TASKFLOW_SUCCESS=0 碰撞） */
+    TASKFLOW_ERROR_RETRY,             /**< 重试执行 */
+    TASKFLOW_ERROR_ROLLBACK,          /**< 回滚到上一个检查点 */
+    TASKFLOW_ERROR_SKIP,              /**< 跳过当前节点 */
+    TASKFLOW_ERROR_ABORT,             /**< 终止整个工作流 */
+    TASKFLOW_ERROR_FALLBACK           /**< 降级到备用处理器 */
 } taskflow_error_strategy_t;
 
 /**
@@ -194,7 +200,7 @@ typedef struct {
 /**
  * @brief 高级工作流引擎句柄(不透明类型)
  */
-typedef struct taskflow_engine_s taskflow_engine_t;
+typedef struct taskflow_adv_engine_s taskflow_engine_t;
 
 /**
  * @brief 任务处理器回调函数类型

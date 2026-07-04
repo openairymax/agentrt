@@ -335,3 +335,41 @@ const provider_t *provider_registry_find(provider_registry_t *reg, const char *m
     agentos_mutex_unlock(&reg->lock);
     AGENTOS_ERROR_NULL(AGENTOS_ERR_UNKNOWN, "operation failed");
 }
+
+int provider_registry_enumerate(provider_registry_t *reg,
+                                int (*cb)(const char *provider_name, const char *model_name,
+                                          void *user_data),
+                                void *user_data)
+{
+    if (!reg || !cb) {
+        return 0;
+    }
+
+    agentos_mutex_lock(&reg->lock);
+    if (!reg->providers) {
+        agentos_mutex_unlock(&reg->lock);
+        return 0;
+    }
+
+    /* P3.16 (ACC-DT17): 遍历所有 (provider, model) 对并回调。
+     * 注意：回调期间持有 reg->lock，因此回调不得回调会获取同一锁的
+     * registry 函数（如 provider_registry_find）。router 端点注册使用
+     * 独立的 router mutex，无死锁风险。回调返回非 0 时短路停止。 */
+    int short_circuit = 0;
+    for (provider_t *p = reg->providers; p->name; ++p) {
+        if (!p->name || !p->models)
+            continue;
+        for (char **m = p->models; *m; ++m) {
+            int rc = cb(p->name, *m, user_data);
+            if (rc != 0) {
+                short_circuit = 1;
+                break;
+            }
+        }
+        if (short_circuit)
+            break;
+    }
+
+    agentos_mutex_unlock(&reg->lock);
+    return short_circuit;
+}

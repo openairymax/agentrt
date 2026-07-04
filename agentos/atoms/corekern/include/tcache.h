@@ -4,7 +4,7 @@
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  *
  * P1.20: per-Thread 缓存层减少多线程场景下的锁竞争。
  * 每个线程维护一个本地缓存，分配/释放优先在本地完成，
