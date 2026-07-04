@@ -19,7 +19,7 @@
  * - Linux (POSIX Socket)
  * - macOS (POSIX Socket)
  *
- * @author Spharx AgentRT Team
+ * @author SPHARX Ltd. - Airymax Team
  * @date 2026-04-02
  * @version 0.1.0
  *

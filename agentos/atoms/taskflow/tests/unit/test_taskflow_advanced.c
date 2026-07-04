@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: Apache-2.0 */
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
@@ -359,19 +359,81 @@ static void test_counts_after_registration(void)
 
 /* ==================== JSON加载 ==================== */
 
+/* IRON-2 (load_workflow_json 桩函数修复)：增强测试验证 JSON 解析的实际效果。
+ * 原测试只检查返回码=0，不验证字段被正确解析（桩函数也能通过）。
+ * 现测试验证：id/name/initial_node_id/nodes 解析 + handler 路由执行。 */
 static void test_load_workflow_json(void)
 {
     taskflow_engine_t *engine = taskflow_engine_create();
-    if (!engine)
+    if (!engine) {
+        TEST_FAIL("load workflow JSON", "engine create failed");
         return;
+    }
 
-    const char *json_str = "{\"id\":\"wf_json_001\",\"name\":\"JSON Workflow\","
-                           "\"version\":\"1.0\",\"initial_node_id\":\"start\"}";
+    /* 注册 handler，用于验证 JSON 中的 task_handler_name 被正确解析和路由 */
+    g_handler_called = 0;
+    taskflow_engine_register_handler(engine, "json_test_handler", mock_task_handler, NULL);
 
+    /* 完整 JSON：包含 id/name/version/initial_node_id/nodes/edges/default_* 字段 */
+    const char *json_str =
+        "{"
+        "\"id\":\"wf_json_001\","
+        "\"name\":\"JSON Workflow\","
+        "\"description\":\"IRON-2 test workflow\","
+        "\"version\":\"1.0\","
+        "\"initial_node_id\":\"start\","
+        "\"nodes\":["
+        "  {\"id\":\"start\",\"name\":\"Start Node\",\"type\":\"task\","
+        "   \"task_handler_name\":\"json_test_handler\","
+        "   \"timeout_ms\":30000,\"max_retries\":3,\"retry_delay_ms\":1000,"
+        "   \"error_strategy\":\"retry\"}"
+        "],"
+        "\"edges\":[],"
+        "\"default_timeout_ms\":30000,"
+        "\"default_max_retries\":3,"
+        "\"default_error_strategy\":\"retry\""
+        "}";
+
+    size_t count_before = taskflow_engine_get_workflow_count(engine);
     int rc = taskflow_engine_load_workflow_json(engine, json_str);
-    printf("    Load JSON result: %d\n", rc);
-    TEST_PASS("load workflow JSON");
+    size_t count_after = taskflow_engine_get_workflow_count(engine);
 
+    printf("    Load JSON result: %d (workflows: %zu -> %zu)\n", rc, count_before, count_after);
+
+    if (rc != 0) {
+        TEST_FAIL("load workflow JSON", "load failed");
+        taskflow_engine_destroy(engine);
+        return;
+    }
+
+    /* 验证 workflow 被注册（count +1） */
+    if (count_after != count_before + 1) {
+        printf("    FAIL: workflow count not incremented (%zu -> %zu)\n", count_before, count_after);
+        TEST_FAIL("load workflow JSON", "count not incremented");
+        taskflow_engine_destroy(engine);
+        return;
+    }
+
+    /* 验证 JSON 字段被正确解析：通过 start workflow 触发 handler 调用。
+     * start 会通过 workflow_id="wf_json_001" 找到 workflow，
+     * 通过 initial_node_id="start" 找到节点，
+     * 通过 node.task_handler_name="json_test_handler" 找到 handler 并调用。 */
+    char *exec_id = NULL;
+    rc = taskflow_engine_start(engine, "wf_json_001", "{\"input\":\"test\"}", &exec_id);
+    printf("    Start result: %d, exec_id=%.32s, handler_called=%d\n",
+           rc, exec_id ? exec_id : "(null)", g_handler_called);
+
+    if (rc != 0) {
+        TEST_FAIL("load workflow JSON", "start failed (JSON fields not parsed correctly)");
+    } else if (g_handler_called != 1) {
+        printf("    FAIL: handler not called (g_handler_called=%d, expected 1)\n", g_handler_called);
+        TEST_FAIL("load workflow JSON", "handler not called (initial_node_id/task_handler_name not parsed)");
+    } else {
+        TEST_PASS("load workflow JSON");
+    }
+
+    if (exec_id)
+        free(exec_id);
     taskflow_engine_destroy(engine);
 }
 

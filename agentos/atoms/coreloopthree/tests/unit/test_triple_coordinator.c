@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: Apache-2.0 */
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * test_triple_coordinator.c
  *   三组件协调器 S2->S1->S2 流式批判循环自动化验证测试

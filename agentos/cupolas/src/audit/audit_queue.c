@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: Apache-2.0 */
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
@@ -8,7 +8,7 @@
 /**
  * @file audit_queue.c
  * @brief Audit Log Queue Implementation - Thread-safe Producer-Consumer Queue
- * @author Spharx AgentRT Team
+ * @author SPHARX Ltd. - Airymax Team
  * @date 2024
  */
 

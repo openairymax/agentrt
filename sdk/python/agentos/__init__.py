@@ -40,8 +40,8 @@ Version History:
 """
 
 __version__ = "0.1.0"
-__author__ = "Spharx AgentRT Team"
-__license__ = "MIT"
+__author__ = "SPHARX Ltd. - Airymax Team"
+__license__ = "AGPL-3.0-or-later OR Apache-2.0"
 
 # 导入异常类和错误码常量
 from .exceptions import (

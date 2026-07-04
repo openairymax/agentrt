@@ -7,13 +7,14 @@ name = "agentos-openlab"
 version = "0.1.0"
 description = "OpenLab - Agent Operating System for intelligent agent management"
 readme = "README.md"
-license = {text = "MIT"}
-authors = ["Spharx AgentRT Team"]
+license = "AGPL-3.0-or-later OR Apache-2.0"
+authors = ["SPHARX Ltd."]
 keywords = ["agent", "ai", "orchestration", "openlab", "multi-agent"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",

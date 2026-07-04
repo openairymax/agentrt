@@ -6,7 +6,7 @@
  * @file sync_spinlock.c
  * @brief 自旋锁实现
  *
- * @author Spharx AgentRT Team
+ * @author SPHARX Ltd. - Airymax Team
  * @date 2026-04-05
  */
 

@@ -1,7 +1,7 @@
 # AgentRT Python SDK - Manager Classes Extended Tests
 # Version: 0.1.0
 # Last updated: 2026-04-05
-# Author: Spharx AgentRT Team
+# Author: SPHARX Ltd. - Airymax Team
 
 """
 Manager类的扩展测试，补充边界条件、异常路径和并发场景测试。

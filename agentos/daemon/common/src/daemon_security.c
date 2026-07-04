@@ -1,6 +1,6 @@
 #include "memory_compat.h"
 #include "error.h"
-/* SPDX-License-Identifier: Apache-2.0 */
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
@@ -10,7 +10,7 @@
 /**
  * @file daemon_security.c
  * @brief Daemon Layer Security Integration - Unified Security for All Daemon Services
- * @author Spharx AgentRT Team
+ * @author SPHARX Ltd. - Airymax Team
  * @date 2026-04-02
  *
  * This module provides unified security integration for all AgentRT daemon services:

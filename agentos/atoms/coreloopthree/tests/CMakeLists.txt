@@ -26,6 +26,8 @@ set(CL3_TEST_SOURCES
     unit/test_browser.c
     unit/test_triple_coordinator.c
     unit/test_hook_integration.c
+    # W18.3 (ACC-FOUND03): CoreLoopThree ↔ taskflow_advanced DAG 集成测试
+    unit/test_dag_integration.c
 )
 
 set(CL3_BENCH_SOURCES

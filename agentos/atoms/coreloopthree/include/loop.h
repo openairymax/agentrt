@@ -19,6 +19,7 @@
 #include "cognition.h"
 #include "execution.h"
 #include "memory.h"
+#include "taskflow_advanced.h"  /* W18: DAG 工作流集成（taskflow_workflow_t/taskflow_task_handler_t 定义） */
 
 #include <stddef.h>
 #include <stdint.h>

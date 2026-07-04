@@ -34,7 +34,7 @@ Example:
 
     asyncio.run(main())
 
-Author: Spharx AgentRT Team
+Author: SPHARX Ltd. - Airymax Team
 Version: 0.1.0
 """
 

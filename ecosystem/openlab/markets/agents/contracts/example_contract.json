@@ -56,7 +56,7 @@
     "complexity": "advanced",
     "language": "python"
   },
-  "license": "MIT",
-  "author": "Spharx AgentRT Team",
+  "license": "AGPL-3.0-or-later OR Apache-2.0",
+  "author": "SPHARX Ltd. - Airymax Team",
   "repository": "https://github.com/spharx/AgentRT"
 }

@@ -62,6 +62,12 @@ struct agentos_core_loop {
      * LLM 可用时激活 LLM 规划路径，不可用时走规则降级。borrowed adapter 来自 llm_adapter。 */
     struct agentos_llm_service *llm_svc;
 
+    /* P0.20.7: reflective fallback 规划策略（BORROW 注入 cognition engine，由 loop 销毁）。
+     * 主 plan_strat（reactive）失败时由 engine.c L973 调用 fallback_strat->plan()，
+     * 实现反思式重规划。BORROW 语义：cognition engine destroy 时不销毁此对象，
+     * 由 loop 在 cleanup/destroy 时显式调用 strat->destroy()。 */
+    agentos_plan_strategy_t *fallback_plan_strat;
+
     /* C-L04: tool_d → CoreLoopThree — IPC adapter for tool execution */
     tool_svc_adapter_t *tool_adapter;
 
@@ -109,9 +115,17 @@ static void free_loop_memory(agentos_core_loop_t *loop);
  * 使用 create_default 规避 config 类型冲突。
  * reactive 规划器接受 agentos_llm_service_t* 参数（planner 侧类型 struct agentos_llm_service），
  * 传 NULL 走 REACTIVE_RULES 关键词匹配降级路径；
- * P2.7 注入真实 LLM service 后，LLM 可用时走 LLM 规划路径。 */
+ * P2.7 注入真实 LLM service 后，LLM 可用时走 LLM 规划路径。
+ *
+ * P0.20.7: 前向声明 reflective 规划器工厂 — 作为 fallback_plan 注入 cognition engine。
+ * reflective 接受 (llm, memory_engine) 双参数：LLM 可用时走反思式重规划（5 阶段管线），
+ * LLM 不可用时 llm_build_dynamic_plan 返回 ESERVICE（不崩溃，安全降级）。
+ * memory_engine 用于历史经验检索（0.1.1 暂不深度集成，仅存储引用）。
+ * 注意：fallback_plan 是 BORROW 语义（engine 不销毁），由 loop 管理生命周期。 */
 struct agentos_llm_service;
 agentos_plan_strategy_t *agentos_plan_reactive_create(struct agentos_llm_service *llm);
+agentos_plan_strategy_t *agentos_plan_reflective_create(struct agentos_llm_service *llm,
+                                                        agentos_memory_engine_t *memory_engine);
 agentos_error_t agentos_llm_service_create_default(struct agentos_llm_service **out_service);
 void agentos_llm_service_destroy(struct agentos_llm_service *service);
 agentos_error_t agentos_llm_service_set_adapter(struct agentos_llm_service *service,
@@ -307,6 +321,26 @@ static agentos_error_t create_loop_engines(agentos_core_loop_t *loop)
 
     agentos_cognition_set_memory(loop->cognition, loop->memory);
 
+    /* P0.20.7: 注入 reflective 作为 fallback 规划策略（BORROW 语义）。
+     * 主 plan_strat（reactive）在 engine.c L966 规划失败时，engine.c L973 调用
+     * fallback_strat->plan() 进行反思式重规划（5 阶段管线：分解→LLM 生成→审计→
+     * 对齐→fallback_plan 构建）。LLM 不可用时 reflective 返回 ESERVICE（安全降级，
+     * 不崩溃），此时 fallback 路径无效果但不会引入故障。
+     * 注意：set_fallback_plan 是 BORROW 语义，cognition engine destroy 时不销毁
+     * fallback 对象，由 loop 在 cleanup/destroy 时显式销毁。 */
+    loop->fallback_plan_strat = agentos_plan_reflective_create(loop->llm_svc, loop->memory);
+    if (loop->fallback_plan_strat) {
+        agentos_cognition_set_fallback_plan(loop->cognition, loop->fallback_plan_strat);
+        AGENTOS_LOG_INFO("P0.20.7: reflective fallback_plan injected into cognition "
+                         "(llm_svc=%p available=%d, memory=%p)",
+                         (void *)loop->llm_svc,
+                         loop->llm_svc ? 1 : 0,
+                         (void *)loop->memory);
+    } else {
+        AGENTOS_LOG_WARN("P0.20.7: reflective fallback_plan creation failed (non-fatal, "
+                         "cognition will fail-fast on primary planning errors)");
+    }
+
     /* C-L04: Create and wire tool IPC adapter */
     {
         tool_svc_adapter_config_t tool_cfg;
@@ -416,6 +450,18 @@ static void cleanup_loop_resources(agentos_core_loop_t *loop)
 {
     if (!loop)
         return;
+
+    /* P0.20.7: 先销毁 fallback_plan_strat（BORROW 语义，engine 不销毁）。
+     * 必须在 cognition destroy 之前销毁，避免 cognition destroy 过程中
+     * 通过 fallback_plan_strat 指针访问已释放资源（防御性编程）。 */
+    if (loop->fallback_plan_strat) {
+        if (loop->fallback_plan_strat->destroy) {
+            loop->fallback_plan_strat->destroy(loop->fallback_plan_strat);
+        } else {
+            AGENTOS_FREE(loop->fallback_plan_strat);
+        }
+        loop->fallback_plan_strat = NULL;
+    }
 
     if (loop->memory) {
         agentos_memory_destroy(loop->memory);
@@ -686,6 +732,20 @@ AGENTOS_API void agentos_loop_destroy(agentos_core_loop_t *loop)
         loop->memory = NULL;
     }
 
+    /* P0.20.7: 销毁 fallback_plan_strat（BORROW 语义，engine 不销毁）。
+     * 必须在 cognition destroy 之前销毁，避免 cognition destroy 过程中
+     * 通过 fallback_plan_strat 指针访问已释放资源（防御性编程）。
+     * 注意：此处 memory 已 destroy，但 fallback_plan_strat 内部 ctx->memory_engine
+     * 仅存储引用（reflective_plan_cleanup 不访问 memory_engine），因此安全。 */
+    if (loop->fallback_plan_strat) {
+        if (loop->fallback_plan_strat->destroy) {
+            loop->fallback_plan_strat->destroy(loop->fallback_plan_strat);
+        } else {
+            AGENTOS_FREE(loop->fallback_plan_strat);
+        }
+        loop->fallback_plan_strat = NULL;
+    }
+
     /* C-L12: 销毁 MemoryRovol 桥接器 */
     if (loop->memory_bridge) {
         memoryrovol_bridge_destroy(loop->memory_bridge);
@@ -698,6 +758,11 @@ AGENTOS_API void agentos_loop_destroy(agentos_core_loop_t *loop)
     if (loop->cognition) {
         agentos_cognition_destroy(loop->cognition);
         loop->cognition = NULL;
+    }
+    /* W18: 销毁 taskflow_advanced DAG 工作流引擎 */
+    if (loop->taskflow_engine) {
+        taskflow_engine_destroy(loop->taskflow_engine);
+        loop->taskflow_engine = NULL;
     }
     if (loop->cond) {
         agentos_cond_free(loop->cond);
@@ -1852,4 +1917,162 @@ AGENTOS_API void agentos_loop_set_orch_adapter(agentos_core_loop_t *loop,
     loop->orch_adapter = adapter;
     AGENTOS_LOG_INFO("C-L06: Orchestrator adapter %s to CoreLoopThree",
                      adapter ? "attached" : "detached");
+}
+
+/* ================================================================
+ * W18: taskflow_advanced DAG 工作流集成实现
+ *
+ * 设计说明：
+ * - CoreLoopThree 内部持有 taskflow_engine_t*，在 loop_create 时创建、loop_destroy 时销毁
+ * - agentos_loop_submit_dag 接受结构化 taskflow_workflow_t，注册并启动执行
+ * - agentos_loop_dag_wait 阻塞直到执行完成，返回输出 JSON
+ * - agentos_loop_dag_status 查询执行状态与进度
+ *
+ * 注意：taskflow_engine_get_execution 返回内部指针（非副本），
+ *       不可调用 taskflow_execution_destroy（会释放引擎内部字段导致 use-after-free），
+ *       此处仅读取字段并复制。
+ * ================================================================ */
+
+AGENTOS_API agentos_error_t agentos_loop_dag_register_handler(
+    agentos_core_loop_t *loop, const char *name, taskflow_task_handler_t handler,
+    void *user_data)
+{
+    if (!loop || !name || !handler)
+        ATM_RET_ERR(AGENTOS_EINVAL);
+    if (!loop->taskflow_engine)
+        ATM_RET_ERR(AGENTOS_ENOTINIT);
+
+    int rc = taskflow_engine_register_handler(loop->taskflow_engine, name, handler, user_data);
+    if (rc != 0) {
+        AGENTOS_LOG_ERROR("CoreLoopThree: dag_register_handler '%s' failed (rc=%d)", name, rc);
+        return AGENTOS_EINVAL;
+    }
+    AGENTOS_LOG_INFO("CoreLoopThree: DAG handler '%s' registered", name);
+    return AGENTOS_SUCCESS;
+}
+
+AGENTOS_API agentos_error_t agentos_loop_submit_dag(agentos_core_loop_t *loop,
+                                                     const taskflow_workflow_t *workflow,
+                                                     const char *input_json,
+                                                     char **out_execution_id)
+{
+    if (!loop || !workflow || !out_execution_id)
+        ATM_RET_ERR(AGENTOS_EINVAL);
+    if (!loop->taskflow_engine)
+        ATM_RET_ERR(AGENTOS_ENOTINIT);
+
+    *out_execution_id = NULL;
+
+    /* 注册工作流定义（taskflow_engine_register_workflow 内部复制节点和边） */
+    int rc = taskflow_engine_register_workflow(loop->taskflow_engine, workflow);
+    if (rc != 0) {
+        AGENTOS_LOG_ERROR("CoreLoopThree: dag_register_workflow '%s' failed (rc=%d)",
+                         workflow->id, rc);
+        return AGENTOS_EINVAL;
+    }
+
+    /* 启动工作流执行 */
+    char *exec_id = NULL;
+    rc = taskflow_engine_start(loop->taskflow_engine, workflow->id, input_json, &exec_id);
+    if (rc != 0 || !exec_id) {
+        AGENTOS_LOG_ERROR("CoreLoopThree: dag_start workflow '%s' failed (rc=%d)",
+                         workflow->id, rc);
+        return AGENTOS_EINVAL;
+    }
+
+    *out_execution_id = exec_id;
+    AGENTOS_LOG_INFO("CoreLoopThree: DAG workflow '%s' submitted (exec_id=%s)",
+                     workflow->id, exec_id);
+    return AGENTOS_SUCCESS;
+}
+
+AGENTOS_API agentos_error_t agentos_loop_dag_wait(agentos_core_loop_t *loop,
+                                                   const char *execution_id,
+                                                   uint32_t timeout_ms,
+                                                   char **out_result_json)
+{
+    if (!loop || !execution_id)
+        ATM_RET_ERR(AGENTOS_EINVAL);
+    if (!loop->taskflow_engine)
+        ATM_RET_ERR(AGENTOS_ENOTINIT);
+
+    (void)timeout_ms;  /* taskflow_engine_run_to_completion 不支持超时参数，
+                        * 0.1.1 版本阻塞等待完成；超时功能留待后续版本 */
+
+    /* 先查询当前执行状态。taskflow_engine_start 对单节点工作流会同步执行 handler
+     * 并将状态直接置为 COMPLETED/FAILED，此时 run_to_completion 会因 "state != RUNNING"
+     * 返回 IO 错误。因此 dag_wait 需先检查状态：已完成（COMPLETED/FAILED/CANCELED/
+     * SKIPPED）则直接获取结果返回，仍在 RUNNING/PENDING 才调用 run_to_completion。 */
+    taskflow_execution_t *exec_peek = NULL;
+    int rc = taskflow_engine_get_execution(loop->taskflow_engine, execution_id, &exec_peek);
+    if (rc != 0 || !exec_peek) {
+        AGENTOS_LOG_ERROR("CoreLoopThree: dag_wait '%s' execution not found (rc=%d)",
+                         execution_id, rc);
+        return AGENTOS_ENOENT;
+    }
+
+    taskflow_state_t cur_state = exec_peek->state;
+    if (cur_state == TASKFLOW_STATE_RUNNING || cur_state == TASKFLOW_STATE_PENDING ||
+        cur_state == TASKFLOW_STATE_READY || cur_state == TASKFLOW_STATE_WAITING ||
+        cur_state == TASKFLOW_STATE_RETRYING) {
+        /* 仍在执行中，阻塞等待完成 */
+        rc = taskflow_engine_run_to_completion(loop->taskflow_engine, execution_id);
+        if (rc != 0) {
+            AGENTOS_LOG_ERROR("CoreLoopThree: dag_wait '%s' run_to_completion failed (rc=%d)",
+                             execution_id, rc);
+            return AGENTOS_EINVAL;
+        }
+    }
+
+    /* 获取执行结果（get_execution 返回内部指针，仅读取不 destroy） */
+    if (out_result_json) {
+        *out_result_json = NULL;
+        taskflow_execution_t *exec = NULL;
+        rc = taskflow_engine_get_execution(loop->taskflow_engine, execution_id, &exec);
+        if (rc == 0 && exec) {
+            *out_result_json = AGENTOS_STRDUP(exec->output_json ? exec->output_json : "{}");
+        }
+    }
+
+    return AGENTOS_SUCCESS;
+}
+
+AGENTOS_API agentos_error_t agentos_loop_dag_status(agentos_core_loop_t *loop,
+                                                     const char *execution_id,
+                                                     char **out_state,
+                                                     double *out_progress)
+{
+    if (!loop || !execution_id)
+        ATM_RET_ERR(AGENTOS_EINVAL);
+    if (!loop->taskflow_engine)
+        ATM_RET_ERR(AGENTOS_ENOTINIT);
+
+    taskflow_execution_t *exec = NULL;
+    int rc = taskflow_engine_get_execution(loop->taskflow_engine, execution_id, &exec);
+    if (rc != 0 || !exec) {
+        return AGENTOS_ENOENT;
+    }
+
+    /* get_execution 返回内部指针，仅读取字段不调用 taskflow_execution_destroy */
+    if (out_state) {
+        const char *state_str = "unknown";
+        switch (exec->state) {
+            case TASKFLOW_STATE_PENDING:   state_str = "pending";   break;
+            case TASKFLOW_STATE_READY:     state_str = "ready";     break;
+            case TASKFLOW_STATE_RUNNING:   state_str = "running";   break;
+            case TASKFLOW_STATE_WAITING:   state_str = "waiting";   break;
+            case TASKFLOW_STATE_COMPLETED: state_str = "completed"; break;
+            case TASKFLOW_STATE_FAILED:    state_str = "failed";    break;
+            case TASKFLOW_STATE_CANCELED:  state_str = "canceled";  break;
+            case TASKFLOW_STATE_SKIPPED:   state_str = "skipped";   break;
+            case TASKFLOW_STATE_RETRYING:  state_str = "retrying";  break;
+        }
+        *out_state = AGENTOS_STRDUP(state_str);
+    }
+
+    if (out_progress) {
+        *out_progress = exec->progress;
+    }
+
+    return AGENTOS_SUCCESS;
 }

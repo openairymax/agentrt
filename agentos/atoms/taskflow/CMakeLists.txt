@@ -3,7 +3,7 @@
 #
 # Copyright (C) 2026 SPHARX. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 SPHARX.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 #
 # TaskFlow 图执行系统，基于 Pregel 超步模型的分布式计算框架
 # 核心功能：
@@ -101,6 +101,20 @@ if(TARGET agentos_coreloopthree)
     target_link_libraries(agentos_taskflow PUBLIC agentos_coreloopthree)
 endif()
 
+# IRON-2 (load_workflow_json 桩函数修复)：taskflow_advanced 是 B 类应用语义层，
+# 可依赖 cJSON 实现 JSON 解析。cJSON 不可用时 load_workflow_json 返回 ENOTSUP
+# （显式不支持，非桩函数），符合 IRON-2 铁律。
+if(AGENTRT_HAS_CJSON)
+    if(cJSON_FOUND)
+        target_link_libraries(agentos_taskflow PRIVATE cjson)
+        target_compile_definitions(agentos_taskflow PRIVATE AGENTOS_TASKFLOW_HAVE_CJSON=1)
+    elseif(CJSON_FOUND)
+        target_link_libraries(agentos_taskflow PRIVATE ${CJSON_LIBRARIES})
+        target_include_directories(agentos_taskflow PRIVATE ${CJSON_INCLUDE_DIRS})
+        target_compile_definitions(agentos_taskflow PRIVATE AGENTOS_TASKFLOW_HAVE_CJSON=1)
+    endif()
+endif()
+
 # 安全编译选项（基于 AgentRT C 编码风格指南附录 A）
 if(MSVC)
     target_compile_options(agentos_taskflow PRIVATE /W4 /WX)
@@ -164,6 +178,16 @@ if(BUILD_TESTS)
         agentos_llm_service
         agentos_tool_service
     )
+
+    # IRON-2: test_taskflow_advanced 需要显式链接 cJSON（静态库 PRIVATE 依赖不传递）
+    if(AGENTRT_HAS_CJSON)
+        if(cJSON_FOUND)
+            target_link_libraries(test_taskflow_advanced PRIVATE cjson)
+        elseif(CJSON_FOUND)
+            target_link_libraries(test_taskflow_advanced PRIVATE ${CJSON_LIBRARIES})
+            target_include_directories(test_taskflow_advanced PRIVATE ${CJSON_INCLUDE_DIRS})
+        endif()
+    endif()
 
     if(UNIX AND NOT APPLE)
         target_link_libraries(test_taskflow_advanced PRIVATE
