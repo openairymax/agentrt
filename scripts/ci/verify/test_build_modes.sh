@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 #
 # MemoryRovol 独立仓库构建模式集成测试脚本
 # R-09-01-6: memoryrovol migrated to independent repo

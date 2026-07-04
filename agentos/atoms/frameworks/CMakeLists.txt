@@ -3,7 +3,7 @@
 #
 # Copyright (C) 2026 SPHARX. All Rights Reserved.
 # SPDX-FileCopyrightText: 2026 SPHARX.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 #
 # Frameworks 层是 Airymax 作为"行业底座"连接外部 AI 框架的桥梁。
 # 核心功能：

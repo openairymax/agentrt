@@ -1,11 +1,11 @@
-/* SPDX-License-Identifier: Apache-2.0 */
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
  * cupolas_utils.h - Common Utility Macros and Functions
  *
  * @brief Unified abstraction layer for Cupolas security module
- * @author Spharx AgentRT Team
+ * @author SPHARX Ltd. - Airymax Team
  * @date 2026-04-05
  * @version 0.1.0
  *

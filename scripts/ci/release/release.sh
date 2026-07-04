@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 #
 # AgentRT One-Click Release Script
 # 一键发布脚本 - 集成质量门禁、版本验证、多平台构建

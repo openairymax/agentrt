@@ -13,7 +13,7 @@
  * - E-5 命名语义化：所有函数名精确表达用途
  * - E-6 错误可追溯：统一的错误码体系
  *
- * @author Spharx AgentRT Team
+ * @author SPHARX Ltd. - Airymax Team
  * @date 2026-04-03
  * @version 0.1.0
  */

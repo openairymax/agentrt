@@ -16,7 +16,7 @@
  * - 适配器注册/注销/查找/调用全部线程安全
  * - 不持有外部框架的内部状态，仅持有不透明 handle
  *
- * @author Spharx AgentRT Team
+ * @author SPHARX Ltd. - Airymax Team
  * @date 2026-06-29
  * @version 3.0  重新设计为外部框架桥接层
  */
