@@ -324,6 +324,11 @@ static const error_info_t g_error_info[] = {
      AGENTOS_ERR_SEVERITY_ERROR},
     {AGENTOS_ERR_COORD_RETRY_EXCEED, "ERR_COORD_RETRY_EXCEED", "Retry limit exceeded",
      "超出重试限制", AGENTOS_ERR_SEVERITY_ERROR},
+    /* P0.22.1 (ARE L2): 协议/校验错误段 */
+    {AGENTOS_ERR_PROTOCOL, "ERR_PROTOCOL", "Protocol violation (magic/version/reserved)",
+     "协议违规（magic/version/reserved 字段不匹配）", AGENTOS_ERR_SEVERITY_ERROR},
+    {AGENTOS_ERR_CHECKSUM, "ERR_CHECKSUM", "Checksum mismatch (CRC32)",
+     "校验和不匹配（CRC32）", AGENTOS_ERR_SEVERITY_ERROR},
 };
 
 static const size_t g_error_info_count = sizeof(g_error_info) / sizeof(g_error_info[0]);

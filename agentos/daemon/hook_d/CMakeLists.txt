@@ -24,6 +24,11 @@ set(HOOK_SERVICE_SOURCES
     src/hook_executor.c
     src/hook_interceptor.c
     src/hook_timeout.c
+    # P0.20.1: 生产 Hook 处理器 — 审计/metrics/trace 内置注册
+    src/hook_builtin_handlers.c
+    src/hook_audit_handler.c
+    src/hook_metrics_handler.c
+    src/hook_trace_handler.c
 )
 
 add_library(agentos_hook_service STATIC ${HOOK_SERVICE_SOURCES})
