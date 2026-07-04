@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 SPHARX.
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 /**
  * @file taskflow.h
  * @brief AgentRT TaskFlow Graph Execution System Main Header
@@ -83,52 +83,59 @@ typedef struct taskflow_partition_s *taskflow_partition_handle_t;
 // ============================================================================
 
 /**
- * @brief 创建 TaskFlow 引擎实例
+ * @brief 创建 TaskFlow 引擎实例（Pregel 核心引擎）
  * @param config 引擎配置参数
  * @return 引擎句柄，失败返回 NULL
+ *
+ * @note P3.21 (ACC-DT24)：函数改名为 taskflow_engine_create_core，
+ *       与 taskflow_advanced.h 的 taskflow_engine_create（无参版本）分离，
+ *       消除符号冲突导致的配置静默丢弃 BUG。
+ *       原声明 taskflow_engine_create(const taskflow_config_t *) 在 .c 文件
+ *       中无实现，调用方通过本声明带参调用，链接器却解析到 taskflow_advanced.c
+ *       的无参版本，导致配置参数被静默丢弃。
  */
-taskflow_handle_t taskflow_engine_create(const taskflow_config_t *config);
+taskflow_handle_t taskflow_engine_create_core(const taskflow_config_t *config);
 
 /**
  * @brief 销毁 TaskFlow 引擎实例
  * @param engine 引擎句柄
  */
-void taskflow_engine_destroy(taskflow_handle_t engine);
+void taskflow_engine_destroy_core(taskflow_handle_t engine);
 
 /**
  * @brief 初始化 TaskFlow 引擎
  * @param engine 引擎句柄
  * @return 错误码
  */
-taskflow_error_t taskflow_engine_init(taskflow_handle_t engine);
+taskflow_error_t taskflow_engine_init_core(taskflow_handle_t engine);
 
 /**
  * @brief 启动 TaskFlow 引擎
  * @param engine 引擎句柄
  * @return 错误码
  */
-taskflow_error_t taskflow_engine_start(taskflow_handle_t engine);
+taskflow_error_t taskflow_engine_start_core(taskflow_handle_t engine);
 
 /**
  * @brief 停止 TaskFlow 引擎
  * @param engine 引擎句柄
  * @return 错误码
  */
-taskflow_error_t taskflow_engine_stop(taskflow_handle_t engine);
+taskflow_error_t taskflow_engine_stop_core(taskflow_handle_t engine);
 
 /**
  * @brief 暂停 TaskFlow 引擎
  * @param engine 引擎句柄
  * @return 错误码
  */
-taskflow_error_t taskflow_engine_pause(taskflow_handle_t engine);
+taskflow_error_t taskflow_engine_pause_core(taskflow_handle_t engine);
 
 /**
  * @brief 恢复 TaskFlow 引擎
  * @param engine 引擎句柄
  * @return 错误码
  */
-taskflow_error_t taskflow_engine_resume(taskflow_handle_t engine);
+taskflow_error_t taskflow_engine_resume_core(taskflow_handle_t engine);
 
 // ============================================================================
 // 核心API：图管理

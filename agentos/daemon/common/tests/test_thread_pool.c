@@ -2,7 +2,7 @@
  * @file test_thread_pool.c
  * @brief 线程池单元测试 (P1-C06)
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  */
 
 #include "thread_pool.h"

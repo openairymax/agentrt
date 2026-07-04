@@ -9,7 +9,7 @@ Powered by OpenAirymax
 [![GitHub stars](https://img.shields.io/github/stars/SpharxTeam/AgentRT)](https://github.com/SpharxTeam/AgentRT/stargazers)
 
 [![Version](https://img.shields.io/badge/version-0.1.0-5a6b7e)](https://atomgit.com/openairymax/agentos)
-[![License](https://img.shields.io/badge/license-Apache--2.0-4a90d9)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![Build](https://img.shields.io/badge/build-passing-2ea44f)](https://atomgit.com/openairymax/agentos)
 
 [![C/C++](https://img.shields.io/badge/C%2FC%2B%2B-11%2F17-00599C?logo=c%2B%2B&logoColor=white)](https://isocpp.org)
@@ -80,7 +80,7 @@ Personal Client Preview
 Complete architecture from kernel to application:
 ```
 ⬇️ Ecosystem Layer (ecosystem) — Apps/Config/Prompts/Hooks/Skills
-⇅ Service Layer (daemon) — 10+ daemon services
+⇅ Service Layer (daemon) — 12 daemon services
 ⇅ Protocol Layer (protocols) — 5-layer unified protocol stack
 ⇅ Gateway Layer (gateway) — HTTP/WS/Stdio → JSON-RPC 2.0
 ⇅ Storage Layer (heapstore) — Runtime data persistence
@@ -286,7 +286,7 @@ See [AUTHORS.md](AUTHORS.md) for the list of contributors.
 
 ## 7️⃣ License
 
-This project is licensed under the **Apache License 2.0**. See [LICENSE](LICENSE) file for details.
+This project is dual-licensed under **AGPL v3 + Apache 2.0** (SPDX: `AGPL-3.0-or-later OR Apache-2.0`). You may choose either license at your option. See [LICENSE](LICENSE) file for details. Copyright (c) 2025-2026 SPHARX Ltd.
 
 ***
 

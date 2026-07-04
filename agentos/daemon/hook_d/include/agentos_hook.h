@@ -18,7 +18,7 @@
  *   agentos_hook_unregister("my_audit_hook");
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  */
 
 #ifndef AGENTOS_HOOK_H

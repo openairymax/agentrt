@@ -31,6 +31,7 @@ set(TOOL_TEST_SOURCES
     test_executor.c
     test_validator.c
     test_registry.c
+    test_sandbox_integration.c
 )
 
 set(TOOL_COMMON_INCLUDES
@@ -60,10 +61,29 @@ foreach(TEST_SRC ${TOOL_TEST_SOURCES})
 
     target_include_directories(test_tool_${TEST_NAME} PRIVATE ${TOOL_COMMON_INCLUDES})
 
+    # P3.18 (ACC-DT27): executor.c 调用 sandbox API（agentos_sandbox_*），
+    # 需链接 agentos_syscall。agentos_syscall PUBLIC 依赖 agentos_coreloopthree，
+    # 后者引用 cognition/llm_service/checkpoint/hook_d 等符号，需完整传递依赖。
+    # 仿照 test_syscall_extended 配置，但不链接 agentos_tool_service（避免与
+    # TOOL_IMPL_SOURCES 中的 executor.c/service.c 等重复符号）。
     target_link_libraries(test_tool_${TEST_NAME} PRIVATE
         svc_common
         cupolas
+        agentos_syscall
+        -Wl,--whole-archive
+        agentos_coreloopthree
+        -Wl,--no-whole-archive
+        agentos_cognition
+        agentos_execution
+        agentos_core
+        agentos_memory
+        agentos_atoms
+        agentos_common
+        agentos_llm_service
         Threads::Threads
+        uuid
+        agentos_platform_libs
+        m
     )
 
     # cJSON found by root CMakeLists.txt (AGENTOS_HAS_CJSON)

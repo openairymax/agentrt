@@ -18,7 +18,7 @@
  * 性能目标：高频分配场景性能提升 > 20%
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  */
 
 #include "slab.h"

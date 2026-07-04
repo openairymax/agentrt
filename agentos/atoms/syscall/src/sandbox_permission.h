@@ -8,27 +8,18 @@
 #define AGENTOS_SANDBOX_PERMISSION_H
 
 #include "agentos.h"
+/* P3.18 (ACC-DT27): permission_type_t 和 agentos_sandbox_t 前向声明
+ * 已提升至公共头 agentos_sandbox.h，此处包含以复用单一真值源。 */
+#include "agentos_sandbox.h"
 
 #include <stdint.h>
 
-/* 前向声明 */
-typedef struct agentos_sandbox agentos_sandbox_t;
-
 /**
- * @brief 权限类型枚举
- */
-typedef enum {
-    PERM_ALLOW = 0, /**< 允许 */
-    PERM_DENY,      /**< 拒绝 */
-    PERM_ASK        /**< 需确认 */
-} permission_type_t;
-
-/**
- * @brief 权限规则结构
+ * @brief 权限规则结构（内部类型，不对外暴露）
  */
 typedef struct permission_rule {
     int syscall_num;              /**< 系统调用号 */
-    permission_type_t perm_type;  /**< 权限类型 */
+    permission_type_t perm_type;  /**< 权限类型（来自 agentos_sandbox.h） */
     char *condition;              /**< 条件表达式（JSON 格式） */
     uint32_t flags;               /**< 标志位 */
     struct permission_rule *next; /**< 下一个规则 */

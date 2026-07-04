@@ -88,6 +88,9 @@ struct agentos_core_loop {
     char **tool_call_history;           /* P1.6.2: 工具调用历史 */
     size_t tool_call_history_count;
     size_t tool_call_history_capacity;
+
+    /* W18: taskflow_advanced DAG 工作流引擎（用于复杂工作流编排） */
+    taskflow_engine_t *taskflow_engine;
 };
 
 /* 辅助函数声明 - 用于重构降低圈复杂度 */
@@ -581,6 +584,16 @@ AGENTOS_API agentos_error_t agentos_loop_create(const agentos_loop_config_t *man
         AGENTOS_LOG_INFO("CoreLoopThree: Arena created (chunk_size=%zu) for request-level allocations",
                          (size_t)ARENA_DEFAULT_CHUNK_SIZE);
     }
+
+    /* W18: 创建 taskflow_advanced DAG 工作流引擎，用于复杂工作流编排
+     * （条件分支/并行汇聚/循环迭代等 DAG 模式） */
+    loop->taskflow_engine = taskflow_engine_create();
+    if (!loop->taskflow_engine) {
+        AGENTOS_LOG_ERROR("CoreLoopThree: taskflow_engine_create failed");
+        cleanup_loop_resources(loop);
+        return AGENTOS_ENOMEM;
+    }
+    AGENTOS_LOG_INFO("CoreLoopThree: taskflow_advanced DAG engine initialized");
 
     if (loop->manager.loop_config_checkpoint_enabled) {
         const char *cp_path = loop->manager.loop_config_checkpoint_path;

@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 /**
  * @file daemon_bootstrap_sd.h
  * @brief P1.7 C-L08: daemon ServiceDiscovery 一键引导模块

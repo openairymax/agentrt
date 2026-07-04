@@ -15,7 +15,7 @@
  * 验证目标：OOM 场景下 IPC 不死锁
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  */
 
 #ifndef AGENTOS_COREKERN_MEMPOOL_H

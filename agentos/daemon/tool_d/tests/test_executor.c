@@ -62,7 +62,11 @@ static void test_executor_run(void)
             printf("    Output: %s\n", result->output);
         tool_result_free(result);
     } else {
-        printf("    Execution skipped or failed (expected in test env)\n");
+        /* P3.17: fail-closed 路径仍可能分配 result（executor 在审批前已 calloc），
+         * 必须释放避免内存泄漏。*/
+        if (result)
+            tool_result_free(result);
+        printf("    Execution skipped or failed (expected in test env, ret=%d)\n", ret);
     }
 
     tool_executor_destroy(exec);
@@ -89,7 +93,9 @@ static void test_executor_run_async(void)
     if (ret == 0 && result != NULL) {
         tool_result_free(result);
     } else {
-        printf("    Async execution skipped or failed (expected in test env)\n");
+        if (result)
+            tool_result_free(result);
+        printf("    Async execution skipped or failed (expected in test env, ret=%d)\n", ret);
     }
 
     tool_executor_destroy(exec);

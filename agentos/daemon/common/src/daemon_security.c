@@ -244,14 +244,19 @@ int daemon_sanitize_llm_input(const char *input, char *output, size_t output_siz
 
     ensure_mutex_initialized();
     agentos_mutex_lock(&g_security_mutex);
+    /* P3.15 ACC-DT16: fail-safe — 不再 lazy-init。未初始化时使用最严格的
+     * SANITIZE_LEVEL_STRICT 继续净化（净化是保护性操作，拒绝会降低安全性）。
+     * 调用方应在 daemon 启动时通过 daemon_cupolas_init() 显式初始化。 */
+    sanitize_level_t level;
     if (!g_security_ctx.initialized) {
+        level = SANITIZE_LEVEL_STRICT;
         agentos_mutex_unlock(&g_security_mutex);
-        daemon_security_init(NULL, NULL);
-        agentos_mutex_lock(&g_security_mutex);
+        SVC_LOG_WARN("daemon_sanitize_llm_input: daemon_security not initialized — "
+                     "call daemon_cupolas_init() during startup. Using SANITIZE_LEVEL_STRICT (fail-safe).");
+    } else {
+        level = g_security_ctx.current_sanitize_level;
+        agentos_mutex_unlock(&g_security_mutex);
     }
-
-    sanitize_level_t level = g_security_ctx.current_sanitize_level;
-    agentos_mutex_unlock(&g_security_mutex);
 
     if (contains_dangerous_pattern(input)) {
         SVC_LOG_SECURITY(
@@ -282,12 +287,14 @@ int daemon_sanitize_tool_params(const char *tool_name, const char *params, char 
 
     ensure_mutex_initialized();
     agentos_mutex_lock(&g_security_mutex);
-    if (!g_security_ctx.initialized) {
-        agentos_mutex_unlock(&g_security_mutex);
-        daemon_security_init(NULL, NULL);
-        agentos_mutex_lock(&g_security_mutex);
-    }
+    /* P3.15 ACC-DT16: fail-safe — 不再 lazy-init。未初始化时仍执行净化
+     *（净化是保护性操作），仅记录警告。 */
+    bool sec_uninitialized = !g_security_ctx.initialized;
     agentos_mutex_unlock(&g_security_mutex);
+    if (sec_uninitialized) {
+        SVC_LOG_WARN("daemon_sanitize_tool_params: daemon_security not initialized — "
+                     "call daemon_cupolas_init() during startup. Proceeding with default sanitize (fail-safe).");
+    }
 
     sanitize_string(sanitized_tool, tool_name, tool_buf_size);
 
@@ -314,10 +321,13 @@ int daemon_check_tool_permission(const char *agent_id, const char *tool_name, co
 
     ensure_mutex_initialized();
     agentos_mutex_lock(&g_security_mutex);
+    /* P3.15 ACC-DT16: fail-closed — 未初始化时拒绝所有工具执行。 */
     if (!g_security_ctx.initialized) {
         agentos_mutex_unlock(&g_security_mutex);
-        daemon_security_init(NULL, NULL);
-        agentos_mutex_lock(&g_security_mutex);
+        SVC_LOG_ERROR("daemon_check_tool_permission: daemon_security not initialized — "
+                      "call daemon_cupolas_init() during startup. DENYING %s/%s (fail-closed).",
+                      agent_id, tool_name);
+        return AGENTOS_EPERM;
     }
 
     if (!g_security_ctx.permission_enabled) {
@@ -358,10 +368,13 @@ int daemon_check_llm_permission(const char *agent_id, const char *model_name, co
 
     ensure_mutex_initialized();
     agentos_mutex_lock(&g_security_mutex);
+    /* P3.15 ACC-DT16: fail-closed — 未初始化时拒绝所有 LLM 调用。 */
     if (!g_security_ctx.initialized) {
         agentos_mutex_unlock(&g_security_mutex);
-        daemon_security_init(NULL, NULL);
-        agentos_mutex_lock(&g_security_mutex);
+        SVC_LOG_ERROR("daemon_check_llm_permission: daemon_security not initialized — "
+                      "call daemon_cupolas_init() during startup. DENYING %s/%s (fail-closed).",
+                      agent_id, model_name);
+        return AGENTOS_EPERM;
     }
 
     if (!g_security_ctx.permission_enabled) {
@@ -410,10 +423,13 @@ int daemon_verify_package_signature(const char *package_path, bool *is_valid,
 
     ensure_mutex_initialized();
     agentos_mutex_lock(&g_security_mutex);
+    /* P3.15 ACC-DT16: fail-closed — 未初始化时拒绝签名验证（标记为未验证）。 */
     if (!g_security_ctx.initialized) {
         agentos_mutex_unlock(&g_security_mutex);
-        daemon_security_init(NULL, NULL);
-        agentos_mutex_lock(&g_security_mutex);
+        SVC_LOG_ERROR("daemon_verify_package_signature: daemon_security not initialized — "
+                      "call daemon_cupolas_init() during startup. Marking package UNVERIFIED (fail-closed).");
+        *is_valid = false;
+        return AGENTOS_ERR_STATE_ERROR;
     }
 
     if (!g_security_ctx.signature_enabled) {
@@ -597,10 +613,12 @@ int daemon_store_credential(const char *cred_id, cupolas_vault_cred_type_t cred_
 
     ensure_mutex_initialized();
     agentos_mutex_lock(&g_security_mutex);
+    /* P3.15 ACC-DT16: fail-closed — 未初始化时拒绝凭据存储。 */
     if (!g_security_ctx.initialized) {
         agentos_mutex_unlock(&g_security_mutex);
-        daemon_security_init(NULL, NULL);
-        agentos_mutex_lock(&g_security_mutex);
+        SVC_LOG_ERROR("daemon_store_credential: daemon_security not initialized — "
+                      "call daemon_cupolas_init() during startup. DENYING credential storage (fail-closed).");
+        return AGENTOS_ERR_STATE_ERROR;
     }
 
     if (!g_security_ctx.vault_enabled) {
@@ -659,10 +677,12 @@ int daemon_retrieve_credential(const char *cred_id, const char *agent_id, uint8_
 
     ensure_mutex_initialized();
     agentos_mutex_lock(&g_security_mutex);
+    /* P3.15 ACC-DT16: fail-closed — 未初始化时拒绝凭据检索。 */
     if (!g_security_ctx.initialized) {
         agentos_mutex_unlock(&g_security_mutex);
-        daemon_security_init(NULL, NULL);
-        agentos_mutex_lock(&g_security_mutex);
+        SVC_LOG_ERROR("daemon_retrieve_credential: daemon_security not initialized — "
+                      "call daemon_cupolas_init() during startup. DENYING credential retrieval (fail-closed).");
+        return AGENTOS_ERR_STATE_ERROR;
     }
 
     if (!g_security_ctx.vault_enabled) {
@@ -706,8 +726,11 @@ int daemon_audit_log_event(const char *service_name, const char *operation, cons
         return AGENTOS_ERR_INVALID_PARAM;
     }
 
+    /* P3.15 ACC-DT16: fail-closed — 未初始化时拒绝审计日志写入。 */
     if (!g_security_ctx.initialized) {
-        daemon_security_init(NULL, NULL);
+        SVC_LOG_ERROR("daemon_audit_log_event: daemon_security not initialized — "
+                      "call daemon_cupolas_init() during startup. Audit event DROPPED (fail-closed).");
+        return AGENTOS_ERR_STATE_ERROR;
     }
 
     ensure_mutex_initialized();
@@ -780,10 +803,12 @@ int daemon_security_add_acl_rule(const char *agent_id, const char *resource, boo
 
     ensure_mutex_initialized();
     agentos_mutex_lock(&g_security_mutex);
+    /* P3.15 ACC-DT16: fail-closed — 未初始化时拒绝 ACL 规则添加。 */
     if (!g_security_ctx.initialized) {
         agentos_mutex_unlock(&g_security_mutex);
-        daemon_security_init(NULL, NULL);
-        agentos_mutex_lock(&g_security_mutex);
+        SVC_LOG_ERROR("daemon_security_add_acl_rule: daemon_security not initialized — "
+                      "call daemon_cupolas_init() during startup. DENYING ACL rule add (fail-closed).");
+        return AGENTOS_ERR_STATE_ERROR;
     }
 
     /* 查找已有的同 (agent_id, resource) 条目，覆盖其 allowed 状态 */

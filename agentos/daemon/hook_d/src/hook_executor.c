@@ -3,7 +3,7 @@
  * @brief P2.1.2: Hook 执行器实现
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  */
 
 #include "hook_executor.h"
@@ -141,6 +141,18 @@ hook_decision_t hook_executor_run_one(const hook_entry_t *entry,
         if (out_duration_ns) *out_duration_ns = 0;
         return HOOK_DECISION_CONTINUE;
     }
+
+    /* P3.18 fix: 将 entry 的 hook_name 和 user_data 注入 ctx，使回调能访问。
+     *
+     * 根因：调用者（agentos_hook_trigger）传入的 ctx 通常不含 user_data
+     * （user_data 是注册时与 callback 绑定的，存储在 entry->user_data 中）。
+     * 多个 hook 共享同一 ctx 时，每个 hook 执行前必须更新这两个字段，
+     * 否则回调从 ctx->user_data 读取的是 NULL 或上一个 hook 的 user_data。
+     *
+     * 同步更新 hook_name，使回调内可识别当前执行的 hook（审计/日志），
+     * 且 hook_executor_ctx_to_json 序列化时能输出正确的 hook_name。 */
+    ctx->hook_name = entry->name;
+    ctx->user_data = entry->user_data;
 
     hook_decision_t decision = HOOK_DECISION_CONTINUE;
 

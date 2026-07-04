@@ -7,33 +7,19 @@
 #include "syscalls.h"
 
 #include <stddef.h>
+#include <stdint.h> /* intptr_t */
 
-/* 系统调用号枚举 */
-enum {
-    SYS_TASK_SUBMIT = 1,
-    SYS_TASK_QUERY,
-    SYS_TASK_WAIT,
-    SYS_TASK_CANCEL,
-    SYS_MEMORY_WRITE,
-    SYS_MEMORY_SEARCH,
-    SYS_MEMORY_GET,
-    SYS_MEMORY_DELETE,
-    SYS_SESSION_CREATE,
-    SYS_SESSION_GET,
-    SYS_SESSION_CLOSE,
-    SYS_SESSION_LIST,
-    SYS_TELEMETRY_METRICS,
-    SYS_TELEMETRY_TRACES,
-    SYS_AGENT_SPAWN,
-    SYS_AGENT_TERMINATE,
-    SYS_AGENT_INVOKE,
-    SYS_AGENT_LIST,
-    SYS_SKILL_INSTALL,
-    SYS_SKILL_EXECUTE,
-    SYS_SKILL_LIST,
-    SYS_SKILL_UNINSTALL,
-    SYS_MAX
-};
+/* 系统调用号 enum 现已提升为 syscalls.h 的公共 agentos_syscall_num_t，
+ * 消除 syscall_table.c / test_syscalls.c / test_syscall_extended.c 三处
+ * 重复定义（零债务约束）。SYS_TOOL_EXECUTE 等符号直接来自 syscalls.h。 */
+
+/* 编译期校验：SYS_TOOL_EXECUTE 必须为 23，SYS_MAX 必须为 24。
+ * 若未来在 enum 中插入新项导致值漂移，此处立即编译失败。
+ * 零债务约束：错误早暴露，不留运行期隐患。 */
+_Static_assert(SYS_TOOL_EXECUTE == 23,
+               "SYS_TOOL_EXECUTE must be 23 (see syscalls.h agentos_syscall_num_t)");
+_Static_assert(SYS_MAX == 24,
+               "SYS_MAX must be 24 (see syscalls.h agentos_syscall_num_t)");
 
 typedef void *(*syscall_func_t)(void **args, int argc);
 
@@ -60,6 +46,8 @@ extern void *sys_skill_install(void **args, int argc);
 extern void *sys_skill_execute(void **args, int argc);
 extern void *sys_skill_list(void **args, int argc);
 extern void *sys_skill_uninstall(void **args, int argc);
+/* P3.18 (ACC-DT27): 工具执行 syscall（实现在 syscall_entry.c） */
+extern void *sys_tool_execute(void **args, int argc);
 
 static syscall_func_t syscall_table[SYS_MAX] = {
     [SYS_TASK_SUBMIT] = sys_task_submit,
@@ -84,6 +72,7 @@ static syscall_func_t syscall_table[SYS_MAX] = {
     [SYS_SKILL_EXECUTE] = sys_skill_execute,
     [SYS_SKILL_LIST] = sys_skill_list,
     [SYS_SKILL_UNINSTALL] = sys_skill_uninstall,
+    [SYS_TOOL_EXECUTE] = sys_tool_execute,  /* P3.18 (ACC-DT27) */
 };
 
 void *agentos_syscall_invoke(int syscall_num, void **args, int argc)

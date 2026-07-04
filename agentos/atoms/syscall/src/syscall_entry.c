@@ -9,6 +9,7 @@
 #include "logger.h"
 #include "memory_compat.h"
 #include "memory_provider.h"
+#include "platform.h"   /* P3.18 (ACC-DT27): agentos_process_run_capture */
 #include "string_compat.h"
 #include "syscalls.h"
 
@@ -285,6 +286,44 @@ void *sys_skill_uninstall(void **args, int argc)
     const char *skill_id = (const char *)args[0];
     intptr_t res = agentos_sys_skill_uninstall(skill_id);
     return (void *)res;
+}
+
+/* P3.18 (ACC-DT27): 工具执行系统调用处理函数。
+ *
+ * 设计说明：
+ * - args[0] 指向调用者构造的 tool_execute_args_t 结构体（栈或堆分配）。
+ * - 结构体的 output_buffer 由调用者分配并保证 cap_size 字节可写，
+ *   agentos_process_run_capture 将子进程 stdout 写入此缓冲区。
+ * - exec_result 字段输出 agentos_process_run_capture 的原始返回值
+ *   (0-255=exit code; -1=启动失败; -2=超时)，供调用者区分失败类型。
+ * - 返回值：agentos_process_run_capture >= 0 时返回 AGENTOS_SUCCESS
+ *   （进程启动成功，即使 exit code 非零也属于"执行完成"）；
+ *   返回 -1/-2 时返回 AGENTOS_EFAIL（启动或超时失败）。
+ *   调用者通过 targs.exec_result 获取具体退出码，通过返回值判断是否需 fail-closed。
+ *
+ * 安全说明：
+ * - 此函数经 sandbox_invoke 调用，sandbox 的 permission_check 和 quota_check
+ *   在本函数之前执行（见 sandbox.c:325-351），DENY 时本函数不会被调用。
+ * - agentos_process_run_capture 使用 fork+execvp（不经 shell），消除命令注入风险。
+ */
+void *sys_tool_execute(void **args, int argc)
+{
+    CHECK_ARGS();
+    if (argc != 1)
+        return (void *)(intptr_t)AGENTOS_EINVAL;
+
+    tool_execute_args_t *t = (tool_execute_args_t *)args[0];
+    if (!t || !t->executable || !t->output_buffer || t->cap_size == 0)
+        return (void *)(intptr_t)AGENTOS_EINVAL;
+
+    t->exec_result = agentos_process_run_capture(
+        t->executable, t->argv, NULL, t->timeout_ms, t->output_buffer, t->cap_size);
+
+    /* >= 0: 子进程启动并退出（含非零 exit code）→ syscall 层面成功 */
+    if (t->exec_result >= 0)
+        return (void *)(intptr_t)AGENTOS_SUCCESS;
+    /* -1=启动失败, -2=超时 → syscall 层面失败 */
+    return (void *)(intptr_t)AGENTOS_EFAIL;
 }
 
 static agentos_cognition_engine_t *g_cognition_engine = NULL;

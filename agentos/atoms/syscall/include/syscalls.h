@@ -261,6 +261,63 @@ AGENTOS_API agentos_error_t agentos_sys_skill_list(char ***out_skills, size_t *o
  */
 AGENTOS_API agentos_error_t agentos_sys_skill_uninstall(const char *skill_id);
 
+/* ==================== 工具执行（P3.18 / ACC-DT27） ==================== */
+
+/**
+ * @brief 系统调用号枚举（公共 API）
+ * @details 单一真值源：所有需要 syscall 号的代码（syscall_table.c 分发表、
+ * tool_d 经 sandbox 调用、测试代码）均引用此枚举，消除重复定义导致的
+ * 值漂移风险。P3.18 (ACC-DT27) 新增 SYS_TOOL_EXECUTE 供 tool_d 经 sandbox
+ * 执行工具。
+ *
+ * 值约定：从 1 开始连续递增，SYS_MAX 为哨兵值（合法 syscall 号 < SYS_MAX）。
+ * 在 SYS_MAX 之前追加新项即可扩展，不得在中间插入（会破坏 ABI 兼容性）。
+ */
+typedef enum {
+    SYS_TASK_SUBMIT = 1,
+    SYS_TASK_QUERY,
+    SYS_TASK_WAIT,
+    SYS_TASK_CANCEL,
+    SYS_MEMORY_WRITE,
+    SYS_MEMORY_SEARCH,
+    SYS_MEMORY_GET,
+    SYS_MEMORY_DELETE,
+    SYS_SESSION_CREATE,
+    SYS_SESSION_GET,
+    SYS_SESSION_CLOSE,
+    SYS_SESSION_LIST,
+    SYS_TELEMETRY_METRICS,
+    SYS_TELEMETRY_TRACES,
+    SYS_AGENT_SPAWN,
+    SYS_AGENT_TERMINATE,
+    SYS_AGENT_INVOKE,
+    SYS_AGENT_LIST,
+    SYS_SKILL_INSTALL,
+    SYS_SKILL_EXECUTE,
+    SYS_SKILL_LIST,
+    SYS_SKILL_UNINSTALL,
+    SYS_TOOL_EXECUTE,   /**< P3.18 (ACC-DT27): tool_d 经 sandbox 执行工具 = 23 */
+    SYS_MAX             /**< 哨兵值：合法 syscall 号 < SYS_MAX。当前 = 24 */
+} agentos_syscall_num_t;
+
+/**
+ * @brief 工具执行参数结构体
+ * @details 由 tool_executor_run 构造，经 agentos_sandbox_invoke 传递给
+ * sys_tool_execute 处理函数。output_buffer 由调用者分配（保证 cap_size
+ * 字节可写），sys_tool_execute 将 agentos_process_run_capture 的返回值
+ * 写入 exec_result 字段供调用者读取。此结构体生命周期由调用者管理
+ * （栈分配或堆分配均可），sandbox 调用期间必须保持有效。
+ */
+typedef struct {
+    const char *executable;   /**< 工具可执行文件路径（非 NULL） */
+    char *const *argv;        /**< 参数数组（argv[0]=executable, 末尾 NULL） */
+    uint32_t timeout_ms;      /**< 超时毫秒数，0=无限等待 */
+    char *output_buffer;      /**< 调用者分配的 stdout 捕获缓冲区 */
+    size_t cap_size;          /**< output_buffer 容量（含 '\0'） */
+    int exec_result;          /**< 输出：agentos_process_run_capture 返回值
+                                   (0-255=exit code; -1=启动失败; -2=超时) */
+} tool_execute_args_t;
+
 /* ==================== 辅助函数 ==================== */
 
 /**

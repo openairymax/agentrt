@@ -2,7 +2,7 @@
  * @file log_sanitizer.h
  * @brief 日志脱敏过滤器 - 防止敏感信息泄露到日志
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  *
  * 功能：
  * 1. 自动检测并脱敏敏感字段（API Key、密码、Token 等）

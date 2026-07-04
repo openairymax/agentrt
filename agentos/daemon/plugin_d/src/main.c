@@ -18,6 +18,7 @@
 
 #include "daemon_bootstrap_sd.h"
 #include "daemon_bootstrap_ipc.h"
+#include "daemon_cupolas_bootstrap.h"
 #include "logger.h"
 #include "platform.h"
 
@@ -84,6 +85,9 @@ int main(int argc, char *argv[])
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 #endif
+
+    /* P3.14 ACC-DT15: 初始化 cupolas 安全穹顶（permission_engine + sanitizer + audit_logger）*/
+    daemon_cupolas_init("plugin_d");
 
     /* 创建 Unix Socket 服务器 */
     g_server_fd = agentos_socket_create_unix_server(PLUGIN_D_SOCKET_PATH);
@@ -213,6 +217,8 @@ int main(int argc, char *argv[])
         agentos_socket_close(g_server_fd);
         g_server_fd = AGENTOS_INVALID_SOCKET;
     }
+
+    daemon_cupolas_cleanup(); /* P3.14 ACC-DT15: 清理 cupolas 安全穹顶 */
 
     AGENTOS_LOG_INFO("Plugin_d: Stopped");
     return EXIT_SUCCESS;

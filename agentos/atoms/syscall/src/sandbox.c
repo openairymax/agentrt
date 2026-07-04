@@ -17,6 +17,8 @@
 #include "logger.h"
 #include "../include/syscalls.h"
 #include "agentos.h"
+/* P3.18 (ACC-DT27): sandbox 公共 API 声明（本文件实现其全部函数） */
+#include "agentos_sandbox.h"
 #include "sandbox_permission.h"
 #include "sandbox_quota.h"
 #include "sandbox_utils.h"
@@ -248,6 +250,33 @@ AGENTOS_STRNCPY_TERM(sandbox->policy.updated_by, "system", sizeof(sandbox->polic
                      (unsigned long long)sandbox->sandbox_id);
 
     return AGENTOS_SUCCESS;
+}
+
+/* P3.18 (ACC-DT27): 使用默认配置创建沙箱 — agentos_sandbox_create 的便捷封装。
+ *
+ * 设计说明：
+ * - agentos_sandbox_create 需要调用者构造 sandbox_config_t（含 resource_quota_t），
+ *   这些内部类型不暴露在公共 agentos_sandbox.h 中。本函数在内部构造默认 config
+ *   后调用真实 create，使 tool_d 等外部调用方无需了解内部配置结构。
+ * - 默认值：priority=0, timeout_ms=30000（与 tool_d 默认一致）, flags=0,
+ *   quota 由 sandbox_quota_init 初始化为默认上限。
+ * - 非桩函数：功能完整，等价于调用方自行构造 config + agentos_sandbox_create。 */
+agentos_error_t agentos_sandbox_create_default(const char *name, const char *owner_id,
+                                               agentos_sandbox_t **out_sandbox)
+{
+    if (!out_sandbox)
+        AGENTOS_ERROR(AGENTOS_EINVAL, "failed to create sandbox: null out_sandbox");
+
+    sandbox_config_t config;
+    __builtin_memset(&config, 0, sizeof(config));
+    config.sandbox_name = (char *)name;     /* agentos_sandbox_create 内部会 strdup */
+    config.owner_id = (char *)owner_id;     /* agentos_sandbox_create 内部会 strdup */
+    config.priority = 0;
+    config.timeout_ms = DEFAULT_SANDBOX_TIMEOUT_MS;  /* 30000ms，与 tool_d 默认一致 */
+    config.flags = 0;
+    /* quota 由 agentos_sandbox_create 内部 sandbox_quota_init 初始化 */
+
+    return agentos_sandbox_create(&config, out_sandbox);
 }
 
 void agentos_sandbox_destroy(agentos_sandbox_t *sandbox)

@@ -46,6 +46,8 @@ target_include_directories(agentos_cognition PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../daemon/common/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../daemon/llm_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../daemon/tool_d/include
+    # P3.18 (ACC-DT26): hook_d → CoreLoopThree — engine.c 引用 agentos_hook.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../daemon/hook_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../commons/utils/quality
 )
 

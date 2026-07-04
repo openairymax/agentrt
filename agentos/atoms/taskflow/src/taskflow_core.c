@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 SPHARX.
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 /**
  * @file taskflow_core.c
  * @brief TaskFlow Core Implementation
@@ -144,7 +144,6 @@ static void taskflow_log(const char *fmt, ...)
 
 static void taskflow_engine_init_defaults(taskflow_config_t *config);
 static taskflow_error_t taskflow_engine_validate_config(const taskflow_config_t *config);
-static taskflow_error_t taskflow_engine_stop_core(taskflow_handle_t engine);
 
 // ============================================================================
 // 核心API实现 (内部Pregel引擎接口)
@@ -262,7 +261,7 @@ void taskflow_engine_destroy_core(taskflow_handle_t engine)
     AGENTOS_FREE(e);
 }
 
-taskflow_error_t taskflow_engine_init(taskflow_handle_t engine)
+taskflow_error_t taskflow_engine_init_core(taskflow_handle_t engine)
 {
     if (!engine) {
         return TASKFLOW_ERROR_INVALID_ARG;
@@ -1174,8 +1173,16 @@ static void taskflow_engine_init_defaults(taskflow_config_t *config)
         config->max_edges = 5000000;  // 默认500万边
     }
 
+    /* BAN-333: 0.1.1 强制 pregel_engine max_workers=1 串行降级。
+     * 默认 1 个工作线程；若调用方传入 >1 则强制降级为 1 并打印警告。
+     * 这是因为 0.1.1 的 pregel_engine 并发路径尚未经过多线程验证，
+     * 强制串行模式以确保正确性优先于性能。 */
     if (config->worker_threads == 0) {
-        config->worker_threads = 4;  // 默认4个工作线程
+        config->worker_threads = 1;
+    } else if (config->worker_threads > 1) {
+        taskflow_log("taskflow: BAN-333 强制降级 worker_threads=%zu -> 1 (0.1.1 串行模式)",
+                     config->worker_threads);
+        config->worker_threads = 1;
     }
 
     if (config->partition_count == 0) {
