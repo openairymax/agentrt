@@ -52,6 +52,11 @@ add_library(agentos_coreloopthree STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/hook_d/src/hook_registry.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/hook_d/src/hook_interceptor.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/hook_d/src/hook_timeout.c
+    # P0.20.1: 生产 Hook 处理器 — 审计/metrics/trace 内置注册
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/hook_d/src/hook_builtin_handlers.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/hook_d/src/hook_audit_handler.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/hook_d/src/hook_metrics_handler.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/hook_d/src/hook_trace_handler.c
 )
 
 target_link_libraries(agentos_coreloopthree PUBLIC agentos_atoms)

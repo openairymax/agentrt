@@ -253,6 +253,19 @@ if(BUILD_TESTS)
     )
     target_link_libraries(test_cupolas_core cupolas)
 
+    # P0.25.6 (ACC-STD06): 错误码一致性测试
+    # 验证 cupolas enum 与 commons AGENTOS_ERR_* 宏数值一致、CUPOLAS_* 段
+    # 与 SEC_* 段不冲突、各模块错误码段区间互不重叠。该测试仅依赖头文件
+    # （cupolas_error.h + error.h），但链接 cupolas 库以覆盖转换函数实现。
+    add_executable(test_error_code_consistency tests/unit/test_error_code_consistency.c)
+    target_compile_definitions(test_error_code_consistency PRIVATE AGENTOS_COMPLIANCE_IMPL)
+    target_include_directories(test_error_code_consistency PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${COMMON_INCLUDE_DIRS}
+    )
+    target_link_libraries(test_error_code_consistency cupolas)
+
     # test_cupolas_integration disabled: uses deprecated printf which conflicts with global -Werror
     # add_executable(test_cupolas_integration tests/integration/test_cupolas_integration.c)
     # ...
@@ -269,6 +282,7 @@ if(BUILD_TESTS)
     endif()
 
     add_test(NAME cupolas_core_tests COMMAND test_cupolas_core)
+    add_test(NAME error_code_consistency_tests COMMAND test_error_code_consistency)
     # add_test(NAME cupolas_integration_tests COMMAND test_cupolas_integration)
     # add_test(NAME cupolas_signature_tests COMMAND test_cupolas_signature)
     # add_test(NAME cupolas_vault_tests COMMAND test_cupolas_vault)  # disabled: requires OpenSSL

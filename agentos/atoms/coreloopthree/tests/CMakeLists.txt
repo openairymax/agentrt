@@ -26,6 +26,8 @@ set(CL3_TEST_SOURCES
     unit/test_browser.c
     unit/test_triple_coordinator.c
     unit/test_hook_integration.c
+    # P0.20.1: 内置 Hook 处理器（审计/metrics/trace）测试
+    unit/test_hook_builtin_handlers.c
     # W18.3 (ACC-FOUND03): CoreLoopThree ↔ taskflow_advanced DAG 集成测试
     unit/test_dag_integration.c
 )
