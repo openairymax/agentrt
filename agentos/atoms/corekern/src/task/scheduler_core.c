@@ -25,9 +25,13 @@
 
 /* ==================== 静态全局状态 ==================== */
 
-static scheduler_core_ctx_t *g_core_ctx = NULL;
+/* W09.4 (BUG-4 修复): g_core_ctx 和 g_ctx_init_lock 声明为 _Atomic 指针。
+ * 原声明为非 _Atomic 指针，但通过 (_Atomic void **) 强制转换访问，
+ * 在 C11 标准下属于未定义行为（对非 _Atomic 限定对象使用原子操作）。
+ * 修复：声明为 _Atomic，所有访问通过 atomic_load_explicit/atomic_store_explicit。 */
+static _Atomic(scheduler_core_ctx_t *) g_core_ctx = NULL;
 
-static void *g_ctx_init_lock = NULL;
+static _Atomic(void *) g_ctx_init_lock = NULL;
 
 /* ==================== 内部辅助函数 ==================== */
 
@@ -49,7 +53,8 @@ static scheduler_core_ctx_t *create_core_ctx(void)
 
     /* 初始化原子状态 */
     atomic_init(&ctx->initialized, 0);
-    ctx->next_task_id = 1;
+    /* W09.4: atomic_uint64_t 应使用 atomic_init 初始化，而非直接赋值 */
+    atomic_init(&ctx->next_task_id, (uint64_t)1);
     ctx->task_count = 0;
 
     /* 清零哈希?*/
@@ -94,80 +99,99 @@ static void destroy_core_ctx(scheduler_core_ctx_t *ctx)
 
 scheduler_core_ctx_t *scheduler_core_get_ctx(void)
 {
-    return g_core_ctx;
+    /* W09.4: _Atomic 指针需通过 atomic_load 读取 */
+    return atomic_load_explicit(&g_core_ctx, memory_order_acquire);
 }
 
 int scheduler_core_init(void)
 {
-    if (atomic_load_ptr((_Atomic void **)&g_core_ctx, memory_order_acquire)) {
+    /* W09.4: 使用 atomic_load_explicit 读取 _Atomic 指针，移除 (_Atomic void **) 强制转换 */
+    if (atomic_load_explicit(&g_core_ctx, memory_order_acquire)) {
         return 0;
     }
 
-    if (!g_ctx_init_lock) {
+    /* 延迟初始化 init 锁（CAS 保证仅创建一次） */
+    if (!atomic_load_explicit(&g_ctx_init_lock, memory_order_acquire)) {
         void *new_lock = agentos_mutex_create();
         if (!new_lock)
             ATM_RET_ERR(AGENTOS_EINVAL);
 
         void *expected = NULL;
-        if (!atomic_compare_exchange_strong_ptr((_Atomic void **)&g_ctx_init_lock, &expected,
-                                                new_lock, memory_order_seq_cst,
-                                                memory_order_seq_cst)) {
+        /* W09.4: 使用 C11 泛型宏 atomic_compare_exchange_strong_explicit，
+         * 避免 atomic_compare_exchange_strong_ptr 的 _Atomic void** 类型不匹配警告。
+         * g_ctx_init_lock 是 _Atomic(void *)，泛型宏可正确处理任意 _Atomic 类型。 */
+        if (!atomic_compare_exchange_strong_explicit(&g_ctx_init_lock, &expected,
+                                                     new_lock, memory_order_seq_cst,
+                                                     memory_order_seq_cst)) {
             agentos_mutex_free(new_lock);
         }
     }
 
-    agentos_mutex_lock(g_ctx_init_lock);
+    void *init_lock = atomic_load_explicit(&g_ctx_init_lock, memory_order_acquire);
+    agentos_mutex_lock(init_lock);
 
-    if (atomic_load_ptr((_Atomic void **)&g_core_ctx, memory_order_acquire)) {
-        agentos_mutex_unlock(g_ctx_init_lock);
+    if (atomic_load_explicit(&g_core_ctx, memory_order_acquire)) {
+        agentos_mutex_unlock(init_lock);
         return 0;
     }
 
-    g_core_ctx = create_core_ctx();
-    if (!g_core_ctx) {
-        agentos_mutex_unlock(g_ctx_init_lock);
+    scheduler_core_ctx_t *ctx = create_core_ctx();
+    if (!ctx) {
+        agentos_mutex_unlock(init_lock);
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
-    atomic_store_explicit(&g_core_ctx->initialized, 1, memory_order_release);
+    /* W09.4: 使用 atomic_store_explicit 写入 _Atomic 指针 */
+    atomic_store_explicit(&g_core_ctx, ctx, memory_order_release);
+    atomic_store_explicit(&ctx->initialized, 1, memory_order_release);
     atomic_thread_fence(memory_order_release);
 
-    agentos_mutex_unlock(g_ctx_init_lock);
+    agentos_mutex_unlock(init_lock);
     return 0;
 }
 
 void scheduler_core_destroy(void)
 {
-    if (!g_core_ctx)
+    /* W09.4: 使用 atomic_load_explicit 读取 _Atomic 指针 */
+    scheduler_core_ctx_t *ctx = atomic_load_explicit(&g_core_ctx, memory_order_acquire);
+    if (!ctx)
         return;
 
-    agentos_mutex_lock(g_ctx_init_lock);
+    void *init_lock = atomic_load_explicit(&g_ctx_init_lock, memory_order_acquire);
+    agentos_mutex_lock(init_lock);
 
-    destroy_core_ctx(g_core_ctx);
-    g_core_ctx = NULL;
+    /* 在锁内重新读取，确保线程安全 */
+    ctx = atomic_load_explicit(&g_core_ctx, memory_order_acquire);
+    destroy_core_ctx(ctx);
+    atomic_store_explicit(&g_core_ctx, (scheduler_core_ctx_t *)NULL, memory_order_release);
 
-    agentos_mutex_unlock(g_ctx_init_lock);
+    agentos_mutex_unlock(init_lock);
 
-    agentos_mutex_free(g_ctx_init_lock);
-    g_ctx_init_lock = NULL;
+    agentos_mutex_free(init_lock);
+    atomic_store_explicit(&g_ctx_init_lock, (void *)NULL, memory_order_release);
 }
 
 int scheduler_core_is_initialized(void)
 {
-    return g_core_ctx &&
-           (atomic_load_explicit(&g_core_ctx->initialized, memory_order_acquire) == 1);
+    /* W09.4: 使用 atomic_load_explicit 读取 _Atomic 指针 */
+    scheduler_core_ctx_t *ctx = atomic_load_explicit(&g_core_ctx, memory_order_acquire);
+    return ctx && (atomic_load_explicit(&ctx->initialized, memory_order_acquire) == 1);
 }
 
 uint64_t scheduler_core_fetch_add_task_id(void)
 {
-    if (!g_core_ctx)
+    /* W09.4: 使用 atomic_load_explicit 读取 _Atomic 指针 */
+    scheduler_core_ctx_t *ctx = atomic_load_explicit(&g_core_ctx, memory_order_acquire);
+    if (!ctx)
         return 0;
-    return atomic_fetch_add_explicit(&g_core_ctx->next_task_id, 1, memory_order_seq_cst);
+    return atomic_fetch_add_explicit(&ctx->next_task_id, 1, memory_order_seq_cst);
 }
 
 void scheduler_core_hash_insert(agentos_task_id_t id, task_info_core_t *info)
 {
-    if (!g_core_ctx || !info)
+    /* W09.4: 使用 atomic_load_explicit 读取 _Atomic 指针 */
+    scheduler_core_ctx_t *ctx = atomic_load_explicit(&g_core_ctx, memory_order_acquire);
+    if (!ctx || !info)
         return;
 
     size_t bucket = task_hash_core(id);
@@ -177,16 +201,18 @@ void scheduler_core_hash_insert(agentos_task_id_t id, task_info_core_t *info)
 
     node->id = id;
     node->task_info = info;
-    node->next = g_core_ctx->id_hash_table[bucket];
-    g_core_ctx->id_hash_table[bucket] = node;
+    node->next = ctx->id_hash_table[bucket];
+    ctx->id_hash_table[bucket] = node;
 }
 
 task_info_core_t *scheduler_core_hash_find(agentos_task_id_t id)
 {
-    if (!g_core_ctx) return NULL;
+    /* W09.4: 使用 atomic_load_explicit 读取 _Atomic 指针 */
+    scheduler_core_ctx_t *ctx = atomic_load_explicit(&g_core_ctx, memory_order_acquire);
+    if (!ctx) return NULL;
 
     size_t bucket = task_hash_core(id);
-    task_hash_node_t *node = g_core_ctx->id_hash_table[bucket];
+    task_hash_node_t *node = ctx->id_hash_table[bucket];
 
     while (node) {
         if (node->id == id) {
@@ -200,11 +226,13 @@ task_info_core_t *scheduler_core_hash_find(agentos_task_id_t id)
 
 void scheduler_core_hash_remove(agentos_task_id_t id)
 {
-    if (!g_core_ctx)
+    /* W09.4: 使用 atomic_load_explicit 读取 _Atomic 指针 */
+    scheduler_core_ctx_t *ctx = atomic_load_explicit(&g_core_ctx, memory_order_acquire);
+    if (!ctx)
         return;
 
     size_t bucket = task_hash_core(id);
-    task_hash_node_t *node = g_core_ctx->id_hash_table[bucket];
+    task_hash_node_t *node = ctx->id_hash_table[bucket];
     task_hash_node_t *prev = NULL;
 
     while (node) {
@@ -212,7 +240,7 @@ void scheduler_core_hash_remove(agentos_task_id_t id)
             if (prev) {
                 prev->next = node->next;
             } else {
-                g_core_ctx->id_hash_table[bucket] = node->next;
+                ctx->id_hash_table[bucket] = node->next;
             }
             AGENTOS_FREE(node);
             return;
@@ -261,29 +289,33 @@ void scheduler_core_task_info_destroy(task_info_core_t *info)
 
 int scheduler_core_task_table_add(task_info_core_t *info)
 {
-    if (!g_core_ctx || !info)
+    /* W09.4: 使用 atomic_load_explicit 读取 _Atomic 指针 */
+    scheduler_core_ctx_t *ctx = atomic_load_explicit(&g_core_ctx, memory_order_acquire);
+    if (!ctx || !info)
         ATM_RET_ERR(AGENTOS_EINVAL);
 
-    if (g_core_ctx->task_count >= TASK_TABLE_CAPACITY) {
+    if (ctx->task_count >= TASK_TABLE_CAPACITY) {
         ATM_RET_ERR(AGENTOS_EINVAL);
     }
 
-    g_core_ctx->task_table[g_core_ctx->task_count++] = info;
+    ctx->task_table[ctx->task_count++] = info;
     return 0;
 }
 
 task_info_core_t *scheduler_core_task_table_remove(agentos_task_id_t id)
 {
-    if (!g_core_ctx) return NULL;
+    /* W09.4: 使用 atomic_load_explicit 读取 _Atomic 指针 */
+    scheduler_core_ctx_t *ctx = atomic_load_explicit(&g_core_ctx, memory_order_acquire);
+    if (!ctx) return NULL;
 
-    for (uint32_t i = 0; i < g_core_ctx->task_count; i++) {
-        if (g_core_ctx->task_table[i] && g_core_ctx->task_table[i]->id == id) {
-            task_info_core_t *removed = g_core_ctx->task_table[i];
+    for (uint32_t i = 0; i < ctx->task_count; i++) {
+        if (ctx->task_table[i] && ctx->task_table[i]->id == id) {
+            task_info_core_t *removed = ctx->task_table[i];
 
             /* 移动最后一个元素到当前位置 */
-            g_core_ctx->task_table[i] = g_core_ctx->task_table[g_core_ctx->task_count - 1];
-            g_core_ctx->task_table[g_core_ctx->task_count - 1] = NULL;
-            g_core_ctx->task_count--;
+            ctx->task_table[i] = ctx->task_table[ctx->task_count - 1];
+            ctx->task_table[ctx->task_count - 1] = NULL;
+            ctx->task_count--;
 
             return removed;
         }
@@ -294,12 +326,14 @@ task_info_core_t *scheduler_core_task_table_remove(agentos_task_id_t id)
 
 task_info_core_t *scheduler_core_find_by_platform_handle(void *platform_handle)
 {
-    if (!g_core_ctx || !platform_handle) return NULL;
+    /* W09.4: 使用 atomic_load_explicit 读取 _Atomic 指针 */
+    scheduler_core_ctx_t *ctx = atomic_load_explicit(&g_core_ctx, memory_order_acquire);
+    if (!ctx || !platform_handle) return NULL;
 
-    for (uint32_t i = 0; i < g_core_ctx->task_count; i++) {
-        if (g_core_ctx->task_table[i] &&
-            g_core_ctx->task_table[i]->platform_handle == platform_handle) {
-            return g_core_ctx->task_table[i];
+    for (uint32_t i = 0; i < ctx->task_count; i++) {
+        if (ctx->task_table[i] &&
+            ctx->task_table[i]->platform_handle == platform_handle) {
+            return ctx->task_table[i];
         }
     }
 

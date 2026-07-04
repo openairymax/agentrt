@@ -1,6 +1,6 @@
 # Gateway Daemon - AgentRT 网关守护进程
 # Copyright (C) 2026 SPHARX. All Rights Reserved.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 #
 # 架构说明：
 #   gateway_d 是 gateway 库的用户空间守护进程包装器。

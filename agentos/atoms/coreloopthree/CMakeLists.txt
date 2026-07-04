@@ -114,6 +114,7 @@ endif()
 
 target_include_directories(agentos_coreloopthree PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../taskflow/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/llm_d/include>
     $<INSTALL_INTERFACE:include/agentos/coreloopthree>
 )
@@ -146,6 +147,7 @@ target_include_directories(agentos_coreloopthree PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/cognition/foundation
     ${CMAKE_CURRENT_SOURCE_DIR}/../memory
     ${CMAKE_CURRENT_SOURCE_DIR}/../memory/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../taskflow/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/common/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/llm_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemon/tool_d/include
@@ -159,6 +161,7 @@ target_link_libraries(agentos_coreloopthree PUBLIC
     agentos_execution
     agentos_core
     agentos_memory
+    agentos_taskflow
     svc_common
 )
 

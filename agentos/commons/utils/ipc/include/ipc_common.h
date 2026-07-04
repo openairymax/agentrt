@@ -26,7 +26,7 @@
  * - 内置超时和重试机制
  * - 线程安全设计
  *
- * @author Spharx AgentRT Team
+ * @author SPHARX Ltd. - Airymax Team
  * @date 2026-04-02
  * @version 0.1.0
  *

@@ -9,6 +9,14 @@
 #include <string.h>
 #include "error_compat.h"
 
+/* IRON-2 (load_workflow_json 桩函数修复)：cJSON 可用时实现真正的 JSON 解析。
+ * taskflow_advanced 是 B 类应用语义层，可依赖 cJSON（项目已有依赖）。
+ * cJSON 不可用时 load_workflow_json 返回 ENOTSUP（显式不支持，非桩函数）。 */
+#ifdef AGENTOS_TASKFLOW_HAVE_CJSON
+#include <cjson/cJSON.h>
+#include "logging_compat.h"
+#endif
+
 #define ATM_RET_ERR(c) \
     do { agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentos_error_str(c)); return (c); } while(0)
 
@@ -190,28 +198,280 @@ int taskflow_engine_unregister_workflow(taskflow_engine_t *engine, const char *w
     return 1;
 }
 
+/* IRON-2 (load_workflow_json 桩函数修复)：JSON 解析辅助函数。
+ * 以下三个函数仅在使用 cJSON 时被引用，放在 #ifdef 块中避免未使用警告。 */
+#ifdef AGENTOS_TASKFLOW_HAVE_CJSON
+
+/* 将节点类型字符串映射为 taskflow_node_type_t 枚举。
+ * 未知字符串返回默认值 TASKFLOW_NODE_TASK。 */
+static taskflow_node_type_t taskflow_parse_node_type(const char *str)
+{
+    if (!str) return TASKFLOW_NODE_TASK;
+    if (strcmp(str, "task") == 0) return TASKFLOW_NODE_TASK;
+    if (strcmp(str, "condition") == 0) return TASKFLOW_NODE_CONDITION;
+    if (strcmp(str, "fork") == 0) return TASKFLOW_NODE_FORK;
+    if (strcmp(str, "join") == 0) return TASKFLOW_NODE_JOIN;
+    if (strcmp(str, "subflow") == 0) return TASKFLOW_NODE_SUBFLOW;
+    if (strcmp(str, "loop") == 0) return TASKFLOW_NODE_LOOP;
+    if (strcmp(str, "delay") == 0) return TASKFLOW_NODE_DELAY;
+    if (strcmp(str, "event_wait") == 0) return TASKFLOW_NODE_EVENT_WAIT;
+    if (strcmp(str, "transform") == 0) return TASKFLOW_NODE_TRANSFORM;
+    return TASKFLOW_NODE_TASK;
+}
+
+/* 将错误策略字符串映射为 taskflow_error_strategy_t 枚举。
+ * 未知字符串返回 TASKFLOW_ERROR_STRATEGY_NONE（显式空值）。 */
+static taskflow_error_strategy_t taskflow_parse_error_strategy(const char *str)
+{
+    if (!str) return TASKFLOW_ERROR_STRATEGY_NONE;
+    if (strcmp(str, "none") == 0) return TASKFLOW_ERROR_STRATEGY_NONE;
+    if (strcmp(str, "retry") == 0) return TASKFLOW_ERROR_RETRY;
+    if (strcmp(str, "rollback") == 0) return TASKFLOW_ERROR_ROLLBACK;
+    if (strcmp(str, "skip") == 0) return TASKFLOW_ERROR_SKIP;
+    if (strcmp(str, "abort") == 0) return TASKFLOW_ERROR_ABORT;
+    if (strcmp(str, "fallback") == 0) return TASKFLOW_ERROR_FALLBACK;
+    return TASKFLOW_ERROR_STRATEGY_NONE;
+}
+
+/* 释放 taskflow_workflow_t 的动态分配字段（nodes/edges/initial_node_id 等）。
+ * 用于 load_workflow_json 解析失败或 register_workflow 失败时的回滚清理。
+ * 注意：此函数与 taskflow_engine_destroy 中的释放逻辑一致，但作用于单个 workflow。 */
+static void taskflow_free_workflow_fields(taskflow_workflow_t *wf)
+{
+    if (!wf) return;
+    if (wf->nodes) {
+        for (size_t j = 0; j < wf->node_count; j++) {
+            taskflow_node_t *n = &wf->nodes[j];
+            AGENTOS_FREE(n->task_handler_name);
+            AGENTOS_FREE(n->config_json);
+            AGENTOS_FREE(n->input_transform_json);
+            AGENTOS_FREE(n->output_transform_json);
+            AGENTOS_FREE(n->fallback_handler_name);
+            AGENTOS_FREE(n->condition_expr);
+            AGENTOS_FREE(n->subflow_id);
+            AGENTOS_FREE(n->loop_condition_expr);
+            AGENTOS_FREE(n->loop_foreach_json);
+            AGENTOS_FREE(n->event_type);
+        }
+        AGENTOS_FREE(wf->nodes);
+        wf->nodes = NULL;
+        wf->node_count = 0;
+    }
+    if (wf->edges) {
+        AGENTOS_FREE(wf->edges);
+        wf->edges = NULL;
+        wf->edge_count = 0;
+    }
+    AGENTOS_FREE(wf->initial_node_id);
+    wf->initial_node_id = NULL;
+    AGENTOS_FREE(wf->input_schema_json);
+    wf->input_schema_json = NULL;
+    AGENTOS_FREE(wf->output_schema_json);
+    wf->output_schema_json = NULL;
+}
+
+#endif /* AGENTOS_TASKFLOW_HAVE_CJSON */
+
 int taskflow_engine_load_workflow_json(taskflow_engine_t *engine, const char *workflow_json)
 {
     if (!engine || !workflow_json)
         AGENTOS_ERROR(AGENTOS_EINVAL, "failed to load workflow json: null engine or workflow_json");
     if (engine->workflow_count >= TASKFLOW_MAX_SUBFLOWS)
         ATM_RET_ERR(AGENTOS_ERR_OVERFLOW);
-    workflow_entry_t *we = &engine->workflows[engine->workflow_count];
-    __builtin_memset(we, 0, sizeof(workflow_entry_t));
-    snprintf(we->workflow.id, sizeof(we->workflow.id), "wf_json_%zu", engine->workflow_count);
-    snprintf(we->workflow.name, sizeof(we->workflow.name), "JSON Workflow %zu",
-             engine->workflow_count);
-    we->workflow.node_count = 1;
-    we->workflow.nodes = (taskflow_node_t *)AGENTOS_CALLOC(1, sizeof(taskflow_node_t));
-    if (!we->workflow.nodes)
-        ATM_RET_ERR(AGENTOS_ERR_OUT_OF_MEMORY);
-    snprintf(we->workflow.nodes[0].id, sizeof(we->workflow.nodes[0].id), "node_0");
-    we->workflow.nodes[0].type = TASKFLOW_NODE_TASK;
-    we->workflow.nodes[0].state = TASKFLOW_STATE_PENDING;
-    we->workflow.initial_node_id = AGENTOS_STRDUP("node_0");
-    we->registered = 1;
-    engine->workflow_count++;
+
+#ifndef AGENTOS_TASKFLOW_HAVE_CJSON
+    /* IRON-2: cJSON 不可用时显式返回 ENOTSUP，非桩函数。
+     * 调用方可通过 taskflow_engine_register_workflow（结构体方式）注册工作流。
+     * W18 taskflow coreloopthree 集成即采用 register_workflow 方式避免依赖此函数。 */
+    AGENTOS_LOG_WARN("taskflow: load_workflow_json requires cJSON (not available), "
+                     "use taskflow_engine_register_workflow instead");
+    ATM_RET_ERR(AGENTOS_ENOTSUP);
+#else
+    /* IRON-2 修复：原实现是桩函数（不解析 JSON，硬编码单节点工作流 id="wf_json_N"）。
+     * 现在使用 cJSON 实现真正的 JSON 解析，填充 taskflow_workflow_t 全部字段。
+     * JSON 格式：
+     * {
+     *   "id": "wf_001", "name": "...", "description": "...", "version": "1.0",
+     *   "initial_node_id": "start",
+     *   "nodes": [{"id":"...", "name":"...", "type":"task|condition|...",
+     *              "task_handler_name":"...", "timeout_ms":N, "max_retries":N,
+     *              "retry_delay_ms":N, "error_strategy":"retry|...",
+     *              "config_json":"...", "fallback_handler_name":"...",
+     *              "condition_expr":"...", "subflow_id":"..."}],
+     *   "edges": [{"id":"...", "source_node_id":"...", "target_node_id":"...",
+     *              "condition_expr":"...", "priority":N, "is_default":bool}],
+     *   "default_timeout_ms":N, "default_max_retries":N,
+     *   "default_error_strategy":"retry|...",
+     *   "input_schema_json":"...", "output_schema_json":"..."
+     * } */
+    taskflow_workflow_t wf;
+    AGENTOS_MEMSET(&wf, 0, sizeof(wf));
+
+    cJSON *root = cJSON_Parse(workflow_json);
+    if (!root) {
+        AGENTOS_LOG_WARN("taskflow: load_workflow_json JSON parse failed");
+        ATM_RET_ERR(AGENTOS_EINVAL);
+    }
+
+    /* 辅助宏：读取字符串字段到固定缓冲区 */
+    #define TF_READ_STR_FIELD(obj, dst, field, maxsize) do { \
+        cJSON *_item = cJSON_GetObjectItem(obj, field); \
+        if (_item && cJSON_IsString(_item)) { \
+            AGENTOS_STRNCPY_TERM(dst, _item->valuestring, maxsize); \
+        } \
+    } while (0)
+
+    #define TF_READ_STR_DUP(obj, dst_ptr, field) do { \
+        cJSON *_item = cJSON_GetObjectItem(obj, field); \
+        if (_item && cJSON_IsString(_item) && _item->valuestring) { \
+            dst_ptr = AGENTOS_STRDUP(_item->valuestring); \
+        } \
+    } while (0)
+
+    #define TF_READ_NUM(obj, dst, field) do { \
+        cJSON *_item = cJSON_GetObjectItem(obj, field); \
+        if (_item && cJSON_IsNumber(_item)) { \
+            dst = (int32_t)_item->valueint; \
+        } \
+    } while (0)
+
+    /* 顶层字符串字段 */
+    TF_READ_STR_FIELD(root, wf.id, "id", sizeof(wf.id));
+    TF_READ_STR_FIELD(root, wf.name, "name", sizeof(wf.name));
+    TF_READ_STR_FIELD(root, wf.description, "description", sizeof(wf.description));
+    TF_READ_STR_FIELD(root, wf.version, "version", sizeof(wf.version));
+    TF_READ_STR_DUP(root, wf.initial_node_id, "initial_node_id");
+    TF_READ_STR_DUP(root, wf.input_schema_json, "input_schema_json");
+    TF_READ_STR_DUP(root, wf.output_schema_json, "output_schema_json");
+
+    /* 顶层数值字段 */
+    TF_READ_NUM(root, wf.default_timeout_ms, "default_timeout_ms");
+    TF_READ_NUM(root, wf.default_max_retries, "default_max_retries");
+    {
+        cJSON *es_item = cJSON_GetObjectItem(root, "default_error_strategy");
+        if (es_item && cJSON_IsString(es_item) && es_item->valuestring) {
+            wf.default_error_strategy = taskflow_parse_error_strategy(es_item->valuestring);
+        }
+    }
+
+    /* nodes 数组 */
+    {
+        cJSON *nodes_arr = cJSON_GetObjectItem(root, "nodes");
+        if (nodes_arr && cJSON_IsArray(nodes_arr)) {
+            int n_count = cJSON_GetArraySize(nodes_arr);
+            if (n_count < 0 || (size_t)n_count > TASKFLOW_MAX_NODES) {
+                cJSON_Delete(root);
+                taskflow_free_workflow_fields(&wf);
+                AGENTOS_LOG_WARN("taskflow: load_workflow_json nodes count overflow (%d)", n_count);
+                ATM_RET_ERR(AGENTOS_ERR_OVERFLOW);
+            }
+            if (n_count > 0) {
+                wf.nodes = (taskflow_node_t *)AGENTOS_CALLOC((size_t)n_count, sizeof(taskflow_node_t));
+                if (!wf.nodes) {
+                    cJSON_Delete(root);
+                    taskflow_free_workflow_fields(&wf);
+                    ATM_RET_ERR(AGENTOS_ERR_OUT_OF_MEMORY);
+                }
+                wf.node_count = (size_t)n_count;
+                for (int i = 0; i < n_count; i++) {
+                    cJSON *node_obj = cJSON_GetArrayItem(nodes_arr, i);
+                    taskflow_node_t *n = &wf.nodes[i];
+                    n->state = TASKFLOW_STATE_PENDING;  /* 默认状态：等待中 */
+                    n->type = TASKFLOW_NODE_TASK;       /* 默认类型 */
+
+                    TF_READ_STR_FIELD(node_obj, n->id, "id", sizeof(n->id));
+                    TF_READ_STR_FIELD(node_obj, n->name, "name", sizeof(n->name));
+                    TF_READ_STR_DUP(node_obj, n->task_handler_name, "task_handler_name");
+                    TF_READ_STR_DUP(node_obj, n->config_json, "config_json");
+                    TF_READ_STR_DUP(node_obj, n->input_transform_json, "input_transform_json");
+                    TF_READ_STR_DUP(node_obj, n->output_transform_json, "output_transform_json");
+                    TF_READ_STR_DUP(node_obj, n->fallback_handler_name, "fallback_handler_name");
+                    TF_READ_STR_DUP(node_obj, n->condition_expr, "condition_expr");
+                    TF_READ_STR_DUP(node_obj, n->subflow_id, "subflow_id");
+                    TF_READ_NUM(node_obj, n->timeout_ms, "timeout_ms");
+                    TF_READ_NUM(node_obj, n->max_retries, "max_retries");
+                    TF_READ_NUM(node_obj, n->retry_delay_ms, "retry_delay_ms");
+
+                    cJSON *ntype = cJSON_GetObjectItem(node_obj, "type");
+                    if (ntype && cJSON_IsString(ntype) && ntype->valuestring) {
+                        n->type = taskflow_parse_node_type(ntype->valuestring);
+                    }
+                    cJSON *nerr = cJSON_GetObjectItem(node_obj, "error_strategy");
+                    if (nerr && cJSON_IsString(nerr) && nerr->valuestring) {
+                        n->error_strategy = taskflow_parse_error_strategy(nerr->valuestring);
+                    }
+                }
+            }
+        }
+    }
+
+    /* edges 数组 */
+    {
+        cJSON *edges_arr = cJSON_GetObjectItem(root, "edges");
+        if (edges_arr && cJSON_IsArray(edges_arr)) {
+            int e_count = cJSON_GetArraySize(edges_arr);
+            if (e_count < 0 || (size_t)e_count > TASKFLOW_MAX_EDGES) {
+                cJSON_Delete(root);
+                taskflow_free_workflow_fields(&wf);
+                AGENTOS_LOG_WARN("taskflow: load_workflow_json edges count overflow (%d)", e_count);
+                ATM_RET_ERR(AGENTOS_ERR_OVERFLOW);
+            }
+            if (e_count > 0) {
+                wf.edges = (taskflow_edge_t *)AGENTOS_CALLOC((size_t)e_count, sizeof(taskflow_edge_t));
+                if (!wf.edges) {
+                    cJSON_Delete(root);
+                    taskflow_free_workflow_fields(&wf);
+                    ATM_RET_ERR(AGENTOS_ERR_OUT_OF_MEMORY);
+                }
+                wf.edge_count = (size_t)e_count;
+                for (int i = 0; i < e_count; i++) {
+                    cJSON *edge_obj = cJSON_GetArrayItem(edges_arr, i);
+                    taskflow_edge_t *e = &wf.edges[i];
+                    e->priority = 0;
+                    e->is_default = false;
+
+                    TF_READ_STR_FIELD(edge_obj, e->id, "id", sizeof(e->id));
+                    TF_READ_STR_FIELD(edge_obj, e->source_node_id, "source_node_id", sizeof(e->source_node_id));
+                    TF_READ_STR_FIELD(edge_obj, e->target_node_id, "target_node_id", sizeof(e->target_node_id));
+                    TF_READ_STR_FIELD(edge_obj, e->condition_expr, "condition_expr", sizeof(e->condition_expr));
+                    TF_READ_NUM(edge_obj, e->priority, "priority");
+                    {
+                        cJSON *def_item = cJSON_GetObjectItem(edge_obj, "is_default");
+                        if (def_item && cJSON_IsBool(def_item)) {
+                            e->is_default = cJSON_IsTrue(def_item);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #undef TF_READ_STR_FIELD
+    #undef TF_READ_STR_DUP
+    #undef TF_READ_NUM
+
+    cJSON_Delete(root);
+
+    /* 验证必需字段：id 不能为空 */
+    if (wf.id[0] == '\0') {
+        taskflow_free_workflow_fields(&wf);
+        AGENTOS_LOG_WARN("taskflow: load_workflow_json missing required field 'id'");
+        ATM_RET_ERR(AGENTOS_EINVAL);
+    }
+
+    /* 通过 register_workflow 注册（浅拷贝，所有权转移给 engine）。
+     * register_workflow 失败时需释放 wf 资源避免泄漏。 */
+    int rc = taskflow_engine_register_workflow(engine, &wf);
+    if (rc != 0) {
+        taskflow_free_workflow_fields(&wf);
+        AGENTOS_LOG_WARN("taskflow: load_workflow_json register_workflow failed (rc=%d)", rc);
+        return rc;
+    }
+
+    AGENTOS_LOG_INFO("taskflow: workflow '%s' loaded from JSON (nodes=%zu edges=%zu)",
+                     wf.id, wf.node_count, wf.edge_count);
     return 0;
+#endif /* AGENTOS_TASKFLOW_HAVE_CJSON */
 }
 
 static taskflow_workflow_t *find_workflow(taskflow_engine_t *engine, const char *workflow_id)

@@ -6,7 +6,7 @@
  * @file sync_event.c
  * @brief 事件实现
  *
- * @author Spharx AgentRT Team
+ * @author SPHARX Ltd. - Airymax Team
  * @date 2026-04-05
  */
 

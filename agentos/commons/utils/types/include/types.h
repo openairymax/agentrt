@@ -20,7 +20,7 @@
  * 5. Agent类型：Agent契约、能力定义
  * 6. 可观测性类型：指标、追踪、日志
  *
- * @author Spharx AgentRT Team
+ * @author SPHARX Ltd. - Airymax Team
  * @date 2026-04-03
  * @version 0.1.0
  *

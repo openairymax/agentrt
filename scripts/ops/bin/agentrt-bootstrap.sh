@@ -3,7 +3,7 @@
 # =============================================================================
 # agentrt-bootstrap.sh — AgentRT 一键启动脚本
 # Copyright (C) 2025-2026 SPHARX Ltd.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 #
 # P1.23.3: 按 DAG 层级顺序启动所有 daemon，等待每个 daemon
 #          健康检查通过后再启动下一层。

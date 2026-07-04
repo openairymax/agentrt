@@ -18,7 +18,7 @@
  * - 网络类型（连接、HTTP 请求/响应）
  * - 辅助宏（ARRAY_SIZE, MIN/MAX, ALIGN_UP 等）
  *
- * @author Spharx AgentRT Team
+ * @author SPHARX Ltd. - Airymax Team
  * @date 2026-04-02
  */
 

@@ -32,8 +32,13 @@
 #ifndef AGENTOS_CORELOOPTHREE_CHECKPOINT_ADAPTER_H
 #define AGENTOS_CORELOOPTHREE_CHECKPOINT_ADAPTER_H
 
-#include "checkpoint.h"
-
+/* P4.7 阶段 A（ACC-DT28）：移除不必要 `#include "checkpoint.h"`。
+ * 本头文件所有类型均自定义（checkpoint_adapter_s / checkpoint_adapter_config_t /
+ * checkpoint_snapshot_t），不引用 checkpoint.h 中的任何类型或符号。
+ * checkpoint_adapter.c 实现端仍保留 include（调用 agentos_checkpoint_save /
+ * agentos_checkpoint_restore 等 API 与 agentos_task_checkpoint_t 类型）。
+ * 头文件依赖最小化是 atoms 层架构清理的目标之一，可减少传递性 include 污染
+ * （loop.c/orch_adapter.c 等仅 include 本 header 不再被迫拉入 checkpoint.h）。 */
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

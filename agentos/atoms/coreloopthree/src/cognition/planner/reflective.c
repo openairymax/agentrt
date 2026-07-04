@@ -172,23 +172,31 @@ static agentos_error_t reflective_plan_init(void **out_context)
 
 static void reflective_plan_cleanup(agentos_plan_strategy_t *strategy)
 {
-    if (!strategy || !strategy->data)
+    if (!strategy)
         return;
     reflective_context_t *ctx = (reflective_context_t *)strategy->data;
-    if (ctx->chain) {
-        agentos_tc_chain_stop(ctx->chain);
-        agentos_tc_chain_destroy(ctx->chain);
-        ctx->chain = NULL;
+    if (ctx) {
+        if (ctx->chain) {
+            agentos_tc_chain_stop(ctx->chain);
+            agentos_tc_chain_destroy(ctx->chain);
+            ctx->chain = NULL;
+        }
+        if (ctx->meta) {
+            agentos_mc_destroy(ctx->meta);
+            ctx->meta = NULL;
+        }
+        if (ctx->last_goal) {
+            AGENTOS_FREE(ctx->last_goal);
+            ctx->last_goal = NULL;
+        }
+        AGENTOS_FREE(ctx);
     }
-    if (ctx->meta) {
-        agentos_mc_destroy(ctx->meta);
-        ctx->meta = NULL;
-    }
-    if (ctx->last_goal) {
-        AGENTOS_FREE(ctx->last_goal);
-        ctx->last_goal = NULL;
-    }
-    AGENTOS_FREE(ctx);
+    /* P0.20.7: 释放 strategy 本身，与 reactive_destroy 约定保持一致
+     * （reactive.c L86 AGENTOS_FREE(strategy)）。
+     * cognition engine destroy 时调用 plan_strat->destroy(plan_strat)，
+     * 期望 destroy 回调释放 strategy 本身。原实现遗漏此步导致 24 字节泄漏。
+     * 即使 data=NULL（理论上不会发生），strategy 本身也必须释放。 */
+    AGENTOS_FREE(strategy);
 }
 
 static agentos_error_t reflective_plan(const agentos_intent_t *intent, void *context,

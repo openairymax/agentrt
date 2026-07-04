@@ -13,7 +13,7 @@
  * 4. 线程安全的错误信息存储
  * 5. 支持结构化错误上下文
  *
- * @author Spharx AgentRT Team
+ * @author SPHARX Ltd. - Airymax Team
  * @date 2026-03-30
  * @version 2.0
  *
@@ -396,6 +396,67 @@ extern "C" {
 #endif
 #ifndef AGENTOS_ERR_ESANITIZE
 #define AGENTOS_ERR_ESANITIZE (-711)
+#endif
+
+/* Cupolas 安全穹顶专属错误码 (-712 到 -799)
+ *
+ * P0.25.4 (ACC-STD06)：任务清单原要求 -700~-705 段，但 -700~-711 已被
+ * AGENTOS_ERR_SEC_* 占用（v3.4 之前已定义）。为避免数值冲突，Cupolas 专属
+ * 错误码段调整为 -712~-799。Cupolas 公共 API 仍可通过 cupolas_ERR_* enum
+ * （数值与 AGENTOS_ERR_* 通用码一致，如 cupolas_ERR_OUT_OF_MEMORY=-4）
+ * 返回通用错误码；本段仅定义 Cupolas 特有的语义错误（如沙箱隔离、策略拒绝、
+ * 审计失败等），供 cupolas 模块内部和调用方区分错误来源。
+ *
+ * 段分配：
+ *   -712  AGENTOS_ERR_CUPOLAS_BASE       段基址
+ *   -713  AGENTOS_ERR_CUPOLAS_DENIED     权限/策略拒绝（Cupolas 决策）
+ *   -714  AGENTOS_ERR_CUPOLAS_QUARANTINE 隔离/隔离区
+ *   -715  AGENTOS_ERR_CUPOLAS_POLICY     策略评估失败
+ *   -716  AGENTOS_ERR_CUPOLAS_SANDBOX    沙箱执行失败/逃逸检测
+ *   -717  AGENTOS_ERR_CUPOLAS_AUDIT      审计日志写入失败
+ *   -718  AGENTOS_ERR_CUPOLAS_TAMPERED   篡改检测
+ *   -719  AGENTOS_ERR_CUPOLAS_SIGNATURE  签名验证失败
+ *   -720  AGENTOS_ERR_CUPOLAS_VAULT      Vault 凭据访问失败
+ *   -721  AGENTOS_ERR_CUPOLAS_ENTITLEMENT 权限声明无效
+ *   -722  AGENTOS_ERR_CUPOLAS_RUNTIME    运行时保护违规
+ *   -723  AGENTOS_ERR_CUPOLAS_NETWORK    网络安全策略拒绝
+ *   -724~-799 预留扩展
+ */
+#ifndef AGENTOS_ERR_CUPOLAS_BASE
+#define AGENTOS_ERR_CUPOLAS_BASE (-712)
+#endif
+#ifndef AGENTOS_ERR_CUPOLAS_DENIED
+#define AGENTOS_ERR_CUPOLAS_DENIED (-713)
+#endif
+#ifndef AGENTOS_ERR_CUPOLAS_QUARANTINE
+#define AGENTOS_ERR_CUPOLAS_QUARANTINE (-714)
+#endif
+#ifndef AGENTOS_ERR_CUPOLAS_POLICY
+#define AGENTOS_ERR_CUPOLAS_POLICY (-715)
+#endif
+#ifndef AGENTOS_ERR_CUPOLAS_SANDBOX
+#define AGENTOS_ERR_CUPOLAS_SANDBOX (-716)
+#endif
+#ifndef AGENTOS_ERR_CUPOLAS_AUDIT
+#define AGENTOS_ERR_CUPOLAS_AUDIT (-717)
+#endif
+#ifndef AGENTOS_ERR_CUPOLAS_TAMPERED
+#define AGENTOS_ERR_CUPOLAS_TAMPERED (-718)
+#endif
+#ifndef AGENTOS_ERR_CUPOLAS_SIGNATURE
+#define AGENTOS_ERR_CUPOLAS_SIGNATURE (-719)
+#endif
+#ifndef AGENTOS_ERR_CUPOLAS_VAULT
+#define AGENTOS_ERR_CUPOLAS_VAULT (-720)
+#endif
+#ifndef AGENTOS_ERR_CUPOLAS_ENTITLEMENT
+#define AGENTOS_ERR_CUPOLAS_ENTITLEMENT (-721)
+#endif
+#ifndef AGENTOS_ERR_CUPOLAS_RUNTIME
+#define AGENTOS_ERR_CUPOLAS_RUNTIME (-722)
+#endif
+#ifndef AGENTOS_ERR_CUPOLAS_NETWORK
+#define AGENTOS_ERR_CUPOLAS_NETWORK (-723)
 #endif
 
 /* 协调/规划错误 (-800 到 -899) */

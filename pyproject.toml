@@ -2,7 +2,7 @@
 name = "agentrt"
 version = "0.1.0"
 description = "AgentRT - Agent Runtime Platform"
-authors = ["Spharx AgentRT Team"]
+authors = ["SPHARX Ltd. - Airymax Team"]
 license = "AGPL-3.0-or-later OR Apache-2.0"
 readme = "README.md"
 homepage = "https://spharx.cn"

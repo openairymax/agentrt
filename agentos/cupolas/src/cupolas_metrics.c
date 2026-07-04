@@ -1,5 +1,5 @@
 #include "cupolas.h"
-/* SPDX-License-Identifier: Apache-2.0 */
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
@@ -9,7 +9,7 @@
 /**
  * @file cupolas_metrics.c
  * @brief Metrics Export - Prometheus Format
- * @author Spharx AgentRT Team
+ * @author SPHARX Ltd. - Airymax Team
  * @date 2024
  *
  * This module implements metrics collection and export:

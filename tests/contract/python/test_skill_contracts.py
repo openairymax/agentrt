@@ -416,7 +416,7 @@ class TestSkillContractStructure:
                 "last_audit": "2026-03-15"
             },
             "extensions": {
-                "author": "Spharx AgentRT Team",
+                "author": "SPHARX Ltd. - Airymax Team",
                 "license": "MIT"
             }
         }

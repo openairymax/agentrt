@@ -6,12 +6,13 @@ build-backend = "setuptools.build_meta"
 name = "agentos"
 version = "0.1.0"
 description = "AgentRT Python SDK - 官方多语言 SDK 集合"
-authors = ["Spharx AgentRT Team"]
-license = { file = "LICENSE" }
+authors = ["SPHARX Ltd."]
+license = "AGPL-3.0-or-later OR Apache-2.0"
 readme = "README.md"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: Apache Software License",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "Operating System :: OS Independent",
 ]
 requires-python = ">=3.8"

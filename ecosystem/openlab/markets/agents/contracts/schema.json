@@ -141,7 +141,7 @@
     "license": {
       "type": "string",
       "description": "License information",
-      "enum": ["MIT", "Apache-2.0", "GPL-3.0", "BSD-3-Clause", "Proprietary"]
+      "enum": ["MIT", "Apache-2.0", "GPL-3.0", "AGPL-3.0-or-later OR Apache-2.0", "BSD-3-Clause", "Proprietary"]
     },
     "author": {
       "type": "string",

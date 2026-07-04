@@ -1,7 +1,7 @@
 /**
  * @file cupolas_signature.c
  * @brief 代码签名验证实现
- * @author Spharx AgentRT Team
+ * @author SPHARX Ltd. - Airymax Team
  * @date 2026
  */
 

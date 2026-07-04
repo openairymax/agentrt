@@ -9,7 +9,7 @@
  * 提供一组通用的检查宏，用于参数验证、错误处理和资源清理。
  * 旨在消除项目中分散的检查代码，提供一致的验证模式。
  *
- * @author Spharx AgentRT Team
+ * @author SPHARX Ltd. - Airymax Team
  * @date 2026-04-07
  * @version 1.0
  *
