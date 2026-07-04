@@ -315,6 +315,8 @@ void agentos_cognition_destroy(agentos_cognition_engine_t *engine)
 
     /* P3.18 (ACC-DT26): 销毁 hook 系统 — 与 create 中的 agentos_hook_init 配对。
      * hook_shutdown 幂等，重复调用安全。 */
+    /* P0.20.1: 先注销内置 handler，再销毁 hook 系统（顺序正确避免悬挂指针）。 */
+    agentos_hook_unregister_builtin_handlers();
     agentos_hook_shutdown();
 
     if (engine->chain) {

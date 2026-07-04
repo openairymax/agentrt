@@ -482,6 +482,20 @@ extern "C" {
 #define AGENTOS_ERR_COORD_RETRY_EXCEED (-806)
 #endif
 
+/* 协议/校验错误 (-900 到 -909)
+ *
+ * P0.22.1 (ARE L2)：IPC Bus 统一消息头校验失败的专属错误码段。
+ * - AGENTOS_ERR_PROTOCOL  magic/version/reserved 字段不匹配（消息必须丢弃）
+ * - AGENTOS_ERR_CHECKSUM  CRC32 校验和不匹配（消息必须丢弃，不得回复 ERROR）
+ * 详见 Docs/Capital_Specifications/are_standards/L2_service_protocol.md §2.3
+ */
+#ifndef AGENTOS_ERR_PROTOCOL
+#define AGENTOS_ERR_PROTOCOL (-900)
+#endif
+#ifndef AGENTOS_ERR_CHECKSUM
+#define AGENTOS_ERR_CHECKSUM (-901)
+#endif
+
 /* ==================== 错误上下文 ==================== */
 
 /**

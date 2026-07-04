@@ -5,6 +5,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(COREKERN_SOURCES
     src/core_init.c
     src/error.c
+    src/ipc/are_ipc.c
     src/ipc/binder.c
     src/ipc/buffer.c
     src/mem/alloc.c

@@ -35,7 +35,7 @@ typedef enum {
 
 typedef struct {
     /** 目标 daemon 映射 */
-    const char *a2a_target_daemon;      /**< A2A 目标 daemon（默认 "agent_d"） */
+    const char *a2a_target_daemon;      /**< A2A 目标 daemon（默认 "sched_d" — 提供 agent 注册 + task 调度） */
     const char *mcp_target_daemon;      /**< MCP 目标 daemon（默认 "tool_d"） */
     const char *openai_target_daemon;   /**< OpenAI 目标 daemon（默认 "llm_d"） */
     const char *jsonrpc_target_daemon;  /**< JSON-RPC 目标 daemon（默认 "sched_d"） */
@@ -56,7 +56,7 @@ typedef struct {
 /** 默认转发配置 */
 #define GW_FORWARD_CONFIG_DEFAULTS                                             \
     {                                                                          \
-        .a2a_target_daemon = "agent_d", .mcp_target_daemon = "tool_d",        \
+        .a2a_target_daemon = "sched_d", .mcp_target_daemon = "tool_d",        \
         .openai_target_daemon = "llm_d", .jsonrpc_target_daemon = "sched_d",  \
         .a2a_channel = "a2a", .mcp_channel = "mcp", .openai_channel = "llm",  \
         .jsonrpc_channel = "sched", .request_timeout_ms = 30000,              \
@@ -123,7 +123,7 @@ int gw_forward_request(gw_forward_t *fw, gw_fwd_proto_t proto, const char *metho
 /**
  * @brief C-L11.2: A2A 协议转发路径
  *
- * Agent-to-Agent 请求 → IPC Bus → agent_d
+ * Agent-to-Agent 请求 → IPC Bus → sched_d
  */
 int gw_forward_a2a(gw_forward_t *fw, const char *method, const char *path,
                    const char *body, size_t body_len, char **out_response,

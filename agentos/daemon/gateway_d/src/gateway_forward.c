@@ -8,7 +8,7 @@
  *
  * 实现：
  *   P1.10.1: 外部 HTTP → gateway → gateway_d → 协议路由 → 目标 daemon
- *   P1.10.2: A2A 协议转发路径 → agent_d
+ *   P1.10.2: A2A 协议转发路径 → sched_d
  *   P1.10.3: MCP 协议转发路径 → tool_d / llm_d
  *   P1.10.4: OpenAI 兼容转发路径 → llm_d
  */

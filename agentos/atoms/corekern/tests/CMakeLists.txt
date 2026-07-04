@@ -93,3 +93,25 @@ target_link_libraries(test_oom_handler
 
 add_test(NAME oom_handler COMMAND test_oom_handler)
 agentos_print_info("corekern test: test_oom_handler (OOM trigger→degrade→restore)")
+
+# P0.22.1: ARE L2 统一 IPC 消息头单元测试
+# 验证 128 字节定长头 + CRC32 校验 + 完整消息生命周期 + trace_id echo 语义
+add_executable(test_are_ipc test_are_ipc.c)
+
+target_include_directories(test_are_ipc PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
+
+target_compile_features(test_are_ipc PRIVATE c_std_11)
+target_compile_options(test_are_ipc PRIVATE
+    -Wall -Wextra -Wpedantic -Werror=vla -Wno-address -Wno-unused-function
+)
+
+target_link_libraries(test_are_ipc
+    PRIVATE agentos_test_ldflags
+    PRIVATE agentos_core
+    PRIVATE Threads::Threads agentos_platform_libs
+)
+
+add_test(NAME are_ipc COMMAND test_are_ipc)
+agentos_print_info("corekern test: test_are_ipc (ARE L2 unified IPC header)")
