@@ -11,6 +11,10 @@
 
 #include "hook_timeout.h"
 #include "hook_registry.h"
+/* SP04: coreloopthree PUBLIC link agentrt_core 导致 AGENTRT_USE_SCHEDULER_THREAD_IMPL 被定义，
+ * 禁用了 platform.h 中的 agentrt_thread_create/join 宏。hook_timeout.c 需要使用 platform
+ * 线程 API（而非 scheduler 线程），因此 #undef 该宏。与 taskflow_core.c:13 同模式。 */
+#undef AGENTRT_USE_SCHEDULER_THREAD_IMPL
 #include "platform.h"
 #include "memory_compat.h"
 #include "sync_compat.h"
