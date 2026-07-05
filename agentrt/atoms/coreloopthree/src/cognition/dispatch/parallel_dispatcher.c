@@ -1,0 +1,347 @@
+#include "parallel_dispatcher.h"
+
+#include "agentrt.h"
+#include "atomic_compat.h"
+#include "delegate.h"
+#include "memory_compat.h"
+#include "platform.h"
+
+#include <stdlib.h>
+#include <string.h>
+#include "error.h"
+#include "error_compat.h"
+
+#define ATM_RET_ERR(c) \
+    do { agentrt_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", agentrt_error_str(c)); return (c); } while(0)
+
+
+typedef struct tool_exec_context {
+    agentrt_tool_execute_fn executor;
+    void *user_data;
+    const agentrt_tool_call_t *call;
+    agentrt_tool_result_t *result;
+    agentrt_thread_t thread;
+    int started;
+    int joined;
+} tool_exec_context_t;
+
+struct agentrt_parallel_dispatcher {
+    int max_parallel;
+    agentrt_tool_execute_fn executor;
+    void *executor_user_data;
+    agentrt_mutex_t mutex;
+    atomic_int cancelled;
+};
+
+static int has_path_conflict(const agentrt_tool_call_t *a, const agentrt_tool_call_t *b)
+{
+    if (!a->resource_path || !b->resource_path)
+        return 0;
+    return strcmp(a->resource_path, b->resource_path) == 0;
+}
+
+static int must_be_serial(const agentrt_tool_call_t *call)
+{
+    return call->safety_class == AGENTRT_TOOL_INTERACTIVE ||
+           call->safety_class == AGENTRT_TOOL_SIDE_EFFECT;
+}
+
+static int any_interactive(const agentrt_tool_call_t *calls, size_t count)
+{
+    for (size_t i = 0; i < count; i++) {
+        if (calls[i].safety_class == AGENTRT_TOOL_INTERACTIVE)
+            return 1;
+    }
+    return 0;
+}
+
+static void *tool_exec_thread(void *arg)
+{
+    tool_exec_context_t *ctx = (tool_exec_context_t *)arg;
+    if (!ctx || !ctx->executor || !ctx->call || !ctx->result) {
+        AGENTRT_ERROR_NULL(AGENTRT_ERR_INVALID_PARAM, "null parameter");
+    }
+
+    uint64_t start_ns = agentrt_time_ns();
+
+    char *output = NULL;
+    size_t output_len = 0;
+    agentrt_error_t err =
+        ctx->executor(ctx->call->tool_name, ctx->call->arguments, ctx->call->arguments_len, &output,
+                      &output_len, ctx->user_data);
+
+    uint64_t end_ns = agentrt_time_ns();
+
+    ctx->result->error = err;
+    ctx->result->output = output;
+    ctx->result->output_len = output_len;
+    ctx->result->elapsed_ns = end_ns - start_ns;
+
+    return NULL;
+}
+
+static agentrt_error_t exec_single_tool(agentrt_tool_execute_fn executor, void *user_data,
+                                        const agentrt_tool_call_t *call,
+                                        agentrt_tool_result_t *result)
+{
+    uint64_t start_ns = agentrt_time_ns();
+    char *output = NULL;
+    size_t output_len = 0;
+    agentrt_error_t err = executor(call->tool_name, call->arguments, call->arguments_len, &output,
+                                   &output_len, user_data);
+    uint64_t end_ns = agentrt_time_ns();
+    result->error = err;
+    result->output = output;
+    result->output_len = output_len;
+    result->elapsed_ns = end_ns - start_ns;
+    return err;
+}
+
+agentrt_parallel_dispatcher_t *agentrt_parallel_dispatcher_create(int max_parallel)
+{
+    agentrt_parallel_dispatcher_t *d =
+        (agentrt_parallel_dispatcher_t *)AGENTRT_CALLOC(1, sizeof(agentrt_parallel_dispatcher_t));
+    if (!d) return NULL;
+    d->max_parallel = max_parallel > 0 ? max_parallel : 4;
+    d->executor = NULL;
+    d->executor_user_data = NULL;
+    d->cancelled = 0;
+    agentrt_mutex_init(&d->mutex);
+    return d;
+}
+
+void agentrt_parallel_dispatcher_destroy(agentrt_parallel_dispatcher_t *dispatcher)
+{
+    if (!dispatcher)
+        return;
+    agentrt_mutex_destroy(&dispatcher->mutex);
+    AGENTRT_FREE(dispatcher);
+}
+
+agentrt_error_t agentrt_parallel_dispatcher_set_executor(agentrt_parallel_dispatcher_t *dispatcher,
+                                                         agentrt_tool_execute_fn executor,
+                                                         void *user_data)
+{
+    if (!dispatcher || !executor)
+        ATM_RET_ERR(AGENTRT_EINVAL);
+    agentrt_mutex_lock(&dispatcher->mutex);
+    dispatcher->executor = executor;
+    dispatcher->executor_user_data = user_data;
+    agentrt_mutex_unlock(&dispatcher->mutex);
+    return AGENTRT_SUCCESS;
+}
+
+agentrt_error_t agentrt_parallel_dispatcher_dispatch(agentrt_parallel_dispatcher_t *dispatcher,
+                                                     const agentrt_tool_call_t *calls,
+                                                     size_t call_count,
+                                                     agentrt_tool_result_t **out_results,
+                                                     size_t *out_result_count)
+{
+    if (!dispatcher || !calls || call_count == 0 || !out_results || !out_result_count) {
+        ATM_RET_ERR(AGENTRT_EINVAL);
+    }
+
+    agentrt_mutex_lock(&dispatcher->mutex);
+    if (!dispatcher->executor) {
+        agentrt_mutex_unlock(&dispatcher->mutex);
+        ATM_RET_ERR(AGENTRT_ENOTINIT);
+    }
+    dispatcher->cancelled = 0;
+    agentrt_mutex_unlock(&dispatcher->mutex);
+
+    agentrt_tool_result_t *results =
+        (agentrt_tool_result_t *)AGENTRT_CALLOC(call_count, sizeof(agentrt_tool_result_t));
+    if (!results)
+        ATM_RET_ERR(AGENTRT_ENOMEM);
+
+    for (size_t i = 0; i < call_count; i++) {
+        results[i].tool_name = calls[i].tool_name ? AGENTRT_STRDUP(calls[i].tool_name) : NULL;
+        results[i].error = AGENTRT_SUCCESS;
+        results[i].output = NULL;
+        results[i].output_len = 0;
+        results[i].elapsed_ns = 0;
+    }
+
+    if (any_interactive(calls, call_count)) {
+        for (size_t i = 0; i < call_count; i++) {
+            if (dispatcher->cancelled) {
+                results[i].error = AGENTRT_ECANCELLED;
+                continue;
+            }
+            exec_single_tool(dispatcher->executor, dispatcher->executor_user_data, &calls[i],
+                             &results[i]);
+        }
+        *out_results = results;
+        *out_result_count = call_count;
+        return AGENTRT_SUCCESS;
+    }
+
+    int *group_id;
+    SAFE_MALLOC_ARRAY(group_id, call_count, sizeof(int));
+    int *serial_flags = (int *)AGENTRT_CALLOC(call_count, sizeof(int));
+    if (!group_id || !serial_flags) {
+        AGENTRT_FREE(group_id);
+        AGENTRT_FREE(serial_flags);
+        for (size_t i = 0; i < call_count; i++) {
+            AGENTRT_FREE(results[i].tool_name);
+        }
+        AGENTRT_FREE(results);
+        ATM_RET_ERR(AGENTRT_ENOMEM);
+    }
+
+    for (size_t i = 0; i < call_count; i++) {
+        group_id[i] = -1;
+        if (must_be_serial(&calls[i])) {
+            serial_flags[i] = 1;
+        }
+    }
+
+    int group_count = 0;
+    for (size_t i = 0; i < call_count; i++) {
+        if (group_id[i] >= 0)
+            continue;
+        group_id[i] = group_count;
+        if (serial_flags[i]) {
+            group_count++;
+            continue;
+        }
+        for (size_t j = i + 1; j < call_count; j++) {
+            if (group_id[j] >= 0)
+                continue;
+            if (serial_flags[j])
+                continue;
+            if (calls[i].safety_class == AGENTRT_TOOL_WRITE_SHARED &&
+                calls[j].safety_class == AGENTRT_TOOL_WRITE_SHARED &&
+                has_path_conflict(&calls[i], &calls[j])) {
+                continue;
+            }
+            int conflict = 0;
+            for (size_t k = i; k < j; k++) {
+                if (group_id[k] == group_count &&
+                    calls[k].safety_class == AGENTRT_TOOL_WRITE_SHARED &&
+                    calls[j].safety_class == AGENTRT_TOOL_WRITE_SHARED &&
+                    has_path_conflict(&calls[k], &calls[j])) {
+                    conflict = 1;
+                    break;
+                }
+            }
+            if (!conflict) {
+                group_id[j] = group_count;
+            }
+        }
+        group_count++;
+    }
+
+    for (int g = 0; g < group_count; g++) {
+        if (dispatcher->cancelled) {
+            for (size_t i = 0; i < call_count; i++) {
+                if (group_id[i] == g) {
+                    results[i].error = AGENTRT_ECANCELLED;
+                }
+            }
+            continue;
+        }
+
+        size_t group_size = 0;
+        for (size_t i = 0; i < call_count; i++) {
+            if (group_id[i] == g)
+                group_size++;
+        }
+        if (group_size == 0)
+            continue;
+
+        int is_serial = 0;
+        for (size_t i = 0; i < call_count; i++) {
+            if (group_id[i] == g && serial_flags[i]) {
+                is_serial = 1;
+                break;
+            }
+        }
+
+        if (is_serial || group_size == 1) {
+            for (size_t i = 0; i < call_count; i++) {
+                if (group_id[i] != g)
+                    continue;
+                if (dispatcher->cancelled) {
+                    results[i].error = AGENTRT_ECANCELLED;
+                    continue;
+                }
+                exec_single_tool(dispatcher->executor, dispatcher->executor_user_data, &calls[i],
+                                 &results[i]);
+            }
+        } else {
+            size_t parallel_count = group_size;
+            if ((int)parallel_count > dispatcher->max_parallel) {
+                parallel_count = (size_t)dispatcher->max_parallel;
+            }
+
+            tool_exec_context_t *contexts =
+                (tool_exec_context_t *)AGENTRT_CALLOC(parallel_count, sizeof(tool_exec_context_t));
+            if (!contexts) {
+                for (size_t i = 0; i < call_count; i++) {
+                    if (group_id[i] != g)
+                        continue;
+                    results[i].error = AGENTRT_ENOMEM;
+                }
+                continue;
+            }
+
+            size_t ctx_idx = 0;
+            for (size_t i = 0; i < call_count && ctx_idx < parallel_count; i++) {
+                if (group_id[i] != g)
+                    continue;
+                if (dispatcher->cancelled) {
+                    results[i].error = AGENTRT_ECANCELLED;
+                    continue;
+                }
+                contexts[ctx_idx].executor = dispatcher->executor;
+                contexts[ctx_idx].user_data = dispatcher->executor_user_data;
+                contexts[ctx_idx].call = &calls[i];
+                contexts[ctx_idx].result = &results[i];
+                contexts[ctx_idx].started = 0;
+                contexts[ctx_idx].joined = 0;
+                int ret = agentrt_platform_thread_create(&contexts[ctx_idx].thread,
+                                                         tool_exec_thread, &contexts[ctx_idx]);
+                contexts[ctx_idx].started = (ret == 0);
+                if (ret != 0) {
+                    results[i].error = AGENTRT_EIO;
+                }
+                ctx_idx++;
+            }
+
+            for (size_t j = 0; j < ctx_idx; j++) {
+                if (contexts[j].started && !contexts[j].joined) {
+                    agentrt_platform_thread_join(contexts[j].thread, NULL);
+                    contexts[j].joined = 1;
+                }
+            }
+            AGENTRT_FREE(contexts);
+        }
+    }
+
+    AGENTRT_FREE(group_id);
+    AGENTRT_FREE(serial_flags);
+
+    *out_results = results;
+    *out_result_count = call_count;
+    return AGENTRT_SUCCESS;
+}
+
+agentrt_error_t agentrt_parallel_dispatcher_cancel(agentrt_parallel_dispatcher_t *dispatcher)
+{
+    if (!dispatcher)
+        ATM_RET_ERR(AGENTRT_EINVAL);
+    agentrt_mutex_lock(&dispatcher->mutex);
+    dispatcher->cancelled = 1;
+    dispatcher->executor = NULL;
+    dispatcher->executor_user_data = NULL;
+    agentrt_mutex_unlock(&dispatcher->mutex);
+    return AGENTRT_SUCCESS;
+}
+
+bool agentrt_parallel_dispatcher_is_cancelled(const agentrt_parallel_dispatcher_t *dispatcher)
+{
+    if (!dispatcher)
+        return false;
+    return dispatcher->cancelled != 0;
+}

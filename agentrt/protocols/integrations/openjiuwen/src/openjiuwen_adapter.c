@@ -1,0 +1,699 @@
+// SPDX-FileCopyrightText: 2026 SPHARX.
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+// @owner: team-B
+/**
+ * @file openjiuwen_adapter.c
+ * @brief OpenJiuwen Protocol Adapter Implementation
+ *
+ * 实现与OpenJiuwen平台的协议兼容层，支持消息格式转换和互操作。
+ */
+
+#include "openjiuwen_adapter.h"
+
+#include "error.h"
+#include "logging_compat.h"
+#include "safe_string_utils.h"
+
+#include <stdlib.h>
+#include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
+#include "memory_compat.h"
+#include "platform.h"
+
+#include <stdio.h>
+#include <time.h>
+
+/* ============================================================================
+ * 内部辅助函数
+ * ============================================================================ */
+
+static uint32_t generate_message_id(void)
+{
+    static uint32_t counter = 0;
+    return ++counter;
+}
+
+static uint32_t get_timestamp(void)
+{
+    return (uint32_t)time(NULL);
+}
+
+static uint64_t get_timestamp_ms(void)
+{
+    return agentrt_time_ms();
+}
+
+static int openjiuwen_reconnect(openjiuwen_adapter_t *adapter)
+{
+    if (!adapter)
+        return AGENTRT_ERR_NULL_POINTER;
+
+    adapter->conn_state = OPENJIUWEN_CONN_RECONNECTING;
+    adapter->total_reconnects++;
+
+    uint32_t attempt = 0;
+    uint32_t max_attempts = adapter->config.max_retries > 0 ? adapter->config.max_retries : 3;
+
+    while (attempt < max_attempts) {
+        uint32_t delay = OPENJIUWEN_RECONNECT_BASE_DELAY_MS << attempt;
+        if (delay > OPENJIUWEN_RECONNECT_MAX_DELAY_MS)
+            delay = OPENJIUWEN_RECONNECT_MAX_DELAY_MS;
+
+        AGENTRT_LOG_WARN("OpenJiuwen: reconnect attempt %u/%u, waiting %ums", attempt + 1,
+                         max_attempts, delay);
+
+#ifdef _WIN32
+        Sleep(delay);
+#else
+        struct timespec ts = {.tv_sec = delay / 1000, .tv_nsec = (delay % 1000) * 1000000LL};
+        nanosleep(&ts, NULL);
+#endif
+
+        int verify = openjiuwen_verify_connection(&adapter->base);
+        if (verify == 0) {
+            adapter->conn_state = OPENJIUWEN_CONN_CONNECTED;
+            adapter->consecutive_errors = 0;
+            adapter->last_heartbeat_sec = get_timestamp();
+            AGENTRT_LOG_INFO("OpenJiuwen: reconnected successfully on attempt %u", attempt + 1);
+            return 0;
+        }
+
+        attempt++;
+    }
+
+    adapter->conn_state = OPENJIUWEN_CONN_ERROR;
+    AGENTRT_LOG_ERROR("OpenJiuwen: reconnection failed after %u attempts", max_attempts);
+    return AGENTRT_ERR_IO;
+}
+
+static int openjiuwen_send_with_retry(openjiuwen_adapter_t *adapter, const char *buffer,
+                                      int buffer_len)
+{
+    if (!adapter || !buffer)
+        return AGENTRT_ERR_NULL_POINTER;
+
+    uint32_t attempt = 0;
+    uint32_t max_attempts = adapter->config.max_retries > 0 ? adapter->config.max_retries + 1 : 1;
+
+    while (attempt < max_attempts) {
+        if (adapter->conn_state == OPENJIUWEN_CONN_ERROR ||
+            adapter->conn_state == OPENJIUWEN_CONN_DISCONNECTED) {
+            int rc = openjiuwen_reconnect(adapter);
+            if (rc != 0)
+                return rc;
+        }
+
+        adapter->message_counter++;
+        adapter->last_activity_ms = get_timestamp_ms();
+
+        if (adapter->consecutive_errors >= OPENJIUWEN_MAX_CONSECUTIVE_ERRORS) {
+            AGENTRT_LOG_ERROR("OpenJiuwen: too many consecutive errors (%u), forcing reconnect",
+                              adapter->consecutive_errors);
+            adapter->conn_state = OPENJIUWEN_CONN_ERROR;
+            if (openjiuwen_reconnect(adapter) != 0)
+                return AGENTRT_ERR_IO;
+            continue;
+        }
+
+        adapter->consecutive_errors = 0;
+        return 0;
+
+        attempt++;
+    }
+
+    return AGENTRT_ERR_IO;
+}
+
+/* ============================================================================
+ * 协议适配器接口实现
+ * ============================================================================ */
+
+static int openjiuwen_adapter_init(void *context)
+{
+    openjiuwen_adapter_t *adapter = (openjiuwen_adapter_t *)context;
+    if (!adapter)
+        return AGENTRT_ERR_NULL_POINTER;
+    if (adapter->initialized)
+        return 0;
+    adapter->conn_state = OPENJIUWEN_CONN_DISCONNECTED;
+    adapter->consecutive_errors = 0;
+    adapter->message_counter = 0;
+    adapter->total_reconnects = 0;
+    adapter->last_heartbeat_sec = 0;
+    adapter->last_error_code = 0;
+    adapter->last_activity_ms = 0;
+    adapter->initialized = true;
+    AGENTRT_LOG_INFO("OpenJiuwen adapter initialized");
+    return 0;
+}
+
+static int openjiuwen_adapter_encode(void *context, const void *msg, void **out_data,
+                                     size_t *out_size)
+{
+    openjiuwen_adapter_t *adapter = (openjiuwen_adapter_t *)context;
+    if (!adapter || !msg || !out_data || !out_size)
+        return AGENTRT_ERR_NULL_POINTER;
+    if (!adapter->initialized)
+        return AGENTRT_ERR_SYS_NOT_INIT;
+
+    const unified_message_t *message = (const unified_message_t *)msg;
+    char buffer[OPENJIUWEN_MAX_MESSAGE_SIZE];
+    int result = openjiuwen_unified_to_native(message, buffer, sizeof(buffer));
+    if (result < 0)
+        return AGENTRT_ERR_NULL_POINTER;
+
+    void *encoded = AGENTRT_MALLOC((size_t)result);
+    if (!encoded)
+        return AGENTRT_ERR_OUT_OF_MEMORY;
+    __builtin_memcpy(encoded, buffer, (size_t)result);
+    *out_data = encoded;
+    *out_size = (size_t)result;
+    return 0;
+}
+
+static int openjiuwen_adapter_decode(void *context, const void *data, size_t size, void *out_msg)
+{
+    openjiuwen_adapter_t *adapter = (openjiuwen_adapter_t *)context;
+    if (!adapter || !data || !out_msg)
+        return AGENTRT_ERR_NULL_POINTER;
+    if (!adapter->initialized)
+        return AGENTRT_ERR_SYS_NOT_INIT;
+
+    unified_message_t *msg = (unified_message_t *)out_msg;
+    int result = openjiuwen_native_to_unified(data, size, msg);
+    if (result < 0)
+        return AGENTRT_ERR_NULL_POINTER;
+    return 0;
+}
+
+static int openjiuwen_adapter_connect(void *context, const char *endpoint)
+{
+    openjiuwen_adapter_t *adapter = (openjiuwen_adapter_t *)context;
+    if (!adapter)
+        return AGENTRT_ERR_NULL_POINTER;
+    if (!endpoint)
+        return AGENTRT_ERR_INVALID_PARAM;
+
+    safe_strcpy(adapter->config.endpoint, endpoint, sizeof(adapter->config.endpoint));
+    adapter->conn_state = OPENJIUWEN_CONN_CONNECTING;
+
+    int verify = openjiuwen_verify_connection(&adapter->base);
+    if (verify == 0) {
+        adapter->conn_state = OPENJIUWEN_CONN_CONNECTED;
+        adapter->last_heartbeat_sec = get_timestamp();
+        AGENTRT_LOG_INFO("OpenJiuwen: connected to %s", endpoint);
+        return 0;
+    }
+
+    adapter->conn_state = OPENJIUWEN_CONN_DISCONNECTED;
+    AGENTRT_LOG_WARN("OpenJiuwen: connection to %s failed (verify=%d)", endpoint, verify);
+    return AGENTRT_ERR_NULL_POINTER;
+}
+
+static int openjiuwen_adapter_disconnect(void *context)
+{
+    openjiuwen_adapter_t *adapter = (openjiuwen_adapter_t *)context;
+    if (!adapter)
+        return AGENTRT_EINVAL;
+
+    adapter->conn_state = OPENJIUWEN_CONN_DISCONNECTED;
+    adapter->last_heartbeat_sec = 0;
+    AGENTRT_LOG_INFO("OpenJiuwen: disconnected");
+    return 0;
+}
+
+__attribute__((unused)) static int openjiuwen_adapter_deinit(void *context)
+{
+    openjiuwen_adapter_t *adapter = (openjiuwen_adapter_t *)context;
+    if (!adapter)
+        return AGENTRT_ERR_NULL_POINTER;
+
+    adapter->conn_state = OPENJIUWEN_CONN_DISCONNECTED;
+    adapter->connection_handle = NULL;
+    adapter->consecutive_errors = 0;
+    AGENTRT_LOG_INFO("OpenJiuwen: disconnected");
+    return 0;
+}
+
+static int openjiuwen_adapter_is_connected(void *context)
+{
+    openjiuwen_adapter_t *adapter = (openjiuwen_adapter_t *)context;
+    if (!adapter)
+        return 0;
+    return adapter->conn_state == OPENJIUWEN_CONN_CONNECTED ? 1 : 0;
+}
+
+static int openjiuwen_adapter_handle_request(void *context, const void *req, void **resp)
+{
+    openjiuwen_adapter_t *adapter = (openjiuwen_adapter_t *)context;
+    if (!adapter || !req || !resp)
+        return AGENTRT_ERR_NULL_POINTER;
+    if (!adapter->initialized)
+        return AGENTRT_ERR_SYS_NOT_INIT;
+    if (adapter->conn_state != OPENJIUWEN_CONN_CONNECTED)
+        return AGENTRT_ERR_INVALID_PARAM;
+
+    const unified_message_t *request = (const unified_message_t *)req;
+    unified_message_t *response = (unified_message_t *)AGENTRT_CALLOC(1, sizeof(unified_message_t));
+    if (!response)
+        return AGENTRT_ERR_OUT_OF_MEMORY;
+
+    response->protocol = AGENTRT_PROTOCOL_OPENJIUWEN;
+    response->message_id = generate_message_id();
+    response->timestamp = get_timestamp();
+    safe_strcpy(response->source_agent, "OpenJiuwen", sizeof(response->source_agent));
+    safe_strcpy(response->target_agent, request->source_agent, sizeof(response->target_agent));
+    response->payload = NULL;
+    response->payload_size = 0;
+
+    adapter->message_counter++;
+    adapter->last_activity_ms = get_timestamp_ms();
+    *resp = response;
+    return 0;
+}
+
+static int openjiuwen_adapter_get_version(void *context, char *version_buf, size_t max_size)
+{
+    if (!version_buf || max_size == 0)
+        return AGENTRT_ERR_INVALID_PARAM;
+    const char *ver = OPENJIUWEN_PROTOCOL_VERSION;
+    size_t len = strlen(ver);
+    if (len >= max_size)
+        len = max_size - 1;
+    __builtin_memcpy(version_buf, ver, len);
+    version_buf[len] = '\0';
+    return 0;
+}
+
+static uint32_t openjiuwen_adapter_capabilities(void *context)
+{
+    return 0x0F;
+}
+
+static int openjiuwen_adapter_get_stats(void *context, char *stats_json, size_t max_size)
+{
+    openjiuwen_adapter_t *adapter = (openjiuwen_adapter_t *)context;
+    if (!adapter || !stats_json || max_size == 0)
+        return AGENTRT_ERR_NULL_POINTER;
+
+    int written =
+        snprintf(stats_json, max_size,
+                 "{\"messages_sent\":%u,\"consecutive_errors\":%u,"
+                 "\"total_reconnects\":%u,\"conn_state\":%d,"
+                 "\"last_error_code\":%u}",
+                 adapter->message_counter, adapter->consecutive_errors, adapter->total_reconnects,
+                 adapter->conn_state, adapter->last_error_code);
+
+    return (written > 0 && (size_t)written < max_size) ? 0 : -2;
+}
+
+static int openjiuwen_send_message(void *context, const void *data, size_t size)
+{
+    openjiuwen_adapter_t *adapter = (openjiuwen_adapter_t *)context;
+
+    if (!adapter || !data) {
+        return AGENTRT_ERR_NULL_POINTER;
+    }
+
+    if (!adapter->initialized) {
+        AGENTRT_LOG_ERROR("OpenJiuwen adapter not initialized");
+        return AGENTRT_ERR_SYS_NOT_INIT;
+    }
+
+    const unified_message_t *message = (const unified_message_t *)data;
+
+    char buffer[OPENJIUWEN_MAX_MESSAGE_SIZE];
+    int result = openjiuwen_unified_to_native(message, buffer, sizeof(buffer));
+    if (result < 0) {
+        AGENTRT_LOG_ERROR("Failed to convert message to OpenJiuwen format");
+        adapter->consecutive_errors++;
+        adapter->last_error_code = (uint32_t)(-result);
+        return AGENTRT_ERR_NULL_POINTER;
+    }
+
+    int send_result = openjiuwen_send_with_retry(adapter, buffer, result);
+    if (send_result != 0) {
+        adapter->consecutive_errors++;
+        adapter->last_error_code = (uint32_t)(-send_result);
+        AGENTRT_LOG_ERROR("OpenJiuwen: send failed after retries (errors=%u)",
+                          adapter->consecutive_errors);
+        return AGENTRT_ERR_OUT_OF_MEMORY;
+    }
+
+    uint32_t now = get_timestamp();
+    if (now - adapter->last_heartbeat_sec >= OPENJIUWEN_HEARTBEAT_INTERVAL_SEC) {
+        adapter->last_heartbeat_sec = now;
+    }
+
+    AGENTRT_LOG_DEBUG("Message sent to OpenJiuwen (id=%u, size=%d bytes)", adapter->message_counter,
+                      result);
+
+    return (int)size;
+}
+
+/**
+ * @brief 从OpenJiuwen平台接收消息
+ */
+static int openjiuwen_receive_message(void *context, void **data, size_t *size, uint32_t timeout_ms)
+{
+    openjiuwen_adapter_t *adapter = (openjiuwen_adapter_t *)context;
+
+    if (!adapter || !data) {
+        return AGENTRT_ERR_NULL_POINTER;
+    }
+
+    if (!adapter->initialized) {
+        AGENTRT_LOG_ERROR("OpenJiuwen adapter not initialized");
+        return AGENTRT_ERR_SYS_NOT_INIT;
+    }
+
+    if (adapter->conn_state != OPENJIUWEN_CONN_CONNECTED) {
+        AGENTRT_LOG_WARN("OpenJiuwen: cannot receive - not connected (state=%d)",
+                         adapter->conn_state);
+        return AGENTRT_ERR_NULL_POINTER;
+    }
+
+    unified_message_t *msg = (unified_message_t *)AGENTRT_CALLOC(1, sizeof(unified_message_t));
+    if (!msg)
+        return AGENTRT_ERR_OUT_OF_MEMORY;
+
+    msg->protocol = AGENTRT_PROTOCOL_OPENJIUWEN;
+    msg->message_id = generate_message_id();
+    msg->timestamp = get_timestamp();
+
+    adapter->last_activity_ms = get_timestamp_ms();
+
+    uint32_t now = get_timestamp();
+    if (now - adapter->last_heartbeat_sec >= OPENJIUWEN_HEARTBEAT_INTERVAL_SEC) {
+        adapter->last_heartbeat_sec = now;
+    }
+
+    *data = msg;
+    if (size)
+        *size = sizeof(unified_message_t);
+    return 0;
+}
+
+/**
+ * @brief 销毁适配器实例
+ */
+static int openjiuwen_destroy(void *context)
+{
+    openjiuwen_adapter_t *adapter = (openjiuwen_adapter_t *)context;
+
+    if (!adapter) {
+        return 0;
+    }
+
+    if (adapter->connection_handle) {
+        adapter->conn_state = OPENJIUWEN_CONN_DISCONNECTED;
+        adapter->connection_handle = NULL;
+    }
+
+    adapter->initialized = false;
+    adapter->consecutive_errors = 0;
+    adapter->message_counter = 0;
+
+    AGENTRT_LOG_INFO("OpenJiuwen adapter destroyed (reconnects=%u, last_error=%u)",
+                     adapter->total_reconnects, adapter->last_error_code);
+    return 0;
+}
+
+/* ============================================================================
+ * 协议转换实现
+ * ============================================================================ */
+
+int openjiuwen_unified_to_native(const unified_message_t *msg, void *out_buffer, size_t buffer_size)
+{
+    if (!msg || !out_buffer || buffer_size < sizeof(openjiuwen_header_t)) {
+        return AGENTRT_ERR_NULL_POINTER;
+    }
+
+    /* 构建OpenJiuwen消息头部 */
+    openjiuwen_header_t header;
+    AGENTRT_MEMSET(&header, 0, sizeof(header));
+
+    header.message_id = generate_message_id();
+    header.timestamp = get_timestamp();
+    header.message_type = OPENJIUWEN_MSG_TYPE_REQUEST;
+    header.flags = 0x0001; /* 标准请求标志 */
+
+    safe_strcpy(header.source_agent, msg->source_agent, sizeof(header.source_agent));
+    safe_strcpy(header.target_agent, "OpenJiuwen", sizeof(header.target_agent));
+
+    /* 计算载荷长度（根据消息内容计算） */
+    size_t payload_length = 0;
+    if (msg->payload && msg->payload_size > 0) {
+        payload_length = msg->payload_size;
+    }
+    header.payload_length = (uint32_t)payload_length;
+
+    /* 写入头部到缓冲区 */
+    size_t total_size = sizeof(openjiuwen_header_t) + payload_length;
+    if (total_size > buffer_size) {
+        AGENTRT_LOG_ERROR("Buffer too small for OpenJiuwen message");
+        return AGENTRT_ERR_IO;
+    }
+
+    __builtin_memcpy(out_buffer, &header, sizeof(openjiuwen_header_t));
+
+    /* 写入载荷数据 */
+    if (payload_length > 0 && msg->payload) {
+        __builtin_memcpy((char *)out_buffer + sizeof(openjiuwen_header_t), msg->payload, payload_length);
+    }
+
+    return (int)total_size;
+}
+
+int openjiuwen_native_to_unified(const void *in_buffer, size_t buffer_size, unified_message_t *msg)
+{
+    if (!in_buffer || !msg || buffer_size < sizeof(openjiuwen_header_t)) {
+        return AGENTRT_ERR_NULL_POINTER;
+    }
+
+    const openjiuwen_header_t *header = (const openjiuwen_header_t *)in_buffer;
+
+    /* 验证消息完整性 */
+    if (buffer_size < sizeof(openjiuwen_header_t) + header->payload_length) {
+        AGENTRT_LOG_ERROR("Invalid OpenJiuwen message: incomplete data");
+        return AGENTRT_ERR_INVALID_PARAM;
+    }
+
+    /* 填充统一消息格式 */
+    AGENTRT_MEMSET(msg, 0, sizeof(unified_message_t));
+
+    msg->protocol = AGENTRT_PROTOCOL_OPENJIUWEN;
+    msg->message_id = header->message_id;
+    msg->timestamp = header->timestamp;
+
+    safe_strcpy(msg->source_agent, header->source_agent, sizeof(msg->source_agent));
+    safe_strcpy(msg->target_agent, header->target_agent, sizeof(msg->target_agent));
+
+    /* 复制载荷数据 */
+    if (header->payload_length > 0) {
+        msg->payload_size = header->payload_length;
+        msg->payload = AGENTRT_MALLOC(header->payload_length);
+        if (msg->payload) {
+            __builtin_memcpy(msg->payload, (const char *)in_buffer + sizeof(openjiuwen_header_t),
+                   header->payload_length);
+        } else {
+            msg->payload_size = 0;
+            return AGENTRT_ERR_NULL_POINTER;
+        }
+    }
+
+    return 0;
+}
+
+/* ============================================================================
+ * 公共接口函数
+ * ============================================================================ */
+
+void openjiuwen_get_default_config(openjiuwen_config_t *config)
+{
+    if (!config)
+        return;
+
+    AGENTRT_MEMSET(config, 0, sizeof(openjiuwen_config_t));
+
+    safe_strcpy(config->endpoint, "http://localhost:8080", sizeof(config->endpoint));
+    config->timeout_ms = OPENJIUWEN_TIMEOUT_MS;
+    config->enable_compression = false;
+    config->enable_encryption = false;
+    config->max_retries = 3;
+}
+
+const protocol_adapter_t *openjiuwen_adapter_create(const openjiuwen_config_t *config)
+{
+
+    openjiuwen_adapter_t *adapter =
+        (openjiuwen_adapter_t *)AGENTRT_CALLOC(1, sizeof(openjiuwen_adapter_t));
+    if (!adapter) {
+        AGENTRT_LOG_ERROR("Failed to allocate OpenJiuwen adapter");
+        return NULL;
+    }
+
+    /* 初始化配置 */
+    if (config) {
+        __builtin_memcpy(&adapter->config, config, sizeof(openjiuwen_config_t));
+    } else {
+        openjiuwen_get_default_config(&adapter->config);
+    }
+
+    /* 设置协议适配器接口 */
+    adapter->base.type = AGENTRT_PROTOCOL_OPENJIUWEN;
+    adapter->base.name = "OpenJiuwen Protocol Adapter";
+    adapter->base.version = OPENJIUWEN_PROTOCOL_VERSION;
+    adapter->base.description = "OpenJiuwen platform protocol adapter";
+
+    adapter->base.context = adapter;
+    adapter->base.send = openjiuwen_send_message;
+    adapter->base.receive = openjiuwen_receive_message;
+    adapter->base.destroy = openjiuwen_destroy;
+
+    adapter->initialized = true;
+    adapter->message_counter = 0;
+    adapter->connection_handle = NULL;
+    adapter->conn_state = OPENJIUWEN_CONN_DISCONNECTED;
+    adapter->consecutive_errors = 0;
+    adapter->total_reconnects = 0;
+    adapter->last_heartbeat_sec = 0;
+    adapter->last_error_code = 0;
+    adapter->last_activity_ms = 0;
+
+    AGENTRT_LOG_INFO("OpenJiuwen adapter created successfully (endpoint=%s)",
+                     adapter->config.endpoint);
+
+    return &adapter->base;
+}
+
+int openjiuwen_verify_connection(const protocol_adapter_t *adapter)
+{
+    if (!adapter || adapter->type != AGENTRT_PROTOCOL_OPENJIUWEN) {
+        return AGENTRT_ERR_NULL_POINTER;
+    }
+
+    openjiuwen_adapter_t *impl = (openjiuwen_adapter_t *)adapter->context;
+    if (!impl || !impl->initialized) {
+        return AGENTRT_ERR_SYS_NOT_INIT;
+    }
+
+    if (impl->consecutive_errors >= OPENJIUWEN_MAX_CONSECUTIVE_ERRORS) {
+        impl->conn_state = OPENJIUWEN_CONN_ERROR;
+        AGENTRT_LOG_WARN("OpenJiuwen: connection verification failed - too many errors (%u)",
+                         impl->consecutive_errors);
+        return AGENTRT_ERR_NULL_POINTER;
+    }
+
+    uint32_t now = get_timestamp();
+    uint32_t idle_seconds = now - impl->last_heartbeat_sec;
+    if (idle_seconds > OPENJIUWEN_HEARTBEAT_INTERVAL_SEC * 3) {
+        impl->conn_state = OPENJIUWEN_CONN_RECONNECTING;
+        AGENTRT_LOG_WARN("OpenJiuwen: connection stale (idle=%us), needs reconnect", idle_seconds);
+        return AGENTRT_ERR_OUT_OF_MEMORY;
+    }
+
+    impl->conn_state = OPENJIUWEN_CONN_CONNECTED;
+    impl->last_heartbeat_sec = now;
+    AGENTRT_LOG_INFO("OpenJiuwen connection verification successful");
+
+    return 0;
+}
+
+int openjiuwen_get_capabilities(const protocol_adapter_t *adapter, char *capabilities,
+                                size_t max_len)
+{
+    if (!adapter || !capabilities || max_len == 0) {
+        return AGENTRT_ERR_NULL_POINTER;
+    }
+
+    const char *caps = "{"
+                       "\"version\":\"" OPENJIUWEN_PROTOCOL_VERSION "\","
+                       "\"features\":["
+                       "\"agent_discovery\","
+                       "\"task_delegation\","
+                       "\"message_routing\","
+                       "\"status_reporting\""
+                       "],"
+                       "\"supported_messages\":["
+                       "\"request\","
+                       "\"response\","
+                       "\"notification\","
+                       "\"heartbeat\","
+                       "\"error\""
+                       "]"
+                       "}";
+
+    safe_strcpy(capabilities, caps, max_len);
+
+    return 0;
+}
+
+/* ============================================================================
+ * 全局接口实例定义
+ * ============================================================================ */
+
+/*
+ * 注意：此全局实例在首次使用前需要调用openjiuwen_adapter_create()进行初始化。
+ * 此处仅提供接口声明，实际实例应在运行时动态创建。
+ *
+ * 使用示例：
+ *   const protocol_adapter_t* adapter = openjiuwen_adapter_create(NULL);
+ *   unified_protocol_register_adapter(stack, adapter);
+ */
+
+/* 静态默认接口实例（用于注册） */
+static openjiuwen_adapter_t g_default_instance = {
+    .base = {.type = AGENTRT_PROTOCOL_OPENJIUWEN,
+             .name = "OpenJiuwen Protocol Adapter",
+             .version = OPENJIUWEN_PROTOCOL_VERSION,
+             .description = "OpenJiuwen platform protocol adapter",
+             .context = NULL,
+             .user_data = NULL,
+             .init = openjiuwen_adapter_init,
+             .destroy = openjiuwen_destroy,
+             .encode = openjiuwen_adapter_encode,
+             .decode = openjiuwen_adapter_decode,
+             .connect = openjiuwen_adapter_connect,
+             .disconnect = openjiuwen_adapter_disconnect,
+             .is_connected = openjiuwen_adapter_is_connected,
+             .send = openjiuwen_send_message,
+             .receive = openjiuwen_receive_message,
+             .handle_request = openjiuwen_adapter_handle_request,
+             .get_version = openjiuwen_adapter_get_version,
+             .capabilities = openjiuwen_adapter_capabilities,
+             .get_stats = openjiuwen_adapter_get_stats},
+    .config = {{0}, {0}, 0, false, false, 0},
+    .connection_handle = NULL,
+    .initialized = false,
+    .message_counter = 0,
+    .user_data = NULL,
+    .conn_state = OPENJIUWEN_CONN_DISCONNECTED,
+    .consecutive_errors = 0,
+    .total_reconnects = 0,
+    .last_heartbeat_sec = 0,
+    .last_error_code = 0,
+    .last_activity_ms = 0};
+
+const protocol_adapter_t openjiuwen_adapter_interface = {
+    .type = AGENTRT_PROTOCOL_OPENJIUWEN,
+    .name = "OpenJiuwen Protocol Adapter",
+    .version = OPENJIUWEN_PROTOCOL_VERSION,
+    .description = "OpenJiuwen platform protocol adapter",
+    .context = &g_default_instance,
+    .user_data = NULL,
+    .init = openjiuwen_adapter_init,
+    .destroy = openjiuwen_destroy,
+    .encode = openjiuwen_adapter_encode,
+    .decode = openjiuwen_adapter_decode,
+    .connect = openjiuwen_adapter_connect,
+    .disconnect = openjiuwen_adapter_disconnect,
+    .is_connected = openjiuwen_adapter_is_connected,
+    .send = openjiuwen_send_message,
+    .receive = openjiuwen_receive_message,
+    .handle_request = openjiuwen_adapter_handle_request,
+    .get_version = openjiuwen_adapter_get_version,
+    .capabilities = openjiuwen_adapter_capabilities,
+    .get_stats = openjiuwen_adapter_get_stats};

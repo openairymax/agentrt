@@ -1,0 +1,44 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
+/*
+ * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
+ *
+ * cupolas_signer_info.h - Canonical Signer Information Type Definition
+ *
+ * Single source of truth for cupolas_signer_info_t across all modules.
+ * All modules MUST include this file instead of defining it locally.
+ *
+ * Design Principles (per Engineering Standards Manual v13.0):
+ * - TYPE-002 fix: Eliminates redefinition conflict between
+ *   cupolas/cupolas_signature.h (full struct) and
+ *   daemon_security.h (stub struct { char name[128]; })
+ * - DRY Principle: One definition, used everywhere
+ * - SEC-017 compliant: Production-grade definition always available
+ */
+
+#ifndef CUPOLAS_SIGNER_INFO_H
+#define CUPOLAS_SIGNER_INFO_H
+
+#include <stdbool.h>
+#include <stdint.h>
+
+/**
+ * @brief Code signer identity information (full production definition)
+ *
+ * Contains complete X.509 certificate identity fields for
+ * signature verification in the cupolas security framework.
+ */
+typedef struct {
+    char *subject_cn;
+    char *subject_org;
+    char *subject_ou;
+    char *issuer_cn;
+    char *serial_number;
+    char *key_id;
+    char *algorithm;
+    uint64_t not_before;
+    uint64_t not_after;
+    bool is_ca;
+    uint32_t key_usage;
+} cupolas_signer_info_t;
+
+#endif /* CUPOLAS_SIGNER_INFO_H */

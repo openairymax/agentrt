@@ -1,0 +1,345 @@
+/*
+ * Copyright (C) 2026 SPHARX. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2026 SPHARX.
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+ *
+ * @file main.c
+ * @brief Gateway守护进程主入口（遵循 daemon 模块统一规范）
+ *
+ * 规范遵循:
+ * - ARCHITECTURAL_PRINCIPLES.md E-3 资源确定性(成对管理)
+ * - ARCHITECTURAL_PRINCIPLES.md E-4 跨平台一致性(platform.h)
+ * - ARCHITECTURAL_PRINCIPLES.md E-5 命名语义化(SVC_LOG_*)
+ * - ARCHITECTURAL_PRINCIPLES.md E-6 错误可追溯(AGENTRT_ERR_*)
+ */
+
+#include "atomic_compat.h"
+#include "daemon_bootstrap_sd.h"
+#include "daemon_bootstrap_ipc.h"
+#include "daemon_cupolas_bootstrap.h"
+#include "gateway_forward.h"
+#include "gateway_service.h"
+#include "logging.h"
+#include "platform.h"
+#include "svc_common.h"
+#include "svc_config.h"
+#include "svc_logger.h"
+#include "error.h"
+
+#ifdef AGENTRT_HAS_PROTOCOLS
+#include "a2a_v03_adapter.h"
+#include "mcp_v1_adapter.h"
+#include "openai_enterprise_adapter.h"
+#include "unified_protocol.h"
+#endif
+
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* ==================== 全局状态 ==================== */
+
+static gateway_service_t g_service = NULL;
+static atomic_int g_running = 1;
+static agentrt_mutex_t g_running_lock;
+static daemon_bootstrap_sd_t *g_bsd = NULL;
+static daemon_bootstrap_ipc_t *g_bipc = NULL;
+static gw_forward_t *g_forward = NULL; /* C-L11: 协议转发器 */
+
+/* ==================== 信号处理 ==================== */
+
+/**
+ * @brief 信号处理函数（线程安全，使用互斥锁保护运行标志）
+ */
+static void signal_handler(int sig __attribute__((unused)))
+{
+    agentrt_mutex_lock(&g_running_lock);
+    atomic_store_explicit(&g_running, 0, memory_order_seq_cst);
+    agentrt_mutex_unlock(&g_running_lock);
+
+    if (g_service) {
+        gateway_service_stop(g_service, false);
+    }
+}
+
+#ifdef _WIN32
+/**
+ * @brief Windows控制台事件处理函数
+ */
+static BOOL WINAPI console_handler(DWORD fdwCtrlType)
+{
+    switch (fdwCtrlType) {
+    case CTRL_C_EVENT:
+    case CTRL_CLOSE_EVENT:
+    case CTRL_SHUTDOWN_EVENT:
+        signal_handler((int)fdwCtrlType);
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+#endif
+
+static void svc_log_toggle_handler(int sig)
+{
+    (void)sig;
+    static int debug_mode = 0;
+    debug_mode = !debug_mode;
+    log_set_module_level("*", debug_mode ? LOG_LEVEL_DEBUG : LOG_LEVEL_INFO);
+}
+
+/* ==================== 帮助信息 ==================== */
+
+static void print_usage(const char *prog)
+{
+    char buf[256];
+    fputs("AgentRT Gateway Daemon\n", stdout);
+    snprintf(buf, sizeof(buf), "Usage: %s [options]\n\n", prog);
+    fputs(buf, stdout);
+    fputs("Options:\n", stdout);
+    fputs("  -c <config>   Configuration file path\n", stdout);
+    fputs("  -h <host>     HTTP gateway host (default: 0.0.0.0)\n", stdout);
+    fputs("  -p <port>     HTTP gateway port (default: 8080)\n", stdout);
+    fputs("  -w <port>     WebSocket gateway port (default: 8081)\n", stdout);
+    fputs("  -s            Enable stdio gateway\n", stdout);
+    fputs("  -d            Run as daemon (Unix only)\n", stdout);
+    fputs("  -v            Verbose output\n", stdout);
+    fputs("  --help        Show this help\n", stdout);
+    fputs("\nExamples:\n", stdout);
+    snprintf(buf, sizeof(buf), "  %s -h 127.0.0.1 -p 8080\n", prog);
+    fputs(buf, stdout);
+    snprintf(buf, sizeof(buf), "  %s -c AGENTRT_CONFIG_DIR \"/gateway.conf\"\n", prog);
+    fputs(buf, stdout);
+}
+
+/* ==================== 参数解析 ==================== */
+
+static int parse_args(int argc, char *argv[], gateway_service_config_t *config)
+{
+    gateway_service_get_default_config(config);
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--help") == 0) {
+            print_usage(argv[0]);
+            exit(0);
+        } else if (strcmp(argv[i], "-c") == 0 && i + 1 < argc) {
+            agentrt_error_t err = gateway_service_load_config(config, argv[++i]);
+            if (err != AGENTRT_SUCCESS) {
+                SVC_LOG_ERROR("Failed to load config: %s", argv[i]);
+                AGENTRT_ERROR(AGENTRT_ERR_IO, "failed to load config file");
+            }
+        } else if (strcmp(argv[i], "-h") == 0 && i + 1 < argc) {
+            config->http.host = argv[++i];
+        } else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
+            config->http.port = (uint16_t)strtol(argv[++i], NULL, 10);
+            config->http.enabled = true;
+        } else if (strcmp(argv[i], "-w") == 0 && i + 1 < argc) {
+            config->ws.port = (uint16_t)strtol(argv[++i], NULL, 10);
+            config->ws.enabled = true;
+        } else if (strcmp(argv[i], "-s") == 0) {
+            config->stdio.enabled = true;
+        } else if (strcmp(argv[i], "-v") == 0) {
+            config->enable_metrics = true;
+        } else if (strcmp(argv[i], "-d") == 0) {
+#ifndef _WIN32
+            pid_t pid = fork();
+            if (pid < 0) {
+                SVC_LOG_ERROR("Failed to fork");
+                AGENTRT_ERROR(AGENTRT_ERR_UNKNOWN, "fork failed when daemonizing");
+            }
+            if (pid > 0)
+                exit(0);
+            setsid();
+            umask(022);
+            {
+                int __rc __attribute__((unused)) = chdir("/");
+            }
+            fclose(stdin);
+            fclose(stdout);
+            fclose(stderr);
+            SVC_LOG_INFO("Gateway daemonized");
+#else
+            SVC_LOG_WARN("-d not supported on Windows");
+#endif
+        } else {
+            SVC_LOG_ERROR("Unknown option: %s", argv[i]);
+            AGENTRT_ERROR(AGENTRT_ERR_INVALID_PARAM, "unknown option");
+        }
+    }
+    return 0;
+}
+
+/* ==================== 主函数 ==================== */
+
+int main(int argc, char *argv[])
+{
+    gateway_service_config_t config;
+
+    /* E-3 资源确定性: 初始化与清理成对 */
+    agentrt_socket_init();
+    agentrt_mutex_init(&g_running_lock);
+
+    /* 跨平台信号处理 */
+#ifdef _WIN32
+    SetConsoleCtrlHandler(console_handler, TRUE);
+#else
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+    signal(SIGHUP, SIG_IGN);
+    signal(SIGPIPE, SIG_IGN);
+    signal(SIGUSR1, svc_log_toggle_handler);
+#endif
+
+    agentrt_log_init(NULL);
+    atexit(log_cleanup);
+
+    /* P3.14 ACC-DT15: 初始化 cupolas 安全穹顶（permission_engine + sanitizer + audit_logger）*/
+    daemon_cupolas_init("gateway_d");
+
+    if (parse_args(argc, argv, &config) != 0) {
+        agentrt_mutex_destroy(&g_running_lock);
+        agentrt_socket_cleanup();
+        return 1;
+    }
+
+    SVC_LOG_INFO("Gateway service starting...");
+
+    agentrt_error_t err = gateway_service_create(&g_service, &config);
+    if (err != AGENTRT_SUCCESS) {
+        SVC_LOG_ERROR("Failed to create service (err=%d)", err);
+        goto cleanup;
+    }
+
+    err = gateway_service_init(g_service);
+    if (err != AGENTRT_SUCCESS) {
+        SVC_LOG_ERROR("Failed to init service (err=%d)", err);
+        goto cleanup_service;
+    }
+
+    /* Initialize UnifiedProtocol stack for multi-protocol support */
+#ifdef AGENTRT_HAS_PROTOCOLS
+    const protocol_adapter_t *mcp_adapter = mcp_v1_get_adapter();
+    if (mcp_adapter) {
+        if (mcp_adapter->init(mcp_adapter->context) == 0) {
+            SVC_LOG_INFO("MCP v1.0 adapter initialized (version=%s, caps=0x%x)",
+                         mcp_adapter->version ? mcp_adapter->version : "unknown",
+                         mcp_adapter->capabilities ? mcp_adapter->capabilities(mcp_adapter->context)
+                                                   : 0);
+        } else {
+            SVC_LOG_WARN("Failed to initialize MCP v1.0 adapter");
+        }
+    } else {
+        SVC_LOG_WARN("MCP v1.0 adapter not available");
+    }
+#endif
+
+    /* C-L11: 初始化协议转发器 — 连接 gateway → gateway_d → 目标 daemon */
+    {
+        gw_forward_config_t fwd_cfg = GW_FORWARD_CONFIG_DEFAULTS;
+        g_forward = gw_forward_create(&fwd_cfg);
+        if (!g_forward) {
+            SVC_LOG_ERROR("C-L11: Failed to create gateway forwarder");
+        } else {
+            SVC_LOG_INFO("C-L11: Gateway protocol forwarder initialized");
+        }
+    }
+
+    err = gateway_service_start(g_service);
+    if (err != AGENTRT_SUCCESS) {
+        SVC_LOG_ERROR("Failed to start service (err=%d)", err);
+        goto cleanup_service;
+    }
+
+    SVC_LOG_INFO("AgentRT Gateway Daemon started");
+    SVC_LOG_INFO("  HTTP:     %s:%d %s", config.http.host, config.http.port,
+                 config.http.enabled ? "[enabled]" : "[disabled]");
+    SVC_LOG_INFO("  WebSocket: %s:%d %s", config.ws.host, config.ws.port,
+                 config.ws.enabled ? "[enabled]" : "[disabled]");
+    SVC_LOG_INFO("  Stdio:    %s", config.stdio.enabled ? "[enabled]" : "[disabled]");
+
+    g_bsd = daemon_bootstrap_sd_start("gateway_d", "gateway", config.http.host,
+                                      config.http.port, "gateway,core", 0);
+    g_bipc = daemon_bootstrap_ipc_start("gateway_d", "gateway", config.http.host,
+                                        config.http.port, IPC_BUS_PROTO_JSON_RPC);
+
+    /* 主事件循环：信号驱动 + 周期性健康检查 */
+    int loop_count = 0;
+    const int HEALTH_CHECK_INTERVAL = 30;
+
+    while (atomic_load_explicit(&g_running, memory_order_acquire)) {
+        if (!gateway_service_is_running(g_service)) {
+            SVC_LOG_WARN("Gateway service stopped unexpectedly");
+            break;
+        }
+
+        agentrt_sleep_ms(1000);
+        loop_count++;
+
+        if (config.enable_metrics && (loop_count % HEALTH_CHECK_INTERVAL == 0)) {
+            agentrt_svc_stats_t stats;
+            if (gateway_service_get_stats(g_service, &stats) == AGENTRT_SUCCESS) {
+                SVC_LOG_INFO("Health Check [interval=%ds] "
+                             "| concurrent=%u | total_req=%llu "
+                             "| errors=%llu | avg_time=%.1fms",
+                             HEALTH_CHECK_INTERVAL, stats.current_concurrent,
+                             (unsigned long long)stats.request_count,
+                             (unsigned long long)stats.error_count, stats.avg_time_ms);
+            } else {
+                SVC_LOG_WARN("Health check failed: unable to retrieve service stats");
+            }
+
+            /* C-L11: 报告转发器统计 */
+            if (g_forward && gw_forward_is_healthy(g_forward)) {
+                gw_forward_dump_stats(g_forward, HEALTH_CHECK_INTERVAL);
+            }
+        }
+    }
+
+    daemon_bootstrap_ipc_stop(g_bipc);
+    daemon_bootstrap_sd_stop(g_bsd);
+
+    /* C-L11: 清理协议转发器 */
+    if (g_forward) {
+        gw_forward_stats_t fwd_stats;
+        if (gw_forward_get_stats(g_forward, &fwd_stats) == 0) {
+            SVC_LOG_INFO("C-L11: Forwarder stats — total=%llu (A2A=%llu MCP=%llu OpenAI=%llu "
+                         "JSONRPC=%llu) errors=%llu timeouts=%llu avg_latency=%lluus",
+                         (unsigned long long)fwd_stats.total_forwarded,
+                         (unsigned long long)fwd_stats.by_proto[GW_FWD_PROTO_A2A],
+                         (unsigned long long)fwd_stats.by_proto[GW_FWD_PROTO_MCP],
+                         (unsigned long long)fwd_stats.by_proto[GW_FWD_PROTO_OPENAI],
+                         (unsigned long long)fwd_stats.by_proto[GW_FWD_PROTO_JSONRPC],
+                         (unsigned long long)fwd_stats.forward_errors,
+                         (unsigned long long)fwd_stats.timeout_errors,
+                         (unsigned long long)fwd_stats.avg_latency_us);
+        }
+        gw_forward_destroy(g_forward);
+        g_forward = NULL;
+    }
+
+    SVC_LOG_INFO("Gateway shutting down...");
+    gateway_service_stop(g_service, false);
+
+    /* Cleanup protocol stack */
+#ifdef AGENTRT_HAS_PROTOCOLS
+    {
+        const protocol_adapter_t *mcp_adapter = mcp_v1_get_adapter();
+        if (mcp_adapter && mcp_adapter->destroy) {
+            mcp_adapter->destroy(mcp_adapter->context);
+            SVC_LOG_INFO("MCP adapter destroyed");
+        }
+    }
+#endif
+
+cleanup_service:
+    gateway_service_destroy(g_service);
+cleanup:
+    agentrt_mutex_destroy(&g_running_lock);
+    agentrt_socket_cleanup();
+
+    SVC_LOG_INFO("Gateway daemon stopped");
+    daemon_cupolas_cleanup(); /* P3.14 ACC-DT15: 清理 cupolas 安全穹顶 */
+    log_cleanup();
+    return 0;
+}

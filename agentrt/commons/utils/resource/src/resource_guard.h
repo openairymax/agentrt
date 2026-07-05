@@ -1,0 +1,234 @@
+/**
+ * @file resource_guard.h
+ * @brief 资源作用域守卫 - RAII模式实现
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ *
+ * @details
+ * 本模块提供资源自动释放机制，确保资源在作用域结束时正确释放。
+ * 支持自定义释放函数，适用于文件句柄、内存、锁、网络连接等资源。
+ *
+ * 使用示例：
+ * @code
+ * FILE* file = fopen("test.txt", "r");
+ * AGENTRT_SCOPE_EXIT(fclose(file));  // 作用域结束时自动关闭
+ *
+ * void* buffer = malloc(1024);
+ * AGENTRT_SCOPE_EXIT(free(buffer));  // 作用域结束时自动释放
+ * @endcode
+ */
+
+#ifndef AGENTRT_RESOURCE_GUARD_H
+#define AGENTRT_RESOURCE_GUARD_H
+
+#include <stddef.h>
+#include <stdint.h>
+
+#include "../memory/include/memory_compat.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* ==================== 类型定义 ==================== */
+
+/**
+ * @brief 资源释放函数类型
+ * @param resource 资源指针
+ */
+typedef void (*agentrt_resource_cleanup_t)(void *resource);
+
+/**
+ * @brief 资源守卫结构
+ */
+typedef struct agentrt_resource_guard {
+    void *resource;                     /**< 资源指针 */
+    agentrt_resource_cleanup_t cleanup; /**< 清理函数 */
+    const char *file;                   /**< 分配文件名 */
+    int line;                           /**< 分配行号 */
+    const char *name;                   /**< 资源名称 */
+    int active;                         /**< 是否激活（用于取消释放） */
+} agentrt_resource_guard_t;
+
+/* ==================== 核心接口 ==================== */
+
+/**
+ * @brief 初始化资源守卫
+ * @param guard [out] 守卫结构指针
+ * @param resource [in] 资源指针
+ * @param cleanup [in] 清理函数
+ * @param file [in] 文件名
+ * @param line [in] 行号
+ * @param name [in] 资源名称
+ */
+void agentrt_resource_guard_init(agentrt_resource_guard_t *guard, void *resource,
+                                 agentrt_resource_cleanup_t cleanup, const char *file, int line,
+                                 const char *name);
+
+/**
+ * @brief 执行资源清理
+ * @param guard [in] 守卫结构指针
+ */
+void agentrt_resource_guard_cleanup(agentrt_resource_guard_t *guard);
+
+/**
+ * @brief 取消资源清理（转移所有权）
+ * @param guard [in] 守卫结构指针
+ */
+void agentrt_resource_guard_dismiss(agentrt_resource_guard_t *guard);
+
+/* ==================== 资源追踪接口 ==================== */
+
+#ifdef AGENTRT_RESOURCE_TRACKING
+
+/**
+ * @brief 资源追踪记录
+ */
+typedef struct agentrt_resource_record {
+    void *resource;                       /**< 资源指针 */
+    const char *type;                     /**< 资源类型 */
+    const char *file;                     /**< 分配文件名 */
+    int line;                             /**< 分配行号 */
+    uint64_t timestamp_ns;                /**< 分配时间戳 */
+    struct agentrt_resource_record *next; /**< 下一条记录 */
+} agentrt_resource_record_t;
+
+/**
+ * @brief 注册资源分配
+ * @param resource 资源指针
+ * @param type 资源类型
+ * @param file 文件名
+ * @param line 行号
+ */
+void agentrt_resource_track_alloc(void *resource, const char *type, const char *file, int line);
+
+/**
+ * @brief 注销资源分配
+ * @param resource 资源指针
+ */
+void agentrt_resource_track_free(void *resource);
+
+/**
+ * @brief 获取资源追踪报告
+ * @param out_report [out] 输出报告字符串（调用者负责释放）
+ * @return 未释放资源数量
+ */
+int agentrt_resource_track_report(char **out_report);
+
+/**
+ * @brief 清空资源追踪记录
+ */
+void agentrt_resource_track_clear(void);
+
+#endif /* AGENTRT_RESOURCE_TRACKING */
+
+/* ==================== 便捷宏定义 ==================== */
+
+/**
+ * @brief 创建作用域守卫（自动生成变量名）
+ * @param resource 资源指针
+ * @param cleanup 清理函数
+ */
+#define AGENTRT_SCOPE_GUARD(resource, cleanup)                                                  \
+    agentrt_resource_guard_t AGENTRT_UNIQUE_NAME(_guard)                                        \
+        AGENTRT_ATTRIBUTE((cleanup(agentrt_resource_guard_cleanup))) = {.resource = (resource), \
+                                                                        .cleanup = (cleanup),   \
+                                                                        .file = __FILE__,       \
+                                                                        .line = __LINE__,       \
+                                                                        .name = #resource,      \
+                                                                        .active = 1}
+
+/**
+ * @brief 创建作用域守卫（带自定义清理）
+ * @param resource 资源指针
+ * @param cleanup 清理函数
+ */
+#define AGENTRT_SCOPE_EXIT(resource, cleanup)                                                   \
+    agentrt_resource_guard_t AGENTRT_UNIQUE_NAME(_scope_exit)                                   \
+        AGENTRT_ATTRIBUTE((cleanup(agentrt_resource_guard_cleanup))) = {.resource = (resource), \
+                                                                        .cleanup = (cleanup),   \
+                                                                        .file = __FILE__,       \
+                                                                        .line = __LINE__,       \
+                                                                        .name = #resource,      \
+                                                                        .active = 1}
+
+/**
+ * @brief 取消作用域守卫（转移所有权）
+ * @param resource 资源指针
+ */
+#define AGENTRT_SCOPE_DISMISS(resource)                                    \
+    do {                                                                   \
+        agentrt_resource_guard_dismiss(&AGENTRT_UNIQUE_NAME(_scope_exit)); \
+    } while (0)
+
+/**
+ * @brief 生成唯一变量名
+ */
+#define AGENTRT_UNIQUE_NAME(prefix) AGENTRT_CONCAT(prefix, __LINE__)
+
+/* AGENTRT_CONCAT 需要两层展开确保 __LINE__ 先展开再拼接。
+ * 某些头文件（types.h, compat.h）定义了单层版本 a##b，会导致 __LINE__ 不展开。
+ * 这里强制使用两层版本以避免重定义警告并确保正确展开。 */
+#ifdef AGENTRT_CONCAT
+#undef AGENTRT_CONCAT
+#endif
+#define AGENTRT_CONCAT(a, b) AGENTRT_CONCAT_IMPL(a, b)
+
+#define AGENTRT_CONCAT_IMPL(a, b) a##b
+
+/* ==================== 资源追踪宏 ==================== */
+
+#ifdef AGENTRT_RESOURCE_TRACKING
+
+/**
+ * @brief 追踪内存分配
+ */
+#define AGENTRT_TRACK_ALLOC(ptr, type) agentrt_resource_track_alloc(ptr, type, __FILE__, __LINE__)
+
+/**
+ * @brief 追踪内存释放
+ */
+#define AGENTRT_TRACK_FREE(ptr) agentrt_resource_track_free(ptr)
+
+/**
+ * @brief 追踪的内存分配
+ */
+#define AGENTRT_TRACKED_MALLOC(size)             \
+    ({                                           \
+        void *_ptr = AGENTRT_MALLOC(size);       \
+        if (_ptr)                                \
+            AGENTRT_TRACK_ALLOC(_ptr, "memory"); \
+        _ptr;                                    \
+    })
+
+/**
+ * @brief 追踪的内存释放
+ */
+#define AGENTRT_TRACKED_FREE(ptr)    \
+    do {                             \
+        if (ptr) {                   \
+            AGENTRT_TRACK_FREE(ptr); \
+            AGENTRT_FREE(ptr);       \
+            ptr = NULL;              \
+        }                            \
+    } while (0)
+
+#else
+
+#define AGENTRT_TRACK_ALLOC(ptr, type) ((void)0)
+#define AGENTRT_TRACK_FREE(ptr) ((void)0)
+#define AGENTRT_TRACKED_MALLOC(size) AGENTRT_MALLOC(size)
+#define AGENTRT_TRACKED_FREE(ptr) AGENTRT_FREE(ptr)
+
+#endif /* AGENTRT_RESOURCE_TRACKING */
+
+#ifdef _MSC_VER
+#define AGENTRT_ATTRIBUTE(x)
+#else
+#define AGENTRT_ATTRIBUTE(x) __attribute__(x)
+#endif
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* AGENTRT_RESOURCE_GUARD_H */
