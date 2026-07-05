@@ -3,7 +3,7 @@
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  */
 
-#include "../src/yaml_minimal.h"
+#include "yaml_minimal.h"  /* SP03: migrated to commons/utils/config_unified/include/ */
 
 #include <stdio.h>
 #include <stdlib.h>

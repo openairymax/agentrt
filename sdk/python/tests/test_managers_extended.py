@@ -15,7 +15,7 @@ MemoryManager, and SkillManager classes with focus on:
 
 遵循 ARCHITECTURAL_PRINCIPLES.md 的 E-8（可测试性原则）。
 
-Run with: pytest tests/test_managers_extended.py -v --cov=agentos.modules --cov-report=term-missing
+Run with: pytest tests/test_managers_extended.py -v --cov=agentrt.modules --cov-report=term-missing
 """
 
 import pytest
@@ -29,19 +29,19 @@ import os
 # 添加父目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from agentos.client.client import APIClient, APIResponse
-from agentos.exceptions import AgentOSError, CODE_MISSING_PARAMETER, CODE_INVALID_RESPONSE, CODE_TASK_TIMEOUT
-from agentos.types.common import (
+from agentrt.client.client import APIClient, APIResponse
+from agentrt.exceptions import AgentOSError, CODE_MISSING_PARAMETER, CODE_INVALID_RESPONSE, CODE_TASK_TIMEOUT
+from agentrt.types.common import (
     Task, TaskStatus, TaskResult,
     Session, SessionStatus,
     Memory, MemoryLayer, MemorySearchResult,
     Skill, SkillStatus, SkillResult, SkillInfo,
     ListOptions, PaginationOptions
 )
-from agentos.modules.task.manager import TaskManager
-from agentos.modules.session.manager import SessionManager
-from agentos.modules.memory.manager import MemoryManager, MemoryWriteItem
-from agentos.modules.skill.manager import SkillManager, SkillExecuteRequest
+from agentrt.modules.task.manager import TaskManager
+from agentrt.modules.session.manager import SessionManager
+from agentrt.modules.memory.manager import MemoryManager, MemoryWriteItem
+from agentrt.modules.skill.manager import SkillManager, SkillExecuteRequest
 
 
 # ============================================================================
@@ -235,14 +235,14 @@ class TestTaskManagerMockIsolation:
     @pytest.fixture
     def isolated_task_manager(self):
         """完全隔离的TaskManager实例"""
-        with patch('agentos.modules.task.manager.APIClient') as MockClient:
+        with patch('agentrt.modules.task.manager.APIClient') as MockClient:
             mock_client = MockClient.return_value
             mock_client.post = MagicMock()
             mock_client.get = MagicMock()
             mock_client.put = MagicMock()
             mock_client.delete = MagicMock()
             
-            from agentos.modules.task.manager import TaskManager
+            from agentrt.modules.task.manager import TaskManager
             mgr = TaskManager(api=mock_client)
             yield mgr, mock_client
 
@@ -670,8 +670,8 @@ class TestConcurrentScenarios:
 
     def test_concurrent_task_and_session_operations(self, mock_api):
         """测试并发任务和会话操作"""
-        from agentos.modules.task.manager import TaskManager
-        from agentos.modules.session.manager import SessionManager
+        from agentrt.modules.task.manager import TaskManager
+        from agentrt.modules.session.manager import SessionManager
         
         task_mgr = TaskManager(mock_api)
         session_mgr = SessionManager(mock_api)

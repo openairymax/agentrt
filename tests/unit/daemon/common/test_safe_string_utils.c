@@ -25,12 +25,12 @@ static int test_safe_strcpy(void) {
     }
     
     ret = safe_strcpy(buf, "This is a very long string that exceeds buffer", 10);
-    if (ret != AGENTOS_ERR_OVERFLOW) {
+    if (ret != AGENTRT_ERR_OVERFLOW) {
         TEST_FAIL("safe_strcpy", "Should fail on overflow");
     }
     
     ret = safe_strcpy(NULL, "test", 10);
-    if (ret != AGENTOS_ERR_INVALID_PARAM) {
+    if (ret != AGENTRT_ERR_INVALID_PARAM) {
         TEST_FAIL("safe_strcpy", "Should reject NULL dest");
     }
     
@@ -48,7 +48,7 @@ static int test_safe_strcat(void) {
     
     char small[8] = "Hi";
     ret = safe_strcat(small, " Very Long String", sizeof(small));
-    if (ret != AGENTOS_ERR_OVERFLOW) {
+    if (ret != AGENTRT_ERR_OVERFLOW) {
         TEST_FAIL("safe_strcat", "Should fail on overflow");
     }
     

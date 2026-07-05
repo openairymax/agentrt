@@ -148,7 +148,7 @@ enum ConfigCommand {
         /// Configuration value
         value: String,
     },
-    /// Validate agentos.yaml configuration
+    /// Validate agentrt.yaml configuration
     Validate,
     /// (*) Reload configuration on running gateway
     Reload,

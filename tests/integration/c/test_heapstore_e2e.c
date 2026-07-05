@@ -126,7 +126,7 @@ static void e2e_scenario_1_crud_lifecycle(void)
 
     /* Step 2: 写入 Agent 记录 */
     heapstore_agent_record_t agent;
-    AGENTOS_MEMSET(&agent, 0, sizeof(agent));
+    AGENTRT_MEMSET(&agent, 0, sizeof(agent));
     snprintf(agent.id, sizeof(agent.id), "agent_crud_%ld", (long)now_timestamp());
     snprintf(agent.name, sizeof(agent.name), "CRUD Test Agent");
     snprintf(agent.type, sizeof(agent.type), "planning");
@@ -141,7 +141,7 @@ static void e2e_scenario_1_crud_lifecycle(void)
 
     /* Step 3: 读取 Agent 记录 */
     heapstore_agent_record_t read_agent;
-    AGENTOS_MEMSET(&read_agent, 0, sizeof(read_agent));
+    AGENTRT_MEMSET(&read_agent, 0, sizeof(read_agent));
 
     err = heapstore_registry_get_agent(agent.id, &read_agent);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 3: 读取 Agent 记录成功");
@@ -158,7 +158,7 @@ static void e2e_scenario_1_crud_lifecycle(void)
     err = heapstore_registry_update_agent(&agent);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 4: 更新 Agent 记录成功");
 
-    AGENTOS_MEMSET(&read_agent, 0, sizeof(read_agent));
+    AGENTRT_MEMSET(&read_agent, 0, sizeof(read_agent));
     err = heapstore_registry_get_agent(agent.id, &read_agent);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 4: 读取更新后记录成功");
     TEST_ASSERT_STR_EQ(read_agent.status, "inactive", "Step 4: 状态已更新为 inactive");
@@ -169,7 +169,7 @@ static void e2e_scenario_1_crud_lifecycle(void)
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 5: 删除 Agent 记录成功");
 
     /* Step 6: 验证删除 */
-    AGENTOS_MEMSET(&read_agent, 0, sizeof(read_agent));
+    AGENTRT_MEMSET(&read_agent, 0, sizeof(read_agent));
     err = heapstore_registry_get_agent(agent.id, &read_agent);
     TEST_ASSERT(err != heapstore_SUCCESS, "Step 6: 删除后读取返回非成功");
 
@@ -200,7 +200,7 @@ static void e2e_scenario_2_batch_operations(void)
     char agent_ids[BATCH_COUNT][128];
 
     for (int i = 0; i < BATCH_COUNT; i++) {
-        AGENTOS_MEMSET(&agents[i], 0, sizeof(agents[i]));
+        AGENTRT_MEMSET(&agents[i], 0, sizeof(agents[i]));
         snprintf(agent_ids[i], sizeof(agent_ids[i]), "agent_batch_%d_%ld", i, (long)now_timestamp());
         snprintf(agents[i].id, sizeof(agents[i].id), "%s", agent_ids[i]);
         snprintf(agents[i].name, sizeof(agents[i].name), "Batch Agent %d", i);
@@ -218,7 +218,7 @@ static void e2e_scenario_2_batch_operations(void)
     int read_ok = 0;
     for (int i = 0; i < BATCH_COUNT; i++) {
         heapstore_agent_record_t read_rec;
-        AGENTOS_MEMSET(&read_rec, 0, sizeof(read_rec));
+        AGENTRT_MEMSET(&read_rec, 0, sizeof(read_rec));
 
         err = heapstore_registry_get_agent(agent_ids[i], &read_rec);
         if (err == heapstore_SUCCESS) {
@@ -233,7 +233,7 @@ static void e2e_scenario_2_batch_operations(void)
 
     for (int i = 0; i < 5; i++) {
         heapstore_session_record_t session;
-        AGENTOS_MEMSET(&session, 0, sizeof(session));
+        AGENTRT_MEMSET(&session, 0, sizeof(session));
         snprintf(session.id, sizeof(session.id), "session_batch_%d_%ld", i, (long)now_timestamp());
         snprintf(session.user_id, sizeof(session.user_id), "user_%d", i);
         session.created_at = now_timestamp();
@@ -266,7 +266,7 @@ static void e2e_scenario_2_batch_operations(void)
     int still_exists = 0;
     for (int i = 0; i < BATCH_COUNT; i++) {
         heapstore_agent_record_t read_rec;
-        AGENTOS_MEMSET(&read_rec, 0, sizeof(read_rec));
+        AGENTRT_MEMSET(&read_rec, 0, sizeof(read_rec));
         if (heapstore_registry_get_agent(agent_ids[i], &read_rec) == heapstore_SUCCESS) {
             still_exists++;
         }
@@ -300,7 +300,7 @@ static void e2e_scenario_3_registry_service_management(void)
 
     for (int i = 0; i < 3; i++) {
         heapstore_agent_record_t agent;
-        AGENTOS_MEMSET(&agent, 0, sizeof(agent));
+        AGENTRT_MEMSET(&agent, 0, sizeof(agent));
         snprintf(svc_ids[i], sizeof(svc_ids[i]), "svc_%s_%ld", service_types[i], (long)now_timestamp());
         snprintf(agent.id, sizeof(agent.id), "%s", svc_ids[i]);
         snprintf(agent.name, sizeof(agent.name), "%s", service_names[i]);
@@ -316,7 +316,7 @@ static void e2e_scenario_3_registry_service_management(void)
 
     /* Step 3: 查找特定服务 */
     heapstore_agent_record_t found;
-    AGENTOS_MEMSET(&found, 0, sizeof(found));
+    AGENTRT_MEMSET(&found, 0, sizeof(found));
     err = heapstore_registry_get_agent(svc_ids[0], &found);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 3: 查找服务成功");
     TEST_ASSERT_STR_EQ(found.name, "PlannerSvc", "Step 3: 找到正确的服务名称");
@@ -360,7 +360,7 @@ static void e2e_scenario_3_registry_service_management(void)
     /* Step 7: 验证服务已移除 */
     for (int i = 0; i < 3; i++) {
         heapstore_agent_record_t removed;
-        AGENTOS_MEMSET(&removed, 0, sizeof(removed));
+        AGENTRT_MEMSET(&removed, 0, sizeof(removed));
         err = heapstore_registry_get_agent(svc_ids[i], &removed);
         TEST_ASSERT(err != heapstore_SUCCESS, "Step 7: 服务已确认移除");
     }
@@ -427,7 +427,7 @@ static void e2e_scenario_4_ipc_producer_consumer(void)
 
     /* Step 5: 通过元数据通道验证数据完整性 */
     heapstore_ipc_channel_t ch_info;
-    AGENTOS_MEMSET(&ch_info, 0, sizeof(ch_info));
+    AGENTRT_MEMSET(&ch_info, 0, sizeof(ch_info));
     err = heapstore_ipc_get_channel(channel_id, &ch_info);
     if (err == heapstore_SUCCESS) {
         TEST_ASSERT_STR_EQ(ch_info.name, channel_name, "Step 5: 通道名称匹配");
@@ -436,7 +436,7 @@ static void e2e_scenario_4_ipc_producer_consumer(void)
 
     /* Step 6: 记录并读取 IPC 缓冲区 */
     heapstore_ipc_buffer_t buffer;
-    AGENTOS_MEMSET(&buffer, 0, sizeof(buffer));
+    AGENTRT_MEMSET(&buffer, 0, sizeof(buffer));
     snprintf(buffer.buffer_id, sizeof(buffer.buffer_id), "buf_e2e_%ld", (long)now_timestamp());
     snprintf(buffer.channel_id, sizeof(buffer.channel_id), "%s", channel_id);
     buffer.size = 4096;
@@ -447,7 +447,7 @@ static void e2e_scenario_4_ipc_producer_consumer(void)
     err = heapstore_ipc_record_buffer(&buffer);
     if (err == heapstore_SUCCESS) {
         heapstore_ipc_buffer_t read_buf;
-        AGENTOS_MEMSET(&read_buf, 0, sizeof(read_buf));
+        AGENTRT_MEMSET(&read_buf, 0, sizeof(read_buf));
         err = heapstore_ipc_get_buffer(buffer.buffer_id, &read_buf);
         TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 6: 读取缓冲区记录成功");
         TEST_ASSERT(read_buf.size == buffer.size, "Step 6: 缓冲区大小匹配");
@@ -508,7 +508,7 @@ static void e2e_scenario_5_token_management(void)
 
     /* Step 3: 获取统计信息验证 */
     heapstore_token_stats_t stats;
-    AGENTOS_MEMSET(&stats, 0, sizeof(stats));
+    AGENTRT_MEMSET(&stats, 0, sizeof(stats));
     err = heapstore_token_get_stats(&stats);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 3: 获取 Token 统计信息");
     TEST_ASSERT(stats.total_prompt_tokens >= 1500, "Step 3: Prompt Token >= 1500");
@@ -552,7 +552,7 @@ static void e2e_scenario_5_token_management(void)
     err = heapstore_token_reset_stats();
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 7: 重置 Token 统计");
 
-    AGENTOS_MEMSET(&stats, 0, sizeof(stats));
+    AGENTRT_MEMSET(&stats, 0, sizeof(stats));
     err = heapstore_token_get_stats(&stats);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 7: 重置后获取统计");
     TEST_ASSERT(stats.total_prompt_tokens == 0, "Step 7: 重置后 Prompt Token 为 0");
@@ -562,7 +562,7 @@ static void e2e_scenario_5_token_management(void)
     err = heapstore_token_record(HEAPSTORE_TOKEN_TYPE_PROMPT, 2000, HEAPSTORE_TOKEN_OP_WRITE);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 8: 重置后复用记录 Token");
 
-    AGENTOS_MEMSET(&stats, 0, sizeof(stats));
+    AGENTRT_MEMSET(&stats, 0, sizeof(stats));
     err = heapstore_token_get_stats(&stats);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 8: 复用后获取统计");
     TEST_ASSERT(stats.total_prompt_tokens == 2000, "Step 8: 复用后 Prompt Token = 2000");
@@ -615,7 +615,7 @@ static void e2e_scenario_6_persistence(void)
 
         /* Step 2: 写入 Agent 记录 */
         heapstore_agent_record_t agent;
-        AGENTOS_MEMSET(&agent, 0, sizeof(agent));
+        AGENTRT_MEMSET(&agent, 0, sizeof(agent));
         snprintf(agent.id, sizeof(agent.id), "%s", unique_id);
         snprintf(agent.name, sizeof(agent.name), "Persistence Test Agent");
         snprintf(agent.type, sizeof(agent.type), "memory");
@@ -630,7 +630,7 @@ static void e2e_scenario_6_persistence(void)
 
         /* Step 3: 写入 Session 记录 */
         heapstore_session_record_t session;
-        AGENTOS_MEMSET(&session, 0, sizeof(session));
+        AGENTRT_MEMSET(&session, 0, sizeof(session));
         snprintf(session.id, sizeof(session.id), "persist_session_%ld", (long)now_timestamp());
         snprintf(session.user_id, sizeof(session.user_id), "persist_user");
         session.created_at = now_timestamp();
@@ -643,7 +643,7 @@ static void e2e_scenario_6_persistence(void)
 
         /* Step 4: 写入 Skill 记录 */
         heapstore_skill_record_t skill;
-        AGENTOS_MEMSET(&skill, 0, sizeof(skill));
+        AGENTRT_MEMSET(&skill, 0, sizeof(skill));
         snprintf(skill.id, sizeof(skill.id), "persist_skill_%ld", (long)now_timestamp());
         snprintf(skill.name, sizeof(skill.name), "Persistence Test Skill");
         snprintf(skill.version, sizeof(skill.version), "1.0.0");
@@ -684,7 +684,7 @@ static void e2e_scenario_6_persistence(void)
 
         /* Step 7: 验证 Agent 记录数据完整 */
         heapstore_agent_record_t agent;
-        AGENTOS_MEMSET(&agent, 0, sizeof(agent));
+        AGENTRT_MEMSET(&agent, 0, sizeof(agent));
         err = heapstore_registry_get_agent(unique_id, &agent);
         if (err == heapstore_SUCCESS) {
             TEST_ASSERT_STR_EQ(agent.name, "Persistence Test Agent",
@@ -702,13 +702,13 @@ static void e2e_scenario_6_persistence(void)
 
         /* Step 8: 验证 Session 记录 */
         heapstore_session_record_t session;
-        AGENTOS_MEMSET(&session, 0, sizeof(session));
+        AGENTRT_MEMSET(&session, 0, sizeof(session));
         /* Session ID 在第一阶段动态生成，此处仅验证查询不崩溃 */
         TEST_ASSERT(1, "Phase 2 Step 8: Session 查询接口可调用");
 
         /* Step 9: 验证 Skill 记录 */
         heapstore_skill_record_t skill;
-        AGENTOS_MEMSET(&skill, 0, sizeof(skill));
+        AGENTRT_MEMSET(&skill, 0, sizeof(skill));
         /* Skill ID 在第一阶段动态生成，此处仅验证查询不崩溃 */
         TEST_ASSERT(1, "Phase 2 Step 9: Skill 查询接口可调用");
 
@@ -755,7 +755,7 @@ static void e2e_scenario_7_cross_subsystem(void)
 
     /* Step 2: 注册 Agent → 创建 IPC 通道 → 分配内存池 → 记录 Token */
     heapstore_agent_record_t agent;
-    AGENTOS_MEMSET(&agent, 0, sizeof(agent));
+    AGENTRT_MEMSET(&agent, 0, sizeof(agent));
     snprintf(agent.id, sizeof(agent.id), "cross_agent_%ld", (long)now_timestamp());
     snprintf(agent.name, sizeof(agent.name), "Cross-Subsystem Agent");
     snprintf(agent.type, sizeof(agent.type), "hybrid");
@@ -768,7 +768,7 @@ static void e2e_scenario_7_cross_subsystem(void)
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 2: 注册 Agent");
 
     heapstore_ipc_channel_t ch;
-    AGENTOS_MEMSET(&ch, 0, sizeof(ch));
+    AGENTRT_MEMSET(&ch, 0, sizeof(ch));
     snprintf(ch.channel_id, sizeof(ch.channel_id), "cross_ch_%ld", (long)now_timestamp());
     snprintf(ch.name, sizeof(ch.name), "Cross-Subsystem Channel");
     snprintf(ch.type, sizeof(ch.type), "binder");
@@ -781,7 +781,7 @@ static void e2e_scenario_7_cross_subsystem(void)
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 2: 记录 IPC 通道");
 
     heapstore_memory_pool_t pool;
-    AGENTOS_MEMSET(&pool, 0, sizeof(pool));
+    AGENTRT_MEMSET(&pool, 0, sizeof(pool));
     snprintf(pool.pool_id, sizeof(pool.pool_id), "cross_pool_%ld", (long)now_timestamp());
     snprintf(pool.name, sizeof(pool.name), "Cross-Subsystem Pool");
     pool.total_size = 65536;
@@ -800,22 +800,22 @@ static void e2e_scenario_7_cross_subsystem(void)
 
     /* Step 3: 交叉验证 - 从各子系统读取数据 */
     heapstore_agent_record_t read_agent;
-    AGENTOS_MEMSET(&read_agent, 0, sizeof(read_agent));
+    AGENTRT_MEMSET(&read_agent, 0, sizeof(read_agent));
     err = heapstore_registry_get_agent(agent.id, &read_agent);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 3: 读取 Agent 记录");
 
     heapstore_ipc_channel_t read_ch;
-    AGENTOS_MEMSET(&read_ch, 0, sizeof(read_ch));
+    AGENTRT_MEMSET(&read_ch, 0, sizeof(read_ch));
     err = heapstore_ipc_get_channel(ch.channel_id, &read_ch);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 3: 读取 IPC 通道");
 
     heapstore_memory_pool_t read_pool;
-    AGENTOS_MEMSET(&read_pool, 0, sizeof(read_pool));
+    AGENTRT_MEMSET(&read_pool, 0, sizeof(read_pool));
     err = heapstore_memory_get_pool(pool.pool_id, &read_pool);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 3: 读取内存池");
 
     heapstore_token_stats_t token_stats;
-    AGENTOS_MEMSET(&token_stats, 0, sizeof(token_stats));
+    AGENTRT_MEMSET(&token_stats, 0, sizeof(token_stats));
     err = heapstore_token_get_stats(&token_stats);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 3: 读取 Token 统计");
     TEST_ASSERT(token_stats.total_prompt_tokens >= 5000, "Step 3: Token 统计正确");
@@ -827,7 +827,7 @@ static void e2e_scenario_7_cross_subsystem(void)
 
     /* Step 5: 性能指标 */
     heapstore_metrics_t metrics;
-    AGENTOS_MEMSET(&metrics, 0, sizeof(metrics));
+    AGENTRT_MEMSET(&metrics, 0, sizeof(metrics));
     err = heapstore_get_metrics(&metrics);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 5: 获取性能指标");
     TEST_ASSERT(metrics.total_operations > 0, "Step 5: 总操作数 > 0");
@@ -863,7 +863,7 @@ static void e2e_scenario_8_circuit_breaker(void)
 
     /* Step 2: 检查初始熔断器状态 */
     heapstore_circuit_info_t circuit;
-    AGENTOS_MEMSET(&circuit, 0, sizeof(circuit));
+    AGENTRT_MEMSET(&circuit, 0, sizeof(circuit));
     err = heapstore_get_circuit_state(&circuit);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 2: 获取熔断器状态");
     TEST_ASSERT(circuit.state == heapstore_CIRCUIT_CLOSED,
@@ -874,7 +874,7 @@ static void e2e_scenario_8_circuit_breaker(void)
     err = heapstore_reset_circuit();
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 3: 重置熔断器");
 
-    AGENTOS_MEMSET(&circuit, 0, sizeof(circuit));
+    AGENTRT_MEMSET(&circuit, 0, sizeof(circuit));
     err = heapstore_get_circuit_state(&circuit);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 3: 重置后获取状态");
     TEST_ASSERT(circuit.failure_count == 0, "Step 3: 重置后失败计数为 0");
@@ -887,7 +887,7 @@ static void e2e_scenario_8_circuit_breaker(void)
 
     /* Step 5: 验证统计信息 */
     heapstore_stats_t stats;
-    AGENTOS_MEMSET(&stats, 0, sizeof(stats));
+    AGENTRT_MEMSET(&stats, 0, sizeof(stats));
     err = heapstore_get_stats(&stats);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 5: 获取统计信息");
 
@@ -896,7 +896,7 @@ static void e2e_scenario_8_circuit_breaker(void)
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 6: 重置性能指标");
 
     heapstore_metrics_t metrics;
-    AGENTOS_MEMSET(&metrics, 0, sizeof(metrics));
+    AGENTRT_MEMSET(&metrics, 0, sizeof(metrics));
     err = heapstore_get_metrics(&metrics);
     TEST_ASSERT_EQ(err, heapstore_SUCCESS, "Step 6: 重置后获取指标");
     TEST_ASSERT(metrics.total_operations == 0, "Step 6: 重置后操作数为 0");

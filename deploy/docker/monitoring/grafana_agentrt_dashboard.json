@@ -1,7 +1,7 @@
 {
   "dashboard": {
     "id": null,
-    "uid": "agentos-overview",
+    "uid": "agentrt-overview",
     "title": "AgentRT Overview",
     "description": "AgentRT unified monitoring dashboard - service health, performance, and alerting",
     "tags": ["agentos", "overview"],
@@ -57,7 +57,7 @@
         "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
         "targets": [
           {
-            "expr": "rate(agentos_agentos_runtime_requests_total[5m])",
+            "expr": "rate(agentrt_agentrt_runtime_requests_total[5m])",
             "legendFormat": "{{method}} {{path}}",
             "refId": "A"
           }
@@ -73,7 +73,7 @@
         "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
         "targets": [
           {
-            "expr": "histogram_quantile(0.95, rate(agentos_agentos_runtime_request_duration_seconds_bucket[5m]))",
+            "expr": "histogram_quantile(0.95, rate(agentrt_agentrt_runtime_request_duration_seconds_bucket[5m]))",
             "legendFormat": "P95",
             "refId": "A"
           }
@@ -89,7 +89,7 @@
         "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
         "targets": [
           {
-            "expr": "rate(agentos_agentos_runtime_errors_total[5m])",
+            "expr": "rate(agentrt_agentrt_runtime_errors_total[5m])",
             "legendFormat": "{{type}}",
             "refId": "A"
           }
@@ -105,12 +105,12 @@
         "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
         "targets": [
           {
-            "expr": "agentos_agentos_runtime_active_sessions",
+            "expr": "agentrt_agentrt_runtime_active_sessions",
             "legendFormat": "Sessions",
             "refId": "A"
           },
           {
-            "expr": "agentos_agentos_runtime_active_connections",
+            "expr": "agentrt_agentrt_runtime_active_connections",
             "legendFormat": "Connections",
             "refId": "B"
           }
@@ -123,7 +123,7 @@
         "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
         "targets": [
           {
-            "expr": "agentos_system_process_memory_bytes",
+            "expr": "agentrt_system_process_memory_bytes",
             "legendFormat": "{{instance}}",
             "refId": "A"
           }
@@ -139,7 +139,7 @@
         "gridPos": { "h": 4, "w": 12, "x": 12, "y": 20 },
         "targets": [
           {
-            "expr": "agentos_circuit_breaker_state",
+            "expr": "agentrt_circuit_breaker_state",
             "legendFormat": "{{service}}",
             "refId": "A"
           }
@@ -159,7 +159,7 @@
         "gridPos": { "h": 4, "w": 6, "x": 12, "y": 24 },
         "targets": [
           {
-            "expr": "agentos_sd_active_services",
+            "expr": "agentrt_sd_active_services",
             "legendFormat": "Services",
             "refId": "A"
           }
@@ -172,7 +172,7 @@
         "gridPos": { "h": 4, "w": 6, "x": 18, "y": 24 },
         "targets": [
           {
-            "expr": "agentos_sd_active_instances",
+            "expr": "agentrt_sd_active_instances",
             "legendFormat": "Instances",
             "refId": "A"
           }

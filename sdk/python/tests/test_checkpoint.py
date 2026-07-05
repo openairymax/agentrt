@@ -11,7 +11,7 @@ import tempfile
 import shutil
 from pathlib import Path
 
-from agentos.modules.task.checkpoint import CheckpointManager, CheckpointData
+from agentrt.modules.task.checkpoint import CheckpointManager, CheckpointData
 
 
 class TestCheckpointData:

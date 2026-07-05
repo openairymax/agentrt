@@ -26,7 +26,7 @@ static double get_time_ms(void) {
 }
 
 static void init_agent_record(heapstore_agent_record_t* record, int index) {
-    AGENTOS_MEMSET(record, 0, sizeof(*record));
+    AGENTRT_MEMSET(record, 0, sizeof(*record));
     snprintf(record->id, sizeof(record->id), "agent_%06d", index);
     snprintf(record->name, sizeof(record->name), "Test Agent %d", index);
     snprintf(record->type, sizeof(record->type), "test_type");
@@ -41,7 +41,7 @@ static int test_single_insert_performance(void) {
     printf("\n=== 测试：单条插入性能（基准） ===\n\n");
 
     heapstore_config_t config = {0};
-    config.root_path = AGENTOS_TMP_DIR "/heapstore_perf_test";
+    config.root_path = AGENTRT_TMP_DIR "/heapstore_perf_test";
     config.enable_auto_cleanup = false;
 
     heapstore_error_t err = heapstore_init(&config);
@@ -82,7 +82,7 @@ static int test_batch_insert_performance(void) {
     printf("\n=== 测试：批量插入性能（事务优化） ===\n\n");
 
     heapstore_config_t config = {0};
-    config.root_path = AGENTOS_TMP_DIR "/heapstore_perf_test_batch";
+    config.root_path = AGENTRT_TMP_DIR "/heapstore_perf_test_batch";
     config.enable_auto_cleanup = false;
 
     heapstore_error_t err = heapstore_init(&config);

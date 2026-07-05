@@ -91,7 +91,7 @@ logging:
   # ===========================================================================
   file:
     # 日志文件基础目录
-    base_dir: "${AGENTOS_LOG_DIR}"
+    base_dir: "${AGENTRT_LOG_DIR}"
 
     # 单个日志文件最大大小（MB）
     max_size_mb: 100
@@ -135,7 +135,7 @@ logging:
 
     cupolas:
       level: "info"
-      file: "agentos/cupolas/cupolas.log"
+      file: "agentrt/cupolas/cupolas.log"
       enabled: true
       domain_id: "0xD000105"
 

@@ -18,11 +18,11 @@ void test_null_pointer_check() {
     void *ptr = NULL;
     TEST_ASSERT_NULL(ptr, "pointer should be NULL");
 
-    ptr = AGENTOS_MALLOC(100);
-    TEST_ASSERT_NOT_NULL(ptr, "AGENTOS_MALLOC should return non-NULL");
+    ptr = AGENTRT_MALLOC(100);
+    TEST_ASSERT_NOT_NULL(ptr, "AGENTRT_MALLOC should return non-NULL");
 
     if (ptr != NULL) {
-        AGENTOS_FREE(ptr);
+        AGENTRT_FREE(ptr);
     }
 
     TEST_CASE_END();

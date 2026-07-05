@@ -29,9 +29,9 @@ def fix_braces_and_error_codes(filepath):
             next_line = lines[i + 1]
             next_next_line = lines[i + 2]
 
-            # Check: next line is agentos_error_push_ex, next+1 is return CODE;
-            push_match = re.match(r'^(\s*)agentos_error_push_ex\(', next_line)
-            ret_match = re.match(r'^(\s*)return\s+(AGENTOS_ERR_\w+)\s*;', next_next_line)
+            # Check: next line is agentrt_error_push_ex, next+1 is return CODE;
+            push_match = re.match(r'^(\s*)agentrt_error_push_ex\(', next_line)
+            ret_match = re.match(r'^(\s*)return\s+(AGENTRT_ERR_\w+)\s*;', next_next_line)
 
             if push_match and ret_match:
                 push_indent = push_match.group(1)
@@ -47,24 +47,24 @@ def fix_braces_and_error_codes(filepath):
                     fixed_push = next_line
                     fixed_ret = next_next_line
 
-                    if 'AGENTOS_ERR_NULL_POINTER' in next_line and 'not initialized' in next_line:
-                        fixed_push = next_line.replace('AGENTOS_ERR_NULL_POINTER', 'AGENTOS_ERR_STATE_ERROR')
-                        fixed_ret = next_next_line.replace('AGENTOS_ERR_NULL_POINTER', 'AGENTOS_ERR_STATE_ERROR')
+                    if 'AGENTRT_ERR_NULL_POINTER' in next_line and 'not initialized' in next_line:
+                        fixed_push = next_line.replace('AGENTRT_ERR_NULL_POINTER', 'AGENTRT_ERR_STATE_ERROR')
+                        fixed_ret = next_next_line.replace('AGENTRT_ERR_NULL_POINTER', 'AGENTRT_ERR_STATE_ERROR')
                         code_fixes += 1
 
-                    if 'AGENTOS_ERR_UNKNOWN' in next_line and 'a2a_timestamp_ms' in next_line:
-                        fixed_push = next_line.replace('AGENTOS_ERR_UNKNOWN', 'AGENTOS_ERR_NOT_SUPPORTED')
-                        fixed_ret = next_next_line.replace('AGENTOS_ERR_UNKNOWN', 'AGENTOS_ERR_NOT_SUPPORTED')
+                    if 'AGENTRT_ERR_UNKNOWN' in next_line and 'a2a_timestamp_ms' in next_line:
+                        fixed_push = next_line.replace('AGENTRT_ERR_UNKNOWN', 'AGENTRT_ERR_NOT_SUPPORTED')
+                        fixed_ret = next_next_line.replace('AGENTRT_ERR_UNKNOWN', 'AGENTRT_ERR_NOT_SUPPORTED')
                         code_fixes += 1
 
-                    if 'AGENTOS_ERR_UNKNOWN' in next_line and 'AGENTOS_STRDUP' in next_line:
-                        fixed_push = next_line.replace('AGENTOS_ERR_UNKNOWN', 'AGENTOS_ERR_OUT_OF_MEMORY')
-                        fixed_ret = next_next_line.replace('AGENTOS_ERR_UNKNOWN', 'AGENTOS_ERR_OUT_OF_MEMORY')
+                    if 'AGENTRT_ERR_UNKNOWN' in next_line and 'AGENTRT_STRDUP' in next_line:
+                        fixed_push = next_line.replace('AGENTRT_ERR_UNKNOWN', 'AGENTRT_ERR_OUT_OF_MEMORY')
+                        fixed_ret = next_next_line.replace('AGENTRT_ERR_UNKNOWN', 'AGENTRT_ERR_OUT_OF_MEMORY')
                         code_fixes += 1
 
-                    if 'AGENTOS_ERR_UNKNOWN' in next_line and 'memset' in next_line:
-                        fixed_push = next_line.replace('AGENTOS_ERR_UNKNOWN', 'AGENTOS_ERR_NULL_POINTER')
-                        fixed_ret = next_next_line.replace('AGENTOS_ERR_UNKNOWN', 'AGENTOS_ERR_NULL_POINTER')
+                    if 'AGENTRT_ERR_UNKNOWN' in next_line and 'memset' in next_line:
+                        fixed_push = next_line.replace('AGENTRT_ERR_UNKNOWN', 'AGENTRT_ERR_NULL_POINTER')
+                        fixed_ret = next_next_line.replace('AGENTRT_ERR_UNKNOWN', 'AGENTRT_ERR_NULL_POINTER')
                         code_fixes += 1
 
                     result.append(fixed_push)
@@ -76,25 +76,25 @@ def fix_braces_and_error_codes(filepath):
                     continue
         else:
             # Also check for non-if error_push + return patterns that might be standalone
-            push_match2 = re.match(r'^(\s*)agentos_error_push_ex\((AGENTOS_ERR_UNKNOWN),', line)
+            push_match2 = re.match(r'^(\s*)agentrt_error_push_ex\((AGENTRT_ERR_UNKNOWN),', line)
             if push_match2 and i + 1 < len(lines):
-                ret_match2 = re.match(r'^(\s*)return\s+AGENTOS_ERR_UNKNOWN\s*;', lines[i + 1])
+                ret_match2 = re.match(r'^(\s*)return\s+AGENTRT_ERR_UNKNOWN\s*;', lines[i + 1])
                 if ret_match2:
                     indent_p = push_match2.group(1)
                     # Fix UNKNOWN codes based on description
                     if 'a2a_timestamp_ms' in line:
-                        line = line.replace('AGENTOS_ERR_UNKNOWN', 'AGENTOS_ERR_NOT_SUPPORTED')
-                        lines[i + 1] = lines[i + 1].replace('AGENTOS_ERR_UNKNOWN', 'AGENTOS_ERR_NOT_SUPPORTED')
+                        line = line.replace('AGENTRT_ERR_UNKNOWN', 'AGENTRT_ERR_NOT_SUPPORTED')
+                        lines[i + 1] = lines[i + 1].replace('AGENTRT_ERR_UNKNOWN', 'AGENTRT_ERR_NOT_SUPPORTED')
                         code_fixes += 1
                         modified = True
-                    elif 'AGENTOS_STRDUP' in line:
-                        line = line.replace('AGENTOS_ERR_UNKNOWN', 'AGENTOS_ERR_OUT_OF_MEMORY')
-                        lines[i + 1] = lines[i + 1].replace('AGENTOS_ERR_UNKNOWN', 'AGENTOS_ERR_OUT_OF_MEMORY')
+                    elif 'AGENTRT_STRDUP' in line:
+                        line = line.replace('AGENTRT_ERR_UNKNOWN', 'AGENTRT_ERR_OUT_OF_MEMORY')
+                        lines[i + 1] = lines[i + 1].replace('AGENTRT_ERR_UNKNOWN', 'AGENTRT_ERR_OUT_OF_MEMORY')
                         code_fixes += 1
                         modified = True
                     elif 'memset' in line:
-                        line = line.replace('AGENTOS_ERR_UNKNOWN', 'AGENTOS_ERR_NULL_POINTER')
-                        lines[i + 1] = lines[i + 1].replace('AGENTOS_ERR_UNKNOWN', 'AGENTOS_ERR_NULL_POINTER')
+                        line = line.replace('AGENTRT_ERR_UNKNOWN', 'AGENTRT_ERR_NULL_POINTER')
+                        lines[i + 1] = lines[i + 1].replace('AGENTRT_ERR_UNKNOWN', 'AGENTRT_ERR_NULL_POINTER')
                         code_fixes += 1
                         modified = True
 

@@ -33,7 +33,7 @@ class BaseTestCase:
     def setup_class(cls):
         """类级别的设置"""
         cls.test_data_dir = PROJECT_ROOT / "tests" / "fixtures" / "data"
-        cls.temp_dir = Path(tempfile.gettempdir()) / "agentos_tests"
+        cls.temp_dir = Path(tempfile.gettempdir()) / "agentrt_tests"
         cls.temp_dir.mkdir(parents=True, exist_ok=True)
 
         # 加载测试数据
@@ -335,11 +335,11 @@ class IntegrationTestCase(BaseTestCase):
             sock.settimeout(5)
             result = sock.connect_ex(('localhost', 18789))
             sock.close()
-            self.agentos_available = result == 0
+            self.agentrt_available = result == 0
         except Exception:
-            self.agentos_available = False
+            self.agentrt_available = False
 
-        if not self.agentos_available:
+        if not self.agentrt_available:
             pytest.skip("AgentRT服务不可用，跳过集成测试")
 
     def wait_for_service(self, host: str = "localhost", port: int = 18789,

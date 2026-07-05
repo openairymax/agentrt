@@ -34,7 +34,7 @@ static void test_registry_add(void) {
     assert(reg != NULL);
 
     tool_metadata_t meta;
-    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
+    AGENTRT_MEMSET(&meta, 0, sizeof(meta));
     meta.id = "test_tool_001";
     meta.name = "Test Tool";
     meta.description = "A test tool for unit testing";
@@ -60,7 +60,7 @@ static void test_registry_add_duplicate(void) {
     assert(reg != NULL);
 
     tool_metadata_t meta;
-    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
+    AGENTRT_MEMSET(&meta, 0, sizeof(meta));
     meta.id = "duplicate_tool";
     meta.name = "Duplicate Tool";
     meta.executable = "/usr/bin/echo";
@@ -86,7 +86,7 @@ static void test_registry_get(void) {
     assert(reg != NULL);
 
     tool_metadata_t meta;
-    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
+    AGENTRT_MEMSET(&meta, 0, sizeof(meta));
     meta.id = "get_test_tool";
     meta.name = "Get Test Tool";
     meta.description = "Tool for get testing";
@@ -132,7 +132,7 @@ static void test_registry_remove(void) {
     assert(reg != NULL);
 
     tool_metadata_t meta;
-    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
+    AGENTRT_MEMSET(&meta, 0, sizeof(meta));
     meta.id = "remove_test_tool";
     meta.name = "Remove Test Tool";
     meta.executable = "/usr/bin/ls";
@@ -177,13 +177,13 @@ static void test_registry_list_json(void) {
     assert(reg != NULL);
 
     tool_metadata_t meta1;
-    AGENTOS_MEMSET(&meta1, 0, sizeof(meta1));
+    AGENTRT_MEMSET(&meta1, 0, sizeof(meta1));
     meta1.id = "json_tool_1";
     meta1.name = "JSON Tool 1";
     meta1.executable = "/usr/bin/echo";
 
     tool_metadata_t meta2;
-    AGENTOS_MEMSET(&meta2, 0, sizeof(meta2));
+    AGENTRT_MEMSET(&meta2, 0, sizeof(meta2));
     meta2.id = "json_tool_2";
     meta2.name = "JSON Tool 2";
     meta2.executable = "/usr/bin/cat";
@@ -231,7 +231,7 @@ static void test_registry_null_param(void) {
     assert(ret != 0);
 
     tool_metadata_t meta;
-    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
+    AGENTRT_MEMSET(&meta, 0, sizeof(meta));
     meta.id = NULL;
 
     tool_registry_t* reg = tool_registry_create(NULL);
@@ -259,14 +259,14 @@ static void test_registry_tool_with_params(void) {
     assert(reg != NULL);
 
     tool_param_t params[2];
-    AGENTOS_MEMSET(params, 0, sizeof(params));
+    AGENTRT_MEMSET(params, 0, sizeof(params));
     params[0].name = "input_file";
     params[0].schema = "{\"type\": \"string\"}";
     params[1].name = "output_file";
     params[1].schema = "{\"type\": \"string\"}";
 
     tool_metadata_t meta;
-    AGENTOS_MEMSET(&meta, 0, sizeof(meta));
+    AGENTRT_MEMSET(&meta, 0, sizeof(meta));
     meta.id = "param_tool";
     meta.name = "Param Tool";
     meta.executable = "/usr/bin/cp";

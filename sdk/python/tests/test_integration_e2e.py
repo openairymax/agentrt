@@ -8,18 +8,18 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from agentos.framework.plugin import (
+from agentrt.framework.plugin import (
     PluginRegistry, PluginManager, PluginState,
     PluginManifest, BasePlugin, get_plugin_registry,
 )
-from agentos.framework.plugins.logger_plugin import LoggerPlugin
-from agentos.framework.plugins.metrics_plugin import MetricsPlugin
-from agentos.exceptions import (
+from agentrt.framework.plugins.logger_plugin import LoggerPlugin
+from agentrt.framework.plugins.metrics_plugin import MetricsPlugin
+from agentrt.exceptions import (
     AgentOSError, NetworkError, ValidationError,
     TimeoutError, AgentOSTimeoutError, CODE_NETWORK_ERROR, CODE_TIMEOUT,
     CODE_VALIDATION_ERROR, CODE_UNKNOWN, CODE_INTERNAL,
 )
-from agentos.framework.event import EventBus
+from agentrt.framework.event import EventBus
 
 
 class TestConfigClientIntegration(unittest.TestCase):

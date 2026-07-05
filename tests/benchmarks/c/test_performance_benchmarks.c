@@ -22,15 +22,15 @@
 #include <time.h>
 
 /* corekern */
-#include "agentos.h"
+#include "agentrt.h"
 #include "mem.h"
 #include "task.h"
 #include "ipc.h"
 #include "error.h"
-#include "agentos_time.h"
+#include "agentrt_time.h"
 #include "observability.h"
 
-/* daemon/common */
+/* daemons/common */
 #include "svc_common.h"
 #include "circuit_breaker.h"
 #include "config_manager.h"
@@ -101,36 +101,36 @@ static void print_result(const benchmark_result_t* r)
 static void bm_mem_alloc_small(void* arg)
 {
     (void)arg;
-    void* p = agentos_mem_alloc(64);
-    if (p) agentos_mem_free(p);
+    void* p = agentrt_mem_alloc(64);
+    if (p) agentrt_mem_free(p);
 }
 
 static void bm_mem_alloc_medium(void* arg)
 {
     (void)arg;
-    void* p = agentos_mem_alloc(4096);
-    if (p) agentos_mem_free(p);
+    void* p = agentrt_mem_alloc(4096);
+    if (p) agentrt_mem_free(p);
 }
 
 static void bm_mem_alloc_large(void* arg)
 {
     (void)arg;
-    void* p = agentos_mem_alloc(1024 * 1024);
-    if (p) agentos_mem_free(p);
+    void* p = agentrt_mem_alloc(1024 * 1024);
+    if (p) agentrt_mem_free(p);
 }
 
 static void bm_mem_alloc_ex(void* arg)
 {
     (void)arg;
-    void* p = agentos_mem_alloc_ex(256, __FILE__, __LINE__);
-    if (p) agentos_mem_free(p);
+    void* p = agentrt_mem_alloc_ex(256, __FILE__, __LINE__);
+    if (p) agentrt_mem_free(p);
 }
 
 static void bm_mem_aligned_alloc(void* arg)
 {
     (void)arg;
-    void* p = agentos_mem_aligned_alloc(512, 64);
-    if (p) agentos_mem_aligned_free(p);
+    void* p = agentrt_mem_aligned_alloc(512, 64);
+    if (p) agentrt_mem_aligned_free(p);
 }
 
 static void test_benchmark_memory(void)
@@ -141,7 +141,7 @@ static void test_benchmark_memory(void)
     printf("  %-30s-+-%-14s-+-%-14s-+-%-14s-+-%-14s\n",
            "------------------------------", "--------------", "--------------", "--------------", "--------------");
 
-    agentos_mem_init(0);
+    agentrt_mem_init(0);
 
     benchmark_result_t r;
 
@@ -160,10 +160,10 @@ static void test_benchmark_memory(void)
     benchmark_run("mem_aligned_alloc(512B, 64)", bm_mem_aligned_alloc, NULL, 50000, &r);
     print_result(&r);
 
-    size_t leaks = agentos_mem_check_leaks();
+    size_t leaks = agentrt_mem_check_leaks();
     printf("\n  [INFO] 内存泄漏检查: %zu blocks\n", leaks);
 
-    agentos_mem_cleanup();
+    agentrt_mem_cleanup();
 }
 
 /* --- BM-02: 任务调度基准 --- */
@@ -171,17 +171,17 @@ static void test_benchmark_memory(void)
 static void bm_task_self(void* arg)
 {
     (void)arg;
-    agentos_task_self();
+    agentrt_task_self();
 }
 
 static void bm_task_yield(void* arg)
 {
     (void)arg;
-    agentos_task_yield();
+    agentrt_task_yield();
 }
 
 typedef struct {
-    agentos_task_id_t ids[100];
+    agentrt_task_id_t ids[100];
     int index;
 } task_ids_collector_t;
 
@@ -190,7 +190,7 @@ static void* task_self_thread_fn(void* arg)
     task_ids_collector_t* col = (task_ids_collector_t*)arg;
     int idx = __atomic_fetch_add(&col->index, 1, __ATOMIC_SEQ_CST);
     if (idx < 100) {
-        col->ids[idx] = agentos_task_self();
+        col->ids[idx] = agentrt_task_self();
     }
     return NULL;
 }
@@ -209,7 +209,7 @@ static void test_benchmark_task(void)
     printf("  %-30s-+-%-14s-+-%-14s-+-%-14s-+-%-14s\n",
            "------------------------------", "--------------", "--------------", "--------------", "--------------");
 
-    agentos_task_init();
+    agentrt_task_init();
 
     benchmark_result_t r;
 
@@ -223,7 +223,7 @@ static void test_benchmark_task(void)
     benchmark_run("task_self() 多线程", bm_task_self_multi_thread, &col, 10000, &r);
     print_result(&r);
 
-    agentos_task_cleanup();
+    agentrt_task_cleanup();
 }
 
 /* --- BM-03: 配置读写基准 --- */
@@ -369,14 +369,14 @@ static void test_benchmark_dispatcher(void)
 static void bm_metric_counter_inc(void* arg)
 {
     (void)arg;
-    agentos_metric_counter_inc("bm_counter", "tag1", 1.0);
+    agentrt_metric_counter_inc("bm_counter", "tag1", 1.0);
 }
 
 static void bm_trace_span_start(void* arg)
 {
     (void)arg;
-    agentos_trace_context_t ctx;
-    agentos_trace_span_start(&ctx, "bm_service", "bm_op");
+    agentrt_trace_context_t ctx;
+    agentrt_trace_span_start(&ctx, "bm_service", "bm_op");
 }
 
 static void test_benchmark_observability(void)
@@ -387,10 +387,10 @@ static void test_benchmark_observability(void)
     printf("  %-30s-+-%-14s-+-%-14s-+-%-14s-+-%-14s\n",
            "------------------------------", "--------------", "--------------", "--------------", "--------------");
 
-    agentos_observability_config_t cfg = {
+    agentrt_observability_config_t cfg = {
         .enable_metrics = 1, .enable_tracing = 1, .enable_health_check = 1
     };
-    agentos_observability_init(&cfg);
+    agentrt_observability_init(&cfg);
 
     benchmark_result_t r;
 
@@ -400,7 +400,7 @@ static void test_benchmark_observability(void)
     benchmark_run("trace_span_start()", bm_trace_span_start, NULL, 50000, &r);
     print_result(&r);
 
-    agentos_observability_shutdown();
+    agentrt_observability_shutdown();
 }
 
 /* --- BM-07: 系统调用基准 --- */
@@ -409,8 +409,8 @@ static void bm_sys_memory_write(void* arg)
 {
     (void)arg;
     char* record_id = NULL;
-    agentos_sys_memory_write("bm_data", 7, "{\"type\":\"bm\"}", &record_id);
-    if (record_id) agentos_sys_free(record_id);
+    agentrt_sys_memory_write("bm_data", 7, "{\"type\":\"bm\"}", &record_id);
+    if (record_id) agentrt_sys_free(record_id);
 }
 
 static void test_benchmark_syscall(void)
@@ -441,10 +441,10 @@ static void* bm_concurrent_thread_fn(void* arg)
 
     uint64_t start = get_time_ns();
     for (int i = 0; i < 10000; i++) {
-        void* p = agentos_mem_alloc(128 + (size_t)(ctx->thread_id % 8) * 16);
+        void* p = agentrt_mem_alloc(128 + (size_t)(ctx->thread_id % 8) * 16);
         if (p) {
-            AGENTOS_MEMSET(p, (unsigned char)(ctx->thread_id + i), 128 + (size_t)(ctx->thread_id % 8) * 16);
-            agentos_mem_free(p);
+            AGENTRT_MEMSET(p, (unsigned char)(ctx->thread_id + i), 128 + (size_t)(ctx->thread_id % 8) * 16);
+            agentrt_mem_free(p);
             ctx->alloc_count++;
         }
     }
@@ -458,10 +458,10 @@ static void test_benchmark_concurrent(void)
 {
     printf("\n--- [BM-08] 多线程并发基准测试 ---\n");
 
-    agentos_mem_init(0);
+    agentrt_mem_init(0);
 
     #define BM_THREAD_COUNT 8
-    agentos_thread_t threads[BM_THREAD_COUNT];
+    agentrt_thread_t threads[BM_THREAD_COUNT];
     bm_thread_ctx_t ctxs[BM_THREAD_COUNT];
 
     uint64_t wall_start = get_time_ns();
@@ -470,12 +470,12 @@ static void test_benchmark_concurrent(void)
         ctxs[i].thread_id = i;
         ctxs[i].total_alloc_time_ns = 0;
         ctxs[i].alloc_count = 0;
-        agentos_platform_thread_create(&threads[i], bm_concurrent_thread_fn, &ctxs[i]);
+        agentrt_platform_thread_create(&threads[i], bm_concurrent_thread_fn, &ctxs[i]);
     }
 
     uint64_t total_ops = 0;
     for (int i = 0; i < BM_THREAD_COUNT; i++) {
-        agentos_platform_thread_join(threads[i], NULL);
+        agentrt_platform_thread_join(threads[i], NULL);
         total_ops += ctxs[i].alloc_count;
     }
 
@@ -488,10 +488,10 @@ static void test_benchmark_concurrent(void)
     printf("  %-30s %.3f seconds\n", "Wall time:", elapsed_s);
     printf("  %-30s %.0f ops/sec\n", "Throughput:", throughput);
 
-    size_t leaks = agentos_mem_check_leaks();
+    size_t leaks = agentrt_mem_check_leaks();
     printf("  %-30s %zu blocks\n", "Memory leaks:", leaks);
 
-    agentos_mem_cleanup();
+    agentrt_mem_cleanup();
 }
 
 /* ==================== main 入口 ==================== */

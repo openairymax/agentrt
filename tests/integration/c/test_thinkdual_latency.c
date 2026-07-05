@@ -152,11 +152,11 @@ static int is_valid_json_prefix(const char *str)
 /* ============================================================================
  * 辅助: 创建默认认知引擎
  * ============================================================================ */
-static agentos_cognition_engine_t *create_default_engine(void)
+static agentrt_cognition_engine_t *create_default_engine(void)
 {
-    agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
-    assert(err == AGENTOS_OK);
+    agentrt_cognition_engine_t *engine = NULL;
+    agentrt_error_t err = agentrt_cognition_create_take(NULL, NULL, NULL, &engine);
+    assert(err == AGENTRT_OK);
     assert(engine != NULL);
     return engine;
 }
@@ -197,8 +197,8 @@ TEST(int04_1_single_semantic_unit_latency)
         /* 预热 */
         for (int w = 0; w < BENCH_WARMUP; w++) {
             su_stream_detector_t *det = NULL;
-            agentos_error_t err = su_stream_detector_create(NULL, &det);
-            if (err == AGENTOS_SUCCESS && det != NULL) {
+            agentrt_error_t err = su_stream_detector_create(NULL, &det);
+            if (err == AGENTRT_SUCCESS && det != NULL) {
                 su_stream_detector_feed(det, test_units[t].text,
                                         strlen(test_units[t].text), 0.8f);
                 su_stream_detector_flush(det);
@@ -207,7 +207,7 @@ TEST(int04_1_single_semantic_unit_latency)
                     su_semantic_unit_t unit;
                     su_stream_detector_pop_pending(det, &unit);
                     if (unit.text)
-                        AGENTOS_FREE(unit.text);
+                        AGENTRT_FREE(unit.text);
                 }
                 su_stream_detector_destroy(det);
             }
@@ -216,8 +216,8 @@ TEST(int04_1_single_semantic_unit_latency)
         /* 基准测试 */
         for (int i = 0; i < BENCH_ITERATIONS; i++) {
             su_stream_detector_t *det = NULL;
-            agentos_error_t err = su_stream_detector_create(NULL, &det);
-            if (err != AGENTOS_SUCCESS || det == NULL) {
+            agentrt_error_t err = su_stream_detector_create(NULL, &det);
+            if (err != AGENTRT_SUCCESS || det == NULL) {
                 all_times[i] = 0;
                 continue;
             }
@@ -233,7 +233,7 @@ TEST(int04_1_single_semantic_unit_latency)
                 su_semantic_unit_t unit;
                 su_stream_detector_pop_pending(det, &unit);
                 if (unit.text)
-                    AGENTOS_FREE(unit.text);
+                    AGENTRT_FREE(unit.text);
             }
 
             all_times[i] = get_time_ns() - start;
@@ -298,8 +298,8 @@ TEST(int04_2_multi_unit_stream_latency)
     /* 预热 */
     for (int w = 0; w < BENCH_WARMUP; w++) {
         su_stream_detector_t *det = NULL;
-        agentos_error_t err = su_stream_detector_create(NULL, &det);
-        if (err == AGENTOS_SUCCESS && det != NULL) {
+        agentrt_error_t err = su_stream_detector_create(NULL, &det);
+        if (err == AGENTRT_SUCCESS && det != NULL) {
             for (int i = 0; i < MULTI_UNIT_COUNT; i++) {
                 su_stream_detector_feed(det, units[i], strlen(units[i]), 0.8f);
             }
@@ -309,7 +309,7 @@ TEST(int04_2_multi_unit_stream_latency)
                 su_semantic_unit_t unit;
                 su_stream_detector_pop_pending(det, &unit);
                 if (unit.text)
-                    AGENTOS_FREE(unit.text);
+                    AGENTRT_FREE(unit.text);
             }
             su_stream_detector_destroy(det);
         }
@@ -318,8 +318,8 @@ TEST(int04_2_multi_unit_stream_latency)
     /* 基准测试 */
     for (int iter = 0; iter < BENCH_ITERATIONS; iter++) {
         su_stream_detector_t *det = NULL;
-        agentos_error_t err = su_stream_detector_create(NULL, &det);
-        if (err != AGENTOS_SUCCESS || det == NULL) {
+        agentrt_error_t err = su_stream_detector_create(NULL, &det);
+        if (err != AGENTRT_SUCCESS || det == NULL) {
             times[iter] = 0;
             continue;
         }
@@ -336,7 +336,7 @@ TEST(int04_2_multi_unit_stream_latency)
             su_semantic_unit_t unit;
             su_stream_detector_pop_pending(det, &unit);
             if (unit.text)
-                AGENTOS_FREE(unit.text);
+                AGENTRT_FREE(unit.text);
         }
 
         times[iter] = get_time_ns() - start;
@@ -398,28 +398,28 @@ TEST(int04_3_stream_critic_latency)
     }
 
     for (int t = 0; critic_inputs[t].input != NULL; t++) {
-        agentos_cognition_engine_t *engine = create_default_engine();
+        agentrt_cognition_engine_t *engine = create_default_engine();
 
         /* 预热 */
         for (int w = 0; w < BENCH_WARMUP; w++) {
-            agentos_task_plan_t *plan = NULL;
-            agentos_cognition_process(engine, critic_inputs[t].input,
+            agentrt_task_plan_t *plan = NULL;
+            agentrt_cognition_process(engine, critic_inputs[t].input,
                                       strlen(critic_inputs[t].input), &plan);
             if (plan)
-                agentos_task_plan_free(plan);
+                agentrt_task_plan_free(plan);
         }
 
         /* 基准测试 */
         for (int i = 0; i < BENCH_ITERATIONS; i++) {
-            agentos_task_plan_t *plan = NULL;
+            agentrt_task_plan_t *plan = NULL;
 
             uint64_t start = get_time_ns();
-            agentos_cognition_process(engine, critic_inputs[t].input,
+            agentrt_cognition_process(engine, critic_inputs[t].input,
                                       strlen(critic_inputs[t].input), &plan);
             times[i] = get_time_ns() - start;
 
             if (plan)
-                agentos_task_plan_free(plan);
+                agentrt_task_plan_free(plan);
         }
 
         bench_result_t result;
@@ -438,7 +438,7 @@ TEST(int04_3_stream_critic_latency)
                    result.p99_ns / 1000000.0);
         }
 
-        agentos_cognition_destroy(engine);
+        agentrt_cognition_destroy(engine);
     }
 
     free(times);
@@ -472,22 +472,22 @@ TEST(int04_4_metacognition_evaluation_latency)
     }
 
     for (int t = 0; meta_inputs[t] != NULL; t++) {
-        agentos_cognition_engine_t *engine = create_default_engine();
-        agentos_memory_engine_t *mem_engine = NULL;
-        agentos_error_t err = agentos_memory_create(NULL, &mem_engine);
-        if (err == AGENTOS_OK && mem_engine != NULL) {
-            agentos_cognition_set_memory(engine, mem_engine);
+        agentrt_cognition_engine_t *engine = create_default_engine();
+        agentrt_memory_engine_t *mem_engine = NULL;
+        agentrt_error_t err = agentrt_memory_create(NULL, &mem_engine);
+        if (err == AGENTRT_OK && mem_engine != NULL) {
+            agentrt_cognition_set_memory(engine, mem_engine);
         }
 
         /* 预热 */
         for (int w = 0; w < BENCH_WARMUP; w++) {
-            agentos_task_plan_t *plan = NULL;
-            agentos_cognition_process(engine, meta_inputs[t],
+            agentrt_task_plan_t *plan = NULL;
+            agentrt_cognition_process(engine, meta_inputs[t],
                                       strlen(meta_inputs[t]), &plan);
             if (plan)
-                agentos_task_plan_free(plan);
+                agentrt_task_plan_free(plan);
             char *health = NULL;
-            agentos_cognition_health_check(engine, &health);
+            agentrt_cognition_health_check(engine, &health);
             if (health)
                 free(health);
         }
@@ -496,14 +496,14 @@ TEST(int04_4_metacognition_evaluation_latency)
         for (int i = 0; i < BENCH_ITERATIONS; i++) {
             uint64_t start = get_time_ns();
 
-            agentos_task_plan_t *plan = NULL;
-            agentos_cognition_process(engine, meta_inputs[t],
+            agentrt_task_plan_t *plan = NULL;
+            agentrt_cognition_process(engine, meta_inputs[t],
                                       strlen(meta_inputs[t]), &plan);
             if (plan)
-                agentos_task_plan_free(plan);
+                agentrt_task_plan_free(plan);
 
             char *health = NULL;
-            agentos_cognition_health_check(engine, &health);
+            agentrt_cognition_health_check(engine, &health);
             times[i] = get_time_ns() - start;
 
             if (health)
@@ -526,9 +526,9 @@ TEST(int04_4_metacognition_evaluation_latency)
                    result.p99_ns / 1000000.0);
         }
 
-        agentos_cognition_destroy(engine);
+        agentrt_cognition_destroy(engine);
         if (mem_engine)
-            agentos_memory_destroy(mem_engine);
+            agentrt_memory_destroy(mem_engine);
     }
 
     free(times);
@@ -590,35 +590,35 @@ TEST(int04_5_e2e_thinkdual_pipeline_latency)
 
     for (int t = 0; pipeline_inputs[t].input != NULL; t++) {
         /* 创建带 feedback 回调的引擎 */
-        agentos_cognition_config_t config;
+        agentrt_cognition_config_t config;
         memset(&config, 0, sizeof(config));
         config.cognition_default_timeout_ms = 30000;
         config.cognition_max_retries = 3;
         config.feedback_callback = pipeline_feedback_callback;
         config.feedback_user_data = NULL;
 
-        agentos_cognition_engine_t *engine = NULL;
-        agentos_error_t err = agentos_cognition_create_ex_take(&config, NULL, NULL, NULL, &engine);
-        if (err != AGENTOS_OK || engine == NULL) {
+        agentrt_cognition_engine_t *engine = NULL;
+        agentrt_error_t err = agentrt_cognition_create_ex_take(&config, NULL, NULL, NULL, &engine);
+        if (err != AGENTRT_OK || engine == NULL) {
             TEST_FAIL("INT-04.5", "engine creation failed");
             continue;
         }
 
         /* 关联记忆引擎 */
-        agentos_memory_engine_t *mem_engine = NULL;
-        err = agentos_memory_create(NULL, &mem_engine);
-        if (err == AGENTOS_OK && mem_engine != NULL) {
-            agentos_cognition_set_memory(engine, mem_engine);
+        agentrt_memory_engine_t *mem_engine = NULL;
+        err = agentrt_memory_create(NULL, &mem_engine);
+        if (err == AGENTRT_OK && mem_engine != NULL) {
+            agentrt_cognition_set_memory(engine, mem_engine);
         }
 
         /* 预热 */
         g_pipeline_feedback_count = 0;
         for (int w = 0; w < BENCH_WARMUP; w++) {
-            agentos_task_plan_t *plan = NULL;
-            agentos_cognition_process(engine, pipeline_inputs[t].input,
+            agentrt_task_plan_t *plan = NULL;
+            agentrt_cognition_process(engine, pipeline_inputs[t].input,
                                       strlen(pipeline_inputs[t].input), &plan);
             if (plan)
-                agentos_task_plan_free(plan);
+                agentrt_task_plan_free(plan);
         }
 
         /* 基准测试: 完整管线 */
@@ -626,22 +626,22 @@ TEST(int04_5_e2e_thinkdual_pipeline_latency)
             uint64_t start = get_time_ns();
 
             /* thinking_chain → triple_coordinator → stream_critic → engine */
-            agentos_task_plan_t *plan = NULL;
-            agentos_cognition_process(engine, pipeline_inputs[t].input,
+            agentrt_task_plan_t *plan = NULL;
+            agentrt_cognition_process(engine, pipeline_inputs[t].input,
                                       strlen(pipeline_inputs[t].input), &plan);
             if (plan)
-                agentos_task_plan_free(plan);
+                agentrt_task_plan_free(plan);
 
             /* metacognition: health_check 包含五维评分 */
             char *health = NULL;
-            agentos_cognition_health_check(engine, &health);
+            agentrt_cognition_health_check(engine, &health);
             if (health)
                 free(health);
 
             /* 统计信息 */
             char *stats = NULL;
             size_t stats_len = 0;
-            agentos_cognition_stats(engine, &stats, &stats_len);
+            agentrt_cognition_stats(engine, &stats, &stats_len);
             if (stats)
                 free(stats);
 
@@ -667,9 +667,9 @@ TEST(int04_5_e2e_thinkdual_pipeline_latency)
         printf("    Pipeline feedback callbacks: %d (across all iterations)\n",
                g_pipeline_feedback_count);
 
-        agentos_cognition_destroy(engine);
+        agentrt_cognition_destroy(engine);
         if (mem_engine)
-            agentos_memory_destroy(mem_engine);
+            agentrt_memory_destroy(mem_engine);
     }
 
     free(times);

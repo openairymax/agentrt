@@ -4,7 +4,7 @@
 //
 // 测试 SDK 的公共 API 和模块集成
 
-use agentos_rs::*;
+use agentrt_rs::*;
 
 // ============================================================
 // 客户端测试
@@ -226,7 +226,7 @@ fn test_validate_endpoint() {
 // ============================================================
 
 #[test]
-fn test_agentos_error_creation() {
+fn test_agentrt_error_creation() {
     let err = AgentOSError::with_code(CODE_INVALID_PARAMETER, "参数无效");
     assert_eq!(err.code(), CODE_INVALID_PARAMETER);
 

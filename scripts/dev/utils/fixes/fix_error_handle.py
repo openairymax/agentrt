@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replace AGENTOS_ERROR_HANDLE(code, msg); return code; with AGENTOS_ERROR(code, msg);"""
+"""Replace AGENTRT_ERROR_HANDLE(code, msg); return code; with AGENTRT_ERROR(code, msg);"""
 
 import re
 import os
@@ -13,13 +13,13 @@ def fix_error_handle_pattern(filepath):
     original = content
     count = 0
 
-    # Pattern: AGENTOS_ERROR_HANDLE(CODE, "msg");
+    # Pattern: AGENTRT_ERROR_HANDLE(CODE, "msg");
     #          <same indent> return CODE;
-    # Replace with: AGENTOS_ERROR(CODE, "msg");
+    # Replace with: AGENTRT_ERROR(CODE, "msg");
     #
     # Handle both whitespace between them
     pattern = re.compile(
-        r'(\s*)AGENTOS_ERROR_HANDLE\((AGENTOS_ERR_\w+),\s*"([^"]*)"\);\s*\n'
+        r'(\s*)AGENTRT_ERROR_HANDLE\((AGENTRT_ERR_\w+),\s*"([^"]*)"\);\s*\n'
         r'\s*return\s+\2\s*;',
         re.MULTILINE
     )
@@ -30,7 +30,7 @@ def fix_error_handle_pattern(filepath):
         indent = m.group(1)
         code = m.group(2)
         msg = m.group(3)
-        return f'{indent}AGENTOS_ERROR({code}, "{msg}");'
+        return f'{indent}AGENTRT_ERROR({code}, "{msg}");'
 
     content = pattern.sub(replacer, content)
 
@@ -59,4 +59,4 @@ for fpath in sorted(files_to_check):
         print(f'{relpath}: {n} fixes')
         total += n
 
-print(f'\nTotal: {total} AGENTOS_ERROR_HANDLE → AGENTOS_ERROR replacements')
+print(f'\nTotal: {total} AGENTRT_ERROR_HANDLE → AGENTRT_ERROR replacements')

@@ -153,8 +153,8 @@ docker run -d --name agentrt -p 8080:8080 -v ./config:/app/config agentrt:latest
 | C/C++ | Develop via `syscalls.h` system call interface |
 | Python | Install via `pip install agentos` then directly import |
 | Go | Use `import "github.com/spharx/agentos/sdk/go"` |
-| Rust | Use `use agentos_toolkit::prelude::*;` |
-| TypeScript | Install via `npm install @spharx/agentos-toolkit` then directly import |
+| Rust | Use `use agentrt_toolkit::prelude::*;` |
+| TypeScript | Install via `npm install @spharx/agentrt-toolkit` then directly import |
 
 **5.5  Reading Navigation**
 
@@ -213,7 +213,7 @@ Security built-in design, four-layer protection
 | Input Sanitization | Regex filtering + Type checking      |
 | Audit Trail | Full-chain tamper-proof logging        |
 
-See [cupolas security documentation](https://atomgit.com/openairymax/agentos/blob/main/agentos/cupolas/README.md)
+See [cupolas security documentation](https://atomgit.com/openairymax/agentos/blob/main/agentrt/cupolas/README.md)
 
 </details>
 
@@ -226,7 +226,7 @@ See [cupolas security documentation](https://atomgit.com/openairymax/agentos/blo
 | System Developer | C/C++, OS fundamentals | 1-2 weeks |
 | Architect   | Microkernel, distributed systems     | 1 month   |
 
-Recommended path: [Quick Start](https://atomgit.com/openairymax/docs/blob/main/QUICK_START.md) → [Architectural Principles](https://atomgit.com/openairymax/docs/blob/main/ARCHITECTURAL_PRINCIPLES.md) → [CoreLoopThree](https://atomgit.com/openairymax/agentos/blob/main/agentos/atoms/coreloopthree/README.md)
+Recommended path: [Quick Start](https://atomgit.com/openairymax/docs/blob/main/QUICK_START.md) → [Architectural Principles](https://atomgit.com/openairymax/docs/blob/main/ARCHITECTURAL_PRINCIPLES.md) → [CoreLoopThree](https://atomgit.com/openairymax/agentos/blob/main/agentrt/atoms/coreloopthree/README.md)
 
 </details>
 

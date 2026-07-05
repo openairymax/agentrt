@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agentos"
+name = "agentrt"
 version = "0.1.0"
 description = "AgentRT Python SDK - 官方多语言 SDK 集合"
 authors = ["SPHARX Ltd."]

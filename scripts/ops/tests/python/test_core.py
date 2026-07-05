@@ -289,7 +289,7 @@ class TestSecurityManager:
     def test_validate_path_safe(self):
         """测试安全路径"""
         manager = SecurityManager()
-        result = manager.validate_path(os.path.join(self._tmpdir(), "agentos_test"))
+        result = manager.validate_path(os.path.join(self._tmpdir(), "agentrt_test"))
         assert result.valid is True
 
     def test_validate_path_traversal(self):

@@ -17,15 +17,15 @@
 #include <stdbool.h>
 
 /* corekern */
-#include "agentos.h"
+#include "agentrt.h"
 #include "mem.h"
 #include "task.h"
 #include "ipc.h"
 #include "error.h"
-#include "agentos_time.h"
+#include "agentrt_time.h"
 #include "observability.h"
 
-/* daemon/common */
+/* daemons/common */
 #include "svc_common.h"
 #include "circuit_breaker.h"
 #include "config_manager.h"
@@ -109,17 +109,17 @@ static void sec_init_functions_real(void)
         cb_manager_destroy(mgr);
     }
 
-    /* agentos_mem_init: 必须支持分配 */
-    agentos_mem_init(0);
-    void* p = agentos_mem_alloc(256);
-    TEST_ASSERT_NOT_NULL(p, "agentos_mem_init: 分配成功（非桩）");
+    /* agentrt_mem_init: 必须支持分配 */
+    agentrt_mem_init(0);
+    void* p = agentrt_mem_alloc(256);
+    TEST_ASSERT_NOT_NULL(p, "agentrt_mem_init: 分配成功（非桩）");
     if (p) {
-        AGENTOS_MEMSET(p, 0xAB, 256);
-        agentos_mem_free(p);
+        AGENTRT_MEMSET(p, 0xAB, 256);
+        agentrt_mem_free(p);
     }
-    size_t leaks = agentos_mem_check_leaks();
-    TEST_ASSERT_EQ(leaks, 0, "agentos_mem_init: 泄漏检测工作（非桩）");
-    agentos_mem_cleanup();
+    size_t leaks = agentrt_mem_check_leaks();
+    TEST_ASSERT_EQ(leaks, 0, "agentrt_mem_init: 泄漏检测工作（非桩）");
+    agentrt_mem_cleanup();
 }
 
 /* ======================================================================== */
@@ -131,25 +131,25 @@ static void sec_sandbox_real_dispatch(void)
     printf("\n--- [SEC-017-T2] Sandbox Invoke源码分发验证 ---\n");
 
     /* 直接分析sandbox.c源码确认已修复桩函数 */
-    const char* agentos_root = getenv("AGENTOS_ROOT");
-#ifdef AGENTOS_SOURCE_ROOT
-    if (!agentos_root) {
-        agentos_root = AGENTOS_SOURCE_ROOT;
+    const char* agentrt_root = getenv("AGENTRT_ROOT");
+#ifdef AGENTRT_SOURCE_ROOT
+    if (!agentrt_root) {
+        agentrt_root = AGENTRT_SOURCE_ROOT;
     }
 #endif
-    if (!agentos_root) {
+    if (!agentrt_root) {
         const char* try_paths[] = {
             ".", "..", "../..", "../../..", "../../../..", NULL
         };
-        agentos_root = ".";
+        agentrt_root = ".";
         for (int i = 0; try_paths[i]; i++) {
             char test_path[512];
             snprintf(test_path, sizeof(test_path),
-                     "%s/agentos/atoms/syscall/src/sandbox.c", try_paths[i]);
+                     "%s/agentrt/atoms/syscall/src/sandbox.c", try_paths[i]);
             FILE* tf = fopen(test_path, "r");
             if (tf) {
                 fclose(tf);
-                agentos_root = try_paths[i];
+                agentrt_root = try_paths[i];
                 break;
             }
         }
@@ -157,7 +157,7 @@ static void sec_sandbox_real_dispatch(void)
 
     char sandbox_path[512];
     snprintf(sandbox_path, sizeof(sandbox_path),
-             "%s/agentos/atoms/syscall/src/sandbox.c", agentos_root);
+             "%s/agentrt/atoms/syscall/src/sandbox.c", agentrt_root);
 
     FILE* f = fopen(sandbox_path, "r");
     if (!f) {
@@ -174,7 +174,7 @@ static void sec_sandbox_real_dispatch(void)
         line_num++;
         
         /* 验证：sandbox_invoke中包含实际的syscall调用（非桩NULL赋值） */
-        if (strstr(line, "agentos_syscall_invoke")) {
+        if (strstr(line, "agentrt_syscall_invoke")) {
             found_real_dispatch++;
         }
         
@@ -188,7 +188,7 @@ static void sec_sandbox_real_dispatch(void)
     fclose(f);
 
     TEST_ASSERT(found_real_dispatch >= 1,
-                "sandbox.c: 包含实际syscall分发(agentos_syscall_invoke)");
+                "sandbox.c: 包含实际syscall分发(agentrt_syscall_invoke)");
     TEST_ASSERT_EQ(found_stub_null, 0,
                    "sandbox.c: 无out_result=NULL桩赋值");
 }
@@ -202,13 +202,13 @@ static void sec_ban02_void_param(void)
     printf("\n--- [BAN-02] (void)参数忽略检测 ---\n");
 
     /* 检查核心源码目录中是否还有(void)未使用变量模式 */
-    const char* agentos_root = getenv("AGENTOS_ROOT");
-    if (!agentos_root) agentos_root = ".";
+    const char* agentrt_root = getenv("AGENTRT_ROOT");
+    if (!agentrt_root) agentrt_root = ".";
 
     const char* scan_dirs[] = {
-        "agentos/atoms/corekern/src",
-        "agentos/atoms/syscall/src",
-        "agentos/daemon/common/src",
+        "agentrt/atoms/corekern/src",
+        "agentrt/atoms/syscall/src",
+        "agentrt/daemons/common/src",
         NULL
     };
 
@@ -321,9 +321,9 @@ static void sec_source_scan_keywords(void)
 
     /* 扫描核心源码目录中的禁止关键词 */
     const char* dirs[] = {
-        "agentos/atoms/corekern/src",
-        "agentos/atoms/syscall/src",
-        "agentos/daemon/common/src",
+        "agentrt/atoms/corekern/src",
+        "agentrt/atoms/syscall/src",
+        "agentrt/daemons/common/src",
         NULL
     };
 
@@ -338,13 +338,13 @@ static void sec_source_scan_keywords(void)
 
     int total_violations = 0;
 
-    const char* agentos_root = getenv("AGENTOS_ROOT");
-    if (!agentos_root) agentos_root = ".";
+    const char* agentrt_root = getenv("AGENTRT_ROOT");
+    if (!agentrt_root) agentrt_root = ".";
 
     for (int d = 0; dirs[d]; d++) {
         char base_path[512];
         snprintf(base_path, sizeof(base_path),
-                 "%s/%s", agentos_root, dirs[d]);
+                 "%s/%s", agentrt_root, dirs[d]);
 
         for (int p = 0; bad_patterns[p]; p++) {
             char cmd[600];
@@ -380,44 +380,44 @@ static void sec_function_body_nonempty(void)
     printf("\n--- [SEC-017-T6] 函数体非空验证 ---\n");
 
     /* 验证各模块的关键函数有实际逻辑体 */
-    agentos_mem_init(0);
+    agentrt_mem_init(0);
 
     /* 内存：分配后数据持久化 */
-    void* p1 = agentos_mem_alloc(128);
-    void* p2 = agentos_mem_alloc_ex(64, __FILE__, __LINE__);
+    void* p1 = agentrt_mem_alloc(128);
+    void* p2 = agentrt_mem_alloc_ex(64, __FILE__, __LINE__);
     TEST_ASSERT(p1 != NULL && p2 != NULL,
                 "内存分配函数有实际实现");
 
     if (p1 && p2) {
-        AGENTOS_MEMSET(p1, 'X', 128);
-        AGENTOS_MEMSET(p2, 'Y', 64);
+        AGENTRT_MEMSET(p1, 'X', 128);
+        AGENTRT_MEMSET(p2, 'Y', 64);
 
         unsigned char c1 = *(unsigned char*)p1;
         unsigned char c2 = *(unsigned char*)p2;
         TEST_ASSERT(c1 == 'X' && c2 == 'Y',
                     "分配内存可读写（非空桩）");
 
-        agentos_mem_free(p1);
-        agentos_mem_free(p2);
+        agentrt_mem_free(p1);
+        agentrt_mem_free(p2);
     }
 
     /* realloc: 数据保持 */
-    void* orig = agentos_mem_alloc(32);
+    void* orig = agentrt_mem_alloc(32);
     if (orig) {
         memcpy(orig, "Hello SEC-017", 14);
-        void* grown = agentos_mem_realloc(orig, 256);
+        void* grown = agentrt_mem_realloc(orig, 256);
         TEST_ASSERT(grown != NULL, "realloc扩展成功");
         if (grown) {
             TEST_ASSERT(memcmp(grown, "Hello SEC-017", 14) == 0,
                         "realloc后原数据保持（非空桩）");
-            agentos_mem_free(grown);
+            agentrt_mem_free(grown);
         }
     }
 
-    size_t leaks = agentos_mem_check_leaks();
+    size_t leaks = agentrt_mem_check_leaks();
     TEST_ASSERT_EQ(leaks, 0, "所有操作后无泄漏");
 
-    agentos_mem_cleanup();
+    agentrt_mem_cleanup();
 }
 
 /* ======================================================================== */

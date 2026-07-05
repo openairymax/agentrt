@@ -126,43 +126,43 @@ spec:
               containerPort: 9090
               protocol: TCP
           env:
-            - name: AGENTOS_SERVICE_NAME
+            - name: AGENTRT_SERVICE_NAME
               value: "gateway_d"
-            - name: AGENTOS_HTTP_PORT
+            - name: AGENTRT_HTTP_PORT
               value: "8080"
-            - name: AGENTOS_WS_PORT
+            - name: AGENTRT_WS_PORT
               value: "8081"
-            - name: AGENTOS_METRICS_PORT
+            - name: AGENTRT_METRICS_PORT
               value: "9090"
-            - name: AGENTOS_LOG_LEVEL
+            - name: AGENTRT_LOG_LEVEL
               value: {{ .Values.agentosConfig.logLevel | quote }}
-            - name: AGENTOS_DEPLOY_ENV
+            - name: AGENTRT_DEPLOY_ENV
               value: {{ .Values.agentosConfig.deployEnv | quote }}
-            - name: AGENTOS_COREKERN_HOST
+            - name: AGENTRT_COREKERN_HOST
               value: {{ include "agentrt.fullname" . }}-corekern
-            - name: AGENTOS_CORELOOPTHREE_HOST
+            - name: AGENTRT_CORELOOPTHREE_HOST
               value: {{ include "agentrt.fullname" . }}-coreloopthree
-            - name: AGENTOS_LLM_HOST
+            - name: AGENTRT_LLM_HOST
               value: {{ include "agentrt.fullname" . }}-llm-d
-            - name: AGENTOS_TOOL_HOST
+            - name: AGENTRT_TOOL_HOST
               value: {{ include "agentrt.fullname" . }}-tool-d
-            - name: AGENTOS_MARKET_HOST
+            - name: AGENTRT_MARKET_HOST
               value: {{ include "agentrt.fullname" . }}-market-d
-            - name: AGENTOS_MEMORY_HOST
+            - name: AGENTRT_MEMORY_HOST
               value: {{ include "agentrt.fullname" . }}-memory
-            - name: AGENTOS_CHANNEL_HOST
+            - name: AGENTRT_CHANNEL_HOST
               value: {{ include "agentrt.fullname" . }}-channel-d
-            - name: AGENTOS_MONIT_HOST
+            - name: AGENTRT_MONIT_HOST
               value: {{ include "agentrt.fullname" . }}-monit-d
-            - name: AGENTOS_REDIS_HOST
+            - name: AGENTRT_REDIS_HOST
               value: {{ .Release.Name }}-redis-master
-            - name: AGENTOS_POSTGRES_HOST
+            - name: AGENTRT_POSTGRES_HOST
               value: {{ .Release.Name }}-postgresql
-            - name: AGENTOS_MCP_ENABLED
+            - name: AGENTRT_MCP_ENABLED
               value: {{ .Values.agentosConfig.mcpEnabled | quote }}
-            - name: AGENTOS_A2A_ENABLED
+            - name: AGENTRT_A2A_ENABLED
               value: {{ .Values.agentosConfig.a2aEnabled | quote }}
-            - name: AGENTOS_OPENAI_ENABLED
+            - name: AGENTRT_OPENAI_ENABLED
               value: {{ .Values.agentosConfig.openaiEnabled | quote }}
           envFrom:
             - configMapRef:

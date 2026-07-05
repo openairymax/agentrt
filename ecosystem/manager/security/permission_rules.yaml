@@ -21,14 +21,14 @@ rules:
   # 产品经理 Agent
   - agent: "product_manager"
     action: "file:read"
-    resource: "${AGENTOS_ROOT}/docs/*"
+    resource: "${AGENTRT_ROOT}/docs/*"
     effect: "allow"
     priority: 10
     audit: false
   
   - agent: "product_manager"
     action: "file:write"
-    resource: "${AGENTOS_DATA_DIR}/workspace/docs/*"
+    resource: "${AGENTRT_DATA_DIR}/workspace/docs/*"
     effect: "allow"
     priority: 10
     audit: true
@@ -36,13 +36,13 @@ rules:
   # 架构师 Agent
   - agent: "architect"
     action: "file:read"
-    resource: "${AGENTOS_ROOT}/**/*"
+    resource: "${AGENTRT_ROOT}/**/*"
     effect: "allow"
     priority: 10
   
   - agent: "architect"
     action: "file:write"
-    resource: "${AGENTOS_DATA_DIR}/workspace/architecture/*"
+    resource: "${AGENTRT_DATA_DIR}/workspace/architecture/*"
     effect: "allow"
     priority: 10
     audit: true
@@ -50,13 +50,13 @@ rules:
   # 前端开发 Agent
   - agent: "frontend"
     action: "file:read"
-    resource: "${AGENTOS_ROOT}/**/*.{js,jsx,ts,tsx,css,html}"
+    resource: "${AGENTRT_ROOT}/**/*.{js,jsx,ts,tsx,css,html}"
     effect: "allow"
     priority: 10
   
   - agent: "frontend"
     action: "file:write"
-    resource: "${AGENTOS_DATA_DIR}/workspace/frontend/*"
+    resource: "${AGENTRT_DATA_DIR}/workspace/frontend/*"
     effect: "allow"
     priority: 10
     audit: true
@@ -64,13 +64,13 @@ rules:
   # 后端开发 Agent
   - agent: "backend"
     action: "file:read"
-    resource: "${AGENTOS_ROOT}/**/*.{py,go,rs,java,c,cpp,h}"
+    resource: "${AGENTRT_ROOT}/**/*.{py,go,rs,java,c,cpp,h}"
     effect: "allow"
     priority: 10
   
   - agent: "backend"
     action: "file:write"
-    resource: "${AGENTOS_DATA_DIR}/workspace/backend/*"
+    resource: "${AGENTRT_DATA_DIR}/workspace/backend/*"
     effect: "allow"
     priority: 10
     audit: true
@@ -84,7 +84,7 @@ rules:
   # 测试 Agent
   - agent: "tester"
     action: "file:read"
-    resource: "${AGENTOS_ROOT}/**/*"
+    resource: "${AGENTRT_ROOT}/**/*"
     effect: "allow"
     priority: 10
   
@@ -98,7 +98,7 @@ rules:
   # DevOps Agent
   - agent: "devops"
     action: "file:read"
-    resource: "${AGENTOS_ROOT}/**/*"
+    resource: "${AGENTRT_ROOT}/**/*"
     effect: "allow"
     priority: 10
   
@@ -113,7 +113,7 @@ rules:
   # 安全审计 Agent
   - agent: "security"
     action: "file:read"
-    resource: "${AGENTOS_DATA_DIR}/logs/*"
+    resource: "${AGENTRT_DATA_DIR}/logs/*"
     effect: "allow"
     priority: 20
   
@@ -132,7 +132,7 @@ rules:
   # 允许所有 Agent 读取临时目录
   - agent: "*"
     action: "file:read"
-    resource: "${AGENTOS_TEMP_DIR}/*"
+    resource: "${AGENTRT_TEMP_DIR}/*"
     effect: "allow"
     priority: 5
   
@@ -208,15 +208,15 @@ roles:
   developer:
     description: "开发者角色，拥有开发相关权限"
     permissions:
-      - "file:read:${AGENTOS_ROOT}/**/*"
-      - "file:write:${AGENTOS_DATA_DIR}/workspace/*"
+      - "file:read:${AGENTRT_ROOT}/**/*"
+      - "file:write:${AGENTRT_DATA_DIR}/workspace/*"
       - "code:execute:*"
   
   viewer:
     description: "查看者角色，只读权限"
     permissions:
-      - "file:read:${AGENTOS_ROOT}/docs/*"
-      - "file:read:${AGENTOS_DATA_DIR}/reports/*"
+      - "file:read:${AGENTRT_ROOT}/docs/*"
+      - "file:read:${AGENTRT_DATA_DIR}/reports/*"
 
 # =============================================================================
 # 默认规则（隐式）

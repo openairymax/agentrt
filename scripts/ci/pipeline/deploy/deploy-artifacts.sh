@@ -43,7 +43,7 @@ BUILD_NUMBER="${GITHUB_RUN_NUMBER:-$(date +%Y%m%d%H%M)}"
 DOCKER_REGISTRY="${DOCKER_REGISTRY:-ghcr.io/spharx}"
 DOCKER_PUSH="${DOCKER_PUSH:-false}"
 PACKAGE_TYPE="${PACKAGE_TYPE:-tar.gz}"
-BUILD_DIR="${AGENTOS_BUILD_DIR:-${PROJECT_ROOT}/../AgentRT-build}"
+BUILD_DIR="${AGENTRT_BUILD_DIR:-${PROJECT_ROOT}/../AgentRT-build}"
 
 # 版本信息
 extract_version() {
@@ -98,7 +98,7 @@ Options:
     -h, --help             Show this help
 
 Outputs:
-    - agentos-{version}.tar.gz  Source archive
+    - agentrt-{version}.tar.gz  Source archive
     - Docker images (optional)
     - ci-report.json           Build metadata
 EOF
@@ -118,7 +118,7 @@ prepare_output() {
 package_source_archive() {
     local version
     version=$(extract_version)
-    local archive_name="agentos-${version}.tar.gz"
+    local archive_name="agentrt-${version}.tar.gz"
     local archive_path="${OUTPUT_DIR}/${archive_name}"
 
     log_info "Creating source archive: $archive_name"

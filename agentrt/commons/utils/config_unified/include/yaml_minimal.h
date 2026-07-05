@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 /**
  * @file yaml_minimal.h
  * @brief YAML 1.1 parser for AgentRT configuration files
@@ -7,11 +9,17 @@
  * Chomping indicators (|-/|+/|2), YAML directives (%YAML/%TAG),
  * Flow/Block styles, Complex keys, BOM handling.
  *
+ * @details
+ * SP03 解耦：本文件从 cupolas/src/ 迁移至 commons/utils/config_unified/include/，
+ * 消除 atoms/coreloopthree 对 cupolas 层的物理依赖（ACC-SP03 解耦点 #2）。
+ * yaml_minimal 仅依赖 commons 层的 memory_compat.h 与 error.h，迁移后
+ * cupolas 与 coreloopthree 均通过 agentrt_common PUBLIC include 路径获取本头文件。
+ *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef CUPOLAS_YAML_MINIMAL_H
-#define CUPOLAS_YAML_MINIMAL_H
+#ifndef AGENTRT_YAML_MINIMAL_H
+#define AGENTRT_YAML_MINIMAL_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -98,4 +106,4 @@ char *yaml_serialize(yaml_document_t *doc);
 }
 #endif
 
-#endif /* CUPOLAS_YAML_MINIMAL_H */
+#endif /* AGENTRT_YAML_MINIMAL_H */

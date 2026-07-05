@@ -147,7 +147,7 @@ static void test_log_get_file_info(void) {
     heapstore_error_t err = heapstore_log_init();
     if (err == heapstore_SUCCESS) {
         heapstore_log_file_info_t info;
-        AGENTOS_MEMSET(&info, 0, sizeof(info));
+        AGENTRT_MEMSET(&info, 0, sizeof(info));
 
         err = heapstore_log_get_file_info(NULL, &info);
         assert(err == heapstore_SUCCESS);

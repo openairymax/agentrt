@@ -82,9 +82,9 @@ pub async fn publish(gateway_url: &str) -> Result<()> {
 
     println!("{} Publishing to OpenLab Markets...", "📤".blue());
 
-    // Check for agentos.yaml
-    if !std::path::Path::new("configs/agentos.yaml").exists() {
-        anyhow::bail!("No agentos.yaml found. Run 'agentrt init' first.");
+    // Check for agentrt.yaml
+    if !std::path::Path::new("configs/agentrt.yaml").exists() {
+        anyhow::bail!("No agentrt.yaml found. Run 'agentrt init' first.");
     }
 
     match client

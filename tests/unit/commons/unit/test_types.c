@@ -39,29 +39,29 @@
 static void test_error_codes_valid(void **state) {
     (void)state;
 
-    assert_int_equal(AGENTOS_SUCCESS, 0);
-    assert_true(AGENTOS_EINVAL < 0);
-    assert_true(AGENTOS_ENOMEM < 0);
-    assert_true(AGENTOS_ETIMEDOUT < 0);
-    assert_true(AGENTOS_EOVERFLOW < 0);
-    assert_true(AGENTOS_EBUSY < 0);
-    assert_true(AGENTOS_ENOTCONN < 0);
-    assert_true(AGENTOS_ECANCELLED < 0);
+    assert_int_equal(AGENTRT_SUCCESS, 0);
+    assert_true(AGENTRT_EINVAL < 0);
+    assert_true(AGENTRT_ENOMEM < 0);
+    assert_true(AGENTRT_ETIMEDOUT < 0);
+    assert_true(AGENTRT_EOVERFLOW < 0);
+    assert_true(AGENTRT_EBUSY < 0);
+    assert_true(AGENTRT_ENOTCONN < 0);
+    assert_true(AGENTRT_ECANCELLED < 0);
 }
 
 /**
- * @brief 测试 agentos_result_t 结构体大小和字段
+ * @brief 测试 agentrt_result_t 结构体大小和字段
  */
-static void test_agentos_result_t_structure(void **state) {
+static void test_agentrt_result_t_structure(void **state) {
     (void)state;
 
-    agentos_result_t result = {0};
+    agentrt_result_t result = {0};
     result.success = true;
-    result.error_code = AGENTOS_SUCCESS;
-    AGENTOS_STRNCPY_TERM(result.error_message, "Test error", sizeof(result.error_message));
+    result.error_code = AGENTRT_SUCCESS;
+    AGENTRT_STRNCPY_TERM(result.error_message, "Test error", sizeof(result.error_message));
 
     assert_true(result.success);
-    assert_int_equal(result.error_code, AGENTOS_SUCCESS);
+    assert_int_equal(result.error_code, AGENTRT_SUCCESS);
     assert_string_equal(result.error_message, "Test error");
 }
 
@@ -71,10 +71,10 @@ static void test_agentos_result_t_structure(void **state) {
 static void test_priority_enums(void **state) {
     (void)state;
 
-    assert_int_equal(AGENTOS_PRIORITY_LOW, 0);
-    assert_int_equal(AGENTOS_PRIORITY_NORMAL, 1);
-    assert_int_equal(AGENTOS_PRIORITY_HIGH, 2);
-    assert_int_equal(AGENTOS_PRIORITY_CRITICAL, 3);
+    assert_int_equal(AGENTRT_PRIORITY_LOW, 0);
+    assert_int_equal(AGENTRT_PRIORITY_NORMAL, 1);
+    assert_int_equal(AGENTRT_PRIORITY_HIGH, 2);
+    assert_int_equal(AGENTRT_PRIORITY_CRITICAL, 3);
 }
 
 /* ============================================================================
@@ -87,12 +87,12 @@ static void test_priority_enums(void **state) {
 static void test_task_status_enums(void **state) {
     (void)state;
 
-    assert_int_equal(AGENTOS_TASK_PENDING, 0);
-    assert_int_equal(AGENTOS_TASK_RUNNING, 1);
-    assert_int_equal(AGENTOS_TASK_COMPLETED, 2);
-    assert_int_equal(AGENTOS_TASK_FAILED, 3);
-    assert_int_equal(AGENTOS_TASK_CANCELLED, 4);
-    assert_int_equal(AGENTOS_TASK_TIMEOUT, 5);
+    assert_int_equal(AGENTRT_TASK_PENDING, 0);
+    assert_int_equal(AGENTRT_TASK_RUNNING, 1);
+    assert_int_equal(AGENTRT_TASK_COMPLETED, 2);
+    assert_int_equal(AGENTRT_TASK_FAILED, 3);
+    assert_int_equal(AGENTRT_TASK_CANCELLED, 4);
+    assert_int_equal(AGENTRT_TASK_TIMEOUT, 5);
 }
 
 /**
@@ -101,14 +101,14 @@ static void test_task_status_enums(void **state) {
 static void test_task_config_init(void **state) {
     (void)state;
 
-    agentos_task_config_t config = {0};
+    agentrt_task_config_t config = {0};
 
-    config.priority = AGENTOS_PRIORITY_NORMAL;
+    config.priority = AGENTRT_PRIORITY_NORMAL;
     config.timeout_ms = 5000;
     config.max_retries = 3;
     config.retry_delay_ms = 1000;
 
-    assert_int_equal(config.priority, AGENTOS_PRIORITY_NORMAL);
+    assert_int_equal(config.priority, AGENTRT_PRIORITY_NORMAL);
     assert_int_equal(config.timeout_ms, 5000);
     assert_int_equal(config.max_retries, 3);
     assert_int_equal(config.retry_delay_ms, 1000);
@@ -120,13 +120,13 @@ static void test_task_config_init(void **state) {
 static void test_task_result_structure(void **state) {
     (void)state;
 
-    agentos_task_result_t result = {0};
+    agentrt_task_result_t result = {0};
 
-    result.status = AGENTOS_TASK_COMPLETED;
+    result.status = AGENTRT_TASK_COMPLETED;
     result.exit_code = 0;
     result.duration_ms = 1234;
 
-    assert_int_equal(result.status, AGENTOS_TASK_COMPLETED);
+    assert_int_equal(result.status, AGENTRT_TASK_COMPLETED);
     assert_int_equal(result.exit_code, 0);
     assert_int_equal(result.duration_ms, 1234);
 }
@@ -141,10 +141,10 @@ static void test_task_result_structure(void **state) {
 static void test_memory_layer_enums(void **state) {
     (void)state;
 
-    assert_int_equal(AGENTOS_MEMORY_L1_WORKING, 0);
-    assert_int_equal(AGENTOS_MEMORY_L2_EPISODIC, 1);
-    assert_int_equal(AGENTOS_MEMORY_L3_SEMANTIC, 2);
-    assert_int_equal(AGENTOS_MEMORY_L4_PROCEDURAL, 3);
+    assert_int_equal(AGENTRT_MEMORY_L1_WORKING, 0);
+    assert_int_equal(AGENTRT_MEMORY_L2_EPISODIC, 1);
+    assert_int_equal(AGENTRT_MEMORY_L3_SEMANTIC, 2);
+    assert_int_equal(AGENTRT_MEMORY_L4_PROCEDURAL, 3);
 }
 
 /**
@@ -153,14 +153,14 @@ static void test_memory_layer_enums(void **state) {
 static void test_memory_entry_structure(void **state) {
     (void)state;
 
-    agentos_memory_entry_t entry = {0};
+    agentrt_memory_entry_t entry = {0};
 
-    entry.layer = AGENTOS_MEMORY_L2_EPISODIC;
+    entry.layer = AGENTRT_MEMORY_L2_EPISODIC;
     entry.importance = 0.8f;
     entry.access_count = 10;
     entry.size_bytes = 1024;
 
-    assert_int_equal(entry.layer, AGENTOS_MEMORY_L2_EPISODIC);
+    assert_int_equal(entry.layer, AGENTRT_MEMORY_L2_EPISODIC);
     assert_float_within(0.01, 0.8f, entry.importance);
     assert_int_equal(entry.access_count, 10);
     assert_int_equal(entry.size_bytes, 1024);
@@ -176,7 +176,7 @@ static void test_memory_entry_structure(void **state) {
 static void test_session_config_structure(void **state) {
     (void)state;
 
-    agentos_session_config_t config = {0};
+    agentrt_session_config_t config = {0};
 
     config.session_timeout_ms = 30000;
     config.max_history_size = 100;
@@ -193,15 +193,15 @@ static void test_session_config_structure(void **state) {
 static void test_context_structure(void **state) {
     (void)state;
 
-    agentos_context_t ctx = {0};
+    agentrt_context_t ctx = {0};
 
     ctx.agent_id = "agent_001";
     ctx.session_id = "session_abc";
-    ctx.current_priority = AGENTOS_PRIORITY_HIGH;
+    ctx.current_priority = AGENTRT_PRIORITY_HIGH;
 
     assert_string_equal(ctx.agent_id, "agent_001");
     assert_string_equal(ctx.session_id, "session_abc");
-    assert_int_equal(ctx.current_priority, AGENTOS_PRIORITY_HIGH);
+    assert_int_equal(ctx.current_priority, AGENTRT_PRIORITY_HIGH);
 }
 
 /* ============================================================================
@@ -214,13 +214,13 @@ static void test_context_structure(void **state) {
 static void test_agent_contract_structure(void **state) {
     (void)state;
 
-    agentos_agent_contract_t contract = {0};
+    agentrt_agent_contract_t contract = {0};
 
-    contract.agent_type = AGENTOS_AGENT_TYPE_ASSISTANT;
+    contract.agent_type = AGENTRT_AGENT_TYPE_ASSISTANT;
     contract.max_concurrent_tasks = 5;
     contract.memory_limit_mb = 256;
 
-    assert_int_equal(contract.agent_type, AGENTOS_AGENT_TYPE_ASSISTANT);
+    assert_int_equal(contract.agent_type, AGENTRT_AGENT_TYPE_ASSISTANT);
     assert_int_equal(contract.max_concurrent_tasks, 5);
     assert_int_equal(contract.memory_limit_mb, 256);
 }
@@ -231,7 +231,7 @@ static void test_agent_contract_structure(void **state) {
 static void test_capability_structure(void **state) {
     (void)state;
 
-    agentos_capability_t caps = {0};
+    agentrt_capability_t caps = {0};
 
     caps.has_tool_use = true;
     caps.has_file_access = false;
@@ -254,7 +254,7 @@ static void test_capability_structure(void **state) {
 static void test_metric_structure(void **state) {
     (void)state;
 
-    agentos_metric_t metric = {0};
+    agentrt_metric_t metric = {0};
 
     metric.name = strdup("test_metric");
     metric.value = 42.5;
@@ -277,17 +277,17 @@ static void test_metric_structure(void **state) {
 static void test_ipc_header_structure(void **state) {
     (void)state;
 
-    agentos_ipc_header_t header = {0};
+    agentrt_ipc_header_t header = {0};
 
     header.magic = 0x49504300;
     header.version = 1;
-    header.type = AGENTOS_IPC_PIPE;
+    header.type = AGENTRT_IPC_PIPE;
     header.payload_len = 1024;
     header.message_id = 12345;
 
     assert_int_equal(header.magic, 0x49504300);
     assert_int_equal(header.version, 1);
-    assert_int_equal(header.type, AGENTOS_IPC_PIPE);
+    assert_int_equal(header.type, AGENTRT_IPC_PIPE);
     assert_int_equal(header.payload_len, 1024);
     assert_int_equal(header.message_id, 12345);
 }
@@ -298,17 +298,17 @@ static void test_ipc_header_structure(void **state) {
 static void test_ipc_config_structure(void **state) {
     (void)state;
 
-    agentos_ipc_config_t config = {0};
+    agentrt_ipc_config_t config = {0};
 
-    config.ipc_type = AGENTOS_IPC_SOCKET;
+    config.ipc_type = AGENTRT_IPC_SOCKET;
     config.buffer_size = 8192;
     config.timeout_ms = 5000;
-    config.mode = AGENTOS_IPC_MODE_READ_WRITE;
+    config.mode = AGENTRT_IPC_MODE_READ_WRITE;
 
-    assert_int_equal(config.ipc_type, AGENTOS_IPC_SOCKET);
+    assert_int_equal(config.ipc_type, AGENTRT_IPC_SOCKET);
     assert_int_equal(config.buffer_size, 8192);
     assert_int_equal(config.timeout_ms, 5000);
-    assert_int_equal(config.mode, AGENTOS_IPC_MODE_READ_WRITE);
+    assert_int_equal(config.mode, AGENTRT_IPC_MODE_READ_WRITE);
 }
 
 /* ============================================================================
@@ -321,7 +321,7 @@ static void test_ipc_config_structure(void **state) {
 static void test_conn_config_structure(void **state) {
     (void)state;
 
-    agentos_conn_config_t config = {0};
+    agentrt_conn_config_t config = {0};
 
     config.remote.host = strdup("localhost");
     config.port = 8080;
@@ -342,7 +342,7 @@ static void test_conn_config_structure(void **state) {
 static void test_http_request_structure(void **state) {
     (void)state;
 
-    agentos_http_request_t request = {0};
+    agentrt_http_request_t request = {0};
 
     request.method = strdup("GET");
     request.path = strdup("http://api.example.com/data");
@@ -359,7 +359,7 @@ static void test_http_request_structure(void **state) {
 static void test_http_response_structure(void **state) {
     (void)state;
 
-    agentos_http_response_t response = {0};
+    agentrt_http_response_t response = {0};
 
     response.status_code = 200;
     response.body = strdup("{\"status\":\"ok\"}");
@@ -375,59 +375,59 @@ static void test_http_response_structure(void **state) {
  * ============================================================================ */
 
 /**
- * @brief 测试 AGENTOS_ARRAY_SIZE 宏
+ * @brief 测试 AGENTRT_ARRAY_SIZE 宏
  */
 static void test_macro_array_size(void **state) {
     (void)state;
 
     int array[] = {1, 2, 3, 4, 5};
-    assert_int_equal(AGENTOS_ARRAY_SIZE(array), 5);
+    assert_int_equal(AGENTRT_ARRAY_SIZE(array), 5);
 }
 
 /**
- * @brief 测试 AGENTOS_MIN 宏
+ * @brief 测试 AGENTRT_MIN 宏
  */
 static void test_macro_min(void **state) {
     (void)state;
 
-    assert_int_equal(AGENTOS_MIN(3, 7), 3);
-    assert_int_equal(AGENTOS_MIN(-1, 5), -1);
-    assert_int_equal(AGENTOS_MIN(100, 100), 100);
+    assert_int_equal(AGENTRT_MIN(3, 7), 3);
+    assert_int_equal(AGENTRT_MIN(-1, 5), -1);
+    assert_int_equal(AGENTRT_MIN(100, 100), 100);
 }
 
 /**
- * @brief 测试 AGENTOS_MAX 宏
+ * @brief 测试 AGENTRT_MAX 宏
  */
 static void test_macro_max(void **state) {
     (void)state;
 
-    assert_int_equal(AGENTOS_MAX(3, 7), 7);
-    assert_int_equal(AGENTOS_MAX(-1, 5), 5);
-    assert_int_equal(AGENTOS_MAX(100, 100), 100);
+    assert_int_equal(AGENTRT_MAX(3, 7), 7);
+    assert_int_equal(AGENTRT_MAX(-1, 5), 5);
+    assert_int_equal(AGENTRT_MAX(100, 100), 100);
 }
 
 /**
- * @brief 测试 AGENTOS_ALIGN_UP 宏
+ * @brief 测试 AGENTRT_ALIGN_UP 宏
  */
 static void test_macro_align_up(void **state) {
     (void)state;
 
-    assert_int_equal(AGENTOS_ALIGN_UP(0, 16), 0);
-    assert_int_equal(AGENTOS_ALIGN_UP(15, 16), 16);
-    assert_int_equal(AGENTOS_ALIGN_UP(16, 16), 16);
-    assert_int_equal(AGENTOS_ALIGN_UP(17, 16), 32);
-    assert_int_equal(AGENTOS_ALIGN_UP(31, 16), 32);
+    assert_int_equal(AGENTRT_ALIGN_UP(0, 16), 0);
+    assert_int_equal(AGENTRT_ALIGN_UP(15, 16), 16);
+    assert_int_equal(AGENTRT_ALIGN_UP(16, 16), 16);
+    assert_int_equal(AGENTRT_ALIGN_UP(17, 16), 32);
+    assert_int_equal(AGENTRT_ALIGN_UP(31, 16), 32);
 }
 
 /**
- * @brief 测试 AGENTOS_VERSION_MAJOR/MINOR/PATCH 宏
+ * @brief 测试 AGENTRT_VERSION_MAJOR/MINOR/PATCH 宏
  */
 static void test_macro_version(void **state) {
     (void)state;
 
-    assert_int_equal(AGENTOS_VERSION_MAJOR(0x01020303), 1);
-    assert_int_equal(AGENTOS_VERSION_MINOR(0x01020303), 2);
-    assert_int_equal(AGENTOS_VERSION_PATCH(0x01020303), 3);
+    assert_int_equal(AGENTRT_VERSION_MAJOR(0x01020303), 1);
+    assert_int_equal(AGENTRT_VERSION_MINOR(0x01020303), 2);
+    assert_int_equal(AGENTRT_VERSION_PATCH(0x01020303), 3);
 }
 
 /**
@@ -438,10 +438,10 @@ static void test_macro_time_conversion(void **state) {
 
     uint64_t ns = 1500000000ULL; /* 1.5 秒 */
 
-    assert_int_equal(AGENTOS_NS_TO_MS(ns), 1500);
-    assert_int_equal(AGENTOS_MS_TO_NS(1500), ns);
-    assert_int_equal(AGENTOS_NS_TO_US(ns), 1500000);
-    assert_int_equal(AGENTOS_US_TO_NS(1500000), ns);
+    assert_int_equal(AGENTRT_NS_TO_MS(ns), 1500);
+    assert_int_equal(AGENTRT_MS_TO_NS(1500), ns);
+    assert_int_equal(AGENTRT_NS_TO_US(ns), 1500000);
+    assert_int_equal(AGENTRT_US_TO_NS(1500000), ns);
 }
 
 /* ============================================================================
@@ -452,7 +452,7 @@ int main(void) {
     const struct CMUnitTest tests[] = {
         /* 基础类型测试 */
         cmocka_unit_test(test_error_codes_valid),
-        cmocka_unit_test(test_agentos_result_t_structure),
+        cmocka_unit_test(test_agentrt_result_t_structure),
         cmocka_unit_test(test_priority_enums),
 
         /* 任务类型测试 */

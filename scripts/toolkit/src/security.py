@@ -246,8 +246,8 @@ class SecurityManager:
         "/usr/local",
         "/opt",
         "/tmp",
-        "/var/lib/agentos",
-        "/etc/agentos",
+        "/var/lib/agentrt",
+        "/etc/agentrt",
     ]
 
     # Shell metacharacters that are dangerous in command context

@@ -200,7 +200,7 @@ class ProtocolSessionManager:
                 try:
                     client = ProtocolClient(ProtocolConfig(
                         protocol_type=proto_type,
-                        endpoint=os.environ.get("AGENTOS_ENDPOINT", "http://127.0.0.1:18789"),
+                        endpoint=os.environ.get("AGENTRT_ENDPOINT", "http://127.0.0.1:18789"),
                     ))
                     if hasattr(client, 'detect_protocol'):
                         detection = await client.detect_protocol()
@@ -392,7 +392,7 @@ class JSONRPCHandler(ProtocolHandler):
 
     def __init__(self, endpoint: str = None):
         if endpoint is None:
-            endpoint = os.environ.get("AGENTOS_ENDPOINT", "http://127.0.0.1:18789")
+            endpoint = os.environ.get("AGENTRT_ENDPOINT", "http://127.0.0.1:18789")
         self._endpoint = endpoint
         self._request_id = 0
 
@@ -444,7 +444,7 @@ class MCPHandler(ProtocolHandler):
 
     def __init__(self, endpoint: str = None):
         if endpoint is None:
-            endpoint = os.environ.get("AGENTOS_ENDPOINT", "http://127.0.0.1:18789")
+            endpoint = os.environ.get("AGENTRT_ENDPOINT", "http://127.0.0.1:18789")
         self._endpoint = endpoint
 
     @property

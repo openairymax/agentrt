@@ -25,7 +25,7 @@ import statistics
 import argparse
 from typing import List, Dict
 
-GATEWAY_URL = os.environ.get("AGENTOS_GATEWAY_URL", "http://localhost:18789")
+GATEWAY_URL = os.environ.get("AGENTRT_GATEWAY_URL", "http://localhost:18789")
 
 
 def http_post(url_path: str, data: Dict, timeout: int = 10):

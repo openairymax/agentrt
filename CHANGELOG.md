@@ -59,7 +59,7 @@ AgentRT 首个正式发行版。经过多轮深度代码审计、版本统一、
 - **更新**: agentos/ 下全部 55 个 README.md 文档
 - **对齐**: 目录树与实际源码结构完全一致
 - **修正**: heapstore 存储描述（LMDB+Redis → SQLite+内存后端）
-- **补充**: 遗漏的子目录描述（commons/compliance/quality、cupolas/platform/docs、daemon/examples/scripts 等）
+- **补充**: 遗漏的子目录描述（commons/compliance/quality、cupolas/platform/docs、daemons/examples/scripts 等）
 
 ### 🔧 代码质量改进
 
@@ -108,7 +108,7 @@ AgentRT 首个正式发行版。经过多轮深度代码审计、版本统一、
 
 #### corekern 内核模块 (20+ 修复)
 - **修复**: `service.c` 中 yaml_len <= 0 时过早 return svc，导致跳过初始化流程（致命 bug）
-- **修复**: `timer.c` 中 `agentos_time_timer_process()` 对 one-shot 定时器自动 `AGENTOS_FREE`，与调用方 `agentos_timer_destroy()` 形成 double-free
+- **修复**: `timer.c` 中 `agentrt_time_timer_process()` 对 one-shot 定时器自动 `AGENTRT_FREE`，与调用方 `agentrt_timer_destroy()` 形成 double-free
 - **修复**: `timer_destroy` 未找到定时器时未解锁互斥锁且未释放内存
 - **修复**: `core_init.c` 三态初始化竞态问题（0→2→1 模式）
 - **修复**: `ipc_service_bus.c` 超时路径中 resp_json 内存泄漏
@@ -150,7 +150,7 @@ AgentRT 首个正式发行版。经过多轮深度代码审计、版本统一、
 
 #### 通用修复
 - **修复**: 所有 `strcpy` 替换为 `strncpy`/`strdup`
-- **修复**: 内存分配器统一为 `AGENTOS_MALLOC/CALLOC/FREE` 系列
+- **修复**: 内存分配器统一为 `AGENTRT_MALLOC/CALLOC/FREE` 系列
 - **修复**: 宏重定义保护 `#ifndef` 防护
 - **清理**: 移除临时文件 `event.c.tmp3` 等残留
 
@@ -192,7 +192,7 @@ AgentRT 首个正式发行版。经过多轮深度代码审计、版本统一、
 
 #### 内存管理一致性检查
 - **修复**: 统一内存分配器使用，解决分配器不匹配问题
-  - `malloc`/`calloc`/`strdup`/`free` → `AGENTOS_MALLOC`/`AGENTOS_CALLOC`/`AGENTOS_STRDUP`/`AGENTOS_FREE`
+  - `malloc`/`calloc`/`strdup`/`free` → `AGENTRT_MALLOC`/`AGENTRT_CALLOC`/`AGENTRT_STRDUP`/`AGENTRT_FREE`
   - 主要修复文件：`network_common.c` (15+处修复)，`embedder.c` (2处修复)
   - 修复模式：分配器不匹配、缺失 NULL 检查、错误路径资源泄漏
 - **修复**: 执行单元内存管理完整性
@@ -202,7 +202,7 @@ AgentRT 首个正式发行版。经过多轮深度代码审计、版本统一、
 
 #### 宏重定义防护
 - **修复**: `error.h` 与 `types.h` 的宏重定义冲突（C4005 警告）
-  - 在 `error.h` 中所有向后兼容的 `AGENTOS_E*` 宏前添加 `#ifndef` 保护
+  - 在 `error.h` 中所有向后兼容的 `AGENTRT_E*` 宏前添加 `#ifndef` 保护
   - 解决 Windows 编译警告，提升跨平台兼容性
 
 #### 输入验证和边界检查补全

@@ -1,7 +1,7 @@
 {
   "dashboard": {
     "title": "AgentRT cupolas Module CI/CD Dashboard",
-    "uid": "agentos-cupolas-cicd",
+    "uid": "agentrt-cupolas-cicd",
     "tags": ["agentos", "cupolas", "cicd"],
     "timezone": "browser",
     "refresh": "1m",

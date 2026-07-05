@@ -7,20 +7,20 @@
 # Test Framework Initialization
 ###############################################################################
 
-AGENTOS_TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_TEST_DIR")"
+AGENTRT_TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENTRT_SCRIPTS_DIR="$(dirname "$AGENTRT_TEST_DIR")"
 
 # Load dependencies
 # shellcheck source=../library/common.sh
-source "$AGENTOS_SCRIPTS_DIR/library/common.sh"
+source "$AGENTRT_SCRIPTS_DIR/library/common.sh"
 
 ###############################################################################
 # Test Configuration
 ###############################################################################
 
-AGENTOS_TEST_VERBOSE="${AGENTOS_TEST_VERBOSE:-0}"
-AGENTOS_TEST_COVERAGE="${AGENTOS_TEST_COVERAGE:-0}"
-AGENTOS_TEST_TIMEOUT="${AGENTOS_TEST_TIMEOUT:-60}"
+AGENTRT_TEST_VERBOSE="${AGENTRT_TEST_VERBOSE:-0}"
+AGENTRT_TEST_COVERAGE="${AGENTRT_TEST_COVERAGE:-0}"
+AGENTRT_TEST_TIMEOUT="${AGENTRT_TEST_TIMEOUT:-60}"
 
 ###############################################################################
 # Test Statistics
@@ -40,7 +40,7 @@ TEST_FAILURES=()
 test_start() {
     local test_name="$1"
     ((TESTS_RUN++))
-    if [[ "$AGENTOS_TEST_VERBOSE" == "1" ]]; then
+    if [[ "$AGENTRT_TEST_VERBOSE" == "1" ]]; then
         echo -e "${COLOR_DIM}[RUN]${COLOR_NC} $test_name"
     fi
 }
@@ -49,7 +49,7 @@ test_start() {
 test_pass() {
     local test_name="$1"
     ((TESTS_PASSED++))
-    if [[ "$AGENTOS_TEST_VERBOSE" == "1" ]]; then
+    if [[ "$AGENTRT_TEST_VERBOSE" == "1" ]]; then
         echo -e "${COLOR_GREEN}[PASS]${COLOR_NC} $test_name"
     fi
 }

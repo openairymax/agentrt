@@ -101,7 +101,7 @@ static cJSON* create_request_with_params(const char* method, cJSON* params, int 
 static void test_handle_valid_request(void) {
     TEST_BEGIN("handle_valid_request");
 
-    cJSON* request = create_valid_request("agentos_sys_task_submit", 1);
+    cJSON* request = create_valid_request("agentrt_sys_task_submit", 1);
     ASSERT_NOT_NULL(request);
 
     rpc_result_t result = gateway_rpc_handle_request(request, NULL, NULL);
@@ -134,7 +134,7 @@ static void test_handle_request_with_params(void) {
     cJSON* params = cJSON_CreateObject();
     cJSON_AddStringToObject(params, "name", "test_task");
 
-    cJSON* request = create_request_with_params("agentos_sys_memory_write", params, 2);
+    cJSON* request = create_request_with_params("agentrt_sys_memory_write", params, 2);
     ASSERT_NOT_NULL(request);
 
     rpc_result_t result = gateway_rpc_handle_request(request, NULL, NULL);
@@ -381,7 +381,7 @@ static void test_memory_stability_under_load(void) {
 
     for (int i = 0; i < 1000; i++) {
         char method[64];
-        snprintf(method, sizeof(method), "agentos_sys_task_submit_%d", i);
+        snprintf(method, sizeof(method), "agentrt_sys_task_submit_%d", i);
 
         cJSON* request = create_valid_request(method, i);
         ASSERT_NOT_NULL(request);
@@ -429,7 +429,7 @@ static void test_very_long_method_name(void) {
     TEST_BEGIN("very_long_method_name");
 
     char long_method[1024];
-    AGENTOS_MEMSET(long_method, 'A', sizeof(long_method) - 1);
+    AGENTRT_MEMSET(long_method, 'A', sizeof(long_method) - 1);
     long_method[sizeof(long_method) - 1] = '\0';
 
     cJSON* request = cJSON_CreateObject();
@@ -457,7 +457,7 @@ static void test_special_characters_in_method(void) {
         "agentos.sys.task.submit",      /* 点号 */
         "agentos/sys/task/submit",       /* 斜杠 */
         "agentos::sys::task::submit",    /* 双冒号 */
-        "agentos_sys_task_submit_中文",  /* 中文 */
+        "agentrt_sys_task_submit_中文",  /* 中文 */
         NULL
     };
 

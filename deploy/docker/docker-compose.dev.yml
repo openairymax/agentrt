@@ -23,8 +23,8 @@ services:
         BUILD_VERSION: ${BUILD_VERSION:-0.1.0}
         BUILD_DATE: ${BUILD_DATE:-2026-04-12}
       target: runtime
-    image: ghcr.io/spharx/agentos/gateway:${BUILD_VERSION:-latest}
-    container_name: agentos-gateway
+    image: ghcr.io/spharx/agentrt/gateway:${BUILD_VERSION:-latest}
+    container_name: agentrt-gateway
     hostname: gateway
     restart: unless-stopped
     ports:
@@ -32,27 +32,27 @@ services:
       - "${WS_PORT:-8081}:8081"
       - "${METRICS_PORT:-9090}:9090"
     environment:
-      - AGENTOS_LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - AGENTOS_SERVER_HOST=0.0.0.0
-      - AGENTOS_HTTP_PORT=8080
-      - AGENTOS_WS_PORT=8081
-      - AGENTOS_METRICS_PORT=9090
-      - AGENTOS_REDIS_HOST=redis
-      - AGENTOS_REDIS_PORT=6379
-      - AGENTOS_POSTGRES_HOST=postgres
-      - AGENTOS_POSTGRES_PORT=5432
-      - AGENTOS_POSTGRES_DB=agentos
-      - AGENTOS_POSTGRES_USER=agentos
-      - AGENTOS_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - AGENTOS_JWT_SECRET=${JWT_SECRET}
-      - AGENTOS_ENABLE_AUTH=${ENABLE_AUTH:-false}
-      - AGENTOS_MCP_ENABLED=true
-      - AGENTOS_A2A_ENABLED=true
-      - AGENTOS_OPENAI_ENABLED=true
-      - AGENTOS_TRACING_ENABLED=true
-      - AGENTOS_TRACING_ENDPOINT=http://jaeger:4318/v1/traces
+      - AGENTRT_LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - AGENTRT_SERVER_HOST=0.0.0.0
+      - AGENTRT_HTTP_PORT=8080
+      - AGENTRT_WS_PORT=8081
+      - AGENTRT_METRICS_PORT=9090
+      - AGENTRT_REDIS_HOST=redis
+      - AGENTRT_REDIS_PORT=6379
+      - AGENTRT_POSTGRES_HOST=postgres
+      - AGENTRT_POSTGRES_PORT=5432
+      - AGENTRT_POSTGRES_DB=agentos
+      - AGENTRT_POSTGRES_USER=agentos
+      - AGENTRT_POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - AGENTRT_JWT_SECRET=${JWT_SECRET}
+      - AGENTRT_ENABLE_AUTH=${ENABLE_AUTH:-false}
+      - AGENTRT_MCP_ENABLED=true
+      - AGENTRT_A2A_ENABLED=true
+      - AGENTRT_OPENAI_ENABLED=true
+      - AGENTRT_TRACING_ENABLED=true
+      - AGENTRT_TRACING_ENDPOINT=http://jaeger:4318/v1/traces
     volumes:
-      - ../manager:/etc/agentos/gateway:ro
+      - ../manager:/etc/agentrt/gateway:ro
       - gateway-logs:/var/log/agentos
       - gateway-run:/var/run/agentos
     depends_on:
@@ -61,7 +61,7 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - agentos-net
+      - agentrt-net
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 15s
@@ -71,7 +71,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: agentos-redis
+    container_name: agentrt-redis
     hostname: redis
     restart: unless-stopped
     ports:
@@ -79,7 +79,7 @@ services:
     volumes:
       - redis-data:/data
     networks:
-      - agentos-net
+      - agentrt-net
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -88,7 +88,7 @@ services:
 
   postgres:
     image: postgres:15-alpine
-    container_name: agentos-postgres
+    container_name: agentrt-postgres
     hostname: postgres
     restart: unless-stopped
     ports:
@@ -101,7 +101,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
-      - agentos-net
+      - agentrt-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U agentos"]
       interval: 10s
@@ -110,7 +110,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.45.0
-    container_name: agentos-prometheus
+    container_name: agentrt-prometheus
     hostname: prometheus
     restart: unless-stopped
     ports:
@@ -125,13 +125,13 @@ services:
       - '--storage.tsdb.retention.time=15d'
       - '--web.enable-lifecycle'
     networks:
-      - agentos-net
+      - agentrt-net
     profiles:
       - monitoring
 
   grafana:
     image: grafana/grafana:10.2.0
-    container_name: agentos-grafana
+    container_name: agentrt-grafana
     hostname: grafana
     restart: unless-stopped
     ports:
@@ -148,13 +148,13 @@ services:
     depends_on:
       - prometheus
     networks:
-      - agentos-net
+      - agentrt-net
     profiles:
       - monitoring
 
   jaeger:
     image: jaegertracing/all-in-one:1.53
-    container_name: agentos-jaeger
+    container_name: agentrt-jaeger
     hostname: jaeger
     restart: unless-stopped
     ports:
@@ -163,7 +163,7 @@ services:
     environment:
       - COLLECTOR_OTLP_ENABLED=true
     networks:
-      - agentos-net
+      - agentrt-net
     profiles:
       - monitoring
 
@@ -176,6 +176,6 @@ volumes:
   grafana-data:
 
 networks:
-  agentos-net:
+  agentrt-net:
     driver: bridge
-    name: agentos-network
+    name: agentrt-network

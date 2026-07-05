@@ -9,7 +9,7 @@ set -e  # 遇到错误立即退出
 
 # 获取脚本所在目录的父目录（即AgentOS根目录）
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AGENTOS_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+AGENTRT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 echo "=================================================="
 echo "🧹 AgentOS 构建产物清理脚本 v1.0.0"
@@ -17,7 +17,7 @@ echo "=================================================="
 echo ""
 
 # 切换到AgentOS目录
-cd "$AGENTOS_ROOT"
+cd "$AGENTRT_ROOT"
 
 echo "📍 当前目录: $(pwd)"
 echo ""
@@ -78,7 +78,7 @@ find . -maxdepth 4 -type d -name "_build" 2>/dev/null | while read dir; do
 done
 
 # 删除AgentRT-build目录（如果存在）
-if [ -d "$AGENTOS_ROOT/AgentRT-build" ]; then
+if [ -d "$AGENTRT_ROOT/AgentRT-build" ]; then
     echo "  ⚠️  AgentRT-build目录存在（保留，不删除）"
 fi
 

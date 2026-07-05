@@ -24,7 +24,7 @@
 #include "memory_compat.h"
 #include "safety_guard_bridge.h"
 #include "daemon_security.h"
-#include "agentos_types.h"
+#include "agentrt_types.h"
 
 /* ============================================================================
  * Test Helpers

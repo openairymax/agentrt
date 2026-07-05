@@ -51,7 +51,7 @@
       "title": "项目结构分析",
       "description": "了解AgentRT的代码组织结构",
       "step_type": "theory",
-      "content": "# AgentRT 项目结构\n\n## 主要目录\n```\nagentos/\n├── atoms/                    # 核心原子模块\n│   ├── coreloopthree/       # 认知三层循环\n│   ├── memoryrovol/         # 记忆系统\n│   └── syscall/             # 系统调用接口\n├── daemon/                  # 守护进程服务\n├── include/                 # 公共头文件\n├── scripts/                 # 开发运维工具\n└── docs/                    # 文档\n```\n\n## 关键文件\n- **CMakeLists.txt**: 构建系统配置\n- **ARCHITECTURAL_PRINCIPLES.md**: 架构设计原则\n- **Capital_Specifications/**: 项目规范文档\n\n## 实践任务\n浏览项目目录，熟悉关键文件：\n```bash\nls -la agentos/\nfind agentos -name \"*.md\" | head -10\n```\n\n了解项目结构有助于你快速定位代码和文档。",
+      "content": "# AgentRT 项目结构\n\n## 主要目录\n```\nagentos/\n├── atoms/                    # 核心原子模块\n│   ├── coreloopthree/       # 认知三层循环\n│   ├── memoryrovol/         # 记忆系统\n│   └── syscall/             # 系统调用接口\n├── daemons/                  # 守护进程服务\n├── include/                 # 公共头文件\n├── scripts/                 # 开发运维工具\n└── docs/                    # 文档\n```\n\n## 关键文件\n- **CMakeLists.txt**: 构建系统配置\n- **ARCHITECTURAL_PRINCIPLES.md**: 架构设计原则\n- **Capital_Specifications/**: 项目规范文档\n\n## 实践任务\n浏览项目目录，熟悉关键文件：\n```bash\nls -la agentos/\nfind agentos -name \"*.md\" | head -10\n```\n\n了解项目结构有助于你快速定位代码和文档。",
       "duration_minutes": 15,
       "prerequisites": ["env-setup"],
       "commands": [

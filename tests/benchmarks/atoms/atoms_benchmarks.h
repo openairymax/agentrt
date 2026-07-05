@@ -7,14 +7,14 @@
  * - 任务切换延迟: <1ms
  * - 记忆检索延迟: <10ms
  *
- * @note 本文件从 agentos/atoms/benchmarks/ 迁移至 tests/benchmarks/agentos/atoms/
+ * @note 本文件从 agentrt/atoms/benchmarks/ 迁移至 tests/benchmarks/agentrt/atoms/
  *       符合项目原始设计规范：atoms仅包含5个核心子模块
  *
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 
-#ifndef AGENTOS_ATOMS_BENCHMARKS_H
-#define AGENTOS_ATOMS_BENCHMARKS_H
+#ifndef AGENTRT_ATOMS_BENCHMARKS_H
+#define AGENTRT_ATOMS_BENCHMARKS_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -61,4 +61,4 @@ bool benchmark_verify_sla(const benchmark_result_t* result, uint64_t sla_thresho
 }
 #endif
 
-#endif /* AGENTOS_ATOMS_BENCHMARKS_H */
+#endif /* AGENTRT_ATOMS_BENCHMARKS_H */

@@ -15,7 +15,7 @@
 
 /* 包含必要的头文件 */
 #include "syscalls.h"
-#include "agentos.h"
+#include "agentrt.h"
 
 /**
  * @brief 测试系统调用表基本功�?

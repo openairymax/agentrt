@@ -141,11 +141,11 @@ static void print_result_ms(const bench_result_t *result)
 /* ============================================================================
  * 辅助: 创建默认认知引擎
  * ============================================================================ */
-static agentos_cognition_engine_t *create_default_engine(void)
+static agentrt_cognition_engine_t *create_default_engine(void)
 {
-    agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
-    assert(err == AGENTOS_OK);
+    agentrt_cognition_engine_t *engine = NULL;
+    agentrt_error_t err = agentrt_cognition_create_take(NULL, NULL, NULL, &engine);
+    assert(err == AGENTRT_OK);
     assert(engine != NULL);
     return engine;
 }
@@ -182,28 +182,28 @@ TEST(int17_1_minimal_cycle_latency)
     }
 
     for (int t = 0; simple_inputs[t].input != NULL; t++) {
-        agentos_cognition_engine_t *engine = create_default_engine();
+        agentrt_cognition_engine_t *engine = create_default_engine();
 
         /* 预热 */
         for (int w = 0; w < BENCH_WARMUP; w++) {
-            agentos_task_plan_t *plan = NULL;
-            agentos_cognition_process(engine, simple_inputs[t].input,
+            agentrt_task_plan_t *plan = NULL;
+            agentrt_cognition_process(engine, simple_inputs[t].input,
                                       strlen(simple_inputs[t].input), &plan);
             if (plan)
-                agentos_task_plan_free(plan);
+                agentrt_task_plan_free(plan);
         }
 
         /* 基准测试 */
         for (int i = 0; i < BENCH_ITERATIONS; i++) {
-            agentos_task_plan_t *plan = NULL;
+            agentrt_task_plan_t *plan = NULL;
 
             uint64_t start = get_time_ns();
-            agentos_cognition_process(engine, simple_inputs[t].input,
+            agentrt_cognition_process(engine, simple_inputs[t].input,
                                       strlen(simple_inputs[t].input), &plan);
             all_times[i] = get_time_ns() - start;
 
             if (plan)
-                agentos_task_plan_free(plan);
+                agentrt_task_plan_free(plan);
         }
 
         bench_result_t result;
@@ -220,7 +220,7 @@ TEST(int17_1_minimal_cycle_latency)
                    result.p50_ns / 1000000.0);
         }
 
-        agentos_cognition_destroy(engine);
+        agentrt_cognition_destroy(engine);
     }
 
     free(all_times);
@@ -264,22 +264,22 @@ TEST(int17_2_full_pipeline_cycle)
     }
 
     for (int t = 0; pipeline_inputs[t].input != NULL; t++) {
-        agentos_cognition_engine_t *engine = create_default_engine();
+        agentrt_cognition_engine_t *engine = create_default_engine();
 
         /* 关联记忆引擎 */
-        agentos_memory_engine_t *mem_engine = NULL;
-        agentos_error_t err = agentos_memory_create(NULL, &mem_engine);
-        if (err == AGENTOS_OK && mem_engine != NULL) {
-            agentos_cognition_set_memory(engine, mem_engine);
+        agentrt_memory_engine_t *mem_engine = NULL;
+        agentrt_error_t err = agentrt_memory_create(NULL, &mem_engine);
+        if (err == AGENTRT_OK && mem_engine != NULL) {
+            agentrt_cognition_set_memory(engine, mem_engine);
         }
 
         /* 预热 */
         for (int w = 0; w < BENCH_WARMUP; w++) {
-            agentos_task_plan_t *plan = NULL;
-            agentos_cognition_process(engine, pipeline_inputs[t].input,
+            agentrt_task_plan_t *plan = NULL;
+            agentrt_cognition_process(engine, pipeline_inputs[t].input,
                                       strlen(pipeline_inputs[t].input), &plan);
             if (plan)
-                agentos_task_plan_free(plan);
+                agentrt_task_plan_free(plan);
         }
 
         /* 基准测试: 完整管线 decomposition→planning→generation→critique→verification */
@@ -287,22 +287,22 @@ TEST(int17_2_full_pipeline_cycle)
             uint64_t start = get_time_ns();
 
             /* decomposition + planning: cognition_process */
-            agentos_task_plan_t *plan = NULL;
-            agentos_cognition_process(engine, pipeline_inputs[t].input,
+            agentrt_task_plan_t *plan = NULL;
+            agentrt_cognition_process(engine, pipeline_inputs[t].input,
                                       strlen(pipeline_inputs[t].input), &plan);
             if (plan)
-                agentos_task_plan_free(plan);
+                agentrt_task_plan_free(plan);
 
             /* generation + critique: health_check 包含内部评估 */
             char *health = NULL;
-            agentos_cognition_health_check(engine, &health);
+            agentrt_cognition_health_check(engine, &health);
             if (health)
                 free(health);
 
             /* verification: stats 包含验证统计 */
             char *stats = NULL;
             size_t stats_len = 0;
-            agentos_cognition_stats(engine, &stats, &stats_len);
+            agentrt_cognition_stats(engine, &stats, &stats_len);
             if (stats)
                 free(stats);
 
@@ -325,9 +325,9 @@ TEST(int17_2_full_pipeline_cycle)
                    result.p50_ns / 1000000.0);
         }
 
-        agentos_cognition_destroy(engine);
+        agentrt_cognition_destroy(engine);
         if (mem_engine)
-            agentos_memory_destroy(mem_engine);
+            agentrt_memory_destroy(mem_engine);
     }
 
     free(times);
@@ -366,16 +366,16 @@ TEST(int17_3_multi_task_throughput)
         return;
     }
 
-    agentos_cognition_engine_t *engine = create_default_engine();
+    agentrt_cognition_engine_t *engine = create_default_engine();
 
     /* 预热 */
     for (int w = 0; w < BENCH_WARMUP; w++) {
         for (int i = 0; i < CONCURRENT_TASK_COUNT; i++) {
-            agentos_task_plan_t *plan = NULL;
-            agentos_cognition_process(engine, concurrent_inputs[i],
+            agentrt_task_plan_t *plan = NULL;
+            agentrt_cognition_process(engine, concurrent_inputs[i],
                                       strlen(concurrent_inputs[i]), &plan);
             if (plan)
-                agentos_task_plan_free(plan);
+                agentrt_task_plan_free(plan);
         }
     }
 
@@ -384,11 +384,11 @@ TEST(int17_3_multi_task_throughput)
         uint64_t start = get_time_ns();
 
         for (int i = 0; i < CONCURRENT_TASK_COUNT; i++) {
-            agentos_task_plan_t *plan = NULL;
-            agentos_cognition_process(engine, concurrent_inputs[i],
+            agentrt_task_plan_t *plan = NULL;
+            agentrt_cognition_process(engine, concurrent_inputs[i],
                                       strlen(concurrent_inputs[i]), &plan);
             if (plan)
-                agentos_task_plan_free(plan);
+                agentrt_task_plan_free(plan);
         }
 
         batch_times[iter] = get_time_ns() - start;
@@ -411,7 +411,7 @@ TEST(int17_3_multi_task_throughput)
     double throughput = (double)CONCURRENT_TASK_COUNT / (result.avg_ns / 1000000000.0);
     printf("    Throughput: %.1f tasks/sec\n", throughput);
 
-    agentos_cognition_destroy(engine);
+    agentrt_cognition_destroy(engine);
     free(batch_times);
     TEST_PASS("INT-17.3: multi-task throughput benchmark completed");
 }
@@ -433,23 +433,23 @@ TEST(int17_4_cycle_overhead_breakdown)
     const char *input = "分析以下销售数据：产品A=15000，产品B=23000，产品C=18000。"
                         "比较去年同期数据并生成战略建议。";
 
-    agentos_cognition_engine_t *engine = create_default_engine();
+    agentrt_cognition_engine_t *engine = create_default_engine();
 
     /* 关联记忆引擎 */
-    agentos_memory_engine_t *mem_engine = NULL;
-    agentos_error_t err = agentos_memory_create(NULL, &mem_engine);
-    if (err == AGENTOS_OK && mem_engine != NULL) {
-        agentos_cognition_set_memory(engine, mem_engine);
+    agentrt_memory_engine_t *mem_engine = NULL;
+    agentrt_error_t err = agentrt_memory_create(NULL, &mem_engine);
+    if (err == AGENTRT_OK && mem_engine != NULL) {
+        agentrt_cognition_set_memory(engine, mem_engine);
     }
 
     /* 预热 */
     for (int w = 0; w < BENCH_WARMUP; w++) {
-        agentos_task_plan_t *plan = NULL;
-        agentos_cognition_process(engine, input, strlen(input), &plan);
+        agentrt_task_plan_t *plan = NULL;
+        agentrt_cognition_process(engine, input, strlen(input), &plan);
         if (plan)
-            agentos_task_plan_free(plan);
+            agentrt_task_plan_free(plan);
         char *health = NULL;
-        agentos_cognition_health_check(engine, &health);
+        agentrt_cognition_health_check(engine, &health);
         if (health)
             free(health);
     }
@@ -469,31 +469,31 @@ TEST(int17_4_cycle_overhead_breakdown)
         free(phase_generation);
         free(phase_critique);
         free(phase_verification);
-        agentos_cognition_destroy(engine);
+        agentrt_cognition_destroy(engine);
         if (mem_engine)
-            agentos_memory_destroy(mem_engine);
+            agentrt_memory_destroy(mem_engine);
         return;
     }
 
     for (int i = 0; i < BENCH_ITERATIONS; i++) {
         /* Phase 1: Decomposition - 意图解析 */
         uint64_t t0 = get_time_ns();
-        agentos_intent_parser_t *parser = NULL;
-        agentos_intent_parser_create(&parser);
-        agentos_intent_t *intent = NULL;
-        agentos_intent_parser_parse(parser, input, strlen(input), &intent);
+        agentrt_intent_parser_t *parser = NULL;
+        agentrt_intent_parser_create(&parser);
+        agentrt_intent_t *intent = NULL;
+        agentrt_intent_parser_parse(parser, input, strlen(input), &intent);
         phase_decomposition[i] = get_time_ns() - t0;
 
         /* Phase 2: Planning - 任务规划 (cognition_process 包含分解+规划) */
         uint64_t t1 = get_time_ns();
-        agentos_task_plan_t *plan = NULL;
-        agentos_cognition_process(engine, input, strlen(input), &plan);
+        agentrt_task_plan_t *plan = NULL;
+        agentrt_cognition_process(engine, input, strlen(input), &plan);
         phase_planning[i] = get_time_ns() - t1;
 
         /* Phase 3: Generation - 内容生成 (health_check 触发内部生成) */
         uint64_t t2 = get_time_ns();
         char *health = NULL;
-        agentos_cognition_health_check(engine, &health);
+        agentrt_cognition_health_check(engine, &health);
         phase_generation[i] = get_time_ns() - t2;
         if (health)
             free(health);
@@ -502,7 +502,7 @@ TEST(int17_4_cycle_overhead_breakdown)
         uint64_t t3 = get_time_ns();
         char *stats = NULL;
         size_t stats_len = 0;
-        agentos_cognition_stats(engine, &stats, &stats_len);
+        agentrt_cognition_stats(engine, &stats, &stats_len);
         phase_critique[i] = get_time_ns() - t3;
         if (stats)
             free(stats);
@@ -510,17 +510,17 @@ TEST(int17_4_cycle_overhead_breakdown)
         /* Phase 5: Verification - 验证 (二次 health_check) */
         uint64_t t4 = get_time_ns();
         char *verify = NULL;
-        agentos_cognition_health_check(engine, &verify);
+        agentrt_cognition_health_check(engine, &verify);
         phase_verification[i] = get_time_ns() - t4;
         if (verify)
             free(verify);
 
         /* 清理本轮资源 */
         if (plan)
-            agentos_task_plan_free(plan);
+            agentrt_task_plan_free(plan);
         if (intent)
-            agentos_intent_free(intent);
-        agentos_intent_parser_destroy(parser);
+            agentrt_intent_free(intent);
+        agentrt_intent_parser_destroy(parser);
     }
 
     /* 输出各阶段统计 */
@@ -562,9 +562,9 @@ TEST(int17_4_cycle_overhead_breakdown)
     free(phase_critique);
     free(phase_verification);
 
-    agentos_cognition_destroy(engine);
+    agentrt_cognition_destroy(engine);
     if (mem_engine)
-        agentos_memory_destroy(mem_engine);
+        agentrt_memory_destroy(mem_engine);
     TEST_PASS("INT-17.4: cycle overhead breakdown benchmark completed");
 }
 
@@ -594,48 +594,48 @@ TEST(int17_5_warm_vs_cold_cycle)
 
     /* 冷启动测试: 每次迭代都创建新引擎，测量第一个 process */
     for (int i = 0; i < BENCH_ITERATIONS; i++) {
-        agentos_cognition_engine_t *engine = NULL;
-        agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
-        if (err != AGENTOS_OK || engine == NULL) {
+        agentrt_cognition_engine_t *engine = NULL;
+        agentrt_error_t err = agentrt_cognition_create_take(NULL, NULL, NULL, &engine);
+        if (err != AGENTRT_OK || engine == NULL) {
             cold_times[i] = 0;
             continue;
         }
 
         uint64_t start = get_time_ns();
-        agentos_task_plan_t *plan = NULL;
-        agentos_cognition_process(engine, input, strlen(input), &plan);
+        agentrt_task_plan_t *plan = NULL;
+        agentrt_cognition_process(engine, input, strlen(input), &plan);
         cold_times[i] = get_time_ns() - start;
 
         if (plan)
-            agentos_task_plan_free(plan);
-        agentos_cognition_destroy(engine);
+            agentrt_task_plan_free(plan);
+        agentrt_cognition_destroy(engine);
     }
 
     /* 热启动测试: 创建一次引擎，预热后测量后续 process */
     {
-        agentos_cognition_engine_t *engine = create_default_engine();
+        agentrt_cognition_engine_t *engine = create_default_engine();
 
         /* 预热 */
         for (int w = 0; w < BENCH_WARMUP; w++) {
-            agentos_task_plan_t *plan = NULL;
-            agentos_cognition_process(engine, input, strlen(input), &plan);
+            agentrt_task_plan_t *plan = NULL;
+            agentrt_cognition_process(engine, input, strlen(input), &plan);
             if (plan)
-                agentos_task_plan_free(plan);
+                agentrt_task_plan_free(plan);
         }
 
         /* 热启动基准测试 */
         for (int i = 0; i < BENCH_ITERATIONS; i++) {
-            agentos_task_plan_t *plan = NULL;
+            agentrt_task_plan_t *plan = NULL;
 
             uint64_t start = get_time_ns();
-            agentos_cognition_process(engine, input, strlen(input), &plan);
+            agentrt_cognition_process(engine, input, strlen(input), &plan);
             warm_times[i] = get_time_ns() - start;
 
             if (plan)
-                agentos_task_plan_free(plan);
+                agentrt_task_plan_free(plan);
         }
 
-        agentos_cognition_destroy(engine);
+        agentrt_cognition_destroy(engine);
     }
 
     /* 统计 */

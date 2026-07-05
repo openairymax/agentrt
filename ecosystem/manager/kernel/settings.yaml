@@ -10,7 +10,7 @@
 _owner:
   module: "corekern"
   contact: "corekern-team@example.com"
-  path: "AgentRT/agentos/atoms/corekern"
+  path: "AgentRT/agentrt/atoms/corekern"
   description: "内容定义责任归属 corekern 模块，管理责任归属 Manager 模块"
 
 # 配置版本
@@ -21,8 +21,8 @@ _schema: "schema/kernel-settings.schema.json"
 
 # 版本兼容性
 _compatibility:
-  min_agentos_version: "1.0.0"
-  max_agentos_version: "2.0.0"
+  min_agentrt_version: "1.0.0"
+  max_agentrt_version: "2.0.0"
 
 # =============================================================================
 # 内核基础设置

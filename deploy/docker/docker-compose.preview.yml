@@ -6,14 +6,14 @@ version: '3.8'
 
 services:
   # ==================== AgentRT Preview 服务 ====================
-  agentos-preview:
+  agentrt-preview:
     build:
       context: ..
       dockerfile: docker/Dockerfile
       target: runtime
-    image: ${DOCKER_REGISTRY:-spharx}/agentos-preview:0.1.0
-    container_name: agentos-preview
-    hostname: agentos-preview
+    image: ${DOCKER_REGISTRY:-spharx}/agentrt-preview:0.1.0
+    container_name: agentrt-preview
+    hostname: agentrt-preview
     restart: unless-stopped
 
     # 资源限制
@@ -29,11 +29,11 @@ services:
     # 环境变量
     environment:
       - TZ=Asia/Shanghai
-      - AGENTOS_ENV=preview
-      - AGENTOS_LOG_LEVEL=INFO
-      - AGENTOS_LOG_FORMAT=json
-      - AGENTOS_ENABLE_TRACING=true
-      - AGENTOS_TELEMETRY_ENDPOINT=http://otel-collector:4317
+      - AGENTRT_ENV=preview
+      - AGENTRT_LOG_LEVEL=INFO
+      - AGENTRT_LOG_FORMAT=json
+      - AGENTRT_ENABLE_TRACING=true
+      - AGENTRT_TELEMETRY_ENDPOINT=http://otel-collector:4317
 
     # 端口映射
     ports:
@@ -42,12 +42,12 @@ services:
     # 数据卷挂载
     volumes:
       - preview-logs:/var/log/agentos:rw
-      - preview-data:/var/lib/agentos:rw
-      - ../../ecosystem/manager/preview:/etc/agentos:ro
+      - preview-data:/var/lib/agentrt:rw
+      - ../../ecosystem/manager/preview:/etc/agentrt:ro
 
     # 网络配置
     networks:
-      - agentos-preview-network
+      - agentrt-preview-network
 
     # 健康检查
     healthcheck:
@@ -61,7 +61,7 @@ services:
     command: >
       bash -c "
         echo 'Starting AgentRT Preview...';
-        python3 -m scripts.core.cli --manager /etc/agentos/manager.yaml;
+        python3 -m scripts.core.cli --manager /etc/agentrt/manager.yaml;
       "
 
     # 依赖
@@ -72,8 +72,8 @@ services:
   # ==================== 辅助服务 ====================
   redis-preview:
     image: redis:7-alpine
-    container_name: agentos-redis-preview
-    hostname: agentos-redis-preview
+    container_name: agentrt-redis-preview
+    hostname: agentrt-redis-preview
     restart: unless-stopped
 
     # 数据持久化
@@ -82,7 +82,7 @@ services:
 
     # 网络配置
     networks:
-      - agentos-preview-network
+      - agentrt-preview-network
 
     # 健康检查
     healthcheck:
@@ -93,13 +93,13 @@ services:
 
   postgres-preview:
     image: postgres:15-alpine
-    container_name: agentos-postgres-preview
-    hostname: agentos-postgres-preview
+    container_name: agentrt-postgres-preview
+    hostname: agentrt-postgres-preview
     restart: unless-stopped
 
     # 环境变量
     environment:
-      - POSTGRES_DB=agentos_preview
+      - POSTGRES_DB=agentrt_preview
       - POSTGRES_USER=agentos
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 
@@ -109,7 +109,7 @@ services:
 
     # 网络配置
     networks:
-      - agentos-preview-network
+      - agentrt-preview-network
 
     # 健康检查
     healthcheck:
@@ -131,7 +131,7 @@ volumes:
 
 # ==================== 网络配置 ====================
 networks:
-  agentos-preview-network:
+  agentrt-preview-network:
     driver: bridge
     ipam:
       manager:

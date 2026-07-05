@@ -82,11 +82,11 @@ cd ../AgentRT-build && ctest --output-on-failure
 ### 3.1 C 代码风格
 
 - 遵循项目 `.clang-format` 配置，提交前运行 `clang-format -i` 格式化
-- 函数命名：`agentos_动词_名词()` 风格
+- 函数命名：`agentrt_动词_名词()` 风格
 - 类型命名：`名词_t` 风格
-- 常量：`AGENTOS_大写` 宏风格
+- 常量：`AGENTRT_大写` 宏风格
 - 所有公共 API 必须有 Doxygen 注释
-- 使用项目统一内存分配器 `AGENTOS_MALLOC` / `AGENTOS_FREE`，禁止直接使用裸 `malloc` / `free`
+- 使用项目统一内存分配器 `AGENTRT_MALLOC` / `AGENTRT_FREE`，禁止直接使用裸 `malloc` / `free`
 - 使用安全字符串函数（`strncpy`、`snprintf`），禁止使用 `strcpy`、`gets`、`sprintf`
 
 ### 3.2 Python 代码风格

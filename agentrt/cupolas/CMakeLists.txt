@@ -71,7 +71,6 @@ set(CUPOLAS_SOURCES
     src/circuit_breaker.c
     src/slab.c
     src/mempool.c
-    src/yaml_minimal.c
 )
 # OpenSSL-dependent sources
 if(AGENTRT_HAS_OPENSSL)
@@ -123,7 +122,6 @@ set(CUPOLAS_HEADERS
     src/circuit_breaker.h
     src/slab.h
     src/mempool.h
-    src/yaml_minimal.h
 )
 
 # commons 模块路径

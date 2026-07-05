@@ -66,7 +66,7 @@ target_include_directories(agentrt_atoms INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/security/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/resource/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/uuid/include>
-    $<INSTALL_INTERFACE:include/agentos>
+    $<INSTALL_INTERFACE:include/agentrt>
 )
 
 add_subdirectory(corekern)

@@ -16,9 +16,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # 添加路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from agentos.client import Client
-from agentos.modules.task.manager import TaskManager
-from agentos.modules.memory.manager import MemoryManager
+from agentrt.client import Client
+from agentrt.modules.task.manager import TaskManager
+from agentrt.modules.memory.manager import MemoryManager
 
 
 class TestBenchmarkBase:
@@ -303,7 +303,7 @@ class TestCachePerformanceBenchmark(TestBenchmarkBase):
     
     def test_lru_cache_performance(self):
         """测试 LRU 缓存性能"""
-        from agentos.utils.token_optimizer import LRUCache
+        from agentrt.utils.token_optimizer import LRUCache
         
         cache = LRUCache(max_size_mb=10, ttl_seconds=3600)
         iterations = 10000

@@ -220,10 +220,10 @@ check_environment() {
     fi
 
     # 检查必要的环境变量（如果已加载）
-    if [ -n "$AGENTOS_CONFIG" ]; then
-        print_check "AGENTOS_CONFIG 环境变量" "PASS"
+    if [ -n "$AGENTRT_CONFIG" ]; then
+        print_check "AGENTRT_CONFIG 环境变量" "PASS"
     else
-        print_check "AGENTOS_CONFIG 环境变量" "WARN" "未设置（可选）"
+        print_check "AGENTRT_CONFIG 环境变量" "WARN" "未设置（可选）"
     fi
 }
 

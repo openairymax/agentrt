@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fix agentos_error_push_ex parameter order in all affected files."""
+"""Fix agentrt_error_push_ex parameter order in all affected files."""
 
 import re
 import os
@@ -7,8 +7,8 @@ import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 WRONG_ORDER_RE = re.compile(
-    r'(agentos_error_push_ex\()'
-    r'(AGENTOS_ERR_\w+|CUPOLAS_ERR_\w+)'
+    r'(agentrt_error_push_ex\()'
+    r'(AGENTRT_ERR_\w+|CUPOLAS_ERR_\w+)'
     r',\s*'
     r'("(?:[^"\\]|\\.)*")'
     r',\s*__FILE__\s*,\s*__LINE__\s*,\s*__func__\s*\)'
@@ -56,4 +56,4 @@ for fpath in sorted(files_to_check):
         print(f'{relpath}: {n} fixes')
         total_fixes += n
 
-print(f'\nTotal: {total_fixes} agentos_error_push_ex calls fixed')
+print(f'\nTotal: {total_fixes} agentrt_error_push_ex calls fixed')

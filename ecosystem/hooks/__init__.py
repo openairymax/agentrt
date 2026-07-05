@@ -5,7 +5,7 @@ AgentRT Official Hook Base
 Defines the common hook interface and lifecycle events that all
 official hooks must implement.
 
-Hook lifecycle events (from agentos.yaml hooks section):
+Hook lifecycle events (from agentrt.yaml hooks section):
   - on_agent_start    — Fired when an agent starts execution
   - on_agent_end      — Fired when an agent finishes execution
   - on_tool_call      — Fired before/after a tool is invoked

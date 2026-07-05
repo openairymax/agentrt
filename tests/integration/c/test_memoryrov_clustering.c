@@ -393,7 +393,7 @@ TEST(int10_1_cluster_formation)
     printf("    --- Cluster Formation ---\n");
 
     /* 1. 生成聚类数据 */
-    cluster_point_t *points = (cluster_point_t *)AGENTOS_CALLOC(
+    cluster_point_t *points = (cluster_point_t *)AGENTRT_CALLOC(
         CLUSTER_MAX_POINTS, sizeof(cluster_point_t));
     TEST_ASSERT(points != NULL);
 
@@ -460,7 +460,7 @@ TEST(int10_1_cluster_formation)
     }
 
     /* 6. 清理 */
-    AGENTOS_FREE(points);
+    AGENTRT_FREE(points);
 }
 
 /* ============================================================================
@@ -477,7 +477,7 @@ TEST(int10_2_silhouette_score)
     printf("    --- Silhouette Score ---\n");
 
     /* 1. 生成清晰分离的聚类数据 */
-    cluster_point_t *points = (cluster_point_t *)AGENTOS_CALLOC(
+    cluster_point_t *points = (cluster_point_t *)AGENTRT_CALLOC(
         CLUSTER_MAX_POINTS, sizeof(cluster_point_t));
     TEST_ASSERT(points != NULL);
 
@@ -534,7 +534,7 @@ TEST(int10_2_silhouette_score)
     }
 
     /* 6. 清理 */
-    AGENTOS_FREE(points);
+    AGENTRT_FREE(points);
 }
 
 /* ============================================================================
@@ -551,7 +551,7 @@ TEST(int10_3_noise_point_handling)
     printf("    --- Noise Point Handling ---\n");
 
     /* 1. 创建明确的聚类 + 噪声点 */
-    cluster_point_t *points = (cluster_point_t *)AGENTOS_CALLOC(
+    cluster_point_t *points = (cluster_point_t *)AGENTRT_CALLOC(
         CLUSTER_MAX_POINTS, sizeof(cluster_point_t));
     TEST_ASSERT(points != NULL);
 
@@ -627,7 +627,7 @@ TEST(int10_3_noise_point_handling)
     TEST_ASSERT(core_count > 0);
 
     /* 7. 清理 */
-    AGENTOS_FREE(points);
+    AGENTRT_FREE(points);
 }
 
 /* ============================================================================
@@ -644,7 +644,7 @@ TEST(int10_4_cluster_stability)
     printf("    --- Cluster Stability ---\n");
 
     /* 1. 生成第一组数据 */
-    cluster_point_t *points1 = (cluster_point_t *)AGENTOS_CALLOC(
+    cluster_point_t *points1 = (cluster_point_t *)AGENTRT_CALLOC(
         CLUSTER_MAX_POINTS, sizeof(cluster_point_t));
     TEST_ASSERT(points1 != NULL);
 
@@ -653,7 +653,7 @@ TEST(int10_4_cluster_stability)
     generate_cluster_data(points1, &count1, &seed1);
 
     /* 2. 生成第二组数据 (相同分布，不同种子) */
-    cluster_point_t *points2 = (cluster_point_t *)AGENTOS_CALLOC(
+    cluster_point_t *points2 = (cluster_point_t *)AGENTRT_CALLOC(
         CLUSTER_MAX_POINTS, sizeof(cluster_point_t));
     TEST_ASSERT(points2 != NULL);
 
@@ -710,8 +710,8 @@ TEST(int10_4_cluster_stability)
     }
 
     /* 7. 清理 */
-    AGENTOS_FREE(points1);
-    AGENTOS_FREE(points2);
+    AGENTRT_FREE(points1);
+    AGENTRT_FREE(points2);
 }
 
 /* ============================================================================
@@ -728,7 +728,7 @@ TEST(int10_5_incremental_clustering)
     printf("    --- Incremental Clustering ---\n");
 
     /* 1. 初始聚类 */
-    cluster_point_t *points = (cluster_point_t *)AGENTOS_CALLOC(
+    cluster_point_t *points = (cluster_point_t *)AGENTRT_CALLOC(
         CLUSTER_MAX_POINTS, sizeof(cluster_point_t));
     TEST_ASSERT(points != NULL);
 
@@ -842,7 +842,7 @@ TEST(int10_5_incremental_clustering)
            label_changes, new_start < 100 ? new_start : 100);
 
     /* 8. 清理 */
-    AGENTOS_FREE(points);
+    AGENTRT_FREE(points);
 }
 
 /* ============================================================================

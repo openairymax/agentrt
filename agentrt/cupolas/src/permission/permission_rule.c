@@ -14,7 +14,7 @@
 
 #include "permission_rule.h"
 
-#include "../yaml_minimal.h"
+#include "yaml_minimal.h"  /* SP03: migrated to commons/utils/config_unified/include/ */
 
 #include <stdio.h>
 #include <stdlib.h>

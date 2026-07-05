@@ -113,47 +113,47 @@ agentrt_print_info("")
 
 # 安装支持
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/common/include/
-    DESTINATION include/agentos
+    DESTINATION include/agentrt
     FILES_MATCHING PATTERN "*.h"
 )
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/gateway_d/include/
-    DESTINATION include/agentos
+    DESTINATION include/agentrt
     FILES_MATCHING PATTERN "*.h"
 )
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/llm_d/include/
-    DESTINATION include/agentos
+    DESTINATION include/agentrt
     FILES_MATCHING PATTERN "*.h"
 )
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tool_d/include/
-    DESTINATION include/agentos
+    DESTINATION include/agentrt
     FILES_MATCHING PATTERN "*.h"
 )
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/monit_d/include/
-    DESTINATION include/agentos
+    DESTINATION include/agentrt
     FILES_MATCHING PATTERN "*.h"
 )
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/sched_d/include/
-    DESTINATION include/agentos
+    DESTINATION include/agentrt
     FILES_MATCHING PATTERN "*.h"
 )
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/market_d/include/
-    DESTINATION include/agentos
+    DESTINATION include/agentrt
     FILES_MATCHING PATTERN "*.h"
 )
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/hook_d/include/
-    DESTINATION include/agentos
+    DESTINATION include/agentrt
     FILES_MATCHING PATTERN "*.h"
 )
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/plugin_d/include/
-    DESTINATION include/agentos
+    DESTINATION include/agentrt
     FILES_MATCHING PATTERN "*.h"
 )
 
@@ -162,7 +162,14 @@ if(TARGET svc_common AND TARGET gateway_d AND TARGET llm_d AND TARGET tool_d
    AND TARGET monit_d AND TARGET sched_d AND TARGET market_d
    AND TARGET channel_d AND TARGET info_d AND TARGET notify_d
    AND TARGET observe_d AND TARGET hook_d AND TARGET plugin_d)
-    export(TARGETS svc_common gateway_d llm_d tool_d
+    # 注意：仅导出 12 个 daemon 可执行文件。
+    # svc_common 是 STATIC 库且 PUBLIC 链接 agentrt_common/agentrt_compile_defs/
+    # cupolas/agentrt_platform_libs，若将其加入 export(TARGETS) 列表，
+    # 则要求上述 4 个传递依赖也在同一 export set（它们定义于 commons/cupolas 等
+    # 独立 CMakeLists.txt，无法在本文件加入）。daemon 可执行文件对 svc_common
+    # 及 service 库均为 PRIVATE 链接，不产生 INTERFACE_LINK_LIBRARIES 传递要求，
+    # 因此单独导出可执行文件即可满足 build-tree 消费场景。
+    export(TARGETS gateway_d llm_d tool_d
                   monit_d sched_d market_d channel_d
                   info_d notify_d observe_d
                   hook_d plugin_d

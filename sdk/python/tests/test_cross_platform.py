@@ -24,23 +24,23 @@ class TestPythonPlatformCompatibility(unittest.TestCase):
         self.assertIn(system, ["Linux", "Darwin", "Windows"])
 
     def test_import_chain(self):
-        from agentos.framework import plugin as plugin_mod
-        from agentos.framework import config as config_mod
-        from agentos.framework import errors as errors_mod
-        from agentos.framework import event as event_mod
-        from agentos.framework import state as state_mod
-        from agentos.framework import lifecycle as lifecycle_mod
-        from agentos.framework import task as task_mod
-        from agentos.framework import skill as skill_mod
-        from agentos.framework import application as app_mod
+        from agentrt.framework import plugin as plugin_mod
+        from agentrt.framework import config as config_mod
+        from agentrt.framework import errors as errors_mod
+        from agentrt.framework import event as event_mod
+        from agentrt.framework import state as state_mod
+        from agentrt.framework import lifecycle as lifecycle_mod
+        from agentrt.framework import task as task_mod
+        from agentrt.framework import skill as skill_mod
+        from agentrt.framework import application as app_mod
 
         self.assertTrue(hasattr(plugin_mod, 'PluginRegistry'))
         self.assertTrue(hasattr(plugin_mod, 'PluginManager'))
         self.assertTrue(hasattr(errors_mod, 'ErrorHandlingFramework'))
 
     def test_plugin_module_import(self):
-        from agentos.framework.plugins.logger_plugin import LoggerPlugin
-        from agentos.framework.plugins.metrics_plugin import MetricsPlugin
+        from agentrt.framework.plugins.logger_plugin import LoggerPlugin
+        from agentrt.framework.plugins.metrics_plugin import MetricsPlugin
 
         logger = LoggerPlugin()
         metrics = MetricsPlugin()
@@ -49,7 +49,7 @@ class TestPythonPlatformCompatibility(unittest.TestCase):
         self.assertIn("logging", caps)
 
     def test_exceptions_import(self):
-        from agentos.exceptions import (
+        from agentrt.exceptions import (
             AgentOSError, NetworkError, ValidationError,
             TimeoutError, CODE_SUCCESS, CODE_UNKNOWN,
             http_status_to_code,
@@ -58,7 +58,7 @@ class TestPythonPlatformCompatibility(unittest.TestCase):
         self.assertEqual(http_status_to_code(404), "0x0005")
 
     def test_path_handling_unix_style(self):
-        from agentos.framework.plugin import PluginManifest
+        from agentrt.framework.plugin import PluginManifest
         manifest = PluginManifest(
             plugin_id="path_test",
             name="Path Test",
@@ -71,7 +71,7 @@ class TestCrossModuleTypeCompatibility(unittest.TestCase):
     """跨模块类型兼容性"""
 
     def test_plugin_state_enum_values(self):
-        from agentos.framework.plugin import PluginState
+        from agentrt.framework.plugin import PluginState
         states = [
             PluginState.DISCOVERED, PluginState.LOADED,
             PluginState.ACTIVE, PluginState.UNLOADED,
@@ -81,7 +81,7 @@ class TestCrossModuleTypeCompatibility(unittest.TestCase):
             self.assertIsInstance(state.value, str)
 
     def test_manifest_field_types(self):
-        from agentos.framework.plugin import PluginManifest
+        from agentrt.framework.plugin import PluginManifest
         m = PluginManifest(
             plugin_id="type_test",
             name="Type Test",
@@ -92,7 +92,7 @@ class TestCrossModuleTypeCompatibility(unittest.TestCase):
         self.assertIsInstance(m.permissions, list)
 
     def test_registry_returns_correct_types(self):
-        from agentos.framework.plugin import PluginRegistry, PluginState
+        from agentrt.framework.plugin import PluginRegistry, PluginState
         r = PluginRegistry()
         state = r.get_state("nonexistent")
         if state is not None:
@@ -103,7 +103,7 @@ class TestEncodingCompatibility(unittest.TestCase):
     """编码兼容性测试（UTF-8/中文路径）"""
 
     def test_chinese_in_manifest(self):
-        from agentos.framework.plugin import PluginManifest
+        from agentrt.framework.plugin import PluginManifest
         m = PluginManifest(
             plugin_id="encoding_test",
             name="中文插件名称",
@@ -113,7 +113,7 @@ class TestEncodingCompatibility(unittest.TestCase):
         self.assertIn("UTF-8", m.description)
 
     def test_unicode_capability_names(self):
-        from agentos.framework.plugin import PluginManifest
+        from agentrt.framework.plugin import PluginManifest
         m = PluginManifest(
             plugin_id="unicode_cap",
             name="Unicode Cap",
@@ -126,7 +126,7 @@ class TestConcurrentAccess(unittest.TestCase):
     """并发访问兼容性"""
 
     def test_registry_concurrent_register(self):
-        from agentos.framework.plugin import PluginRegistry
+        from agentrt.framework.plugin import PluginRegistry
         r = PluginRegistry()
 
         class FastPlugin:
@@ -159,8 +159,8 @@ class TestSDKVersionAlignment(unittest.TestCase):
 
     def test_python_sdk_version(self):
         try:
-            import agentos
-            version = getattr(agentos, 'VERSION', None)
+            import agentrt
+            version = getattr(agentrt, 'VERSION', None)
             if version:
                 self.assertTrue(version.startswith('2') or version.startswith('3'))
         except ImportError:

@@ -24,7 +24,7 @@
 #include "memory_compat.h"
 #include "memoryrovol_bridge.h"
 #include "memoryrovol.h"
-#include "agentos_types.h"
+#include "agentrt_types.h"
 
 /* ============================================================================
  * Test Helpers
@@ -91,7 +91,7 @@ static void test_normal_bridge_lifecycle_builtin(void) {
           "Bridge should be ready after creation");
 
     /* Get provider interface */
-    agentos_memory_provider_t *provider = memoryrovol_bridge_get_provider(bridge);
+    agentrt_memory_provider_t *provider = memoryrovol_bridge_get_provider(bridge);
     CHECK(provider != NULL, "memoryrovol_bridge_get_provider should return provider");
 
     /* Verify provider has required function pointers */
@@ -138,7 +138,7 @@ static void test_normal_full_layers(void) {
     CHECK(memoryrovol_bridge_is_ready(bridge),
           "Bridge should be ready with all layers");
 
-    agentos_memory_provider_t *provider = memoryrovol_bridge_get_provider(bridge);
+    agentrt_memory_provider_t *provider = memoryrovol_bridge_get_provider(bridge);
     CHECK(provider != NULL, "Provider should be available");
 
     memoryrovol_bridge_destroy(bridge);
@@ -218,7 +218,7 @@ static void test_error_null_handling(void) {
     CHECK(!memoryrovol_bridge_is_ready(NULL), "NULL bridge should not be ready");
 
     /* NULL get_provider should return NULL */
-    agentos_memory_provider_t *provider = memoryrovol_bridge_get_provider(NULL);
+    agentrt_memory_provider_t *provider = memoryrovol_bridge_get_provider(NULL);
     CHECK(provider == NULL, "NULL bridge get_provider should return NULL");
 
     /* NULL get_mode should return NULL */
@@ -230,7 +230,7 @@ static void test_error_null_handling(void) {
     CHECK(ret != 0, "NULL bridge switch_mode should fail");
 
     /* NULL get_stats should fail */
-    agentos_memory_stats_t stats;
+    agentrt_memory_stats_t stats;
     ret = memoryrovol_bridge_get_stats(NULL, &stats);
     CHECK(ret != 0, "NULL bridge get_stats should fail");
 
@@ -254,11 +254,11 @@ static void test_timeout_bridge_ops(void) {
     CHECK(bridge != NULL, "memoryrovol_bridge_create returned NULL");
 
     /* Get provider should be fast */
-    agentos_memory_provider_t *provider = memoryrovol_bridge_get_provider(bridge);
+    agentrt_memory_provider_t *provider = memoryrovol_bridge_get_provider(bridge);
     CHECK(provider != NULL, "Get provider should complete quickly");
 
     /* Get stats should be fast */
-    agentos_memory_stats_t stats;
+    agentrt_memory_stats_t stats;
     memset(&stats, 0, sizeof(stats));
     int ret = memoryrovol_bridge_get_stats(bridge, &stats);
     CHECK_EQ(ret, 0, "Get stats should complete within timeout");
@@ -301,7 +301,7 @@ static void test_concurrent_bridge_instances(void) {
         CHECK(memoryrovol_bridge_is_ready(bridges[i]),
               "Bridge should be ready");
 
-        agentos_memory_provider_t *provider = memoryrovol_bridge_get_provider(bridges[i]);
+        agentrt_memory_provider_t *provider = memoryrovol_bridge_get_provider(bridges[i]);
         CHECK(provider != NULL, "Provider should not be NULL");
 
         /* Verify provider has required function pointers */
@@ -389,7 +389,7 @@ static void test_health_check_and_dump(void) {
     }
 
     /* Get stats */
-    agentos_memory_stats_t stats;
+    agentrt_memory_stats_t stats;
     memset(&stats, 0, sizeof(stats));
     ret = memoryrovol_bridge_get_stats(bridge, &stats);
     CHECK_EQ(ret, 0, "Get stats should succeed");
@@ -410,20 +410,20 @@ static void test_health_check_and_dump(void) {
 static void test_l3_public_api_bind_and_query(void) {
     TEST("C-L12 C2: L3 bind_entity + query_relations (no ENOTSUP stub)");
 
-    agentos_memoryrov_handle_t *handle = agentos_memoryrov_create();
-    CHECK(handle != NULL, "agentos_memoryrov_create returned NULL");
+    agentrt_memoryrov_handle_t *handle = agentrt_memoryrov_create();
+    CHECK(handle != NULL, "agentrt_memoryrov_create returned NULL");
 
     /* 1. 绑定实体 rec_001，附带两条关系 */
     const char *relations =
         "[{\"to\":\"rec_002\",\"type\":\"BEFORE\",\"weight\":0.8},"
         " {\"to\":\"rec_003\",\"type\":\"SIMILAR_TO\",\"weight\":0.9}]";
-    agentos_error_t err = agentos_memoryrov_l3_bind_entity(
+    agentrt_error_t err = agentrt_memoryrov_l3_bind_entity(
         handle, "rec_001", "memory_record", relations);
 
     /* OSS 模式（L3 未编译）返回 ENOTSUP — 非桩，是合法降级 */
-    if (err == (agentos_error_t)AGENTOS_ENOTSUP) {
+    if (err == (agentrt_error_t)AGENTRT_ENOTSUP) {
         printf("(OSS mode, L3 not compiled) ");
-        agentos_memoryrov_destroy(handle);
+        agentrt_memoryrov_destroy(handle);
         PASS();
         return;
     }
@@ -431,7 +431,7 @@ static void test_l3_public_api_bind_and_query(void) {
 
     /* 2. 查询 rec_001 的关联实体 */
     char *json = NULL;
-    err = agentos_memoryrov_l3_query_relations(handle, "rec_001", &json);
+    err = agentrt_memoryrov_l3_query_relations(handle, "rec_001", &json);
     CHECK_EQ(err, 0, "l3_query_relations should succeed");
     CHECK(json != NULL, "query_relations should return JSON");
 
@@ -446,17 +446,17 @@ static void test_l3_public_api_bind_and_query(void) {
 
     /* 4. 查询不存在的实体 — 应返回 ENOENT 或空数组 */
     char *json2 = NULL;
-    err = agentos_memoryrov_l3_query_relations(handle, "nonexistent_xyz", &json2);
+    err = agentrt_memoryrov_l3_query_relations(handle, "nonexistent_xyz", &json2);
     if (json2) free(json2);
     /* ENOENT 或 SUCCESS(空数组) 均可接受 */
 
     /* 5. NULL 参数错误处理 */
-    err = agentos_memoryrov_l3_bind_entity(NULL, "rec", "type", NULL);
+    err = agentrt_memoryrov_l3_bind_entity(NULL, "rec", "type", NULL);
     CHECK(err != 0, "NULL handle should fail");
-    err = agentos_memoryrov_l3_query_relations(NULL, "rec", &json);
+    err = agentrt_memoryrov_l3_query_relations(NULL, "rec", &json);
     CHECK(err != 0, "NULL handle query should fail");
 
-    agentos_memoryrov_destroy(handle);
+    agentrt_memoryrov_destroy(handle);
     PASS();
 }
 
