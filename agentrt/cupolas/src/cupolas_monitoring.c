@@ -21,7 +21,7 @@
 #include "cupolas_monitoring.h"
 
 #include "cupolas_metrics.h"
-#include "gateway.h"
+/* SP06 解耦：移除 #include "gateway.h"，改为通过 cupolas_endpoint_register_fn_t 回调注入 */
 #include "platform/platform.h"
 #include "utils/cupolas_utils.h"
 #include "error.h"
@@ -279,8 +279,8 @@ static void *reporter_thread_func(void *arg)
 
 /* ========== Dynamic Endpoint Handlers (via gateway registration) ========== */
 
-static int handle_metrics_endpoint(const gateway_endpoint_request_t *req,
-                                   gateway_endpoint_response_t *resp)
+static int handle_metrics_endpoint(const cupolas_endpoint_request_t *req,
+                                   cupolas_endpoint_response_t *resp)
 {
     cupolas_monitoring_t *mgr = (cupolas_monitoring_t *)req->user_data;
 
@@ -307,8 +307,8 @@ static int handle_metrics_endpoint(const gateway_endpoint_request_t *req,
     return 0;
 }
 
-static int handle_health_endpoint(const gateway_endpoint_request_t *req,
-                                  gateway_endpoint_response_t *resp)
+static int handle_health_endpoint(const cupolas_endpoint_request_t *req,
+                                  cupolas_endpoint_response_t *resp)
 {
     cupolas_monitoring_t *mgr = (cupolas_monitoring_t *)req->user_data;
 
@@ -338,8 +338,8 @@ static int handle_health_endpoint(const gateway_endpoint_request_t *req,
     return 0;
 }
 
-static int handle_index_endpoint(const gateway_endpoint_request_t *req __attribute__((unused)),
-                                 gateway_endpoint_response_t *resp)
+static int handle_index_endpoint(const cupolas_endpoint_request_t *req __attribute__((unused)),
+                                 cupolas_endpoint_response_t *resp)
 {
     const char *body = "<html><head><title>Cupolas Monitoring</title></head><body>"
                        "<h2>AgentRT Cupolas Monitoring</h2>"
@@ -895,32 +895,34 @@ void cupolas_monitoring_shutdown_instance(void)
     cupolas_rwlock_unlock(&g_monitoring_lock);
 }
 
-int cupolas_monitoring_register_endpoints(cupolas_monitoring_t *mgr, gateway_t *gw)
+int cupolas_monitoring_register_endpoints(cupolas_monitoring_t *mgr,
+                                           void *server_handle,
+                                           cupolas_endpoint_register_fn_t register_fn)
 {
-    if (!mgr || !gw)
+    if (!mgr || !server_handle || !register_fn)
         return AGENTRT_EINVAL;
 
     agentrt_error_t err;
 
-    err = gateway_register_endpoint(gw, "GET", "/metrics", handle_metrics_endpoint, mgr);
+    err = register_fn(server_handle, "GET", "/metrics", handle_metrics_endpoint, mgr);
     if (err != AGENTRT_SUCCESS) {
         CUPOLAS_LOG_ERROR("monitoring: failed to register /metrics endpoint");
         return AGENTRT_EINVAL;
     }
 
-    err = gateway_register_endpoint(gw, "GET", "/health", handle_health_endpoint, mgr);
+    err = register_fn(server_handle, "GET", "/health", handle_health_endpoint, mgr);
     if (err != AGENTRT_SUCCESS) {
         CUPOLAS_LOG_ERROR("monitoring: failed to register /health endpoint");
         return AGENTRT_EINVAL;
     }
 
-    err = gateway_register_endpoint(gw, "GET", "/monitoring", handle_index_endpoint, mgr);
+    err = register_fn(server_handle, "GET", "/monitoring", handle_index_endpoint, mgr);
     if (err != AGENTRT_SUCCESS) {
         CUPOLAS_LOG_ERROR("monitoring: failed to register /monitoring endpoint");
         return AGENTRT_EINVAL;
     }
 
-    CUPOLAS_LOG("monitoring: endpoints registered with gateway");
+    CUPOLAS_LOG("monitoring: endpoints registered via callback");
 
     return 0;
 }

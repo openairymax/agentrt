@@ -5,7 +5,7 @@
  * 注册到 PRE_EXEC + POST_EXEC 两种事件类型，记录 trace span 的开始与结束，
  * 为 OpenTelemetry span 导出做准备。trace_id 跨进程贯穿（L2 规范 §6）。
  *
- * Trace span 记录格式（结构化 SVC_LOG_INFO）：
+ * Trace span 记录格式（结构化 LOG_INFO）：
  *   - PRE_EXEC：SPAN_START|op=...|trace=...|sess=...|ts=...
  *   - POST_EXEC：SPAN_END|op=...|trace=...|sess=...|ts=...
  *
@@ -20,7 +20,7 @@
 
 #include "hook_builtin_handlers.h"
 #include "hook_registry.h"
-#include "svc_logger.h"
+#include <logging.h>
 
 /* ==================== Trace 回调 ==================== */
 
@@ -34,7 +34,7 @@ static hook_decision_t hook_trace_pre_exec_callback(hook_context_t *ctx)
 {
     if (!ctx) return HOOK_DECISION_CONTINUE;
 
-    SVC_LOG_INFO("TRACE|SPAN_START|op=%s|src=%s|trace=%s|sess=%s|ts=%llu",
+    LOG_INFO("TRACE|SPAN_START|op=%s|src=%s|trace=%s|sess=%s|ts=%llu",
                  ctx->operation ? ctx->operation : "unknown",
                  ctx->source_daemon ? ctx->source_daemon : "unknown",
                  ctx->trace_id[0] ? ctx->trace_id : "-",
@@ -53,7 +53,7 @@ static hook_decision_t hook_trace_post_exec_callback(hook_context_t *ctx)
 {
     if (!ctx) return HOOK_DECISION_CONTINUE;
 
-    SVC_LOG_INFO("TRACE|SPAN_END|op=%s|src=%s|trace=%s|sess=%s|ts=%llu",
+    LOG_INFO("TRACE|SPAN_END|op=%s|src=%s|trace=%s|sess=%s|ts=%llu",
                  ctx->operation ? ctx->operation : "unknown",
                  ctx->source_daemon ? ctx->source_daemon : "unknown",
                  ctx->trace_id[0] ? ctx->trace_id : "-",
@@ -76,7 +76,7 @@ int hook_trace_handler_register(void)
                                NULL,
                                90,
                                true) != 0) {
-        SVC_LOG_WARN("hook_trace: failed to register PRE_EXEC handler (may already exist)");
+        LOG_WARN("hook_trace: failed to register PRE_EXEC handler (may already exist)");
     }
 
     /* POST_EXEC：span 结束，priority=10（最后执行） */
@@ -86,7 +86,7 @@ int hook_trace_handler_register(void)
                                NULL,
                                10,
                                true) != 0) {
-        SVC_LOG_WARN("hook_trace: failed to register POST_EXEC handler (may already exist)");
+        LOG_WARN("hook_trace: failed to register POST_EXEC handler (may already exist)");
     }
 
     return 0;

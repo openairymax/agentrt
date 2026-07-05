@@ -19,7 +19,7 @@
  */
 
 #include "hook_builtin_handlers.h"
-#include "svc_logger.h"
+#include <logging.h>
 
 /* ==================== 子处理器前向声明 ==================== */
 
@@ -54,7 +54,7 @@ int agentrt_hook_register_builtin_handlers(void)
         total_registered += 2;
     }
 
-    SVC_LOG_INFO("P0.20.1: builtin hook handlers registered (total=%d, "
+    LOG_INFO("P0.20.1: builtin hook handlers registered (total=%d, "
                  "metrics=8 audit=2 trace=2)", total_registered);
     return 0;
 }
@@ -66,5 +66,5 @@ void agentrt_hook_unregister_builtin_handlers(void)
     hook_audit_handler_unregister();
     hook_metrics_handler_unregister();
 
-    SVC_LOG_INFO("P0.20.1: builtin hook handlers unregistered");
+    LOG_INFO("P0.20.1: builtin hook handlers unregistered");
 }

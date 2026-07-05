@@ -23,7 +23,6 @@ set(INTEGRATION_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/common/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/monit_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/gateway_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/hook_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/market_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/memory/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/error/include
@@ -132,8 +131,9 @@ configure_real_lib_test(test_c_link_10_monit_prometheus
 )
 
 # P2.8: Hook System Integration（hook_registry/executor/interceptor/timeout 真实实现）
+# SP04: hook 系统核心已迁移到 agentrt_coreloopthree，不再链接 agentrt_hook_service
 configure_real_lib_test(test_hook_system
-    LIBS agentrt_hook_service
+    LIBS agentrt_coreloopthree
 )
 
 # ============================================================================

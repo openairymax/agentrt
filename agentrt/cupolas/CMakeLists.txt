@@ -168,7 +168,6 @@ target_include_directories(cupolas PUBLIC
 
 target_include_directories(cupolas PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/agentrt/gateway/include
 )
 
 target_include_directories(cupolas PUBLIC

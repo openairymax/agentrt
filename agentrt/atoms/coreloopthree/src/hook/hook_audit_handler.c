@@ -3,7 +3,7 @@
  * @brief P0.20.1: 审计 Hook 处理器 — 错误事件与工具调用事件审计留痕
  *
  * 注册到 ON_ERROR + POST_TOOL 两种事件类型，将关键事件记录到审计日志
- * （结构化 SVC_LOG_INFO），满足 L3 安全治理规范"所有安全相关操作必须留痕"。
+ * （结构化 LOG_INFO），满足 L3 安全治理规范"所有安全相关操作必须留痕"。
  *
  * 审计记录字段：
  *   - timestamp_ns：事件时间戳（纳秒，CLOCK_REALTIME 对齐）
@@ -22,7 +22,7 @@
 
 #include "hook_builtin_handlers.h"
 #include "hook_registry.h"
-#include "svc_logger.h"
+#include <logging.h>
 
 #include <stdio.h>
 
@@ -38,7 +38,7 @@ static hook_decision_t hook_audit_on_error_callback(hook_context_t *ctx)
 {
     if (!ctx) return HOOK_DECISION_CONTINUE;
 
-    SVC_LOG_INFO("AUDIT|ON_ERROR|op=%s|src=%s|trace=%s|sess=%s|in_len=%zu",
+    LOG_INFO("AUDIT|ON_ERROR|op=%s|src=%s|trace=%s|sess=%s|in_len=%zu",
                  ctx->operation ? ctx->operation : "unknown",
                  ctx->source_daemon ? ctx->source_daemon : "unknown",
                  ctx->trace_id[0] ? ctx->trace_id : "-",
@@ -57,7 +57,7 @@ static hook_decision_t hook_audit_post_tool_callback(hook_context_t *ctx)
 {
     if (!ctx) return HOOK_DECISION_CONTINUE;
 
-    SVC_LOG_INFO("AUDIT|POST_TOOL|op=%s|src=%s|trace=%s|sess=%s|in_len=%zu|out_len=%zu",
+    LOG_INFO("AUDIT|POST_TOOL|op=%s|src=%s|trace=%s|sess=%s|in_len=%zu|out_len=%zu",
                  ctx->operation ? ctx->operation : "unknown",
                  ctx->source_daemon ? ctx->source_daemon : "unknown",
                  ctx->trace_id[0] ? ctx->trace_id : "-",
@@ -82,7 +82,7 @@ int hook_audit_handler_register(void)
                                NULL,   /* user_data */
                                80,     /* priority */
                                true) != 0) {
-        SVC_LOG_WARN("hook_audit: failed to register ON_ERROR handler (may already exist)");
+        LOG_WARN("hook_audit: failed to register ON_ERROR handler (may already exist)");
         /* 不返回错误：重名是幂等场景，部分已注册可接受 */
     }
 
@@ -93,7 +93,7 @@ int hook_audit_handler_register(void)
                                NULL,
                                80,
                                true) != 0) {
-        SVC_LOG_WARN("hook_audit: failed to register POST_TOOL handler (may already exist)");
+        LOG_WARN("hook_audit: failed to register POST_TOOL handler (may already exist)");
     }
 
     return 0;

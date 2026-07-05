@@ -44,17 +44,17 @@ add_library(agentrt_coreloopthree STATIC
     src/memory/memory_service.c
     src/memory/memoryrovol_bridge.c
     src/orchestrator.c        # SP02: 从 daemons/common/src/ 迁入（编排器与 coreloopthree 强耦合）
-    # P3.18 (ACC-DT26): hook_d → CoreLoopThree — 关键事件 hook 触发
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/hook_d/src/service.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/hook_d/src/hook_executor.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/hook_d/src/hook_registry.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/hook_d/src/hook_interceptor.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/hook_d/src/hook_timeout.c
-    # P0.20.1: 生产 Hook 处理器 — 审计/metrics/trace 内置注册
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/hook_d/src/hook_builtin_handlers.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/hook_d/src/hook_audit_handler.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/hook_d/src/hook_metrics_handler.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/hook_d/src/hook_trace_handler.c
+    # SP04: Hook 系统核心从 daemons/hook_d/src/ 迁入（消除 atoms→daemons 反向依赖）
+    # hook_interceptor.c 依赖 cupolas/safety_guard.h，通过 svc_common→cupolas 传递依赖获取
+    src/hook/service.c
+    src/hook/hook_executor.c
+    src/hook/hook_registry.c
+    src/hook/hook_interceptor.c
+    src/hook/hook_timeout.c
+    src/hook/hook_builtin_handlers.c
+    src/hook/hook_audit_handler.c
+    src/hook/hook_metrics_handler.c
+    src/hook/hook_trace_handler.c
 )
 
 target_link_libraries(agentrt_coreloopthree PUBLIC agentrt_atoms)
@@ -129,7 +129,7 @@ if(MSVC)
     target_compile_options(agentrt_coreloopthree PRIVATE /sdl)
     target_compile_options(agentrt_coreloopthree PRIVATE /guard:cf)
 else()
-    target_compile_options(agentrt_coreloopthree PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(agentrt_coreloopthree PRIVATE -Wall -Wextra -Wpedantic -Werror=implicit-function-declaration -Werror=return-type)
     target_compile_options(agentrt_coreloopthree PRIVATE -fstack-protector-strong)
     target_compile_options(agentrt_coreloopthree PRIVATE $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2>)
     target_compile_options(agentrt_coreloopthree PRIVATE -fPIE)
@@ -151,12 +151,22 @@ target_include_directories(agentrt_coreloopthree PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../memory
     ${CMAKE_CURRENT_SOURCE_DIR}/../memory/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../taskflow/include
+    # SP04: commons/platform/include 必须在 daemons/common/include 之前，
+    # 确保找到真正的 platform.h（含 agentrt_thread_create/join 宏），
+    # 而非 daemons/common/include/platform.h 桩版本
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/platform/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/sync/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/logging/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../cupolas/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/common/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/llm_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/tool_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/hook_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/quality
 )
+
+# SP04: safety_guard.h 中 safety_guard_create 等声明在 #ifdef AGENTRT_ENABLE_V2_API 块中
+target_compile_definitions(agentrt_coreloopthree PRIVATE AGENTRT_ENABLE_V2_API=1)
 
 target_link_libraries(agentrt_coreloopthree PUBLIC
     agentrt_cognition

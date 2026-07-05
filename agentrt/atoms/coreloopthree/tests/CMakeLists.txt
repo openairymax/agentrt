@@ -47,8 +47,6 @@ set(CL3_COMMON_INCLUDES
     ${CORELOOPTHREE_DIR}/../../daemons/common/include
     ${CORELOOPTHREE_DIR}/../../daemons/llm_d/include
     ${CORELOOPTHREE_DIR}/../../daemons/tool_d/include
-    # P3.18 (ACC-DT26): hook_d — test_hook_integration.c 引用 agentrt_hook.h
-    ${CORELOOPTHREE_DIR}/../../daemons/hook_d/include
     ${CORELOOPTHREE_DIR}/../../commons/utils/quality
     ${CORELOOPTHREE_DIR}/../../cupolas/src
     ${COREKERN_INCLUDE_DIR}

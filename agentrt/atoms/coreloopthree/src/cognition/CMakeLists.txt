@@ -46,8 +46,6 @@ target_include_directories(agentrt_cognition PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../daemons/common/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../daemons/llm_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../daemons/tool_d/include
-    # P3.18 (ACC-DT26): hook_d → CoreLoopThree — engine.c 引用 agentrt_hook.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../daemons/hook_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../../commons/utils/quality
 )
 

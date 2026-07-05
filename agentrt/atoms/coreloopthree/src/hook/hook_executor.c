@@ -8,7 +8,7 @@
 
 #include "hook_executor.h"
 #include "hook_timeout.h"
-#include "svc_logger.h"
+#include <logging.h>
 #include "memory_compat.h"
 
 #include <errno.h>
@@ -417,7 +417,7 @@ int hook_run_subprocess(const char *const argv[], char **envp, int timeout_sec)
      * hook_run_shell）会处理 -1 返回值（记录失败并返回错误）。 */
     (void)envp;
     (void)timeout_sec;
-    SVC_LOG_ERROR("hook_executor: subprocess execution not supported on Windows, "
+    LOG_ERROR("hook_executor: subprocess execution not supported on Windows, "
                   "use tool_d IPC instead (fork/execve unavailable)");
     return -1;
 #endif /* _WIN32 */
@@ -435,7 +435,7 @@ int hook_run_script(const char *interpreter, const char *script_path,
 
     char **env = hook_build_env_with_context(json_buf);
     if (!env) {
-        SVC_LOG_ERROR("hook_executor: failed to build env for script '%s'", script_path);
+        LOG_ERROR("hook_executor: failed to build env for script '%s'", script_path);
         return -1;
     }
 
@@ -444,11 +444,11 @@ int hook_run_script(const char *interpreter, const char *script_path,
     hook_free_env(env);
 
     if (exit_code == -2) {
-        SVC_LOG_WARN("hook_executor: script hook '%s' timed out (%ds)", script_path, timeout_sec);
+        LOG_WARN("hook_executor: script hook '%s' timed out (%ds)", script_path, timeout_sec);
         return -1;
     }
     if (exit_code < 0) {
-        SVC_LOG_ERROR("hook_executor: failed to launch interpreter '%s' for '%s'",
+        LOG_ERROR("hook_executor: failed to launch interpreter '%s' for '%s'",
                       interpreter, script_path);
         return -1;
     }
@@ -479,7 +479,7 @@ static int hook_webhook_post_curl(const char *url, const char *json_body)
 {
     CURL *curl = curl_easy_init();
     if (!curl) {
-        SVC_LOG_ERROR("hook_executor: curl_easy_init failed for webhook '%s'", url);
+        LOG_ERROR("hook_executor: curl_easy_init failed for webhook '%s'", url);
         return -1;
     }
 
@@ -504,11 +504,11 @@ static int hook_webhook_post_curl(const char *url, const char *json_body)
     curl_easy_cleanup(curl);
 
     if (res != CURLE_OK) {
-        SVC_LOG_WARN("hook_executor: webhook POST '%s' failed: %s", url, curl_easy_strerror(res));
+        LOG_WARN("hook_executor: webhook POST '%s' failed: %s", url, curl_easy_strerror(res));
         return -1;
     }
     if (http_code < 200 || http_code >= 300) {
-        SVC_LOG_WARN("hook_executor: webhook '%s' returned HTTP %ld", url, http_code);
+        LOG_WARN("hook_executor: webhook '%s' returned HTTP %ld", url, http_code);
         return -1;
     }
     return 0;
@@ -541,15 +541,15 @@ int hook_executor_run_webhook(const char *url, hook_context_t *ctx)
     };
     int exit_code = hook_run_subprocess(argv, NULL, HOOK_WEBHOOK_TIMEOUT_SEC + 5);
     if (exit_code == -2) {
-        SVC_LOG_WARN("hook_executor: webhook curl '%s' timed out", url);
+        LOG_WARN("hook_executor: webhook curl '%s' timed out", url);
         return -1;
     }
     if (exit_code < 0) {
-        SVC_LOG_ERROR("hook_executor: failed to launch curl for webhook '%s'", url);
+        LOG_ERROR("hook_executor: failed to launch curl for webhook '%s'", url);
         return -1;
     }
     if (exit_code != 0) {
-        SVC_LOG_WARN("hook_executor: webhook curl '%s' exit=%d", url, exit_code);
+        LOG_WARN("hook_executor: webhook curl '%s' exit=%d", url, exit_code);
         return -1;
     }
     return 0;

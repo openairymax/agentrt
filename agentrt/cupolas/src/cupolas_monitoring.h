@@ -14,7 +14,33 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef struct gateway gateway_t;
+/* SP06 解耦：cupolas 不再反向依赖 gateway 模块。
+ * 以下类型定义了通用的 HTTP 端点请求/响应抽象，
+ * 由调用方（如 gateway_d）负责适配到具体的 HTTP 服务器实现。 */
+
+/** HTTP 端点请求（cupolas 视角的抽象） */
+typedef struct cupolas_endpoint_request {
+    void *user_data;  /**< 调用方在注册时传入的 user_data */
+} cupolas_endpoint_request_t;
+
+/** HTTP 端点响应（cupolas 视角的抽象） */
+typedef struct cupolas_endpoint_response {
+    int status_code;       /**< HTTP 状态码 */
+    const char *content_type; /**< Content-Type 头 */
+    char *body;            /**< 响应体（调用方负责释放） */
+    size_t body_len;       /**< 响应体长度 */
+} cupolas_endpoint_response_t;
+
+/** HTTP 端点处理函数指针 */
+typedef int (*cupolas_endpoint_handler_t)(const cupolas_endpoint_request_t *req,
+                                          cupolas_endpoint_response_t *resp);
+
+/** HTTP 端点注册函数指针（由调用方注入，如 gateway 适配器） */
+typedef int (*cupolas_endpoint_register_fn_t)(void *server_handle,
+                                              const char *method,
+                                              const char *path,
+                                              cupolas_endpoint_handler_t handler,
+                                              void *user_data);
 
 #ifdef __cplusplus
 extern "C" {
@@ -367,25 +393,30 @@ int cupolas_monitoring_init_instance(const monitoring_config_t *config);
 void cupolas_monitoring_shutdown_instance(void);
 
 /**
- * @brief Register monitoring endpoints with a gateway instance
+ * @brief Register monitoring endpoints with an HTTP server
  *
  * Registers /metrics, /health, and /monitoring endpoints with the
- * specified gateway. After registration, the gateway's HTTP server
- * will serve monitoring data, eliminating the need for a separate
- * HTTP server in the monitoring module.
+ * specified HTTP server via a caller-injected registration callback.
+ * After registration, the server's HTTP handler will serve monitoring
+ * data, eliminating the need for a separate HTTP server in the monitoring
+ * module.
  *
  * @param[in] mgr Monitoring manager handle
- * @param[in] gw Gateway instance (must be GATEWAY_TYPE_HTTP)
+ * @param[in] server_handle Opaque server handle (e.g. gateway_t *)
+ * @param[in] register_fn Endpoint registration callback injected by caller
  * @return 0 on success, negative on failure
  *
- * @note Must be called after cupolas_monitoring_start() and before gateway_start()
+ * @note Must be called after cupolas_monitoring_start() and before server start
  * @note Thread-safe: Safe to call from main thread only
  * @reentrant No
- * @ownership mgr and gw: caller retains ownership
+ * @ownership mgr and server_handle: caller retains ownership
  *
  * @since 0.1.0
+ * @changed SP06 (0.1.1): gateway_t *gw → void *server_handle + register_fn callback
  */
-int cupolas_monitoring_register_endpoints(cupolas_monitoring_t *mgr, gateway_t *gw);
+int cupolas_monitoring_register_endpoints(cupolas_monitoring_t *mgr,
+                                           void *server_handle,
+                                           cupolas_endpoint_register_fn_t register_fn);
 
 #ifdef __cplusplus
 }
