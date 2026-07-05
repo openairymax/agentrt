@@ -236,14 +236,14 @@ class UnitTestRunner:
 class CTestRunner:
     """C/C++ 测试运行器 (通过 CTest)"""
 
-    def __init__(self, agentos_dir: Path):
-        self.agentos_dir = agentos_dir
+    def __init__(self, agentrt_dir: Path):
+        self.agentrt_dir = agentrt_dir
 
     def run(self, verbose: bool = False) -> bool:
         """运行 C 单元测试"""
         print("🧪 运行 C/C++ 单元测试...")
 
-        build_dir = self.agentos_dir / "build"
+        build_dir = self.agentrt_dir / "build"
         if not build_dir.exists():
             print("  ⚠️  编译目录不存在，请先运行 cmake 构建")
             return False

@@ -3,7 +3,7 @@
 # check_memcpy_dynamic.sh — 动态长度 memcpy/memmove/memset 前置校验扫描 (SEC-11)
 # Phase 2.5: 内存安全四层防御体系 — Tier1 预防层
 # 用途: 自动扫描项目中所有动态长度的内存拷贝操作
-#       标记需要人工审查或替换为 AGENTOS_MEMCPY_SAFE 的调用点
+#       标记需要人工审查或替换为 AGENTRT_MEMCPY_SAFE 的调用点
 # 调用: bash check_memcpy_dynamic.sh [project_root] [--fix] [--report FILE]
 # =============================================================================
 
@@ -50,7 +50,7 @@ classify_memcpy_call() {
     local line="$1"
 
     # 已使用安全宏 → safe
-    echo "$line" | grep -q 'AGENTOS_MEMCPY_SAFE' && { echo "safe"; return; }
+    echo "$line" | grep -q 'AGENTRT_MEMCPY_SAFE' && { echo "safe"; return; }
 
     # 第三参数是 sizeof(...) → safe
     echo "$line" | grep -qE 'sizeof\s*\(.+\)' && { echo "safe"; return; }
@@ -119,7 +119,7 @@ while IFS= read -r -d '' file; do
 
                 # --fix 模式：生成建议的修复代码
                 if $FIX_MODE; then
-                    echo "  FIX SUGGESTION: Replace with AGENTOS_MEMCPY_SAFE(dst, dst_cap, src, src_size)"
+                    echo "  FIX SUGGESTION: Replace with AGENTRT_MEMCPY_SAFE(dst, dst_cap, src, src_size)"
                 fi
                 ;;
         esac

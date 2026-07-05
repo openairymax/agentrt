@@ -16,13 +16,13 @@
       "type": "object",
       "description": "Version compatibility constraints",
       "properties": {
-        "min_agentos_version": {
+        "min_agentrt_version": {
           "type": "string",
           "pattern": "^\\d+\\.\\d+\\.\\d+$",
           "description": "Minimum compatible AgentRT version",
           "examples": ["1.0.0"]
         },
-        "max_agentos_version": {
+        "max_agentrt_version": {
           "type": "string",
           "pattern": "^\\d+\\.\\d+\\.\\d+$",
           "description": "Maximum compatible AgentRT version",
@@ -39,7 +39,7 @@
           "minLength": 1,
           "maxLength": 64,
           "description": "Kernel instance name",
-          "examples": ["AgentRT-Core-01", "agentos-production"]
+          "examples": ["AgentRT-Core-01", "agentrt-production"]
         },
         "version": {
           "type": "string",
@@ -78,7 +78,7 @@
               "minimum": 1,
               "maximum": 100000,
               "default": 1024,
-              "description": "Maximum number of tasks (from agentos.yaml)",
+              "description": "Maximum number of tasks (from agentrt.yaml)",
               "examples": [512, 1024, 2048, 4096]
             },
             "default_priority": {
@@ -86,7 +86,7 @@
               "minimum": 0,
               "maximum": 100,
               "default": 50,
-              "description": "Default task priority (from agentos.yaml)",
+              "description": "Default task priority (from agentrt.yaml)",
               "examples": [10, 25, 50, 75, 100]
             },
             "max_concurrency": {
@@ -306,7 +306,7 @@
               "minimum": 50,
               "maximum": 99,
               "default": 85,
-              "description": "OOM watermark percentage threshold (from agentos.yaml)",
+              "description": "OOM watermark percentage threshold (from agentrt.yaml)",
               "examples": [80, 85, 90, 95]
             },
             "arena_default_size_kb": {
@@ -314,7 +314,7 @@
               "minimum": 4,
               "maximum": 1024,
               "default": 64,
-              "description": "Default arena allocator size in KB (from agentos.yaml)",
+              "description": "Default arena allocator size in KB (from agentrt.yaml)",
               "examples": [16, 32, 64, 128, 256]
             },
             "pool_thread_cache_max": {
@@ -322,7 +322,7 @@
               "minimum": 0,
               "maximum": 10000,
               "default": 256,
-              "description": "Max thread cache objects per pool (from agentos.yaml)",
+              "description": "Max thread cache objects per pool (from agentrt.yaml)",
               "examples": [64, 128, 256, 512]
             },
             "slab_min_objs": {
@@ -330,7 +330,7 @@
               "minimum": 1,
               "maximum": 100,
               "default": 8,
-              "description": "Minimum objects per slab (from agentos.yaml)",
+              "description": "Minimum objects per slab (from agentrt.yaml)",
               "examples": [4, 8, 16, 32]
             },
             "mempool_reserved_mb": {
@@ -338,7 +338,7 @@
               "minimum": 0,
               "maximum": 1024,
               "default": 32,
-              "description": "Reserved mempool size in MB (from agentos.yaml)",
+              "description": "Reserved mempool size in MB (from agentrt.yaml)",
               "examples": [16, 32, 64, 128]
             },
             "leak_scan_interval_sec": {
@@ -346,7 +346,7 @@
               "minimum": 10,
               "maximum": 3600,
               "default": 60,
-              "description": "Leak scan interval in seconds (from agentos.yaml)",
+              "description": "Leak scan interval in seconds (from agentrt.yaml)",
               "examples": [30, 60, 120, 300]
             },
             "soak_test_rss_growth_percent": {
@@ -354,13 +354,13 @@
               "minimum": 1,
               "maximum": 100,
               "default": 5,
-              "description": "Soak test RSS growth threshold percent (from agentos.yaml)",
+              "description": "Soak test RSS growth threshold percent (from agentrt.yaml)",
               "examples": [2, 5, 10, 20]
             },
             "sensitive_zero_on_free": {
               "type": "boolean",
               "default": true,
-              "description": "Zero memory on free for sensitive data (from agentos.yaml)",
+              "description": "Zero memory on free for sensitive data (from agentrt.yaml)",
               "examples": [true, false]
             },
             "deferred_free_delay_ms": {
@@ -368,7 +368,7 @@
               "minimum": 0,
               "maximum": 60000,
               "default": 1000,
-              "description": "Deferred free delay in milliseconds (from agentos.yaml)",
+              "description": "Deferred free delay in milliseconds (from agentrt.yaml)",
               "examples": [500, 1000, 2000, 5000]
             },
             "guard_enabled": {
@@ -528,7 +528,7 @@
               "minimum": 256,
               "maximum": 1048576,
               "default": 65536,
-              "description": "Maximum message size in bytes (from agentos.yaml)",
+              "description": "Maximum message size in bytes (from agentrt.yaml)",
               "examples": [16384, 32768, 65536, 131072]
             },
             "shm_pool_size_mb": {
@@ -536,7 +536,7 @@
               "minimum": 4,
               "maximum": 4096,
               "default": 128,
-              "description": "Shared memory pool size in MB (from agentos.yaml)",
+              "description": "Shared memory pool size in MB (from agentrt.yaml)",
               "examples": [64, 128, 256, 512]
             },
             "timeout_ms": {

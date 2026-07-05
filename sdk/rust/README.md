@@ -69,7 +69,7 @@ rust/
 | `APIClient` | 高级 API 客户端，封装所有业务模块 |
 
 ```rust
-use agentos_rs::{new_client, new_client_with_api_key};
+use agentrt_rs::{new_client, new_client_with_api_key};
 
 let client = new_client("http://localhost:18789")?;
 let client = new_client_with_api_key("http://localhost:18789", "api-key")?;
@@ -137,7 +137,7 @@ let client = new_client_with_api_key("http://localhost:18789", "api-key")?;
 ### 便捷函数
 
 ```rust
-use agentos_rs::{new_client, new_client_with_api_key, VERSION, AUTHOR, LICENSE};
+use agentrt_rs::{new_client, new_client_with_api_key, VERSION, AUTHOR, LICENSE};
 
 let client = new_client("http://localhost:18789")?;
 let client = new_client_with_api_key("http://localhost:18789", "key")?;
@@ -147,7 +147,7 @@ let client = new_client_with_api_key("http://localhost:18789", "key")?;
 
 ```rust
 use std::sync::Arc;
-use agentos_rs::{new_client, TaskManager, MemoryManager, MemoryLayer};
+use agentrt_rs::{new_client, TaskManager, MemoryManager, MemoryLayer};
 
 let task_mgr = TaskManager::new(Arc::new(client));
 
@@ -161,7 +161,7 @@ task_mgr.cancel(&task_id).await?;
 
 ```rust
 use std::sync::Arc;
-use agentos_rs::{new_client, MemoryManager, MemoryLayer};
+use agentrt_rs::{new_client, MemoryManager, MemoryLayer};
 
 let memory_mgr = MemoryManager::new(Arc::new(client));
 
@@ -174,7 +174,7 @@ memory_mgr.delete(&memory_id).await?;
 ### 工具函数
 
 ```rust
-use agentos_rs::{
+use agentrt_rs::{
     extract_data_map, get_string, get_i64, get_f64, get_bool,
     build_url, generate_id, validate_endpoint,
     merge_maps, parse_time_from_map,
@@ -211,7 +211,7 @@ cargo clippy
 
 ```rust
 use std::sync::Arc;
-use agentos_rs::{new_client, TaskManager, MemoryManager, MemoryLayer};
+use agentrt_rs::{new_client, TaskManager, MemoryManager, MemoryLayer};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

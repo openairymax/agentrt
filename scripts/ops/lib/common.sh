@@ -12,22 +12,22 @@ set -euo pipefail
 ###############################################################################
 # 路径常量
 ###############################################################################
-AGENTOS_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AGENTOS_SCRIPTS_DIR="$(dirname "$AGENTOS_SCRIPT_DIR")"
-AGENTOS_PROJECT_ROOT="$(dirname "$AGENTOS_SCRIPTS_DIR")"
-AGENTOS_LIB_DIR="$AGENTOS_SCRIPTS_DIR/library"
-AGENTOS_CONFIG_DIR="$AGENTOS_PROJECT_ROOT/manager"
-AGENTOS_heapstore_DIR="$AGENTOS_PROJECT_ROOT/heapstore"
+AGENTRT_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+AGENTRT_SCRIPTS_DIR="$(dirname "$AGENTRT_SCRIPT_DIR")"
+AGENTRT_PROJECT_ROOT="$(dirname "$AGENTRT_SCRIPTS_DIR")"
+AGENTRT_LIB_DIR="$AGENTRT_SCRIPTS_DIR/library"
+AGENTRT_CONFIG_DIR="$AGENTRT_PROJECT_ROOT/manager"
+AGENTRT_heapstore_DIR="$AGENTRT_PROJECT_ROOT/heapstore"
 
 ###############################################################################
 # 加载依赖模块
 ###############################################################################
-agentos_load_libs() {
+agentrt_load_libs() {
     local libs=("log.sh" "error.sh" "platform.sh")
     local lib
 
     for lib in "${libs[@]}"; do
-        local lib_path="$AGENTOS_LIB_DIR/$lib"
+        local lib_path="$AGENTRT_LIB_DIR/$lib"
         if [[ -f "$lib_path" ]]; then
             # 使用 shellcheck 忽略 SC1090
             # shellcheck source=/dev/null
@@ -39,34 +39,34 @@ agentos_load_libs() {
     done
 }
 
-agentos_load_libs
+agentrt_load_libs
 
 ###############################################################################
 # 字符串工具
 ###############################################################################
 
-agentos_to_lower() {
+agentrt_to_lower() {
     echo "$1" | tr '[:upper:]' '[:lower:]'
 }
 
-agentos_to_upper() {
+agentrt_to_upper() {
     echo "$1" | tr '[:lower:]' '[:upper:]'
 }
 
-agentos_trim() {
+agentrt_trim() {
     local var="$1"
     var="${var#"${var%%[![:space:]]*}"}"
     var="${var%"${var##*[![:space:]]}"}"
     echo -n "$var"
 }
 
-agentos_contains() {
+agentrt_contains() {
     local haystack="$1"
     local needle="$2"
     [[ "$haystack" == *"$needle"* ]]
 }
 
-agentos_random_string() {
+agentrt_random_string() {
     local length="${1:-16}"
     LC_ALL=C tr -dc 'a-zA-Z0-9' </dev/urandom | head -c "$length"
 }
@@ -75,7 +75,7 @@ agentos_random_string() {
 # 文件工具
 ###############################################################################
 
-agentos_mkdir() {
+agentrt_mkdir() {
     local dir="$1"
     local mode="${2:-0755}"
 
@@ -84,18 +84,18 @@ agentos_mkdir() {
     fi
 
     if ! mkdir -p "$dir" 2>/dev/null; then
-        agentos_log_error "Failed to create directory: $dir"
+        agentrt_log_error "Failed to create directory: $dir"
         return 1
     fi
 
     if ! chmod "$mode" "$dir" 2>/dev/null; then
-        agentos_log_warn "Failed to set permissions on: $dir"
+        agentrt_log_warn "Failed to set permissions on: $dir"
     fi
 
     return 0
 }
 
-agentos_safe_rm() {
+agentrt_safe_rm() {
     local file="$1"
 
     if [[ -f "$file" ]]; then
@@ -103,7 +103,7 @@ agentos_safe_rm() {
     fi
 }
 
-agentos_backup_file() {
+agentrt_backup_file() {
     local file="$1"
     local backup=""
 
@@ -114,7 +114,7 @@ agentos_backup_file() {
     backup="${file}.backup.$(date +%Y%m%d_%H%M%S)"
 
     if ! cp "$file" "$backup"; then
-        agentos_log_error "Failed to backup file: $file"
+        agentrt_log_error "Failed to backup file: $file"
         return 1
     fi
 
@@ -122,7 +122,7 @@ agentos_backup_file() {
     return 0
 }
 
-agentos_file_size() {
+agentrt_file_size() {
     local file="$1"
 
     if [[ ! -f "$file" ]]; then
@@ -144,7 +144,7 @@ agentos_file_size() {
     fi
 }
 
-agentos_is_executable() {
+agentrt_is_executable() {
     local file="$1"
     [[ -x "$file" ]] || [[ -f "$file" && "${file: -3}" == ".sh" ]]
 }
@@ -153,17 +153,17 @@ agentos_is_executable() {
 # 进程工具
 ###############################################################################
 
-agentos_is_process_running() {
+agentrt_is_process_running() {
     local pid="$1"
     kill -0 "$pid" 2>/dev/null
 }
 
-agentos_wait_for_process() {
+agentrt_wait_for_process() {
     local pid="$1"
     local timeout="${2:-60}"
     local elapsed=0
 
-    while agentos_is_process_running "$pid"; do
+    while agentrt_is_process_running "$pid"; do
         if [[ $elapsed -ge $timeout ]]; then
             return 124
         fi
@@ -174,17 +174,17 @@ agentos_wait_for_process() {
     return 0
 }
 
-agentos_kill_process() {
+agentrt_kill_process() {
     local pid="$1"
     local sig="${2:-TERM}"
 
-    if ! agentos_is_process_running "$pid"; then
+    if ! agentrt_is_process_running "$pid"; then
         return 0
     fi
 
     kill -$sig "$pid" 2>/dev/null || true
-    agentos_wait_for_process "$pid" 5
-    if agentos_is_process_running "$pid"; then
+    agentrt_wait_for_process "$pid" 5
+    if agentrt_is_process_running "$pid"; then
         kill -9 "$pid" 2>/dev/null || true
     fi
 }
@@ -193,7 +193,7 @@ agentos_kill_process() {
 # 网络工具
 ###############################################################################
 
-agentos_is_port_available() {
+agentrt_is_port_available() {
     local port="$1"
 
     if command -v lsof &> /dev/null; then
@@ -205,7 +205,7 @@ agentos_is_port_available() {
     fi
 }
 
-agentos_wait_for_url() {
+agentrt_wait_for_url() {
     local url="$1"
     local timeout="${2:-60}"
     local elapsed=0
@@ -225,7 +225,7 @@ agentos_wait_for_url() {
 # 数组工具
 ###############################################################################
 
-agentos_in_array() {
+agentrt_in_array() {
     local element="$1"
     shift
     local array=("$@")
@@ -238,7 +238,7 @@ agentos_in_array() {
     return 1
 }
 
-agentos_array_length() {
+agentrt_array_length() {
     local array=("$@")
     echo "${#array[@]}"
 }
@@ -247,7 +247,7 @@ agentos_array_length() {
 # 版本比较
 ###############################################################################
 
-agentos_version_compare() {
+agentrt_version_compare() {
     local v1="$1"
     local v2="$2"
 
@@ -272,11 +272,11 @@ agentos_version_compare() {
     return 0
 }
 
-agentos_version_check() {
+agentrt_version_check() {
     local required="$1"
     local actual="$2"
 
-    agentos_version_compare "$actual" "$required"
+    agentrt_version_compare "$actual" "$required"
     local result=$?
 
     [[ $result -ne 2 ]]
@@ -286,7 +286,7 @@ agentos_version_check() {
 # 配置文件工具
 ###############################################################################
 
-agentos_config_get() {
+agentrt_config_get() {
     local file="$1"
     local key="$2"
     local default="${3:-}"
@@ -306,7 +306,7 @@ agentos_config_get() {
     fi
 }
 
-agentos_config_set() {
+agentrt_config_set() {
     local file="$1"
     local key="$2"
     local value="$3"
@@ -326,7 +326,7 @@ agentos_config_set() {
 # 用户交互工具
 ###############################################################################
 
-agentos_confirm() {
+agentrt_confirm() {
     local prompt="${1:-Are you sure?}"
     local default="${2:-N}"
 
@@ -342,7 +342,7 @@ agentos_confirm() {
     [[ "$yn" =~ ^[Yy]$ ]]
 }
 
-agentos_select() {
+agentrt_select() {
     local prompt="$1"
     shift
     local options=("$@")
@@ -369,23 +369,23 @@ agentos_select() {
 # 下载工具
 ###############################################################################
 
-agentos_download() {
+agentrt_download() {
     local url="$1"
     local dest="$2"
     local timeout="${3:-60}"
 
     local curl_opts=("-fsSL" "--max-time" "$timeout" "-o" "$dest")
 
-    if [[ -n "${AGENTOS_HTTP_PROXY:-}" ]]; then
-        curl_opts+=("--proxy" "$AGENTOS_HTTP_PROXY")
+    if [[ -n "${AGENTRT_HTTP_PROXY:-}" ]]; then
+        curl_opts+=("--proxy" "$AGENTRT_HTTP_PROXY")
     fi
 
-    if [[ -n "${AGENTOS_HTTPS_PROXY:-}" ]]; then
-        curl_opts+=("--proxy" "$AGENTOS_HTTPS_PROXY")
+    if [[ -n "${AGENTRT_HTTPS_PROXY:-}" ]]; then
+        curl_opts+=("--proxy" "$AGENTRT_HTTPS_PROXY")
     fi
 
     if ! curl "${curl_opts[@]}" "$url"; then
-        agentos_log_error "Failed to download: $url"
+        agentrt_log_error "Failed to download: $url"
         return 1
     fi
 
@@ -395,13 +395,13 @@ agentos_download() {
 ###############################################################################
 # 导出公共API
 ###############################################################################
-export -f agentos_load_libs
-export -f agentos_to_lower agentos_to_upper agentos_trim agentos_contains agentos_random_string
-export -f agentos_mkdir agentos_safe_rm agentos_backup_file agentos_file_size agentos_is_executable
-export -f agentos_is_process_running agentos_wait_for_process agentos_kill_process
-export -f agentos_is_port_available agentos_wait_for_url
-export -f agentos_in_array agentos_array_length
-export -f agentos_version_compare agentos_version_check
-export -f agentos_config_get agentos_config_set
-export -f agentos_confirm agentos_select
-export -f agentos_download
+export -f agentrt_load_libs
+export -f agentrt_to_lower agentrt_to_upper agentrt_trim agentrt_contains agentrt_random_string
+export -f agentrt_mkdir agentrt_safe_rm agentrt_backup_file agentrt_file_size agentrt_is_executable
+export -f agentrt_is_process_running agentrt_wait_for_process agentrt_kill_process
+export -f agentrt_is_port_available agentrt_wait_for_url
+export -f agentrt_in_array agentrt_array_length
+export -f agentrt_version_compare agentrt_version_check
+export -f agentrt_config_get agentrt_config_set
+export -f agentrt_confirm agentrt_select
+export -f agentrt_download

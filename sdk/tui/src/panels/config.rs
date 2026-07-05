@@ -22,7 +22,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     if app.config_content.is_empty() {
         let text = vec![
             Line::from(Span::styled("Config not loaded.", Style::default().fg(Color::DarkGray))),
-            Line::from(Span::styled("Check your agentos.yaml file.", Style::default().fg(Color::DarkGray))),
+            Line::from(Span::styled("Check your agentrt.yaml file.", Style::default().fg(Color::DarkGray))),
         ];
         f.render_widget(Paragraph::new(text).block(block), area);
     } else {

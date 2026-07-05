@@ -2,7 +2,7 @@
  * @file test_mkdir_recursive.c
  * @brief R-09-87 platform_mkdir_recursive 递归创建目录单元测试
  *
- * 测试 agentos_mkdir 的 POSIX 递归创建逻辑（Linux 路径）。
+ * 测试 agentrt_mkdir 的 POSIX 递归创建逻辑（Linux 路径）。
  * 通过直接测试算法核心验证以下场景：
  * - 递归创建多层目录
  * - 已存在目录（幂等性）
@@ -32,7 +32,7 @@
 #include "test_macros.h"
 #include "platform.h"
 
-#define TEST_BASE_DIR AGENTOS_TMP_DIR "/agentos_test_mkdir_XXXXXX"
+#define TEST_BASE_DIR AGENTRT_TMP_DIR "/agentrt_test_mkdir_XXXXXX"
 
 static char g_test_dir[256];
 
@@ -43,7 +43,7 @@ static int dir_exists(const char* path)
 }
 
 /**
- * @brief POSIX递归mkdir - 与 agentos_mkdir 的递归逻辑一致
+ * @brief POSIX递归mkdir - 与 agentrt_mkdir 的递归逻辑一致
  */
 static int posix_mkdir_recursive(const char* path)
 {

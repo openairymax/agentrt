@@ -80,7 +80,7 @@ version_control:
   # Git 配置
   git:
     # 配置仓库路径
-    repo_path: "${AGENTOS_DATA_DIR}/manager-repo"
+    repo_path: "${AGENTRT_DATA_DIR}/manager-repo"
     
     # 分支名称
     branch: "manager"
@@ -99,7 +99,7 @@ version_control:
   # 文件后端配置
   file:
     # 版本历史目录
-    history_dir: "${AGENTOS_DATA_DIR}/manager-history"
+    history_dir: "${AGENTRT_DATA_DIR}/manager-history"
     
     # 最大版本数
     max_versions: 100
@@ -152,7 +152,7 @@ validation:
   schema_validation:
     enabled: true
     # Schema 目录
-    schema_dir: "${AGENTOS_CONFIG_DIR}/schema"
+    schema_dir: "${AGENTRT_CONFIG_DIR}/schema"
   
   # 自定义验证规则
   custom_rules:
@@ -171,7 +171,7 @@ audit:
   enabled: true
   
   # 审计日志路径
-  log_path: "${AGENTOS_LOG_DIR}/manager-audit.log"
+  log_path: "${AGENTRT_LOG_DIR}/manager-audit.log"
   
   # 审计事件
   events:
@@ -200,10 +200,10 @@ encryption:
   key_source: "env"
   
   # 密钥环境变量名
-  key_env_var: "AGENTOS_CONFIG_KEY"
+  key_env_var: "AGENTRT_CONFIG_KEY"
   
   # 密钥文件路径（当 key_source 为 file 时）
-  key_file: "${AGENTOS_DATA_DIR}/keys/manager.key"
+  key_file: "${AGENTRT_DATA_DIR}/keys/manager.key"
   
   # 需要加密的字段
   encrypted_fields:

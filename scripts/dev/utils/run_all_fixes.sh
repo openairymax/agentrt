@@ -38,8 +38,8 @@ FIXES_FAILED=0
 
 # 修复脚本列表（按依赖顺序）
 declare -a FIX_SCRIPTS=(
-    "fix_agentos_efail.py"
-    "fix_agentos_efail_macro.py"
+    "fix_agentrt_efail.py"
+    "fix_agentrt_efail_macro.py"
     "fix_return_neg_N.py"
     "fix_strncpy.py"
     "fix_sec22.py"

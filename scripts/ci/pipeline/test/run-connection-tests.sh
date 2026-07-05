@@ -356,7 +356,7 @@ run_connection_test() {
 
             # C-L10: monit_d → Prometheus
             L10_*)
-                if curl -s --max-time 10 "http://localhost:${TEST_MONIT_METRICS_PORT:-19902}/metrics" 2>/dev/null | grep -qE "agentos_|# HELP|# TYPE"; then
+                if curl -s --max-time 10 "http://localhost:${TEST_MONIT_METRICS_PORT:-19902}/metrics" 2>/dev/null | grep -qE "agentrt_|# HELP|# TYPE"; then
                     result="pass"
                 else
                     result="fail"

@@ -46,7 +46,7 @@ resources/
 技术演示脚本目录，包含可独立运行的演示模块：
 
 - **phase3_technology_demo.py**：第三阶段技术演示脚本，展示 AgentRT 的核心技术栈，包括：
-  - 服务框架演示：展示 `daemon/` 和 `gateway/` 的服务架构和通信机制
+  - 服务框架演示：展示 `daemons/` 和 `gateway/` 的服务架构和通信机制
   - 基准测试演示：展示 `atoms/` 层核心组件的性能特征
   - 工具链演示：展示 `toolkit/` 多语言 SDK 的使用方式
   - 开源治理演示：展示 `openlab/` 的贡献流程和治理模型

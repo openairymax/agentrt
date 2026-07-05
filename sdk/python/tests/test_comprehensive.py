@@ -11,7 +11,7 @@ import json
 import time
 
 # Import all available public APIs
-from agentos import (
+from agentrt import (
     AgentRT, AsyncAgentRT,
     Telemetry, Meter, Tracer, Span, SpanStatus,
     TaskStatus, TaskResult, SkillInfo, SkillResult,
@@ -27,10 +27,10 @@ from agentos import (
 )
 
 # 从子模块直接导入（不在 __init__.py 的 __all__ 中）
-from agentos.task import Task
-from agentos.memory import Memory
-from agentos.session import Session
-from agentos.skill import Skill
+from agentrt.task import Task
+from agentrt.memory import Memory
+from agentrt.session import Session
+from agentrt.skill import Skill
 
 # 向后兼容别名
 AgentRT_MemoryError = AgentOSMemoryError
@@ -92,9 +92,9 @@ class TestTypes(unittest.TestCase):
 class TestExceptions(unittest.TestCase):
     """Test exception classes."""
     
-    def test_agentos_error(self):
+    def test_agentrt_error(self):
         """Test base AgentOSError."""
-        from agentos.exceptions import CODE_NOT_FOUND
+        from agentrt.exceptions import CODE_NOT_FOUND
         
         error = AgentOSError(
             message="Test error",
@@ -118,7 +118,7 @@ class TestExceptions(unittest.TestCase):
     
     def test_initialization_error(self):
         """Test InitializationError."""
-        from agentos.exceptions import CODE_INTERNAL
+        from agentrt.exceptions import CODE_INTERNAL
         
         error = InitializationError(
             message="Failed to load library",
@@ -290,7 +290,7 @@ class TestTelemetry(unittest.TestCase):
     
     def test_meter(self):
         """Test Meter (Metrics) class."""
-        from agentos.telemetry import TelemetryConfig
+        from agentrt.telemetry import TelemetryConfig
         
         meter = Meter()
         
@@ -313,7 +313,7 @@ class TestTelemetry(unittest.TestCase):
     
     def test_tracer(self):
         """Test Tracer class."""
-        from agentos.telemetry import TelemetryConfig
+        from agentrt.telemetry import TelemetryConfig
         
         config = TelemetryConfig(service_name="test_service")
         tracer = Tracer(config)
@@ -330,7 +330,7 @@ class TestTelemetry(unittest.TestCase):
     
     def test_telemetry_integration(self):
         """Test Telemetry coordinator."""
-        from agentos.telemetry import TelemetryConfig
+        from agentrt.telemetry import TelemetryConfig
         
         config = TelemetryConfig(service_name="test_service")
         telemetry = Telemetry(config)
@@ -353,7 +353,7 @@ class TestRetryDecorator(unittest.TestCase):
 
     def test_retry_success(self):
         """Test retry until success."""
-        from agentos.utils.core import retry_with_backoff
+        from agentrt.utils.core import retry_with_backoff
 
         call_count = 0
 
@@ -371,7 +371,7 @@ class TestRetryDecorator(unittest.TestCase):
 
     def test_retry_exhausted(self):
         """Test retry exhaustion."""
-        from agentos.utils.core import retry_with_backoff
+        from agentrt.utils.core import retry_with_backoff
 
         call_count = 0
 

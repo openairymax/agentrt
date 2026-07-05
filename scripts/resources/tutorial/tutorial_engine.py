@@ -237,7 +237,7 @@ agentos/
 │   ├── coreloopthree/       # 认知三层循环
 │   ├── memoryrovol/         # 记忆系统
 │   └── syscall/             # 系统调用接口
-├── daemon/                  # 守护进程服务
+├── daemons/                  # 守护进程服务
 ├── include/                 # 公共头文件
 ├── scripts/                 # 开发运维工具
 └── docs/                    # 文档

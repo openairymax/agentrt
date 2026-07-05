@@ -23,18 +23,18 @@
 static int passed_tests = 0, failed_tests = 0;
 
 static int test_cost_estimate(void) {
-    agentos_cost_estimator_t* estimator = agentos_cost_estimator_create(NULL);
+    agentrt_cost_estimator_t* estimator = agentrt_cost_estimator_create(NULL);
     if (!estimator) { printf("  Cost estimate: Skipped\n"); return 0; }
     
-    double cost = agentos_cost_estimator_estimate(estimator, "gpt-4", 100, 50);
+    double cost = agentrt_cost_estimator_estimate(estimator, "gpt-4", 100, 50);
     printf("  Cost estimate: $%.6f\n", cost);
     
-    agentos_cost_estimator_destroy(estimator);
+    agentrt_cost_estimator_destroy(estimator);
     return 0;
 }
 
 int main(void) {
-    printf("agentos/commons/cost 单元测试\n");
+    printf("agentrt/commons/cost 单元测试\n");
     TEST_RUN(test_cost_estimate);
     printf("测试结果�?d 通过�?d 失败\n", passed_tests, failed_tests);
     return failed_tests > 0 ? 1 : 0;

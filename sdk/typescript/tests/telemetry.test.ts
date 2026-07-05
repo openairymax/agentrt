@@ -154,7 +154,7 @@ describe('Tracer', () => {
 describe('Telemetry', () => {
   test('should create telemetry with default service name', () => {
     const telemetry = new Telemetry();
-    expect(telemetry.getServiceName()).toBe('agentos-sdk');
+    expect(telemetry.getServiceName()).toBe('agentrt-sdk');
   });
 
   test('should create telemetry with custom service name', () => {

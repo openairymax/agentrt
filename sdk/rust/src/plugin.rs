@@ -531,7 +531,7 @@ impl SkillDefinition {
 /// # Example
 ///
 /// ```rust
-/// use agentos_rs::plugin::{SkillPlugin, SkillDefinition};
+/// use agentrt_rs::plugin::{SkillPlugin, SkillDefinition};
 /// use std::collections::HashMap;
 ///
 /// struct CodeReviewSkill;

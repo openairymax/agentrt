@@ -153,8 +153,8 @@ docker run -d --name agentrt -p 8080:8080 -v ./config:/app/config agentrt:latest
 | C/C++ | 通过 `syscalls.h` 系统调用接口开发 |
 | Python | 通过 `pip install agentos` 后直接 import |
 | Go | 通过 `import "github.com/spharx/agentos/sdk/go"` |
-| Rust | 通过 `use agentos_toolkit::prelude::*;` |
-| TypeScript | 通过 `npm install @spharx/agentos-toolkit` 后直接 import |
+| Rust | 通过 `use agentrt_toolkit::prelude::*;` |
+| TypeScript | 通过 `npm install @spharx/agentrt-toolkit` 后直接 import |
 
 **5.5  阅读导航**
 
@@ -213,7 +213,7 @@ AgentRT 是操作系统级产品，而非单一框架：
 | 输入净化 | 正则过滤 + 类型检查      |
 | 审计追踪 | 全链路不可篡改日志        |
 
-详见 [cupolas 安全穹顶文档](https://atomgit.com/openairymax/agentos/blob/main/agentos/cupolas/README.md)
+详见 [cupolas 安全穹顶文档](https://atomgit.com/openairymax/agentos/blob/main/agentrt/cupolas/README.md)
 
 </details>
 
@@ -226,7 +226,7 @@ AgentRT 是操作系统级产品，而非单一框架：
 | 系统开发者 | C/C++, 操作系统基础 | 1-2 周深入 |
 | 架构师   | 微核心，分布式系统     | 1 月精通   |
 
-推荐路径：[快速开始](https://atomgit.com/openairymax/docs/blob/main/QUICK_START.md) → [架构原则](https://atomgit.com/openairymax/docs/blob/main/ARCHITECTURAL_PRINCIPLES.md) → [CoreLoopThree](https://atomgit.com/openairymax/agentos/blob/main/agentos/atoms/coreloopthree/README.md)
+推荐路径：[快速开始](https://atomgit.com/openairymax/docs/blob/main/QUICK_START.md) → [架构原则](https://atomgit.com/openairymax/docs/blob/main/ARCHITECTURAL_PRINCIPLES.md) → [CoreLoopThree](https://atomgit.com/openairymax/agentos/blob/main/agentrt/atoms/coreloopthree/README.md)
 
 </details>
 

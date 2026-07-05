@@ -47,9 +47,9 @@ pub fn run(name: &str) -> Result<()> {
         println!("  {} Created {}", "✓".green(), path.display());
     }
 
-    // Write agentos.yaml
-    let config_path = project_dir.join("agentos.yaml");
-    fs::write(&config_path, templates::DEFAULT_AGENTOS_YAML)
+    // Write agentrt.yaml
+    let config_path = project_dir.join("agentrt.yaml");
+    fs::write(&config_path, templates::DEFAULT_AGENTRT_YAML)
         .with_context(|| format!("Failed to write {}", config_path.display()))?;
     println!("  {} Created {}", "✓".green(), config_path.display());
 

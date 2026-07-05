@@ -21,7 +21,7 @@
 #include <unistd.h>
 
 #include "memory_compat.h"
-#include "agentos_types.h"
+#include "agentrt_types.h"
 
 /* ============================================================================
  * Mock Market Client Structures

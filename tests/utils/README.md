@@ -21,9 +21,9 @@
 | tests/utils/ 目录 | 对应的 agentos/ 模块 | 用途说明 |
 |-------------------|---------------------|----------|
 | `fixtures/data/memories/` | `atoms/memory/`, `atoms/memoryrovol/` | 记忆子系统测试数据（L1-L4 层样本数据） |
-| `fixtures/data/sessions/` | `daemon/`, `gateway/` | 会话管理测试数据（会话创建/恢复/过期样本） |
+| `fixtures/data/sessions/` | `daemons/`, `gateway/` | 会话管理测试数据（会话创建/恢复/过期样本） |
 | `fixtures/data/skills/` | `openlab/contrib/` | 技能模块测试数据（Skill 定义/元数据样本） |
-| `fixtures/data/tasks/` | `daemon/sched_d/`, `daemon/tool_d/` | 任务调度测试数据（任务定义/优先级/依赖样本） |
+| `fixtures/data/tasks/` | `daemons/sched_d/`, `daemons/tool_d/` | 任务调度测试数据（任务定义/优先级/依赖样本） |
 | `python/base_test.py` | 全部模块 | 测试基类（BaseTestCase/SDKTestCase/APITestCase/IntegrationTestCase） |
 | `python/data_generator.py` | 全部模块 | 测试数据生成器（随机/参数化/边界值数据） |
 | `python/data_manager.py` | 全部模块 | 测试数据管理器（数据加载/清理/持久化） |
@@ -35,9 +35,9 @@
 | `python/generate_combined_report.py` | 全部模块 | 综合报告生成器（合并多维度测试结果） |
 | `python/run_tests.py` | 全部模块 | 测试统一运行入口 |
 | `templates/c/test_template.c` | `atoms/`, `commons/`, `cupolas/`, `heapstore/` | C 语言测试文件模板 |
-| `templates/python/test_template.py` | `daemon/`, `manager/`, `openlab/`, `toolkit/` | Python 单元测试模板 |
-| `templates/python/test_template_integration.py` | `daemon/`, `gateway/`, `heapstore/` | Python 集成测试模板 |
-| `templates/python/test_template_security.py` | `cupolas/`, `daemon/common/` | Python 安全测试模板 |
+| `templates/python/test_template.py` | `daemons/`, `manager/`, `openlab/`, `toolkit/` | Python 单元测试模板 |
+| `templates/python/test_template_integration.py` | `daemons/`, `gateway/`, `heapstore/` | Python 集成测试模板 |
+| `templates/python/test_template_security.py` | `cupolas/`, `daemons/common/` | Python 安全测试模板 |
 
 ## 目录结构
 

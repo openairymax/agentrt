@@ -152,8 +152,8 @@ class TestModuleNamespaceIsolation:
         assert p2 is not None
         assert p1.metadata.name != p2.metadata.name
 
-        alpha_modules = [k for k in sys.modules if k.startswith("agentos_plugin_alpha_")]
-        beta_modules = [k for k in sys.modules if k.startswith("agentos_plugin_beta_")]
+        alpha_modules = [k for k in sys.modules if k.startswith("agentrt_plugin_alpha_")]
+        beta_modules = [k for k in sys.modules if k.startswith("agentrt_plugin_beta_")]
         assert len(alpha_modules) == 1
         assert len(beta_modules) == 1
         assert alpha_modules[0] != beta_modules[0]
@@ -175,8 +175,8 @@ class TestModuleNamespaceIsolation:
         assert registry.get("first_plugin") is p1
         assert registry.get("second_plugin") is p2
 
-        first_mods = [k for k in sys.modules if "first" in k and k.startswith("agentos_plugin_")]
-        second_mods = [k for k in sys.modules if "second" in k and k.startswith("agentos_plugin_")]
+        first_mods = [k for k in sys.modules if "first" in k and k.startswith("agentrt_plugin_")]
+        second_mods = [k for k in sys.modules if "second" in k and k.startswith("agentrt_plugin_")]
         assert len(first_mods) == 1
         assert len(second_mods) == 1
 
@@ -193,9 +193,9 @@ class TestModuleNameGeneration:
         registry = PluginRegistry()
         registry.load_plugin_from_module(str(f))
 
-        matching = [k for k in sys.modules if "my_tool" in k and k.startswith("agentos_plugin_")]
+        matching = [k for k in sys.modules if "my_tool" in k and k.startswith("agentrt_plugin_")]
         assert len(matching) == 1
-        assert matching[0].startswith("agentos_plugin_my_tool_")
+        assert matching[0].startswith("agentrt_plugin_my_tool_")
 
     def test_same_filename_different_dirs_different_modules(self, tmp_path):
         dir1 = tmp_path / "dir1"
@@ -215,7 +215,7 @@ class TestModuleNameGeneration:
         assert p1.metadata.name == "worker_v1"
         assert p2.metadata.name == "worker_v2"
 
-        worker_mods = [k for k in sys.modules if "worker" in k and k.startswith("agentos_plugin_")]
+        worker_mods = [k for k in sys.modules if "worker" in k and k.startswith("agentrt_plugin_")]
         assert len(worker_mods) == 2
         assert worker_mods[0] != worker_mods[1]
 
@@ -224,7 +224,7 @@ class TestModuleNameGeneration:
         registry = PluginRegistry()
         registry.load_plugin_from_module(str(f))
 
-        matching = [k for k in sys.modules if k.startswith("agentos_plugin_hash_test_")]
+        matching = [k for k in sys.modules if k.startswith("agentrt_plugin_hash_test_")]
         assert len(matching) == 1
         hash_suffix = matching[0].split("_")[-1]
         assert len(hash_suffix) == 8
@@ -268,12 +268,12 @@ class TestUnregisterModuleCleanup:
         registry = PluginRegistry()
         registry.load_plugin_from_module(str(f))
 
-        cleanup_mods = [k for k in sys.modules if "cleanup" in k and k.startswith("agentos_plugin_")]
+        cleanup_mods = [k for k in sys.modules if "cleanup" in k and k.startswith("agentrt_plugin_")]
         assert len(cleanup_mods) == 1
 
         registry.unregister("cleanup_plugin")
 
-        cleanup_mods_after = [k for k in sys.modules if "cleanup" in k and k.startswith("agentos_plugin_")]
+        cleanup_mods_after = [k for k in sys.modules if "cleanup" in k and k.startswith("agentrt_plugin_")]
         assert len(cleanup_mods_after) == 0
 
     def test_unregister_removes_from_module_mapping(self, tmp_path):
@@ -309,8 +309,8 @@ class TestUnregisterModuleCleanup:
 
         registry.unregister("remove_plugin")
 
-        keep_mods = [k for k in sys.modules if "keep" in k and k.startswith("agentos_plugin_")]
-        remove_mods = [k for k in sys.modules if "remove" in k and k.startswith("agentos_plugin_")]
+        keep_mods = [k for k in sys.modules if "keep" in k and k.startswith("agentrt_plugin_")]
+        remove_mods = [k for k in sys.modules if "remove" in k and k.startswith("agentrt_plugin_")]
         assert len(keep_mods) == 1
         assert len(remove_mods) == 0
 
@@ -393,7 +393,7 @@ class TestLoadFailure:
 
         assert result is None
 
-        fail_mods = [k for k in sys.modules if "fail_init" in k and k.startswith("agentos_plugin_")]
+        fail_mods = [k for k in sys.modules if "fail_init" in k and k.startswith("agentrt_plugin_")]
         assert len(fail_mods) == 0
 
     def test_syntax_error_returns_none(self, tmp_path):
@@ -516,18 +516,18 @@ class TestMemoryLeakPrevention:
         f = _create_plugin_file(tmp_path, "leak_test.py", "leak_plugin")
         registry = PluginRegistry()
 
-        initial_count = len([k for k in sys.modules if k.startswith("agentos_plugin_")])
+        initial_count = len([k for k in sys.modules if k.startswith("agentrt_plugin_")])
 
         for _ in range(5):
             for k in list(sys.modules.keys()):
-                if k.startswith("agentos_plugin_leak_test_"):
+                if k.startswith("agentrt_plugin_leak_test_"):
                     del sys.modules[k]
 
             p = registry.load_plugin_from_module(str(f))
             if p:
                 registry.unregister("leak_plugin")
 
-        final_count = len([k for k in sys.modules if k.startswith("agentos_plugin_")])
+        final_count = len([k for k in sys.modules if k.startswith("agentrt_plugin_")])
         assert final_count == initial_count
 
 

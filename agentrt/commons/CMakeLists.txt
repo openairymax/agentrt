@@ -55,6 +55,8 @@ set(SOURCES
     utils/config_unified/src/core_config.c
     utils/config_unified/src/config_source.c
     utils/config_unified/src/config_compat.c
+    utils/config_unified/src/yaml_minimal.c
+    utils/execution/src/checkpoint.c
 )
 if(NOT WIN32)
     list(APPEND SOURCES utils/ipc/src/ipc_common.c)
@@ -100,6 +102,7 @@ set(_inc_dirs
     utils/cache/include
     utils/platform/include
     utils/config_unified/include
+    utils/execution/include
     utils/cognition/include
     utils/strategy/include
     utils/network/include
@@ -161,6 +164,7 @@ target_include_directories(agentrt_common PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/cache/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/platform/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/config_unified/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils/execution/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/cognition/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/strategy/include
     ${CMAKE_CURRENT_SOURCE_DIR}/utils/network/include
@@ -204,6 +208,7 @@ install(DIRECTORY utils/observability/include/ DESTINATION include/agentrt/utils
 install(DIRECTORY utils/logging/include/ DESTINATION include/agentrt/utils/logging)
 install(DIRECTORY utils/error/include/ DESTINATION include/agentrt/utils/error)
 install(DIRECTORY utils/config_unified/include/ DESTINATION include/agentrt/utils/config_unified)
+install(DIRECTORY utils/execution/include/ DESTINATION include/agentrt/utils/execution)
 install(DIRECTORY utils/io/include/ DESTINATION include/agentrt/utils/io)
 install(DIRECTORY utils/types/include/ DESTINATION include/agentrt/utils/types)
 install(FILES utils/security/src/input_validator.h DESTINATION include/agentrt/utils/security)

@@ -26,8 +26,8 @@ def fix_indentation_and_codes(filepath):
             
             # Find closing brace
             if i + 1 < len(lines):
-                # Check if next line is agentos_error_push_ex at wrong indent
-                next_indent_match = re.match(r'^(\s*)agentos_error_push_ex\(', lines[i + 1])
+                # Check if next line is agentrt_error_push_ex at wrong indent
+                next_indent_match = re.match(r'^(\s*)agentrt_error_push_ex\(', lines[i + 1])
                 if next_indent_match:
                     content_indent = next_indent_match.group(1)
                     if content_indent != expected_indent:
@@ -53,18 +53,18 @@ def fix_indentation_and_codes(filepath):
 
         # Part 2: Fix error codes
         # Fix >= MAX capacity checks that were mapped to STATE_ERROR
-        if 'agentos_error_push_ex(AGENTOS_ERR_STATE_ERROR' in line:
+        if 'agentrt_error_push_ex(AGENTRT_ERR_STATE_ERROR' in line:
             ctx_start = max(0, i - 3)
             context = ' '.join(l.strip() for l in lines[ctx_start:i])
             if re.search(r'>=.*(MAX|COUNT|CAPACITY)', context):
                 # Fix the push line
                 old_line = line
-                line = line.replace('AGENTOS_ERR_STATE_ERROR', 'AGENTOS_ERR_BUFFER_TOO_SMALL')
+                line = line.replace('AGENTRT_ERR_STATE_ERROR', 'AGENTRT_ERR_BUFFER_TOO_SMALL')
                 line = line.replace('"not initialized"', '"capacity exceeded"')
                 lines[i] = line
                 # Fix the return line
-                if i + 1 < len(lines) and 'return AGENTOS_ERR_STATE_ERROR;' in lines[i + 1]:
-                    lines[i + 1] = lines[i + 1].replace('AGENTOS_ERR_STATE_ERROR', 'AGENTOS_ERR_BUFFER_TOO_SMALL')
+                if i + 1 < len(lines) and 'return AGENTRT_ERR_STATE_ERROR;' in lines[i + 1]:
+                    lines[i + 1] = lines[i + 1].replace('AGENTRT_ERR_STATE_ERROR', 'AGENTRT_ERR_BUFFER_TOO_SMALL')
                 code_fixes += 1
                 modified = True
 

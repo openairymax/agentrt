@@ -44,7 +44,7 @@ hooks:
 
 # 权限声明
 permissions:
-  - "file:read:${AGENTOS_DATA_DIR}/support/*"
+  - "file:read:${AGENTRT_DATA_DIR}/support/*"
   - "network:connect:api.internal.com:443"
   - "memory:write"
   - "memory:read"

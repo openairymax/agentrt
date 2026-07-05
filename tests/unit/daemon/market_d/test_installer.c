@@ -26,8 +26,8 @@ static void test_installer_config(void) {
     printf("  test_installer_config...\n");
 
     installer_config_t manager = {
-        .install_dir = AGENTOS_TMP_DIR "/agentos/test",
-        .temp_dir = AGENTOS_TMP_DIR "/agentos/temp",
+        .install_dir = AGENTRT_TMP_DIR "/agentos/test",
+        .temp_dir = AGENTRT_TMP_DIR "/agentos/temp",
         .verify_signature = 1,
         .max_retries = 3
     };
@@ -47,13 +47,13 @@ static void test_installer_prepare_request(void) {
     assert(inst != NULL);
 
     install_request_t request;
-    AGENTOS_MEMSET(&request, 0, sizeof(request));
+    AGENTRT_MEMSET(&request, 0, sizeof(request));
     request.package_id = "test_package_001";
     request.version = "1.0.0";
-    request.install_path = AGENTOS_TMP_DIR "/test_install";
+    request.install_path = AGENTRT_TMP_DIR "/test_install";
 
     int ret = installer_prepare_request(inst, &request);
-    assert(ret == 0 || ret == AGENTOS_ERR_INVALID_PARAM);
+    assert(ret == 0 || ret == AGENTRT_ERR_INVALID_PARAM);
 
     installer_destroy(inst);
 
@@ -87,7 +87,7 @@ static void test_installer_download_progress(void) {
     assert(inst != NULL);
 
     install_progress_t progress;
-    AGENTOS_MEMSET(&progress, 0, sizeof(progress));
+    AGENTRT_MEMSET(&progress, 0, sizeof(progress));
     progress.total_bytes = 1024;
     progress.downloaded_bytes = 512;
     progress.percentage = 50;
@@ -107,12 +107,12 @@ static void test_installer_rollback(void) {
     assert(inst != NULL);
 
     install_request_t request;
-    AGENTOS_MEMSET(&request, 0, sizeof(request));
+    AGENTRT_MEMSET(&request, 0, sizeof(request));
     request.package_id = "rollback_test";
     request.version = "1.0.0";
 
     int ret = installer_rollback(inst, &request);
-    assert(ret == 0 || ret == AGENTOS_ERR_NOT_FOUND);
+    assert(ret == 0 || ret == AGENTRT_ERR_NOT_FOUND);
 
     installer_destroy(inst);
 

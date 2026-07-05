@@ -59,7 +59,7 @@ static void test_message_build(void) {
     printf("  test_message_build...\n");
 
     llm_message_t messages[2];
-    AGENTOS_MEMSET(messages, 0, sizeof(messages));
+    AGENTRT_MEMSET(messages, 0, sizeof(messages));
 
     messages[0].role = strdup("system");
     messages[0].content = strdup("You are a helpful assistant.");
@@ -82,7 +82,7 @@ static void test_request_config(void) {
     printf("  test_request_config...\n");
 
     llm_request_config_t manager;
-    AGENTOS_MEMSET(&manager, 0, sizeof(manager));
+    AGENTRT_MEMSET(&manager, 0, sizeof(manager));
 
     manager.model = "gpt-4";
     manager.temperature = 0.7;

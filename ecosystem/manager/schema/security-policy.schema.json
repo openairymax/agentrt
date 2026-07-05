@@ -18,19 +18,19 @@
         "enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable security enforcement (from agentos.yaml)",
+          "description": "Enable security enforcement (from agentrt.yaml)",
           "examples": [true, false]
         },
         "mode": {
           "type": "string",
           "enum": ["disabled", "permissive", "standard", "strict"],
           "default": "standard",
-          "description": "Security operation mode (from agentos.yaml)",
+          "description": "Security operation mode (from agentrt.yaml)",
           "examples": ["standard", "strict", "permissive"]
         },
         "permission": {
           "type": "object",
-          "description": "Permission configuration (from agentos.yaml)",
+          "description": "Permission configuration (from agentrt.yaml)",
           "properties": {
             "model": {
               "type": "string",

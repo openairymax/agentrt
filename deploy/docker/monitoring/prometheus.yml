@@ -6,7 +6,7 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
   external_labels:
-    monitor: 'agentos-gateway'
+    monitor: 'agentrt-gateway'
     environment: 'production'
 
 # 告警规则文件
@@ -25,7 +25,7 @@ scrape_configs:
   # ==========================================================================
   # gateway Module 自身指标
   # ==========================================================================
-  - job_name: 'agentos-gateway'
+  - job_name: 'agentrt-gateway'
     static_configs:
       - targets: ['gateway:9090']
     metrics_path: /metrics
@@ -39,7 +39,7 @@ scrape_configs:
     metric_relabel_configs:
       # 保留关键指标
       - source_labels: [__name__]
-        regex: 'agentos_.*|http_.*|websocket_.*|session_.*|connection_.*'
+        regex: 'agentrt_.*|http_.*|websocket_.*|session_.*|connection_.*'
         action: keep
 
   # ==========================================================================
@@ -68,7 +68,7 @@ scrape_configs:
       - role: pod
         namespaces:
           names:
-            - agentos-gateway
+            - agentrt-gateway
     relabel_configs:
       # 只抓取带有 prometheus.io/scrape=true 注解的 Pod
       - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]

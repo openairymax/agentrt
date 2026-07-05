@@ -1,7 +1,7 @@
-use agentos_rs::plugin::{
+use agentrt_rs::plugin::{
     PluginState, PluginType, PluginManifest, BasePlugin, PluginRegistry, PluginManager,
 };
-use agentos_rs::hook::{Hook, HookContext, HookResult};
+use agentrt_rs::hook::{Hook, HookContext, HookResult};
 
 use std::collections::HashMap;
 

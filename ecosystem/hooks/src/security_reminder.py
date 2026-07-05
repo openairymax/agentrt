@@ -12,10 +12,10 @@ Injected reminders cover:
   - Output safety: don't generate malicious content, sanitize outputs
   - Audit compliance: log all tool calls and sensitive operations
 
-The reminder text is fully configurable via agentos.yaml or defaults to
+The reminder text is fully configurable via agentrt.yaml or defaults to
 a comprehensive built-in security policy.
 
-Hook configuration in agentos.yaml:
+Hook configuration in agentrt.yaml:
   hooks:
     global_hooks:
       on_agent_start:

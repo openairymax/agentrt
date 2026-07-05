@@ -198,15 +198,15 @@ export function newConfig(...opts: ConfigOption[]): manager {
 /**
  * 从环境变量创建配置
  * 支持的环境变量：
- * - AGENTOS_ENDPOINT
- * - AGENTOS_TIMEOUT
- * - AGENTOS_MAX_RETRIES
- * - AGENTOS_RETRY_DELAY
- * - AGENTOS_API_KEY
- * - AGENTOS_DEBUG
- * - AGENTOS_LOG_LEVEL
- * - AGENTOS_MAX_CONNECTIONS
- * - AGENTOS_USER_AGENT
+ * - AGENTRT_ENDPOINT
+ * - AGENTRT_TIMEOUT
+ * - AGENTRT_MAX_RETRIES
+ * - AGENTRT_RETRY_DELAY
+ * - AGENTRT_API_KEY
+ * - AGENTRT_DEBUG
+ * - AGENTRT_LOG_LEVEL
+ * - AGENTRT_MAX_CONNECTIONS
+ * - AGENTRT_USER_AGENT
  */
 export function newConfigFromEnv(): manager {
   const manager = defaultConfig();
@@ -215,52 +215,52 @@ export function newConfigFromEnv(): manager {
   if (typeof process !== 'undefined' && process.env) {
     const env = process.env;
 
-    if (env.AGENTOS_ENDPOINT) {
-      manager.endpoint = env.AGENTOS_ENDPOINT;
+    if (env.AGENTRT_ENDPOINT) {
+      manager.endpoint = env.AGENTRT_ENDPOINT;
     }
 
-    if (env.AGENTOS_TIMEOUT) {
-      const timeout = parseInt(env.AGENTOS_TIMEOUT, 10);
+    if (env.AGENTRT_TIMEOUT) {
+      const timeout = parseInt(env.AGENTRT_TIMEOUT, 10);
       if (!isNaN(timeout) && timeout > 0) {
         manager.timeout = timeout;
       }
     }
 
-    if (env.AGENTOS_MAX_RETRIES) {
-      const maxRetries = parseInt(env.AGENTOS_MAX_RETRIES, 10);
+    if (env.AGENTRT_MAX_RETRIES) {
+      const maxRetries = parseInt(env.AGENTRT_MAX_RETRIES, 10);
       if (!isNaN(maxRetries) && maxRetries >= 0) {
         manager.maxRetries = maxRetries;
       }
     }
 
-    if (env.AGENTOS_RETRY_DELAY) {
-      const delay = parseInt(env.AGENTOS_RETRY_DELAY, 10);
+    if (env.AGENTRT_RETRY_DELAY) {
+      const delay = parseInt(env.AGENTRT_RETRY_DELAY, 10);
       if (!isNaN(delay) && delay > 0) {
         manager.retryDelay = delay;
       }
     }
 
-    if (env.AGENTOS_API_KEY) {
-      manager.apiKey = env.AGENTOS_API_KEY;
+    if (env.AGENTRT_API_KEY) {
+      manager.apiKey = env.AGENTRT_API_KEY;
     }
 
-    if (env.AGENTOS_DEBUG) {
-      manager.debug = env.AGENTOS_DEBUG === 'true' || env.AGENTOS_DEBUG === '1';
+    if (env.AGENTRT_DEBUG) {
+      manager.debug = env.AGENTRT_DEBUG === 'true' || env.AGENTRT_DEBUG === '1';
     }
 
-    if (env.AGENTOS_LOG_LEVEL) {
-      manager.logLevel = env.AGENTOS_LOG_LEVEL;
+    if (env.AGENTRT_LOG_LEVEL) {
+      manager.logLevel = env.AGENTRT_LOG_LEVEL;
     }
 
-    if (env.AGENTOS_MAX_CONNECTIONS) {
-      const maxConn = parseInt(env.AGENTOS_MAX_CONNECTIONS, 10);
+    if (env.AGENTRT_MAX_CONNECTIONS) {
+      const maxConn = parseInt(env.AGENTRT_MAX_CONNECTIONS, 10);
       if (!isNaN(maxConn) && maxConn > 0) {
         manager.maxConnections = maxConn;
       }
     }
 
-    if (env.AGENTOS_USER_AGENT) {
-      manager.userAgent = env.AGENTOS_USER_AGENT;
+    if (env.AGENTRT_USER_AGENT) {
+      manager.userAgent = env.AGENTRT_USER_AGENT;
     }
   }
 

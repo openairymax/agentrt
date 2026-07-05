@@ -15,14 +15,14 @@
  *
  * 编译方式:
  *   gcc -fsanitize=thread -g -O1 -pthread \
- *       -I../../agentos/atoms/coreloopthree/src/cognition/critique \
- *       -I../../agentos/atoms/coreloopthree/src/cognition/foundation \
- *       -I../../agentos/atoms/coreloopthree/include \
- *       -I../../agentos/atoms/corekern/include \
- *       -I../../agentos/commons/include \
- *       -I../../agentos/commons/utils/error/include \
- *       -I../../agentos/commons/utils/types/include \
- *       -I../../agentos/commons/platform/include \
+ *       -I../../agentrt/atoms/coreloopthree/src/cognition/critique \
+ *       -I../../agentrt/atoms/coreloopthree/src/cognition/foundation \
+ *       -I../../agentrt/atoms/coreloopthree/include \
+ *       -I../../agentrt/atoms/corekern/include \
+ *       -I../../agentrt/commons/include \
+ *       -I../../agentrt/commons/utils/error/include \
+ *       -I../../agentrt/commons/utils/types/include \
+ *       -I../../agentrt/commons/platform/include \
  *       test_thinkdual_tsan.c -o test_thinkdual_tsan
  *
  * 该测试设计为通过 ThreadSanitizer 检测数据竞争。
@@ -61,8 +61,8 @@ static int g_tests_failed = 0;
 
 #define ASSERT_OK(expr)                                                        \
     do {                                                                       \
-        agentos_error_t __err = (expr);                                        \
-        if (__err != AGENTOS_OK) {                                             \
+        agentrt_error_t __err = (expr);                                        \
+        if (__err != AGENTRT_OK) {                                             \
             printf("    ASSERT_FAIL: %s returned %d at line %d\n", #expr,     \
                    (int)__err, __LINE__);                                       \
             g_tests_failed++;                                                  \
@@ -94,11 +94,11 @@ static int is_valid_json_prefix(const char *str)
 /* ============================================================================
  * 辅助: 创建默认认知引擎
  * ============================================================================ */
-static agentos_cognition_engine_t *create_default_engine(void)
+static agentrt_cognition_engine_t *create_default_engine(void)
 {
-    agentos_cognition_engine_t *engine = NULL;
-    agentos_error_t err = agentos_cognition_create_take(NULL, NULL, NULL, &engine);
-    assert(err == AGENTOS_OK);
+    agentrt_cognition_engine_t *engine = NULL;
+    agentrt_error_t err = agentrt_cognition_create_take(NULL, NULL, NULL, &engine);
+    assert(err == AGENTRT_OK);
     assert(engine != NULL);
     return engine;
 }
@@ -123,7 +123,7 @@ static void null_feedback_callback(int level, const char *module,
  * ============================================================================ */
 static int g_mock_t2_call_count = 0;
 
-static agentos_error_t mock_t2_thinking(const char **prompts, size_t count,
+static agentrt_error_t mock_t2_thinking(const char **prompts, size_t count,
                                         void *context, char **out_result)
 {
     (void)context;
@@ -142,7 +142,7 @@ static agentos_error_t mock_t2_thinking(const char **prompts, size_t count,
     for (size_t i = 0; i < count; i++)
         assert(prompts[i] != NULL);
 
-    return AGENTOS_OK;
+    return AGENTRT_OK;
 }
 
 /* ============================================================================
@@ -150,7 +150,7 @@ static agentos_error_t mock_t2_thinking(const char **prompts, size_t count,
  * ============================================================================ */
 static int g_mock_t1f_call_count = 0;
 
-static agentos_error_t mock_t1f_fast_check(const char **prompts, size_t count,
+static agentrt_error_t mock_t1f_fast_check(const char **prompts, size_t count,
                                             void *context, char **out_result)
 {
     (void)context;
@@ -166,7 +166,7 @@ static agentos_error_t mock_t1f_fast_check(const char **prompts, size_t count,
     assert(*out_result != NULL);
     snprintf(*out_result, total_len, "%s%s%s", header, count_buf, trailer);
 
-    return AGENTOS_OK;
+    return AGENTRT_OK;
 }
 
 /* ============================================================================
@@ -174,7 +174,7 @@ static agentos_error_t mock_t1f_fast_check(const char **prompts, size_t count,
  * ============================================================================ */
 static int g_mock_t1p_call_count = 0;
 
-static agentos_error_t mock_t1p_parallel_dispatch(const char **prompts, size_t count,
+static agentrt_error_t mock_t1p_parallel_dispatch(const char **prompts, size_t count,
                                                    void *context, char **out_result)
 {
     (void)context;
@@ -190,10 +190,10 @@ static agentos_error_t mock_t1p_parallel_dispatch(const char **prompts, size_t c
     assert(*out_result != NULL);
     snprintf(*out_result, total_len, "%s%s%s", header, count_buf, trailer);
 
-    return AGENTOS_OK;
+    return AGENTRT_OK;
 }
 
-static void mock_coordinator_destroy(agentos_coordinator_strategy_t *strategy)
+static void mock_coordinator_destroy(agentrt_coordinator_strategy_t *strategy)
 {
     free(strategy);
 }
@@ -203,7 +203,7 @@ static void mock_coordinator_destroy(agentos_coordinator_strategy_t *strategy)
  * ============================================================================ */
 static int g_mock_s2_gen_count = 0;
 
-static agentos_error_t mock_s2_gen(const char *input, size_t input_len, char **output,
+static agentrt_error_t mock_s2_gen(const char *input, size_t input_len, char **output,
                                    size_t *output_len, void *user_data)
 {
     (void)input;
@@ -220,7 +220,7 @@ static agentos_error_t mock_s2_gen(const char *input, size_t input_len, char **o
     memcpy(buf, result, len + 1);
     *output = buf;
     *output_len = len;
-    return AGENTOS_OK;
+    return AGENTRT_OK;
 }
 
 /* ============================================================================
@@ -228,7 +228,7 @@ static agentos_error_t mock_s2_gen(const char *input, size_t input_len, char **o
  * ============================================================================ */
 static int g_mock_s1_expert_count = 0;
 
-static agentos_error_t mock_s1_exp(const char *content, size_t content_len,
+static agentrt_error_t mock_s1_exp(const char *content, size_t content_len,
                                    const char *critique, size_t critique_len,
                                    float *out_score, tc3_verdict_t *out_verdict,
                                    char **out_opinion, size_t *out_opinion_len,
@@ -255,7 +255,7 @@ static agentos_error_t mock_s1_exp(const char *content, size_t content_len,
         if (out_opinion_len)
             *out_opinion_len = olen;
     }
-    return AGENTOS_OK;
+    return AGENTRT_OK;
 }
 
 /* ============================================================================
@@ -276,11 +276,11 @@ static agentos_error_t mock_s1_exp(const char *content, size_t content_len,
 typedef struct {
     int thread_id;
     int iterations;
-    agentos_coordinator_strategy_t *strategy;
+    agentrt_coordinator_strategy_t *strategy;
     const char **prompts;
     size_t prompt_count;
     int *local_success;
-    agentos_mutex_t *mutex;
+    agentrt_mutex_t *mutex;
 } coord_access_args_t;
 
 static void *coord_access_worker(void *arg)
@@ -290,18 +290,18 @@ static void *coord_access_worker(void *arg)
 
     for (int i = 0; i < args->iterations; i++) {
         char *result = NULL;
-        agentos_error_t err = args->strategy->coordinate(
+        agentrt_error_t err = args->strategy->coordinate(
             args->prompts, args->prompt_count, NULL, &result);
-        if (err == AGENTOS_OK && result != NULL) {
+        if (err == AGENTRT_OK && result != NULL) {
             if (is_valid_json_prefix(result))
                 success++;
             free(result);
         }
     }
 
-    agentos_mutex_lock(args->mutex);
+    agentrt_mutex_lock(args->mutex);
     (*args->local_success) += success;
-    agentos_mutex_unlock(args->mutex);
+    agentrt_mutex_unlock(args->mutex);
 
     return (void *)(intptr_t)success;
 }
@@ -319,12 +319,12 @@ TEST(int02_1_concurrent_t2_t1f_t1p_access)
     g_mock_t1p_call_count = 0;
 
     /* 创建三组策略 */
-    agentos_coordinator_strategy_t *t2_strategy =
-        (agentos_coordinator_strategy_t *)calloc(1, sizeof(agentos_coordinator_strategy_t));
-    agentos_coordinator_strategy_t *t1f_strategy =
-        (agentos_coordinator_strategy_t *)calloc(1, sizeof(agentos_coordinator_strategy_t));
-    agentos_coordinator_strategy_t *t1p_strategy =
-        (agentos_coordinator_strategy_t *)calloc(1, sizeof(agentos_coordinator_strategy_t));
+    agentrt_coordinator_strategy_t *t2_strategy =
+        (agentrt_coordinator_strategy_t *)calloc(1, sizeof(agentrt_coordinator_strategy_t));
+    agentrt_coordinator_strategy_t *t1f_strategy =
+        (agentrt_coordinator_strategy_t *)calloc(1, sizeof(agentrt_coordinator_strategy_t));
+    agentrt_coordinator_strategy_t *t1p_strategy =
+        (agentrt_coordinator_strategy_t *)calloc(1, sizeof(agentrt_coordinator_strategy_t));
     ASSERT_TRUE(t2_strategy != NULL);
     ASSERT_TRUE(t1f_strategy != NULL);
     ASSERT_TRUE(t1p_strategy != NULL);
@@ -346,11 +346,11 @@ TEST(int02_1_concurrent_t2_t1f_t1p_access)
     const char *fast_prompts[] = {"Verify: growth rate calculation"};
     const char *parallel_prompts[] = {"Chart A", "Chart B", "Chart C"};
 
-    agentos_mutex_t mutex;
-    agentos_mutex_init(&mutex);
+    agentrt_mutex_t mutex;
+    agentrt_mutex_init(&mutex);
 
     int total_success = 0;
-    agentos_thread_t threads[INT02_1_TOTAL_THREADS];
+    agentrt_thread_t threads[INT02_1_TOTAL_THREADS];
     coord_access_args_t args[INT02_1_TOTAL_THREADS];
 
     /* 创建 t2 线程组 */
@@ -362,7 +362,7 @@ TEST(int02_1_concurrent_t2_t1f_t1p_access)
         args[i].prompt_count = 2;
         args[i].local_success = &total_success;
         args[i].mutex = &mutex;
-        ASSERT_TRUE(agentos_platform_thread_create(&threads[i], coord_access_worker, &args[i]) == 0);
+        ASSERT_TRUE(agentrt_platform_thread_create(&threads[i], coord_access_worker, &args[i]) == 0);
     }
 
     /* 创建 t1-f 线程组 */
@@ -375,7 +375,7 @@ TEST(int02_1_concurrent_t2_t1f_t1p_access)
         args[idx].prompt_count = 1;
         args[idx].local_success = &total_success;
         args[idx].mutex = &mutex;
-        ASSERT_TRUE(agentos_platform_thread_create(&threads[idx], coord_access_worker, &args[idx]) == 0);
+        ASSERT_TRUE(agentrt_platform_thread_create(&threads[idx], coord_access_worker, &args[idx]) == 0);
     }
 
     /* 创建 t1-p 线程组 */
@@ -388,12 +388,12 @@ TEST(int02_1_concurrent_t2_t1f_t1p_access)
         args[idx].prompt_count = 3;
         args[idx].local_success = &total_success;
         args[idx].mutex = &mutex;
-        ASSERT_TRUE(agentos_platform_thread_create(&threads[idx], coord_access_worker, &args[idx]) == 0);
+        ASSERT_TRUE(agentrt_platform_thread_create(&threads[idx], coord_access_worker, &args[idx]) == 0);
     }
 
     /* 等待所有线程完成 */
     for (int i = 0; i < INT02_1_TOTAL_THREADS; i++) {
-        agentos_platform_thread_join(threads[i], NULL);
+        agentrt_platform_thread_join(threads[i], NULL);
     }
 
     printf("    t2 calls: %d, t1-f calls: %d, t1-p calls: %d\n",
@@ -407,7 +407,7 @@ TEST(int02_1_concurrent_t2_t1f_t1p_access)
     ASSERT_TRUE(g_mock_t1p_call_count == INT02_1_THREADS_PER_ROLE * INT02_1_ITERATIONS);
     ASSERT_TRUE(total_success == INT02_1_TOTAL_THREADS * INT02_1_ITERATIONS);
 
-    agentos_mutex_destroy(&mutex);
+    agentrt_mutex_destroy(&mutex);
     t2_strategy->destroy(t2_strategy);
     t1f_strategy->destroy(t1f_strategy);
     t1p_strategy->destroy(t1p_strategy);
@@ -431,9 +431,9 @@ TEST(int02_1_concurrent_t2_t1f_t1p_access)
 typedef struct {
     int thread_id;
     int iterations;
-    agentos_thinking_chain_t *chain;
+    agentrt_thinking_chain_t *chain;
     int *steps_completed;
-    agentos_mutex_t *mutex;
+    agentrt_mutex_t *mutex;
 } chain_worker_args_t;
 
 static void *chain_worker(void *arg)
@@ -445,27 +445,27 @@ static void *chain_worker(void *arg)
         char input_buf[64];
         snprintf(input_buf, sizeof(input_buf), "thread_%d_step_%d", args->thread_id, i);
 
-        agentos_thinking_step_t *step = NULL;
-        agentos_error_t err = agentos_tc_step_create(
+        agentrt_thinking_step_t *step = NULL;
+        agentrt_error_t err = agentrt_tc_step_create(
             args->chain, TC_STEP_GENERATION, input_buf, strlen(input_buf),
             NULL, 0, &step);
 
-        if (err == AGENTOS_OK && step != NULL) {
+        if (err == AGENTRT_OK && step != NULL) {
             char content_buf[128];
             snprintf(content_buf, sizeof(content_buf),
                      "Generated content from thread %d iteration %d with sufficient length",
                      args->thread_id, i);
 
-            err = agentos_tc_step_complete(step, content_buf, strlen(content_buf),
+            err = agentrt_tc_step_complete(step, content_buf, strlen(content_buf),
                                            0.8f, "S2");
-            if (err == AGENTOS_OK)
+            if (err == AGENTRT_OK)
                 local_completed++;
         }
     }
 
-    agentos_mutex_lock(args->mutex);
+    agentrt_mutex_lock(args->mutex);
     (*args->steps_completed) += local_completed;
-    agentos_mutex_unlock(args->mutex);
+    agentrt_mutex_unlock(args->mutex);
 
     return (void *)(intptr_t)local_completed;
 }
@@ -478,16 +478,16 @@ TEST(int02_2_concurrent_thinking_chain_ops)
     #define INT02_2_ITERATIONS 25
 
     /* 创建共享 thinking chain */
-    agentos_thinking_chain_t *chain = NULL;
-    ASSERT_OK(agentos_tc_chain_create("tsan_chain_test", 8192, 64, &chain));
+    agentrt_thinking_chain_t *chain = NULL;
+    ASSERT_OK(agentrt_tc_chain_create("tsan_chain_test", 8192, 64, &chain));
     ASSERT_TRUE(chain != NULL);
-    ASSERT_OK(agentos_tc_chain_start(chain));
+    ASSERT_OK(agentrt_tc_chain_start(chain));
 
-    agentos_mutex_t mutex;
-    agentos_mutex_init(&mutex);
+    agentrt_mutex_t mutex;
+    agentrt_mutex_init(&mutex);
 
     int steps_completed = 0;
-    agentos_thread_t threads[INT02_2_NUM_THREADS];
+    agentrt_thread_t threads[INT02_2_NUM_THREADS];
     chain_worker_args_t args[INT02_2_NUM_THREADS];
 
     for (int i = 0; i < INT02_2_NUM_THREADS; i++) {
@@ -496,11 +496,11 @@ TEST(int02_2_concurrent_thinking_chain_ops)
         args[i].chain = chain;
         args[i].steps_completed = &steps_completed;
         args[i].mutex = &mutex;
-        ASSERT_TRUE(agentos_platform_thread_create(&threads[i], chain_worker, &args[i]) == 0);
+        ASSERT_TRUE(agentrt_platform_thread_create(&threads[i], chain_worker, &args[i]) == 0);
     }
 
     for (int i = 0; i < INT02_2_NUM_THREADS; i++) {
-        agentos_platform_thread_join(threads[i], NULL);
+        agentrt_platform_thread_join(threads[i], NULL);
     }
 
     printf("    Steps completed: %d / %d\n",
@@ -514,14 +514,14 @@ TEST(int02_2_concurrent_thinking_chain_ops)
     /* 获取链路统计信息 */
     char *stats = NULL;
     size_t stats_len = 0;
-    ASSERT_OK(agentos_tc_chain_stats(chain, &stats, &stats_len));
+    ASSERT_OK(agentrt_tc_chain_stats(chain, &stats, &stats_len));
     ASSERT_TRUE(stats != NULL);
     printf("    Chain stats: %.100s\n", stats);
     free(stats);
 
-    agentos_tc_chain_stop(chain);
-    agentos_tc_chain_destroy(chain);
-    agentos_mutex_destroy(&mutex);
+    agentrt_tc_chain_stop(chain);
+    agentrt_tc_chain_destroy(chain);
+    agentrt_mutex_destroy(&mutex);
 
     #undef INT02_2_NUM_THREADS
     #undef INT02_2_ITERATIONS
@@ -542,10 +542,10 @@ TEST(int02_2_concurrent_thinking_chain_ops)
 typedef struct {
     int thread_id;
     int iterations;
-    agentos_metacognition_t *mc;
-    agentos_thinking_chain_t *chain;
+    agentrt_metacognition_t *mc;
+    agentrt_thinking_chain_t *chain;
     int *evals_completed;
-    agentos_mutex_t *mutex;
+    agentrt_mutex_t *mutex;
 } metacog_worker_args_t;
 
 static void *metacog_worker(void *arg)
@@ -558,37 +558,37 @@ static void *metacog_worker(void *arg)
         char input_buf[64];
         snprintf(input_buf, sizeof(input_buf), "meta_test_%d_%d", args->thread_id, i);
 
-        agentos_thinking_step_t *step = NULL;
-        agentos_error_t err = agentos_tc_step_create(
+        agentrt_thinking_step_t *step = NULL;
+        agentrt_error_t err = agentrt_tc_step_create(
             args->chain, TC_STEP_GENERATION, input_buf, strlen(input_buf),
             NULL, 0, &step);
 
-        if (err == AGENTOS_OK && step != NULL) {
+        if (err == AGENTRT_OK && step != NULL) {
             char content_buf[128];
             snprintf(content_buf, sizeof(content_buf),
                      "Content for metacognition evaluation from thread %d step %d",
                      args->thread_id, i);
 
-            agentos_tc_step_complete(step, content_buf, strlen(content_buf),
+            agentrt_tc_step_complete(step, content_buf, strlen(content_buf),
                                      0.75f, "S2");
 
             /* 执行快速评估 */
             float score = 0.0f;
             int acceptable = 0;
-            err = agentos_mc_evaluate_quick(args->mc, step, &score, &acceptable);
-            if (err == AGENTOS_OK) {
+            err = agentrt_mc_evaluate_quick(args->mc, step, &score, &acceptable);
+            if (err == AGENTRT_OK) {
                 local_completed++;
             }
 
             /* 校准置信度 */
-            float calibrated = agentos_mc_calibrate_confidence(args->mc, 0.75f);
+            float calibrated = agentrt_mc_calibrate_confidence(args->mc, 0.75f);
             (void)calibrated;
         }
     }
 
-    agentos_mutex_lock(args->mutex);
+    agentrt_mutex_lock(args->mutex);
     (*args->evals_completed) += local_completed;
-    agentos_mutex_unlock(args->mutex);
+    agentrt_mutex_unlock(args->mutex);
 
     return (void *)(intptr_t)local_completed;
 }
@@ -601,24 +601,24 @@ TEST(int02_3_concurrent_metacognition_evaluation)
     #define INT02_3_ITERATIONS 20
 
     /* 创建共享元认知引擎 */
-    agentos_metacognition_t *mc = NULL;
-    ASSERT_OK(agentos_mc_create(&mc));
+    agentrt_metacognition_t *mc = NULL;
+    ASSERT_OK(agentrt_mc_create(&mc));
     ASSERT_TRUE(mc != NULL);
 
     /* 创建共享 thinking chain */
-    agentos_thinking_chain_t *chain = NULL;
-    ASSERT_OK(agentos_tc_chain_create("meta_tsan_test", 8192, 64, &chain));
+    agentrt_thinking_chain_t *chain = NULL;
+    ASSERT_OK(agentrt_tc_chain_create("meta_tsan_test", 8192, 64, &chain));
     ASSERT_TRUE(chain != NULL);
-    ASSERT_OK(agentos_tc_chain_start(chain));
+    ASSERT_OK(agentrt_tc_chain_start(chain));
 
     /* 关联链路 */
-    agentos_mc_set_chain(mc, chain);
+    agentrt_mc_set_chain(mc, chain);
 
-    agentos_mutex_t mutex;
-    agentos_mutex_init(&mutex);
+    agentrt_mutex_t mutex;
+    agentrt_mutex_init(&mutex);
 
     int evals_completed = 0;
-    agentos_thread_t threads[INT02_3_NUM_THREADS];
+    agentrt_thread_t threads[INT02_3_NUM_THREADS];
     metacog_worker_args_t args[INT02_3_NUM_THREADS];
 
     for (int i = 0; i < INT02_3_NUM_THREADS; i++) {
@@ -628,11 +628,11 @@ TEST(int02_3_concurrent_metacognition_evaluation)
         args[i].chain = chain;
         args[i].evals_completed = &evals_completed;
         args[i].mutex = &mutex;
-        ASSERT_TRUE(agentos_platform_thread_create(&threads[i], metacog_worker, &args[i]) == 0);
+        ASSERT_TRUE(agentrt_platform_thread_create(&threads[i], metacog_worker, &args[i]) == 0);
     }
 
     for (int i = 0; i < INT02_3_NUM_THREADS; i++) {
-        agentos_platform_thread_join(threads[i], NULL);
+        agentrt_platform_thread_join(threads[i], NULL);
     }
 
     printf("    Evaluations completed: %d / %d\n",
@@ -645,15 +645,15 @@ TEST(int02_3_concurrent_metacognition_evaluation)
 
     /* 获取统计信息 */
     char *stats = NULL;
-    ASSERT_OK(agentos_mc_stats(mc, &stats));
+    ASSERT_OK(agentrt_mc_stats(mc, &stats));
     ASSERT_TRUE(stats != NULL);
     printf("    MC stats: %.100s\n", stats);
     free(stats);
 
-    agentos_tc_chain_stop(chain);
-    agentos_tc_chain_destroy(chain);
-    agentos_mc_destroy(mc);
-    agentos_mutex_destroy(&mutex);
+    agentrt_tc_chain_stop(chain);
+    agentrt_tc_chain_destroy(chain);
+    agentrt_mc_destroy(mc);
+    agentrt_mutex_destroy(&mutex);
 
     #undef INT02_3_NUM_THREADS
     #undef INT02_3_ITERATIONS
@@ -675,7 +675,7 @@ typedef struct {
     int thread_id;
     int iterations;
     int *exec_success;
-    agentos_mutex_t *mutex;
+    agentrt_mutex_t *mutex;
 } stream_critic_args_t;
 
 static void *stream_critic_worker(void *arg)
@@ -697,7 +697,7 @@ static void *stream_critic_worker(void *arg)
         config.escalate_threshold = 0.20f;
 
         tc3_coordinator_t *coord = NULL;
-        agentos_error_t err = tc3_coordinator_create(&config, NULL, NULL, &coord);
+        agentrt_error_t err = tc3_coordinator_create(&config, NULL, NULL, &coord);
         if (err != 0 || coord == NULL)
             continue;
 
@@ -726,9 +726,9 @@ static void *stream_critic_worker(void *arg)
         tc3_coordinator_destroy(coord);
     }
 
-    agentos_mutex_lock(args->mutex);
+    agentrt_mutex_lock(args->mutex);
     (*args->exec_success) += local_success;
-    agentos_mutex_unlock(args->mutex);
+    agentrt_mutex_unlock(args->mutex);
 
     return (void *)(intptr_t)local_success;
 }
@@ -743,11 +743,11 @@ TEST(int02_4_stream_critic_race_detection)
     g_mock_s2_gen_count = 0;
     g_mock_s1_expert_count = 0;
 
-    agentos_mutex_t mutex;
-    agentos_mutex_init(&mutex);
+    agentrt_mutex_t mutex;
+    agentrt_mutex_init(&mutex);
 
     int exec_success = 0;
-    agentos_thread_t threads[INT02_4_NUM_THREADS];
+    agentrt_thread_t threads[INT02_4_NUM_THREADS];
     stream_critic_args_t args[INT02_4_NUM_THREADS];
 
     for (int i = 0; i < INT02_4_NUM_THREADS; i++) {
@@ -755,11 +755,11 @@ TEST(int02_4_stream_critic_race_detection)
         args[i].iterations = INT02_4_ITERATIONS;
         args[i].exec_success = &exec_success;
         args[i].mutex = &mutex;
-        ASSERT_TRUE(agentos_platform_thread_create(&threads[i], stream_critic_worker, &args[i]) == 0);
+        ASSERT_TRUE(agentrt_platform_thread_create(&threads[i], stream_critic_worker, &args[i]) == 0);
     }
 
     for (int i = 0; i < INT02_4_NUM_THREADS; i++) {
-        agentos_platform_thread_join(threads[i], NULL);
+        agentrt_platform_thread_join(threads[i], NULL);
     }
 
     printf("    S2 generate calls: %d\n", g_mock_s2_gen_count);
@@ -770,7 +770,7 @@ TEST(int02_4_stream_critic_race_detection)
     /* 验证: S2 至少被调用 N 次（每个 coordinator 至少一次） */
     ASSERT_TRUE(g_mock_s2_gen_count >= INT02_4_NUM_THREADS * INT02_4_ITERATIONS);
 
-    agentos_mutex_destroy(&mutex);
+    agentrt_mutex_destroy(&mutex);
 
     #undef INT02_4_NUM_THREADS
     #undef INT02_4_ITERATIONS
@@ -795,11 +795,11 @@ TEST(int02_4_stream_critic_race_detection)
 typedef struct {
     int thread_id;
     int iterations;
-    agentos_cognition_engine_t *engine;
-    agentos_memory_engine_t *mem_engine;
+    agentrt_cognition_engine_t *engine;
+    agentrt_memory_engine_t *mem_engine;
     const char *input;
     int *ops_completed;
-    agentos_mutex_t *mutex;
+    agentrt_mutex_t *mutex;
 } deadlock_test_args_t;
 
 static void *deadlock_test_worker(void *arg)
@@ -809,17 +809,17 @@ static void *deadlock_test_worker(void *arg)
 
     for (int i = 0; i < args->iterations; i++) {
         /* 操作序列1: 先引擎后记忆 (锁序 A→B) */
-        agentos_task_plan_t *plan = NULL;
-        agentos_error_t err = agentos_cognition_process(
+        agentrt_task_plan_t *plan = NULL;
+        agentrt_error_t err = agentrt_cognition_process(
             args->engine, args->input, strlen(args->input), &plan);
-        if (err == AGENTOS_OK) {
+        if (err == AGENTRT_OK) {
             if (plan)
-                agentos_task_plan_free(plan);
+                agentrt_task_plan_free(plan);
             local_ops++;
         }
 
         /* 操作序列2: 先记忆后引擎 (锁序 B→A) */
-        agentos_memory_record_t record;
+        agentrt_memory_record_t record;
         memset(&record, 0, sizeof(record));
         char data_buf[64];
         snprintf(data_buf, sizeof(data_buf), "deadlock_test_%d_%d", args->thread_id, i);
@@ -829,16 +829,16 @@ static void *deadlock_test_worker(void *arg)
         record.memory_record_importance = 0.5f;
 
         char *record_id = NULL;
-        err = agentos_memory_write(args->mem_engine, &record, &record_id);
-        if (err == AGENTOS_OK && record_id) {
+        err = agentrt_memory_write(args->mem_engine, &record, &record_id);
+        if (err == AGENTRT_OK && record_id) {
             free(record_id);
             local_ops++;
         }
 
         /* 操作序列3: 健康检查 (只读操作) */
         char *health_json = NULL;
-        err = agentos_cognition_health_check(args->engine, &health_json);
-        if (err == AGENTOS_OK && health_json) {
+        err = agentrt_cognition_health_check(args->engine, &health_json);
+        if (err == AGENTRT_OK && health_json) {
             assert(is_valid_json_prefix(health_json));
             free(health_json);
             local_ops++;
@@ -847,16 +847,16 @@ static void *deadlock_test_worker(void *arg)
         /* 操作序列4: 统计信息 (只读操作) */
         char *stats = NULL;
         size_t stats_len = 0;
-        err = agentos_cognition_stats(args->engine, &stats, &stats_len);
-        if (err == AGENTOS_OK && stats) {
+        err = agentrt_cognition_stats(args->engine, &stats, &stats_len);
+        if (err == AGENTRT_OK && stats) {
             free(stats);
             local_ops++;
         }
     }
 
-    agentos_mutex_lock(args->mutex);
+    agentrt_mutex_lock(args->mutex);
     (*args->ops_completed) += local_ops;
-    agentos_mutex_unlock(args->mutex);
+    agentrt_mutex_unlock(args->mutex);
 
     return (void *)(intptr_t)local_ops;
 }
@@ -869,17 +869,17 @@ TEST(int02_5_deadlock_detection)
     #define INT02_5_ITERATIONS 20
 
     /* 创建共享引擎 */
-    agentos_cognition_engine_t *engine = create_default_engine();
-    agentos_memory_engine_t *mem_engine = NULL;
-    ASSERT_OK(agentos_memory_create(NULL, &mem_engine));
+    agentrt_cognition_engine_t *engine = create_default_engine();
+    agentrt_memory_engine_t *mem_engine = NULL;
+    ASSERT_OK(agentrt_memory_create(NULL, &mem_engine));
     ASSERT_TRUE(mem_engine != NULL);
-    agentos_cognition_set_memory(engine, mem_engine);
+    agentrt_cognition_set_memory(engine, mem_engine);
 
-    agentos_mutex_t mutex;
-    agentos_mutex_init(&mutex);
+    agentrt_mutex_t mutex;
+    agentrt_mutex_init(&mutex);
 
     int ops_completed = 0;
-    agentos_thread_t threads[INT02_5_NUM_THREADS];
+    agentrt_thread_t threads[INT02_5_NUM_THREADS];
     deadlock_test_args_t args[INT02_5_NUM_THREADS];
 
     const char *inputs[] = {
@@ -899,11 +899,11 @@ TEST(int02_5_deadlock_detection)
         args[i].input = inputs[i];
         args[i].ops_completed = &ops_completed;
         args[i].mutex = &mutex;
-        ASSERT_TRUE(agentos_platform_thread_create(&threads[i], deadlock_test_worker, &args[i]) == 0);
+        ASSERT_TRUE(agentrt_platform_thread_create(&threads[i], deadlock_test_worker, &args[i]) == 0);
     }
 
     for (int i = 0; i < INT02_5_NUM_THREADS; i++) {
-        agentos_platform_thread_join(threads[i], NULL);
+        agentrt_platform_thread_join(threads[i], NULL);
     }
 
     printf("    Operations completed: %d\n", ops_completed);
@@ -915,15 +915,15 @@ TEST(int02_5_deadlock_detection)
 
     /* 最终健康检查 */
     char *health_json = NULL;
-    ASSERT_OK(agentos_cognition_health_check(engine, &health_json));
+    ASSERT_OK(agentrt_cognition_health_check(engine, &health_json));
     ASSERT_TRUE(health_json != NULL);
     ASSERT_TRUE(is_valid_json_prefix(health_json));
     printf("    Final health check: %.80s\n", health_json);
     free(health_json);
 
-    agentos_cognition_destroy(engine);
-    agentos_memory_destroy(mem_engine);
-    agentos_mutex_destroy(&mutex);
+    agentrt_cognition_destroy(engine);
+    agentrt_memory_destroy(mem_engine);
+    agentrt_mutex_destroy(&mutex);
 
     #undef INT02_5_NUM_THREADS
     #undef INT02_5_ITERATIONS
@@ -943,7 +943,7 @@ typedef struct {
     int iterations;
     int use_feedback;
     int *success_count;
-    agentos_mutex_t *mutex;
+    agentrt_mutex_t *mutex;
 } mixed_tsan_args_t;
 
 static void *mixed_tsan_worker(void *arg)
@@ -952,61 +952,61 @@ static void *mixed_tsan_worker(void *arg)
     int local_success = 0;
 
     for (int i = 0; i < args->iterations; i++) {
-        agentos_cognition_engine_t *engine = NULL;
-        agentos_error_t err;
+        agentrt_cognition_engine_t *engine = NULL;
+        agentrt_error_t err;
 
         if (args->use_feedback) {
-            agentos_cognition_config_t config;
+            agentrt_cognition_config_t config;
             memset(&config, 0, sizeof(config));
             config.cognition_default_timeout_ms = 15000;
             config.cognition_max_retries = 2;
             config.feedback_callback = null_feedback_callback;
             config.feedback_user_data = NULL;
-            err = agentos_cognition_create_ex_take(&config, NULL, NULL, NULL, &engine);
+            err = agentrt_cognition_create_ex_take(&config, NULL, NULL, NULL, &engine);
         } else {
-            agentos_coordinator_strategy_t *coord =
-                (agentos_coordinator_strategy_t *)calloc(1, sizeof(*coord));
+            agentrt_coordinator_strategy_t *coord =
+                (agentrt_coordinator_strategy_t *)calloc(1, sizeof(*coord));
             if (!coord) continue;
             coord->coordinate = mock_t2_thinking;
             coord->destroy = mock_coordinator_destroy;
             coord->data = NULL;
 
-            err = agentos_cognition_create_take(NULL, coord, NULL, &engine);
+            err = agentrt_cognition_create_take(NULL, coord, NULL, &engine);
             coord->destroy(coord);
         }
 
-        if (err == AGENTOS_OK && engine != NULL) {
+        if (err == AGENTRT_OK && engine != NULL) {
             char input_buf[64];
             snprintf(input_buf, sizeof(input_buf), "mixed_tsan_%d_%d", args->thread_id, i);
 
-            agentos_task_plan_t *plan = NULL;
-            err = agentos_cognition_process(engine, input_buf, strlen(input_buf), &plan);
-            if (err == AGENTOS_OK) {
+            agentrt_task_plan_t *plan = NULL;
+            err = agentrt_cognition_process(engine, input_buf, strlen(input_buf), &plan);
+            if (err == AGENTRT_OK) {
                 if (plan)
-                    agentos_task_plan_free(plan);
+                    agentrt_task_plan_free(plan);
                 local_success++;
             }
 
             /* 读取统计和健康信息 */
             char *stats = NULL;
             size_t stats_len = 0;
-            agentos_cognition_stats(engine, &stats, &stats_len);
+            agentrt_cognition_stats(engine, &stats, &stats_len);
             if (stats) free(stats);
 
             char *health = NULL;
-            agentos_cognition_health_check(engine, &health);
+            agentrt_cognition_health_check(engine, &health);
             if (health) {
                 assert(is_valid_json_prefix(health));
                 free(health);
             }
 
-            agentos_cognition_destroy(engine);
+            agentrt_cognition_destroy(engine);
         }
     }
 
-    agentos_mutex_lock(args->mutex);
+    agentrt_mutex_lock(args->mutex);
     (*args->success_count) += local_success;
-    agentos_mutex_unlock(args->mutex);
+    agentrt_mutex_unlock(args->mutex);
 
     return (void *)(intptr_t)local_success;
 }
@@ -1018,11 +1018,11 @@ TEST(int02_mixed_feedback_and_coordinator_tsan)
     #define INT02_MIX_NUM_THREADS 6
     #define INT02_MIX_ITERATIONS 10
 
-    agentos_mutex_t mutex;
-    agentos_mutex_init(&mutex);
+    agentrt_mutex_t mutex;
+    agentrt_mutex_init(&mutex);
 
     int success_count = 0;
-    agentos_thread_t threads[INT02_MIX_NUM_THREADS];
+    agentrt_thread_t threads[INT02_MIX_NUM_THREADS];
     mixed_tsan_args_t args[INT02_MIX_NUM_THREADS];
 
     for (int i = 0; i < INT02_MIX_NUM_THREADS; i++) {
@@ -1031,18 +1031,18 @@ TEST(int02_mixed_feedback_and_coordinator_tsan)
         args[i].use_feedback = (i % 2 == 0); /* 交替使用 feedback 和 coordinator */
         args[i].success_count = &success_count;
         args[i].mutex = &mutex;
-        ASSERT_TRUE(agentos_platform_thread_create(&threads[i], mixed_tsan_worker, &args[i]) == 0);
+        ASSERT_TRUE(agentrt_platform_thread_create(&threads[i], mixed_tsan_worker, &args[i]) == 0);
     }
 
     for (int i = 0; i < INT02_MIX_NUM_THREADS; i++) {
-        agentos_platform_thread_join(threads[i], NULL);
+        agentrt_platform_thread_join(threads[i], NULL);
     }
 
     printf("    Mixed threads: %d / %d succeeded\n",
            success_count, INT02_MIX_NUM_THREADS * INT02_MIX_ITERATIONS);
     ASSERT_TRUE(success_count == INT02_MIX_NUM_THREADS * INT02_MIX_ITERATIONS);
 
-    agentos_mutex_destroy(&mutex);
+    agentrt_mutex_destroy(&mutex);
 
     #undef INT02_MIX_NUM_THREADS
     #undef INT02_MIX_ITERATIONS

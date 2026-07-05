@@ -18,21 +18,21 @@
 
 | tests/unit/ 目录 | 对应的 agentos/ 模块 | 测试内容 |
 |------------------|---------------------|----------|
-| `atoms/corekern/` | `agentos/atoms/corekern/` | 微核心核心（IPC/Binder、内存管理、任务调度、定时器） |
-| `atoms/coreloopthree/` | `agentos/atoms/coreloopthree/` | 三环核心运行时（认知环/执行环/学习环、协调器、多数投票） |
-| `atoms/memory/` | `agentos/atoms/memory/` | 内置记忆子系统（L1+L2 层 Memory Provider） |
-| `atoms/syscall/` | `agentos/atoms/syscall/` | 系统调用接口（任务/内存/会话/遥测/Agent 5 类接口 + 4 层保护） |
-| `atoms/test_common_utils.c` | `agentos/atoms/` | Atoms 层公共工具函数 |
-| `commons/` | `agentos/commons/` | 统一基础库（平台抽象/日志/配置/内存/同步/网络/IPC/Token/成本/可观测性） |
-| `cupolas/` | `agentos/cupolas/` | 安全穹顶单元测试（核心/签名/配置/工作台/指标/安全/金库/审计溢出/熔断器/清洗缓存） |
-| `daemon/gateway_d/` | `agentos/daemon/gateway_d/` | API 网关守护进程（网关核心/JSON-RPC/系统调用路由/RPC 处理器/服务层） |
-| `daemon/llm_d/` | `agentos/daemon/llm_d/` | LLM 服务守护进程（LLM 核心/服务层/响应处理/成本追踪/Token 计数/缓存/多 Provider） |
-| `daemon/tool_d/` | `agentos/daemon/tool_d/` | 工具执行守护进程（执行器/服务层/注册表/工具核心/验证器/缓存） |
-| `daemon/sched_d/` | `agentos/daemon/sched_d/` | 任务调度守护进程（调度器/策略） |
-| `daemon/market_d/` | `agentos/daemon/market_d/` | 应用市场守护进程（市场核心/安装器/Agent 注册/技能注册/Agent 注册核心） |
-| `daemon/monit_d/` | `agentos/daemon/monit_d/` | 监控告警守护进程（监控器/追踪/告警/指标） |
-| `daemon/common/` | `agentos/daemon/common/` | 公共服务库（IPC 客户端/输入验证/服务认证/配置/错误处理/安全字符串/JSON-RPC 辅助/平台/日志） |
-| `heapstore/` | `agentos/heapstore/` | 运行时数据存储（核心/注册表/批量/IPC/日志/内存/追踪/集成/安全路径遍历/模糊并发/边界/基准/批量性能） |
+| `atoms/corekern/` | `agentrt/atoms/corekern/` | 微核心核心（IPC/Binder、内存管理、任务调度、定时器） |
+| `atoms/coreloopthree/` | `agentrt/atoms/coreloopthree/` | 三环核心运行时（认知环/执行环/学习环、协调器、多数投票） |
+| `atoms/memory/` | `agentrt/atoms/memory/` | 内置记忆子系统（L1+L2 层 Memory Provider） |
+| `atoms/syscall/` | `agentrt/atoms/syscall/` | 系统调用接口（任务/内存/会话/遥测/Agent 5 类接口 + 4 层保护） |
+| `atoms/test_common_utils.c` | `agentrt/atoms/` | Atoms 层公共工具函数 |
+| `commons/` | `agentrt/commons/` | 统一基础库（平台抽象/日志/配置/内存/同步/网络/IPC/Token/成本/可观测性） |
+| `cupolas/` | `agentrt/cupolas/` | 安全穹顶单元测试（核心/签名/配置/工作台/指标/安全/金库/审计溢出/熔断器/清洗缓存） |
+| `daemons/gateway_d/` | `agentrt/daemons/gateway_d/` | API 网关守护进程（网关核心/JSON-RPC/系统调用路由/RPC 处理器/服务层） |
+| `daemons/llm_d/` | `agentrt/daemons/llm_d/` | LLM 服务守护进程（LLM 核心/服务层/响应处理/成本追踪/Token 计数/缓存/多 Provider） |
+| `daemons/tool_d/` | `agentrt/daemons/tool_d/` | 工具执行守护进程（执行器/服务层/注册表/工具核心/验证器/缓存） |
+| `daemons/sched_d/` | `agentrt/daemons/sched_d/` | 任务调度守护进程（调度器/策略） |
+| `daemons/market_d/` | `agentrt/daemons/market_d/` | 应用市场守护进程（市场核心/安装器/Agent 注册/技能注册/Agent 注册核心） |
+| `daemons/monit_d/` | `agentrt/daemons/monit_d/` | 监控告警守护进程（监控器/追踪/告警/指标） |
+| `daemons/common/` | `agentrt/daemons/common/` | 公共服务库（IPC 客户端/输入验证/服务认证/配置/错误处理/安全字符串/JSON-RPC 辅助/平台/日志） |
+| `heapstore/` | `agentrt/heapstore/` | 运行时数据存储（核心/注册表/批量/IPC/日志/内存/追踪/集成/安全路径遍历/模糊并发/边界/基准/批量性能） |
 | `manager/` | `ecosystem/manager/` | 统一配置管理中心（配置验证/语法检查/集成/Schema 验证/漂移检测/审计日志验证） |
 | `openlab/` | `ecosystem/openlab/` | 开放生态系统（Agent/任务/工具/存储/规划/调度/视频编辑/多 Agent） |
 | `toolkit/` | `sdk/` + `scripts/toolkit/` | 运维工具包与多语言 SDK（Python SDK/Rust SDK/管理器/检查点/导入/综合/基准性能/Agent/任务管理器重构） |
@@ -105,7 +105,7 @@ unit/                              # 共 138 个文件
 │       ├── test_audit_overflow.c  #   审计溢出测试
 │       ├── test_circuit_breaker.c #   熔断器测试
 │       └── test_sanitizer_cache.c #   清洗缓存测试
-├── daemon/                        # Daemon 守护进程测试（39 个文件）
+├── daemons/                        # Daemon 守护进程测试（39 个文件）
 │   ├── common/                    #   公共守护进程测试（9 个文件）
 │   │   ├── test_config.c          #     配置管理测试
 │   │   ├── test_error.c           #     错误处理测试
@@ -234,7 +234,7 @@ pytest tests/unit/ -v -m unit
 
 # 按模块运行
 pytest tests/unit/atoms/ -v
-pytest tests/unit/daemon/ -v
+pytest tests/unit/daemons/ -v
 pytest tests/unit/commons/ -v
 pytest tests/unit/cupolas/ -v
 pytest tests/unit/heapstore/ -v
@@ -243,13 +243,13 @@ pytest tests/unit/openlab/ -v
 pytest tests/unit/toolkit/ -v
 
 # 按守护进程子模块运行
-pytest tests/unit/daemon/gateway_d/ -v
-pytest tests/unit/daemon/llm_d/ -v
-pytest tests/unit/daemon/tool_d/ -v
-pytest tests/unit/daemon/market_d/ -v
-pytest tests/unit/daemon/monit_d/ -v
-pytest tests/unit/daemon/sched_d/ -v
-pytest tests/unit/daemon/common/ -v
+pytest tests/unit/daemons/gateway_d/ -v
+pytest tests/unit/daemons/llm_d/ -v
+pytest tests/unit/daemons/tool_d/ -v
+pytest tests/unit/daemons/market_d/ -v
+pytest tests/unit/daemons/monit_d/ -v
+pytest tests/unit/daemons/sched_d/ -v
+pytest tests/unit/daemons/common/ -v
 
 # C 语言单元测试
 cd build && ctest -N | grep test_
@@ -273,13 +273,13 @@ pytest tests/unit/ -v -n auto
 | `atoms/syscall/` | 6 | CMocka | 系统调用表完整性、入口验证、5 类接口功能、4 层保护 |
 | `commons/` | 17 | CMocka | 平台抽象、日志输出、配置解析、字符串处理、Token 管理 |
 | `cupolas/` | 10 | CMocka | 安全策略执行、HMAC 签名、金库访问、审计链完整性、熔断器状态机 |
-| `daemon/common/` | 9 | CMocka | IPC 客户端、服务认证、JSON-RPC 协议、安全字符串操作 |
-| `daemon/gateway_d/` | 5 | CMocka | 网关路由、JSON-RPC 处理、系统调用转发、RPC 处理器 |
-| `daemon/llm_d/` | 7 | CMocka + pytest | LLM 调用、响应解析、成本追踪、Token 计数、缓存命中 |
-| `daemon/market_d/` | 5 | CMocka | Agent/技能注册、安装流程、市场查询 |
-| `daemon/monit_d/` | 4 | CMocka | 指标采集、告警触发、追踪链路 |
-| `daemon/sched_d/` | 2 | CMocka | 调度算法、策略切换 |
-| `daemon/tool_d/` | 7 | CMocka + pytest | 工具注册/执行/验证、缓存管理 |
+| `daemons/common/` | 9 | CMocka | IPC 客户端、服务认证、JSON-RPC 协议、安全字符串操作 |
+| `daemons/gateway_d/` | 5 | CMocka | 网关路由、JSON-RPC 处理、系统调用转发、RPC 处理器 |
+| `daemons/llm_d/` | 7 | CMocka + pytest | LLM 调用、响应解析、成本追踪、Token 计数、缓存命中 |
+| `daemons/market_d/` | 5 | CMocka | Agent/技能注册、安装流程、市场查询 |
+| `daemons/monit_d/` | 4 | CMocka | 指标采集、告警触发、追踪链路 |
+| `daemons/sched_d/` | 2 | CMocka | 调度算法、策略切换 |
+| `daemons/tool_d/` | 7 | CMocka + pytest | 工具注册/执行/验证、缓存管理 |
 | `heapstore/` | 13 | CMocka | CRUD 操作、批量处理、IPC 通信、内存后端、路径遍历防护 |
 | `manager/` | 8 | pytest | 配置验证、Schema 校验、漂移检测、审计日志 |
 | `openlab/` | 10 | pytest | Agent 生命周期、任务调度、工具管理、视频编辑 |

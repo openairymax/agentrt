@@ -10,20 +10,24 @@
  * - CROSS-03: time(NULL) → agentrt_time_ns()
  * - 新增 auto-checkpoint hook 机制（CoreLoopThree 集成）
  * - 增强 JSON restore 解析健壮性
+ *
+ * SP02 解耦：本文件从 daemons/common/src/ 迁移至 commons/utils/execution/src/，
+ * 消除 atoms/coreloopthree 对 daemons 层的物理依赖（ACC-SP02 解耦点 #1）。
+ * 迁移时将 SVC_LOG_* 宏替换为 commons 层 LOG_* 宏（两者均调用 log_write()），
+ * 移除 daemons 层的 svc_logger.h 和 daemon_errors.h 依赖。
  */
 
-#include "../include/checkpoint.h"
+#include "checkpoint.h"
 
-#include "../include/svc_logger.h"
-#include "agentrt.h"
-#include "daemon_errors.h"
-#include "platform.h"
+#include <logging.h>       /* LOG_ERROR/LOG_INFO/LOG_WARN/LOG_DEBUG → log_write() */
+#include <types.h>         /* AGENTRT_SUCCESS */
+#include "platform.h"      /* agentrt_time_ns/agentrt_mutex_* */
+#include "error.h"         /* AGENTRT_ERROR/agentrt_error_t/AGENTRT_ERR_STATE_ERROR */
 
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "error.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -112,14 +116,14 @@ static char **safe_str_array_dup(char **src, size_t count)
     }
     char **dst = (char **)AGENTRT_CALLOC(count, sizeof(char *));
     if (!dst) {
-        SVC_LOG_ERROR("C-L07: Checkpoint: ARRAY-DUP-FAIL — OOM for count=%zu", count);
+        LOG_ERROR("C-L07: Checkpoint: ARRAY-DUP-FAIL — OOM for count=%zu", count);
         return NULL;
     }
     __builtin_memset(dst, 0, sizeof(char *) * count);
     for (size_t i = 0; i < count; i++) {
         dst[i] = safe_strdup(src[i]);
         if (!dst[i] && src[i]) {
-            SVC_LOG_ERROR("C-L07: Checkpoint: ARRAY-DUP-FAIL — OOM at index=%zu", i);
+            LOG_ERROR("C-L07: Checkpoint: ARRAY-DUP-FAIL — OOM at index=%zu", i);
             for (size_t j = 0; j < i; j++)
                 AGENTRT_FREE(dst[j]);
             AGENTRT_FREE(dst);
@@ -356,7 +360,7 @@ static char *json_extract_string(const char *json, const char *key)
     size_t cap = 512;
     char *val = (char *)AGENTRT_MALLOC(cap);
     if (!val) {
-        SVC_LOG_ERROR("C-L07: Checkpoint: JSON-EXTRACT-FAIL — OOM (malloc) for key=%s", key);
+        LOG_ERROR("C-L07: Checkpoint: JSON-EXTRACT-FAIL — OOM (malloc) for key=%s", key);
         return NULL;
     }
     size_t len = 0;
@@ -385,7 +389,7 @@ static char *json_extract_string(const char *json, const char *key)
                 cap *= 2;
                 val = (char *)AGENTRT_REALLOC(val, cap);
                 if (!val) {
-                    SVC_LOG_ERROR("C-L07: Checkpoint: JSON-EXTRACT-FAIL — OOM (realloc escape) for key=%s",
+                    LOG_ERROR("C-L07: Checkpoint: JSON-EXTRACT-FAIL — OOM (realloc escape) for key=%s",
                                   key);
                     return NULL;
                 }
@@ -397,7 +401,7 @@ static char *json_extract_string(const char *json, const char *key)
                 cap *= 2;
                 val = (char *)AGENTRT_REALLOC(val, cap);
                 if (!val) {
-                    SVC_LOG_ERROR("C-L07: Checkpoint: JSON-EXTRACT-FAIL — OOM (realloc char) for key=%s",
+                    LOG_ERROR("C-L07: Checkpoint: JSON-EXTRACT-FAIL — OOM (realloc char) for key=%s",
                                   key);
                     return NULL;
                 }
@@ -437,7 +441,7 @@ agentrt_error_t agentrt_checkpoint_init(const char *storage_path)
     const char *path = storage_path ? storage_path : "./" CHECKPOINT_DIRECTORY;
     size_t len = strlen(path);
     if (len == 0 || len >= sizeof(g_checkpoint_storage_path)) {
-        SVC_LOG_ERROR("C-L07: Checkpoint: INIT-FAIL — invalid storage path "
+        LOG_ERROR("C-L07: Checkpoint: INIT-FAIL — invalid storage path "
                       "len=%zu max=%zu", len, sizeof(g_checkpoint_storage_path));
         return AGENTRT_EINVAL;
     }
@@ -450,16 +454,16 @@ agentrt_error_t agentrt_checkpoint_init(const char *storage_path)
                                                     memory_order_seq_cst, memory_order_seq_cst)) {
             if (agentrt_mutex_init(&g_checkpoint_mutex) != 0) {
                 atomic_store_explicit(&g_checkpoint_mutex_initialized, 0, memory_order_seq_cst);
-                SVC_LOG_ERROR("C-L07: Checkpoint: INIT-FAIL — mutex init failed "
+                LOG_ERROR("C-L07: Checkpoint: INIT-FAIL — mutex init failed "
                               "path=%s", g_checkpoint_storage_path);
-                return DAEMON_EINIT;
+                return AGENTRT_ERR_STATE_ERROR;
             }
         }
     }
 
     __builtin_memset(&g_checkpoint_stats, 0, sizeof(g_checkpoint_stats));
     atomic_store_explicit(&g_checkpoint_initialized, 1, memory_order_seq_cst);
-    SVC_LOG_INFO("C-L07: Checkpoint: INIT-OK path=%s", g_checkpoint_storage_path);
+    LOG_INFO("C-L07: Checkpoint: INIT-OK path=%s", g_checkpoint_storage_path);
     return AGENTRT_SUCCESS;
 }
 
@@ -474,7 +478,7 @@ agentrt_error_t agentrt_checkpoint_shutdown(void)
     g_auto_hook = NULL;
     g_auto_hook_user_data = NULL;
     atomic_store_explicit(&g_checkpoint_initialized, 0, memory_order_seq_cst);
-    SVC_LOG_INFO("C-L07: Checkpoint: SHUTDOWN-OK "
+    LOG_INFO("C-L07: Checkpoint: SHUTDOWN-OK "
                  "total=%llu success=%llu failed=%llu",
                  (unsigned long long)g_checkpoint_stats.total_checkpoints,
                  (unsigned long long)g_checkpoint_stats.successful_checkpoints,
@@ -497,7 +501,7 @@ agentrt_error_t agentrt_checkpoint_create(const char *task_id, const char *sessi
     agentrt_task_checkpoint_t *cp =
         (agentrt_task_checkpoint_t *)AGENTRT_CALLOC(1, sizeof(agentrt_task_checkpoint_t));
     if (!cp) {
-        SVC_LOG_ERROR("C-L07: Checkpoint: CREATE-FAIL — OOM for task_id=%s", task_id);
+        LOG_ERROR("C-L07: Checkpoint: CREATE-FAIL — OOM for task_id=%s", task_id);
         return AGENTRT_ENOMEM;
     }
 
@@ -586,7 +590,7 @@ agentrt_error_t agentrt_checkpoint_save(agentrt_task_checkpoint_t *cp)
         agentrt_mutex_lock(&g_checkpoint_mutex);
         g_checkpoint_stats.failed_checkpoints++;
         agentrt_mutex_unlock(&g_checkpoint_mutex);
-        SVC_LOG_ERROR("C-L07: Checkpoint: SAVE-FAIL — cannot open file "
+        LOG_ERROR("C-L07: Checkpoint: SAVE-FAIL — cannot open file "
                       "path=%s task_id=%s errno=%d", tmppath, cp->task_id, errno);
         return AGENTRT_EIO;
     }
@@ -659,7 +663,7 @@ agentrt_error_t agentrt_checkpoint_save(agentrt_task_checkpoint_t *cp)
         agentrt_mutex_lock(&g_checkpoint_mutex);
         g_checkpoint_stats.failed_checkpoints++;
         agentrt_mutex_unlock(&g_checkpoint_mutex);
-        SVC_LOG_ERROR("C-L07: Checkpoint: SAVE-FAIL — rename failed "
+        LOG_ERROR("C-L07: Checkpoint: SAVE-FAIL — rename failed "
                       "tmp=%s dst=%s task_id=%s errno=%d",
                       tmppath, filepath, cp->task_id, errno);
         return AGENTRT_EIO;
@@ -681,7 +685,7 @@ agentrt_error_t agentrt_checkpoint_save(agentrt_task_checkpoint_t *cp)
     }
     agentrt_mutex_unlock(&g_checkpoint_mutex);
 
-    SVC_LOG_DEBUG("C-L07: Checkpoint: SAVE-OK task_id=%s seq=%llu size=%zu",
+    LOG_DEBUG("C-L07: Checkpoint: SAVE-OK task_id=%s seq=%llu size=%zu",
                   cp->task_id, (unsigned long long)cp->sequence_num, cp->state_size);
     return AGENTRT_SUCCESS;
 }
@@ -701,7 +705,7 @@ agentrt_error_t agentrt_checkpoint_restore(const char *task_id, uint64_t sequenc
     if (sequence_num == 0) {
         actual_seq = find_latest_seq(task_id);
         if (actual_seq == 0) {
-            SVC_LOG_WARN("C-L07: Checkpoint: RESTORE-FAIL — no checkpoint found "
+            LOG_WARN("C-L07: Checkpoint: RESTORE-FAIL — no checkpoint found "
                          "task_id=%s", task_id);
             return AGENTRT_ENOENT;
         }
@@ -713,7 +717,7 @@ agentrt_error_t agentrt_checkpoint_restore(const char *task_id, uint64_t sequenc
 
     FILE *fp = fopen(filepath, "r");
     if (!fp) {
-        SVC_LOG_WARN("C-L07: Checkpoint: RESTORE-FAIL — file not found "
+        LOG_WARN("C-L07: Checkpoint: RESTORE-FAIL — file not found "
                      "path=%s task_id=%s seq=%llu errno=%d",
                      filepath, task_id, (unsigned long long)actual_seq, errno);
         return AGENTRT_ENOENT;
@@ -724,7 +728,7 @@ agentrt_error_t agentrt_checkpoint_restore(const char *task_id, uint64_t sequenc
     fseek(fp, 0, SEEK_SET);
     if (file_size <= 0 || file_size > 10 * 1024 * 1024) {
         fclose(fp);
-        SVC_LOG_ERROR("C-L07: Checkpoint: RESTORE-FAIL — invalid file size "
+        LOG_ERROR("C-L07: Checkpoint: RESTORE-FAIL — invalid file size "
                       "path=%s size=%ld task_id=%s", filepath, file_size, task_id);
         return AGENTRT_EIO;
     }
@@ -732,7 +736,7 @@ agentrt_error_t agentrt_checkpoint_restore(const char *task_id, uint64_t sequenc
     char *json_buf = (char *)AGENTRT_MALLOC((size_t)(file_size + 1));
     if (!json_buf) {
         fclose(fp);
-        SVC_LOG_ERROR("C-L07: Checkpoint: RESTORE-FAIL — OOM "
+        LOG_ERROR("C-L07: Checkpoint: RESTORE-FAIL — OOM "
                       "path=%s size=%ld task_id=%s", filepath, file_size, task_id);
         return AGENTRT_ENOMEM;
     }
@@ -741,7 +745,7 @@ agentrt_error_t agentrt_checkpoint_restore(const char *task_id, uint64_t sequenc
     if (read_len != (size_t)file_size) {
         AGENTRT_FREE(json_buf);
         fclose(fp);
-        SVC_LOG_ERROR("C-L07: Checkpoint: RESTORE-FAIL — read error "
+        LOG_ERROR("C-L07: Checkpoint: RESTORE-FAIL — read error "
                       "path=%s expected=%ld actual=%zu task_id=%s",
                       filepath, file_size, read_len, task_id);
         return AGENTRT_EIO;
@@ -786,7 +790,7 @@ agentrt_error_t agentrt_checkpoint_restore(const char *task_id, uint64_t sequenc
     g_checkpoint_stats.total_restore_ops++;
     agentrt_mutex_unlock(&g_checkpoint_mutex);
     *out_cp = cp;
-    SVC_LOG_DEBUG("C-L07: Checkpoint: RESTORE-OK task_id=%s seq=%llu state=%s",
+    LOG_DEBUG("C-L07: Checkpoint: RESTORE-OK task_id=%s seq=%llu state=%s",
                   task_id, (unsigned long long)cp->sequence_num,
                   state_to_string(cp->state));
     return AGENTRT_SUCCESS;
@@ -810,10 +814,10 @@ agentrt_error_t agentrt_checkpoint_delete(const char *task_id, uint64_t seq_num)
         if (result == 0) {
             if (g_checkpoint_stats.total_checkpoints > 0)
                 g_checkpoint_stats.total_checkpoints--;
-            SVC_LOG_INFO("C-L07: Checkpoint: DELETE-OK task_id=%s seq=%llu",
+            LOG_INFO("C-L07: Checkpoint: DELETE-OK task_id=%s seq=%llu",
                          task_id, (unsigned long long)seq_num);
         } else {
-            SVC_LOG_WARN("C-L07: Checkpoint: DELETE-FAIL — unlink failed "
+            LOG_WARN("C-L07: Checkpoint: DELETE-FAIL — unlink failed "
                          "task_id=%s seq=%llu errno=%d",
                          task_id, (unsigned long long)seq_num, errno);
         }
@@ -826,7 +830,7 @@ agentrt_error_t agentrt_checkpoint_delete(const char *task_id, uint64_t seq_num)
     size_t cnt = 0;
     uint64_t *seqs = collect_task_seqs(task_id, &cnt);
     if (!seqs) {
-        SVC_LOG_INFO("C-L07: Checkpoint: DELETE-ALL — no checkpoints for task_id=%s",
+        LOG_INFO("C-L07: Checkpoint: DELETE-ALL — no checkpoints for task_id=%s",
                      task_id);
         return AGENTRT_ENOENT;
     }
@@ -846,7 +850,7 @@ agentrt_error_t agentrt_checkpoint_delete(const char *task_id, uint64_t seq_num)
     agentrt_mutex_unlock(&g_checkpoint_mutex);
     AGENTRT_FREE(seqs);
 
-    SVC_LOG_INFO("C-L07: Checkpoint: DELETE-ALL task_id=%s deleted=%zu/%zu",
+    LOG_INFO("C-L07: Checkpoint: DELETE-ALL task_id=%s deleted=%zu/%zu",
                  task_id, deleted, cnt);
     return (deleted > 0) ? AGENTRT_SUCCESS : AGENTRT_ENOENT;
 }
@@ -1039,7 +1043,7 @@ agentrt_error_t agentrt_snapshot_create(const char *task_id, const char *snap_pa
     FILE *fp = fopen(snap_path, "wb");
     if (!fp) {
         agentrt_checkpoint_destroy(cp);
-        SVC_LOG_ERROR("C-L07: Checkpoint: SNAPSHOT-CREATE-FAIL — cannot open file "
+        LOG_ERROR("C-L07: Checkpoint: SNAPSHOT-CREATE-FAIL — cannot open file "
                       "path=%s task_id=%s errno=%d", snap_path, task_id, errno);
         return AGENTRT_EIO;
     }
@@ -1072,7 +1076,7 @@ agentrt_error_t agentrt_snapshot_restore(const char *snap_path, char **tid)
 
     FILE *fp = fopen(snap_path, "rb");
     if (!fp) {
-        SVC_LOG_WARN("C-L07: Checkpoint: SNAPSHOT-RESTORE-FAIL — file not found "
+        LOG_WARN("C-L07: Checkpoint: SNAPSHOT-RESTORE-FAIL — file not found "
                      "path=%s errno=%d", snap_path, errno);
         return AGENTRT_ENOENT;
     }
@@ -1080,7 +1084,7 @@ agentrt_error_t agentrt_snapshot_restore(const char *snap_path, char **tid)
     char header[64];
     if (!fgets(header, sizeof(header), fp) || strncmp(header, "SNAPSHOT_V1", 11) != 0) {
         fclose(fp);
-        SVC_LOG_ERROR("C-L07: Checkpoint: SNAPSHOT-RESTORE-FAIL — bad header "
+        LOG_ERROR("C-L07: Checkpoint: SNAPSHOT-RESTORE-FAIL — bad header "
                       "path=%s header=%.20s", snap_path, header);
         return AGENTRT_EIO;
     }
