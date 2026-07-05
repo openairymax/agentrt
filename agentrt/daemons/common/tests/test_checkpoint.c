@@ -3,7 +3,7 @@
  * test_checkpoint.c - Checkpoint Module Unit Tests
  */
 
-#include "../include/checkpoint.h"
+#include "checkpoint.h"  /* SP02: migrated to commons/utils/execution/include/ */
 
 #include <stdio.h>
 #include <stdlib.h>

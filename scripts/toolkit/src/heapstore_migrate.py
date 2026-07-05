@@ -503,7 +503,7 @@ def main():
     root = getattr(args, "root", None)
     if not root:
         root = os.environ.get(
-            "AGENTOS_HEAPSTORE_ROOT",
+            "AGENTRT_HEAPSTORE_ROOT",
             os.path.expanduser("~/.agentrt/heapstore")
         )
 

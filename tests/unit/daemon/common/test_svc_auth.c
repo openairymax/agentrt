@@ -45,7 +45,7 @@ int test_jwt_init(void) {
         .secret_len = 35,
         .token_ttl_sec = 3600,
         .refresh_threshold_sec = 300,
-        .issuer = "agentos-test"
+        .issuer = "agentrt-test"
     };
 
     int ret = auth_jwt_init(&config);
@@ -67,7 +67,7 @@ int test_jwt_generate_token(void) {
         .secret_len = 16,
         .token_ttl_sec = 3600,
         .refresh_threshold_sec = 300,
-        .issuer = "agentos-test"
+        .issuer = "agentrt-test"
     };
     auth_jwt_init(&config);
 
@@ -102,7 +102,7 @@ int test_jwt_verify_token(void) {
         .secret_len = 19,
         .token_ttl_sec = 3600,
         .refresh_threshold_sec = 300,
-        .issuer = "agentos-test"
+        .issuer = "agentrt-test"
     };
     auth_jwt_init(&config);
 
@@ -144,7 +144,7 @@ int test_jwt_refresh_token(void) {
         .secret_len = 20,
         .token_ttl_sec = 3600,
         .refresh_threshold_sec = 300,
-        .issuer = "agentos-test"
+        .issuer = "agentrt-test"
     };
     auth_jwt_init(&config);
 
@@ -242,7 +242,7 @@ int test_apikey_add_remove(void) {
 
     /* 添加重复的 Key */
     ret = auth_apikey_add("new-key-12345");
-    TEST_ASSERT(ret == AGENTOS_ERR_ALREADY_EXISTS, "Duplicate key should fail");
+    TEST_ASSERT(ret == AGENTRT_ERR_ALREADY_EXISTS, "Duplicate key should fail");
     TEST_PASS("API Key duplicate rejection");
 
     /* 移除 Key */
@@ -342,7 +342,7 @@ int test_unified_authenticate(void) {
         .jwt.secret_len = 21,
         .jwt.token_ttl_sec = 3600,
         .jwt.refresh_threshold_sec = 300,
-        .jwt.issuer = "agentos-unified",
+        .jwt.issuer = "agentrt-unified",
         .apikey.allowed_keys = (const char*[]){"unified-api-key"},
         .apikey.key_count = 1,
         .ratelimit.requests_per_sec = 100,
@@ -407,7 +407,7 @@ int test_edge_cases(void) {
     };
     auth_jwt_init(&config);
     int ret = auth_jwt_init(&config);  /* 再次初始化 */
-    TEST_ASSERT(ret == AGENTOS_ERR_ALREADY_INIT || ret == 0, 
+    TEST_ASSERT(ret == AGENTRT_ERR_ALREADY_INIT || ret == 0, 
               "Double init should handle gracefully");
     TEST_PASS("Double initialization handling");
     auth_jwt_cleanup();

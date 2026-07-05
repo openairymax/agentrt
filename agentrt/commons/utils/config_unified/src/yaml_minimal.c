@@ -1,6 +1,15 @@
+// SPDX-FileCopyrightText: 2026 SPHARX Ltd.
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 /**
  * @file yaml_minimal.c
  * @brief YAML 1.1 parser - production-grade implementation
+ *
+ * @details
+ * SP03 解耦：本文件从 cupolas/src/ 迁移至 commons/utils/config_unified/src/，
+ * 消除 atoms/coreloopthree 对 cupolas 层的物理依赖（ACC-SP03 解耦点 #2）。
+ * 迁移后编入 agentrt_common 静态库，cupolas 与 coreloopthree 通过
+ * target_link_libraries(... agentrt_common) 获取 yaml_* 系列符号。
+ *
  * @copyright (c) 2026 SPHARX. All Rights Reserved.
  */
 

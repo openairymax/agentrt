@@ -39,7 +39,7 @@ security/
 | 文件系统 | 6 | 临时目录读写、数据目录读写、/etc 写入拒绝、文件删除拒绝 |
 | 网络 | 5 | OpenAI/Anthropic/DeepSeek API 允许、localhost 允许、其他出站拒绝 |
 | 代码执行 | 3 | Python/JavaScript/Shell 沙箱执行 |
-| 环境变量 | 5 | API Key 读取允许、AGENTOS_* 允许、其他拒绝 |
+| 环境变量 | 5 | API Key 读取允许、AGENTRT_* 允许、其他拒绝 |
 
 ### permission_rules.yaml
 

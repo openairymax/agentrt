@@ -41,8 +41,8 @@ static int g_tests_failed = 0;
 
 #define ASSERT_OK(expr)                                                        \
     do {                                                                       \
-        agentos_error_t __err = (expr);                                        \
-        if (__err != AGENTOS_OK) {                                             \
+        agentrt_error_t __err = (expr);                                        \
+        if (__err != AGENTRT_OK) {                                             \
             printf("    ASSERT_FAIL: %s returned %d at line %d\n", #expr,     \
                    (int)__err, __LINE__);                                       \
             g_tests_failed++;                                                  \
@@ -72,26 +72,26 @@ static uint64_t now_ms(void)
 /* ============================================================================
  * 辅助: 创建并初始化 builtin provider
  * ============================================================================ */
-static agentos_memory_provider_t *create_builtin_provider(void)
+static agentrt_memory_provider_t *create_builtin_provider(void)
 {
-    agentos_memory_provider_t *provider = agentos_builtin_provider_create();
+    agentrt_memory_provider_t *provider = agentrt_builtin_provider_create();
     assert(provider != NULL);
 
-    agentos_error_t err = provider->init(provider, "/tmp/agentos_test_memoryrov");
-    assert(err == AGENTOS_OK);
+    agentrt_error_t err = provider->init(provider, "/tmp/agentrt_test_memoryrov");
+    assert(err == AGENTRT_OK);
     return provider;
 }
 
 /* ============================================================================
  * 辅助: 销毁 provider 并清理全局注册
  * ============================================================================ */
-static void destroy_provider(agentos_memory_provider_t *provider)
+static void destroy_provider(agentrt_memory_provider_t *provider)
 {
     if (!provider)
         return;
     if (provider->destroy)
         provider->destroy(provider);
-    AGENTOS_FREE(provider);
+    AGENTRT_FREE(provider);
 }
 
 /* ============================================================================
@@ -121,7 +121,7 @@ TEST(int06_1_l1_raw_write_read)
     printf("    --- L1 Raw Write → Read Verification ---\n");
 
     /* 1. 创建 provider */
-    agentos_memory_provider_t *provider = create_builtin_provider();
+    agentrt_memory_provider_t *provider = create_builtin_provider();
     ASSERT_TRUE(provider != NULL);
     ASSERT_TRUE(provider->impl != NULL);
     printf("    Provider created and initialized\n");
@@ -160,7 +160,7 @@ TEST(int06_1_l1_raw_write_read)
     ASSERT_TRUE(read_len_1 == strlen(text_data));
     ASSERT_TRUE(memcmp(read_data_1, text_data, read_len_1) == 0);
     printf("    Record 1 read OK: len=%zu, content matches\n", read_len_1);
-    AGENTOS_FREE(read_data_1);
+    AGENTRT_FREE(read_data_1);
     read_data_1 = NULL;
 
     /* 6. 读取并验证第二条记录 (二进制) */
@@ -171,7 +171,7 @@ TEST(int06_1_l1_raw_write_read)
     ASSERT_TRUE(read_len_2 == sizeof(binary_data));
     ASSERT_TRUE(memcmp(read_data_2, binary_data, read_len_2) == 0);
     printf("    Record 2 read OK: len=%zu, binary content matches\n", read_len_2);
-    AGENTOS_FREE(read_data_2);
+    AGENTRT_FREE(read_data_2);
     read_data_2 = NULL;
 
     /* 7. 读取并验证第三条记录 */
@@ -182,7 +182,7 @@ TEST(int06_1_l1_raw_write_read)
     ASSERT_TRUE(read_len_3 == strlen(data_no_meta));
     ASSERT_TRUE(memcmp(read_data_3, data_no_meta, read_len_3) == 0);
     printf("    Record 3 read OK: len=%zu\n", read_len_3);
-    AGENTOS_FREE(read_data_3);
+    AGENTRT_FREE(read_data_3);
     read_data_3 = NULL;
 
     /* 8. 删除第一条记录 */
@@ -192,13 +192,13 @@ TEST(int06_1_l1_raw_write_read)
     /* 9. 验证删除后读取失败 */
     void *deleted_data = NULL;
     size_t deleted_len = 0;
-    agentos_error_t del_read_err =
+    agentrt_error_t del_read_err =
         provider->get_raw(provider, record_id_1, &deleted_data, &deleted_len);
-    ASSERT_TRUE(del_read_err != AGENTOS_OK);
+    ASSERT_TRUE(del_read_err != AGENTRT_OK);
     printf("    Record 1 read after delete: expected error, got %d\n", (int)del_read_err);
 
     /* 10. 验证统计信息 */
-    agentos_memory_stats_t stats;
+    agentrt_memory_stats_t stats;
     __builtin_memset(&stats, 0, sizeof(stats));
     ASSERT_OK(provider->stats(provider, &stats));
     ASSERT_TRUE(stats.total_records >= 2);
@@ -210,9 +210,9 @@ TEST(int06_1_l1_raw_write_read)
            (unsigned long long)stats.total_bytes);
 
     /* 11. 清理 */
-    AGENTOS_FREE(record_id_1);
-    AGENTOS_FREE(record_id_2);
-    AGENTOS_FREE(record_id_3);
+    AGENTRT_FREE(record_id_1);
+    AGENTRT_FREE(record_id_2);
+    AGENTRT_FREE(record_id_3);
     destroy_provider(provider);
     g_tests_passed++;
 }
@@ -232,11 +232,11 @@ TEST(int06_2_l1_write_throughput)
 {
     printf("    --- L1 Write Throughput Benchmark ---\n");
 
-    agentos_memory_provider_t *provider = create_builtin_provider();
+    agentrt_memory_provider_t *provider = create_builtin_provider();
     ASSERT_TRUE(provider != NULL);
 
     /* 1. 批量写入 */
-    char **record_ids = (char **)AGENTOS_CALLOC(THROUGHPUT_RECORD_COUNT, sizeof(char *));
+    char **record_ids = (char **)AGENTRT_CALLOC(THROUGHPUT_RECORD_COUNT, sizeof(char *));
     ASSERT_TRUE(record_ids != NULL);
 
     char payload[128];
@@ -247,9 +247,9 @@ TEST(int06_2_l1_write_throughput)
         int n = snprintf(payload, sizeof(payload),
                          "{\"seq\":%zu,\"category\":\"benchmark\",\"ts\":%llu}",
                          i, (unsigned long long)now_ms());
-        agentos_error_t err =
+        agentrt_error_t err =
             provider->write_raw(provider, payload, (size_t)n, NULL, &record_ids[i]);
-        if (err == AGENTOS_OK && record_ids[i] != NULL) {
+        if (err == AGENTRT_OK && record_ids[i] != NULL) {
             successful_writes++;
         }
     }
@@ -281,10 +281,10 @@ TEST(int06_2_l1_write_throughput)
             continue;
         void *data = NULL;
         size_t len = 0;
-        agentos_error_t err = provider->get_raw(provider, record_ids[idx], &data, &len);
-        if (err == AGENTOS_OK && data != NULL && len > 0) {
+        agentrt_error_t err = provider->get_raw(provider, record_ids[idx], &data, &len);
+        if (err == AGENTRT_OK && data != NULL && len > 0) {
             verified++;
-            AGENTOS_FREE(data);
+            AGENTRT_FREE(data);
         }
     }
     printf("    Random sample verification: %zu/%zu readable\n", verified, sample_count);
@@ -293,9 +293,9 @@ TEST(int06_2_l1_write_throughput)
     /* 4. 清理 */
     for (size_t i = 0; i < THROUGHPUT_RECORD_COUNT; i++) {
         if (record_ids[i])
-            AGENTOS_FREE(record_ids[i]);
+            AGENTRT_FREE(record_ids[i]);
     }
-    AGENTOS_FREE(record_ids);
+    AGENTRT_FREE(record_ids);
     destroy_provider(provider);
     g_tests_passed++;
 }
@@ -313,7 +313,7 @@ TEST(int06_3_l2_feature_extraction_recall)
 {
     printf("    --- L2 Feature Extraction and Recall ---\n");
 
-    agentos_memory_provider_t *provider = create_builtin_provider();
+    agentrt_memory_provider_t *provider = create_builtin_provider();
     ASSERT_TRUE(provider != NULL);
 
     /* 1. 写入多条带不同元数据的记录 */
@@ -340,7 +340,7 @@ TEST(int06_3_l2_feature_extraction_recall)
     };
     size_t num_records = sizeof(records) / sizeof(records[0]);
 
-    char **ids = (char **)AGENTOS_CALLOC(num_records, sizeof(char *));
+    char **ids = (char **)AGENTRT_CALLOC(num_records, sizeof(char *));
     ASSERT_TRUE(ids != NULL);
 
     for (size_t i = 0; i < num_records; i++) {
@@ -392,7 +392,7 @@ TEST(int06_3_l2_feature_extraction_recall)
     ASSERT_TRUE(retrieve_count > 0);
 
     /* 5. 验证统计信息包含 L2 索引数据 */
-    agentos_memory_stats_t stats;
+    agentrt_memory_stats_t stats;
     __builtin_memset(&stats, 0, sizeof(stats));
     ASSERT_OK(provider->stats(provider, &stats));
     printf("    Stats: l2_indexed=%llu, total=%llu\n",
@@ -401,13 +401,13 @@ TEST(int06_3_l2_feature_extraction_recall)
     ASSERT_TRUE(stats.l2_indexed > 0);
 
     /* 6. 清理 */
-    agentos_memory_provider_free_query_results(result_ids, scores, result_count);
-    agentos_memory_provider_free_query_results(retrieve_ids, retrieve_scores, retrieve_count);
+    agentrt_memory_provider_free_query_results(result_ids, scores, result_count);
+    agentrt_memory_provider_free_query_results(retrieve_ids, retrieve_scores, retrieve_count);
     for (size_t i = 0; i < num_records; i++) {
         if (ids[i])
-            AGENTOS_FREE(ids[i]);
+            AGENTRT_FREE(ids[i]);
     }
-    AGENTOS_FREE(ids);
+    AGENTRT_FREE(ids);
     destroy_provider(provider);
     g_tests_passed++;
 }
@@ -425,7 +425,7 @@ TEST(int06_4_cross_layer_query)
 {
     printf("    --- Cross-Layer Memory Query ---\n");
 
-    agentos_memory_provider_t *provider = create_builtin_provider();
+    agentrt_memory_provider_t *provider = create_builtin_provider();
     ASSERT_TRUE(provider != NULL);
 
     /* 1. 写入一组关联记录 */
@@ -438,7 +438,7 @@ TEST(int06_4_cross_layer_query)
     };
     size_t num_entries = sizeof(entries) / sizeof(entries[0]);
 
-    char **ids = (char **)AGENTOS_CALLOC(num_entries, sizeof(char *));
+    char **ids = (char **)AGENTRT_CALLOC(num_entries, sizeof(char *));
     ASSERT_TRUE(ids != NULL);
 
     for (size_t i = 0; i < num_entries; i++) {
@@ -467,8 +467,8 @@ TEST(int06_4_cross_layer_query)
 
         void *raw_data = NULL;
         size_t raw_len = 0;
-        agentos_error_t err = provider->get_raw(provider, query_ids[i], &raw_data, &raw_len);
-        if (err == AGENTOS_OK && raw_data != NULL && raw_len > 0) {
+        agentrt_error_t err = provider->get_raw(provider, query_ids[i], &raw_data, &raw_len);
+        if (err == AGENTRT_OK && raw_data != NULL && raw_len > 0) {
             /* 验证读取的数据是我们写入的某条记录 */
             for (size_t j = 0; j < num_entries; j++) {
                 if (raw_len == strlen(entries[j]) &&
@@ -479,7 +479,7 @@ TEST(int06_4_cross_layer_query)
                     break;
                 }
             }
-            AGENTOS_FREE(raw_data);
+            AGENTRT_FREE(raw_data);
         }
     }
     printf("    Cross-layer verification: %zu/%zu matched\n", cross_verified, query_count);
@@ -492,12 +492,12 @@ TEST(int06_4_cross_layer_query)
     }
 
     /* 5. 清理 */
-    agentos_memory_provider_free_query_results(query_ids, query_scores, query_count);
+    agentrt_memory_provider_free_query_results(query_ids, query_scores, query_count);
     for (size_t i = 0; i < num_entries; i++) {
         if (ids[i])
-            AGENTOS_FREE(ids[i]);
+            AGENTRT_FREE(ids[i]);
     }
-    AGENTOS_FREE(ids);
+    AGENTRT_FREE(ids);
     destroy_provider(provider);
     g_tests_passed++;
 }
@@ -518,11 +518,11 @@ TEST(int06_5_memory_eviction_under_pressure)
 {
     printf("    --- Memory Eviction Under Capacity Pressure ---\n");
 
-    agentos_memory_provider_t *provider = create_builtin_provider();
+    agentrt_memory_provider_t *provider = create_builtin_provider();
     ASSERT_TRUE(provider != NULL);
 
     /* 1. 写入大量记录 */
-    char **ids = (char **)AGENTOS_CALLOC(EVICTION_RECORD_COUNT, sizeof(char *));
+    char **ids = (char **)AGENTRT_CALLOC(EVICTION_RECORD_COUNT, sizeof(char *));
     ASSERT_TRUE(ids != NULL);
 
     for (size_t i = 0; i < EVICTION_RECORD_COUNT; i++) {
@@ -531,14 +531,14 @@ TEST(int06_5_memory_eviction_under_pressure)
                          "eviction_test_record_%zu_data_payload", i);
         char meta[64];
         snprintf(meta, sizeof(meta), "{\"seq\":%zu}", i);
-        agentos_error_t err =
+        agentrt_error_t err =
             provider->write_raw(provider, payload, (size_t)n, meta, &ids[i]);
-        if (err != AGENTOS_OK) {
+        if (err != AGENTRT_OK) {
             printf("    Write failed at seq %zu: %d\n", i, (int)err);
         }
     }
 
-    agentos_memory_stats_t stats_before;
+    agentrt_memory_stats_t stats_before;
     __builtin_memset(&stats_before, 0, sizeof(stats_before));
     ASSERT_OK(provider->stats(provider, &stats_before));
     printf("    Before eviction: records=%llu, bytes=%llu\n",
@@ -556,7 +556,7 @@ TEST(int06_5_memory_eviction_under_pressure)
     printf("    Forget called\n");
 
     /* 4. 验证统计信息变化 */
-    agentos_memory_stats_t stats_after;
+    agentrt_memory_stats_t stats_after;
     __builtin_memset(&stats_after, 0, sizeof(stats_after));
     ASSERT_OK(provider->stats(provider, &stats_after));
     printf("    After eviction: records=%llu, bytes=%llu\n",
@@ -570,12 +570,12 @@ TEST(int06_5_memory_eviction_under_pressure)
     if (first_id[0] != '\0') {
         void *data = NULL;
         size_t len = 0;
-        agentos_error_t err = provider->get_raw(provider, first_id, &data, &len);
-        if (err != AGENTOS_OK) {
+        agentrt_error_t err = provider->get_raw(provider, first_id, &data, &len);
+        if (err != AGENTRT_OK) {
             printf("    Oldest record '%s' was evicted (expected)\n", first_id);
         } else {
             printf("    Oldest record '%s' still exists (forget ratio may be small)\n", first_id);
-            AGENTOS_FREE(data);
+            AGENTRT_FREE(data);
         }
     }
 
@@ -584,7 +584,7 @@ TEST(int06_5_memory_eviction_under_pressure)
     printf("    Evolve (compact) called\n");
 
     /* 7. 验证 evolve 后统计信息仍一致 */
-    agentos_memory_stats_t stats_evolved;
+    agentrt_memory_stats_t stats_evolved;
     __builtin_memset(&stats_evolved, 0, sizeof(stats_evolved));
     ASSERT_OK(provider->stats(provider, &stats_evolved));
     printf("    After evolve: records=%llu, l2_indexed=%llu\n",
@@ -594,9 +594,9 @@ TEST(int06_5_memory_eviction_under_pressure)
     /* 8. 清理 */
     for (size_t i = 0; i < EVICTION_RECORD_COUNT; i++) {
         if (ids[i])
-            AGENTOS_FREE(ids[i]);
+            AGENTRT_FREE(ids[i]);
     }
-    AGENTOS_FREE(ids);
+    AGENTRT_FREE(ids);
     destroy_provider(provider);
     g_tests_passed++;
 }
@@ -619,7 +619,7 @@ TEST(int06_6_full_stack_write_query_verify)
     printf("    --- Full Stack: Write → Feature Extract → Query → Verify ---\n");
 
     /* 1. 创建 provider */
-    agentos_memory_provider_t *provider = create_builtin_provider();
+    agentrt_memory_provider_t *provider = create_builtin_provider();
     ASSERT_TRUE(provider != NULL);
     ASSERT_TRUE(provider->impl != NULL);
     printf("    Provider created\n");
@@ -646,7 +646,7 @@ TEST(int06_6_full_stack_write_query_verify)
     };
     size_t num_docs = sizeof(documents) / sizeof(documents[0]);
 
-    char **doc_ids = (char **)AGENTOS_CALLOC(num_docs, sizeof(char *));
+    char **doc_ids = (char **)AGENTRT_CALLOC(num_docs, sizeof(char *));
     ASSERT_TRUE(doc_ids != NULL);
 
     for (size_t i = 0; i < num_docs; i++) {
@@ -680,12 +680,12 @@ TEST(int06_6_full_stack_write_query_verify)
             continue;
         void *data = NULL;
         size_t len = 0;
-        agentos_error_t err = provider->get_raw(provider, query_ids[i], &data, &len);
-        if (err == AGENTOS_OK && data != NULL && len > 0) {
+        agentrt_error_t err = provider->get_raw(provider, query_ids[i], &data, &len);
+        if (err == AGENTRT_OK && data != NULL && len > 0) {
             printf("    Query result[%zu]: len=%zu, score=%.3f, preview=%.40s\n",
                    i, len, query_scores ? query_scores[i] : 0.0f, (const char *)data);
             verified++;
-            AGENTOS_FREE(data);
+            AGENTRT_FREE(data);
         }
     }
     ASSERT_TRUE(verified > 0);
@@ -697,11 +697,11 @@ TEST(int06_6_full_stack_write_query_verify)
     ASSERT_TRUE(health_json != NULL);
     ASSERT_TRUE(is_valid_json_prefix(health_json));
     printf("    Health: %s\n", health_json);
-    AGENTOS_FREE(health_json);
+    AGENTRT_FREE(health_json);
     health_json = NULL;
 
     /* 8. 统计信息验证 */
-    agentos_memory_stats_t stats;
+    agentrt_memory_stats_t stats;
     __builtin_memset(&stats, 0, sizeof(stats));
     ASSERT_OK(provider->stats(provider, &stats));
     ASSERT_TRUE(stats.total_records >= num_docs);
@@ -717,7 +717,7 @@ TEST(int06_6_full_stack_write_query_verify)
 
     /* 9. 删除部分记录并验证统计更新 */
     ASSERT_OK(provider->delete_raw(provider, doc_ids[0]));
-    agentos_memory_stats_t stats_after_del;
+    agentrt_memory_stats_t stats_after_del;
     __builtin_memset(&stats_after_del, 0, sizeof(stats_after_del));
     ASSERT_OK(provider->stats(provider, &stats_after_del));
     ASSERT_TRUE(stats_after_del.total_records < stats.total_records);
@@ -735,15 +735,15 @@ TEST(int06_6_full_stack_write_query_verify)
     ASSERT_TRUE(health_json != NULL);
     ASSERT_TRUE(is_valid_json_prefix(health_json));
     printf("    Final health: %s\n", health_json);
-    AGENTOS_FREE(health_json);
+    AGENTRT_FREE(health_json);
 
     /* 12. 清理 */
-    agentos_memory_provider_free_query_results(query_ids, query_scores, query_count);
+    agentrt_memory_provider_free_query_results(query_ids, query_scores, query_count);
     for (size_t i = 0; i < num_docs; i++) {
         if (doc_ids[i])
-            AGENTOS_FREE(doc_ids[i]);
+            AGENTRT_FREE(doc_ids[i]);
     }
-    AGENTOS_FREE(doc_ids);
+    AGENTRT_FREE(doc_ids);
     destroy_provider(provider);
     g_tests_passed++;
 }

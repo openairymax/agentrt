@@ -1,6 +1,6 @@
 /**
  * @file yaml_loader.c
- * @brief agentrt.yaml 解析器实现 — 基于 cupolas/src/yaml_minimal.h
+ * @brief agentrt.yaml 解析器实现 — 基于 commons/utils/config_unified/include/yaml_minimal.h
  *
  * 解析 agentrt.yaml 文件内容为 agentrt_yaml_config_t 结构体。
  * 支持环境变量覆盖和配置热重载。

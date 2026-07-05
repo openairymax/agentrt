@@ -4,7 +4,7 @@
 #
 # Event Emitter 使用示例
 
-from agentos.utils.event_emitter import (
+from agentrt.utils.event_emitter import (
     EventEmitter,
     AsyncEventEmitter,
     Event,

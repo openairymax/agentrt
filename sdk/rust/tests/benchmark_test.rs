@@ -1,13 +1,13 @@
-use agentos_rs::client::ClientBuilder;
-use agentos_rs::modules::task::TaskManager;
-use agentos_rs::modules::memory::MemoryManager;
-use agentos_rs::modules::session::SessionManager;
-use agentos_rs::modules::skill::SkillManager;
-use agentos_rs::types::MemoryLayer;
+use agentrt_rs::client::ClientBuilder;
+use agentrt_rs::modules::task::TaskManager;
+use agentrt_rs::modules::memory::MemoryManager;
+use agentrt_rs::modules::session::SessionManager;
+use agentrt_rs::modules::skill::SkillManager;
+use agentrt_rs::types::MemoryLayer;
 use std::sync::Arc;
 use std::time::Instant;
 
-fn create_test_client() -> Arc<dyn agentos_rs::client::APIClient> {
+fn create_test_client() -> Arc<dyn agentrt_rs::client::APIClient> {
     let client = ClientBuilder::new("http://localhost:18789")
         .timeout(std::time::Duration::from_secs(5))
         .build()

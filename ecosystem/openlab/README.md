@@ -124,7 +124,7 @@ openlab/
 +-------------------------------------------------------------------+
 ```
 
-> **注意**: OpenLab 通过 `agentos/protocols/` 协议层与 AgentRT 核心运行时通信，所有模块间交互均基于 JSON-RPC 2.0 协议规范。
+> **注意**: OpenLab 通过 `agentrt/protocols/` 协议层与 AgentRT 核心运行时通信，所有模块间交互均基于 JSON-RPC 2.0 协议规范。
 
 ## 应用概述
 
@@ -171,7 +171,7 @@ pip install -e ".[videoedit]"
 pip install -e ".[browser]"
 
 # Docker 构建
-docker build -t agentos-openlab .
+docker build -t agentrt-openlab .
 ```
 
 ## 使用示例

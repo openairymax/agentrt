@@ -114,7 +114,7 @@
             "base_dir": {
               "type": "string",
               "description": "Base directory for log files",
-              "examples": ["${AGENTOS_LOG_DIR}"]
+              "examples": ["${AGENTRT_LOG_DIR}"]
             },
             "max_size_mb": {
               "type": "integer",

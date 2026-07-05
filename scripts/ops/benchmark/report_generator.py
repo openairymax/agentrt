@@ -151,7 +151,7 @@ class ReportGenerator:
         plt.style.use('seaborn-v0_8-darkgrid')
         
         # AgentRT品牌颜色
-        agentos_colors = {
+        agentrt_colors = {
             'primary': '#4A90E2',    # 主蓝色
             'secondary': '#50E3C2',   # 青色
             'accent': '#B8E986',      # 浅绿色

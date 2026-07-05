@@ -30,21 +30,21 @@ declare -r LOG_LEVEL_COLORS=("$COLOR_CYAN" "$COLOR_BLUE" "$COLOR_YELLOW" "$COLOR
 ###############################################################################
 # 全局变量
 ###############################################################################
-_AGENTOS_LOG_LEVEL="${AGENTOS_LOG_LEVEL:-$LOG_LEVEL_INFO}"
-_AGENTOS_LOG_PREFIX="${AGENTOS_LOG_PREFIX:-[AgentOS]}"
-_AGENTOS_LOG_TIMESTAMP="${AGENTOS_LOG_TIMESTAMP:-1}"
-_AGENTOS_LOG_FILE="${AGENTOS_LOG_FILE:-}"
-_AGENTOS_SCRIPT_ERRORS=0
-_AGENTOS_SCRIPT_WARNINGS=0
-_AGENTOS_SCRIPT_NAME="${0##*/}"
-_AGENTOS_SCRIPT_PID=$$
-_AGENTOS_TRACE_ID="${AGENTOS_TRACE_ID:-$(date +%s)-$$}"
+_AGENTRT_LOG_LEVEL="${AGENTRT_LOG_LEVEL:-$LOG_LEVEL_INFO}"
+_AGENTRT_LOG_PREFIX="${AGENTRT_LOG_PREFIX:-[AgentOS]}"
+_AGENTRT_LOG_TIMESTAMP="${AGENTRT_LOG_TIMESTAMP:-1}"
+_AGENTRT_LOG_FILE="${AGENTRT_LOG_FILE:-}"
+_AGENTRT_SCRIPT_ERRORS=0
+_AGENTRT_SCRIPT_WARNINGS=0
+_AGENTRT_SCRIPT_NAME="${0##*/}"
+_AGENTRT_SCRIPT_PID=$$
+_AGENTRT_TRACE_ID="${AGENTRT_TRACE_ID:-$(date +%s)-$$}"
 
 ###############################################################################
 # 内部函数：获取时间戳
 ###############################################################################
-_agentos_timestamp() {
-    if [[ "$_AGENTOS_LOG_TIMESTAMP" == "1" ]]; then
+_agentrt_timestamp() {
+    if [[ "$_AGENTRT_LOG_TIMESTAMP" == "1" ]]; then
         date '+%Y-%m-%d %H:%M:%S'
     fi
 }
@@ -52,119 +52,119 @@ _agentos_timestamp() {
 ###############################################################################
 # 内部函数：写入日志
 ###############################################################################
-_agentos_log_write() {
+_agentrt_log_write() {
     local level=$1
     local message="$2"
-    local timestamp=$(_agentos_timestamp)
+    local timestamp=$(_agentrt_timestamp)
     local level_name="${LOG_LEVEL_NAMES[$level]}"
     local level_color="${LOG_LEVEL_COLORS[$level]}"
     local formatted_msg
 
     if [[ -n "$timestamp" ]]; then
-        formatted_msg="${timestamp} ${_AGENTOS_LOG_PREFIX} ${level_name} ${message}"
+        formatted_msg="${timestamp} ${_AGENTRT_LOG_PREFIX} ${level_name} ${message}"
     else
-        formatted_msg="${_AGENTOS_LOG_PREFIX} ${level_name} ${message}"
+        formatted_msg="${_AGENTRT_LOG_PREFIX} ${level_name} ${message}"
     fi
 
     echo -e "${level_color}${formatted_msg}${COLOR_NC}"
 
-    if [[ -n "$_AGENTOS_LOG_FILE" ]]; then
-        echo "$formatted_msg" >> "$_AGENTOS_LOG_FILE"
+    if [[ -n "$_AGENTRT_LOG_FILE" ]]; then
+        echo "$formatted_msg" >> "$_AGENTRT_LOG_FILE"
     fi
 }
 
 ###############################################################################
 # 公共API：日志函数
 ###############################################################################
-agentos_log_debug() {
-    if [[ $_AGENTOS_LOG_LEVEL -le $LOG_LEVEL_DEBUG ]]; then
-        _agentos_log_write $LOG_LEVEL_DEBUG "$1"
+agentrt_log_debug() {
+    if [[ $_AGENTRT_LOG_LEVEL -le $LOG_LEVEL_DEBUG ]]; then
+        _agentrt_log_write $LOG_LEVEL_DEBUG "$1"
     fi
 }
 
-agentos_log_info() {
-    if [[ $_AGENTOS_LOG_LEVEL -le $LOG_LEVEL_INFO ]]; then
-        _agentos_log_write $LOG_LEVEL_INFO "$1"
+agentrt_log_info() {
+    if [[ $_AGENTRT_LOG_LEVEL -le $LOG_LEVEL_INFO ]]; then
+        _agentrt_log_write $LOG_LEVEL_INFO "$1"
     fi
 }
 
-agentos_log_warn() {
-    ((_AGENTOS_SCRIPT_WARNINGS++))
-    if [[ $_AGENTOS_LOG_LEVEL -le $LOG_LEVEL_WARN ]]; then
-        _agentos_log_write $LOG_LEVEL_WARN "$1"
+agentrt_log_warn() {
+    ((_AGENTRT_SCRIPT_WARNINGS++))
+    if [[ $_AGENTRT_LOG_LEVEL -le $LOG_LEVEL_WARN ]]; then
+        _agentrt_log_write $LOG_LEVEL_WARN "$1"
     fi
 }
 
-agentos_log_error() {
-    ((_AGENTOS_SCRIPT_ERRORS++))
-    if [[ $_AGENTOS_LOG_LEVEL -le $LOG_LEVEL_ERROR ]]; then
-        _agentos_log_write $LOG_LEVEL_ERROR "$1"
+agentrt_log_error() {
+    ((_AGENTRT_SCRIPT_ERRORS++))
+    if [[ $_AGENTRT_LOG_LEVEL -le $LOG_LEVEL_ERROR ]]; then
+        _agentrt_log_write $LOG_LEVEL_ERROR "$1"
     fi
 }
 
-agentos_log_fatal() {
-    ((_AGENTOS_SCRIPT_ERRORS++))
-    _agentos_log_write $LOG_LEVEL_FATAL "$1"
-    agentos_exit 1
+agentrt_log_fatal() {
+    ((_AGENTRT_SCRIPT_ERRORS++))
+    _agentrt_log_write $LOG_LEVEL_FATAL "$1"
+    agentrt_exit 1
 }
 
 ###############################################################################
 # 公共API：设置日志级别
 ###############################################################################
-agentos_log_set_level() {
+agentrt_log_set_level() {
     case "$1" in
-        debug|DEBUG) _AGENTOS_LOG_LEVEL=$LOG_LEVEL_DEBUG ;;
-        info|INFO)   _AGENTOS_LOG_LEVEL=$LOG_LEVEL_INFO ;;
-        warn|WARN)  _AGENTOS_LOG_LEVEL=$LOG_LEVEL_WARN ;;
-        error|ERROR) _AGENTOS_LOG_LEVEL=$LOG_LEVEL_ERROR ;;
-        *)          agentos_log_warn "Unknown log level: $1, using INFO"; _AGENTOS_LOG_LEVEL=$LOG_LEVEL_INFO ;;
+        debug|DEBUG) _AGENTRT_LOG_LEVEL=$LOG_LEVEL_DEBUG ;;
+        info|INFO)   _AGENTRT_LOG_LEVEL=$LOG_LEVEL_INFO ;;
+        warn|WARN)  _AGENTRT_LOG_LEVEL=$LOG_LEVEL_WARN ;;
+        error|ERROR) _AGENTRT_LOG_LEVEL=$LOG_LEVEL_ERROR ;;
+        *)          agentrt_log_warn "Unknown log level: $1, using INFO"; _AGENTRT_LOG_LEVEL=$LOG_LEVEL_INFO ;;
     esac
 }
 
 ###############################################################################
 # 公共API：设置日志文件
 ###############################################################################
-agentos_log_set_file() {
-    _AGENTOS_LOG_FILE="$1"
+agentrt_log_set_file() {
+    _AGENTRT_LOG_FILE="$1"
 }
 
 ###############################################################################
 # 公共API：打印消息（不带日志级别前缀）
 ###############################################################################
-agentos_echo() {
+agentrt_echo() {
     echo -e "$1"
 }
 
-agentos_echo_info() {
+agentrt_echo_info() {
     echo -e "${COLOR_BLUE}[INFO]${COLOR_NC} $1"
 }
 
-agentos_echo_success() {
+agentrt_echo_success() {
     echo -e "${COLOR_GREEN}[SUCCESS]${COLOR_NC} $1"
 }
 
-agentos_echo_warning() {
+agentrt_echo_warning() {
     echo -e "${COLOR_YELLOW}[WARNING]${COLOR_NC} $1"
 }
 
-agentos_echo_error() {
+agentrt_echo_error() {
     echo -e "${COLOR_RED}[ERROR]${COLOR_NC} $1"
 }
 
 ###############################################################################
 # 公共API：错误处理
 ###############################################################################
-agentos_die() {
-    agentos_log_fatal "$1"
+agentrt_die() {
+    agentrt_log_fatal "$1"
     exit "${2:-1}"
 }
 
-agentos_exit() {
+agentrt_exit() {
     local exit_code=$1
     if [[ $exit_code -eq 0 ]]; then
-        agentos_log_info "Script $_AGENTOS_SCRIPT_NAME completed successfully"
+        agentrt_log_info "Script $_AGENTRT_SCRIPT_NAME completed successfully"
     else
-        agentos_log_error "Script $_AGENTOS_SCRIPT_NAME failed with exit code $exit_code"
+        agentrt_log_error "Script $_AGENTRT_SCRIPT_NAME failed with exit code $exit_code"
     fi
     exit $exit_code
 }
@@ -172,76 +172,76 @@ agentos_exit() {
 ###############################################################################
 # 公共API：错误统计获取
 ###############################################################################
-agentos_get_error_count() {
-    echo $_AGENTOS_SCRIPT_ERRORS
+agentrt_get_error_count() {
+    echo $_AGENTRT_SCRIPT_ERRORS
 }
 
-agentos_get_warning_count() {
-    echo $_AGENTOS_SCRIPT_WARNINGS
+agentrt_get_warning_count() {
+    echo $_AGENTRT_SCRIPT_WARNINGS
 }
 
 ###############################################################################
 # 公共API：断言函数
 ###############################################################################
-agentos_assert() {
+agentrt_assert() {
     local condition="$1"
     local message="${2:-Assertion failed}"
     if ! eval "$condition"; then
-        agentos_log_fatal "$message (condition: $condition)"
+        agentrt_log_fatal "$message (condition: $condition)"
     fi
 }
 
-agentos_assert_not_empty() {
+agentrt_assert_not_empty() {
     local value="$1"
     local name="${2:-value}"
     if [[ -z "$value" ]]; then
-        agentos_log_fatal "Assert failed: $name must not be empty"
+        agentrt_log_fatal "Assert failed: $name must not be empty"
     fi
 }
 
-agentos_assert_file_exists() {
+agentrt_assert_file_exists() {
     local file="$1"
     local name="${2:-file}"
     if [[ ! -f "$file" ]]; then
-        agentos_log_fatal "Assert failed: $name does not exist: $file"
+        agentrt_log_fatal "Assert failed: $name does not exist: $file"
     fi
 }
 
-agentos_assert_dir_exists() {
+agentrt_assert_dir_exists() {
     local dir="$1"
     local name="${2:-directory}"
     if [[ ! -d "$dir" ]]; then
-        agentos_log_fatal "Assert failed: $name does not exist: $dir"
+        agentrt_log_fatal "Assert failed: $name does not exist: $dir"
     fi
 }
 
-agentos_assert_command_exists() {
+agentrt_assert_command_exists() {
     local cmd="$1"
     if ! command -v "$cmd" &> /dev/null; then
-        agentos_log_fatal "Assert failed: required command not found: $cmd"
+        agentrt_log_fatal "Assert failed: required command not found: $cmd"
     fi
 }
 
 ###############################################################################
 # 公共API：追踪ID
 ###############################################################################
-agentos_get_trace_id() {
-    echo "$_AGENTOS_TRACE_ID"
+agentrt_get_trace_id() {
+    echo "$_AGENTRT_TRACE_ID"
 }
 
-agentos_set_trace_id() {
-    _AGENTOS_TRACE_ID="$1"
+agentrt_set_trace_id() {
+    _AGENTRT_TRACE_ID="$1"
 }
 
 ###############################################################################
 # 公共API：进度显示
 ###############################################################################
-agentos_progress_start() {
+agentrt_progress_start() {
     local message="$1"
     echo -ne "${COLOR_BLUE}[......]${COLOR_NC} $message"
 }
 
-agentos_progress_update() {
+agentrt_progress_update() {
     local step="$1"
     echo -ne "\b\b\b\b\b\b"
     case "$step" in
@@ -254,7 +254,7 @@ agentos_progress_update() {
     esac
 }
 
-agentos_progress_done() {
+agentrt_progress_done() {
     local message="$1"
     local status="${2:-SUCCESS}"
     echo -ne "\b\b\b\b\b\b"
@@ -269,11 +269,11 @@ agentos_progress_done() {
 ###############################################################################
 # 导出公共API
 ###############################################################################
-export -f agentos_log_debug agentos_log_info agentos_log_warn agentos_log_error agentos_log_fatal
-export -f agentos_log_set_level agentos_log_set_file
-export -f agentos_echo agentos_echo_info agentos_echo_success agentos_echo_warning agentos_echo_error
-export -f agentos_die agentos_exit
-export -f agentos_get_error_count agentos_get_warning_count
-export -f agentos_assert agentos_assert_not_empty agentos_assert_file_exists agentos_assert_dir_exists agentos_assert_command_exists
-export -f agentos_get_trace_id agentos_set_trace_id
-export -f agentos_progress_start agentos_progress_update agentos_progress_done
+export -f agentrt_log_debug agentrt_log_info agentrt_log_warn agentrt_log_error agentrt_log_fatal
+export -f agentrt_log_set_level agentrt_log_set_file
+export -f agentrt_echo agentrt_echo_info agentrt_echo_success agentrt_echo_warning agentrt_echo_error
+export -f agentrt_die agentrt_exit
+export -f agentrt_get_error_count agentrt_get_warning_count
+export -f agentrt_assert agentrt_assert_not_empty agentrt_assert_file_exists agentrt_assert_dir_exists agentrt_assert_command_exists
+export -f agentrt_get_trace_id agentrt_set_trace_id
+export -f agentrt_progress_start agentrt_progress_update agentrt_progress_done

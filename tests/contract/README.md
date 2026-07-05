@@ -19,8 +19,8 @@
 
 | tests/contract/ 目录 | 对应的 agentos/ 模块 | 测试内容 |
 |---------------------|---------------------|----------|
-| `python/contract_test_generator.py` | `openlab/contrib/`, `daemon/` | 契约测试用例自动生成器（从接口定义自动生成测试代码） |
-| `python/test_agent_contracts.py` | `daemon/`, `openlab/` | Agent 接口契约验证（注册/发现/通信/生命周期） |
+| `python/contract_test_generator.py` | `openlab/contrib/`, `daemons/` | 契约测试用例自动生成器（从接口定义自动生成测试代码） |
+| `python/test_agent_contracts.py` | `daemons/`, `openlab/` | Agent 接口契约验证（注册/发现/通信/生命周期） |
 | `python/test_skill_contracts.py` | `openlab/contrib/` | Skill 接口契约验证（输入/输出/元数据/版本兼容） |
 
 ## 目录结构
@@ -90,23 +90,23 @@ pytest tests/contract/ -v --cov=agentos --cov-report=html -m contract
 
 | 契约类型 | 对应的 agentos/ 模块 | 验证目标 | 测试文件 |
 |---------|---------------------|----------|---------|
-| **Agent 注册契约** | `daemon/`, `openlab/` | 注册接口参数、返回值、错误码 | `test_agent_contracts.py` |
-| **Agent 发现契约** | `daemon/`, `openlab/` | 发现接口查询参数、返回格式、分页 | `test_agent_contracts.py` |
-| **Agent 通信契约** | `daemon/` | 通信协议格式、消息结构、超时处理 | `test_agent_contracts.py` |
-| **Agent 生命周期契约** | `daemon/` | 启动/停止/重启接口、状态转换 | `test_agent_contracts.py` |
+| **Agent 注册契约** | `daemons/`, `openlab/` | 注册接口参数、返回值、错误码 | `test_agent_contracts.py` |
+| **Agent 发现契约** | `daemons/`, `openlab/` | 发现接口查询参数、返回格式、分页 | `test_agent_contracts.py` |
+| **Agent 通信契约** | `daemons/` | 通信协议格式、消息结构、超时处理 | `test_agent_contracts.py` |
+| **Agent 生命周期契约** | `daemons/` | 启动/停止/重启接口、状态转换 | `test_agent_contracts.py` |
 | **Skill 输入契约** | `openlab/contrib/` | 输入参数类型、必填项、默认值、约束 | `test_skill_contracts.py` |
 | **Skill 输出契约** | `openlab/contrib/` | 输出格式、字段类型、必填项、枚举值 | `test_skill_contracts.py` |
 | **Skill 元数据契约** | `openlab/contrib/` | 版本号、描述、依赖声明、兼容性 | `test_skill_contracts.py` |
-| **Tool 契约** | `daemon/tool_d/` | 参数验证、执行结果、错误处理 | `test_agent_contracts.py` |
+| **Tool 契约** | `daemons/tool_d/` | 参数验证、执行结果、错误处理 | `test_agent_contracts.py` |
 
 ## 测试覆盖说明
 
 | agentos/ 模块 | 契约测试文件 | 测试框架 | 覆盖范围 |
 |--------------|------------|---------|---------|
-| `daemon/` | `test_agent_contracts.py` | pytest | Agent 注册/发现/通信/生命周期接口契约 |
+| `daemons/` | `test_agent_contracts.py` | pytest | Agent 注册/发现/通信/生命周期接口契约 |
 | `openlab/` | `test_agent_contracts.py` | pytest | Agent 在开放生态中的接口契约 |
 | `openlab/contrib/` | `test_skill_contracts.py` | pytest | Skill 输入/输出/元数据/版本兼容契约 |
-| `daemon/tool_d/` | `test_agent_contracts.py` | pytest | Tool 参数/执行/错误契约 |
+| `daemons/tool_d/` | `test_agent_contracts.py` | pytest | Tool 参数/执行/错误契约 |
 
 ---
 

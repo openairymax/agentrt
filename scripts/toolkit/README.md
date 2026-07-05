@@ -20,20 +20,20 @@
 
 | toolkit/ 模块 | 对应的 agentos/ 模块 | 用途 |
 |---------------|---------------------|------|
-| `initializer.py` | `commons/`, `daemon/` | 配置初始化器（默认配置/完整性验证/环境特定配置/备份恢复） |
-| `doctor.py` | `commons/`, `daemon/`, `manager/` | 系统健康诊断（8 大类别：系统/Python/构建/项目/配置/网络/安全/性能） |
+| `initializer.py` | `commons/`, `daemons/` | 配置初始化器（默认配置/完整性验证/环境特定配置/备份恢复） |
+| `doctor.py` | `commons/`, `daemons/`, `manager/` | 系统健康诊断（8 大类别：系统/Python/构建/项目/配置/网络/安全/性能） |
 | `benchmark.py` | `atoms/corekern/`, `atoms/coreloopthree/` | 性能基准测试（IPC 延迟/内存分配/上下文切换/调度吞吐/JSON 解析） |
 | `memory_manager.py` | `atoms/memory/`, `atoms/memoryrovol/` | 多层记忆管理器（L1 原始/L2 特征/L3 结构化/L4 模式） |
-| `token_utils.py` | `daemon/`, `manager/` | Token 工具集（多策略计数 + 预算分配/追踪/告警） |
-| `config_engine.py` | `commons/`, `daemon/` | 配置模板引擎（Jinja2，dev/staging/production/testing） |
-| `checkpoint_manager.py` | `daemon/` | 状态检查点管理器（创建/恢复/轮转/JSON 序列化） |
+| `token_utils.py` | `daemons/`, `manager/` | Token 工具集（多策略计数 + 预算分配/追踪/告警） |
+| `config_engine.py` | `commons/`, `daemons/` | 配置模板引擎（Jinja2，dev/staging/production/testing） |
+| `checkpoint_manager.py` | `daemons/` | 状态检查点管理器（创建/恢复/轮转/JSON 序列化） |
 | `validate_contracts.py` | `atoms/syscall/`, `commons/` | 接口契约验证（syscall 头文件/配置格式/API 响应合规） |
-| `cli.py` | `daemon/`, `manager/` | 交互式 CLI 增强（彩色输出/进度条/spinner/选择菜单/表格） |
-| `events.py` | `daemon/`, `cupolas/` | 事件总线系统（同步/异步/优先级/过滤/历史回放/分布式追踪） |
+| `cli.py` | `daemons/`, `manager/` | 交互式 CLI 增强（彩色输出/进度条/spinner/选择菜单/表格） |
+| `events.py` | `daemons/`, `cupolas/` | 事件总线系统（同步/异步/优先级/过滤/历史回放/分布式追踪） |
 | `logger.py` | 全部模块 | 日志模块（终端颜色/格式化输出/进度条/spinner/表格渲染） |
-| `plugin.py` | `daemon/`, `manager/` | 插件系统（动态发现/元数据管理/依赖解析/执行隔离） |
-| `security.py` | `commons/`, `daemon/` | 安全模块（输入净化/路径检查/注入防护/权限最小化/审计） |
-| `telemetry.py` | `daemon/`, `manager/` | 遥测系统（实时指标/基准追踪/趋势分析，兼容 Prometheus） |
+| `plugin.py` | `daemons/`, `manager/` | 插件系统（动态发现/元数据管理/依赖解析/执行隔离） |
+| `security.py` | `commons/`, `daemons/` | 安全模块（输入净化/路径检查/注入防护/权限最小化/审计） |
+| `telemetry.py` | `daemons/`, `manager/` | 遥测系统（实时指标/基准追踪/趋势分析，兼容 Prometheus） |
 
 ## 目录结构
 

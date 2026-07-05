@@ -7,8 +7,8 @@ import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 MEMORY_MACROS = [
-    'AGENTOS_MALLOC', 'AGENTOS_FREE', 'AGENTOS_CALLOC',
-    'AGENTOS_REALLOC', 'AGENTOS_STRDUP'
+    'AGENTRT_MALLOC', 'AGENTRT_FREE', 'AGENTRT_CALLOC',
+    'AGENTRT_REALLOC', 'AGENTRT_STRDUP'
 ]
 
 def check_file(fpath):

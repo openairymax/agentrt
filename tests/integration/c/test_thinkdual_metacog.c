@@ -88,7 +88,7 @@ static int g_tests_failed = 0;
 /* ============================================================================
  * 辅助: 初始化思考步骤
  * ============================================================================ */
-static void init_thinking_step(agentos_thinking_step_t *step, uint32_t id,
+static void init_thinking_step(agentrt_thinking_step_t *step, uint32_t id,
                                tc_step_type_t type, const char *content,
                                const char *raw_input, float confidence)
 {
@@ -118,13 +118,13 @@ TEST(int05_1_five_dimension_assessment)
     printf("    --- Five-Dimension Assessment ---\n");
 
     /* 1. 创建元认知引擎 */
-    agentos_metacognition_t *mc = NULL;
-    agentos_error_t err = agentos_mc_create(&mc);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    agentrt_metacognition_t *mc = NULL;
+    agentrt_error_t err = agentrt_mc_create(&mc);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     TEST_ASSERT(mc != NULL);
 
     /* 2. 创建高质量思考步骤 */
-    agentos_thinking_step_t step;
+    agentrt_thinking_step_t step;
     init_thinking_step(&step, 1, TC_STEP_GENERATION,
                        "Computer networking connects devices to share resources. "
                        "The OSI model defines seven layers from physical to application. "
@@ -135,8 +135,8 @@ TEST(int05_1_five_dimension_assessment)
     /* 3. 执行完整评估 */
     mc_evaluation_result_t result;
     memset(&result, 0, sizeof(result));
-    err = agentos_mc_evaluate_step(mc, &step, NULL, 0, &result);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    err = agentrt_mc_evaluate_step(mc, &step, NULL, 0, &result);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
 
     /* 4. 验证5个维度全部被评估 */
     const char *dim_names[] = {
@@ -173,8 +173,8 @@ TEST(int05_1_five_dimension_assessment)
 
     /* 8. 清理 */
     if (result.critique_text)
-        AGENTOS_FREE(result.critique_text);
-    agentos_mc_destroy(mc);
+        AGENTRT_FREE(result.critique_text);
+    agentrt_mc_destroy(mc);
 }
 
 /* ============================================================================
@@ -190,20 +190,20 @@ TEST(int05_2_confidence_calibration)
     printf("    --- Confidence Calibration ---\n");
 
     /* 1. 创建元认知引擎 */
-    agentos_metacognition_t *mc = NULL;
-    agentos_error_t err = agentos_mc_create(&mc);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    agentrt_metacognition_t *mc = NULL;
+    agentrt_error_t err = agentrt_mc_create(&mc);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     TEST_ASSERT(mc->enable_confidence_calibration == 1);
 
     /* 2. 初始状态: 校准样本不足，返回原始置信度 */
     float raw_high = 0.9f;
-    float calibrated = agentos_mc_calibrate_confidence(mc, raw_high);
+    float calibrated = agentrt_mc_calibrate_confidence(mc, raw_high);
     TEST_ASSERT_FLOAT_EQ(calibrated, raw_high, 0.001f);
     printf("    Initial (no samples): raw=%.3f, calibrated=%.3f\n",
            raw_high, calibrated);
 
     /* 3. 高质量输出评估 → 高置信度 */
-    agentos_thinking_step_t high_step;
+    agentrt_thinking_step_t high_step;
     init_thinking_step(&high_step, 10, TC_STEP_GENERATION,
                        "Machine learning is a subset of artificial intelligence that "
                        "enables systems to learn from data. It includes supervised, "
@@ -213,8 +213,8 @@ TEST(int05_2_confidence_calibration)
 
     mc_evaluation_result_t high_result;
     memset(&high_result, 0, sizeof(high_result));
-    err = agentos_mc_evaluate_step(mc, &high_step, NULL, 0, &high_result);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    err = agentrt_mc_evaluate_step(mc, &high_step, NULL, 0, &high_result);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     printf("    High quality: overall=%.3f, confidence=%.3f\n",
            high_result.overall_score, high_result.calibrated_confidence);
 
@@ -222,7 +222,7 @@ TEST(int05_2_confidence_calibration)
     TEST_ASSERT(high_result.overall_score > 0.3f);
 
     /* 4. 低质量输出评估 → 低置信度 */
-    agentos_thinking_step_t low_step;
+    agentrt_thinking_step_t low_step;
     init_thinking_step(&low_step, 11, TC_STEP_GENERATION,
                        "I don't know.",
                        "Explain quantum computing in detail",
@@ -230,8 +230,8 @@ TEST(int05_2_confidence_calibration)
 
     mc_evaluation_result_t low_result;
     memset(&low_result, 0, sizeof(low_result));
-    err = agentos_mc_evaluate_step(mc, &low_step, NULL, 0, &low_result);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    err = agentrt_mc_evaluate_step(mc, &low_step, NULL, 0, &low_result);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     printf("    Low quality: overall=%.3f, confidence=%.3f\n",
            low_result.overall_score, low_result.calibrated_confidence);
 
@@ -240,38 +240,38 @@ TEST(int05_2_confidence_calibration)
 
     /* 5. 提供反馈以训练校准器 - 模拟过度自信 */
     for (int i = 0; i < 10; i++) {
-        err = agentos_mc_feedback(mc, 0.9f, 0);  /* 预测0.9但实际错误 */
-        TEST_ASSERT(err == AGENTOS_SUCCESS);
+        err = agentrt_mc_feedback(mc, 0.9f, 0);  /* 预测0.9但实际错误 */
+        TEST_ASSERT(err == AGENTRT_SUCCESS);
     }
 
     /* 6. 校准后: 过度自信的置信度应被降低 */
-    float calibrated_overconfident = agentos_mc_calibrate_confidence(mc, 0.9f);
+    float calibrated_overconfident = agentrt_mc_calibrate_confidence(mc, 0.9f);
     printf("    After overconfidence feedback: raw=0.9, calibrated=%.3f\n",
            calibrated_overconfident);
     TEST_ASSERT(calibrated_overconfident < 0.9f);
 
     /* 7. 提供反馈训练校准器 - 模拟自信不足 */
-    agentos_metacognition_t *mc2 = NULL;
-    err = agentos_mc_create(&mc2);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    agentrt_metacognition_t *mc2 = NULL;
+    err = agentrt_mc_create(&mc2);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
 
     for (int i = 0; i < 10; i++) {
-        err = agentos_mc_feedback(mc2, 0.3f, 1);  /* 预测0.3但实际正确 */
-        TEST_ASSERT(err == AGENTOS_SUCCESS);
+        err = agentrt_mc_feedback(mc2, 0.3f, 1);  /* 预测0.3但实际正确 */
+        TEST_ASSERT(err == AGENTRT_SUCCESS);
     }
 
-    float calibrated_underconfident = agentos_mc_calibrate_confidence(mc2, 0.3f);
+    float calibrated_underconfident = agentrt_mc_calibrate_confidence(mc2, 0.3f);
     printf("    After underconfidence feedback: raw=0.3, calibrated=%.3f\n",
            calibrated_underconfident);
     TEST_ASSERT(calibrated_underconfident > 0.3f);
 
     /* 8. 清理 */
     if (high_result.critique_text)
-        AGENTOS_FREE(high_result.critique_text);
+        AGENTRT_FREE(high_result.critique_text);
     if (low_result.critique_text)
-        AGENTOS_FREE(low_result.critique_text);
-    agentos_mc_destroy(mc);
-    agentos_mc_destroy(mc2);
+        AGENTRT_FREE(low_result.critique_text);
+    agentrt_mc_destroy(mc);
+    agentrt_mc_destroy(mc2);
 }
 
 /* ============================================================================
@@ -280,21 +280,21 @@ TEST(int05_2_confidence_calibration)
  * 验证低置信度结果触发纠错:
  *   - 低评分结果应触发 MC_CORRECT_AUTO 或 MC_CORRECT_RERUN
  *   - 高评分结果应返回 MC_CORRECT_NONE
- *   - agentos_mc_should_self_correct 正确报告纠错需求
+ *   - agentrt_mc_should_self_correct 正确报告纠错需求
  * ============================================================================ */
 TEST(int05_3_self_correction_trigger)
 {
     printf("    --- Self-Correction Trigger ---\n");
 
     /* 1. 创建元认知引擎 */
-    agentos_metacognition_t *mc = NULL;
-    agentos_error_t err = agentos_mc_create(&mc);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    agentrt_metacognition_t *mc = NULL;
+    agentrt_error_t err = agentrt_mc_create(&mc);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     printf("    Acceptance threshold: %.2f, auto_correct threshold: %.2f\n",
            mc->acceptance_threshold, mc->auto_correct_threshold);
 
     /* 2. 高质量输出 → 无需修正 */
-    agentos_thinking_step_t good_step;
+    agentrt_thinking_step_t good_step;
     init_thinking_step(&good_step, 20, TC_STEP_GENERATION,
                        "Python is a high-level programming language known for its "
                        "readability and versatility. It supports multiple programming "
@@ -304,8 +304,8 @@ TEST(int05_3_self_correction_trigger)
 
     mc_evaluation_result_t good_result;
     memset(&good_result, 0, sizeof(good_result));
-    err = agentos_mc_evaluate_step(mc, &good_step, NULL, 0, &good_result);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    err = agentrt_mc_evaluate_step(mc, &good_step, NULL, 0, &good_result);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     printf("    Good output: score=%.3f, strategy=%d, acceptable=%d\n",
            good_result.overall_score, (int)good_result.strategy,
            good_result.is_acceptable);
@@ -317,7 +317,7 @@ TEST(int05_3_self_correction_trigger)
     }
 
     /* 3. 低质量输出 → 触发纠错 */
-    agentos_thinking_step_t bad_step;
+    agentrt_thinking_step_t bad_step;
     init_thinking_step(&bad_step, 21, TC_STEP_GENERATION,
                        "Uh, I think maybe something about computers?",
                        "Explain the architecture of a distributed database system "
@@ -326,8 +326,8 @@ TEST(int05_3_self_correction_trigger)
 
     mc_evaluation_result_t bad_result;
     memset(&bad_result, 0, sizeof(bad_result));
-    err = agentos_mc_evaluate_step(mc, &bad_step, NULL, 0, &bad_result);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    err = agentrt_mc_evaluate_step(mc, &bad_step, NULL, 0, &bad_result);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     printf("    Bad output: score=%.3f, strategy=%d, acceptable=%d\n",
            bad_result.overall_score, (int)bad_result.strategy,
            bad_result.is_acceptable);
@@ -342,17 +342,17 @@ TEST(int05_3_self_correction_trigger)
     /* 4. 验证 should_self_correct 接口 */
     /* 先注入多次低分评估以建立纠错模式 */
     for (int i = 0; i < 5; i++) {
-        agentos_thinking_step_t low_step;
+        agentrt_thinking_step_t low_step;
         init_thinking_step(&low_step, 30 + i, TC_STEP_GENERATION,
                            "vague answer", "complex question", 0.2f);
         mc_evaluation_result_t low_result;
         memset(&low_result, 0, sizeof(low_result));
-        err = agentos_mc_evaluate_step(mc, &low_step, NULL, 0, &low_result);
-        if (err == AGENTOS_SUCCESS && low_result.critique_text)
-            AGENTOS_FREE(low_result.critique_text);
+        err = agentrt_mc_evaluate_step(mc, &low_step, NULL, 0, &low_result);
+        if (err == AGENTRT_SUCCESS && low_result.critique_text)
+            AGENTRT_FREE(low_result.critique_text);
     }
 
-    int should_correct = agentos_mc_should_self_correct(mc, TC_STEP_GENERATION);
+    int should_correct = agentrt_mc_should_self_correct(mc, TC_STEP_GENERATION);
     printf("    should_self_correct(GENERATION): %d\n", should_correct);
     /* should_self_correct 应返回 0 或 1（不应返回错误 -1） */
     TEST_ASSERT(should_correct >= 0);
@@ -364,10 +364,10 @@ TEST(int05_3_self_correction_trigger)
 
     /* 6. 清理 */
     if (good_result.critique_text)
-        AGENTOS_FREE(good_result.critique_text);
+        AGENTRT_FREE(good_result.critique_text);
     if (bad_result.critique_text)
-        AGENTOS_FREE(bad_result.critique_text);
-    agentos_mc_destroy(mc);
+        AGENTRT_FREE(bad_result.critique_text);
+    agentrt_mc_destroy(mc);
 }
 
 /* ============================================================================
@@ -384,9 +384,9 @@ TEST(int05_4_feedback_loop_integration)
     printf("    --- Feedback Loop Integration ---\n");
 
     /* 1. 创建元认知引擎 */
-    agentos_metacognition_t *mc = NULL;
-    agentos_error_t err = agentos_mc_create(&mc);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    agentrt_metacognition_t *mc = NULL;
+    agentrt_error_t err = agentrt_mc_create(&mc);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
 
     /* 2. 初始校准器状态 */
     printf("    Initial: calibration_count=%zu, calibration_sum=%.4f\n",
@@ -395,28 +395,28 @@ TEST(int05_4_feedback_loop_integration)
 
     /* 3. 第一轮: 提供准确反馈 (预测≈实际) */
     for (int i = 0; i < 5; i++) {
-        err = agentos_mc_feedback(mc, 0.8f, 1);  /* 预测0.8，实际正确 */
-        TEST_ASSERT(err == AGENTOS_SUCCESS);
+        err = agentrt_mc_feedback(mc, 0.8f, 1);  /* 预测0.8，实际正确 */
+        TEST_ASSERT(err == AGENTRT_SUCCESS);
     }
     printf("    After 5 accurate feedbacks: count=%zu, sum=%.4f\n",
            mc->calibrator.calibration_count,
            mc->calibrator.calibration_sum);
 
     /* 4. 第一轮评估: 校准后的置信度应接近原始值 (偏差小) */
-    float cal_round1 = agentos_mc_calibrate_confidence(mc, 0.8f);
+    float cal_round1 = agentrt_mc_calibrate_confidence(mc, 0.8f);
     printf("    Round 1 calibration: raw=0.8, calibrated=%.4f\n", cal_round1);
 
     /* 5. 第二轮: 提供过度自信反馈 (预测高但实际错) */
     for (int i = 0; i < 10; i++) {
-        err = agentos_mc_feedback(mc, 0.9f, 0);  /* 预测0.9，实际错误 */
-        TEST_ASSERT(err == AGENTOS_SUCCESS);
+        err = agentrt_mc_feedback(mc, 0.9f, 0);  /* 预测0.9，实际错误 */
+        TEST_ASSERT(err == AGENTRT_SUCCESS);
     }
     printf("    After overconfidence feedbacks: count=%zu, sum=%.4f\n",
            mc->calibrator.calibration_count,
            mc->calibrator.calibration_sum);
 
     /* 6. 第二轮评估: 校准应降低过度自信的置信度 */
-    float cal_round2 = agentos_mc_calibrate_confidence(mc, 0.9f);
+    float cal_round2 = agentrt_mc_calibrate_confidence(mc, 0.9f);
     printf("    Round 2 calibration: raw=0.9, calibrated=%.4f\n", cal_round2);
     TEST_ASSERT(cal_round2 < 0.9f);
 
@@ -430,41 +430,41 @@ TEST(int05_4_feedback_loop_integration)
 
     /* 9. 验证统计信息 */
     char *stats_json = NULL;
-    err = agentos_mc_stats(mc, &stats_json);
-    if (err == AGENTOS_SUCCESS && stats_json != NULL) {
+    err = agentrt_mc_stats(mc, &stats_json);
+    if (err == AGENTRT_SUCCESS && stats_json != NULL) {
         printf("    Stats JSON: %.100s\n", stats_json);
-        AGENTOS_FREE(stats_json);
+        AGENTRT_FREE(stats_json);
     }
 
     /* 10. 验证评估历史记录 */
     mc_evaluation_record_t *records = NULL;
     size_t record_count = 0;
-    err = agentos_mc_get_history(mc, 10, &records, &record_count);
+    err = agentrt_mc_get_history(mc, 10, &records, &record_count);
     printf("    History records: %zu\n", record_count);
     /* 历史记录可能为0（如果未执行 evaluate_step），这是可接受的 */
 
     /* 11. 执行一次完整评估+反馈循环 */
-    agentos_thinking_step_t step;
+    agentrt_thinking_step_t step;
     init_thinking_step(&step, 50, TC_STEP_VERIFICATION,
                        "The answer is verified and consistent with known facts.",
                        "Verify the previous answer", 0.75f);
 
     mc_evaluation_result_t eval_result;
     memset(&eval_result, 0, sizeof(eval_result));
-    err = agentos_mc_evaluate_step(mc, &step, NULL, 0, &eval_result);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    err = agentrt_mc_evaluate_step(mc, &step, NULL, 0, &eval_result);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
 
     /* 根据评估结果提供反馈 */
     int was_correct = eval_result.is_acceptable ? 1 : 0;
-    err = agentos_mc_feedback(mc, eval_result.calibrated_confidence, was_correct);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    err = agentrt_mc_feedback(mc, eval_result.calibrated_confidence, was_correct);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     printf("    Feedback loop: score=%.3f, confidence=%.3f, correct=%d\n",
            eval_result.overall_score, eval_result.calibrated_confidence, was_correct);
 
     /* 12. 清理 */
     if (eval_result.critique_text)
-        AGENTOS_FREE(eval_result.critique_text);
-    agentos_mc_destroy(mc);
+        AGENTRT_FREE(eval_result.critique_text);
+    agentrt_mc_destroy(mc);
 }
 
 /* ============================================================================
@@ -474,16 +474,16 @@ TEST(int05_4_feedback_loop_integration)
  *   - 默认 acceptance_threshold = 0.7
  *   - 默认 auto_correct_threshold = 0.5
  *   - 修改阈值影响评估结果
- *   - agentos_mc_adapt_threshold 自适应调整
+ *   - agentrt_mc_adapt_threshold 自适应调整
  * ============================================================================ */
 TEST(int05_5_threshold_validation)
 {
     printf("    --- Threshold Validation ---\n");
 
     /* 1. 创建元认知引擎并验证默认阈值 */
-    agentos_metacognition_t *mc = NULL;
-    agentos_error_t err = agentos_mc_create(&mc);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    agentrt_metacognition_t *mc = NULL;
+    agentrt_error_t err = agentrt_mc_create(&mc);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
 
     printf("    Default acceptance_threshold: %.2f\n", mc->acceptance_threshold);
     printf("    Default auto_correct_threshold: %.2f\n", mc->auto_correct_threshold);
@@ -494,15 +494,15 @@ TEST(int05_5_threshold_validation)
     TEST_ASSERT(mc->auto_correct_threshold < mc->acceptance_threshold);
 
     /* 2. 使用默认阈值评估中等质量输出 */
-    agentos_thinking_step_t medium_step;
+    agentrt_thinking_step_t medium_step;
     init_thinking_step(&medium_step, 60, TC_STEP_GENERATION,
                        "Some partially correct information about the topic.",
                        "Explain the topic in detail", 0.6f);
 
     mc_evaluation_result_t result_default;
     memset(&result_default, 0, sizeof(result_default));
-    err = agentos_mc_evaluate_step(mc, &medium_step, NULL, 0, &result_default);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    err = agentrt_mc_evaluate_step(mc, &medium_step, NULL, 0, &result_default);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     printf("    Default threshold: score=%.3f, acceptable=%d, strategy=%d\n",
            result_default.overall_score, result_default.is_acceptable,
            (int)result_default.strategy);
@@ -520,8 +520,8 @@ TEST(int05_5_threshold_validation)
     /* 4. 使用严格阈值重新评估 */
     mc_evaluation_result_t result_strict;
     memset(&result_strict, 0, sizeof(result_strict));
-    err = agentos_mc_evaluate_step(mc, &medium_step, NULL, 0, &result_strict);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    err = agentrt_mc_evaluate_step(mc, &medium_step, NULL, 0, &result_strict);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     printf("    Strict threshold: score=%.3f, acceptable=%d, strategy=%d\n",
            result_strict.overall_score, result_strict.is_acceptable,
            (int)result_strict.strategy);
@@ -538,8 +538,8 @@ TEST(int05_5_threshold_validation)
 
     mc_evaluation_result_t result_lenient;
     memset(&result_lenient, 0, sizeof(result_lenient));
-    err = agentos_mc_evaluate_step(mc, &medium_step, NULL, 0, &result_lenient);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    err = agentrt_mc_evaluate_step(mc, &medium_step, NULL, 0, &result_lenient);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     printf("    Lenient threshold: score=%.3f, acceptable=%d, strategy=%d\n",
            result_lenient.overall_score, result_lenient.is_acceptable,
            (int)result_lenient.strategy);
@@ -557,26 +557,26 @@ TEST(int05_5_threshold_validation)
     /* 模拟连续接受 → 阈值应放宽 */
     mc->consecutive_accepts = 5;
     mc->consecutive_rejects = 0;
-    float adapted = agentos_mc_adapt_threshold(mc);
+    float adapted = agentrt_mc_adapt_threshold(mc);
     printf("    After 5 consecutive accepts: adapted_threshold=%.4f\n", adapted);
 
     /* 模拟连续拒绝 → 阈值应收紧 */
     mc->consecutive_accepts = 0;
     mc->consecutive_rejects = 5;
-    adapted = agentos_mc_adapt_threshold(mc);
+    adapted = agentrt_mc_adapt_threshold(mc);
     printf("    After 5 consecutive rejects: adapted_threshold=%.4f\n", adapted);
 
     /* 7. 验证置信度校准开关 */
     mc->enable_confidence_calibration = 0;
     float raw = 0.8f;
-    float uncalibrated = agentos_mc_calibrate_confidence(mc, raw);
+    float uncalibrated = agentrt_mc_calibrate_confidence(mc, raw);
     TEST_ASSERT_FLOAT_EQ(uncalibrated, raw, 0.001f);
     printf("    Calibration disabled: raw=%.3f, returned=%.3f\n", raw, uncalibrated);
 
     mc->enable_confidence_calibration = 1;
 
     /* 8. 验证重置功能 */
-    agentos_mc_reset(mc);
+    agentrt_mc_reset(mc);
     TEST_ASSERT_EQ(mc->calibrator.calibration_count, 0);
     TEST_ASSERT_FLOAT_EQ(mc->calibrator.calibration_sum, 0.0f, 0.001f);
     printf("    After reset: calibration_count=%zu, sum=%.4f\n",
@@ -584,12 +584,12 @@ TEST(int05_5_threshold_validation)
 
     /* 9. 清理 */
     if (result_default.critique_text)
-        AGENTOS_FREE(result_default.critique_text);
+        AGENTRT_FREE(result_default.critique_text);
     if (result_strict.critique_text)
-        AGENTOS_FREE(result_strict.critique_text);
+        AGENTRT_FREE(result_strict.critique_text);
     if (result_lenient.critique_text)
-        AGENTOS_FREE(result_lenient.critique_text);
-    agentos_mc_destroy(mc);
+        AGENTRT_FREE(result_lenient.critique_text);
+    agentrt_mc_destroy(mc);
 }
 
 /* ============================================================================

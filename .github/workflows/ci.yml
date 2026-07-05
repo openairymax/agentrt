@@ -75,7 +75,7 @@ jobs:
       - name: BAN-43 — Hardcoded secrets scan
         run: |
           FOUND=0
-          if grep -rn 'SECRET\|PASSWORD\|TOKEN.*=' agentos/ \
+          if grep -rn 'SECRET\|PASSWORD\|TOKEN.*=' agentrt/ \
             --include='*.c' --include='*.h' 2>/dev/null | \
             grep -v "secrets\." | grep -v "CHANGE_ME" | grep -v "__GENERATE" | grep -v "fallback" | head -20; then
             echo "::warning::BAN-43: Potential hardcoded secrets found (review above)"
@@ -86,7 +86,7 @@ jobs:
           fi
       - name: BAN-57 — CORS wildcard scan
         run: |
-          if grep -rn "Access-Control-Allow-Origin.*\\*" agentos/ \
+          if grep -rn "Access-Control-Allow-Origin.*\\*" agentrt/ \
             --include='*.c' --include='*.h' --include='*.conf' 2>/dev/null; then
             echo "::error::BAN-57: CORS wildcard found"
             exit 1
@@ -95,7 +95,7 @@ jobs:
           fi
       - name: BAN-58 — Hardcoded absolute paths
         run: |
-          if grep -rn '/var/run/agentos\|/home/spharx' agentos/ \
+          if grep -rn '/var/run/agentrt\|/home/spharx' agentrt/ \
             --include='*.c' --include='*.h' 2>/dev/null | grep -v test_ | grep -v Docs | head -10; then
             echo "::warning::BAN-58: Hardcoded absolute paths found"
           else
@@ -104,7 +104,7 @@ jobs:
       - name: BAN-60 — Stub / not-implemented markers
         run: |
           echo "=== BAN-60: Stub / not-implemented markers ==="
-          grep -rn "ENOSYS\|ENOTSUP\|NOT_IMPLEMENTED\|stub\|TODO.*implement" agentos/ \
+          grep -rn "ENOSYS\|ENOTSUP\|NOT_IMPLEMENTED\|stub\|TODO.*implement" agentrt/ \
             --include='*.c' --include='*.h' 2>/dev/null | grep -v test_ | grep -v Docs | head -20 || \
             echo "[OK] No stub markers found"
       - name: BAN-64 — CMake add_compile_definitions -D check
@@ -122,7 +122,7 @@ jobs:
           grep -rn 'option(WARNINGS_AS_ERRORS' CMakeLists.txt 2>/dev/null && echo "[OK] BAN-72" || echo "::warning::BAN-72"
       - name: BAN-77 — No GBK-encoded source files
         run: |
-          if find agentos/ -name '*.c' -o -name '*.h' | xargs file -i 2>/dev/null | grep -i 'charset=iso-8859\|charset=gb\|charset=unknown-8bit' | head -10; then
+          if find agentrt/ -name '*.c' -o -name '*.h' | xargs file -i 2>/dev/null | grep -i 'charset=iso-8859\|charset=gb\|charset=unknown-8bit' | head -10; then
             echo "::error::BAN-77: Non-UTF-8 encoded source files found"
             exit 1
           else
@@ -201,7 +201,7 @@ jobs:
             --suppress=missingIncludeSystem \
             --suppress=unmatchedSuppression \
             -i build -i third_party -i vendor \
-            agentos/ 2>&1 | tee cppcheck-report.txt
+            agentrt/ 2>&1 | tee cppcheck-report.txt
           ISSUES=$(grep -c '^\[' cppcheck-report.txt 2>/dev/null || echo "0")
           echo "::notice::cppcheck: $ISSUES issues found"
           if [ "$ISSUES" -gt 0 ]; then
@@ -284,7 +284,7 @@ jobs:
         run: |
           echo "=== Verify L3/L4/Forgetting symbols NOT present in OSS mode ==="
           for lib in build-oss/libmemoryrovol*.a \
-                     build-oss/agentos/atoms/memoryrovol/*.a; do
+                     build-oss/agentrt/atoms/memoryrovol/*.a; do
             if [ -f "$lib" ]; then
               echo "Checking: $lib"
               for sym in layer3_create structure_query pattern_match forgetting_apply; do
@@ -329,7 +329,7 @@ jobs:
           echo "=== ACC-C: Verify L3/L4/Forgetting symbols in PRO mode ==="
           FOUND=0
           for lib in build-pro/libmemoryrovol*.a \
-                     build-pro/agentos/atoms/memoryrovol/*.a; do
+                     build-pro/agentrt/atoms/memoryrovol/*.a; do
             if [ -f "$lib" ]; then
               echo "Checking: $lib"
               for sym in layer3_create layer3_destroy structure_query structure_update \
@@ -412,17 +412,17 @@ jobs:
                 echo "  Compiling ${test_name}..."
                 gcc -std=c11 -Wall -Wextra -g \
                   -Wno-unused-function -Wno-unused-variable -Wno-unused-parameter \
-                  -I ../../../agentos/atoms/coreloopthree/include \
-                  -I ../../../agentos/daemon/llm_d/include \
-                  -I ../../../agentos/daemon/tool_d/include \
-                  -I ../../../agentos/daemon/common/include \
-                  -I ../../../agentos/daemon/monit_d/include \
-                  -I ../../../agentos/daemon/gateway_d/include \
-                  -I ../../../agentos/daemon/hook_d/include \
-                  -I ../../../agentos/commons/utils/memory/include \
-                  -I ../../../agentos/commons/utils/error/include \
-                  -I ../../../agentos/commons/platform/include \
-                  -I ../../../agentos/cupolas/include \
+                  -I ../../../agentrt/atoms/coreloopthree/include \
+                  -I ../../../agentrt/daemons/llm_d/include \
+                  -I ../../../agentrt/daemons/tool_d/include \
+                  -I ../../../agentrt/daemons/common/include \
+                  -I ../../../agentrt/daemons/monit_d/include \
+                  -I ../../../agentrt/daemons/gateway_d/include \
+                  -I ../../../agentrt/daemons/hook_d/include \
+                  -I ../../../agentrt/commons/utils/memory/include \
+                  -I ../../../agentrt/commons/utils/error/include \
+                  -I ../../../agentrt/commons/platform/include \
+                  -I ../../../agentrt/cupolas/include \
                   -I . \
                   -o "${test_name}" \
                   "${test_file}" test_stubs.c \

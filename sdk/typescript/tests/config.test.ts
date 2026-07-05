@@ -186,80 +186,80 @@ describe('Config - newConfigFromEnv', () => {
     expect(config.endpoint).toBe('http://localhost:18789');
   });
 
-  test('should read AGENTOS_ENDPOINT', () => {
-    process.env.AGENTOS_ENDPOINT = 'http://env-host:9999';
+  test('should read AGENTRT_ENDPOINT', () => {
+    process.env.AGENTRT_ENDPOINT = 'http://env-host:9999';
     const config = newConfigFromEnv();
     expect(config.endpoint).toBe('http://env-host:9999');
   });
 
-  test('should read AGENTOS_TIMEOUT', () => {
-    process.env.AGENTOS_TIMEOUT = '5000';
+  test('should read AGENTRT_TIMEOUT', () => {
+    process.env.AGENTRT_TIMEOUT = '5000';
     const config = newConfigFromEnv();
     expect(config.timeout).toBe(5000);
   });
 
-  test('should ignore invalid AGENTOS_TIMEOUT', () => {
-    process.env.AGENTOS_TIMEOUT = 'not-a-number';
+  test('should ignore invalid AGENTRT_TIMEOUT', () => {
+    process.env.AGENTRT_TIMEOUT = 'not-a-number';
     const config = newConfigFromEnv();
     expect(config.timeout).toBe(30000);
   });
 
-  test('should ignore zero AGENTOS_TIMEOUT', () => {
-    process.env.AGENTOS_TIMEOUT = '0';
+  test('should ignore zero AGENTRT_TIMEOUT', () => {
+    process.env.AGENTRT_TIMEOUT = '0';
     const config = newConfigFromEnv();
     expect(config.timeout).toBe(30000);
   });
 
-  test('should read AGENTOS_MAX_RETRIES', () => {
-    process.env.AGENTOS_MAX_RETRIES = '5';
+  test('should read AGENTRT_MAX_RETRIES', () => {
+    process.env.AGENTRT_MAX_RETRIES = '5';
     const config = newConfigFromEnv();
     expect(config.maxRetries).toBe(5);
   });
 
-  test('should read AGENTOS_RETRY_DELAY', () => {
-    process.env.AGENTOS_RETRY_DELAY = '2000';
+  test('should read AGENTRT_RETRY_DELAY', () => {
+    process.env.AGENTRT_RETRY_DELAY = '2000';
     const config = newConfigFromEnv();
     expect(config.retryDelay).toBe(2000);
   });
 
-  test('should read AGENTOS_API_KEY', () => {
-    process.env.AGENTOS_API_KEY = 'env-api-key';
+  test('should read AGENTRT_API_KEY', () => {
+    process.env.AGENTRT_API_KEY = 'env-api-key';
     const config = newConfigFromEnv();
     expect(config.apiKey).toBe('env-api-key');
   });
 
-  test('should read AGENTOS_DEBUG true', () => {
-    process.env.AGENTOS_DEBUG = 'true';
+  test('should read AGENTRT_DEBUG true', () => {
+    process.env.AGENTRT_DEBUG = 'true';
     const config = newConfigFromEnv();
     expect(config.debug).toBe(true);
   });
 
-  test('should read AGENTOS_DEBUG as 1', () => {
-    process.env.AGENTOS_DEBUG = '1';
+  test('should read AGENTRT_DEBUG as 1', () => {
+    process.env.AGENTRT_DEBUG = '1';
     const config = newConfigFromEnv();
     expect(config.debug).toBe(true);
   });
 
   test('should not enable debug for other values', () => {
-    process.env.AGENTOS_DEBUG = 'false';
+    process.env.AGENTRT_DEBUG = 'false';
     const config = newConfigFromEnv();
     expect(config.debug).toBe(false);
   });
 
-  test('should read AGENTOS_LOG_LEVEL', () => {
-    process.env.AGENTOS_LOG_LEVEL = 'debug';
+  test('should read AGENTRT_LOG_LEVEL', () => {
+    process.env.AGENTRT_LOG_LEVEL = 'debug';
     const config = newConfigFromEnv();
     expect(config.logLevel).toBe('debug');
   });
 
-  test('should read AGENTOS_MAX_CONNECTIONS', () => {
-    process.env.AGENTOS_MAX_CONNECTIONS = '20';
+  test('should read AGENTRT_MAX_CONNECTIONS', () => {
+    process.env.AGENTRT_MAX_CONNECTIONS = '20';
     const config = newConfigFromEnv();
     expect(config.maxConnections).toBe(20);
   });
 
-  test('should read AGENTOS_USER_AGENT', () => {
-    process.env.AGENTOS_USER_AGENT = 'EnvAgent/2.0';
+  test('should read AGENTRT_USER_AGENT', () => {
+    process.env.AGENTRT_USER_AGENT = 'EnvAgent/2.0';
     const config = newConfigFromEnv();
     expect(config.userAgent).toBe('EnvAgent/2.0');
   });

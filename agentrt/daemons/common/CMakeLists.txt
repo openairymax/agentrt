@@ -47,10 +47,8 @@ set(SVC_COMMON_SOURCES
     src/agentrt_event_loop.c  # 事件驱动循环
     src/daemon_event_driver.c # 统一事件驱动框架
     src/api_recovery.c        # API恢复系统
-    src/orchestrator.c        # 流程编排器
     src/thread_pool.c         # 工作线程池
     src/daemon_task_dispatcher.c # 工具并行执行引擎（原 parallel_dispatcher.c，重命名以消除与 atoms/coreloopthree 同名冲突）
-    src/checkpoint.c
     src/daemon_oom.c          # P1.22: Daemon OOM 降级回调注册
     src/ipc_backpressure.c    # P1.24: IPC Bus 背压控制
     src/daemon_bootstrap_sd.c    # P1.7 C-L08: daemon ServiceDiscovery 一键引导
@@ -252,7 +250,6 @@ install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/include/config_manager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/api_recovery.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/thread_pool.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/orchestrator.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/daemon_defaults.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/parallel_dispatcher.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/agentrt_event_loop.h

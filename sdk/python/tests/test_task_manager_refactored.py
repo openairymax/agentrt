@@ -8,9 +8,9 @@
 import pytest
 from tests.base_test_case import BaseTestCase
 
-from agentos.modules.task.manager import TaskManager
-from agentos.types import TaskStatus
-from agentos.exceptions import AgentOSError, CODE_MISSING_PARAMETER, CODE_INVALID_RESPONSE
+from agentrt.modules.task.manager import TaskManager
+from agentrt.types import TaskStatus
+from agentrt.exceptions import AgentOSError, CODE_MISSING_PARAMETER, CODE_INVALID_RESPONSE
 
 
 class TestTaskManager(BaseTestCase):

@@ -21,15 +21,15 @@
 
 | tests/security/ 目录 | 对应的 agentos/ 模块 | 测试内容 |
 |---------------------|---------------------|----------|
-| `c/test_security_audit.c` | `agentos/cupolas/audit/` | C 层安全审计套件（审计链完整性、事件签名验证） |
-| `c/test_sec017_compliance.c` | `agentos/cupolas/` | SEC-017 桩函数合规验证（安全接口桩函数完整性） |
-| `cupolas/fuzz_permission.c` | `agentos/cupolas/permission/` | 权限模糊测试（随机权限请求、越权检测） |
-| `cupolas/fuzz_sanitizer.c` | `agentos/cupolas/sanitizer/` | 清洗器模糊测试（随机恶意输入、边界条件） |
-| `python/fuzz_framework.py` | `agentos/cupolas/sanitizer/` | Python 模糊测试框架（输入清洗器自动化模糊测试） |
-| `python/sast_dast_scanner.py` | `agentos/cupolas/security/` | SAST/DAST 静态/动态扫描器（代码安全扫描） |
-| `python/test_input_sanitizer.py` | `agentos/cupolas/sanitizer/` | 输入净化测试（XSS/SQL 注入/命令注入/路径遍历） |
-| `python/test_permissions.py` | `agentos/cupolas/permission/` | 权限检查测试（RBAC+ABAC 双模型） |
-| `python/test_sandbox.py` | `agentos/daemon/common/` | 沙箱隔离测试（执行环境隔离/资源限制/逃逸防护） |
+| `c/test_security_audit.c` | `agentrt/cupolas/audit/` | C 层安全审计套件（审计链完整性、事件签名验证） |
+| `c/test_sec017_compliance.c` | `agentrt/cupolas/` | SEC-017 桩函数合规验证（安全接口桩函数完整性） |
+| `cupolas/fuzz_permission.c` | `agentrt/cupolas/permission/` | 权限模糊测试（随机权限请求、越权检测） |
+| `cupolas/fuzz_sanitizer.c` | `agentrt/cupolas/sanitizer/` | 清洗器模糊测试（随机恶意输入、边界条件） |
+| `python/fuzz_framework.py` | `agentrt/cupolas/sanitizer/` | Python 模糊测试框架（输入清洗器自动化模糊测试） |
+| `python/sast_dast_scanner.py` | `agentrt/cupolas/security/` | SAST/DAST 静态/动态扫描器（代码安全扫描） |
+| `python/test_input_sanitizer.py` | `agentrt/cupolas/sanitizer/` | 输入净化测试（XSS/SQL 注入/命令注入/路径遍历） |
+| `python/test_permissions.py` | `agentrt/cupolas/permission/` | 权限检查测试（RBAC+ABAC 双模型） |
+| `python/test_sandbox.py` | `agentrt/daemons/common/` | 沙箱隔离测试（执行环境隔离/资源限制/逃逸防护） |
 
 ## 目录结构
 
@@ -132,7 +132,7 @@ pytest tests/security/ -v -n auto -m security
 | **输入验证** | `cupolas/sanitizer/` | XSS、SQL 注入、命令注入、路径遍历 | `python/test_input_sanitizer.py` |
 | **权限控制** | `cupolas/permission/` | RBAC 角色权限、ABAC 属性策略、越权检测 | `python/test_permissions.py` |
 | **审计追踪** | `cupolas/audit/` | HMAC 签名链、事件完整性、不可篡改性 | `c/test_security_audit.c` |
-| **沙箱隔离** | `daemon/common/` | 执行环境隔离、资源限制、逃逸防护 | `python/test_sandbox.py` |
+| **沙箱隔离** | `daemons/common/` | 执行环境隔离、资源限制、逃逸防护 | `python/test_sandbox.py` |
 | **代码扫描** | 全部模块 | SAST 静态分析、DAST 动态检测 | `python/sast_dast_scanner.py` |
 | **模糊测试** | `cupolas/` | 权限模糊、清洗器模糊 | `cupolas/fuzz_permission.c`, `cupolas/fuzz_sanitizer.c`, `python/fuzz_framework.py` |
 | **合规验证** | `cupolas/` | SEC-017 桩函数合规性 | `c/test_sec017_compliance.c` |
@@ -146,7 +146,7 @@ pytest tests/security/ -v -n auto -m security
 | `cupolas/sanitizer/` | `python/test_input_sanitizer.py`, `cupolas/fuzz_sanitizer.c`, `python/fuzz_framework.py` | pytest + C | 输入净化、XSS/SQL/命令注入防护、模糊测试 |
 | `cupolas/security/` | `python/sast_dast_scanner.py` | pytest | 静态代码分析、动态安全检测 |
 | `cupolas/` (合规) | `c/test_sec017_compliance.c` | CMocka | SEC-017 安全接口桩函数合规性 |
-| `daemon/common/` | `python/test_sandbox.py` | pytest | 沙箱隔离、资源限制、逃逸防护 |
+| `daemons/common/` | `python/test_sandbox.py` | pytest | 沙箱隔离、资源限制、逃逸防护 |
 
 ---
 

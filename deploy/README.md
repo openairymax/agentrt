@@ -22,7 +22,7 @@ deploy/
 │   ├── monitoring/                #   监控配置
 │   │   ├── prometheus.yml         #     Prometheus 采集配置
 │   │   ├── alerts.yml             #     告警规则
-│   │   └── grafana_agentos_dashboard.json  # Grafana 仪表盘
+│   │   └── grafana_agentrt_dashboard.json  # Grafana 仪表盘
 │   ├── secrets/                   #   Docker Swarm 密钥目录（.gitkeep）
 │   └── README.md                  #   Docker 部署详细文档
 └── README.md                      # 本文件

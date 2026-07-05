@@ -23,14 +23,14 @@
 static int passed_tests = 0, failed_tests = 0;
 
 static int test_config_load(void) {
-    agentos_config_t* manager = agentos_config_load("test_config.json");
-    if (manager) agentos_config_free(manager);
+    agentrt_config_t* manager = agentrt_config_load("test_config.json");
+    if (manager) agentrt_config_free(manager);
     printf("  manager load: OK\n");
     return 0;
 }
 
 int main(void) {
-    printf("agentos/commons/manager 单元测试\n");
+    printf("agentrt/commons/manager 单元测试\n");
     TEST_RUN(test_config_load);
     printf("测试结果�?d 通过�?d 失败\n", passed_tests, failed_tests);
     return failed_tests > 0 ? 1 : 0;

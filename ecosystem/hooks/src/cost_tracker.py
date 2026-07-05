@@ -14,7 +14,7 @@ Tracks per-session:
 Pricing table is configurable and covers major providers:
   OpenAI, Anthropic, Google, DeepSeek, local (free).
 
-Hook configuration in agentos.yaml:
+Hook configuration in agentrt.yaml:
   hooks:
     global_hooks:
       on_llm_response:

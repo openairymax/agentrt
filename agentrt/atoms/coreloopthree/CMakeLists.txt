@@ -43,9 +43,7 @@ add_library(agentrt_coreloopthree STATIC
     src/manager_adapter.c
     src/memory/memory_service.c
     src/memory/memoryrovol_bridge.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/common/src/checkpoint.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/common/src/orchestrator.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../cupolas/src/yaml_minimal.c
+    src/orchestrator.c        # SP02: 从 daemons/common/src/ 迁入（编排器与 coreloopthree 强耦合）
     # P3.18 (ACC-DT26): hook_d → CoreLoopThree — 关键事件 hook 触发
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/hook_d/src/service.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/hook_d/src/hook_executor.c
@@ -158,7 +156,6 @@ target_include_directories(agentrt_coreloopthree PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/tool_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/hook_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/quality
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../cupolas/src
 )
 
 target_link_libraries(agentrt_coreloopthree PUBLIC
@@ -183,7 +180,7 @@ elseif(UNIX)
 endif()
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
-    DESTINATION include/agentos
+    DESTINATION include/agentrt
     FILES_MATCHING PATTERN "*.h"
 )
 

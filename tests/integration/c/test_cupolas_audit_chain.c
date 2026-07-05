@@ -81,9 +81,9 @@ static uint64_t now_ms(void)
  * ============================================================================ */
 static int init_cupolas_framework(void)
 {
-    agentos_error_t error = AGENTOS_OK;
+    agentrt_error_t error = AGENTRT_OK;
     int ret = cupolas_init(NULL, &error);
-    if (ret != AGENTOS_OK) {
+    if (ret != AGENTRT_OK) {
         printf("    cupolas_init failed: ret=%d, error=%d\n", ret, (int)error);
         return -1;
     }

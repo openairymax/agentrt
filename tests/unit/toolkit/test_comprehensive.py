@@ -124,7 +124,7 @@ class TestExceptions(unittest.TestCase):
     """Test exception classes."""
     
     @pytest.mark.skip(reason="SDK exception API has evolved, test needs updating")
-    def test_agentos_error(self):
+    def test_agentrt_error(self):
         """Test base AgentOSError."""
         pass
     

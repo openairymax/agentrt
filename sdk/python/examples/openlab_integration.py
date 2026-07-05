@@ -19,14 +19,14 @@ from typing import Dict, Any, List, Optional
 
 # 导入 AgentRT Python SDK
 try:
-    from agentos import AgentOSClient, Task, Memory, Skill
-    from agentos.types import TaskStatus, MemoryType, SkillCategory
-    from agentos.utils.event_emitter import EventEmitter, BuiltinEvents
-    AGENTOS_AVAILABLE = True
+    from agentrt import AgentOSClient, Task, Memory, Skill
+    from agentrt.types import TaskStatus, MemoryType, SkillCategory
+    from agentrt.utils.event_emitter import EventEmitter, BuiltinEvents
+    AGENTRT_AVAILABLE = True
 except ImportError as e:
     print(f"⚠️  AgentRT SDK 未安装: {e}")
     print("请运行: pip install -e sdk/python")
-    AGENTOS_AVAILABLE = False
+    AGENTRT_AVAILABLE = False
 
 # 设置日志
 logging.basicConfig(level=logging.INFO)
@@ -41,25 +41,25 @@ class OpenLabAgentOSIntegration:
     基于五维正交系统设计原则实现。
     """
     
-    def __init__(self, agentos_base_url: str = "http://localhost:8080"):
+    def __init__(self, agentrt_base_url: str = "http://localhost:8080"):
         """
         初始化集成
         
         Args:
-            agentos_base_url: AgentRT 网关地址
+            agentrt_base_url: AgentRT 网关地址
         """
-        if not AGENTOS_AVAILABLE:
+        if not AGENTRT_AVAILABLE:
             raise RuntimeError("AgentRT SDK 未安装，无法初始化集成")
         
-        self.base_url = agentos_base_url
-        self.client = AgentOSClient(base_url=agentos_base_url)
+        self.base_url = agentrt_base_url
+        self.client = AgentOSClient(base_url=agentrt_base_url)
         self.event_emitter = EventEmitter()
         
         # 集成状态
         self.connected = False
         self.initialized = False
         
-        logger.info(f"✅ OpenLab-AgentRT 集成初始化完成，连接到: {agentos_base_url}")
+        logger.info(f"✅ OpenLab-AgentRT 集成初始化完成，连接到: {agentrt_base_url}")
     
     async def connect(self) -> bool:
         """
@@ -135,7 +135,7 @@ class OpenLabAgentOSIntegration:
                 "created_at": datetime.now().isoformat(),
                 "priority": "medium",
                 "estimated_duration_hours": 8,
-                "tags": ["research", "openlab", "agentos"]
+                "tags": ["research", "openlab", "agentrt"]
             }
             
             # 通过 AgentRT SDK 创建任务
@@ -589,7 +589,7 @@ async def main():
     print()
     
     # 检查 AgentRT SDK 可用性
-    if not AGENTOS_AVAILABLE:
+    if not AGENTRT_AVAILABLE:
         print("❌ AgentRT SDK 不可用")
         print("请先安装 AgentRT Python SDK:")
         print("  pip install -e sdk/python")

@@ -23,7 +23,7 @@
 
 #include "memory_compat.h"
 #include "service_discovery.h"
-#include "agentos_types.h"
+#include "agentrt_types.h"
 
 /* ============================================================================
  * Test Helpers
@@ -87,13 +87,13 @@ static void test_normal_sd_lifecycle(void) {
     service_discovery_t sd = sd_create(&config);
     CHECK(sd != NULL, "sd_create returned NULL");
 
-    agentos_error_t err = sd_start(sd);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "sd_start failed");
+    agentrt_error_t err = sd_start(sd);
+    CHECK_EQ(err, AGENTRT_SUCCESS, "sd_start failed");
 
     CHECK(sd_is_running(sd), "Service discovery should be running");
 
     err = sd_stop(sd);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "sd_stop failed");
+    CHECK_EQ(err, AGENTRT_SUCCESS, "sd_stop failed");
 
     CHECK(!sd_is_running(sd), "Service discovery should not be running");
 
@@ -111,14 +111,14 @@ static void test_normal_register_discover_select(void) {
     service_discovery_t sd = sd_create(NULL);
     CHECK(sd != NULL, "sd_create returned NULL");
 
-    agentos_error_t err = sd_start(sd);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "sd_start failed");
+    agentrt_error_t err = sd_start(sd);
+    CHECK_EQ(err, AGENTRT_SUCCESS, "sd_start failed");
 
     /* Register a service */
     sd_instance_t inst = {0};
     snprintf(inst.instance_id, sizeof(inst.instance_id), "llm_d-001");
     snprintf(inst.endpoint, sizeof(inst.endpoint), "127.0.0.1:8080");
-    inst.state = AGENTOS_SVC_STATE_RUNNING;
+    inst.state = AGENTRT_SVC_STATE_RUNNING;
     inst.healthy = true;
     inst.weight = 10;
     inst.active_connections = 0;
@@ -127,13 +127,13 @@ static void test_normal_register_discover_select(void) {
 
     err = sd_register(sd, "llm_d", "llm_service", &inst,
                       "production,llm", "corekern");
-    CHECK_EQ(err, AGENTOS_SUCCESS, "sd_register failed");
+    CHECK_EQ(err, AGENTRT_SUCCESS, "sd_register failed");
 
     /* Discover the service */
     sd_instance_t found[4];
     uint32_t found_count = 0;
     err = sd_discover(sd, "llm_d", found, 4, &found_count);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "sd_discover failed");
+    CHECK_EQ(err, AGENTRT_SUCCESS, "sd_discover failed");
     CHECK(found_count >= 1, "Should find at least 1 instance");
     CHECK_EQ(strcmp(found[0].instance_id, "llm_d-001"), 0,
              "Instance ID should match");
@@ -142,7 +142,7 @@ static void test_normal_register_discover_select(void) {
     sd_instance_t selected;
     memset(&selected, 0, sizeof(selected));
     err = sd_select_instance(sd, "llm_d", SD_LB_ROUND_ROBIN, &selected);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "sd_select_instance failed");
+    CHECK_EQ(err, AGENTRT_SUCCESS, "sd_select_instance failed");
     CHECK(strlen(selected.instance_id) > 0, "Selected instance should have ID");
 
     /* Cleanup */
@@ -162,36 +162,36 @@ static void test_normal_discover_by_type_tags(void) {
     service_discovery_t sd = sd_create(NULL);
     CHECK(sd != NULL, "sd_create returned NULL");
 
-    agentos_error_t err = sd_start(sd);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "sd_start failed");
+    agentrt_error_t err = sd_start(sd);
+    CHECK_EQ(err, AGENTRT_SUCCESS, "sd_start failed");
 
     /* Register multiple services of different types */
     for (int i = 0; i < 3; i++) {
         sd_instance_t inst = {0};
         snprintf(inst.instance_id, sizeof(inst.instance_id), "tool_d-%03d", i);
         snprintf(inst.endpoint, sizeof(inst.endpoint), "127.0.0.1:%d", 9000 + i);
-        inst.state = AGENTOS_SVC_STATE_RUNNING;
+        inst.state = AGENTRT_SVC_STATE_RUNNING;
         inst.healthy = true;
         inst.weight = 10;
         inst.pid = (uint32_t)getpid();
 
         err = sd_register(sd, inst.instance_id, "tool_service", &inst,
                           "production,tools,py", "corekern,llm_d");
-        CHECK_EQ(err, AGENTOS_SUCCESS, "Register tool instance failed");
+        CHECK_EQ(err, AGENTRT_SUCCESS, "Register tool instance failed");
     }
 
     /* Discover by type */
     sd_service_entry_t entries[8];
     uint32_t count = 0;
     err = sd_discover_by_type(sd, "tool_service", entries, 8, &count);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "sd_discover_by_type failed");
+    CHECK_EQ(err, AGENTRT_SUCCESS, "sd_discover_by_type failed");
     CHECK(count >= 3, "Should find at least 3 tool services");
 
     /* Discover by tags */
     sd_service_entry_t tag_entries[8];
     uint32_t tag_count = 0;
     err = sd_discover_by_tags(sd, "tools", tag_entries, 8, &tag_count);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "sd_discover_by_tags failed");
+    CHECK_EQ(err, AGENTRT_SUCCESS, "sd_discover_by_tags failed");
     CHECK(tag_count >= 1, "Should find at least 1 service with 'tools' tag");
 
     /* Cleanup */
@@ -224,13 +224,13 @@ static void test_error_null_handling(void) {
 
     /* NULL sd register should fail */
     sd_instance_t inst = {0};
-    agentos_error_t err = sd_register(NULL, "test", "type", &inst, "", "");
-    CHECK(err != AGENTOS_SUCCESS, "NULL sd register should fail");
+    agentrt_error_t err = sd_register(NULL, "test", "type", &inst, "", "");
+    CHECK(err != AGENTRT_SUCCESS, "NULL sd register should fail");
 
     /* NULL sd discover should fail */
     uint32_t found = 0;
     err = sd_discover(NULL, "test", NULL, 0, &found);
-    CHECK(err != AGENTOS_SUCCESS, "NULL sd discover should fail");
+    CHECK(err != AGENTRT_SUCCESS, "NULL sd discover should fail");
 
     PASS();
 }
@@ -245,18 +245,18 @@ static void test_error_invalid_register(void) {
     service_discovery_t sd = sd_create(NULL);
     CHECK(sd != NULL, "sd_create returned NULL");
 
-    agentos_error_t err = sd_start(sd);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "sd_start failed");
+    agentrt_error_t err = sd_start(sd);
+    CHECK_EQ(err, AGENTRT_SUCCESS, "sd_start failed");
 
     /* Register with NULL service name */
     sd_instance_t inst = {0};
     snprintf(inst.instance_id, sizeof(inst.instance_id), "test-001");
     err = sd_register(sd, NULL, "type", &inst, "", "");
-    CHECK(err != AGENTOS_SUCCESS, "NULL service name should fail");
+    CHECK(err != AGENTRT_SUCCESS, "NULL service name should fail");
 
     /* Register with NULL instance */
     err = sd_register(sd, "test", "type", NULL, "", "");
-    CHECK(err != AGENTOS_SUCCESS, "NULL instance should fail");
+    CHECK(err != AGENTRT_SUCCESS, "NULL instance should fail");
 
     sd_stop(sd);
     sd_destroy(sd);
@@ -278,35 +278,35 @@ static void test_timeout_heartbeat_expire(void) {
     service_discovery_t sd = sd_create(&config);
     CHECK(sd != NULL, "sd_create returned NULL");
 
-    agentos_error_t err = sd_start(sd);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "sd_start failed");
+    agentrt_error_t err = sd_start(sd);
+    CHECK_EQ(err, AGENTRT_SUCCESS, "sd_start failed");
 
     /* Register a service */
     sd_instance_t inst = {0};
     snprintf(inst.instance_id, sizeof(inst.instance_id), "heartbeat-test-001");
     snprintf(inst.endpoint, sizeof(inst.endpoint), "127.0.0.1:9999");
-    inst.state = AGENTOS_SVC_STATE_RUNNING;
+    inst.state = AGENTRT_SVC_STATE_RUNNING;
     inst.healthy = true;
     inst.weight = 10;
     inst.pid = (uint32_t)getpid();
 
     err = sd_register(sd, "heartbeat-svc", "test", &inst, "test", "");
-    CHECK_EQ(err, AGENTOS_SUCCESS, "Register heartbeat service failed");
+    CHECK_EQ(err, AGENTRT_SUCCESS, "Register heartbeat service failed");
 
     /* Send heartbeats */
     for (int i = 0; i < 3; i++) {
         err = sd_heartbeat(sd, "heartbeat-svc", "heartbeat-test-001");
-        CHECK_EQ(err, AGENTOS_SUCCESS, "Heartbeat should succeed");
+        CHECK_EQ(err, AGENTRT_SUCCESS, "Heartbeat should succeed");
         usleep(200000); /* 200ms */
     }
 
     /* Update health status */
     err = sd_update_health(sd, "heartbeat-svc", "heartbeat-test-001", false);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "Update health should succeed");
+    CHECK_EQ(err, AGENTRT_SUCCESS, "Update health should succeed");
 
     /* Update connections */
     err = sd_update_connections(sd, "heartbeat-svc", "heartbeat-test-001", 5);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "Update connections should succeed");
+    CHECK_EQ(err, AGENTRT_SUCCESS, "Update connections should succeed");
 
     /* Verify service count */
     uint32_t count = sd_service_count(sd);
@@ -346,13 +346,13 @@ static void *concurrent_sd_thread(void *arg) {
         snprintf(inst.instance_id, sizeof(inst.instance_id), "%s", id);
         snprintf(inst.endpoint, sizeof(inst.endpoint), "127.0.0.1:%d",
                  10000 + args->thread_id * 100 + i);
-        inst.state = AGENTOS_SVC_STATE_RUNNING;
+        inst.state = AGENTRT_SVC_STATE_RUNNING;
         inst.healthy = true;
         inst.weight = 10;
         inst.pid = (uint32_t)getpid();
 
-        agentos_error_t err = sd_register(args->sd, name, "test", &inst, "", "");
-        if (err == AGENTOS_SUCCESS) {
+        agentrt_error_t err = sd_register(args->sd, name, "test", &inst, "", "");
+        if (err == AGENTRT_SUCCESS) {
             args->success_count++;
         } else {
             args->error_count++;
@@ -371,8 +371,8 @@ static void test_concurrent_sd_registrations(void) {
     service_discovery_t sd = sd_create(&config);
     CHECK(sd != NULL, "sd_create returned NULL");
 
-    agentos_error_t err = sd_start(sd);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "sd_start failed");
+    agentrt_error_t err = sd_start(sd);
+    CHECK_EQ(err, AGENTRT_SUCCESS, "sd_start failed");
 
     pthread_t threads[SD_CONCURRENT_THREADS];
     sd_thread_args_t args[SD_CONCURRENT_THREADS];
@@ -420,31 +420,31 @@ static void test_event_callback_and_stats(void) {
     service_discovery_t sd = sd_create(NULL);
     CHECK(sd != NULL, "sd_create returned NULL");
 
-    agentos_error_t err = sd_start(sd);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "sd_start failed");
+    agentrt_error_t err = sd_start(sd);
+    CHECK_EQ(err, AGENTRT_SUCCESS, "sd_start failed");
 
     /* Register event callback */
     g_event_callback_count = 0;
     err = sd_register_event_callback(sd, test_event_callback, NULL);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "Register event callback should succeed");
+    CHECK_EQ(err, AGENTRT_SUCCESS, "Register event callback should succeed");
 
     /* Register a service to trigger callback */
     sd_instance_t inst = {0};
     snprintf(inst.instance_id, sizeof(inst.instance_id), "event-test-001");
     snprintf(inst.endpoint, sizeof(inst.endpoint), "127.0.0.1:8000");
-    inst.state = AGENTOS_SVC_STATE_RUNNING;
+    inst.state = AGENTRT_SVC_STATE_RUNNING;
     inst.healthy = true;
     inst.weight = 10;
     inst.pid = (uint32_t)getpid();
 
     err = sd_register(sd, "event-svc", "test", &inst, "test", "corekern");
-    CHECK_EQ(err, AGENTOS_SUCCESS, "Register event service should succeed");
+    CHECK_EQ(err, AGENTRT_SUCCESS, "Register event service should succeed");
 
     /* Get stats */
     sd_stats_t stats;
     memset(&stats, 0, sizeof(stats));
     err = sd_get_stats(sd, &stats);
-    CHECK_EQ(err, AGENTOS_SUCCESS, "sd_get_stats should succeed");
+    CHECK_EQ(err, AGENTRT_SUCCESS, "sd_get_stats should succeed");
     CHECK(stats.registrations >= 1, "Stats should reflect registration");
 
     /* Dump stats (should not crash) */

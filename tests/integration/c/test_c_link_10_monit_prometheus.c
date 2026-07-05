@@ -23,7 +23,7 @@
 
 #include "memory_compat.h"
 #include "prometheus_exporter.h"
-#include "agentos_types.h"
+#include "agentrt_types.h"
 
 /* ============================================================================
  * Test Helpers
@@ -92,18 +92,18 @@ static void test_normal_get_metrics(void) {
     CHECK_EQ(ret, 0, "Register required metrics should succeed");
 
     /* Update some metrics */
-    prometheus_counter_inc("agentos_requests_total", 1.0);
-    prometheus_gauge_set("agentos_active_connections", 5.0);
-    prometheus_histogram_observe("agentos_request_duration_ms", 42.5);
+    prometheus_counter_inc("agentrt_requests_total", 1.0);
+    prometheus_gauge_set("agentrt_active_connections", 5.0);
+    prometheus_histogram_observe("agentrt_request_duration_ms", 42.5);
 
     /* Get metrics output */
     char *metrics = prometheus_exporter_get_metrics();
     CHECK(metrics != NULL, "prometheus_exporter_get_metrics should return data");
 
     /* Verify format contains expected Prometheus markers */
-    CHECK(strstr(metrics, "agentos_") != NULL || strstr(metrics, "HELP") != NULL
+    CHECK(strstr(metrics, "agentrt_") != NULL || strstr(metrics, "HELP") != NULL
           || strstr(metrics, "TYPE") != NULL,
-          "Metrics output should contain agentos_ or HELP/TYPE markers");
+          "Metrics output should contain agentrt_ or HELP/TYPE markers");
 
     free(metrics);
     prometheus_exporter_shutdown();
@@ -318,17 +318,17 @@ static void test_all_metric_types(void) {
     CHECK_EQ(ret, 0, "Register required metrics should succeed");
 
     /* Update counter multiple times */
-    prometheus_counter_inc("agentos_llm_requests_total", 10.0);
-    prometheus_counter_inc("agentos_llm_requests_total", 5.0);
+    prometheus_counter_inc("agentrt_llm_requests_total", 10.0);
+    prometheus_counter_inc("agentrt_llm_requests_total", 5.0);
 
     /* Update gauge */
-    prometheus_gauge_set("agentos_memory_usage_bytes", 1048576.0);
-    prometheus_gauge_set("agentos_memory_usage_bytes", 2097152.0);
+    prometheus_gauge_set("agentrt_memory_usage_bytes", 1048576.0);
+    prometheus_gauge_set("agentrt_memory_usage_bytes", 2097152.0);
 
     /* Update histogram */
-    prometheus_histogram_observe("agentos_request_duration_ms", 10.0);
-    prometheus_histogram_observe("agentos_request_duration_ms", 50.0);
-    prometheus_histogram_observe("agentos_request_duration_ms", 100.0);
+    prometheus_histogram_observe("agentrt_request_duration_ms", 10.0);
+    prometheus_histogram_observe("agentrt_request_duration_ms", 50.0);
+    prometheus_histogram_observe("agentrt_request_duration_ms", 100.0);
 
     /* Get metrics and verify they contain updated values */
     char *metrics = prometheus_exporter_get_metrics();

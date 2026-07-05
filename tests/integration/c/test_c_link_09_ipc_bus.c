@@ -23,7 +23,7 @@
 
 #include "memory_compat.h"
 #include "ipc_bus_helper.h"
-#include "agentos_types.h"
+#include "agentrt_types.h"
 
 /* ============================================================================
  * Test Helpers

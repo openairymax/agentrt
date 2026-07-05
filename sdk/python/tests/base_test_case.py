@@ -10,8 +10,8 @@ from unittest.mock import MagicMock, AsyncMock
 from typing import Dict, Any, Optional
 from datetime import datetime
 
-from agentos.client.client import APIClient, APIResponse, ClientConfig
-from agentos.exceptions import AgentOSError
+from agentrt.client.client import APIClient, APIResponse, ClientConfig
+from agentrt.exceptions import AgentOSError
 
 
 class BaseTestCase:

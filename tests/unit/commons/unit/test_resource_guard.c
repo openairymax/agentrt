@@ -137,7 +137,7 @@ static void test_large_memory_allocation(void** state) {
     void* ptr = malloc(large_size);
 
     if (ptr) {
-        AGENTOS_MEMSET(ptr, 0xAB, large_size);
+        AGENTRT_MEMSET(ptr, 0xAB, large_size);
         unsigned char* bytes = (unsigned char*)ptr;
         assert_int_equal(0xAB, bytes[0]);
         assert_int_equal(0xAB, bytes[large_size - 1]);
