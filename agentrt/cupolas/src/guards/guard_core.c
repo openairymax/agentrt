@@ -1,0 +1,779 @@
+// SPDX-FileCopyrightText: 2026 SPHARX.
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+/**
+ * @file guard_core.c
+ * @brief SafetyGuard Core Implementation
+ */
+
+#include "guard_core.h"
+
+#include "../platform/platform.h"
+#include "logging_compat.h"
+#include "atomic_compat.h"
+#include "memory_compat.h"
+#include "utils/cupolas_utils.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+// ============================================================================
+// 内存安全常量（SEC-02 合规）
+// ============================================================================
+
+/** @brief 最大输入数据大小（10 MB）— 防止恶意超大输入耗尽内存 */
+#define GUARD_MAX_INPUT_SIZE (10 * 1024 * 1024)
+
+/** @brief 最大自定义配置大小（1 MB）— 防止配置注入攻击 */
+#define GUARD_MAX_CUSTOM_CONFIG_SIZE (1 * 1024 * 1024)
+
+// ============================================================================
+// 内部数据结构
+// ============================================================================
+
+typedef struct guard_manager_private guard_manager_private_t;
+
+typedef struct async_request {
+    uint64_t request_id;
+    guard_manager_private_t *manager;
+    guard_context_t context;
+    guard_result_t *results;
+    size_t max_results;
+    size_t actual_results;
+    void (*callback)(uint64_t, const guard_result_t *, size_t, void *);
+    void *user_data;
+    struct async_request *next;
+} async_request_t;
+
+struct guard_manager_private {
+    guard_manager_config_t config;
+    guard_t **guards;
+    size_t guard_count;
+    size_t guard_capacity;
+    cupolas_mutex_t lock;
+    cupolas_cond_t cond;
+    uint64_t next_guard_id;
+    guard_stats_t stats;
+    void *result_cache;
+    bool initialized;
+    cupolas_thread_t async_thread;
+    bool async_running;
+    async_request_t *async_queue_head;
+    async_request_t *async_queue_tail;
+};
+
+// ============================================================================
+// 静态辅助函数
+// ============================================================================
+
+static void *guard_async_worker(void *arg);
+
+// 生成唯一守卫ID
+static guard_id_t generate_guard_id(guard_manager_private_t *manager)
+{
+    cupolas_mutex_lock(&manager->lock);
+    guard_id_t id = ++manager->next_guard_id;
+    cupolas_mutex_unlock(&manager->lock);
+    return id;
+}
+
+// 查找守卫索引（按ID）
+static size_t find_guard_index_by_id(guard_manager_private_t *manager, guard_id_t guard_id)
+{
+    for (size_t i = 0; i < manager->guard_count; i++) {
+        if (manager->guards[i] && manager->guards[i]->id == guard_id) {
+            return i;
+        }
+    }
+    return SIZE_MAX;
+}
+
+// 查找守卫索引（按名称）
+static size_t find_guard_index_by_name(guard_manager_private_t *manager, const char *name)
+{
+    if (!name)
+        return SIZE_MAX;
+
+    for (size_t i = 0; i < manager->guard_count; i++) {
+        if (manager->guards[i] && strcmp(manager->guards[i]->name, name) == 0) {
+            return i;
+        }
+    }
+    return SIZE_MAX;
+}
+
+// 比较守卫优先级（用于排序）
+static int compare_guard_priority(const void *a, const void *b)
+{
+    const guard_t *guard_a = *(const guard_t **)a;
+    const guard_t *guard_b = *(const guard_t **)b;
+
+    // 按优先级降序排列（优先级高的先检测）
+    if (guard_a->priority > guard_b->priority)
+        return AGENTRT_ERR_UNKNOWN;
+    if (guard_a->priority < guard_b->priority)
+        return 1;
+    return 0;
+}
+
+// 排序守卫数组（按优先级）
+static void sort_guards_by_priority(guard_manager_private_t *manager)
+{
+    if (manager->guard_count < 2)
+        return;
+
+    qsort(manager->guards, manager->guard_count, sizeof(guard_t *), compare_guard_priority);
+}
+
+// 前向声明
+static void free_guard_context(guard_context_t *context);
+
+// 复制检测上下文 - [INFRA] 保留供未来守卫上下文复制使用
+static guard_context_t *copy_guard_context(const guard_context_t *src)
+{
+    if (!src)
+        return NULL;
+
+    guard_context_t *dst = (guard_context_t *)AGENTRT_CALLOC(1, sizeof(guard_context_t));
+    if (!dst)
+        return NULL;
+
+    // 复制字符串字段（如果非NULL）
+    if (src->operation)
+        dst->operation = AGENTRT_STRDUP(src->operation);
+    if (src->resource)
+        dst->resource = AGENTRT_STRDUP(src->resource);
+    if (src->agent_id)
+        dst->agent_id = AGENTRT_STRDUP(src->agent_id);
+    if (src->session_id)
+        dst->session_id = AGENTRT_STRDUP(src->session_id);
+
+    // 复制输入数据（SEC-02: 前置大小校验防缓冲区溢出）
+    if (src->input_data && src->input_size > 0) {
+        if (src->input_size > GUARD_MAX_INPUT_SIZE) {
+            agentrt_error_push_ex(cupolas_ERROR_OVERFLOW, __FILE__, __LINE__, __func__,
+                                  "copy_guard_context: input_size %zu exceeds max %zu",
+                                  src->input_size, (size_t)GUARD_MAX_INPUT_SIZE);
+            free_guard_context(dst);
+            return NULL;
+        }
+        dst->input_data = AGENTRT_MALLOC(src->input_size);
+        if (dst->input_data) {
+            __builtin_memcpy(dst->input_data, src->input_data, src->input_size);
+            dst->input_size = src->input_size;
+        }
+    }
+
+    // 注意：context_data不复制，由调用者管理
+    dst->context_data = src->context_data;
+    dst->timestamp = src->timestamp;
+
+    return dst;
+}
+
+// 释放检测上下文 - [INFRA] 保留供未来守卫上下文释放使用
+static void free_guard_context(guard_context_t *context)
+{
+    if (!context)
+        return;
+
+    if (context->operation)
+        AGENTRT_FREE((void *)context->operation);
+    if (context->resource)
+        AGENTRT_FREE((void *)context->resource);
+    if (context->agent_id)
+        AGENTRT_FREE((void *)context->agent_id);
+    if (context->session_id)
+        AGENTRT_FREE((void *)context->session_id);
+    if (context->input_data)
+        AGENTRT_FREE(context->input_data);
+
+    AGENTRT_FREE(context);
+}
+
+// ============================================================================
+// 守卫管理器API实现
+// ============================================================================
+
+guard_manager_t *guard_manager_create(const guard_manager_config_t *config)
+{
+    if (!config)
+        return NULL;
+
+    // 分配管理器内存
+    guard_manager_private_t *manager =
+        (guard_manager_private_t *)AGENTRT_CALLOC(1, sizeof(guard_manager_private_t));
+    if (!manager)
+        return NULL;
+
+    // 复制配置
+    manager->config = *config;
+
+    // 设置默认值
+    if (manager->config.max_guards == 0) {
+        manager->config.max_guards = 32;
+    }
+    if (manager->config.default_timeout_ms == 0) {
+        manager->config.default_timeout_ms = 5000;  // 5秒
+    }
+
+    // 分配守卫数组
+    manager->guard_capacity = manager->config.max_guards;
+    manager->guards = (guard_t **)AGENTRT_CALLOC(manager->guard_capacity, sizeof(guard_t *));
+    if (!manager->guards) {
+        AGENTRT_FREE(manager);
+        return NULL;
+    }
+
+    // 初始化锁和条件变量
+    if (cupolas_mutex_init(&manager->lock) != CUPOLAS_OK) {
+        AGENTRT_FREE(manager->guards);
+        AGENTRT_FREE(manager);
+        return NULL;
+    }
+
+    if (cupolas_cond_init(&manager->cond) != CUPOLAS_OK) {
+        cupolas_mutex_destroy(&manager->lock);
+        AGENTRT_FREE(manager->guards);
+        AGENTRT_FREE(manager);
+        return NULL;
+    }
+
+    // 初始化统计信息
+    __builtin_memset(&manager->stats, 0, sizeof(manager->stats));
+
+    manager->next_guard_id = 1000;  // 起始ID
+    manager->initialized = true;
+
+    return (guard_manager_t *)manager;
+}
+
+void guard_manager_destroy(guard_manager_t *manager)
+{
+    if (!manager)
+        return;
+
+    guard_manager_private_t *priv = (guard_manager_private_t *)manager;
+
+    if (priv->async_running) {
+        cupolas_mutex_lock(&priv->lock);
+        priv->async_running = false;
+        cupolas_cond_signal(&priv->cond);
+        cupolas_mutex_unlock(&priv->lock);
+        cupolas_thread_join(priv->async_thread, NULL);
+    }
+
+    for (size_t i = 0; i < priv->guard_count; i++) {
+        if (priv->guards[i]) {
+            guard_destroy(priv->guards[i]);
+        }
+    }
+
+    cupolas_mutex_destroy(&priv->lock);
+    cupolas_cond_destroy(&priv->cond);
+
+    // 释放内存
+    AGENTRT_FREE(priv->guards);
+    AGENTRT_FREE(priv);
+}
+
+int guard_manager_register_guard(guard_manager_t *manager, guard_t *guard)
+{
+    if (!manager || !guard)
+        return cupolas_ERROR_INVALID_ARG;
+
+    guard_manager_private_t *priv = (guard_manager_private_t *)manager;
+
+    cupolas_mutex_lock(&priv->lock);
+
+    // 检查容量
+    if (priv->guard_count >= priv->guard_capacity) {
+        cupolas_mutex_unlock(&priv->lock);
+        return cupolas_ERROR_NO_MEMORY;
+    }
+
+    // 检查名称是否重复
+    if (find_guard_index_by_name(priv, guard->name) != SIZE_MAX) {
+        cupolas_mutex_unlock(&priv->lock);
+        return cupolas_ERROR_BUSY;
+    }
+
+    // 分配ID
+    guard->id = generate_guard_id(priv);
+
+    // 添加到数组
+    priv->guards[priv->guard_count++] = guard;
+
+    // 按优先级排序
+    if (priv->config.enable_priority_scheduling) {
+        sort_guards_by_priority(priv);
+    }
+
+    cupolas_mutex_unlock(&priv->lock);
+
+    return CUPOLAS_OK;
+}
+
+int guard_manager_unregister_guard(guard_manager_t *manager, guard_id_t guard_id)
+{
+    if (!manager || guard_id == 0)
+        return cupolas_ERROR_INVALID_ARG;
+
+    guard_manager_private_t *priv = (guard_manager_private_t *)manager;
+
+    cupolas_mutex_lock(&priv->lock);
+
+    size_t index = find_guard_index_by_id(priv, guard_id);
+    if (index == SIZE_MAX) {
+        cupolas_mutex_unlock(&priv->lock);
+        return cupolas_ERROR_NOT_FOUND;
+    }
+
+    // 移除守卫
+    guard_t *guard = priv->guards[index];
+
+    // 移动后续元素
+    for (size_t i = index; i < priv->guard_count - 1; i++) {
+        priv->guards[i] = priv->guards[i + 1];
+    }
+    priv->guard_count--;
+
+    cupolas_mutex_unlock(&priv->lock);
+
+    // 销毁守卫
+    guard_destroy(guard);
+
+    return CUPOLAS_OK;
+}
+
+guard_t *guard_manager_find_guard_by_name(guard_manager_t *manager, const char *name)
+{
+    if (!manager || !name)
+        return NULL;
+
+    guard_manager_private_t *priv = (guard_manager_private_t *)manager;
+
+    cupolas_mutex_lock(&priv->lock);
+    size_t index = find_guard_index_by_name(priv, name);
+    guard_t *guard = (index != SIZE_MAX) ? priv->guards[index] : NULL;
+    cupolas_mutex_unlock(&priv->lock);
+
+    return guard;
+}
+
+guard_t *guard_manager_find_guard_by_id(guard_manager_t *manager, guard_id_t id)
+{
+    if (!manager || id == 0)
+        return NULL;
+
+    guard_manager_private_t *priv = (guard_manager_private_t *)manager;
+
+    cupolas_mutex_lock(&priv->lock);
+    size_t index = find_guard_index_by_id(priv, id);
+    guard_t *guard = (index != SIZE_MAX) ? priv->guards[index] : NULL;
+    cupolas_mutex_unlock(&priv->lock);
+
+    return guard;
+}
+
+int guard_manager_check_sync(guard_manager_t *manager, const guard_context_t *context,
+                             guard_result_t *results, size_t max_results, size_t *actual_results)
+{
+    if (!manager || !context || !results || !actual_results) {
+        return cupolas_ERROR_INVALID_ARG;
+    }
+
+    guard_manager_private_t *priv = (guard_manager_private_t *)manager;
+
+    cupolas_mutex_lock(&priv->lock);
+
+    // 更新统计信息
+    priv->stats.total_checks++;
+
+    // 执行每个守卫的检测
+    size_t result_count = 0;
+    uint64_t start_time = cupolas_get_timestamp_ns();
+
+    for (size_t i = 0; i < priv->guard_count && result_count < max_results; i++) {
+        guard_t *guard = priv->guards[i];
+
+        // 只检测启用的守卫
+        if (!guard || guard->state != GUARD_STATE_ENABLED) {
+            continue;
+        }
+
+        // 执行检测
+        guard_result_t result;
+        __builtin_memset(&result, 0, sizeof(result));
+
+        int check_result = guard_check(guard, context, &result);
+        if (check_result == CUPOLAS_OK) {
+            if (result_count < max_results) {
+                results[result_count] = result;
+                result_count++;
+
+                if (result.risk_level == RISK_LEVEL_SAFE) {
+                    priv->stats.safe_checks++;
+                } else {
+                    priv->stats.risky_checks++;
+
+                    if (result.recommended_action == GUARD_ACTION_BLOCK ||
+                        result.recommended_action == GUARD_ACTION_ISOLATE ||
+                        result.recommended_action == GUARD_ACTION_TERMINATE) {
+                        priv->stats.blocked_operations++;
+                    } else if (result.recommended_action == GUARD_ACTION_WARN) {
+                        priv->stats.warning_operations++;
+                    }
+                }
+            }
+        } else {
+            priv->stats.error_checks++;
+        }
+
+        uint64_t current_time = cupolas_get_timestamp_ns();
+        uint64_t elapsed = current_time - start_time;
+        const uint64_t TIMEOUT_THRESHOLD_NS = 100000000ULL;
+
+        if (elapsed > TIMEOUT_THRESHOLD_NS) {
+            priv->stats.timeout_checks++;
+            size_t remaining = priv->guard_count - i - 1;
+            if (remaining > 0) {
+                AGENTRT_LOG_WARN("[GUARD] Check timeout after %zu/%zu guards (%llu ms)", i + 1,
+                           priv->guard_count, (unsigned long long)(elapsed / 1000000ULL));
+            }
+            break;
+        }
+    }
+
+    uint64_t end_time = cupolas_get_timestamp_ns();
+    uint64_t detection_time = end_time - start_time;
+
+    // 更新检测时间统计
+    priv->stats.total_detection_time += detection_time;
+    if (detection_time > priv->stats.max_detection_time) {
+        priv->stats.max_detection_time = detection_time;
+    }
+
+    *actual_results = result_count;
+
+    cupolas_mutex_unlock(&priv->lock);
+
+    return CUPOLAS_OK;
+}
+
+uint64_t guard_manager_check_async(guard_manager_t *manager, const guard_context_t *context,
+                                   void (*callback)(uint64_t request_id,
+                                                    const guard_result_t *results, size_t count,
+                                                    void *user_data),
+                                   void *user_data)
+{
+    if (!manager || !context || !callback)
+        return 0;
+
+    guard_manager_private_t *priv = (guard_manager_private_t *)manager;
+
+    static atomic_uint64_t next_request_id = 1;
+    uint64_t request_id = atomic_fetch_add_explicit(&next_request_id, 1, memory_order_relaxed);
+
+    async_request_t *req = (async_request_t *)AGENTRT_CALLOC(1, sizeof(async_request_t));
+    if (!req)
+        return 0;
+
+    req->request_id = request_id;
+    req->manager = priv;
+    req->results = (guard_result_t *)AGENTRT_CALLOC(16, sizeof(guard_result_t));
+    if (!req->results) {
+        AGENTRT_FREE(req);
+        return 0;
+    }
+    req->max_results = 16;
+    req->actual_results = 0;
+    req->callback = callback;
+    req->user_data = user_data;
+    req->next = NULL;
+
+    guard_context_t *ctx_copy = copy_guard_context(context);
+    if (ctx_copy) {
+        req->context = *ctx_copy;
+        AGENTRT_FREE(ctx_copy);
+    }
+
+    cupolas_mutex_lock(&priv->lock);
+
+    if (!priv->async_running) {
+        priv->async_running = true;
+        cupolas_thread_create(&priv->async_thread, guard_async_worker, priv);
+    }
+
+    if (priv->async_queue_tail) {
+        priv->async_queue_tail->next = req;
+    } else {
+        priv->async_queue_head = req;
+    }
+    priv->async_queue_tail = req;
+
+    cupolas_cond_signal(&priv->cond);
+    cupolas_mutex_unlock(&priv->lock);
+
+    return request_id;
+}
+
+static void *guard_async_worker(void *arg)
+{
+    guard_manager_private_t *priv = (guard_manager_private_t *)arg;
+
+    cupolas_mutex_lock(&priv->lock);
+
+    while (priv->async_running || priv->async_queue_head) {
+        while (!priv->async_queue_head && priv->async_running) {
+            cupolas_cond_wait(&priv->cond, &priv->lock);
+        }
+
+        async_request_t *req = priv->async_queue_head;
+        if (!req)
+            continue;
+
+        priv->async_queue_head = req->next;
+        if (!priv->async_queue_head)
+            priv->async_queue_tail = NULL;
+
+        cupolas_mutex_unlock(&priv->lock);
+
+        int result = guard_manager_check_sync((guard_manager_t *)priv, &req->context, req->results,
+                                              req->max_results, &req->actual_results);
+
+        if (result == CUPOLAS_OK && req->callback) {
+            req->callback(req->request_id, req->results, req->actual_results, req->user_data);
+        }
+
+        free_guard_context(&req->context);
+        AGENTRT_FREE(req->results);
+        AGENTRT_FREE(req);
+
+        cupolas_mutex_lock(&priv->lock);
+    }
+
+    cupolas_mutex_unlock(&priv->lock);
+    return NULL;
+}
+
+int guard_manager_get_stats(guard_manager_t *manager, guard_stats_t *stats)
+{
+    if (!manager || !stats)
+        return cupolas_ERROR_INVALID_ARG;
+
+    guard_manager_private_t *priv = (guard_manager_private_t *)manager;
+
+    cupolas_mutex_lock(&priv->lock);
+    *stats = priv->stats;
+    cupolas_mutex_unlock(&priv->lock);
+
+    return CUPOLAS_OK;
+}
+
+int guard_manager_reset_stats(guard_manager_t *manager)
+{
+    if (!manager)
+        return cupolas_ERROR_INVALID_ARG;
+
+    guard_manager_private_t *priv = (guard_manager_private_t *)manager;
+
+    cupolas_mutex_lock(&priv->lock);
+    __builtin_memset(&priv->stats, 0, sizeof(priv->stats));
+    cupolas_mutex_unlock(&priv->lock);
+
+    return CUPOLAS_OK;
+}
+
+// ============================================================================
+// 守卫实例管理API实现
+// ============================================================================
+
+guard_t *guard_create(const char *name, const char *description, guard_type_t type,
+                      const guard_ops_t *ops)
+{
+    if (!name || !ops)
+        return NULL;
+
+    // 分配守卫内存
+    guard_t *guard = (guard_t *)AGENTRT_CALLOC(1, sizeof(guard_t));
+    if (!guard)
+        return NULL;
+
+    // 复制名称和描述
+    AGENTRT_STRNCPY_TERM(guard->name, name, GUARD_NAME_MAX_LEN);
+    if (description) {
+        AGENTRT_STRNCPY_TERM(guard->description, description, GUARD_DESC_MAX_LEN);
+    }
+
+    // 设置基本属性
+    guard->type = type;
+    guard->state = GUARD_STATE_DISABLED;
+    guard->priority = GUARD_PRIORITY_NORMAL;
+
+    // 复制操作函数表
+    guard->ops = (guard_ops_t *)AGENTRT_MALLOC(sizeof(guard_ops_t));
+    if (!guard->ops) {
+        AGENTRT_FREE(guard);
+        return NULL;
+    }
+    __builtin_memcpy(guard->ops, ops, sizeof(guard_ops_t));
+
+    // 初始化统计信息
+    __builtin_memset(&guard->stats, 0, sizeof(guard->stats));
+
+    guard->created_time = cupolas_get_timestamp_ns();
+
+    return guard;
+}
+
+void guard_destroy(guard_t *guard)
+{
+    if (!guard)
+        return;
+
+    // 调用清理函数
+    if (guard->ops && guard->ops->cleanup) {
+        guard->ops->cleanup(guard->priv_data);
+    }
+
+    // 清理操作函数表
+    if (guard->ops)
+        AGENTRT_FREE(guard->ops);
+
+    // 清理私有数据
+    if (guard->priv_data)
+        AGENTRT_FREE(guard->priv_data);
+
+    // 清理配置中的自定义数据
+    if (guard->config.custom_config)
+        AGENTRT_FREE(guard->config.custom_config);
+
+    AGENTRT_FREE(guard);
+}
+
+int guard_init(guard_t *guard, const guard_config_t *config)
+{
+    if (!guard || !config || !guard->ops)
+        return cupolas_ERROR_INVALID_ARG;
+
+    // 复制配置
+    guard->config = *config;
+
+    // 复制自定义配置数据（SEC-02: 前置大小校验防缓冲区溢出）
+    if (config->custom_config && config->custom_config_size > 0) {
+        if (config->custom_config_size > GUARD_MAX_CUSTOM_CONFIG_SIZE) {
+            agentrt_error_push_ex(cupolas_ERROR_OVERFLOW, __FILE__, __LINE__, __func__,
+                                  "guard_init: custom_config_size %zu exceeds max %zu",
+                                  config->custom_config_size, (size_t)GUARD_MAX_CUSTOM_CONFIG_SIZE);
+            return cupolas_ERROR_INVALID_ARG;
+        }
+        guard->config.custom_config = AGENTRT_MALLOC(config->custom_config_size);
+        if (!guard->config.custom_config)
+            return cupolas_ERROR_NO_MEMORY;
+        __builtin_memcpy(guard->config.custom_config, config->custom_config, config->custom_config_size);
+    }
+
+    // 调用守卫初始化函数
+    if (guard->ops->init) {
+        int result = guard->ops->init(guard->priv_data, config);
+        if (result != CUPOLAS_OK) {
+            AGENTRT_FREE(guard->config.custom_config);
+            guard->config.custom_config = NULL;
+            return result;
+        }
+    }
+
+    guard->state = GUARD_STATE_ENABLED;
+
+    return CUPOLAS_OK;
+}
+
+int guard_check(guard_t *guard, const guard_context_t *context, guard_result_t *result)
+{
+    if (!guard || !context || !result || !guard->ops)
+        return cupolas_ERROR_INVALID_ARG;
+
+    // 检查守卫状态
+    if (guard->state != GUARD_STATE_ENABLED && guard->state != GUARD_STATE_ACTIVE) {
+        return cupolas_ERROR_BUSY;
+    }
+
+    // 更新最后使用时间
+    guard->last_used_time = cupolas_get_timestamp_ns();
+
+    // 调用检测函数
+    if (!guard->ops->check)
+        return cupolas_ERROR_NOT_SUPPORTED;
+
+    uint64_t start_time = cupolas_get_timestamp_ns();
+    int check_result = guard->ops->check(guard->priv_data, context, result);
+    uint64_t end_time = cupolas_get_timestamp_ns();
+
+    // 更新统计信息
+    guard->stats.total_checks++;
+    guard->stats.total_detection_time += (end_time - start_time);
+
+    if (check_result == CUPOLAS_OK) {
+        // 更新检测时间
+        result->detection_time = end_time - start_time;
+
+        // 更新风险统计
+        if (result->risk_level == RISK_LEVEL_SAFE) {
+            guard->stats.safe_checks++;
+        } else {
+            guard->stats.risky_checks++;
+        }
+    }
+
+    return check_result;
+}
+
+int guard_enable(guard_t *guard)
+{
+    if (!guard)
+        return cupolas_ERROR_INVALID_ARG;
+
+    guard->state = GUARD_STATE_ENABLED;
+    return CUPOLAS_OK;
+}
+
+int guard_disable(guard_t *guard)
+{
+    if (!guard)
+        return cupolas_ERROR_INVALID_ARG;
+
+    guard->state = GUARD_STATE_DISABLED;
+    return CUPOLAS_OK;
+}
+
+int guard_update_rules(guard_t *guard, const guard_rule_t *rules, size_t count)
+{
+    if (!guard || !rules || count == 0)
+        return cupolas_ERROR_INVALID_ARG;
+
+    if (!guard->ops || !guard->ops->update_rules) {
+        return cupolas_ERROR_NOT_SUPPORTED;
+    }
+
+    return guard->ops->update_rules(guard->priv_data, rules, count);
+}
+
+int guard_get_stats(guard_t *guard, guard_stats_t *stats)
+{
+    if (!guard || !stats)
+        return cupolas_ERROR_INVALID_ARG;
+
+    *stats = guard->stats;
+    return CUPOLAS_OK;
+}
+
+int guard_reset_stats(guard_t *guard)
+{
+    if (!guard)
+        return cupolas_ERROR_INVALID_ARG;
+
+    __builtin_memset(&guard->stats, 0, sizeof(guard->stats));
+    return CUPOLAS_OK;
+}

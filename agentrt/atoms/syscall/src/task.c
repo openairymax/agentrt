@@ -1,0 +1,327 @@
+/**
+ * @file task.c
+ * @brief 任务管理系统调用实现
+ * @copyright (c) 2026 SPHARX. All Rights Reserved.
+ */
+
+#include "../../memory/src/memory_provider.h"
+#include "syscalls.h"
+extern void agentrt_sys_set_memory_provider(void *provider);
+#include "../../coreloopthree/include/cognition.h"
+#include "../../coreloopthree/include/execution.h"
+#include "agentrt.h"
+#include "logger.h"
+
+#include <stdlib.h>
+
+/* Unified base library compatibility layer */
+#include "memory_compat.h"
+#include "string_compat.h"
+
+#include <errno.h>
+#include <string.h>
+
+/* JSON解析库 - 必需依赖（SEC-017: 禁止桩函数） */
+#ifndef AGENTRT_HAS_CJSON
+#include <cjson/cJSON.h>
+#else
+#include <cjson/cJSON.h>
+#include "error.h"
+#endif
+
+#define TASK_RET_ERR(c) \
+    do { agentrt_error_push_ex((c), __FILE__, __LINE__, __func__, "%s", \
+         agentrt_error_str(c)); return (c); } while(0)
+
+static agentrt_cognition_engine_t *g_cognition = NULL;
+static agentrt_execution_engine_t *g_execution = NULL;
+
+void agentrt_sys_init(void *cognition, void *execution, void *memory)
+{
+    g_cognition = (agentrt_cognition_engine_t *)cognition;
+    g_execution = (agentrt_execution_engine_t *)execution;
+    if (memory) {
+        agentrt_sys_set_memory_provider(memory);
+    }
+}
+
+/* -------------------- 辅助函数 -------------------- */
+
+/**
+ * 构建节点名到索引的映射表
+ */
+static cJSON *build_name_to_index_map(agentrt_task_plan_t *plan, size_t n)
+{
+    cJSON *name_to_idx = cJSON_CreateObject();
+    if (!name_to_idx) {
+        AGENTRT_ERROR_NULL(AGENTRT_ERR_UNKNOWN, "validation failed");
+    }
+
+    for (size_t i = 0; i < n; i++) {
+        char idx_str[24];
+        snprintf(idx_str, sizeof(idx_str), "%zu", i);
+        cJSON_AddStringToObject(name_to_idx, plan->task_plan_nodes[i]->task_node_id, idx_str);
+    }
+    return name_to_idx;
+}
+
+/**
+ * 计算每个节点的入度
+ */
+static int *calculate_indegrees(cJSON *name_to_idx, agentrt_task_plan_t *plan, size_t n)
+{
+    int *indeg = (int *)AGENTRT_CALLOC(n, sizeof(int));
+    if (!indeg) {
+        AGENTRT_ERROR_NULL(AGENTRT_ERR_UNKNOWN, "validation failed");
+    }
+
+    for (size_t i = 0; i < n; i++) {
+        agentrt_task_node_t *node = plan->task_plan_nodes[i];
+        for (size_t j = 0; j < node->task_node_depends_count; j++) {
+            cJSON *dep_idx = cJSON_GetObjectItem(name_to_idx, node->task_node_depends_on[j]);
+            if (dep_idx && cJSON_IsString(dep_idx)) {
+                int idx = (int)strtol(dep_idx->valuestring, NULL, 10);
+                if (idx >= 0 && idx < (int)n)
+                    indeg[idx]++;
+            } else {
+                AGENTRT_LOG_WARN("Dependency %s not found in plan", node->task_node_depends_on[j]);
+            }
+        }
+    }
+    return indeg;
+}
+
+/**
+ * 执行Kahn拓扑排序算法
+ * 返回队列指针（需要释放），失败时返回NULL
+ */
+static int *kahn_algorithm(cJSON *name_to_idx, int *indeg, agentrt_task_plan_t *plan, size_t n,
+                           int *order, size_t *pos)
+{
+    int *queue;
+    SAFE_MALLOC_ARRAY(queue, n, sizeof(int));
+    if (!queue) {
+        AGENTRT_ERROR_NULL(AGENTRT_ERR_UNKNOWN, "validation failed");
+    }
+
+    int qhead = 0, qtail = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (indeg[i] == 0)
+            queue[qtail++] = i;
+    }
+
+    while (qhead < qtail) {
+        int u = queue[qhead++];
+        order[(*pos)++] = u;
+        agentrt_task_node_t *node = plan->task_plan_nodes[u];
+
+        for (size_t j = 0; j < node->task_node_depends_count; j++) {
+            cJSON *dep_idx = cJSON_GetObjectItem(name_to_idx, node->task_node_depends_on[j]);
+            if (dep_idx && cJSON_IsString(dep_idx)) {
+                char *endptr;
+                errno = 0;
+                long v_val = strtol(dep_idx->valuestring, &endptr, 10);
+                if (endptr != dep_idx->valuestring && *endptr == '\0' && errno == 0 && v_val >= 0 &&
+                    v_val < (int)n) {
+                    int v = (int)v_val;
+                    if (--indeg[v] == 0) {
+                        if (qtail >= (int)n) {
+                            AGENTRT_LOG_ERROR("Topological sort queue overflow during processing");
+                            AGENTRT_FREE(queue);
+                            AGENTRT_ERROR_NULL(AGENTRT_ERR_OVERFLOW, "limit exceeded");
+                        }
+                        queue[qtail++] = v;
+                    }
+                } else {
+                    AGENTRT_LOG_WARN("Invalid dependency index: %s", dep_idx->valuestring);
+                }
+            }
+        }
+    }
+    return queue;
+}
+
+/**
+ * 拓扑排序：根据依赖关系返回可执行的任务顺序（假设任务图无环）
+ * 返回节点索引数组，需调用者释放
+ */
+static int *topological_sort(agentrt_task_plan_t *plan, size_t *out_count)
+{
+    size_t n = plan->task_plan_node_count;
+    int *order;
+    SAFE_MALLOC_ARRAY(order, n, sizeof(int));
+    if (!order) {
+        AGENTRT_ERROR_NULL(AGENTRT_ERR_UNKNOWN, "validation failed");
+    }
+
+    cJSON *name_to_idx = build_name_to_index_map(plan, n);
+    if (!name_to_idx) {
+        AGENTRT_FREE(order);
+        AGENTRT_ERROR_NULL(AGENTRT_ERR_INVALID_PARAM, "null parameter");
+    }
+
+    int *indeg = calculate_indegrees(name_to_idx, plan, n);
+    if (!indeg) {
+        cJSON_Delete(name_to_idx);
+        AGENTRT_FREE(order);
+        AGENTRT_ERROR_NULL(AGENTRT_ERR_INVALID_PARAM, "null parameter");
+    }
+
+    size_t pos = 0;
+    int *queue = kahn_algorithm(name_to_idx, indeg, plan, n, order, &pos);
+    if (!queue) {
+        cJSON_Delete(name_to_idx);
+        AGENTRT_FREE(indeg);
+        AGENTRT_FREE(order);
+        AGENTRT_ERROR_NULL(AGENTRT_ERR_INVALID_PARAM, "null parameter");
+    }
+
+    AGENTRT_FREE(queue);
+    cJSON_Delete(name_to_idx);
+    AGENTRT_FREE(indeg);
+
+    if (pos != n) {
+        // 有环
+        AGENTRT_FREE(order);
+        AGENTRT_ERROR_NULL(AGENTRT_ERR_UNKNOWN, "validation failed");
+    }
+    *out_count = n;
+    return order;
+}
+
+/**
+ * 执行单个任务节点，返回输出字符串（需释放?
+ */
+static char *execute_node(agentrt_task_node_t *node, uint32_t timeout_ms)
+{
+    agentrt_task_t task;
+    __builtin_memset(&task, 0, sizeof(task));
+    task.task_agent_id = node->task_node_agent_role;
+    task.task_input = node->task_node_input;
+    task.task_timeout_ms = node->task_node_timeout_ms ? node->task_node_timeout_ms : timeout_ms;
+
+    char *task_id = NULL;
+    agentrt_error_t err = agentrt_execution_submit(g_execution, &task, &task_id);
+    if (err != AGENTRT_SUCCESS) {
+        AGENTRT_LOG_ERROR("Failed to submit node %s", node->task_node_id);
+        AGENTRT_ERROR_NULL(AGENTRT_ERR_UNKNOWN, "validation failed");
+    }
+
+    agentrt_task_t *result_task = NULL;
+    err = agentrt_execution_wait(g_execution, task_id, timeout_ms, &result_task);
+    AGENTRT_FREE(task_id);
+    if (err != AGENTRT_SUCCESS || !result_task) {
+        AGENTRT_LOG_ERROR("Node %s execution failed", node->task_node_id);
+        AGENTRT_ERROR_NULL(AGENTRT_ERR_INVALID_PARAM, "null parameter");
+    }
+
+    char *output = NULL;
+    if (result_task->task_output) {
+        output = AGENTRT_STRDUP((char *)result_task->task_output);
+    } else {
+        output = AGENTRT_STRDUP("");
+    }
+    if (!output) {
+        agentrt_task_free(result_task);
+        AGENTRT_ERROR_NULL(AGENTRT_ERR_INVALID_PARAM, "null parameter");
+    }
+    agentrt_task_free(result_task);
+    return output;
+}
+
+/* -------------------- 公共接口 -------------------- */
+
+agentrt_error_t agentrt_sys_task_submit(const char *input, size_t input_len, uint32_t timeout_ms,
+                                        char **out_result)
+{
+    if (!input || !out_result)
+        TASK_RET_ERR(AGENTRT_EINVAL);
+    if (!g_cognition || !g_execution)
+        TASK_RET_ERR(AGENTRT_ENOTINIT);
+
+    agentrt_task_plan_t *plan = NULL;
+    agentrt_error_t err = agentrt_cognition_process(g_cognition, input, input_len, &plan);
+    if (err != AGENTRT_SUCCESS)
+        return err;
+    if (!plan || plan->task_plan_node_count == 0) {
+        agentrt_task_plan_free(plan);
+        TASK_RET_ERR(AGENTRT_EINVAL);
+    }
+
+    // 拓扑排序
+    size_t order_count = 0;
+    int *order = topological_sort(plan, &order_count);
+    if (!order) {
+        agentrt_task_plan_free(plan);
+        TASK_RET_ERR(AGENTRT_EINVAL);
+    }
+
+    // 按顺序执行节?
+    cJSON *result_obj = cJSON_CreateObject();
+    for (size_t i = 0; i < order_count; i++) {
+        int idx = order[i];
+        agentrt_task_node_t *node = plan->task_plan_nodes[idx];
+        char *output = execute_node(node, timeout_ms);
+        if (output) {
+            cJSON_AddStringToObject(result_obj, node->task_node_id, output);
+            AGENTRT_FREE(output);
+        } else {
+            cJSON_AddStringToObject(result_obj, node->task_node_id, "ERROR");
+        }
+    }
+    AGENTRT_FREE(order);
+    agentrt_task_plan_free(plan);
+
+    char *json = cJSON_PrintUnformatted(result_obj);
+    cJSON_Delete(result_obj);
+    if (!json)
+        TASK_RET_ERR(AGENTRT_ENOMEM);
+    *out_result = json;
+    return AGENTRT_SUCCESS;
+}
+
+agentrt_error_t agentrt_sys_task_query(const char *task_id, int *out_status)
+{
+    if (!task_id || !out_status)
+        TASK_RET_ERR(AGENTRT_EINVAL);
+    if (!g_execution)
+        TASK_RET_ERR(AGENTRT_ENOTINIT);
+    agentrt_task_status_t status;
+    agentrt_error_t err = agentrt_execution_query(g_execution, task_id, &status);
+    if (err == AGENTRT_SUCCESS) {
+        *out_status = (int)status;
+    }
+    return err;
+}
+
+agentrt_error_t agentrt_sys_task_wait(const char *task_id, uint32_t timeout_ms, char **out_result)
+{
+    if (!task_id || !out_result)
+        TASK_RET_ERR(AGENTRT_EINVAL);
+    if (!g_execution)
+        TASK_RET_ERR(AGENTRT_ENOTINIT);
+    agentrt_task_t *result_task = NULL;
+    agentrt_error_t err = agentrt_execution_wait(g_execution, task_id, timeout_ms, &result_task);
+    if (err == AGENTRT_SUCCESS && result_task) {
+        if (result_task->task_output) {
+            *out_result = AGENTRT_STRDUP((char *)result_task->task_output);
+        } else {
+            *out_result = AGENTRT_STRDUP("");
+        }
+        if (!*out_result) {
+            agentrt_task_free(result_task);
+            TASK_RET_ERR(AGENTRT_ENOMEM);
+        }
+        agentrt_task_free(result_task);
+    }
+    return err;
+}
+
+agentrt_error_t agentrt_sys_task_cancel(const char *task_id)
+{
+    if (!task_id)
+        TASK_RET_ERR(AGENTRT_EINVAL);
+    if (!g_execution)
+        TASK_RET_ERR(AGENTRT_ENOTINIT);
+    return agentrt_execution_cancel(g_execution, task_id);
+}

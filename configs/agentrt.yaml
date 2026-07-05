@@ -1,0 +1,164 @@
+# agentrt.yaml — AgentRT 统一配置 (v0.1.1)
+# 所有子系统通过此文件统一配置
+# 环境变量覆盖优先级: AGENTRT_* 环境变量 > agentrt.yaml > 默认值
+
+version: "0.1.1"
+
+# ─── 内核配置 ───
+kernel:
+  name: "AgentRT-Core"
+  version: "0.1.1"
+  log_level: "info"
+  ipc:
+    max_message_size: 65536
+    shm_pool_size_mb: 128
+  scheduler:
+    max_tasks: 1024
+    default_priority: 50
+    time_slice_ms: 10
+  memory:
+    max_alloc_mb: 4096
+    oom_watermark_percent: 85
+    arena_default_size_kb: 64
+    pool_thread_cache_max: 256
+    slab_min_objs: 8
+    mempool_reserved_mb: 32
+    leak_scan_interval_sec: 60
+    soak_test_rss_growth_percent: 5
+    sensitive_zero_on_free: true
+    deferred_free_delay_ms: 1000
+  timer:
+    precision_ms: 1
+    max_timers: 10000
+  error:
+    verbose: false
+    retention_days: 30
+
+# ─── LLM 提供商配置 ───
+llm:
+  default_provider: "openai"
+  providers:
+    openai:
+      type: "openai"
+      api_key_env: "OPENAI_API_KEY"
+      base_url: "https://api.openai.com/v1"
+      models: ["gpt-4o", "gpt-4o-mini"]
+    anthropic:
+      type: "anthropic"
+      api_key_env: "ANTHROPIC_API_KEY"
+      models: ["claude-sonnet-4-20250514"]
+    deepseek:
+      type: "openai-compatible"
+      base_url: "https://api.deepseek.com/v1"
+      api_key_env: "DEEPSEEK_API_KEY"
+    google:
+      type: "google"
+      api_key_env: "GOOGLE_API_KEY"
+    local:
+      type: "ollama"
+      base_url: "http://localhost:11434"
+  routing:
+    strategy: "cost_aware"
+    fallback_chain: ["openai", "anthropic", "deepseek"]
+    cost_budget_daily_usd: 10.0
+  cache:
+    enabled: true
+    ttl_seconds: 3600
+    max_entries: 10000
+
+# ─── 记忆系统配置 ───
+memory:
+  enabled: true
+  mode: "full"
+  storage_path: "/var/lib/agentrt/memory"
+  layers:
+    l1:
+      compression: "zstd"
+    l2:
+      embedder: "openai"
+      embedding_dim: 1536
+    l3:
+      enabled: true
+      max_entities: 100000
+    l4:
+      enabled: true
+      clustering_algorithm: "hdbscan"
+
+# ─── 安全配置 (Cupolas) ───
+security:
+  enabled: true
+  mode: "standard"
+  default_policy: "deny"
+  rules: []
+  sandbox:
+    enabled: true
+    type: "seccomp"
+  permission:
+    model: "rbac"
+    cache_ttl_seconds: 300
+  audit:
+    enabled: true
+    log_path: "/var/log/agentos/audit.log"
+
+# ─── 多 Agent 配置 ───
+multi_agent:
+  enabled: false
+  max_concurrent_agents: 64
+  communication:
+    protocol: "a2a"
+  collaboration:
+    default_pattern: "orchestrator"
+  lanes:
+    enabled: true
+    default_isolation: "process"
+
+# ─── 网关配置 ───
+gateway:
+  enabled: true
+  http:
+    port: 8080
+  websocket:
+    enabled: true
+  mcp:
+    enabled: true
+    enable_progress: true
+    enable_cancellation: true
+  a2a:
+    enabled: true
+    default_timeout_ms: 60000
+  openai_compat:
+    enabled: true
+
+# ─── Hook 配置 ───
+hooks:
+  enabled: true
+  hook_dirs:
+    - "/etc/agentrt/hooks.d/"
+    - "~/.agentos/hooks/"
+  global_hooks:
+    on_tool_call:
+      - hook: "security_audit"
+        priority: 100
+
+# ─── 插件配置 ───
+plugins:
+  enabled: true
+  plugin_dirs:
+    - "/usr/lib/agentos/plugins/"
+    - "~/.agentos/plugins/"
+  auto_discover: true
+
+# ─── 可观测性配置 ───
+observability:
+  metrics:
+    enabled: true
+    port: 9090
+  tracing:
+    enabled: false
+    exporter: "otlp"
+  logging:
+    level: "info"
+    format: "json"
+  health:
+    endpoint: "/healthz"
+    ready_endpoint: "/readyz"
