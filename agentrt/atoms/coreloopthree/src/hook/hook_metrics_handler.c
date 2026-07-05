@@ -25,7 +25,7 @@
 
 #include "hook_builtin_handlers.h"
 #include "hook_registry.h"
-#include "svc_logger.h"
+#include <logging.h>
 
 #include <stdatomic.h>
 #include <stdio.h>
@@ -141,7 +141,7 @@ int hook_metrics_handler_register(void)
                                    NULL,   /* user_data */
                                    50,     /* priority — 中等，不与 audit(80)/trace(90) 冲突 */
                                    true) != 0) {
-            SVC_LOG_WARN("hook_metrics: failed to register %s (may already exist)", name);
+            LOG_WARN("hook_metrics: failed to register %s (may already exist)", name);
             /* 幂等：重名不视为致命错误 */
         }
     }

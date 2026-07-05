@@ -17,6 +17,7 @@
 #include "logger.h"
 #include "observability_compat.h"
 #include "syscalls.h"
+#include "trace.h"  /* agentrt_trace_span_get_* 访问器声明（修复 LTO type-mismatch） */
 
 #include <stdlib.h>
 #include <string.h>

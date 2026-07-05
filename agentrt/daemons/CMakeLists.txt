@@ -147,11 +147,6 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/market_d/include/
     FILES_MATCHING PATTERN "*.h"
 )
 
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/hook_d/include/
-    DESTINATION include/agentrt
-    FILES_MATCHING PATTERN "*.h"
-)
-
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/plugin_d/include/
     DESTINATION include/agentrt
     FILES_MATCHING PATTERN "*.h"

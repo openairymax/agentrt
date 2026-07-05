@@ -418,7 +418,6 @@ jobs:
                   -I ../../../agentrt/daemons/common/include \
                   -I ../../../agentrt/daemons/monit_d/include \
                   -I ../../../agentrt/daemons/gateway_d/include \
-                  -I ../../../agentrt/daemons/hook_d/include \
                   -I ../../../agentrt/commons/utils/memory/include \
                   -I ../../../agentrt/commons/utils/error/include \
                   -I ../../../agentrt/commons/platform/include \
