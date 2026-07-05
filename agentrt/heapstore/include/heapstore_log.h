@@ -1,0 +1,246 @@
+/**
+ * @file heapstore_log.h
+ * @brief AgentRT 数据分区日志管理接口
+ *
+ * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
+ * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+ *
+ * "From data intelligence emerges."
+ */
+
+// @owner: team-B
+#ifndef AGENTRT_HEAPSTORE_LOG_H
+#define AGENTRT_HEAPSTORE_LOG_H
+
+#include "heapstore.h"
+
+#include <stdarg.h>
+#include <time.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief 日志级别
+ */
+typedef enum {
+    HEAPSTORE_LOG_DEBUG = 0,
+    HEAPSTORE_LOG_INFO = 1,
+    HEAPSTORE_LOG_WARN = 2,
+    HEAPSTORE_LOG_ERROR = 3,
+    HEAPSTORE_LOG_FATAL = 4
+} heapstore_log_level_t;
+
+/**
+ * @brief 日志处理器类型
+ */
+typedef enum {
+    HEAPSTORE_LOG_HANDLER_FILE = 0,
+    HEAPSTORE_LOG_HANDLER_STDOUT = 1,
+    HEAPSTORE_LOG_HANDLER_STDERR = 2
+} heapstore_log_handler_type_t;
+
+/**
+ * @brief 日志文件信息
+ */
+typedef struct {
+    char path[512];
+    uint64_t size_bytes;
+    uint32_t line_count;
+    time_t created_at;
+    time_t modified_at;
+} heapstore_log_file_info_t;
+
+/* 共享类型已在 heapstore_types.h 中定义，此处仅用于 API 声明 */
+
+/**
+ * @brief 初始化日志系统
+ *
+ * @return heapstore_error_t 错误码
+ *
+ * @ownership 内部管理所有资源
+ * @threadsafe 否，不可多线程同时调用
+ * @reentrant 否
+ *
+ * @see heapstore_log_shutdown()
+ * @since v1.0.0
+ */
+heapstore_error_t heapstore_log_init(void);
+
+/**
+ * @brief 关闭日志系统
+ *
+ * @ownership 内部释放所有资源
+ * @threadsafe 否
+ * @reentrant 否
+ *
+ * @see heapstore_log_init()
+ * @since v1.0.0
+ */
+void heapstore_log_shutdown(void);
+
+/**
+ * @brief 写入日志
+ *
+ * @param level [in] 日志级别
+ * @param service [in] 服务名称
+ * @param trace_id [in] 追踪 ID（可为空）
+ * @param file [in] 文件名
+ * @param line [in] 行号
+ * @param format [in] 格式化字符串
+ * @param ... [in] 可变参数
+ *
+ * @ownership 调用者负责所有参数的生命周期
+ * @threadsafe 是
+ * @reentrant 否
+ *
+ * @note 通常使用宏 heapstore_LOG_* 代替直接调用
+ */
+void heapstore_log_write(heapstore_log_level_t level, const char *service, const char *trace_id,
+                         const char *file, int line, const char *format, ...);
+
+/**
+ * @brief 写入日志（va_list 版本）
+ *
+ * @param level [in] 日志级别
+ * @param service [in] 服务名称
+ * @param trace_id [in] 追踪 ID（可为空）
+ * @param file [in] 文件名
+ * @param line [in] 行号
+ * @param format [in] 格式化字符串
+ * @param args [in] va_list
+ *
+ * @ownership 调用者负责所有参数的生命周期
+ * @threadsafe 是
+ * @reentrant 否
+ */
+void heapstore_log_writev(heapstore_log_level_t level, const char *service, const char *trace_id,
+                          const char *file, int line, const char *format, va_list args);
+
+/**
+ * @brief 获取当前日志级别
+ *
+ * @return heapstore_log_level_t 当前日志级别
+ *
+ * @threadsafe 是
+ * @reentrant 是
+
+ * @since v1.0.0*/
+heapstore_log_level_t heapstore_log_get_level(void);
+
+/**
+ * @brief 设置日志级别
+ *
+ * @param level [in] 日志级别
+ *
+ * @threadsafe 是
+ * @reentrant 是
+
+ * @since v1.0.0*/
+void heapstore_log_set_level(heapstore_log_level_t level);
+
+/**
+ * @brief 获取服务日志路径
+ *
+ * @param service [in] 服务名称
+ * @param buffer [out] 输出缓冲区
+ * @param buffer_size [in] 缓冲区大小
+ * @return heapstore_error_t 错误码
+ *
+ * @ownership 调用者负责 buffer 的分配和释放
+ * @threadsafe 是
+ * @reentrant 是
+
+ * @since v1.0.0*/
+heapstore_error_t heapstore_log_get_service_path(const char *service, char *buffer,
+                                                 size_t buffer_size);
+
+/**
+ * @brief 执行日志轮转
+ *
+ * @return heapstore_error_t 错误码
+ *
+ * @threadsafe 是
+ * @reentrant 否
+
+ * @since v1.0.0*/
+heapstore_error_t heapstore_log_rotate(void);
+
+/**
+ * @brief 清理过期日志文件
+ *
+ * @param days_to_keep [in] 保留天数
+ * @param freed_bytes [out] 释放的字节数
+ * @return heapstore_error_t 错误码
+ *
+ * @ownership 调用者负责 freed_bytes 的分配和释放
+ * @threadsafe 是
+ * @reentrant 否
+
+ * @since v1.0.0*/
+heapstore_error_t heapstore_log_cleanup(int days_to_keep, uint64_t *freed_bytes);
+
+/**
+ * @brief 获取日志文件信息
+ *
+ * @param service [in] 服务名称（NULL 表示主日志）
+ * @param info [out] 输出文件信息
+ * @return heapstore_error_t 错误码
+ *
+ * @ownership 调用者负责 info 的分配和释放
+ * @threadsafe 是
+ * @reentrant 是
+
+ * @since v1.0.0*/
+heapstore_error_t heapstore_log_get_file_info(const char *service, heapstore_log_file_info_t *info);
+
+/**
+ * @brief 获取日志统计信息
+ *
+ * @param total_files [out] 总文件数
+ * @param total_size_bytes [out] 总大小
+ * @param oldest_timestamp [out] 最旧日志时间戳
+ * @return heapstore_error_t 错误码
+ *
+ * @ownership 调用者负责所有输出参数的分配和释放
+ * @threadsafe 是
+ * @reentrant 是
+
+ * @since v1.0.0*/
+heapstore_error_t heapstore_log_get_stats(uint32_t *total_files, uint64_t *total_size_bytes,
+                                          time_t *oldest_timestamp);
+
+/**
+ * @brief 检查日志系统是否健康
+ *
+ * @return bool 健康返回 true
+ *
+ * @threadsafe 是
+ * @reentrant 是
+
+ * @since v1.0.0*/
+bool heapstore_log_is_healthy(void);
+
+#define HEAPSTORE_LOG_ERROR(service, trace_id, fmt, ...)                                 \
+    heapstore_log_write(HEAPSTORE_LOG_ERROR, service, trace_id, __FILE__, __LINE__, fmt, \
+                        ##__VA_ARGS__)
+
+#define HEAPSTORE_LOG_WARN(service, trace_id, fmt, ...)                                 \
+    heapstore_log_write(HEAPSTORE_LOG_WARN, service, trace_id, __FILE__, __LINE__, fmt, \
+                        ##__VA_ARGS__)
+
+#define HEAPSTORE_LOG_INFO(service, trace_id, fmt, ...)                                 \
+    heapstore_log_write(HEAPSTORE_LOG_INFO, service, trace_id, __FILE__, __LINE__, fmt, \
+                        ##__VA_ARGS__)
+
+#define HEAPSTORE_LOG_DEBUG(service, trace_id, fmt, ...)                                 \
+    heapstore_log_write(HEAPSTORE_LOG_DEBUG, service, trace_id, __FILE__, __LINE__, fmt, \
+                        ##__VA_ARGS__)
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* AGENTRT_HEAPSTORE_LOG_H */

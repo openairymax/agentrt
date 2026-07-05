@@ -1,0 +1,741 @@
+#include "memory_compat.h"
+#include "error.h"
+/*
+ * Copyright (c) 2026 SPHARX. All Rights Reserved.
+ */
+
+#include "atomic_compat.h"
+#include "daemon_bootstrap_sd.h"
+#include "daemon_bootstrap_ipc.h"
+#include "daemon_cupolas_bootstrap.h"
+#include "platform.h"
+#include "svc_logger.h"
+
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#ifndef _WIN32
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#endif
+
+#define NOTIFY_D_DEFAULT_PORT 8084
+#define NOTIFY_D_MAX_BUFFER 65536
+#define NOTIFY_D_DEFAULT_SOCKET AGENTRT_RUNTIME_DIR "/notify.sock"
+#define NOTIFY_D_MAX_PENDING 1024
+#define NOTIFY_D_MAX_CLIENTS 128
+#define NOTIFY_D_WS_GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+typedef enum {
+    NOTIFY_CLIENT_SOCKET,
+    NOTIFY_CLIENT_WEBSOCKET,
+    NOTIFY_CLIENT_SSE
+} notify_client_type_t;
+
+typedef struct {
+    agentrt_socket_t fd;
+    notify_client_type_t type;
+    char *channel;
+    uint64_t connected_at;
+    uint64_t last_activity;
+    uint64_t messages_sent;
+    int active;
+    char handshake_done;
+} notify_client_t;
+
+typedef struct {
+    char *message;
+    char *channel;
+    char *event_type;
+    uint64_t timestamp;
+} notify_event_t;
+
+typedef struct {
+    agentrt_socket_t server_fd;
+    agentrt_mutex_t lock;
+    agentrt_thread_t event_thread;
+    atomic_int running;
+    atomic_int event_running;
+    atomic_int force_stop;
+    uint64_t start_time;
+    uint64_t notified_count;
+    uint64_t error_count;
+    notify_client_t clients[NOTIFY_D_MAX_CLIENTS];
+    size_t client_count;
+    notify_event_t *pending[NOTIFY_D_MAX_PENDING];
+    size_t pending_head;
+    size_t pending_tail;
+    size_t pending_count;
+    int tcp_port;
+    char *socket_path;
+} notify_d_service_t;
+
+static notify_d_service_t g_service = {0};
+static atomic_int g_shutdown = 0;
+static daemon_bootstrap_sd_t *g_bsd = NULL;
+static daemon_bootstrap_ipc_t *g_bipc = NULL;
+
+static void notify_d_signal_handler(int sig)
+{
+
+    atomic_store_explicit(&g_shutdown, 1, memory_order_seq_cst);
+}
+
+static int notify_d_compute_ws_accept_key(const char *client_key, char *out_key, size_t out_size)
+{
+    if (!client_key || !out_key || out_size < 64) {
+        AGENTRT_ERROR(AGENTRT_ERR_INVALID_PARAM, "null parameter");
+    }
+
+    char combined[256];
+    snprintf(combined, sizeof(combined), "%s%s", client_key, NOTIFY_D_WS_GUID);
+
+    unsigned char sha1[20];
+    __builtin_memset(sha1, 0, sizeof(sha1));
+
+    unsigned int h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE;
+    unsigned int h3 = 0x10325476, h4 = 0xC3D2E1F0;
+
+    size_t msg_len = strlen(combined);
+    size_t padded_len = ((msg_len + 8) / 64 + 1) * 64;
+    unsigned char *padded = (unsigned char *)AGENTRT_CALLOC(1, padded_len);
+    if (!padded) {
+        AGENTRT_ERROR(AGENTRT_ERR_OUT_OF_MEMORY, "calloc failed for SHA1 padded buffer");
+    }
+    __builtin_memcpy(padded, combined, msg_len);
+    padded[msg_len] = 0x80;
+
+    uint64_t bit_len = (uint64_t)msg_len * 8;
+    for (int i = 0; i < 8; i++)
+        padded[padded_len - 8 + i] = (unsigned char)(bit_len >> (56 - 8 * i));
+
+    for (size_t off = 0; off < padded_len; off += 64) {
+        unsigned int w[80];
+        for (int i = 0; i < 16; i++) {
+            w[i] = ((unsigned int)padded[off + i * 4] << 24) |
+                   ((unsigned int)padded[off + i * 4 + 1] << 16) |
+                   ((unsigned int)padded[off + i * 4 + 2] << 8) |
+                   ((unsigned int)padded[off + i * 4 + 3]);
+        }
+        for (int i = 16; i < 80; i++) {
+            w[i] = (w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]);
+            w[i] = (w[i] << 1) | (w[i] >> 31);
+        }
+        unsigned int a = h0, b = h1, c = h2, d = h3, e = h4;
+        for (int i = 0; i < 80; i++) {
+            unsigned int f, k;
+            if (i < 20) {
+                f = (b & c) | (~b & d);
+                k = 0x5A827999;
+            } else if (i < 40) {
+                f = b ^ c ^ d;
+                k = 0x6ED9EBA1;
+            } else if (i < 60) {
+                f = (b & c) | (b & d) | (c & d);
+                k = 0x8F1BBCDC;
+            } else {
+                f = b ^ c ^ d;
+                k = 0xCA62C1D6;
+            }
+            unsigned int temp = ((a << 5) | (a >> 27)) + f + e + k + w[i];
+            e = d;
+            d = c;
+            c = (b << 30) | (b >> 2);
+            b = a;
+            a = temp;
+        }
+        h0 += a;
+        h1 += b;
+        h2 += c;
+        h3 += d;
+        h4 += e;
+    }
+    AGENTRT_FREE(padded);
+    padded = NULL;
+
+    sha1[0] = (unsigned char)(h0 >> 24);
+    sha1[1] = (unsigned char)(h0 >> 16);
+    sha1[2] = (unsigned char)(h0 >> 8);
+    sha1[3] = (unsigned char)(h0);
+    sha1[4] = (unsigned char)(h1 >> 24);
+    sha1[5] = (unsigned char)(h1 >> 16);
+    sha1[6] = (unsigned char)(h1 >> 8);
+    sha1[7] = (unsigned char)(h1);
+    sha1[8] = (unsigned char)(h2 >> 24);
+    sha1[9] = (unsigned char)(h2 >> 16);
+    sha1[10] = (unsigned char)(h2 >> 8);
+    sha1[11] = (unsigned char)(h2);
+    sha1[12] = (unsigned char)(h3 >> 24);
+    sha1[13] = (unsigned char)(h3 >> 16);
+    sha1[14] = (unsigned char)(h3 >> 8);
+    sha1[15] = (unsigned char)(h3);
+    sha1[16] = (unsigned char)(h4 >> 24);
+    sha1[17] = (unsigned char)(h4 >> 16);
+    sha1[18] = (unsigned char)(h4 >> 8);
+    sha1[19] = (unsigned char)(h4);
+
+    static const char *b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    size_t off = 0;
+    /* 处理前 18 字节（6 组 3 字节 → 24 字符） */
+    for (int i = 0; i < 18 && off + 4 <= out_size; i += 3) {
+        unsigned int val = ((unsigned int)sha1[i] << 16) | ((unsigned int)sha1[i + 1] << 8) |
+                           (unsigned int)sha1[i + 2];
+        out_key[off++] = b64[(val >> 18) & 0x3F];
+        out_key[off++] = b64[(val >> 12) & 0x3F];
+        out_key[off++] = b64[(val >> 6) & 0x3F];
+        out_key[off++] = b64[val & 0x3F];
+    }
+    /* 处理最后 2 字节 → 3 字符 + '='（避免访问 sha1[20] 越界） */
+    if (off + 4 <= out_size) {
+        unsigned int val = ((unsigned int)sha1[18] << 16) | ((unsigned int)sha1[19] << 8);
+        out_key[off++] = b64[(val >> 18) & 0x3F];
+        out_key[off++] = b64[(val >> 12) & 0x3F];
+        out_key[off++] = b64[(val >> 6) & 0x3F];
+        out_key[off++] = '=';
+    }
+    out_key[off] = '\0';
+
+    return 0;
+}
+
+static int notify_d_handle_ws_upgrade(notify_d_service_t *svc, notify_client_t *client,
+                                      const char *request)
+{
+    const char *key_tag = "Sec-WebSocket-Key: ";
+    const char *key_start = strstr(request, key_tag);
+    if (!key_start) {
+        AGENTRT_ERROR(AGENTRT_ERR_UNKNOWN, "missing Sec-WebSocket-Key header");
+    }
+    key_start += strlen(key_tag);
+
+    const char *key_end = strstr(key_start, "\r\n");
+    if (!key_end) {
+        AGENTRT_ERROR(AGENTRT_ERR_UNKNOWN, "Sec-WebSocket-Key value not terminated by CRLF");
+    }
+
+    char client_key[256];
+    size_t key_len = (size_t)(key_end - key_start);
+    if (key_len >= sizeof(client_key)) {
+        AGENTRT_ERROR(AGENTRT_ERR_UNKNOWN, "Sec-WebSocket-Key too long");
+    }
+    __builtin_memcpy(client_key, key_start, key_len);
+    client_key[key_len] = '\0';
+
+    char accept_key[64];
+    if (notify_d_compute_ws_accept_key(client_key, accept_key, sizeof(accept_key)) != 0) {
+        AGENTRT_ERROR(AGENTRT_ERR_UNKNOWN, "failed to compute WebSocket accept key");
+    }
+
+    char response[1024];
+    int resp_len = snprintf(response, sizeof(response),
+                            "HTTP/1.1 101 Switching Protocols\r\n"
+                            "Upgrade: websocket\r\n"
+                            "Connection: Upgrade\r\n"
+                            "Sec-WebSocket-Accept: %s\r\n"
+                            "\r\n",
+                            accept_key);
+
+    if (agentrt_socket_send(client->fd, response, (size_t)resp_len) <= 0) {
+        AGENTRT_ERROR(AGENTRT_ERR_UNKNOWN, "failed to send WebSocket 101 response");
+    }
+
+    client->type = NOTIFY_CLIENT_WEBSOCKET;
+    client->handshake_done = 1;
+    return 0;
+}
+
+static int notify_d_send_ws_frame(notify_client_t *client, const char *payload, size_t payload_len)
+{
+    if (!client || !payload || client->fd == AGENTRT_INVALID_SOCKET) {
+        AGENTRT_ERROR(AGENTRT_ERR_INVALID_PARAM, "null parameter or invalid socket");
+    }
+
+    unsigned char frame[10];
+    size_t header_len = 2;
+    frame[0] = 0x81;
+
+    if (payload_len <= 125) {
+        frame[1] = (unsigned char)payload_len;
+    } else if (payload_len <= 65535) {
+        frame[1] = 126;
+        frame[2] = (unsigned char)(payload_len >> 8);
+        frame[3] = (unsigned char)(payload_len & 0xFF);
+        header_len = 4;
+    } else {
+        frame[1] = 127;
+        for (int i = 0; i < 8; i++)
+            frame[2 + i] = (unsigned char)(payload_len >> (56 - 8 * i));
+        header_len = 10;
+    }
+
+    if (agentrt_socket_send(client->fd, (const char *)frame, header_len) <= 0) {
+        AGENTRT_ERROR(AGENTRT_ERR_UNKNOWN, "failed to send WS frame header");
+    }
+    if (agentrt_socket_send(client->fd, payload, payload_len) <= 0) {
+        AGENTRT_ERROR(AGENTRT_ERR_UNKNOWN, "failed to send WS frame payload");
+    }
+
+    return 0;
+}
+
+static int notify_d_broadcast_event(notify_d_service_t *svc, const notify_event_t *event)
+{
+    if (!svc || !event) {
+        AGENTRT_ERROR(AGENTRT_ERR_INVALID_PARAM, "null parameter");
+    }
+
+    char json_msg[8192];
+    int msg_len =
+        snprintf(json_msg, sizeof(json_msg),
+                 "{"
+                 "\"event\":\"%s\","
+                 "\"channel\":\"%s\","
+                 "\"message\":\"%s\","
+                 "\"timestamp\":%llu"
+                 "}",
+                 event->event_type ? event->event_type : "message",
+                 event->channel ? event->channel : "default", event->message ? event->message : "",
+                 (unsigned long long)event->timestamp);
+
+    size_t broadcast_count = 0;
+
+    for (size_t i = 0; i < svc->client_count; i++) {
+        notify_client_t *client = &svc->clients[i];
+        if (!client->active)
+            continue;
+
+        int subscribed = !event->channel || !client->channel ||
+                         strcmp(event->channel, "broadcast") == 0 ||
+                         strcmp(client->channel, event->channel) == 0;
+
+        if (!subscribed)
+            continue;
+
+        if (client->type == NOTIFY_CLIENT_WEBSOCKET && client->handshake_done) {
+            notify_d_send_ws_frame(client, json_msg, (size_t)msg_len);
+            client->messages_sent++;
+            broadcast_count++;
+        } else if (client->type == NOTIFY_CLIENT_SOCKET) {
+            agentrt_socket_send(client->fd, json_msg, (size_t)msg_len);
+            client->messages_sent++;
+            broadcast_count++;
+        } else if (client->type == NOTIFY_CLIENT_SSE) {
+            char sse_msg[8448];
+            int sse_len = snprintf(sse_msg, sizeof(sse_msg), "event: %s\ndata: %s\n\n",
+                                   event->event_type ? event->event_type : "message", json_msg);
+            agentrt_socket_send(client->fd, sse_msg, (size_t)sse_len);
+            client->messages_sent++;
+            broadcast_count++;
+        }
+    }
+
+    return (int)broadcast_count;
+}
+
+#ifndef _WIN32
+static void *notify_d_event_loop(void *arg)
+{
+#else
+static DWORD WINAPI notify_d_event_loop(LPVOID arg)
+{
+#endif
+    notify_d_service_t *svc = (notify_d_service_t *)arg;
+    if (!svc) {
+#ifndef _WIN32
+        AGENTRT_ERROR_NULL(AGENTRT_ERR_INVALID_PARAM, "null parameter");
+#else
+        return 1;
+#endif
+    }
+
+    while (svc->event_running) {
+        agentrt_mutex_lock(&svc->lock);
+
+        if (svc->pending_count > 0) {
+            notify_event_t *event = svc->pending[svc->pending_head];
+            svc->pending_head = (svc->pending_head + 1) % NOTIFY_D_MAX_PENDING;
+            svc->pending_count--;
+
+            agentrt_mutex_unlock(&svc->lock);
+
+            notify_d_broadcast_event(svc, event);
+
+            AGENTRT_FREE(event->message);
+            AGENTRT_FREE(event->channel);
+            AGENTRT_FREE(event->event_type);
+            AGENTRT_FREE(event);
+        } else {
+            agentrt_mutex_unlock(&svc->lock);
+#ifndef _WIN32
+            /* 替代 sleep(1)，允许更快响应关闭信号 */
+            for (int _w = 0; _w < 10 && svc->event_running; _w++) {
+                usleep(100000); /* 100ms */
+            }
+#else
+            /* 替代 Sleep(1000)，允许更快响应关闭信号 */
+            for (int _w = 0; _w < 10 && svc->event_running; _w++) {
+                Sleep(100); /* 100ms */
+            }
+#endif
+        }
+    }
+
+#ifndef _WIN32
+    return NULL;
+#else
+    return 0;
+#endif
+}
+
+static int notify_d_enqueue(notify_d_service_t *svc, const char *msg, const char *channel,
+                            const char *event_type)
+{
+    if (!svc || !msg) {
+        AGENTRT_ERROR(AGENTRT_ERR_INVALID_PARAM, "null parameter");
+    }
+    if (svc->pending_count >= NOTIFY_D_MAX_PENDING) {
+        AGENTRT_ERROR(AGENTRT_ERR_UNKNOWN, "pending queue full");
+    }
+
+    notify_event_t *event = (notify_event_t *)AGENTRT_CALLOC(1, sizeof(notify_event_t));
+    if (!event) {
+        AGENTRT_ERROR(AGENTRT_ERR_OUT_OF_MEMORY, "calloc failed for notify_event_t");
+    }
+
+    event->message = AGENTRT_STRDUP(msg);
+    event->channel = channel ? AGENTRT_STRDUP(channel) : AGENTRT_STRDUP("default");
+    event->event_type = event_type ? AGENTRT_STRDUP(event_type) : AGENTRT_STRDUP("message");
+    event->timestamp = (uint64_t)time(NULL);
+
+    svc->pending[svc->pending_tail] = event;
+    svc->pending_tail = (svc->pending_tail + 1) % NOTIFY_D_MAX_PENDING;
+    svc->pending_count++;
+
+    return 0;
+}
+
+static notify_client_t *notify_d_find_client_slot(notify_d_service_t *svc)
+{
+    for (size_t i = 0; i < NOTIFY_D_MAX_CLIENTS; i++) {
+        if (!svc->clients[i].active)
+            return &svc->clients[i];
+    }
+    if (svc->client_count < NOTIFY_D_MAX_CLIENTS)
+        return &svc->clients[svc->client_count];
+    AGENTRT_ERROR_NULL(AGENTRT_ERR_INVALID_PARAM, "null parameter");
+}
+
+static int notify_d_init(notify_d_service_t *svc, int port, const char *sock)
+{
+    if (!svc) {
+        AGENTRT_ERROR(AGENTRT_EINVAL, "svc is NULL");
+    }
+
+    __builtin_memset(svc, 0, sizeof(*svc));
+    svc->tcp_port = port > 0 ? port : NOTIFY_D_DEFAULT_PORT;
+    svc->socket_path = sock ? AGENTRT_STRDUP(sock) : AGENTRT_STRDUP(NOTIFY_D_DEFAULT_SOCKET);
+    svc->start_time = (uint64_t)time(NULL);
+
+    agentrt_mutex_init(&svc->lock);
+    agentrt_socket_init();
+
+    SVC_LOG_INFO("notify_d: init complete (max_clients=%d)", NOTIFY_D_MAX_CLIENTS);
+    return AGENTRT_SUCCESS;
+}
+
+static int notify_d_start(notify_d_service_t *svc)
+{
+    if (!svc) {
+        AGENTRT_ERROR(AGENTRT_EINVAL, "svc is NULL");
+    }
+
+#ifndef _WIN32
+    svc->server_fd = agentrt_socket_create_unix_server(svc->socket_path);
+    if (svc->server_fd < 0) {
+        SVC_LOG_ERROR("notify_d: failed to create socket at %s", svc->socket_path);
+        AGENTRT_ERROR(AGENTRT_ERR_UNKNOWN, "failed to create unix socket");
+    }
+#else
+    svc->server_fd = agentrt_socket_create_tcp_server("127.0.0.1", (uint16_t)svc->tcp_port);
+    if (svc->server_fd < 0) {
+        SVC_LOG_ERROR("notify_d: failed to create TCP server");
+        AGENTRT_ERROR(AGENTRT_ERR_UNKNOWN, "failed to create TCP server");
+    }
+#endif
+
+    svc->running = 1;
+    svc->event_running = 1;
+    svc->force_stop = 0;
+
+    agentrt_thread_create(&svc->event_thread, notify_d_event_loop, svc);
+
+    SVC_LOG_INFO("notify_d: service started (event_loop=active)");
+    return AGENTRT_SUCCESS;
+}
+
+static int notify_d_stop(notify_d_service_t *svc, int force)
+{
+    if (!svc) {
+        AGENTRT_ERROR(AGENTRT_EINVAL, "svc is NULL");
+    }
+
+    agentrt_mutex_lock(&svc->lock);
+    svc->running = 0;
+    svc->event_running = 0;
+    if (force)
+        svc->force_stop = 1;
+    agentrt_mutex_unlock(&svc->lock);
+
+    if (!force) {
+        agentrt_thread_join(svc->event_thread, NULL);
+    }
+
+    for (size_t i = 0; i < svc->client_count; i++) {
+        if (svc->clients[i].active && svc->clients[i].fd != AGENTRT_INVALID_SOCKET) {
+            if (force) {
+                agentrt_socket_close(svc->clients[i].fd);
+                svc->clients[i].fd = AGENTRT_INVALID_SOCKET;
+                svc->clients[i].active = 0;
+            }
+        }
+    }
+
+    if (force) {
+        for (size_t i = 0; i < svc->pending_count; i++) {
+            size_t idx = (svc->pending_head + i) % NOTIFY_D_MAX_PENDING;
+            AGENTRT_FREE(svc->pending[idx]->message);
+            AGENTRT_FREE(svc->pending[idx]->channel);
+            AGENTRT_FREE(svc->pending[idx]->event_type);
+            AGENTRT_FREE(svc->pending[idx]);
+        }
+        svc->pending_count = 0;
+        svc->pending_head = 0;
+        svc->pending_tail = 0;
+    }
+
+    if (svc->server_fd != AGENTRT_INVALID_SOCKET) {
+        agentrt_socket_close(svc->server_fd);
+        svc->server_fd = AGENTRT_INVALID_SOCKET;
+    }
+
+    if (force) {
+#ifndef _WIN32
+        unlink(svc->socket_path);
+#endif
+    }
+
+    SVC_LOG_INFO("notify_d: service stopped (force=%d, pending=%zu, clients=%zu)", force,
+                 svc->pending_count, svc->client_count);
+    return AGENTRT_SUCCESS;
+}
+
+static int notify_d_destroy(notify_d_service_t *svc)
+{
+    if (!svc) {
+        AGENTRT_ERROR(AGENTRT_EINVAL, "svc is NULL");
+    }
+
+    notify_d_stop(svc, 1);
+
+    for (size_t i = 0; i < svc->client_count; i++) {
+        AGENTRT_FREE(svc->clients[i].channel);
+    }
+    agentrt_socket_cleanup();
+    agentrt_mutex_destroy(&svc->lock);
+    AGENTRT_FREE(svc->socket_path);
+    __builtin_memset(svc, 0, sizeof(*svc));
+    SVC_LOG_INFO("notify_d: service destroyed");
+    return AGENTRT_SUCCESS;
+}
+
+static int notify_d_healthcheck(notify_d_service_t *svc)
+{
+    if (!svc)
+        return 0;
+
+    agentrt_mutex_lock(&svc->lock);
+    int healthy = svc->running && svc->event_running ? 1 : 0;
+    size_t active_clients = 0;
+    for (size_t i = 0; i < svc->client_count; i++) {
+        if (svc->clients[i].active)
+            active_clients++;
+    }
+    size_t pending = svc->pending_count;
+    size_t error_count = svc->error_count;
+    size_t notified_count = svc->notified_count;
+    agentrt_mutex_unlock(&svc->lock);
+
+    if (pending >= NOTIFY_D_MAX_PENDING)
+        healthy = 0;
+    if (error_count > notified_count / 2 && notified_count > 10)
+        healthy = 0;
+
+    return healthy;
+}
+
+static void notify_d_handle_request(notify_d_service_t *svc, agentrt_socket_t client_fd)
+{
+    char buffer[NOTIFY_D_MAX_BUFFER];
+    ssize_t n = agentrt_socket_recv(client_fd, buffer, sizeof(buffer) - 1);
+    if (n <= 0) {
+        agentrt_socket_close(client_fd);
+        return;
+    }
+    buffer[n] = '\0';
+
+    agentrt_mutex_lock(&svc->lock);
+
+    int is_upgrade = (strstr(buffer, "Upgrade: websocket") != NULL ||
+                      strstr(buffer, "Upgrade: WebSocket") != NULL);
+    int is_sse = (strstr(buffer, "Accept: text/event-stream") != NULL);
+
+    notify_client_t *client = notify_d_find_client_slot(svc);
+    if (!client) {
+        agentrt_mutex_unlock(&svc->lock);
+        const char *busy = "{\"error\":\"max_clients_reached\"}";
+        agentrt_socket_send(client_fd, busy, strlen(busy));
+        agentrt_socket_close(client_fd);
+        return;
+    }
+
+    __builtin_memset(client, 0, sizeof(*client));
+    client->fd = client_fd;
+    client->connected_at = (uint64_t)time(NULL);
+    client->last_activity = client->connected_at;
+    client->active = 1;
+
+    if (is_sse) {
+        client->type = NOTIFY_CLIENT_SSE;
+        const char *sse_headers = "HTTP/1.1 200 OK\r\n"
+                                  "Content-Type: text/event-stream\r\n"
+                                  "Cache-Control: no-cache\r\n"
+                                  "Connection: keep-alive\r\n"
+                                  "\r\n";
+        agentrt_socket_send(client_fd, sse_headers, strlen(sse_headers));
+        client->handshake_done = 1;
+        svc->client_count++;
+    } else if (is_upgrade) {
+        client->type = NOTIFY_CLIENT_WEBSOCKET;
+        if (notify_d_handle_ws_upgrade(svc, client, buffer) == 0) {
+            svc->client_count++;
+        } else {
+            client->active = 0;
+            agentrt_mutex_unlock(&svc->lock);
+            agentrt_socket_close(client_fd);
+            return;
+        }
+    } else {
+        client->type = NOTIFY_CLIENT_SOCKET;
+
+        const char *channel = "inbound";
+        const char *channel_hdr = "X-Channel: ";
+        const char *ch = strstr(buffer, channel_hdr);
+        if (ch) {
+            const char *che = strstr(ch + strlen(channel_hdr), "\r\n");
+            if (che) {
+                size_t clen = (size_t)(che - (ch + strlen(channel_hdr)));
+                char *cn = (char *)AGENTRT_MALLOC(clen + 1);
+                if (cn) {
+                    __builtin_memcpy(cn, ch + strlen(channel_hdr), clen);
+                    cn[clen] = '\0';
+                    channel = cn;
+                }
+            }
+        }
+        client->channel = AGENTRT_STRDUP(channel);
+        if (strcmp(channel, "inbound") != 0)
+            AGENTRT_FREE((void *)channel);
+        svc->client_count++;
+
+        int ret = notify_d_enqueue(svc, buffer, client->channel, NULL);
+        if (ret == 0) {
+            svc->notified_count++;
+        } else {
+            svc->error_count++;
+        }
+    }
+
+    uint64_t uptime = (uint64_t)time(NULL) - svc->start_time;
+    size_t active_clients = 0;
+    for (size_t i = 0; i < svc->client_count; i++) {
+        if (svc->clients[i].active)
+            active_clients++;
+    }
+
+    size_t depth = svc->pending_count;
+    agentrt_mutex_unlock(&svc->lock);
+
+    if (client->type == NOTIFY_CLIENT_SOCKET) {
+        char response[4096];
+        snprintf(response, sizeof(response),
+                 "{"
+                 "\"service\":\"notify_d\","
+                 "\"status\":\"%s\","
+                 "\"queued\":%llu,"
+                 "\"pending\":%zu,"
+                 "\"active_clients\":%zu,"
+                 "\"uptime_sec\":%llu,"
+                 "\"healthy\":%s"
+                 "}",
+                 svc->error_count > svc->notified_count / 2 ? "degraded" : "ok",
+                 (unsigned long long)svc->notified_count, depth, active_clients,
+                 (unsigned long long)uptime, notify_d_healthcheck(svc) ? "true" : "false");
+
+        agentrt_socket_send(client_fd, response, strlen(response));
+        agentrt_socket_close(client_fd);
+
+        agentrt_mutex_lock(&svc->lock);
+        client->active = 0;
+        client->fd = AGENTRT_INVALID_SOCKET;
+        agentrt_mutex_unlock(&svc->lock);
+    }
+}
+
+int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
+{
+
+#ifndef _WIN32
+    signal(SIGINT, notify_d_signal_handler);
+    signal(SIGTERM, notify_d_signal_handler);
+    signal(SIGPIPE, SIG_IGN);
+#endif
+
+    agentrt_log_init(NULL);
+    atexit(log_cleanup);
+
+    /* P3.14 ACC-DT15: 初始化 cupolas 安全穹顶（permission_engine + sanitizer + audit_logger）*/
+    daemon_cupolas_init("notify_d");
+
+    if (notify_d_init(&g_service, NOTIFY_D_DEFAULT_PORT, NOTIFY_D_DEFAULT_SOCKET) !=
+        AGENTRT_SUCCESS)
+        return 1;
+    if (notify_d_start(&g_service) != AGENTRT_SUCCESS) {
+        notify_d_destroy(&g_service);
+        return 1;
+    }
+
+    g_bsd = daemon_bootstrap_sd_start("notify_d", "notify", g_service.socket_path,
+                                      0, "notify,core", 0);
+    g_bipc = daemon_bootstrap_ipc_start("notify_d", "notify", g_service.socket_path,
+                                        0, IPC_BUS_PROTO_JSON_RPC);
+
+    while (!g_shutdown && g_service.running) {
+        agentrt_socket_t client = agentrt_socket_accept(g_service.server_fd, 1000);
+        if (client != AGENTRT_INVALID_SOCKET) {
+            notify_d_handle_request(&g_service, client);
+        }
+    }
+
+    daemon_bootstrap_ipc_stop(g_bipc);
+    daemon_bootstrap_sd_stop(g_bsd);
+    notify_d_stop(&g_service, g_shutdown ? 1 : 0);
+    notify_d_destroy(&g_service);
+    daemon_cupolas_cleanup(); /* P3.14 ACC-DT15: 清理 cupolas 安全穹顶 */
+    log_cleanup();
+    return 0;
+}
