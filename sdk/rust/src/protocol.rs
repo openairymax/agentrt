@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 //! @file protocol.rs
 //! @brief AgentRT Rust SDK — Protocol Client Module
 //!
@@ -56,7 +56,7 @@ pub struct ProtocolConfig {
 
 impl Default for ProtocolConfig {
     fn default() -> Self {
-        let endpoint = std::env::var("AGENTOS_ENDPOINT")
+        let endpoint = std::env::var("AGENTRT_ENDPOINT")
             .unwrap_or_else(|_| "http://127.0.0.1:18789".to_string());
         Self {
             protocol_type: ProtocolType::JsonRpc,

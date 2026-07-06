@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: Apache-2.0 */
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
@@ -96,7 +96,7 @@ TEST(test_vault_large_secret) {
     char* secret = malloc(secret_size);
     ASSERT(secret != NULL, "Allocate large secret");
     
-    AGENTOS_MEMSET(secret, 'A', secret_size);
+    AGENTRT_MEMSET(secret, 'A', secret_size);
     
     int store_result = cupolas_vault_store(id, secret, secret_size);
     

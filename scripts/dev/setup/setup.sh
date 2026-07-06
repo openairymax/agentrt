@@ -34,57 +34,57 @@ show_menu() {
 }
 
 install_dependencies() {
-    agentos_log_info "Installing dependencies..."
+    agentrt_log_info "Installing dependencies..."
     
-    OS=$(agentos_platform_detect_os)
-    agentos_log_info "Detected OS: $OS"
+    OS=$(agentrt_platform_detect_os)
+    agentrt_log_info "Detected OS: $OS"
     
     if [ "$OS" = "linux" ]; then
         if command -v vcpkg &> /dev/null; then
-            agentos_log_info "vcpkg found: $(vcpkg version | head -1)"
+            agentrt_log_info "vcpkg found: $(vcpkg version | head -1)"
         else
-            agentos_log_warn "vcpkg not found in PATH"
-            agentos_log_info "Please install vcpkg and set VCPKG_ROOT"
-            agentos_log_info "See: https://github.com/microsoft/vcpkg"
+            agentrt_log_warn "vcpkg not found in PATH"
+            agentrt_log_info "Please install vcpkg and set VCPKG_ROOT"
+            agentrt_log_info "See: https://github.com/microsoft/vcpkg"
         fi
         
         if command -v python3 &> /dev/null; then
-            agentos_log_info "Python3: $(python3 --version)"
+            agentrt_log_info "Python3: $(python3 --version)"
         else
-            agentos_log_error "Python3 not found"
+            agentrt_log_error "Python3 not found"
         fi
         
     elif [ "$OS" = "macos" ]; then
         if command -v brew &> /dev/null; then
-            agentos_log_info "Homebrew installed"
+            agentrt_log_info "Homebrew installed"
         else
-            agentos_log_warn "Homebrew not found"
+            agentrt_log_warn "Homebrew not found"
         fi
         
         if command -v python3 &> /dev/null; then
-            agentos_log_info "Python3: $(python3 --version)"
+            agentrt_log_info "Python3: $(python3 --version)"
         else
-            agentos_log_error "Python3 not found"
+            agentrt_log_error "Python3 not found"
         fi
         
     elif [ "$OS" = "windows" ]; then
-        agentos_log_error "Windows not supported by this script"
-        agentos_log_info "Please use setup.ps1 on Windows"
+        agentrt_log_error "Windows not supported by this script"
+        agentrt_log_info "Please use setup.ps1 on Windows"
         return 1
     fi
     
-    agentos_log_info "Dependencies check complete"
+    agentrt_log_info "Dependencies check complete"
 }
 
 build_project() {
-    agentos_log_info "Building AgentOS..."
+    agentrt_log_info "Building AgentOS..."
     
     BUILD_SCRIPT="${SCRIPT_DIR}/../../ci/pipeline/build/build-module.sh"
 
     if [ ! -f "$BUILD_SCRIPT" ]; then
-        agentos_log_error "Build script not found: $BUILD_SCRIPT"
-        agentos_log_info "Available scripts in pipeline/build/:"
-        ls -la "${SCRIPT_DIR}/../../ci/pipeline/build/" 2>/dev/null || agentos_log_warn "Cannot list pipeline/build directory"
+        agentrt_log_error "Build script not found: $BUILD_SCRIPT"
+        agentrt_log_info "Available scripts in pipeline/build/:"
+        ls -la "${SCRIPT_DIR}/../../ci/pipeline/build/" 2>/dev/null || agentrt_log_warn "Cannot list pipeline/build directory"
         return 1
     fi
     
@@ -93,7 +93,7 @@ build_project() {
 }
 
 run_tests() {
-    agentos_log_info "Running tests..."
+    agentrt_log_info "Running tests..."
     
     TEST_SCRIPT="${SCRIPT_DIR}/tests/shell/test_framework.sh"
     
@@ -101,19 +101,19 @@ run_tests() {
         chmod +x "$TEST_SCRIPT"
         bash "$TEST_SCRIPT"
     else
-        agentos_log_warn "Test script not found: $TEST_SCRIPT"
-        agentos_log_info "Running basic validation..."
+        agentrt_log_warn "Test script not found: $TEST_SCRIPT"
+        agentrt_log_info "Running basic validation..."
         
         if [ -f "${PROJECT_ROOT}/CMakeLists.txt" ]; then
-            agentos_log_info "CMakeLists.txt exists"
+            agentrt_log_info "CMakeLists.txt exists"
         else
-            agentos_log_error "CMakeLists.txt not found!"
+            agentrt_log_error "CMakeLists.txt not found!"
         fi
     fi
 }
 
 full_setup() {
-    agentos_log_info "Starting full setup..."
+    agentrt_log_info "Starting full setup..."
     install_dependencies && build_project && run_tests
 }
 
@@ -130,11 +130,11 @@ main() {
             3) run_tests ;;
             4) full_setup ;;
             5|q|Q) 
-                agentos_log_info "Exiting..."
+                agentrt_log_info "Exiting..."
                 exit 0
                 ;;
             *) 
-                agentos_log_error "Invalid option: $choice"
+                agentrt_log_error "Invalid option: $choice"
                 exit 1
                 ;;
         esac
@@ -149,7 +149,7 @@ main() {
                 exit 0
                 ;;
             *)
-                agentos_log_error "Unknown option: $1"
+                agentrt_log_error "Unknown option: $1"
                 show_menu
                 exit 1
                 ;;
@@ -157,7 +157,7 @@ main() {
     fi
     
     echo ""
-    agentos_log_info "Setup complete!"
+    agentrt_log_info "Setup complete!"
 }
 
 main "$@"

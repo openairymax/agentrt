@@ -5,14 +5,14 @@ AgentRT Python SDK 安装脚本
 from setuptools import setup, find_packages
 
 setup(
-    name="agentos",
+    name="agentrt",
     version="0.1.0",
     description="AgentRT Python SDK - 官方多语言 SDK 集合",
     long_description=open("README.md", "r", encoding="utf-8").read() if __name__ == "__main__" else "",
     long_description_content_type="text/markdown",
     author="SPHARX Ltd.",
     author_email="team@spharx.com",
-    url="https://github.com/spharx/agentos",
+    url="https://github.com/spharx/agentrt",
     packages=find_packages(exclude=["tests", "tests.*"]),
     python_requires=">=3.8",
     install_requires=[
@@ -38,10 +38,10 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     license="Apache-2.0",
-    keywords="agentos sdk client agent memory session skill",
+    keywords="agentrt sdk client agent memory session skill",
     project_urls={
-        "Documentation": "https://github.com/spharx/agentos/tree/main/sdk/python",
-        "Source": "https://github.com/spharx/agentos",
-        "Bug Tracker": "https://github.com/spharx/agentos/issues",
+        "Documentation": "https://github.com/spharx/agentrt/tree/main/sdk/python",
+        "Source": "https://github.com/spharx/agentrt",
+        "Bug Tracker": "https://github.com/spharx/agentrt/issues",
     },
 )

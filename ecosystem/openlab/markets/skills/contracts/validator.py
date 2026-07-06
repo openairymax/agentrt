@@ -183,7 +183,7 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(
-        prog="agentos-skill-validator",
+        prog="agentrt-skill-validator",
         description="AgentRT Skill Contract Validator",
     )
     parser.add_argument(

@@ -5,8 +5,8 @@
   "agent_name": "DevOps Agent",
   "description": "运维部署智能体，负责CI/CD、容器化部署、基硢设施管理和监控告?,
   "version": "0.1.0",
-  "author": "Spharx AgentRT Team",
-  "license": "Apache-2.0",
+  "author": "SPHARX Ltd. - Airymax Team",
+  "license": "AGPL-3.0-or-later OR Apache-2.0",
   
   "capabilities": [
     {

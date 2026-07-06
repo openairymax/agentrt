@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: Apache-2.0 */
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
@@ -216,12 +216,12 @@ static size_t count_semantic_units_zh(const char *text)
 static size_t feed_and_count(su_stream_detector_t *d, const char *text, float confidence)
 {
     size_t len = strlen(text);
-    agentos_error_t err = su_stream_detector_feed(d, text, len, confidence);
-    if (err != AGENTOS_SUCCESS)
+    agentrt_error_t err = su_stream_detector_feed(d, text, len, confidence);
+    if (err != AGENTRT_SUCCESS)
         return 0;
 
     err = su_stream_detector_flush(d);
-    if (err != AGENTOS_SUCCESS)
+    if (err != AGENTRT_SUCCESS)
         return 0;
 
     size_t count = su_stream_detector_pending_count(d);
@@ -230,10 +230,10 @@ static size_t feed_and_count(su_stream_detector_t *d, const char *text, float co
     for (size_t i = 0; i < count; i++) {
         su_semantic_unit_t unit;
         err = su_stream_detector_pop_pending(d, &unit);
-        if (err != AGENTOS_SUCCESS)
+        if (err != AGENTRT_SUCCESS)
             break;
         if (unit.text) {
-            AGENTOS_FREE(unit.text);
+            AGENTRT_FREE(unit.text);
         }
     }
 
@@ -328,8 +328,8 @@ TEST(int03_2_stream_detector_paragraph)
 {
     /* 流式检测器段落边界检测 */
     su_stream_detector_t *detector = NULL;
-    agentos_error_t err = su_stream_detector_create(NULL, &detector);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    agentrt_error_t err = su_stream_detector_create(NULL, &detector);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     TEST_ASSERT(detector != NULL);
 
     const char *text = "Para1\n\nPara2";
@@ -471,8 +471,8 @@ TEST(int03_5_long_text_stream_detector)
 {
     /* 流式检测器处理长中文文本 */
     su_stream_detector_t *detector = NULL;
-    agentos_error_t err = su_stream_detector_create(NULL, &detector);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    agentrt_error_t err = su_stream_detector_create(NULL, &detector);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     TEST_ASSERT(detector != NULL);
 
     const char *long_text =
@@ -510,8 +510,8 @@ TEST(int03_5_stream_detector_chunk_adjustment)
     config.high_confidence_threshold = 0.7f;
 
     su_stream_detector_t *detector = NULL;
-    agentos_error_t err = su_stream_detector_create(&config, &detector);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    agentrt_error_t err = su_stream_detector_create(&config, &detector);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     TEST_ASSERT(detector != NULL);
 
     /* 低置信度 → 更小的分块 */
@@ -527,21 +527,21 @@ TEST(int03_5_stream_detector_stats_after_long_text)
 {
     /* 长文本处理后统计信息验证 */
     su_stream_detector_t *detector = NULL;
-    agentos_error_t err = su_stream_detector_create(NULL, &detector);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    agentrt_error_t err = su_stream_detector_create(NULL, &detector);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     TEST_ASSERT(detector != NULL);
 
     const char *text =
         "句子一。句子二。句子三。句子四。句子五。";
     size_t len = strlen(text);
     err = su_stream_detector_feed(detector, text, len, 0.8f);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     err = su_stream_detector_flush(detector);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
 
     char *stats_json = NULL;
     err = su_stream_detector_stats(detector, &stats_json);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     TEST_ASSERT(stats_json != NULL);
     TEST_ASSERT(stats_json[0] == '{');
     printf("    Stats after long text: %s\n", stats_json);
@@ -552,10 +552,10 @@ TEST(int03_5_stream_detector_stats_after_long_text)
         su_semantic_unit_t unit;
         su_stream_detector_pop_pending(detector, &unit);
         if (unit.text)
-            AGENTOS_FREE(unit.text);
+            AGENTRT_FREE(unit.text);
     }
 
-    AGENTOS_FREE(stats_json);
+    AGENTRT_FREE(stats_json);
     su_stream_detector_destroy(detector);
 }
 
@@ -625,15 +625,15 @@ TEST(int03_6_stream_detector_empty_input)
 {
     /* 流式检测器空输入 */
     su_stream_detector_t *detector = NULL;
-    agentos_error_t err = su_stream_detector_create(NULL, &detector);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    agentrt_error_t err = su_stream_detector_create(NULL, &detector);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
     TEST_ASSERT(detector != NULL);
 
     err = su_stream_detector_feed(detector, "", 0, 0.5f);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
 
     err = su_stream_detector_flush(detector);
-    TEST_ASSERT(err == AGENTOS_SUCCESS);
+    TEST_ASSERT(err == AGENTRT_SUCCESS);
 
     size_t count = su_stream_detector_pending_count(detector);
     TEST_ASSERT_EQ(count, 0);
@@ -645,14 +645,14 @@ TEST(int03_6_stream_detector_empty_input)
 TEST(int03_6_stream_detector_null_params)
 {
     /* 流式检测器 NULL 参数检查 */
-    agentos_error_t err = su_stream_detector_create(NULL, NULL);
-    TEST_ASSERT(err != AGENTOS_SUCCESS);
+    agentrt_error_t err = su_stream_detector_create(NULL, NULL);
+    TEST_ASSERT(err != AGENTRT_SUCCESS);
 
     err = su_stream_detector_feed(NULL, "test", 4, 0.5f);
-    TEST_ASSERT(err != AGENTOS_SUCCESS);
+    TEST_ASSERT(err != AGENTRT_SUCCESS);
 
     err = su_stream_detector_flush(NULL);
-    TEST_ASSERT(err != AGENTOS_SUCCESS);
+    TEST_ASSERT(err != AGENTRT_SUCCESS);
 
     size_t count = su_stream_detector_pending_count(NULL);
     TEST_ASSERT_EQ(count, 0);

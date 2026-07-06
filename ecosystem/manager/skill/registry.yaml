@@ -3,7 +3,7 @@
 # 版本: v1.0.0
 # 最后更新: 2026-04-02
 # Schema: schema/skill-registry.schema.json
-# 规范依据: specifications/agentos_contract/skill_contract.md
+# 规范依据: specifications/agentrt_contract/skill_contract.md
 # =============================================================================
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
 
@@ -45,8 +45,8 @@ skills:
       - "file:write"
     dependencies: []
     compatibility:
-      min_agentos_version: "1.0.0"
-      max_agentos_version: "2.0.0"
+      min_agentrt_version: "1.0.0"
+      max_agentrt_version: "2.0.0"
       platforms: ["linux", "macos", "windows"]
     resource_limits:
       max_memory_mb: 128
@@ -78,8 +78,8 @@ skills:
       - "code:execute:shell"
     dependencies: []
     compatibility:
-      min_agentos_version: "1.0.0"
-      max_agentos_version: "2.0.0"
+      min_agentrt_version: "1.0.0"
+      max_agentrt_version: "2.0.0"
       platforms: ["linux", "macos"]
     resource_limits:
       max_memory_mb: 256
@@ -110,8 +110,8 @@ skills:
       - "network:connect"
     dependencies: []
     compatibility:
-      min_agentos_version: "1.0.0"
-      max_agentos_version: "2.0.0"
+      min_agentrt_version: "1.0.0"
+      max_agentrt_version: "2.0.0"
       platforms: ["linux", "macos", "windows"]
     resource_limits:
       max_memory_mb: 128
@@ -142,8 +142,8 @@ skills:
       - "code:execute:python"
     dependencies: []
     compatibility:
-      min_agentos_version: "1.0.0"
-      max_agentos_version: "2.0.0"
+      min_agentrt_version: "1.0.0"
+      max_agentrt_version: "2.0.0"
       platforms: ["linux", "macos", "windows"]
     resource_limits:
       max_memory_mb: 512
@@ -174,8 +174,8 @@ skills:
       - "code:execute:javascript"
     dependencies: []
     compatibility:
-      min_agentos_version: "1.0.0"
-      max_agentos_version: "2.0.0"
+      min_agentrt_version: "1.0.0"
+      max_agentrt_version: "2.0.0"
       platforms: ["linux", "macos", "windows"]
     resource_limits:
       max_memory_mb: 256
@@ -207,8 +207,8 @@ skills:
       - "database:query"
     dependencies: []
     compatibility:
-      min_agentos_version: "1.0.0"
-      max_agentos_version: "2.0.0"
+      min_agentrt_version: "1.0.0"
+      max_agentrt_version: "2.0.0"
       platforms: ["linux", "macos", "windows"]
     resource_limits:
       max_memory_mb: 256
@@ -243,8 +243,8 @@ skills:
         version: ">=1.0.0"
         optional: true
     compatibility:
-      min_agentos_version: "1.0.0"
-      max_agentos_version: "2.0.0"
+      min_agentrt_version: "1.0.0"
+      max_agentrt_version: "2.0.0"
       platforms: ["linux", "macos", "windows"]
     resource_limits:
       max_memory_mb: 1024
@@ -281,8 +281,8 @@ skills:
         version: ">=1.0.0"
         optional: false
     compatibility:
-      min_agentos_version: "1.0.0"
-      max_agentos_version: "2.0.0"
+      min_agentrt_version: "1.0.0"
+      max_agentrt_version: "2.0.0"
       platforms: ["linux", "macos", "windows"]
     resource_limits:
       max_memory_mb: 256
@@ -314,8 +314,8 @@ skills:
       - "vector:search"
     dependencies: []
     compatibility:
-      min_agentos_version: "1.0.0"
-      max_agentos_version: "2.0.0"
+      min_agentrt_version: "1.0.0"
+      max_agentrt_version: "2.0.0"
       platforms: ["linux", "macos", "windows"]
     resource_limits:
       max_memory_mb: 512
@@ -344,14 +344,14 @@ skills:
     unit_type: "tool"
     contract_path: "ecosystem/openlab/contrib/skills/log_analysis/contract.json"
     permissions:
-      - "file:read:${AGENTOS_LOG_DIR}/*"
+      - "file:read:${AGENTRT_LOG_DIR}/*"
     dependencies:
       - skill_id: "filesystem_skill"
         version: ">=1.0.0"
         optional: false
     compatibility:
-      min_agentos_version: "1.0.0"
-      max_agentos_version: "2.0.0"
+      min_agentrt_version: "1.0.0"
+      max_agentrt_version: "2.0.0"
       platforms: ["linux", "macos", "windows"]
     resource_limits:
       max_memory_mb: 256

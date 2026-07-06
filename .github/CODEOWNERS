@@ -15,25 +15,25 @@
 # =============================================================================
 
 # Core Kernel & Runtime (atoms/corekern, syscall, coreloopthree, memoryrovol, taskflow)
-/agentos/atoms/corekern/       @spharx-org/team-core-runtime
-/agentos/atoms/syscall/        @spharx-org/team-core-runtime
-/agentos/atoms/coreloopthree/  @spharx-org/team-core-runtime
-/agentos/atoms/memoryrovol/    @spharx-org/team-core-runtime
-/agentos/atoms/taskflow/       @spharx-org/team-core-runtime
+/agentrt/atoms/corekern/       @spharx-org/team-core-runtime
+/agentrt/atoms/syscall/        @spharx-org/team-core-runtime
+/agentrt/atoms/coreloopthree/  @spharx-org/team-core-runtime
+/agentrt/atoms/memoryrovol/    @spharx-org/team-core-runtime
+/agentrt/atoms/taskflow/       @spharx-org/team-core-runtime
 
 # Common Libraries
-/agentos/commons/              @spharx-org/team-core-runtime
+/agentrt/commons/              @spharx-org/team-core-runtime
 
 # User-space Services (daemon, gateway, cupolas, heapstore, protocols)
-/agentos/daemon/               @spharx-org/team-services
-/agentos/gateway/              @spharx-org/team-services
-/agentos/cupolas/              @spharx-org/team-services
-/agentos/heapstore/            @spharx-org/team-services
-/agentos/protocols/            @spharx-org/team-services
+/agentrt/daemon/               @spharx-org/team-services
+/agentrt/gateway/              @spharx-org/team-services
+/agentrt/cupolas/              @spharx-org/team-services
+/agentrt/heapstore/            @spharx-org/team-services
+/agentrt/protocols/            @spharx-org/team-services
 
 # SDK & Tooling (toolkit, openlab)
-/agentos/toolkit/              @spharx-org/team-sdk-tooling
-/agentos/openlab/              @spharx-org/team-sdk-tooling
+/agentrt/toolkit/              @spharx-org/team-sdk-tooling
+/agentrt/openlab/              @spharx-org/team-sdk-tooling
 
 # CI/CD & Testing
 /tests/                        @spharx-org/team-sdk-tooling
@@ -41,7 +41,7 @@
 
 # Build Configuration (all teams)
 /CMakeLists.txt                @spharx-org/reviewers
-/agentos/**/CMakeLists.txt     @spharx-org/reviewers
+/agentrt/**/CMakeLists.txt     @spharx-org/reviewers
 
 # Project Metadata
 /README.md                     @spharx-org/reviewers

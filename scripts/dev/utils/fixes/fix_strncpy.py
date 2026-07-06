@@ -35,7 +35,7 @@ for f in sorted(glob.glob('agentos/**/*.c', recursive=True)):
             prefix, dst, src, sz_var, prefix, dst, sz_var)
         return result
 
-    # Match strncpy with AGENTOS_STRNCPY_TERM pattern (parenthesized args + sizeof-1)
+    # Match strncpy with AGENTRT_STRNCPY_TERM pattern (parenthesized args + sizeof-1)
     new_content = re.sub(
         r'^(\s*)strncpy\(\([^)]+\)\),\([^)]+\),\(sizeof\([^)]+\)-1\)\);',
         fix_strncpy_match,

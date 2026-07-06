@@ -13,7 +13,7 @@ AgentRT TypeScript SDK 提供基于 TypeScript 的 AgentRT 系统编程接口，
 typescript/
 ├── src/
 │   ├── index.ts                # 模块入口，导出所有公共 API
-│   ├── agentos.ts              # AgentRT 主类 / createAgentRT 工厂
+│   ├── agentrt.ts              # AgentRT 主类 / createAgentRT 工厂
 │   ├── manager.ts              # 配置管理（ConfigOption/环境变量）
 │   ├── config.ts               # 配置类型定义
 │   ├── errors.ts               # 错误定义与错误码
@@ -66,7 +66,7 @@ typescript/
 ### AgentRT 主类
 
 ```typescript
-import { AgentRT, createAgentRT } from 'agentos';
+import { AgentRT, createAgentRT } from 'agentrt';
 
 const client = new AgentRT({
     endpoint: 'http://localhost:18789',
@@ -121,7 +121,7 @@ import {
     withAPIKey, withUserAgent, withDebug,
     withLogLevel, withMaxConnections, withHeaders,
     validateConfig, cloneConfig, mergeConfig,
-} from 'agentos';
+} from 'agentrt';
 
 const config = newConfig(
     withEndpoint('http://localhost:18789'),
@@ -222,7 +222,7 @@ npm run lint
 ### 基本使用
 
 ```typescript
-import { AgentRT } from 'agentos';
+import { AgentRT } from 'agentrt';
 
 const client = new AgentRT({ endpoint: 'http://localhost:18789' });
 
@@ -236,11 +236,11 @@ await client.close();
 ### 使用工厂函数
 
 ```typescript
-import { createAgentRT } from 'agentos';
+import { createAgentRT } from 'agentrt';
 
 const client = createAgentRT({
     endpoint: 'http://localhost:18789',
-    apiKey: process.env.AGENTOS_API_KEY,
+    apiKey: process.env.AGENTRT_API_KEY,
     timeout: 30000,
 });
 
@@ -251,7 +251,7 @@ const results = await client.memoryManager().search('data', 5);
 ### 使用系统调用
 
 ```typescript
-import { HttpSyscallBinding, TaskSyscall } from 'agentos';
+import { HttpSyscallBinding, TaskSyscall } from 'agentrt';
 
 const binding = new HttpSyscallBinding('http://localhost:18789');
 const taskSyscall = new TaskSyscall(binding);

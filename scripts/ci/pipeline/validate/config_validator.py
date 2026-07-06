@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
-# config_validator.py — AgentRT agentos.yaml Schema 校验器 (ACC-C19)
+# config_validator.py — AgentRT agentrt.yaml Schema 校验器 (ACC-C19)
 #
 # 用法:
-#   python3 scripts/ci/pipeline/validate/config_validator.py [--config agentos.yaml] [--strict]
+#   python3 scripts/ci/pipeline/validate/config_validator.py [--config agentrt.yaml] [--strict]
 #
 # 校验项:
 #   1. YAML 语法合法性
@@ -26,7 +26,7 @@ except ImportError:
 
 
 # ============================================================================
-# Schema 定义 — agentos.yaml v0.1.1
+# Schema 定义 — agentrt.yaml v0.1.1
 # ============================================================================
 
 # 必填字段定义: (key, type, validator_fn, description)
@@ -380,9 +380,9 @@ def validate_env_security(data: dict) -> List[ValidationWarning]:
 def main():
     import argparse
     parser = argparse.ArgumentParser(
-        description="AgentRT agentos.yaml Schema Validator (ACC-C19)")
-    parser.add_argument("--config", default="configs/agentos.yaml",
-                        help="Path to agentos.yaml (default: configs/agentos.yaml)")
+        description="AgentRT agentrt.yaml Schema Validator (ACC-C19)")
+    parser.add_argument("--config", default="configs/agentrt.yaml",
+                        help="Path to agentrt.yaml (default: configs/agentrt.yaml)")
     parser.add_argument("--strict", action="store_true",
                         help="Treat warnings as errors")
     parser.add_argument("--json", action="store_true",

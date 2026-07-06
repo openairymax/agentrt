@@ -5,12 +5,12 @@ AgentRT OpenLab: Market Error Mapping
 Maps market_d daemon error codes (from market_service.h / main.c) to
 Python exception classes for clean error handling in OpenLab Markets.
 
-Error code reference from agentos/daemon/market_d/src/main.c:
-  - MARKET_ERR_INVALID_PARAM   = AGENTOS_ERR_INVALID_PARAM
-  - MARKET_ERR_OUT_OF_MEMORY   = AGENTOS_ERR_OUT_OF_MEMORY
-  - MARKET_ERR_NOT_FOUND       = AGENTOS_ERR_NOT_FOUND
-  - MARKET_ERR_ALREADY_EXISTS  = AGENTOS_ERR_DAEMON_BASE + 0x20
-  - MARKET_ERR_INSTALL_FAIL    = AGENTOS_ERR_DAEMON_BASE + 0x21
+Error code reference from agentrt/daemons/market_d/src/main.c:
+  - MARKET_ERR_INVALID_PARAM   = AGENTRT_ERR_INVALID_PARAM
+  - MARKET_ERR_OUT_OF_MEMORY   = AGENTRT_ERR_OUT_OF_MEMORY
+  - MARKET_ERR_NOT_FOUND       = AGENTRT_ERR_NOT_FOUND
+  - MARKET_ERR_ALREADY_EXISTS  = AGENTRT_ERR_DAEMON_BASE + 0x20
+  - MARKET_ERR_INSTALL_FAIL    = AGENTRT_ERR_DAEMON_BASE + 0x21
 """
 
 from __future__ import annotations

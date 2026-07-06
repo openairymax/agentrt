@@ -330,7 +330,7 @@ def check_iac(result: CheckResult) -> CheckResult:
 # ─── Check 9: API 安全扫描 ──────────────────────────────────────────────────
 def check_api(result: CheckResult) -> CheckResult:
     """API security scan using OWASP ZAP baseline."""
-    gateway_port = os.environ.get("AGENTOS_GATEWAY_PORT", "8080")
+    gateway_port = os.environ.get("AGENTRT_GATEWAY_PORT", "8080")
     api_url = f"http://localhost:{gateway_port}"
 
     if tool_available("zap-baseline.py") or tool_available("zap.sh"):

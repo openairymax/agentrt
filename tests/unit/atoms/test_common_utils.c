@@ -15,7 +15,7 @@
 
 #include "memory_compat.h"
 #include "string_compat.h"
-#include "agentos_quality.h"
+#include "agentrt_quality.h"
 
 #define TEST_BUFFER_SIZE 256
 
@@ -25,7 +25,7 @@ int test_safe_strcpy_basic(void) {
     char dest[TEST_BUFFER_SIZE];
     const char* src = "Hello, AgentOS!";
 
-    int result = agentos_safe_strcpy(dest, sizeof(dest), src);
+    int result = agentrt_safe_strcpy(dest, sizeof(dest), src);
     if (result != 0) {
         printf("    复制失败\n");
         return 1;
@@ -44,7 +44,7 @@ int test_safe_strcpy_null_src(void) {
     printf("  测试空源字符串处理...\n");
 
     char dest[TEST_BUFFER_SIZE] = "original";
-    int result = agentos_safe_strcpy(dest, sizeof(dest), NULL);
+    int result = agentrt_safe_strcpy(dest, sizeof(dest), NULL);
 
     if (result == 0) {
         printf("    空源应返回错误\n");
@@ -58,7 +58,7 @@ int test_safe_strcpy_null_src(void) {
 int test_safe_strcpy_null_dest(void) {
     printf("  测试空目标缓冲区...\n");
 
-    int result = agentos_safe_strcpy(NULL, 100, "test");
+    int result = agentrt_safe_strcpy(NULL, 100, "test");
 
     if (result == 0) {
         printf("    空目标应返回错误\n");
@@ -75,7 +75,7 @@ int test_safe_strcpy_overflow(void) {
     char dest[10];
     const char* long_src = "This is a very long string that exceeds the buffer";
 
-    int result = agentos_safe_strcpy(dest, sizeof(dest), long_src);
+    int result = agentrt_safe_strcpy(dest, sizeof(dest), long_src);
 
     if (result != 0) {
         printf("    溢出时返回错误\n");
@@ -97,7 +97,7 @@ int test_safe_strcat_basic(void) {
     char dest[TEST_BUFFER_SIZE] = "Hello";
     const char* src = ", World!";
 
-    int result = agentos_safe_strcat(dest, sizeof(dest), src);
+    int result = agentrt_safe_strcat(dest, sizeof(dest), src);
     if (result != 0) {
         printf("    拼接失败\n");
         return 1;
@@ -116,9 +116,9 @@ int test_safe_strcat_empty_dest(void) {
     printf("  测试空目标拼接...\n");
 
     char dest[TEST_BUFFER_SIZE];
-    AGENTOS_MEMSET(dest, 0, sizeof(dest));
+    AGENTRT_MEMSET(dest, 0, sizeof(dest));
 
-    int result = agentos_safe_strcat(dest, sizeof(dest), "test");
+    int result = agentrt_safe_strcat(dest, sizeof(dest), "test");
     if (result != 0 || strcmp(dest, "test") != 0) {
         printf("    空目标拼接失败\n");
         return 1;
@@ -131,10 +131,10 @@ int test_safe_strcat_empty_dest(void) {
 int test_validate_non_negative(void) {
     printf("  测试非负整数验证...\n");
 
-    if (!agentos_validate_non_negative(0)) { return 1; }
-    if (!agentos_validate_non_negative(100)) { return 1; }
-    if (agentos_validate_non_negative(-1)) { return 1; }
-    if (agentos_validate_non_negative(INT32_MIN)) { return 1; }
+    if (!agentrt_validate_non_negative(0)) { return 1; }
+    if (!agentrt_validate_non_negative(100)) { return 1; }
+    if (agentrt_validate_non_negative(-1)) { return 1; }
+    if (agentrt_validate_non_negative(INT32_MIN)) { return 1; }
 
     printf("    非负整数验证测试通过\n");
     return 0;
@@ -143,10 +143,10 @@ int test_validate_non_negative(void) {
 int test_validate_positive(void) {
     printf("  测试正整数验证...\n");
 
-    if (agentos_validate_positive(0)) { return 1; }
-    if (!agentos_validate_positive(1)) { return 1; }
-    if (!agentos_validate_positive(100)) { return 1; }
-    if (agentos_validate_positive(-1)) { return 1; }
+    if (agentrt_validate_positive(0)) { return 1; }
+    if (!agentrt_validate_positive(1)) { return 1; }
+    if (!agentrt_validate_positive(100)) { return 1; }
+    if (agentrt_validate_positive(-1)) { return 1; }
 
     printf("    正整数验证测试通过\n");
     return 0;
@@ -155,11 +155,11 @@ int test_validate_positive(void) {
 int test_validate_percentage(void) {
     printf("  测试百分比验证...\n");
 
-    if (!agentos_validate_percentage(0.0f)) { return 1; }
-    if (!agentos_validate_percentage(50.5f)) { return 1; }
-    if (!agentos_validate_percentage(100.0f)) { return 1; }
-    if (agentos_validate_percentage(-1.0f)) { return 1; }
-    if (agentos_validate_percentage(101.0f)) { return 1; }
+    if (!agentrt_validate_percentage(0.0f)) { return 1; }
+    if (!agentrt_validate_percentage(50.5f)) { return 1; }
+    if (!agentrt_validate_percentage(100.0f)) { return 1; }
+    if (agentrt_validate_percentage(-1.0f)) { return 1; }
+    if (agentrt_validate_percentage(101.0f)) { return 1; }
 
     printf("    百分比验证测试通过\n");
     return 0;
@@ -168,11 +168,11 @@ int test_validate_percentage(void) {
 int test_validate_probability(void) {
     printf("  测试概率值验证...\n");
 
-    if (!agentos_validate_probability(0.0f)) { return 1; }
-    if (!agentos_validate_probability(0.5f)) { return 1; }
-    if (!agentos_validate_probability(1.0f)) { return 1; }
-    if (agentos_validate_probability(-0.1f)) { return 1; }
-    if (agentos_validate_probability(1.1f)) { return 1; }
+    if (!agentrt_validate_probability(0.0f)) { return 1; }
+    if (!agentrt_validate_probability(0.5f)) { return 1; }
+    if (!agentrt_validate_probability(1.0f)) { return 1; }
+    if (agentrt_validate_probability(-0.1f)) { return 1; }
+    if (agentrt_validate_probability(1.1f)) { return 1; }
 
     printf("    概率值验证测试通过\n");
     return 0;
@@ -181,11 +181,11 @@ int test_validate_probability(void) {
 int test_validate_priority(void) {
     printf("  测试优先级验证...\n");
 
-    if (!agentos_validate_priority(5, 0, 10)) { return 1; }
-    if (!agentos_validate_priority(0, 0, 10)) { return 1; }
-    if (!agentos_validate_priority(10, 0, 10)) { return 1; }
-    if (agentos_validate_priority(-1, 0, 10)) { return 1; }
-    if (agentos_validate_priority(11, 0, 10)) { return 1; }
+    if (!agentrt_validate_priority(5, 0, 10)) { return 1; }
+    if (!agentrt_validate_priority(0, 0, 10)) { return 1; }
+    if (!agentrt_validate_priority(10, 0, 10)) { return 1; }
+    if (agentrt_validate_priority(-1, 0, 10)) { return 1; }
+    if (agentrt_validate_priority(11, 0, 10)) { return 1; }
 
     printf("    优先级验证测试通过\n");
     return 0;
@@ -194,11 +194,11 @@ int test_validate_priority(void) {
 int test_timestamp_ns(void) {
     printf("  测试纳秒时间戳...\n");
 
-    uint64_t ts1 = agentos_get_timestamp_ns();
+    uint64_t ts1 = agentrt_get_timestamp_ns();
     
     for (volatile int i = 0; i < 10000; i++);
     
-    uint64_t ts2 = agentos_get_timestamp_ns();
+    uint64_t ts2 = agentrt_get_timestamp_ns();
 
     if (ts2 <= ts1) {
         printf("    时间戳应单调递增\n");
@@ -217,11 +217,11 @@ int test_timestamp_ns(void) {
 int test_timestamp_ms(void) {
     printf("  测试毫秒时间戳...\n");
 
-    uint64_t ts1 = agentos_get_timestamp_ms();
+    uint64_t ts1 = agentrt_get_timestamp_ms();
     
     for (volatile int i = 0; i < 100000; i++);
     
-    uint64_t ts2 = agentos_get_timestamp_ms();
+    uint64_t ts2 = agentrt_get_timestamp_ms();
 
     if (ts2 < ts1) {
         printf("    时间戳应单调递增\n");
@@ -238,25 +238,25 @@ int test_atomic_operations(void) {
 
     volatile int32_t counter = 0;
 
-    int32_t old = agentos_atomic_fetch_add(&counter, 10);
+    int32_t old = agentrt_atomic_fetch_add(&counter, 10);
     if (old != 0 || counter != 10) {
         printf("    原子加法结果错误\n");
         return 1;
     }
 
-    old = agentos_atomic_fetch_add(&counter, 5);
+    old = agentrt_atomic_fetch_add(&counter, 5);
     if (old != 10 || counter != 15) {
         printf("    原子加法结果错误\n");
         return 1;
     }
 
-    bool success = agentos_atomic_compare_exchange(&counter, 15, 20);
+    bool success = agentrt_atomic_compare_exchange(&counter, 15, 20);
     if (!success || counter != 20) {
         printf("    原子比较交换结果错误\n");
         return 1;
     }
 
-    success = agentos_atomic_compare_exchange(&counter, 15, 25);
+    success = agentrt_atomic_compare_exchange(&counter, 15, 25);
     if (success) {
         printf("    不应交换成功\n");
         return 1;
@@ -269,11 +269,11 @@ int test_atomic_operations(void) {
 int test_log_message(void) {
     printf("  测试日志消息...\n");
 
-    AGENTOS_LOG_DEBUG("Debug message: %d", 42);
-    AGENTOS_LOG_INFO("Info message: %s", "test");
-    AGENTOS_LOG_WARN("Warning message: %f", 3.14);
-    AGENTOS_LOG_ERROR("Error message: %s", "error");
-    AGENTOS_LOG_FATAL("Fatal message: %d", 999);
+    AGENTRT_LOG_DEBUG("Debug message: %d", 42);
+    AGENTRT_LOG_INFO("Info message: %s", "test");
+    AGENTRT_LOG_WARN("Warning message: %f", 3.14);
+    AGENTRT_LOG_ERROR("Error message: %s", "error");
+    AGENTRT_LOG_FATAL("Fatal message: %d", 999);
 
     printf("    日志消息测试通过\n");
     return 0;

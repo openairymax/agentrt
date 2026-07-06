@@ -23,12 +23,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
-MIGRATIONS_DIR="${PROJECT_ROOT}/agentos/heapstore/migrations"
-DB_HOST="${AGENTOS_POSTGRES_HOST:-localhost}"
-DB_PORT="${AGENTOS_POSTGRES_PORT:-5432}"
-DB_NAME="${AGENTOS_POSTGRES_DB:-agentrt}"
-DB_USER="${AGENTOS_POSTGRES_USER:-agentrt}"
-DB_PASSWORD="${AGENTOS_POSTGRES_PASSWORD:-}"
+MIGRATIONS_DIR="${PROJECT_ROOT}/agentrt/heapstore/migrations"
+DB_HOST="${AGENTRT_POSTGRES_HOST:-localhost}"
+DB_PORT="${AGENTRT_POSTGRES_PORT:-5432}"
+DB_NAME="${AGENTRT_POSTGRES_DB:-agentrt}"
+DB_USER="${AGENTRT_POSTGRES_USER:-agentrt}"
+DB_PASSWORD="${AGENTRT_POSTGRES_PASSWORD:-}"
 
 # 命令行参数
 COMMAND="${1:-status}"
@@ -105,7 +105,7 @@ do_status() {
     # 检查连接
     if ! "${PG_CMD[@]}" -c "SELECT 1" >/dev/null 2>&1; then
         log_error "Cannot connect to PostgreSQL at ${DB_HOST}:${DB_PORT}/${DB_NAME}"
-        log_info "Set AGENTOS_POSTGRES_HOST/PORT/DB/USER/PASSWORD env vars"
+        log_info "Set AGENTRT_POSTGRES_HOST/PORT/DB/USER/PASSWORD env vars"
         exit 1
     fi
 
@@ -356,8 +356,8 @@ case "${COMMAND}" in
         echo "Options:"
         echo "  --dry-run    Preview without executing"
         echo "  --force      Required for rollback"
-        echo "  --host HOST  PostgreSQL host (env: AGENTOS_POSTGRES_HOST)"
-        echo "  --port PORT  PostgreSQL port (env: AGENTOS_POSTGRES_PORT)"
+        echo "  --host HOST  PostgreSQL host (env: AGENTRT_POSTGRES_HOST)"
+        echo "  --port PORT  PostgreSQL port (env: AGENTRT_POSTGRES_PORT)"
         exit 0
         ;;
     *)

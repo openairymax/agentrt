@@ -10,26 +10,26 @@ MemoryManager, and SkillManager classes.
 
 遵循 ARCHITECTURAL_PRINCIPLES.md 的 E-8（可测试性原则）。
 
-Run with: pytest tests/test_managers.py -v --cov=agentos.modules --cov-report=term-missing
+Run with: pytest tests/test_managers.py -v --cov=agentrt.modules --cov-report=term-missing
 """
 
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime
 
-from agentos.client.client import APIClient, APIResponse
-from agentos.exceptions import AgentOSError, CODE_MISSING_PARAMETER, CODE_INVALID_RESPONSE, CODE_TASK_TIMEOUT
-from agentos.types.common import (
+from agentrt.client.client import APIClient, APIResponse
+from agentrt.exceptions import AgentOSError, CODE_MISSING_PARAMETER, CODE_INVALID_RESPONSE, CODE_TASK_TIMEOUT
+from agentrt.types.common import (
     Task, TaskStatus, TaskResult,
     Session, SessionStatus,
     Memory, MemoryLayer, MemorySearchResult,
     Skill, SkillStatus, SkillResult, SkillInfo,
     ListOptions, PaginationOptions
 )
-from agentos.modules.task.manager import TaskManager
-from agentos.modules.session.manager import SessionManager
-from agentos.modules.memory.manager import MemoryManager, MemoryWriteItem
-from agentos.modules.skill.manager import SkillManager, SkillExecuteRequest
+from agentrt.modules.task.manager import TaskManager
+from agentrt.modules.session.manager import SessionManager
+from agentrt.modules.memory.manager import MemoryManager, MemoryWriteItem
+from agentrt.modules.skill.manager import SkillManager, SkillExecuteRequest
 
 
 class TestTaskManager:

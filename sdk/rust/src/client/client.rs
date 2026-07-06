@@ -54,7 +54,7 @@ impl Client {
     ///
     /// # 示例
     /// ```rust
-    /// use agentos_rs::Client;
+    /// use agentrt_rs::Client;
     ///
     /// let client = Client::new("http://localhost:18789");
     /// ```
@@ -351,7 +351,7 @@ impl ClientBuilder {
     /// 创建新的构建器
     pub fn new(endpoint: &str) -> Self {
         let endpoint = if endpoint.is_empty() {
-            std::env::var("AGENTOS_ENDPOINT")
+            std::env::var("AGENTRT_ENDPOINT")
                 .unwrap_or_else(|_| "http://127.0.0.1:18789".to_string())
         } else {
             let trimmed = endpoint.trim_end_matches('/');

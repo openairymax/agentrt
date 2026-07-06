@@ -66,7 +66,7 @@ security:
   
   rules:
     - id: "file_read_temp"
-      resource: "file:read:${AGENTOS_TEMP_DIR}/*"
+      resource: "file:read:${AGENTRT_TEMP_DIR}/*"
       action: "read"
       effect: "allow"
       priority: 10
@@ -86,7 +86,7 @@ logging:
   output: "both"
   
   file:
-    base_dir: "${AGENTOS_LOG_DIR}"
+    base_dir: "${AGENTRT_LOG_DIR}"
     max_size_mb: 50
     backups: 5
     rotate_daily: true

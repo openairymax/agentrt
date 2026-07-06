@@ -4,8 +4,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-AGENTOS_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-BUILD_DIR="${AGENTOS_BUILD_DIR:-$(mktemp -d /tmp/agentos_build_XXXXXX)}"
+AGENTRT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+BUILD_DIR="${AGENTRT_BUILD_DIR:-$(mktemp -d /tmp/agentrt_build_XXXXXX)}"
 
 COLOR_RED='\033[0;31m'
 COLOR_GREEN='\033[0;32m'
@@ -39,12 +39,12 @@ echo "╚═══════════════════════�
 section "1. Clean Build (Compilation)"
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
-if cmake "$AGENTOS_ROOT/agentos" > /dev/null 2>&1; then
+if cmake "$AGENTRT_ROOT/agentos" > /dev/null 2>&1; then
     CMAKE_OUTPUT=$(cmake --build . 2>&1 || true)
     ERROR_COUNT=$(echo "$CMAKE_OUTPUT" | grep -c "error:" || true)
     WARNING_COUNT=$(echo "$CMAKE_OUTPUT" | grep -c "warning:" || true)
     
-    DAEMON_ERRORS=$(echo "$CMAKE_OUTPUT" | grep "error:" | grep -c "daemon/" || true)
+    DAEMON_ERRORS=$(echo "$CMAKE_OUTPUT" | grep "error:" | grep -c "daemons/" || true)
     NON_DAEMON_ERRORS=$((ERROR_COUNT - DAEMON_ERRORS))
     
     if [ "$NON_DAEMON_ERRORS" -eq 0 ]; then
@@ -63,7 +63,7 @@ else
 fi
 
 section "2. flawfinder Security Scan (Level 4)"
-cd "$AGENTOS_ROOT/agentos"
+cd "$AGENTRT_ROOT/agentos"
 L4_HITS=$(flawfinder --minlevel 4 atoms/ commons/ cupolas/ 2>&1 | grep -c "\[4\]" || true)
 L4_THRESHOLD=10
 
@@ -94,7 +94,7 @@ fi
 
 section "4. Security Check Script (SEC-001~SEC-011)"
 SEC_RESULT=$(python3 "$SCRIPT_DIR/security_check.py" \
-    "$AGENTOS_ROOT/agentos/atoms/" "$AGENTOS_ROOT/agentos/commons/" 2>&1 || true)
+    "$AGENTRT_ROOT/agentrt/atoms/" "$AGENTRT_ROOT/agentrt/commons/" 2>&1 || true)
 
 CRITICAL_COUNT=$(echo "$SEC_RESULT" | grep -c "CRITICAL" || true)
 HIGH_COUNT=$(echo "$SEC_RESULT" | grep -c "\[HIGH\]" || true)
@@ -108,12 +108,12 @@ else
 fi
 
 section "5. Vulnerability Pattern Verification"
-SHELL_CMD_ALLOWED=$(grep -c "is_shell_command_allowed" "$AGENTOS_ROOT/agentos/atoms/coreloopthree/src/execution/units/shell.c" 2>/dev/null || echo "0")
-PATH_TRAVERSAL_CHECK=$(grep -c "is_path_component_safe\|is_path_traversal_attempt" "$AGENTOS_ROOT/agentos/atoms/coreloopthree/src/execution/units/file.c" 2>/dev/null || echo "0")
-SQL_INJECTION_CHECK=$(grep -c "DANGEROUS_SQL_KEYWORDS\|is_safe_query" "$AGENTOS_ROOT/agentos/atoms/coreloopthree/src/execution/units/db.c" 2>/dev/null || echo "0")
-SSRF_CHECK=$(grep -c "is_private_ip\|is_safe_url" "$AGENTOS_ROOT/agentos/atoms/coreloopthree/src/execution/units/browser.c" 2>/dev/null || echo "0")
+SHELL_CMD_ALLOWED=$(grep -c "is_shell_command_allowed" "$AGENTRT_ROOT/agentrt/atoms/coreloopthree/src/execution/units/shell.c" 2>/dev/null || echo "0")
+PATH_TRAVERSAL_CHECK=$(grep -c "is_path_component_safe\|is_path_traversal_attempt" "$AGENTRT_ROOT/agentrt/atoms/coreloopthree/src/execution/units/file.c" 2>/dev/null || echo "0")
+SQL_INJECTION_CHECK=$(grep -c "DANGEROUS_SQL_KEYWORDS\|is_safe_query" "$AGENTRT_ROOT/agentrt/atoms/coreloopthree/src/execution/units/db.c" 2>/dev/null || echo "0")
+SSRF_CHECK=$(grep -c "is_private_ip\|is_safe_url" "$AGENTRT_ROOT/agentrt/atoms/coreloopthree/src/execution/units/browser.c" 2>/dev/null || echo "0")
 # R-09-01-6: memoryrovol migrated, storage.c path check deprecated
-# MEMORYROV_PATH_CHECK=$(grep -c "is_path_component_safe" "$AGENTOS_ROOT/agentos/atoms/memoryrovol/src/layer1_raw/storage.c" 2>/dev/null || echo "0")
+# MEMORYROV_PATH_CHECK=$(grep -c "is_path_component_safe" "$AGENTRT_ROOT/agentrt/atoms/memoryrovol/src/layer1_raw/storage.c" 2>/dev/null || echo "0")
 
 if [ "$SHELL_CMD_ALLOWED" -ge 1 ]; then pass "shell.c: Command whitelist validation present"; else warn "shell.c: Missing command validation (file may not exist yet)"; fi
 if [ "$PATH_TRAVERSAL_CHECK" -ge 1 ]; then pass "file.c: Path traversal protection present"; else warn "file.c: Missing path traversal check (file may not exist yet)"; fi
@@ -123,12 +123,12 @@ if [ "$MEMORYROV_PATH_CHECK" -ge 1 ]; then pass "storage.c: Memory path validati
 
 section "6. Python SDK Syntax Validation"
 PYTHON_FILES=(
-    "$AGENTOS_ROOT/sdk/python/agentos/exceptions.py"
-    "$AGENTOS_ROOT/sdk/python/agentos/agent.py"
-    "$AGENTOS_ROOT/sdk/python/agentos/task.py"
-    "$AGENTOS_ROOT/sdk/python/agentos/protocol.py"
-    "$AGENTOS_ROOT/sdk/python/agentos/client/client.py"
-    "$AGENTOS_ROOT/sdk/python/agentos/session.py"
+    "$AGENTRT_ROOT/sdk/python/agentos/exceptions.py"
+    "$AGENTRT_ROOT/sdk/python/agentos/agent.py"
+    "$AGENTRT_ROOT/sdk/python/agentos/task.py"
+    "$AGENTRT_ROOT/sdk/python/agentos/protocol.py"
+    "$AGENTRT_ROOT/sdk/python/agentos/client/client.py"
+    "$AGENTRT_ROOT/sdk/python/agentos/session.py"
 )
 PYTHON_FAIL=0
 PYTHON_FOUND=0

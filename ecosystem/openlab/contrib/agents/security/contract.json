@@ -5,8 +5,8 @@
   "agent_name": "Security Agent",
   "description": "安全审计智能体，负责安全评估、漏洞扫描和安全策略制定",
   "version": "0.1.0",
-  "author": "Spharx AgentRT Team",
-  "license": "Apache-2.0",
+  "author": "SPHARX Ltd. - Airymax Team",
+  "license": "AGPL-3.0-or-later OR Apache-2.0",
   
   "capabilities": [
     {

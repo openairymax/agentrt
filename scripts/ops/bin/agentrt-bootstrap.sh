@@ -3,7 +3,7 @@
 # =============================================================================
 # agentrt-bootstrap.sh — AgentRT 一键启动脚本
 # Copyright (C) 2025-2026 SPHARX Ltd.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 #
 # P1.23.3: 按 DAG 层级顺序启动所有 daemon，等待每个 daemon
 #          健康检查通过后再启动下一层。
@@ -12,7 +12,7 @@
 #   bash agentrt-bootstrap.sh [选项]
 #
 # 选项:
-#   -c <config>    指定 agentos.yaml 配置文件
+#   -c <config>    指定 agentrt.yaml 配置文件
 #   -b <bindir>    指定 daemon 二进制目录 (默认: /usr/local/bin)
 #   -r <runtimedir> 指定运行时目录 (默认: /tmp/agentos)
 #   -t <timeout>   全局健康检查超时秒数 (默认: 120)
@@ -45,9 +45,9 @@ log_debug() { ((SILENT)) || echo -e "${BLUE}[DEBUG]${NC} $*"; }
 
 # ==================== 默认值 ====================
 
-AGENTOS_BINDIR="${AGENTOS_BINDIR:-/usr/local/bin}"
-AGENTOS_RUNTIME_DIR="${AGENTOS_RUNTIME_DIR:-/tmp/agentos}"
-AGENTOS_CONFIG="${AGENTOS_CONFIG:-}"
+AGENTRT_BINDIR="${AGENTRT_BINDIR:-/usr/local/bin}"
+AGENTRT_RUNTIME_DIR="${AGENTRT_RUNTIME_DIR:-/tmp/agentos}"
+AGENTRT_CONFIG="${AGENTRT_CONFIG:-}"
 GLOBAL_TIMEOUT_SEC=120
 HEALTH_CHECK_INTERVAL_SEC=1
 
@@ -89,19 +89,19 @@ declare -A DAEMON_PORT=(
 )
 
 # daemon 二进制名称映射 (daemon_name -> binary_name)
-# CMake 构建产出使用 agentos-<name>-d 命名，channel_d/gateway_d 例外
+# CMake 构建产出使用 agentrt-<name>-d 命名，channel_d/gateway_d 例外
 declare -A DAEMON_BIN_NAME=(
-    [monit_d]="agentos-monit-d"
-    [observe_d]="agentos-observe-d"
-    [info_d]="agentos-info-d"
-    [notify_d]="agentos-notify-d"
-    [sched_d]="agentos-sched-d"
+    [monit_d]="monit_d"
+    [observe_d]="observe_d"
+    [info_d]="info_d"
+    [notify_d]="notify_d"
+    [sched_d]="sched_d"
     [channel_d]="channel_d"
-    [llm_d]="agentos-llm-d"
-    [tool_d]="agentos-tool-d"
-    [hook_d]="agentos-hook-d"
-    [plugin_d]="agentos-plugin-d"
-    [market_d]="agentos-market-d"
+    [llm_d]="llm_d"
+    [tool_d]="tool_d"
+    [hook_d]="hook_d"
+    [plugin_d]="plugin_d"
+    [market_d]="market_d"
     [gateway_d]="gateway_d"
 )
 
@@ -119,7 +119,7 @@ AgentRT Bootstrap Script — 一键按序启动所有 daemon
 Usage: bash agentrt-bootstrap.sh [options]
 
 Options:
-  -c <config>      指定 agentos.yaml 配置文件
+  -c <config>      指定 agentrt.yaml 配置文件
   -b <bindir>      指定 daemon 二进制目录 (默认: /usr/local/bin)
   -r <runtimedir>  指定运行时目录 (默认: /tmp/agentos)
   -t <timeout>     全局健康检查超时秒数 (默认: 120)
@@ -144,9 +144,9 @@ EOF
 parse_args() {
     while getopts ":c:b:r:t:snh" opt; do
         case "$opt" in
-            c) AGENTOS_CONFIG="$OPTARG" ;;
-            b) AGENTOS_BINDIR="$OPTARG" ;;
-            r) AGENTOS_RUNTIME_DIR="$OPTARG" ;;
+            c) AGENTRT_CONFIG="$OPTARG" ;;
+            b) AGENTRT_BINDIR="$OPTARG" ;;
+            r) AGENTRT_RUNTIME_DIR="$OPTARG" ;;
             t) GLOBAL_TIMEOUT_SEC="$OPTARG" ;;
             s) SILENT=1 ;;
             n) DRY_RUN=1 ;;
@@ -162,7 +162,7 @@ check_daemon_health_unix() {
     local name="$1"
     # daemon socket 名称不带 _d 后缀 (monit_d → monit.sock)
     local short_name="${name%_d}"
-    local sock_path="${AGENTOS_RUNTIME_DIR}/${short_name}.sock"
+    local sock_path="${AGENTRT_RUNTIME_DIR}/${short_name}.sock"
 
     # 检查 Unix Socket 是否存在且可连接
     if [[ -S "$sock_path" ]]; then
@@ -234,11 +234,11 @@ wait_for_daemon() {
 start_daemon() {
     local name="$1"
     local bin_name="${DAEMON_BIN_NAME[$name]:-$name}"
-    local bin_path="${AGENTOS_BINDIR}/${bin_name}"
+    local bin_path="${AGENTRT_BINDIR}/${bin_name}"
 
     local cmd=("$bin_path")
-    if [[ -n "$AGENTOS_CONFIG" ]]; then
-        cmd+=("-c" "$AGENTOS_CONFIG")
+    if [[ -n "$AGENTRT_CONFIG" ]]; then
+        cmd+=("-c" "$AGENTRT_CONFIG")
     fi
 
     log_step "Starting $name..."
@@ -257,7 +257,7 @@ start_daemon() {
     fi
 
     # 确保 runtime 目录存在
-    mkdir -p "$AGENTOS_RUNTIME_DIR"
+    mkdir -p "$AGENTRT_RUNTIME_DIR"
 
     # 启动 daemon（后台运行）
     "${cmd[@]}" &
@@ -357,16 +357,16 @@ main() {
     parse_args "$@"
 
     log_info "AgentRT Bootstrap v0.1.1"
-    log_info "  Bindir:    $AGENTOS_BINDIR"
-    log_info "  Runtime:   $AGENTOS_RUNTIME_DIR"
-    log_info "  Config:    ${AGENTOS_CONFIG:-<none>}"
+    log_info "  Bindir:    $AGENTRT_BINDIR"
+    log_info "  Runtime:   $AGENTRT_RUNTIME_DIR"
+    log_info "  Config:    ${AGENTRT_CONFIG:-<none>}"
     log_info "  Timeout:   ${GLOBAL_TIMEOUT_SEC}s"
     log_info "  Dry-run:   $DRY_RUN"
     echo ""
 
     # 前置检查
-    if ! ((DRY_RUN)) && [[ ! -d "$AGENTOS_BINDIR" ]]; then
-        log_error "Binary directory not found: $AGENTOS_BINDIR"
+    if ! ((DRY_RUN)) && [[ ! -d "$AGENTRT_BINDIR" ]]; then
+        log_error "Binary directory not found: $AGENTRT_BINDIR"
         exit 1
     fi
 

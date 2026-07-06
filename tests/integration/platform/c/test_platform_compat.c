@@ -26,15 +26,15 @@
 #include <unistd.h>
 
 /* corekern */
-#include "agentos.h"
+#include "agentrt.h"
 #include "mem.h"
 #include "task.h"
 #include "ipc.h"
 #include "error.h"
-#include "agentos_time.h"
+#include "agentrt_time.h"
 #include "observability.h"
 
-/* daemon/common */
+/* daemons/common */
 #include "svc_common.h"
 #include "circuit_breaker.h"
 #include "config_manager.h"
@@ -97,50 +97,50 @@ static void pt_platform_detection(void)
 {
     printf("\n--- [PT-01] 平台检测宏 ---\n");
 
-#if defined(AGENTOS_PLATFORM_LINUX)
+#if defined(AGENTRT_PLATFORM_LINUX)
     TEST_ASSERT(1, "当前平台: Linux");
-    TEST_ASSERT_EQ(AGENTOS_PLATFORM_LINUX, 1, "AGENTOS_PLATFORM_LINUX=1");
-#elif defined(AGENTOS_PLATFORM_WINDOWS)
+    TEST_ASSERT_EQ(AGENTRT_PLATFORM_LINUX, 1, "AGENTRT_PLATFORM_LINUX=1");
+#elif defined(AGENTRT_PLATFORM_WINDOWS)
     TEST_ASSERT(1, "当前平台: Windows");
-    TEST_ASSERT_EQ(AGENTOS_PLATFORM_WINDOWS, 1, "AGENTOS_PLATFORM_WINDOWS=1");
-#elif defined(AGENTOS_PLATFORM_MACOS)
+    TEST_ASSERT_EQ(AGENTRT_PLATFORM_WINDOWS, 1, "AGENTRT_PLATFORM_WINDOWS=1");
+#elif defined(AGENTRT_PLATFORM_MACOS)
     TEST_ASSERT(1, "当前平台: macOS");
-    TEST_ASSERT_EQ(AGENTOS_PLATFORM_MACOS, 1, "AGENTOS_PLATFORM_MACOS=1");
+    TEST_ASSERT_EQ(AGENTRT_PLATFORM_MACOS, 1, "AGENTRT_PLATFORM_MACOS=1");
 #else
     TEST_ASSERT(0, "未知平台!");
 #endif
 
     /* 平台名称非空 */
-    const char* name = AGENTOS_PLATFORM_NAME;
+    const char* name = AGENTRT_PLATFORM_NAME;
     TEST_ASSERT(name != NULL && strlen(name) > 0,
-                "AGENTOS_PLATFORM_NAME 有效");
+                "AGENTRT_PLATFORM_NAME 有效");
 
     /* 平台位数有效 */
     #if defined(__x86_64__) || defined(__aarch64__) || defined(_WIN64)
-    TEST_ASSERT_EQ(AGENTOS_PLATFORM_BITS, 64, "64位系统");
+    TEST_ASSERT_EQ(AGENTRT_PLATFORM_BITS, 64, "64位系统");
     #elif defined(__i386__) || defined(_WIN32)
-    TEST_ASSERT_EQ(AGENTOS_PLATFORM_BITS, 32, "32位系统");
+    TEST_ASSERT_EQ(AGENTRT_PLATFORM_BITS, 32, "32位系统");
     #else
-    TEST_ASSERT(AGENTOS_PLATFORM_BITS == 32 || AGENTOS_PLATFORM_BITS == 64,
+    TEST_ASSERT(AGENTRT_PLATFORM_BITS == 32 || AGENTRT_PLATFORM_BITS == 64,
                 "PLATFORM_BITS 为32或64");
     #endif
 
     /* POSIX标志 */
-    #if defined(AGENTOS_PLATFORM_POSIX)
-    TEST_ASSERT_EQ(AGENTOS_PLATFORM_POSIX, 1, "POSIX标志设置");
+    #if defined(AGENTRT_PLATFORM_POSIX)
+    TEST_ASSERT_EQ(AGENTRT_PLATFORM_POSIX, 1, "POSIX标志设置");
     #else
     TEST_ASSERT(1, "非POSIX平台标志未设置（Windows）");
     #endif
 
     /* CMake系统名匹配 */
     #if defined(_WIN32)
-    TEST_ASSERT(strcmp(AGENTOS_PLATFORM_NAME, "Windows") == 0,
+    TEST_ASSERT(strcmp(AGENTRT_PLATFORM_NAME, "Windows") == 0,
                 "CMake WIN32 与平台名称匹配");
     #elif defined(__APPLE__)
-    TEST_ASSERT(strcmp(AGENTOS_PLATFORM_NAME, "macOS") == 0,
+    TEST_ASSERT(strcmp(AGENTRT_PLATFORM_NAME, "macOS") == 0,
                 "CMake APPLE 与平台名称匹配");
     #elif defined(__linux__)
-    TEST_ASSERT(strcmp(AGENTOS_PLATFORM_NAME, "Linux") == 0,
+    TEST_ASSERT(strcmp(AGENTRT_PLATFORM_NAME, "Linux") == 0,
                 "CMake UNIX(Linux) 与平台名称匹配");
     #endif
 }
@@ -171,10 +171,10 @@ static void pt_type_sizes(void)
     TEST_ASSERT(sizeof(ssize_t) == sizeof(size_t), "ssize_t==size_t");
 
     /* 指针大小匹配平台位数 */
-    #if AGENTOS_PLATFORM_BITS == 64
+    #if AGENTRT_PLATFORM_BITS == 64
     TEST_ASSERT_EQ((int)sizeof(void*), 8, "64位平台: sizeof(void*)==8");
     TEST_ASSERT_EQ((int)sizeof(size_t), 8, "64位平台: sizeof(size_t)==8");
-    #elif AGENTOS_PLATFORM_BITS == 32
+    #elif AGENTRT_PLATFORM_BITS == 32
     TEST_ASSERT_EQ((int)sizeof(void*), 4, "32位平台: sizeof(void*)==4");
     TEST_ASSERT_EQ((int)sizeof(size_t), 4, "32位平台: sizeof(size_t)==4");
     #endif
@@ -237,34 +237,34 @@ static void pt_thread_api(void)
 {
     printf("\n--- [PT-04] 线程API可用性 ---\n");
 
-    agentos_task_init();
+    agentrt_task_init();
     g_thread_counter = 0;
 
     /* 创建线程 */
-    agentos_thread_t th;
-    int ret = agentos_platform_thread_create(&th, pt_thread_fn, NULL);
+    agentrt_thread_t th;
+    int ret = agentrt_platform_thread_create(&th, pt_thread_fn, NULL);
     TEST_ASSERT(ret == 0, "thread_create 成功");
 
     /* Join线程 */
-    ret = agentos_platform_thread_join(th, NULL);
+    ret = agentrt_platform_thread_join(th, NULL);
     TEST_ASSERT(ret == 0, "thread_join 成功");
 
     TEST_ASSERT_EQ(g_thread_counter, 1, "线程函数执行完成");
 
     /* 多线程 */
     #define PT_THREAD_COUNT 5
-    agentos_thread_t threads[PT_THREAD_COUNT];
+    agentrt_thread_t threads[PT_THREAD_COUNT];
     for (int i = 0; i < PT_THREAD_COUNT; i++) {
-        ret = agentos_platform_thread_create(&threads[i], pt_thread_fn, NULL);
+        ret = agentrt_platform_thread_create(&threads[i], pt_thread_fn, NULL);
         TEST_ASSERT(ret == 0, "多线程创建成功");
     }
 
     for (int i = 0; i < PT_THREAD_COUNT; i++) {
-        agentos_platform_thread_join(threads[i], NULL);
+        agentrt_platform_thread_join(threads[i], NULL);
     }
     TEST_ASSERT_EQ(g_thread_counter, PT_THREAD_COUNT + 1, "所有线程执行完成");
 
-    agentos_task_cleanup();
+    agentrt_task_cleanup();
 }
 
 /* ======================================================================== */
@@ -276,37 +276,37 @@ static void pt_sync_primitives(void)
     printf("\n--- [PT-05] 同步原语 ---\n");
 
     /* Mutex创建/销毁 */
-    agentos_mutex_t* mtx = agentos_mutex_create();
+    agentrt_mutex_t* mtx = agentrt_mutex_create();
     TEST_ASSERT_NOT_NULL(mtx, "mutex_create 成功");
 
-    agentos_mutex_lock(mtx);
-    agentos_mutex_unlock(mtx);
+    agentrt_mutex_lock(mtx);
+    agentrt_mutex_unlock(mtx);
     TEST_ASSERT(1, "lock/unlock 循环成功");
 
     /* 重复lock/unlock循环（非嵌套） */
-    agentos_mutex_lock(mtx);
-    agentos_mutex_unlock(mtx);
-    agentos_mutex_lock(mtx);
-    agentos_mutex_unlock(mtx);
+    agentrt_mutex_lock(mtx);
+    agentrt_mutex_unlock(mtx);
+    agentrt_mutex_lock(mtx);
+    agentrt_mutex_unlock(mtx);
     TEST_ASSERT(1, "重复lock/unlock循环安全");
 
-    agentos_mutex_free(mtx);
+    agentrt_mutex_free(mtx);
     TEST_ASSERT(1, "mutex_free 成功");
 
     /* Condvar */
-    agentos_cond_t* cond = agentos_cond_create();
+    agentrt_cond_t* cond = agentrt_cond_create();
     TEST_ASSERT_NOT_NULL(cond, "cond_create 成功");
 
-    agentos_cond_signal(cond);
-    agentos_cond_broadcast(cond);
+    agentrt_cond_signal(cond);
+    agentrt_cond_broadcast(cond);
     TEST_ASSERT(1, "cond_signal/broadcast 不崩溃");
 
-    agentos_cond_free(cond);
+    agentrt_cond_free(cond);
     TEST_ASSERT(1, "cond_free 成功");
 
     /* NULL安全 */
-    agentos_mutex_free(NULL);
-    agentos_cond_free(NULL);
+    agentrt_mutex_free(NULL);
+    agentrt_cond_free(NULL);
     TEST_ASSERT(1, "NULL参数安全");
 }
 
@@ -319,9 +319,9 @@ static void pt_time_precision(void)
     printf("\n--- [PT-06] 时间函数精度 ---\n");
 
     /* 单调时钟递增 */
-    uint64_t t1 = agentos_time_monotonic_ns();
+    uint64_t t1 = agentrt_time_monotonic_ns();
     usleep(1000); /* 1ms */
-    uint64_t t2 = agentos_time_monotonic_ns();
+    uint64_t t2 = agentrt_time_monotonic_ns();
 
     TEST_ASSERT(t2 >= t1, "单调时间不回退");
     uint64_t diff_us = (t2 - t1) / 1000;
@@ -329,19 +329,19 @@ static void pt_time_precision(void)
     TEST_ASSERT(diff_us <= 10000, "1ms睡眠后<=10ms经过（合理上限）");
 
     /* sleep精度 */
-    agentos_task_init();
+    agentrt_task_init();
 
-    uint64_t before_sleep = agentos_time_monotonic_ns();
-    agentos_task_sleep(50);
-    uint64_t after_sleep = agentos_time_monotonic_ns();
+    uint64_t before_sleep = agentrt_time_monotonic_ns();
+    agentrt_task_sleep(50);
+    uint64_t after_sleep = agentrt_time_monotonic_ns();
 
     uint64_t sleep_us = (after_sleep - before_sleep) / 1000;
     TEST_ASSERT(sleep_us >= 40000, "task_sleep(50ms)>=40ms");
     TEST_ASSERT(sleep_us <= 200000, "task_sleep(50ms)<=200ms");
 
-    agentos_task_cleanup();
+    agentrt_task_cleanup();
 
-    /* 时间戳格式 - agentos_time_format_iso8601 待实现 */
+    /* 时间戳格式 - agentrt_time_format_iso8601 待实现 */
     char ts_buf[64];
     time_t now = time(NULL);
     struct tm* tm_info = gmtime(&now);
@@ -361,7 +361,7 @@ static void pt_memory_cross_platform(void)
 {
     printf("\n--- [PT-07] 内存分配跨平台 ---\n");
 
-    agentos_mem_init(0);
+    agentrt_mem_init(0);
 
     /* 各种大小的分配 */
     size_t sizes[] = {1, 7, 31, 127, 512, 1023, 4096, 65536};
@@ -369,7 +369,7 @@ static void pt_memory_cross_platform(void)
     int alloc_ok = 1;
 
     for (size_t i = 0; i < sizeof(sizes)/sizeof(sizes[0]); i++) {
-        ptrs[i] = agentos_mem_alloc(sizes[i]);
+        ptrs[i] = agentrt_mem_alloc(sizes[i]);
         if (!ptrs[i]) alloc_ok = 0;
     }
     TEST_ASSERT(alloc_ok, "各种大小分配全部成功");
@@ -377,7 +377,7 @@ static void pt_memory_cross_platform(void)
     /* 写入并验证 */
     for (size_t i = 0; i < sizeof(sizes)/sizeof(sizes[0]); i++) {
         if (ptrs[i]) {
-            AGENTOS_MEMSET(ptrs[i], (unsigned char)(i & 0xFF), sizes[i]);
+            AGENTRT_MEMSET(ptrs[i], (unsigned char)(i & 0xFF), sizes[i]);
             unsigned char* p = (unsigned char*)ptrs[i];
             TEST_ASSERT(p[0] == (unsigned char)(i & 0xFF),
                         "写入数据可读回");
@@ -387,24 +387,24 @@ static void pt_memory_cross_platform(void)
     /* 对齐分配 */
     size_t alignments[] = {8, 16, 32, 64, 128, 256, 4096};
     for (size_t a = 0; a < sizeof(alignments)/sizeof(alignments[0]); a++) {
-        void* ap = agentos_mem_aligned_alloc(256, alignments[a]);
+        void* ap = agentrt_mem_aligned_alloc(256, alignments[a]);
         if (ap) {
             uintptr_t addr = (uintptr_t)ap;
             TEST_ASSERT(addr % alignments[a] == 0,
                         "aligned_alloc 地址对齐正确");
-            agentos_mem_aligned_free(ap);
+            agentrt_mem_aligned_free(ap);
         }
     }
 
     /* 释放所有 */
     for (size_t i = 0; i < sizeof(sizes)/sizeof(sizes[0]); i++) {
-        if (ptrs[i]) agentos_mem_free(ptrs[i]);
+        if (ptrs[i]) agentrt_mem_free(ptrs[i]);
     }
 
-    size_t leaks = agentos_mem_check_leaks();
+    size_t leaks = agentrt_mem_check_leaks();
     TEST_ASSERT_EQ(leaks, 0, "无内存泄漏");
 
-    agentos_mem_cleanup();
+    agentrt_mem_cleanup();
 }
 
 /* ======================================================================== */
@@ -433,7 +433,7 @@ static void pt_string_encoding(void)
 
     /* memcpy/memset 跨平台 */
     char buf[128];
-    AGENTOS_MEMSET(buf, 'X', sizeof(buf));
+    AGENTRT_MEMSET(buf, 'X', sizeof(buf));
     TEST_ASSERT(buf[0] == 'X' && buf[127] == 'X', "memset全范围覆盖");
 
     memcpy(buf, "ABCDEF", 6);
@@ -456,27 +456,27 @@ static void pt_error_codes(void)
     printf("\n--- [PT-09] 错误码一致性 ---\n");
 
     /* 核心错误码定义 */
-    TEST_ASSERT_EQ(AGENTOS_SUCCESS, 0, "SUCCESS=0");
-    TEST_ASSERT(AGENTOS_EINVAL != 0, "EINVAL!=0");
-    TEST_ASSERT(AGENTOS_ENOMEM != 0, "ENOMEM!=0");
-    TEST_ASSERT(AGENTOS_ENOTSUP != 0, "ENOTSUP!=0");
-    TEST_ASSERT(AGENTOS_EPERM != 0, "EPERM!=0");
-    TEST_ASSERT(AGENTOS_EAGAIN != 0, "EAGAIN!=0");
-    TEST_ASSERT(AGENTOS_EBUSY != 0, "EBUSY!=0");
-    TEST_ASSERT(AGENTOS_ETIMEDOUT != 0, "ETIMEDOUT!=0");
+    TEST_ASSERT_EQ(AGENTRT_SUCCESS, 0, "SUCCESS=0");
+    TEST_ASSERT(AGENTRT_EINVAL != 0, "EINVAL!=0");
+    TEST_ASSERT(AGENTRT_ENOMEM != 0, "ENOMEM!=0");
+    TEST_ASSERT(AGENTRT_ENOTSUP != 0, "ENOTSUP!=0");
+    TEST_ASSERT(AGENTRT_EPERM != 0, "EPERM!=0");
+    TEST_ASSERT(AGENTRT_EAGAIN != 0, "EAGAIN!=0");
+    TEST_ASSERT(AGENTRT_EBUSY != 0, "EBUSY!=0");
+    TEST_ASSERT(AGENTRT_ETIMEDOUT != 0, "ETIMEDOUT!=0");
 
     /* 错误码互不相同 */
-    TEST_ASSERT(AGENTOS_EINVAL != AGENTOS_ENOMEM,
+    TEST_ASSERT(AGENTRT_EINVAL != AGENTRT_ENOMEM,
                 "EINVAL!=ENOMEM");
-    TEST_ASSERT(AGENTOS_ENOMEM != AGENTOS_ETIMEDOUT,
+    TEST_ASSERT(AGENTRT_ENOMEM != AGENTRT_ETIMEDOUT,
                 "ENOMEM!=ETIMEDOUT");
 
     /* daemon错误码 - 常量待定义 */
-    /* TEST_ASSERT(AGENTOS_SVC_ERR_NONE == 0, "SVC_ERR_NONE=0"); */
-    /* TEST_ASSERT(AGENTOS_SVC_ERR_INVALID_PARAM != 0, "SVC_ERR_INVALID_PARAM!=0"); */
+    /* TEST_ASSERT(AGENTRT_SVC_ERR_NONE == 0, "SVC_ERR_NONE=0"); */
+    /* TEST_ASSERT(AGENTRT_SVC_ERR_INVALID_PARAM != 0, "SVC_ERR_INVALID_PARAM!=0"); */
 
     /* IPC错误码 - 常量待定义 */
-    /* TEST_ASSERT(AGENTOS_IPC_OK == 0, "IPC_OK=0"); */
+    /* TEST_ASSERT(AGENTRT_IPC_OK == 0, "IPC_OK=0"); */
 }
 
 /* ======================================================================== */
@@ -488,25 +488,25 @@ static void pt_api_versions(void)
     printf("\n--- [PT-10] API版本常量 ---\n");
 
     /* Core API版本 */
-    TEST_ASSERT_EQ(AGENTOS_CORE_API_VERSION_MAJOR, 1, "CORE MAJOR=1");
-    TEST_ASSERT(AGENTOS_CORE_API_VERSION_MINOR >= 0, "CORE MINOR>=0");
-    TEST_ASSERT(AGENTOS_CORE_API_VERSION_PATCH >= 0, "CORE PATCH>=0");
+    TEST_ASSERT_EQ(AGENTRT_CORE_API_VERSION_MAJOR, 1, "CORE MAJOR=1");
+    TEST_ASSERT(AGENTRT_CORE_API_VERSION_MINOR >= 0, "CORE MINOR>=0");
+    TEST_ASSERT(AGENTRT_CORE_API_VERSION_PATCH >= 0, "CORE PATCH>=0");
 
     /* IPC API版本 */
-    TEST_ASSERT_EQ(AGENTOS_IPC_API_VERSION_MAJOR, 1, "IPC MAJOR=1");
-    TEST_ASSERT(AGENTOS_IPC_API_VERSION_MINOR >= 0, "IPC MINOR>=0");
+    TEST_ASSERT_EQ(AGENTRT_IPC_API_VERSION_MAJOR, 1, "IPC MAJOR=1");
+    TEST_ASSERT(AGENTRT_IPC_API_VERSION_MINOR >= 0, "IPC MINOR>=0");
 
     /* CoreKern API版本 */
-    TEST_ASSERT_EQ(AGENTOS_COREKERN_API_VERSION, 1, "COREKERN VERSION=1");
+    TEST_ASSERT_EQ(AGENTRT_COREKERN_API_VERSION, 1, "COREKERN VERSION=1");
 
     /* Syscall API版本 */
     TEST_ASSERT_EQ(SYSCALL_API_VERSION_MAJOR, 1, "SYSCALL MAJOR=1");
     TEST_ASSERT(SYSCALL_API_VERSION_MINOR >= 0, "SYSCALL MINOR>=0");
 
     /* 版本号合理性 */
-    TEST_ASSERT(AGENTOS_CORE_API_VERSION_MAJOR <= 99,
+    TEST_ASSERT(AGENTRT_CORE_API_VERSION_MAJOR <= 99,
                 "MAJOR版本在合理范围(<100)");
-    TEST_ASSERT(AGENTOS_CORE_API_VERSION_MINOR <= 99,
+    TEST_ASSERT(AGENTRT_CORE_API_VERSION_MINOR <= 99,
                 "MINOR版本在合理范围(<100)");
 }
 
@@ -521,7 +521,7 @@ static void pt_config_paths(void)
     cm_init(NULL);
 
     /* Unix风格路径 */
-    cm_set("unix.path", AGENTOS_TMP_DIR "/config.json", "pt");
+    cm_set("unix.path", AGENTRT_TMP_DIR "/config.json", "pt");
     const char* upath = cm_get("unix.path", NULL);
     TEST_ASSERT(upath != NULL && upath[0] == '/',
                 "Unix绝对路径存储正确");
@@ -561,32 +561,32 @@ static void pt_full_init_chain(void)
 
     /* 所有子系统的init/shutdown循环 */
     for (int round = 0; round < 2; round++) {
-        agentos_mem_init(0);
-        agentos_task_init();
+        agentrt_mem_init(0);
+        agentrt_task_init();
 
-        agentos_error_t ipc_err = agentos_ipc_init();
-        TEST_ASSERT(ipc_err == AGENTOS_SUCCESS, "ipc_init成功");
+        agentrt_error_t ipc_err = agentrt_ipc_init();
+        TEST_ASSERT(ipc_err == AGENTRT_SUCCESS, "ipc_init成功");
 
-        agentos_observability_config_t obs_cfg = {
+        agentrt_observability_config_t obs_cfg = {
             .enable_metrics = 1, .enable_tracing = 1, .enable_health_check = 1
         };
-        int obs_ret = agentos_observability_init(&obs_cfg);
-        TEST_ASSERT(obs_ret == AGENTOS_SUCCESS, "observability_init成功");
+        int obs_ret = agentrt_observability_init(&obs_cfg);
+        TEST_ASSERT(obs_ret == AGENTRT_SUCCESS, "observability_init成功");
 
         cm_init(NULL);
         am_init(NULL);
 
         /* 功能验证 */
-        void* p = agentos_mem_alloc(1024);
+        void* p = agentrt_mem_alloc(1024);
         TEST_ASSERT_NOT_NULL(p, "内存分配工作");
-        if (p) agentos_mem_free(p);
+        if (p) agentrt_mem_free(p);
 
         am_shutdown();
         cm_shutdown();
-        agentos_observability_shutdown();
-        agentos_ipc_cleanup();
-        agentos_task_cleanup();
-        agentos_mem_cleanup();
+        agentrt_observability_shutdown();
+        agentrt_ipc_cleanup();
+        agentrt_task_cleanup();
+        agentrt_mem_cleanup();
     }
 
     TEST_ASSERT(1, "2轮完整init/shutdown链路成功");
@@ -613,8 +613,8 @@ int main(void)
            "Unknown"
 #endif
     );
-    printf("    AGENTOS_PLATFORM_NAME: %s\n", AGENTOS_PLATFORM_NAME);
-    printf("    AGENTOS_PLATFORM_BITS: %d\n", AGENTOS_PLATFORM_BITS);
+    printf("    AGENTRT_PLATFORM_NAME: %s\n", AGENTRT_PLATFORM_NAME);
+    printf("    AGENTRT_PLATFORM_BITS: %d\n", AGENTRT_PLATFORM_BITS);
     printf("    sizeof(void*): %zu\n", sizeof(void*));
     printf("    sizeof(size_t): %zu\n", sizeof(size_t));
 

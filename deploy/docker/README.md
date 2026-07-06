@@ -22,7 +22,7 @@ docker/
 ├── monitoring/                         # 监控配置
 │   ├── prometheus.yml                  # Prometheus 采集配置
 │   ├── alerts.yml                      # 告警规则
-│   └── grafana_agentos_dashboard.json  # Grafana 仪表盘
+│   └── grafana_agentrt_dashboard.json  # Grafana 仪表盘
 ├── secrets/                            # Docker Swarm 密钥目录（.gitkeep）
 └── README.md                           # 本文件
 ```
@@ -43,7 +43,7 @@ docker/
 - 非 root 用户 `agentos`（UID 1000）运行
 - 健康检查：`wget http://localhost:8080/health`
 - 暴露端口：8080（HTTP）/ 8081（WebSocket）/ 9090（Metrics）
-- 入口命令：`/usr/bin/gateway --manager /etc/agentos/gateway/manager.yaml`
+- 入口命令：`/usr/bin/gateway --manager /etc/agentrt/gateway/manager.yaml`
 
 ### docker-compose.yml
 
@@ -94,15 +94,15 @@ docker-compose down
 
 ```bash
 # 构建镜像
-docker build -t agentos-gateway:latest -f docker/Dockerfile .
+docker build -t agentrt-gateway:latest -f docker/Dockerfile .
 
 # 运行容器
 docker run -d \
   --name agentrt-gateway \
   -p 8080:8080 -p 8081:8081 -p 9090:9090 \
-  -v /etc/agentos/config:/etc/agentos/gateway:ro \
-  -v /etc/agentos/certs:/etc/agentos/certs:ro \
-  agentos-gateway:latest
+  -v /etc/agentrt/config:/etc/agentrt/gateway:ro \
+  -v /etc/agentrt/certs:/etc/agentrt/certs:ro \
+  agentrt-gateway:latest
 ```
 
 ## 依赖关系

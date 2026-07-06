@@ -127,7 +127,7 @@ def start_gateway(gateway_binary, port):
     print(f"\n  {INFO} 启动网关: {gateway_binary} -p {port}")
     env = os.environ.copy()
     # 添加 conda libuuid 路径（如果存在）— v3.1: 改为环境变量注入，消除硬编码本地路径
-    conda_lib = os.environ.get("AGENTOS_CONDA_LIBUUID", "")
+    conda_lib = os.environ.get("AGENTRT_CONDA_LIBUUID", "")
     if conda_lib and os.path.exists(conda_lib):
         env["LD_LIBRARY_PATH"] = conda_lib + ":" + env.get("LD_LIBRARY_PATH", "")
     try:
@@ -304,7 +304,7 @@ def test_tui_connectivity_simulation(gateway_url):
             print(f"  {PASS}  [Phase2] Gateway health check: HTTP 200")
     else:
         print(f"  {WARN}  [Phase2] Gateway health check FAILED: HTTP {status}")
-        print(f"  {WARN}  → Start gateway: docker compose up -d  or  agentos-gateway_d")
+        print(f"  {WARN}  → Start gateway: docker compose up -d  or  agentrt-gateway_d")
 
     # Phase 3: 终端设置（模拟）
     print(f"  {INFO} [Phase3] Setting up terminal (raw mode + alternate screen)...")
@@ -353,8 +353,8 @@ def main():
     parser.add_argument("--health-only", action="store_true", help="Only test gateway health")
     parser.add_argument("--start-gateway", action="store_true", help="Auto-start gateway daemon")
     parser.add_argument("--gateway-binary",
-                        default=os.environ.get("AGENTOS_GATEWAY_BINARY", "gateway_d"),
-                        help="Path to gateway binary (default: %(default)s, env: AGENTOS_GATEWAY_BINARY)")
+                        default=os.environ.get("AGENTRT_GATEWAY_BINARY", "gateway_d"),
+                        help="Path to gateway binary (default: %(default)s, env: AGENTRT_GATEWAY_BINARY)")
     parser.add_argument("--no-color", action="store_true", help="Disable ANSI color output")
     args = parser.parse_args()
 

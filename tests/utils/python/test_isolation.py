@@ -61,18 +61,18 @@ class TestIsolationManager:
         env_id = f"{test_name}_{uuid.uuid4().hex[:8]}"
 
         with self.lock:
-            temp_dir = Path(tempfile.mkdtemp(prefix=f"agentos_test_{env_id}_"))
+            temp_dir = Path(tempfile.mkdtemp(prefix=f"agentrt_test_{env_id}_"))
             self.temp_dirs[env_id] = temp_dir
 
             original_env = {}
             test_env = {
-                "AGENTOS_TEST_ID": env_id,
-                "AGENTOS_TEST_DIR": str(temp_dir),
-                "AGENTOS_ENDPOINT": f"http://localhost:{18789 + hash(env_id) % 1000}",
-                "AGENTOS_TEMP_DIR": str(temp_dir / "temp"),
-                "AGENTOS_LOG_FILE": str(temp_dir / "test.log"),
-                "AGENTOS_DB_PATH": str(temp_dir / "test.db"),
-                "AGENTOS_CONFIG_PATH": str(temp_dir / "manager.json")
+                "AGENTRT_TEST_ID": env_id,
+                "AGENTRT_TEST_DIR": str(temp_dir),
+                "AGENTRT_ENDPOINT": f"http://localhost:{18789 + hash(env_id) % 1000}",
+                "AGENTRT_TEMP_DIR": str(temp_dir / "temp"),
+                "AGENTRT_LOG_FILE": str(temp_dir / "test.log"),
+                "AGENTRT_DB_PATH": str(temp_dir / "test.db"),
+                "AGENTRT_CONFIG_PATH": str(temp_dir / "manager.json")
             }
 
             for key, value in test_env.items():
@@ -85,11 +85,11 @@ class TestIsolationManager:
 
             manager = {
                 "test_id": env_id,
-                "endpoint": test_env["AGENTOS_ENDPOINT"],
-                "temp_dir": test_env["AGENTOS_TEMP_DIR"],
-                "log_file": test_env["AGENTOS_LOG_FILE"],
-                "database": {"path": test_env["AGENTOS_DB_PATH"], "type": "sqlite"},
-                "logging": {"level": "DEBUG", "file": test_env["AGENTOS_LOG_FILE"]}
+                "endpoint": test_env["AGENTRT_ENDPOINT"],
+                "temp_dir": test_env["AGENTRT_TEMP_DIR"],
+                "log_file": test_env["AGENTRT_LOG_FILE"],
+                "database": {"path": test_env["AGENTRT_DB_PATH"], "type": "sqlite"},
+                "logging": {"level": "DEBUG", "file": test_env["AGENTRT_LOG_FILE"]}
             }
 
             with open(temp_dir / "manager.json", 'w') as f:
@@ -372,7 +372,7 @@ class DatabaseIsolator:
     """数据库隔离器"""
 
     def __init__(self, base_dir: Path = None):
-        self.base_dir = base_dir or Path(tempfile.gettempdir()) / "agentos_test_dbs"
+        self.base_dir = base_dir or Path(tempfile.gettempdir()) / "agentrt_test_dbs"
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self._connections: Dict[str, sqlite3.Connection] = {}
 

@@ -8,12 +8,12 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from agentos.framework.plugin import (
+from agentrt.framework.plugin import (
     PluginRegistry, PluginManager, PluginState,
     PluginManifest, BasePlugin, get_plugin_registry,
 )
-from agentos.framework.plugins.logger_plugin import LoggerPlugin
-from agentos.framework.plugins.metrics_plugin import MetricsPlugin
+from agentrt.framework.plugins.logger_plugin import LoggerPlugin
+from agentrt.framework.plugins.metrics_plugin import MetricsPlugin
 
 
 class SimplePlugin(BasePlugin):

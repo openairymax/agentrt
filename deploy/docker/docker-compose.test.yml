@@ -20,10 +20,10 @@
 version: '3.8'
 
 x-common-env: &common-env
-  AGENTOS_TEST_MODE: "1"
-  AGENTOS_LOG_LEVEL: "${LOG_LEVEL:-DEBUG}"
-  AGENTOS_CONFIG_PATH: "/etc/agentrt/agentos.yaml"
-  AGENTOS_DEPLOY_ENV: "test"
+  AGENTRT_TEST_MODE: "1"
+  AGENTRT_LOG_LEVEL: "${LOG_LEVEL:-DEBUG}"
+  AGENTRT_CONFIG_PATH: "/etc/agentrt/agentrt.yaml"
+  AGENTRT_DEPLOY_ENV: "test"
 
 x-common-daemon: &common-daemon
   build:
@@ -93,8 +93,8 @@ services:
       - "${TEST_COREKERN_PORT:-19001}:9001"
     environment:
       <<: *common-env
-      AGENTOS_SERVICE_NAME: corekern
-      AGENTOS_SERVICE_PORT: "9001"
+      AGENTRT_SERVICE_NAME: corekern
+      AGENTRT_SERVICE_PORT: "9001"
     depends_on:
       redis:
         condition: service_healthy
@@ -116,10 +116,10 @@ services:
     ports:
       - "${TEST_CL3_PORT:-19002}:9002"
     environment:
-      AGENTOS_SERVICE_NAME: coreloopthree
-      AGENTOS_SERVICE_PORT: "9002"
-      AGENTOS_COREKERN_HOST: corekern
-      AGENTOS_COREKERN_PORT: "9001"
+      AGENTRT_SERVICE_NAME: coreloopthree
+      AGENTRT_SERVICE_PORT: "9002"
+      AGENTRT_COREKERN_HOST: corekern
+      AGENTRT_COREKERN_PORT: "9001"
     depends_on:
       corekern:
         condition: service_healthy
@@ -137,9 +137,9 @@ services:
     ports:
       - "${TEST_TASKFLOW_PORT:-19003}:9003"
     environment:
-      AGENTOS_SERVICE_NAME: taskflow
-      AGENTOS_SERVICE_PORT: "9003"
-      AGENTOS_COREKERN_HOST: corekern
+      AGENTRT_SERVICE_NAME: taskflow
+      AGENTRT_SERVICE_PORT: "9003"
+      AGENTRT_COREKERN_HOST: corekern
     depends_on:
       corekern:
         condition: service_healthy
@@ -157,11 +157,11 @@ services:
     ports:
       - "${TEST_MEMORY_PORT:-19004}:9004"
     environment:
-      AGENTOS_SERVICE_NAME: memory
-      AGENTOS_SERVICE_PORT: "9004"
-      AGENTOS_COREKERN_HOST: corekern
-      AGENTOS_POSTGRES_HOST: postgres
-      AGENTOS_POSTGRES_PORT: "5432"
+      AGENTRT_SERVICE_NAME: memory
+      AGENTRT_SERVICE_PORT: "9004"
+      AGENTRT_COREKERN_HOST: corekern
+      AGENTRT_POSTGRES_HOST: postgres
+      AGENTRT_POSTGRES_PORT: "5432"
     depends_on:
       corekern:
         condition: service_healthy
@@ -185,9 +185,9 @@ services:
     ports:
       - "${TEST_CHANNEL_PORT:-19101}:9101"
     environment:
-      AGENTOS_SERVICE_NAME: channel_d
-      AGENTOS_SERVICE_PORT: "9101"
-      AGENTOS_COREKERN_HOST: corekern
+      AGENTRT_SERVICE_NAME: channel_d
+      AGENTRT_SERVICE_PORT: "9101"
+      AGENTRT_COREKERN_HOST: corekern
     depends_on:
       corekern:
         condition: service_healthy
@@ -206,10 +206,10 @@ services:
       - "${TEST_MONIT_PORT:-19102}:9102"
       - "${TEST_MONIT_METRICS_PORT:-19902}:9902"
     environment:
-      AGENTOS_SERVICE_NAME: monit_d
-      AGENTOS_SERVICE_PORT: "9102"
-      AGENTOS_METRICS_PORT: "9902"
-      AGENTOS_COREKERN_HOST: corekern
+      AGENTRT_SERVICE_NAME: monit_d
+      AGENTRT_SERVICE_PORT: "9102"
+      AGENTRT_METRICS_PORT: "9902"
+      AGENTRT_COREKERN_HOST: corekern
     depends_on:
       corekern:
         condition: service_healthy
@@ -227,10 +227,10 @@ services:
     ports:
       - "${TEST_OBSERVE_PORT:-19103}:9103"
     environment:
-      AGENTOS_SERVICE_NAME: observe_d
-      AGENTOS_SERVICE_PORT: "9103"
-      AGENTOS_COREKERN_HOST: corekern
-      AGENTOS_MONIT_HOST: monit-d
+      AGENTRT_SERVICE_NAME: observe_d
+      AGENTRT_SERVICE_PORT: "9103"
+      AGENTRT_COREKERN_HOST: corekern
+      AGENTRT_MONIT_HOST: monit-d
     depends_on:
       corekern:
         condition: service_healthy
@@ -254,11 +254,11 @@ services:
     ports:
       - "${TEST_LLM_PORT:-19201}:9201"
     environment:
-      AGENTOS_SERVICE_NAME: llm_d
-      AGENTOS_SERVICE_PORT: "9201"
-      AGENTOS_COREKERN_HOST: corekern
-      AGENTOS_CORELOOPTHREE_HOST: coreloopthree
-      AGENTOS_CHANNEL_HOST: channel-d
+      AGENTRT_SERVICE_NAME: llm_d
+      AGENTRT_SERVICE_PORT: "9201"
+      AGENTRT_COREKERN_HOST: corekern
+      AGENTRT_CORELOOPTHREE_HOST: coreloopthree
+      AGENTRT_CHANNEL_HOST: channel-d
     depends_on:
       corekern:
         condition: service_healthy
@@ -280,11 +280,11 @@ services:
     ports:
       - "${TEST_TOOL_PORT:-19202}:9202"
     environment:
-      AGENTOS_SERVICE_NAME: tool_d
-      AGENTOS_SERVICE_PORT: "9202"
-      AGENTOS_COREKERN_HOST: corekern
-      AGENTOS_CORELOOPTHREE_HOST: coreloopthree
-      AGENTOS_CHANNEL_HOST: channel-d
+      AGENTRT_SERVICE_NAME: tool_d
+      AGENTRT_SERVICE_PORT: "9202"
+      AGENTRT_COREKERN_HOST: corekern
+      AGENTRT_CORELOOPTHREE_HOST: coreloopthree
+      AGENTRT_CHANNEL_HOST: channel-d
     depends_on:
       corekern:
         condition: service_healthy
@@ -306,11 +306,11 @@ services:
     ports:
       - "${TEST_MARKET_PORT:-19203}:9203"
     environment:
-      AGENTOS_SERVICE_NAME: market_d
-      AGENTOS_SERVICE_PORT: "9203"
-      AGENTOS_COREKERN_HOST: corekern
-      AGENTOS_CHANNEL_HOST: channel-d
-      AGENTOS_REDIS_HOST: redis
+      AGENTRT_SERVICE_NAME: market_d
+      AGENTRT_SERVICE_PORT: "9203"
+      AGENTRT_COREKERN_HOST: corekern
+      AGENTRT_CHANNEL_HOST: channel-d
+      AGENTRT_REDIS_HOST: redis
     depends_on:
       corekern:
         condition: service_healthy
@@ -332,10 +332,10 @@ services:
     ports:
       - "${TEST_SCHED_PORT:-19204}:9204"
     environment:
-      AGENTOS_SERVICE_NAME: sched_d
-      AGENTOS_SERVICE_PORT: "9204"
-      AGENTOS_COREKERN_HOST: corekern
-      AGENTOS_CHANNEL_HOST: channel-d
+      AGENTRT_SERVICE_NAME: sched_d
+      AGENTRT_SERVICE_PORT: "9204"
+      AGENTRT_COREKERN_HOST: corekern
+      AGENTRT_CHANNEL_HOST: channel-d
     depends_on:
       corekern:
         condition: service_healthy
@@ -359,11 +359,11 @@ services:
     ports:
       - "${TEST_HOOK_PORT:-19301}:9301"
     environment:
-      AGENTOS_SERVICE_NAME: hook_d
-      AGENTOS_SERVICE_PORT: "9301"
-      AGENTOS_COREKERN_HOST: corekern
-      AGENTOS_CORELOOPTHREE_HOST: coreloopthree
-      AGENTOS_CHANNEL_HOST: channel-d
+      AGENTRT_SERVICE_NAME: hook_d
+      AGENTRT_SERVICE_PORT: "9301"
+      AGENTRT_COREKERN_HOST: corekern
+      AGENTRT_CORELOOPTHREE_HOST: coreloopthree
+      AGENTRT_CHANNEL_HOST: channel-d
     depends_on:
       corekern:
         condition: service_healthy
@@ -385,10 +385,10 @@ services:
     ports:
       - "${TEST_PLUGIN_PORT:-19302}:9302"
     environment:
-      AGENTOS_SERVICE_NAME: plugin_d
-      AGENTOS_SERVICE_PORT: "9302"
-      AGENTOS_COREKERN_HOST: corekern
-      AGENTOS_CHANNEL_HOST: channel-d
+      AGENTRT_SERVICE_NAME: plugin_d
+      AGENTRT_SERVICE_PORT: "9302"
+      AGENTRT_COREKERN_HOST: corekern
+      AGENTRT_CHANNEL_HOST: channel-d
     depends_on:
       corekern:
         condition: service_healthy
@@ -408,10 +408,10 @@ services:
     ports:
       - "${TEST_INFO_PORT:-19303}:9303"
     environment:
-      AGENTOS_SERVICE_NAME: info_d
-      AGENTOS_SERVICE_PORT: "9303"
-      AGENTOS_COREKERN_HOST: corekern
-      AGENTOS_CHANNEL_HOST: channel-d
+      AGENTRT_SERVICE_NAME: info_d
+      AGENTRT_SERVICE_PORT: "9303"
+      AGENTRT_COREKERN_HOST: corekern
+      AGENTRT_CHANNEL_HOST: channel-d
     depends_on:
       corekern:
         condition: service_healthy
@@ -431,10 +431,10 @@ services:
     ports:
       - "${TEST_NOTIFY_PORT:-19304}:9304"
     environment:
-      AGENTOS_SERVICE_NAME: notify_d
-      AGENTOS_SERVICE_PORT: "9304"
-      AGENTOS_COREKERN_HOST: corekern
-      AGENTOS_CHANNEL_HOST: channel-d
+      AGENTRT_SERVICE_NAME: notify_d
+      AGENTRT_SERVICE_PORT: "9304"
+      AGENTRT_COREKERN_HOST: corekern
+      AGENTRT_CHANNEL_HOST: channel-d
     depends_on:
       corekern:
         condition: service_healthy
@@ -460,25 +460,25 @@ services:
       - "${TEST_GATEWAY_WS_PORT:-8081}:8081"
       - "${TEST_GATEWAY_METRICS_PORT:-9090}:9090"
     environment:
-      AGENTOS_SERVICE_NAME: gateway_d
-      AGENTOS_HTTP_PORT: "8080"
-      AGENTOS_WS_PORT: "8081"
-      AGENTOS_METRICS_PORT: "9090"
-      AGENTOS_COREKERN_HOST: corekern
-      AGENTOS_CORELOOPTHREE_HOST: coreloopthree
-      AGENTOS_LLM_HOST: llm-d
-      AGENTOS_TOOL_HOST: tool-d
-      AGENTOS_MARKET_HOST: market-d
-      AGENTOS_MEMORY_HOST: memory
-      AGENTOS_CHANNEL_HOST: channel-d
-      AGENTOS_MONIT_HOST: monit-d
-      AGENTOS_REDIS_HOST: redis
-      AGENTOS_POSTGRES_HOST: postgres
-      AGENTOS_CUPOLAS_HOST: corekern
-      AGENTOS_SERVICE_DISCOVERY_HOST: channel-d
-      AGENTOS_MCP_ENABLED: "true"
-      AGENTOS_A2A_ENABLED: "true"
-      AGENTOS_OPENAI_ENABLED: "true"
+      AGENTRT_SERVICE_NAME: gateway_d
+      AGENTRT_HTTP_PORT: "8080"
+      AGENTRT_WS_PORT: "8081"
+      AGENTRT_METRICS_PORT: "9090"
+      AGENTRT_COREKERN_HOST: corekern
+      AGENTRT_CORELOOPTHREE_HOST: coreloopthree
+      AGENTRT_LLM_HOST: llm-d
+      AGENTRT_TOOL_HOST: tool-d
+      AGENTRT_MARKET_HOST: market-d
+      AGENTRT_MEMORY_HOST: memory
+      AGENTRT_CHANNEL_HOST: channel-d
+      AGENTRT_MONIT_HOST: monit-d
+      AGENTRT_REDIS_HOST: redis
+      AGENTRT_POSTGRES_HOST: postgres
+      AGENTRT_CUPOLAS_HOST: corekern
+      AGENTRT_SERVICE_DISCOVERY_HOST: channel-d
+      AGENTRT_MCP_ENABLED: "true"
+      AGENTRT_A2A_ENABLED: "true"
+      AGENTRT_OPENAI_ENABLED: "true"
     depends_on:
       corekern:
         condition: service_healthy
@@ -552,10 +552,10 @@ services:
         fi
         # Test metrics endpoint
         METRICS=$(curl -s http://gateway-d:9090/metrics 2>/dev/null || echo "")
-        if echo "$$METRICS" | grep -q "agentos_"; then
-          echo "[PASS] Metrics endpoint (agentos_ metrics found)"
+        if echo "$$METRICS" | grep -q "agentrt_"; then
+          echo "[PASS] Metrics endpoint (agentrt_ metrics found)"
         elif [ -n "$$METRICS" ]; then
-          echo "[WARN] Metrics endpoint responded but no agentos_ metrics"
+          echo "[WARN] Metrics endpoint responded but no agentrt_ metrics"
         else
           echo "[INFO] Metrics endpoint (not yet exposing metrics)"
         fi

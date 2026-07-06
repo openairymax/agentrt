@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 """
 AgentRT Heapstore 数据格式迁移脚本
 
@@ -503,7 +503,7 @@ def main():
     root = getattr(args, "root", None)
     if not root:
         root = os.environ.get(
-            "AGENTOS_HEAPSTORE_ROOT",
+            "AGENTRT_HEAPSTORE_ROOT",
             os.path.expanduser("~/.agentrt/heapstore")
         )
 

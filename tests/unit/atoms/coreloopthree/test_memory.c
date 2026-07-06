@@ -5,7 +5,7 @@
  */
 
 #include "memory.h"
-#include "agentos.h"
+#include "agentrt.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -18,11 +18,11 @@
  * @brief 测试记忆引擎创建和销毁
  */
 static void test_memory_create_destroy() {
-    agentos_memory_engine_t* engine = NULL;
-    agentos_error_t err = agentos_memory_create(NULL, &engine);
+    agentrt_memory_engine_t* engine = NULL;
+    agentrt_error_t err = agentrt_memory_create(NULL, &engine);
     printf("test_memory_create_destroy: %d\n", err);
-    if (err == AGENTOS_SUCCESS) {
-        agentos_memory_destroy(engine);
+    if (err == AGENTRT_SUCCESS) {
+        agentrt_memory_destroy(engine);
     }
 }
 
@@ -30,17 +30,17 @@ static void test_memory_create_destroy() {
  * @brief 测试记忆写入
  */
 static void test_memory_write() {
-    agentos_memory_engine_t* engine = NULL;
-    agentos_error_t err = agentos_memory_create(NULL, &engine);
-    if (err != AGENTOS_SUCCESS) {
+    agentrt_memory_engine_t* engine = NULL;
+    agentrt_error_t err = agentrt_memory_create(NULL, &engine);
+    if (err != AGENTRT_SUCCESS) {
         printf("test_memory_write: Failed to create engine\n");
         return;
     }
 
-    agentos_memory_record_t record = {
+    agentrt_memory_record_t record = {
         .memory_record_id = NULL,
         .memory_record_id_len = 0,
-        .memory_record_type = AGENTOS_MEMTYPE_TEXT,
+        .memory_record_type = AGENTRT_MEMTYPE_TEXT,
         .memory_record_timestamp_ns = 0,
         .memory_record_source_agent = "test_agent",
         .memory_record_source_len = strlen("test_agent"),
@@ -53,31 +53,31 @@ static void test_memory_write() {
     };
 
     char* record_id = NULL;
-    err = agentos_memory_write(engine, &record, &record_id);
+    err = agentrt_memory_write(engine, &record, &record_id);
     printf("test_memory_write: %d\n", err);
-    if (err == AGENTOS_SUCCESS && record_id) {
+    if (err == AGENTRT_SUCCESS && record_id) {
         printf("Record ID: %s\n", record_id);
-        AGENTOS_FREE(record_id);
+        AGENTRT_FREE(record_id);
     }
 
-    agentos_memory_destroy(engine);
+    agentrt_memory_destroy(engine);
 }
 
 /**
  * @brief 测试记忆查询
  */
 static void test_memory_query() {
-    agentos_memory_engine_t* engine = NULL;
-    agentos_error_t err = agentos_memory_create(NULL, &engine);
-    if (err != AGENTOS_SUCCESS) {
+    agentrt_memory_engine_t* engine = NULL;
+    agentrt_error_t err = agentrt_memory_create(NULL, &engine);
+    if (err != AGENTRT_SUCCESS) {
         printf("test_memory_query: Failed to create engine\n");
         return;
     }
 
-    agentos_memory_record_t record = {
+    agentrt_memory_record_t record = {
         .memory_record_id = NULL,
         .memory_record_id_len = 0,
-        .memory_record_type = AGENTOS_MEMTYPE_TEXT,
+        .memory_record_type = AGENTRT_MEMTYPE_TEXT,
         .memory_record_timestamp_ns = 0,
         .memory_record_source_agent = "test_agent",
         .memory_record_source_len = strlen("test_agent"),
@@ -90,9 +90,9 @@ static void test_memory_query() {
     };
 
     char* record_id = NULL;
-    err = agentos_memory_write(engine, &record, &record_id);
-    if (err == AGENTOS_SUCCESS && record_id) {
-        agentos_memory_query_t query = {
+    err = agentrt_memory_write(engine, &record, &record_id);
+    if (err == AGENTRT_SUCCESS && record_id) {
+        agentrt_memory_query_t query = {
             .memory_query_text = "test",
             .memory_query_text_len = strlen("test"),
             .memory_query_start_time = 0,
@@ -104,35 +104,35 @@ static void test_memory_query() {
             .memory_query_include_raw = 1
         };
 
-        agentos_memory_result_ext_t* result = NULL;
-        err = agentos_memory_query(engine, &query, &result);
+        agentrt_memory_result_ext_t* result = NULL;
+        err = agentrt_memory_query(engine, &query, &result);
         printf("test_memory_query: %d\n", err);
-        if (err == AGENTOS_SUCCESS && result) {
+        if (err == AGENTRT_SUCCESS && result) {
             printf("Query results: %zu\n", result->memory_result_count);
-            agentos_memory_result_free(result);
+            agentrt_memory_result_free(result);
         }
 
-        AGENTOS_FREE(record_id);
+        AGENTRT_FREE(record_id);
     }
 
-    agentos_memory_destroy(engine);
+    agentrt_memory_destroy(engine);
 }
 
 /**
  * @brief 测试根据 ID 获取记忆记录
  */
 static void test_memory_get() {
-    agentos_memory_engine_t* engine = NULL;
-    agentos_error_t err = agentos_memory_create(NULL, &engine);
-    if (err != AGENTOS_SUCCESS) {
+    agentrt_memory_engine_t* engine = NULL;
+    agentrt_error_t err = agentrt_memory_create(NULL, &engine);
+    if (err != AGENTRT_SUCCESS) {
         printf("test_memory_get: Failed to create engine\n");
         return;
     }
 
-    agentos_memory_record_t record = {
+    agentrt_memory_record_t record = {
         .memory_record_id = NULL,
         .memory_record_id_len = 0,
-        .memory_record_type = AGENTOS_MEMTYPE_TEXT,
+        .memory_record_type = AGENTRT_MEMTYPE_TEXT,
         .memory_record_timestamp_ns = 0,
         .memory_record_source_agent = "test_agent",
         .memory_record_source_len = strlen("test_agent"),
@@ -145,37 +145,37 @@ static void test_memory_get() {
     };
 
     char* record_id = NULL;
-    err = agentos_memory_write(engine, &record, &record_id);
-    if (err == AGENTOS_SUCCESS && record_id) {
-        agentos_memory_record_t* retrieved_record = NULL;
-        err = agentos_memory_get(engine, record_id, 1, &retrieved_record);
+    err = agentrt_memory_write(engine, &record, &record_id);
+    if (err == AGENTRT_SUCCESS && record_id) {
+        agentrt_memory_record_t* retrieved_record = NULL;
+        err = agentrt_memory_get(engine, record_id, 1, &retrieved_record);
         printf("test_memory_get: %d\n", err);
-        if (err == AGENTOS_SUCCESS && retrieved_record) {
+        if (err == AGENTRT_SUCCESS && retrieved_record) {
             printf("Retrieved record ID: %s\n", retrieved_record->memory_record_id);
-            agentos_memory_record_free(retrieved_record);
+            agentrt_memory_record_free(retrieved_record);
         }
 
-        AGENTOS_FREE(record_id);
+        AGENTRT_FREE(record_id);
     }
 
-    agentos_memory_destroy(engine);
+    agentrt_memory_destroy(engine);
 }
 
 /**
  * @brief 测试记忆挂载
  */
 static void test_memory_mount() {
-    agentos_memory_engine_t* engine = NULL;
-    agentos_error_t err = agentos_memory_create(NULL, &engine);
-    if (err != AGENTOS_SUCCESS) {
+    agentrt_memory_engine_t* engine = NULL;
+    agentrt_error_t err = agentrt_memory_create(NULL, &engine);
+    if (err != AGENTRT_SUCCESS) {
         printf("test_memory_mount: Failed to create engine\n");
         return;
     }
 
-    agentos_memory_record_t record = {
+    agentrt_memory_record_t record = {
         .memory_record_id = NULL,
         .memory_record_id_len = 0,
-        .memory_record_type = AGENTOS_MEMTYPE_TEXT,
+        .memory_record_type = AGENTRT_MEMTYPE_TEXT,
         .memory_record_timestamp_ns = 0,
         .memory_record_source_agent = "test_agent",
         .memory_record_source_len = strlen("test_agent"),
@@ -188,54 +188,54 @@ static void test_memory_mount() {
     };
 
     char* record_id = NULL;
-    err = agentos_memory_write(engine, &record, &record_id);
-    if (err == AGENTOS_SUCCESS && record_id) {
-        err = agentos_memory_mount(engine, record_id, "test_context");
+    err = agentrt_memory_write(engine, &record, &record_id);
+    if (err == AGENTRT_SUCCESS && record_id) {
+        err = agentrt_memory_mount(engine, record_id, "test_context");
         printf("test_memory_mount: %d\n", err);
 
-        AGENTOS_FREE(record_id);
+        AGENTRT_FREE(record_id);
     }
 
-    agentos_memory_destroy(engine);
+    agentrt_memory_destroy(engine);
 }
 
 /**
  * @brief 测试记忆进化
  */
 static void test_memory_evolve() {
-    agentos_memory_engine_t* engine = NULL;
-    agentos_error_t err = agentos_memory_create(NULL, &engine);
-    if (err != AGENTOS_SUCCESS) {
+    agentrt_memory_engine_t* engine = NULL;
+    agentrt_error_t err = agentrt_memory_create(NULL, &engine);
+    if (err != AGENTRT_SUCCESS) {
         printf("test_memory_evolve: Failed to create engine\n");
         return;
     }
 
-    err = agentos_memory_evolve(engine, 0);
+    err = agentrt_memory_evolve(engine, 0);
     printf("test_memory_evolve: %d\n", err);
 
-    agentos_memory_destroy(engine);
+    agentrt_memory_destroy(engine);
 }
 
 /**
  * @brief 测试记忆引擎健康检查
  */
 static void test_memory_health_check() {
-    agentos_memory_engine_t* engine = NULL;
-    agentos_error_t err = agentos_memory_create(NULL, &engine);
-    if (err != AGENTOS_SUCCESS) {
+    agentrt_memory_engine_t* engine = NULL;
+    agentrt_error_t err = agentrt_memory_create(NULL, &engine);
+    if (err != AGENTRT_SUCCESS) {
         printf("test_memory_health_check: Failed to create engine\n");
         return;
     }
 
     char* health = NULL;
-    err = agentos_memory_health_check(engine, &health);
+    err = agentrt_memory_health_check(engine, &health);
     printf("test_memory_health_check: %d\n", err);
-    if (err == AGENTOS_SUCCESS && health) {
+    if (err == AGENTRT_SUCCESS && health) {
         printf("Health: %s\n", health);
-        AGENTOS_FREE(health);
+        AGENTRT_FREE(health);
     }
 
-    agentos_memory_destroy(engine);
+    agentrt_memory_destroy(engine);
 }
 
 int main() {

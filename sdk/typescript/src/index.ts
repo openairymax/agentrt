@@ -10,7 +10,7 @@
  * AgentRT TypeScript SDK
  *
  * 模块化结构：
- * - agentos.ts: 主入口，提供 AgentRT 类
+ * - agentrt.ts: 主入口，提供 AgentRT 类
  * - manager.ts: 配置管理
  * - errors.ts: 错误定义
  * - client/: HTTP 客户端层
@@ -20,7 +20,7 @@
  */
 
 // 主入口
-export { AgentRT, createAgentRT } from './agentos';
+export { AgentRT, createAgentRT } from './agentrt';
 
 // 客户端
 export { Client, APIClient, MockClient } from './client';

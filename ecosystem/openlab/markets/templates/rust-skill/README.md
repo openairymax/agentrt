@@ -72,7 +72,7 @@ impl Skill for MySkill {
 
 ```toml
 [dependencies]
-agentos-sdk = { path = "../../../sdk/rust" }
+agentrt-sdk = { path = "../../../sdk/rust" }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -83,7 +83,7 @@ tracing = "0.1"
 
 ## 依赖关系
 
-- **核心依赖**: agentos-sdk (AgentRT Rust SDK), tokio, serde, anyhow, thiserror, tracing
+- **核心依赖**: agentrt-sdk (AgentRT Rust SDK), tokio, serde, anyhow, thiserror, tracing
 - **Rust Edition**: 2021
 
 ## 构建说明
@@ -106,7 +106,7 @@ cargo run --example basic_usage
 ## 使用示例
 
 ```rust
-use agentos_sdk::{Skill, SkillContext, SkillResult};
+use agentrt_sdk::{Skill, SkillContext, SkillResult};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
