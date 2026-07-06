@@ -52,8 +52,8 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # 引入统一构建打印系统（彩色 + 时间戳 + 级别）
-# v4.0: 29 仓拆分后 scripts/dev/cmake/ 已移除，agentrt 特有 CMake 模块归位至 cmake/
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/agentrt_print.cmake)
+# v4.0: cmake 模块统一归位至伞仓直属 cmake/（消除 agentrt/cmake 与伞仓 cmake 命名冲突）
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/agentrt_print.cmake)
 
 # 项目范围选项
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" OFF)
@@ -570,12 +570,12 @@ if(AGENTRT_BUILD_ALL)
     endif()
 
     if(MSVC)
-        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows_preinclude.h")
-            agentrt_print_ok("[MSVC] Force-include file found: cmake/windows_preinclude.h")
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/windows_preinclude.h")
+            agentrt_print_ok("[MSVC] Force-include file found: ../cmake/windows_preinclude.h")
         else()
-            agentrt_print_warn("[MSVC] Force-include file NOT FOUND: cmake/windows_preinclude.h")
+            agentrt_print_warn("[MSVC] Force-include file NOT FOUND: ../cmake/windows_preinclude.h")
         endif()
-        add_compile_options(/FI"${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows_preinclude.h")
+        add_compile_options(/FI"${CMAKE_CURRENT_SOURCE_DIR}/../cmake/windows_preinclude.h")
     endif()
 
     # 模块选项设置
@@ -705,7 +705,7 @@ include(CPack)
 # 这里我们通过 configure_file 生成一个 ctest 包装脚本
 if(BUILD_TESTS AND ENABLE_SANITIZERS AND NOT MSVC)
     configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ctest_wrapper.sh.in"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/ctest_wrapper.sh.in"
         "${CMAKE_BINARY_DIR}/run_tests.sh"
         @ONLY
     )
