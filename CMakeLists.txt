@@ -461,6 +461,13 @@ if(AGENTRT_BUILD_ALL)
     agentrt_print_section("Building AgentRT core components")
 
     # 全局include路径（确保所有模块都能找到commons的头文件）
+    # P0.17 IRON-6 跨层耦合禁令修复:
+    # commons 权威路径必须声明在 daemons/common/include 之前。
+    # include_directories() 是全局命令，影响所有目标，路径顺序决定 -I 查找顺序。
+    # 若 daemons/common/include 在前，atoms 源代码 #include "daemon_bootstrap_ipc.h"
+    # 等会先命中 daemons 重导出兼容头（虽然内部经相对路径到达 commons，但仍构成
+    # 编译期 atoms→daemons 反向依赖）。将 daemons/common/include 移至 commons 路径之后，
+    # 确保 atoms 直接解析 commons 权威版本。
     include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}/commons
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/include
@@ -470,8 +477,19 @@ if(AGENTRT_BUILD_ALL)
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/logging/include
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/error/include
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/platform/include
+        # P0.17 阶段 3: svc_common.h、ipc_service_bus.h 迁移至 commons/utils/ipc/include
+        # P0.17 阶段 4: daemon_bootstrap_ipc.h、ipc_bus_helper.h、ipc_backpressure.h 迁移至 commons/utils/ipc/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/ipc/include
+        # P0.17 阶段 4: daemon_bootstrap_sd.h、service_discovery.h、service_discovery_helper.h 迁移至 commons/utils/sd/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/sd/include
+        # P0.17 阶段 5: thread_pool.h 迁移至 commons/utils/sync/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/sync/include
+        # P0.17 阶段 1: agentrt_defaults.h 位于 commons/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/include
         ${CMAKE_CURRENT_SOURCE_DIR}/atoms/corekern/include
         ${CMAKE_CURRENT_SOURCE_DIR}/protocols/include
+        # daemons/common/include 作为兼容层放在最后（仅 daemons 自己需要，
+        # atoms 应通过上述 commons 权威路径解析已迁移的头文件）
         ${CMAKE_CURRENT_SOURCE_DIR}/daemons/common/include
         ${CMAKE_CURRENT_SOURCE_DIR}/gateway/src
     )
@@ -487,6 +505,10 @@ if(AGENTRT_BUILD_ALL)
         commons/utils/logging/include
         commons/utils/error/include
         commons/platform/include
+        commons/utils/ipc/include
+        commons/utils/sd/include
+        commons/utils/sync/include
+        commons/include
         atoms/corekern/include
         protocols/include
         daemons/common/include
