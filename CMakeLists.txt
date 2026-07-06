@@ -52,8 +52,8 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # 引入统一构建打印系统（彩色 + 时间戳 + 级别）
-# v3.1: 模块从 agentrt/cmake/ 整合至 scripts/dev/cmake/（消除 agentrt/cmake/ 独立目录）
-include(${CMAKE_CURRENT_SOURCE_DIR}/scripts/dev/cmake/agentrt_print.cmake)
+# v4.0: 29 仓拆分后 scripts/dev/cmake/ 已移除，agentrt 特有 CMake 模块归位至 agentrt/cmake/
+include(${CMAKE_CURRENT_SOURCE_DIR}/agentrt/cmake/agentrt_print.cmake)
 
 # 项目范围选项
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" OFF)
@@ -87,7 +87,7 @@ if(BUILD_TESTS)
     # 为所有测试设置 sanitizer 环境变量（set(ENV{}) 不会传递给 ctest）
     if(ENABLE_SANITIZERS AND NOT MSVC)
         set(AGENTRT_ASAN_OPTIONS "halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1:allocator_may_return_null=1")
-        set(AGENTRT_LSAN_OPTIONS "suppressions=${CMAKE_SOURCE_DIR}/ecosystem/manager/sanitizer/lsan-suppressions:print_suppressions=0")
+        set(AGENTRT_LSAN_OPTIONS "suppressions=${CMAKE_SOURCE_DIR}/../ecosystem/manager/sanitizer/lsan-suppressions:print_suppressions=0")
         set(AGENTRT_UBSAN_OPTIONS "halt_on_error=1:print_stacktrace=1")
     endif()
 endif()
@@ -107,7 +107,7 @@ agentrt_print_info("Sanitizers:       ${ENABLE_SANITIZERS}")
 
 # 关键路径验证：确认核心目录存在
 agentrt_print_info("Path check: Source root = ${CMAKE_CURRENT_SOURCE_DIR}")
-foreach(_dir agentrt agentrt/atoms agentrt/commons agentrt/protocols agentrt/gateway agentrt/daemon agentrt/cupolas agentrt/heapstore)
+foreach(_dir agentrt agentrt/atoms agentrt/commons agentrt/protocols agentrt/gateway agentrt/daemons agentrt/cupolas agentrt/heapstore)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_dir}")
         agentrt_print_ok("  ${_dir}/")
     else()
@@ -184,7 +184,7 @@ if(ENABLE_SANITIZERS AND NOT MSVC)
         add_link_options(-fsanitize=address,undefined,leak,float-divide-by-zero)
         # CI环境变量：halt_on_error确保任何检测到的问题立即阻断
         set(ENV{ASAN_OPTIONS} "halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1")
-        set(ENV{LSAN_OPTIONS} "suppressions=${CMAKE_SOURCE_DIR}/ecosystem/manager/sanitizer/lsan-suppressions")
+        set(ENV{LSAN_OPTIONS} "suppressions=${CMAKE_SOURCE_DIR}/../ecosystem/manager/sanitizer/lsan-suppressions")
         set(ENV{UBSAN_OPTIONS} "halt_on_error=1:print_stacktrace=1")
         agentrt_print_ok("Sanitizers enabled: ASan + LSan + UBSan")
     else()
@@ -578,7 +578,7 @@ include(CPack)
 # 这里我们通过 configure_file 生成一个 ctest 包装脚本
 if(BUILD_TESTS AND ENABLE_SANITIZERS AND NOT MSVC)
     configure_file(
-        "${CMAKE_SOURCE_DIR}/scripts/dev/cmake/ctest_wrapper.sh.in"
+        "${CMAKE_CURRENT_SOURCE_DIR}/agentrt/cmake/ctest_wrapper.sh.in"
         "${CMAKE_BINARY_DIR}/run_tests.sh"
         @ONLY
     )
