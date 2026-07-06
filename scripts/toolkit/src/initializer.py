@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Optional
 DEFAULT_CONFIG_DIR = os.path.expanduser("~/.agentos")
 CONFIG_DIRS = [
     os.path.expanduser("~/.agentos"),
-    "/etc/agentos",
+    "/etc/agentrt",
     os.path.join(os.getcwd(), "manager")
 ]
 
@@ -382,7 +382,7 @@ class ConfigInitializer:
 
         backup_file = os.path.join(
             output_path,
-            f"agentos_config_backup_{datetime.now().strftime('%Y%m%d%H%M%S')}.tar.gz"
+            f"agentrt_config_backup_{datetime.now().strftime('%Y%m%d%H%M%S')}.tar.gz"
         )
 
         import tarfile

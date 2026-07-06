@@ -4,12 +4,12 @@ blank_issues_enabled: true
 
 contact_links:
   - name: Security Vulnerability Report
-    url: https://atomgit.com/openairymax/agentos/security
+    url: https://atomgit.com/openairymax/agentrt/security
     about: |
       Please do not report security vulnerabilities via public issues.
       See SECURITY.md for proper reporting procedures.
 
   - name: Contributing Guide
-    url: https://atomgit.com/openairymax/agentos/blob/main/CONTRIBUTING.md
+    url: https://atomgit.com/openairymax/agentrt/blob/main/CONTRIBUTING.md
     about: |
       Please read our contributing guide before submitting issues or PRs.

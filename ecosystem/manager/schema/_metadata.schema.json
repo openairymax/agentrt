@@ -48,12 +48,12 @@
       "type": "object",
       "description": "Version compatibility constraints for this configuration",
       "properties": {
-        "min_agentos_version": {
+        "min_agentrt_version": {
           "type": "string",
           "pattern": "^\\d+\\.\\d+\\.\\d+$",
           "description": "Minimum compatible AgentRT version"
         },
-        "max_agentos_version": {
+        "max_agentrt_version": {
           "type": "string",
           "pattern": "^\\d+\\.\\d+\\.\\d+$",
           "description": "Maximum compatible AgentRT version"

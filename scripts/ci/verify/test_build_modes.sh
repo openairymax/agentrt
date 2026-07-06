@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 #
 # MemoryRovol 独立仓库构建模式集成测试脚本
 # R-09-01-6: memoryrovol migrated to independent repo
@@ -93,17 +93,17 @@ S1_CMD="
 
     NMC\$(nproc | tr -d '\n') > /dev/null 2>&1 || { cleanup \"\$BUILD_DIR\"; exit 1; }
 
-    if [ -f libagentos_memoryrovol.a ]; then
-        echo 'OSS build: libagentos_memoryrovol.a generated'
+    if [ -f libagentrt_memoryrovol.a ]; then
+        echo 'OSS build: libagentrt_memoryrovol.a generated'
     fi
 
     cmake --install . --prefix \"\$BUILD_DIR/install\" > /dev/null 2>&1 || true
 
-    if [ -f \"\$BUILD_DIR/install/include/agentos/memoryrovol/memoryrovol.h\" ]; then
+    if [ -f \"\$BUILD_DIR/install/include/agentrt/memoryrovol/memoryrovol.h\" ]; then
         echo 'OSS install: public headers installed'
     fi
 
-    if [ -f \"\$BUILD_DIR/install/include/agentos/memoryrovol/layer3_structure.h\" ] 2>/dev/null; then
+    if [ -f \"\$BUILD_DIR/install/include/agentrt/memoryrovol/layer3_structure.h\" ] 2>/dev/null; then
         echo 'WARNING: OSS install should NOT include layer3_structure.h'
         cleanup \"\$BUILD_DIR\"
         exit 1
@@ -111,7 +111,7 @@ S1_CMD="
         echo 'OSS install: layer3_structure.h correctly excluded'
     fi
 
-    if [ -f \"\$BUILD_DIR/install/include/agentos/memoryrovol/forgetting.h\" ] 2>/dev/null; then
+    if [ -f \"\$BUILD_DIR/install/include/agentrt/memoryrovol/forgetting.h\" ] 2>/dev/null; then
         echo 'WARNING: OSS install should NOT include forgetting.h'
         cleanup \"\$BUILD_DIR\"
         exit 1
@@ -134,8 +134,8 @@ S2_CMD="
     cmake \"$MR_DIR\" -DBUILD_TESTS=OFF > /dev/null 2>&1 || { cleanup \"\$BUILD_DIR\"; exit 1; }
     cmake --build . --parallel \"\$(nproc)\" > /dev/null 2>&1 || { cleanup \"\$BUILD_DIR\"; exit 1; }
 
-    if [ -f libagentos_memoryrovol.a ]; then
-        echo 'PRO build: libagentos_memoryrovol.a generated'
+    if [ -f libagentrt_memoryrovol.a ]; then
+        echo 'PRO build: libagentrt_memoryrovol.a generated'
     else
         cleanup \"\$BUILD_DIR\"
         exit 1
@@ -143,7 +143,7 @@ S2_CMD="
 
     cmake --install . --prefix \"\$BUILD_DIR/install\" > /dev/null 2>&1 || true
 
-    if [ -f \"\$BUILD_DIR/install/include/agentos/memoryrovol/layer3_structure.h\" ]; then
+    if [ -f \"\$BUILD_DIR/install/include/agentrt/memoryrovol/layer3_structure.h\" ]; then
         echo 'PRO install: layer3_structure.h included (correct)'
     else
         echo 'WARNING: PRO install should include layer3_structure.h'
@@ -151,7 +151,7 @@ S2_CMD="
         exit 1
     fi
 
-    if [ -f \"\$BUILD_DIR/install/include/agentos/memoryrovol/forgetting.h\" ]; then
+    if [ -f \"\$BUILD_DIR/install/include/agentrt/memoryrovol/forgetting.h\" ]; then
         echo 'PRO install: forgetting.h included (correct)'
     else
         echo 'WARNING: PRO install should include forgetting.h'

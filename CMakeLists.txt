@@ -52,8 +52,8 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # 引入统一构建打印系统（彩色 + 时间戳 + 级别）
-# v3.1: 模块从 agentos/cmake/ 整合至 scripts/dev/cmake/（消除 agentos/cmake/ 独立目录）
-include(${CMAKE_CURRENT_SOURCE_DIR}/scripts/dev/cmake/agentos_print.cmake)
+# v3.1: 模块从 agentrt/cmake/ 整合至 scripts/dev/cmake/（消除 agentrt/cmake/ 独立目录）
+include(${CMAKE_CURRENT_SOURCE_DIR}/scripts/dev/cmake/agentrt_print.cmake)
 
 # 项目范围选项
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" OFF)
@@ -62,10 +62,10 @@ option(BUILD_TESTS "Build unit tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
 option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" ON)
 option(AGENTRT_BUILD_ALL "Build all AgentRT components" ON)
-option(AGENTOS_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" OFF)
+option(AGENTRT_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" OFF)
 # 兼容别名：允许使用 AGENTRT_WITH_MEMORYROVOL（旧名）
-if(DEFINED AGENTRT_WITH_MEMORYROVOL AND NOT DEFINED AGENTOS_WITH_MEMORYROVOL)
-    set(AGENTOS_WITH_MEMORYROVOL ${AGENTRT_WITH_MEMORYROVOL})
+if(DEFINED AGENTRT_WITH_MEMORYROVOL AND NOT DEFINED AGENTRT_WITH_MEMORYROVOL)
+    set(AGENTRT_WITH_MEMORYROVOL ${AGENTRT_WITH_MEMORYROVOL})
 endif()
 option(AGENTRT_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe functions)" ON)
 set(AGENTRT_MEMORY_BACKEND "builtin" CACHE STRING "Memory backend (builtin|memoryrovol)")
@@ -78,12 +78,12 @@ set(AGENTRT_DOCKER_BUILD OFF CACHE BOOL "Docker build mode")
 # in the default configuration. This was a design error (BAN-181 compliance fix).
 if(BUILD_TESTS)
     if(AGENTRT_COMPLIANCE_STRICT)
-        agentos_print_ok("Tests enabled with strict compliance (AGENTRT_COMPLIANCE_STRICT=ON)")
+        agentrt_print_ok("Tests enabled with strict compliance (AGENTRT_COMPLIANCE_STRICT=ON)")
     endif()
 endif()
 if(BUILD_TESTS)
     enable_testing()
-    agentos_print_info("CTest enabled at root level (before subdirectories)")
+    agentrt_print_info("CTest enabled at root level (before subdirectories)")
     # 为所有测试设置 sanitizer 环境变量（set(ENV{}) 不会传递给 ctest）
     if(ENABLE_SANITIZERS AND NOT MSVC)
         set(AGENTRT_ASAN_OPTIONS "halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1:allocator_may_return_null=1")
@@ -93,25 +93,25 @@ if(BUILD_TESTS)
 endif()
 
 # 输出构建配置信息
-agentos_print_section("AgentRT v${PROJECT_VERSION} Build Configuration")
-agentos_print_info("Build type:       ${CMAKE_BUILD_TYPE}")
-agentos_print_info("Platform:         ${CMAKE_SYSTEM_NAME} (${CMAKE_SYSTEM_PROCESSOR})")
-agentos_print_info("Compiler:         ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
-agentos_print_info("Shared libs:      ${BUILD_SHARED_LIBS}")
-agentos_print_info("Build tests:      ${BUILD_TESTS}")
-agentos_print_info("Compliance strict:${AGENTRT_COMPLIANCE_STRICT}")
-agentos_print_info("Memory backend:   ${AGENTRT_MEMORY_BACKEND}")
-agentos_print_info("MemoryRovol Pro:  ${AGENTOS_WITH_MEMORYROVOL}")
-agentos_print_info("Docker build:     ${AGENTRT_DOCKER_BUILD}")
-agentos_print_info("Sanitizers:       ${ENABLE_SANITIZERS}")
+agentrt_print_section("AgentRT v${PROJECT_VERSION} Build Configuration")
+agentrt_print_info("Build type:       ${CMAKE_BUILD_TYPE}")
+agentrt_print_info("Platform:         ${CMAKE_SYSTEM_NAME} (${CMAKE_SYSTEM_PROCESSOR})")
+agentrt_print_info("Compiler:         ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
+agentrt_print_info("Shared libs:      ${BUILD_SHARED_LIBS}")
+agentrt_print_info("Build tests:      ${BUILD_TESTS}")
+agentrt_print_info("Compliance strict:${AGENTRT_COMPLIANCE_STRICT}")
+agentrt_print_info("Memory backend:   ${AGENTRT_MEMORY_BACKEND}")
+agentrt_print_info("MemoryRovol Pro:  ${AGENTRT_WITH_MEMORYROVOL}")
+agentrt_print_info("Docker build:     ${AGENTRT_DOCKER_BUILD}")
+agentrt_print_info("Sanitizers:       ${ENABLE_SANITIZERS}")
 
 # 关键路径验证：确认核心目录存在
-agentos_print_info("Path check: Source root = ${CMAKE_CURRENT_SOURCE_DIR}")
-foreach(_dir agentos agentos/atoms agentos/commons agentos/protocols agentos/gateway agentos/daemon agentos/cupolas agentos/heapstore)
+agentrt_print_info("Path check: Source root = ${CMAKE_CURRENT_SOURCE_DIR}")
+foreach(_dir agentrt agentrt/atoms agentrt/commons agentrt/protocols agentrt/gateway agentrt/daemon agentrt/cupolas agentrt/heapstore)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_dir}")
-        agentos_print_ok("  ${_dir}/")
+        agentrt_print_ok("  ${_dir}/")
     else()
-        agentos_print_error("  ${_dir}/ — MISSING!")
+        agentrt_print_error("  ${_dir}/ — MISSING!")
     endif()
 endforeach()
 
@@ -156,15 +156,15 @@ else()
     endif()
 
     if(AGENTRT_COMPLIANCE_STRICT)
-        add_compile_definitions(AGENTRT_COMPLIANCE_STRICT AGENTOS_COMPLIANCE_STRICT)
-        add_compile_options(-include ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/compliance/include/banned_functions.h)
+        add_compile_definitions(AGENTRT_COMPLIANCE_STRICT AGENTRT_COMPLIANCE_STRICT)
+        add_compile_options(-include ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/utils/compliance/include/banned_functions.h)
 
-        # 注意：内存子系统实现层的 AGENTOS_COMPLIANCE_IMPL 豁免由各子目录的
+        # 注意：内存子系统实现层的 AGENTRT_COMPLIANCE_IMPL 豁免由各子目录的
         # CMakeLists.txt 中的 set_source_files_properties 设置，因为该属性
         # 仅在目标创建的目录作用域内生效。
-        # 详见：agentos/atoms/corekern/CMakeLists.txt
-        #       agentos/cupolas/CMakeLists.txt
-        #       agentos/commons/CMakeLists.txt
+        # 详见：agentrt/atoms/corekern/CMakeLists.txt
+        #       agentrt/cupolas/CMakeLists.txt
+        #       agentrt/commons/CMakeLists.txt
     endif()
 
     # 链接器安全选项
@@ -186,9 +186,9 @@ if(ENABLE_SANITIZERS AND NOT MSVC)
         set(ENV{ASAN_OPTIONS} "halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1")
         set(ENV{LSAN_OPTIONS} "suppressions=${CMAKE_SOURCE_DIR}/ecosystem/manager/sanitizer/lsan-suppressions")
         set(ENV{UBSAN_OPTIONS} "halt_on_error=1:print_stacktrace=1")
-        agentos_print_ok("Sanitizers enabled: ASan + LSan + UBSan")
+        agentrt_print_ok("Sanitizers enabled: ASan + LSan + UBSan")
     else()
-        agentos_print_warn("Sanitizers only supported for GCC/Clang compilers")
+        agentrt_print_warn("Sanitizers only supported for GCC/Clang compilers")
     endif()
 endif()
 
@@ -199,7 +199,7 @@ if(ENABLE_TSAN AND NOT MSVC)
         add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
         add_link_options(-fsanitize=thread)
         set(ENV{TSAN_OPTIONS} "halt_on_error=1:history_size=7:second_deadlock_stack=1")
-        agentos_print_ok("ThreadSanitizer enabled")
+        agentrt_print_ok("ThreadSanitizer enabled")
     endif()
 endif()
 
@@ -208,7 +208,7 @@ if(MSVC AND CMAKE_BUILD_TYPE STREQUAL "Release")
     # 移除默认的/RTC1标志（如果存在），因为与/O2不兼容
     string(REPLACE "/RTC1" "" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
     string(REPLACE "/RTC1" "" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
-    agentos_print_info("Adjusted MSVC Release flags to avoid /O2 and /RTC1 conflict")
+    agentrt_print_info("Adjusted MSVC Release flags to avoid /O2 and /RTC1 conflict")
 endif()
 
 # 调试符号（由构建类型控制）
@@ -239,20 +239,20 @@ if(ENABLE_COVERAGE)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         add_compile_options(-fprofile-arcs -ftest-coverage)
         add_link_options(-fprofile-arcs -ftest-coverage -lgcov)
-        agentos_print_ok("Code coverage enabled for ${CMAKE_C_COMPILER_ID}")
+        agentrt_print_ok("Code coverage enabled for ${CMAKE_C_COMPILER_ID}")
     elseif(MSVC)
-        agentos_print_warn("Code coverage for MSVC requires Visual Studio professional edition")
+        agentrt_print_warn("Code coverage for MSVC requires Visual Studio professional edition")
     else()
-        agentos_print_warn("Code coverage only supported for GCC/Clang and MSVC compilers")
+        agentrt_print_warn("Code coverage only supported for GCC/Clang and MSVC compilers")
     endif()
 endif()
 
 # 查找必需的系统依赖
 if(WIN32)
-    agentos_print_info("Using Windows built-in thread support")
+    agentrt_print_info("Using Windows built-in thread support")
 else()
     find_package(Threads REQUIRED)
-    agentos_print_ok("Threads found: ${CMAKE_THREAD_LIBS_INIT}")
+    agentrt_print_ok("Threads found: ${CMAKE_THREAD_LIBS_INIT}")
 endif()
 
 # ============================================================
@@ -278,10 +278,10 @@ if(NOT SQLite3_FOUND AND NOT SQLITE3_FOUND)
 endif()
 if(SQLite3_FOUND OR SQLITE3_FOUND)
     set(AGENTRT_HAS_SQLITE3 TRUE CACHE BOOL "SQLite3 available")
-    agentos_print_ok("SQLite3 found: ${SQLite3_LIBRARIES}${SQLITE3_LIBRARIES}")
+    agentrt_print_ok("SQLite3 found: ${SQLite3_LIBRARIES}${SQLITE3_LIBRARIES}")
 else()
     set(AGENTRT_HAS_SQLITE3 FALSE CACHE BOOL "SQLite3 available")
-    agentos_print_warn("SQLite3 not found, registry/vector-store features disabled")
+    agentrt_print_warn("SQLite3 not found, registry/vector-store features disabled")
 endif()
 
 # --- cJSON ---
@@ -291,10 +291,10 @@ if(NOT cJSON_FOUND AND PkgConfig_FOUND)
 endif()
 if(cJSON_FOUND OR CJSON_FOUND)
     set(AGENTRT_HAS_CJSON TRUE CACHE BOOL "cJSON available")
-    agentos_print_ok("cJSON found: ${cJSON_VERSION}${CJSON_VERSION}")
+    agentrt_print_ok("cJSON found: ${cJSON_VERSION}${CJSON_VERSION}")
 else()
     set(AGENTRT_HAS_CJSON FALSE CACHE BOOL "cJSON available")
-    agentos_print_warn("cJSON not found, JSON features disabled")
+    agentrt_print_warn("cJSON not found, JSON features disabled")
 endif()
 
 # --- libyaml ---
@@ -307,20 +307,20 @@ if(NOT YAML_FOUND AND PkgConfig_FOUND)
 endif()
 if(YAML_FOUND)
     set(AGENTRT_HAS_YAML TRUE CACHE BOOL "libyaml available")
-    agentos_print_ok("libyaml found: ${YAML_LIBRARIES}")
+    agentrt_print_ok("libyaml found: ${YAML_LIBRARIES}")
 else()
     set(AGENTRT_HAS_YAML FALSE CACHE BOOL "libyaml available")
-    agentos_print_warn("libyaml not found, YAML config features disabled")
+    agentrt_print_warn("libyaml not found, YAML config features disabled")
 endif()
 
 # --- OpenSSL ---
 find_package(OpenSSL QUIET)
 if(OpenSSL_FOUND)
     set(AGENTRT_HAS_OPENSSL TRUE CACHE BOOL "OpenSSL available")
-    agentos_print_ok("OpenSSL found: ${OpenSSL_VERSION}")
+    agentrt_print_ok("OpenSSL found: ${OpenSSL_VERSION}")
 else()
     set(AGENTRT_HAS_OPENSSL FALSE CACHE BOOL "OpenSSL available")
-    agentos_print_warn("OpenSSL not found, crypto features disabled")
+    agentrt_print_warn("OpenSSL not found, crypto features disabled")
 endif()
 
 # --- libcurl ---
@@ -330,10 +330,10 @@ if(NOT CURL_FOUND AND PkgConfig_FOUND)
 endif()
 if(CURL_FOUND OR LIBCURL_FOUND)
     set(AGENTRT_HAS_CURL TRUE CACHE BOOL "libcurl available")
-    agentos_print_ok("libcurl found: ${CURL_LIBRARIES}${LIBCURL_LIBRARIES}")
+    agentrt_print_ok("libcurl found: ${CURL_LIBRARIES}${LIBCURL_LIBRARIES}")
 else()
     set(AGENTRT_HAS_CURL FALSE CACHE BOOL "libcurl available")
-    agentos_print_warn("libcurl not found, HTTP client features disabled")
+    agentrt_print_warn("libcurl not found, HTTP client features disabled")
 endif()
 
 # --- libmicrohttpd ---
@@ -343,10 +343,10 @@ if(NOT libmicrohttpd_FOUND AND PkgConfig_FOUND)
 endif()
 if(libmicrohttpd_FOUND OR MICROHTTPD_FOUND)
     set(AGENTRT_HAS_MICROHTTPD TRUE CACHE BOOL "libmicrohttpd available")
-    agentos_print_ok("libmicrohttpd found")
+    agentrt_print_ok("libmicrohttpd found")
 else()
     set(AGENTRT_HAS_MICROHTTPD FALSE CACHE BOOL "libmicrohttpd available")
-    agentos_print_warn("libmicrohttpd not found, HTTP gateway may be limited")
+    agentrt_print_warn("libmicrohttpd not found, HTTP gateway may be limited")
 endif()
 
 # --- libwebsockets ---
@@ -356,10 +356,10 @@ if(NOT libwebsockets_FOUND AND PkgConfig_FOUND)
 endif()
 if(libwebsockets_FOUND OR LIBWEBSOCKETS_FOUND)
     set(AGENTRT_HAS_LIBWEBSOCKETS TRUE CACHE BOOL "libwebsockets available")
-    agentos_print_ok("libwebsockets found")
+    agentrt_print_ok("libwebsockets found")
 else()
     set(AGENTRT_HAS_LIBWEBSOCKETS FALSE CACHE BOOL "libwebsockets available")
-    agentos_print_warn("libwebsockets not found, WebSocket features disabled")
+    agentrt_print_warn("libwebsockets not found, WebSocket features disabled")
 endif()
 
 # --- libevent ---
@@ -369,10 +369,10 @@ if(NOT libevent_FOUND AND PkgConfig_FOUND)
 endif()
 if(libevent_FOUND OR LIBEVENT_FOUND)
     set(AGENTRT_HAS_LIBEVENT TRUE CACHE BOOL "libevent available")
-    agentos_print_ok("libevent found")
+    agentrt_print_ok("libevent found")
 else()
     set(AGENTRT_HAS_LIBEVENT FALSE CACHE BOOL "libevent available")
-    agentos_print_warn("libevent not found, event-loop features disabled")
+    agentrt_print_warn("libevent not found, event-loop features disabled")
 endif()
 
 # --- GTest ---
@@ -380,10 +380,10 @@ if(BUILD_TESTS)
     find_package(GTest QUIET)
     if(GTest_FOUND)
         set(AGENTRT_HAS_GTEST TRUE CACHE BOOL "GTest available")
-        agentos_print_ok("GTest found: ${GTEST_LIBRARIES}")
+        agentrt_print_ok("GTest found: ${GTEST_LIBRARIES}")
     else()
         set(AGENTRT_HAS_GTEST FALSE CACHE BOOL "GTest available")
-        agentos_print_warn("GTest not found, tests will use custom framework")
+        agentrt_print_warn("GTest not found, tests will use custom framework")
     endif()
 endif()
 
@@ -401,107 +401,107 @@ if(BUILD_TESTS)
         if(NOT CMOCKA_INCLUDE_DIRS)
             set(CMOCKA_INCLUDE_DIRS ${cmocka_INCLUDE_DIRS} CACHE STRING "cmocka include dirs" FORCE)
         endif()
-        agentos_print_ok("cmocka found")
+        agentrt_print_ok("cmocka found")
     else()
         set(AGENTRT_HAS_CMOCKA FALSE CACHE BOOL "cmocka available")
-        agentos_print_warn("cmocka not found, some tests may use stub framework")
+        agentrt_print_warn("cmocka not found, some tests may use stub framework")
     endif()
 endif()
 
 # 创建 INTERFACE 库用于传递全局依赖编译定义
-add_library(agentos_compile_defs INTERFACE)
+add_library(agentrt_compile_defs INTERFACE)
 if(AGENTRT_HAS_SQLITE3)
-    target_compile_definitions(agentos_compile_defs INTERFACE AGENTRT_HAS_SQLITE3)
+    target_compile_definitions(agentrt_compile_defs INTERFACE AGENTRT_HAS_SQLITE3)
 endif()
 if(AGENTRT_HAS_CJSON)
-    target_compile_definitions(agentos_compile_defs INTERFACE AGENTRT_HAS_CJSON)
+    target_compile_definitions(agentrt_compile_defs INTERFACE AGENTRT_HAS_CJSON)
 endif()
 if(AGENTRT_HAS_YAML)
-    target_compile_definitions(agentos_compile_defs INTERFACE AGENTRT_HAS_YAML)
+    target_compile_definitions(agentrt_compile_defs INTERFACE AGENTRT_HAS_YAML)
 endif()
 if(AGENTRT_HAS_OPENSSL)
-    target_compile_definitions(agentos_compile_defs INTERFACE AGENTRT_HAS_OPENSSL)
+    target_compile_definitions(agentrt_compile_defs INTERFACE AGENTRT_HAS_OPENSSL)
 endif()
 if(AGENTRT_HAS_CURL)
-    target_compile_definitions(agentos_compile_defs INTERFACE AGENTRT_HAS_CURL)
+    target_compile_definitions(agentrt_compile_defs INTERFACE AGENTRT_HAS_CURL)
 endif()
 if(AGENTRT_HAS_MICROHTTPD)
-    target_compile_definitions(agentos_compile_defs INTERFACE AGENTRT_HAS_MICROHTTPD)
+    target_compile_definitions(agentrt_compile_defs INTERFACE AGENTRT_HAS_MICROHTTPD)
 endif()
 if(AGENTRT_HAS_LIBWEBSOCKETS)
-    target_compile_definitions(agentos_compile_defs INTERFACE AGENTRT_HAS_LIBWEBSOCKETS)
+    target_compile_definitions(agentrt_compile_defs INTERFACE AGENTRT_HAS_LIBWEBSOCKETS)
 endif()
 if(AGENTRT_HAS_LIBEVENT)
-    target_compile_definitions(agentos_compile_defs INTERFACE AGENTRT_HAS_LIBEVENT)
+    target_compile_definitions(agentrt_compile_defs INTERFACE AGENTRT_HAS_LIBEVENT)
 endif()
 
 # ============================================================
 # 跨平台系统库统一管理（BAN-15: 禁止硬编码平台库）
-# agentos_platform_libs, dl, pthread, m, ws2_32 等通过此 INTERFACE 库统一提供
+# agentrt_platform_libs, dl, pthread, m, ws2_32 等通过此 INTERFACE 库统一提供
 # ============================================================
-add_library(agentos_platform_libs INTERFACE)
+add_library(agentrt_platform_libs INTERFACE)
 if(UNIX AND NOT APPLE)
-    target_link_libraries(agentos_platform_libs INTERFACE dl)
+    target_link_libraries(agentrt_platform_libs INTERFACE dl)
 endif()
 if(WIN32)
-    target_link_libraries(agentos_platform_libs INTERFACE ws2_32)
+    target_link_libraries(agentrt_platform_libs INTERFACE ws2_32)
 endif()
 
 # ============================================================
 # 测试链接选项统一管理（BAN-26: 禁止硬编码链接器标志）
 # --allow-multiple-definition 仅在 Linux/GNU ld 下有效
 # ============================================================
-add_library(agentos_test_ldflags INTERFACE)
+add_library(agentrt_test_ldflags INTERFACE)
 if(UNIX AND NOT APPLE)
-    target_link_options(agentos_test_ldflags INTERFACE -Wl,--allow-multiple-definition)
+    target_link_options(agentrt_test_ldflags INTERFACE -Wl,--allow-multiple-definition)
 endif()
 
 # 包含子目录
 if(AGENTRT_BUILD_ALL)
-    agentos_print_section("Building AgentRT core components")
+    agentrt_print_section("Building AgentRT core components")
 
     # 全局include路径（确保所有模块都能找到commons的头文件）
     include_directories(
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/compat/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/memory/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/string/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/logging/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/utils/error/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/platform/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/atoms/corekern/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/protocols/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/daemon/common/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentos/gateway/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/utils/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/utils/compat/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/utils/memory/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/utils/string/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/utils/logging/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/utils/error/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/platform/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/atoms/corekern/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/protocols/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/daemons/common/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/gateway/src
     )
 
     # 验证全局 include 路径是否存在
-    agentos_print_info("Verifying global include directories...")
+    agentrt_print_info("Verifying global include directories...")
     set(_global_inc_dirs
-        agentos/commons
-        agentos/commons/utils/include
-        agentos/commons/utils/compat/include
-        agentos/commons/utils/memory/include
-        agentos/commons/utils/string/include
-        agentos/commons/utils/logging/include
-        agentos/commons/utils/error/include
-        agentos/commons/platform/include
-        agentos/atoms/corekern/include
-        agentos/protocols/include
-        agentos/daemon/common/include
-        agentos/gateway/src
+        agentrt/commons
+        agentrt/commons/utils/include
+        agentrt/commons/utils/compat/include
+        agentrt/commons/utils/memory/include
+        agentrt/commons/utils/string/include
+        agentrt/commons/utils/logging/include
+        agentrt/commons/utils/error/include
+        agentrt/commons/platform/include
+        agentrt/atoms/corekern/include
+        agentrt/protocols/include
+        agentrt/daemons/common/include
+        agentrt/gateway/src
     )
     foreach(_inc ${_global_inc_dirs})
         if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_inc}")
-            agentos_print_ok("  ${_inc}")
+            agentrt_print_ok("  ${_inc}")
         else()
-            agentos_print_error("  ${_inc} — MISSING!")
+            agentrt_print_error("  ${_inc} — MISSING!")
         endif()
     endforeach()
 
     # 依赖检测汇总
-    agentos_print_section("Dependency Detection Summary")
+    agentrt_print_section("Dependency Detection Summary")
     foreach(_dep_info
             "SQLite3:       ${AGENTRT_HAS_SQLITE3}"
             "cJSON:         ${AGENTRT_HAS_CJSON}"
@@ -512,17 +512,17 @@ if(AGENTRT_BUILD_ALL)
             "libwebsockets: ${AGENTRT_HAS_LIBWEBSOCKETS}"
             "libevent:      ${AGENTRT_HAS_LIBEVENT}")
         if(_dep_info MATCHES ": +(ON|YES|TRUE|1)")
-            agentos_print_ok("  ${_dep_info}")
+            agentrt_print_ok("  ${_dep_info}")
         else()
-            agentos_print_warn("  ${_dep_info}")
+            agentrt_print_warn("  ${_dep_info}")
         endif()
     endforeach()
 
     # 主要AgentRT组件
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/agentos")
-        add_subdirectory(agentos)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/agentrt")
+        add_subdirectory(agentrt)
     else()
-        agentos_print_error("agentos directory not found, core components will not be built")
+        agentrt_print_error("agentrt directory not found, core components will not be built")
     endif()
 
     # 测试组件（可选）
@@ -582,7 +582,7 @@ if(BUILD_TESTS AND ENABLE_SANITIZERS AND NOT MSVC)
         "${CMAKE_BINARY_DIR}/run_tests.sh"
         @ONLY
     )
-    agentos_print_info("Test wrapper script: ${CMAKE_BINARY_DIR}/run_tests.sh")
+    agentrt_print_info("Test wrapper script: ${CMAKE_BINARY_DIR}/run_tests.sh")
 endif()
 
 # 自定义目标：清理构建
@@ -593,23 +593,23 @@ add_custom_target(clean-all
 )
 
 # 构建后信息
-agentos_print_ok("AgentRT v${PROJECT_VERSION} configured successfully!")
-agentos_print_info("  Build directory: ${CMAKE_BINARY_DIR}")
-agentos_print_info("  Install prefix:  ${CMAKE_INSTALL_PREFIX}")
-agentos_print_info("Next steps:")
-agentos_print_info("  cmake --build . --config Release   # Build")
-agentos_print_info("  cmake --install . --config Release # Install")
-agentos_print_info("  ctest --output-on-failure          # Test")
+agentrt_print_ok("AgentRT v${PROJECT_VERSION} configured successfully!")
+agentrt_print_info("  Build directory: ${CMAKE_BINARY_DIR}")
+agentrt_print_info("  Install prefix:  ${CMAKE_INSTALL_PREFIX}")
+agentrt_print_info("Next steps:")
+agentrt_print_info("  cmake --build . --config Release   # Build")
+agentrt_print_info("  cmake --install . --config Release # Install")
+agentrt_print_info("  ctest --output-on-failure          # Test")
 
 # 检查常见问题
 if(MSVC AND CMAKE_C_STANDARD EQUAL 11)
-    agentos_print_warn("MSVC may have limited C11 support. Consider Visual Studio 2019+.")
+    agentrt_print_warn("MSVC may have limited C11 support. Consider Visual Studio 2019+.")
 endif()
 
-if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/agentos/atoms/CMakeLists.txt")
-    agentos_print_warn("agentos/atoms/CMakeLists.txt not found - atoms module may not build correctly")
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/agentrt/atoms/CMakeLists.txt")
+    agentrt_print_warn("agentrt/atoms/CMakeLists.txt not found - atoms module may not build correctly")
 endif()
 
-if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/agentos/commons/CMakeLists.txt")
-    agentos_print_warn("agentos/commons/CMakeLists.txt not found - commons module may not build correctly")
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/CMakeLists.txt")
+    agentrt_print_warn("agentrt/commons/CMakeLists.txt not found - commons module may not build correctly")
 endif()

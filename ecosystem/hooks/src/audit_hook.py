@@ -33,7 +33,7 @@ DEFAULT_AUDIT_LOG_PATH = "/var/log/agentos/audit.log"
 class AuditHook(BaseHook):
     """Listens to tool call events and writes structured audit logs.
 
-    Hook configuration in agentos.yaml:
+    Hook configuration in agentrt.yaml:
       hooks:
         global_hooks:
           on_tool_call:

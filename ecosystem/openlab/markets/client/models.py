@@ -3,7 +3,7 @@
 AgentRT OpenLab: Market Models
 
 Python dataclass mappings for market_d C structures defined in
-agentos/daemon/market_d/include/market_service.h.
+agentrt/daemons/market_d/include/market_service.h.
 
 Each dataclass directly corresponds to a C struct, ensuring contract
 consistency between the C daemon and Python client.

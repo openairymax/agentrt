@@ -1,5 +1,5 @@
-#ifndef AGENTOS_WINDOWS_PREINCLUDE_H
-#define AGENTOS_WINDOWS_PREINCLUDE_H
+#ifndef AGENTRT_WINDOWS_PREINCLUDE_H
+#define AGENTRT_WINDOWS_PREINCLUDE_H
 
 #ifdef _MSC_VER
 
@@ -32,8 +32,8 @@
 typedef SSIZE_T ssize_t;
 #endif
 
-#ifndef AGENTOS_UNUSED
-#define AGENTOS_UNUSED  __pragma(warning(suppress:4100))
+#ifndef AGENTRT_UNUSED
+#define AGENTRT_UNUSED  __pragma(warning(suppress:4100))
 #endif
 
 #define __attribute__(x)
@@ -93,18 +93,18 @@ typedef SSIZE_T ssize_t;
 #define __builtin_offsetof(type, member)  offsetof(type, member)
 
 /* MSVC 等效的位操作内建函数 */
-static inline int agentos_msvc_ctz(unsigned int x) {
+static inline int agentrt_msvc_ctz(unsigned int x) {
     unsigned long r;
     _BitScanForward(&r, x);
     return (int)r;
 }
-static inline int agentos_msvc_clz(unsigned int x) {
+static inline int agentrt_msvc_clz(unsigned int x) {
     unsigned long r;
     _BitScanReverse(&r, x);
     return 31 - (int)r;
 }
-#define __builtin_ctz(x)        agentos_msvc_ctz((unsigned int)(x))
-#define __builtin_clz(x)        agentos_msvc_clz((unsigned int)(x))
+#define __builtin_ctz(x)        agentrt_msvc_ctz((unsigned int)(x))
+#define __builtin_clz(x)        agentrt_msvc_clz((unsigned int)(x))
 #define __builtin_popcount(x)   __popcnt((unsigned int)(x))
 #define __builtin_unreachable() __assume(0)
 
@@ -115,7 +115,7 @@ static inline int agentos_msvc_clz(unsigned int x) {
 #define SHUT_RDWR       SD_BOTH
 #endif
 
-#ifndef AGENTOS_HAS_CJSON
+#ifndef AGENTRT_HAS_CJSON
 struct cJSON { int type; char *valuestring; double valuedouble; int valueint; char *string; struct cJSON *next; struct cJSON *prev; struct cJSON *child; };
 typedef struct cJSON cJSON;
 static inline cJSON* cJSON_CreateObject(void) { return (cJSON*)calloc(1, sizeof(cJSON)); }
@@ -130,4 +130,4 @@ static inline void cJSON_AddItemToObject(cJSON* o, const char* n, cJSON* i) { (v
 #endif
 
 #endif /* _MSC_VER */
-#endif /* AGENTOS_WINDOWS_PREINCLUDE_H */
+#endif /* AGENTRT_WINDOWS_PREINCLUDE_H */

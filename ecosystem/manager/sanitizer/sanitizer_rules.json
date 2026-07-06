@@ -4,7 +4,7 @@
   "_owner": {
     "module": "cupolas",
     "contact": "cupolas-team@example.com",
-    "path": "AgentRT/agentos/cupolas/sanitizer",
+    "path": "AgentRT/agentrt/cupolas/sanitizer",
     "description": "内容定义责任归属 cupolas 模块，管理责任归属 Manager 模块"
   },
   "_schema": "schema/sanitizer-rules.schema.json",

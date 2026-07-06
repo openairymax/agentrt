@@ -2,10 +2,10 @@
 """
 AgentRT: Schema Diff Tool
 
-Compares Manager 11 Schema files against agentos.yaml to detect
+Compares Manager 11 Schema files against agentrt.yaml to detect
 field inconsistencies, schema drift, and missing configurations.
 
-Part of P1.15: Manager Schema ↔ agentos.yaml bidirectional sync.
+Part of P1.15: Manager Schema ↔ agentrt.yaml bidirectional sync.
 
 Usage:
     python3 -m ecosystem.manager.schema_diff [--report] [--check]
@@ -73,7 +73,7 @@ class DiffReport:
     def format_text(self) -> str:
         lines = [
             "=" * 60,
-            "  Schema Diff Report: Manager Schemas ↔ agentos.yaml",
+            "  Schema Diff Report: Manager Schemas ↔ agentrt.yaml",
             "=" * 60,
             "",
             f"  Errors:   {self.summary['error']}",
@@ -116,28 +116,28 @@ class DiffReport:
 
 
 class SchemaDiffer:
-    """Compares Manager JSON Schemas against agentos.yaml for consistency.
+    """Compares Manager JSON Schemas against agentrt.yaml for consistency.
 
-    Mappings between Manager schemas and agentos.yaml sections:
+    Mappings between Manager schemas and agentrt.yaml sections:
       kernel-settings.schema.json → kernel
       model.schema.json           → llm
       security-policy.schema.json → security
       logging.schema.json         → observability.logging
-      agent-registry.schema.json  → (not in agentos.yaml)
-      skill-registry.schema.json  → (not in agentos.yaml)
-      tool-service.schema.json    → (not in agentos.yaml)
-      config-management.schema.json → (not in agentos.yaml)
-      config-audit-log.schema.json  → (not in agentos.yaml)
+      agent-registry.schema.json  → (not in agentrt.yaml)
+      skill-registry.schema.json  → (not in agentrt.yaml)
+      tool-service.schema.json    → (not in agentrt.yaml)
+      config-management.schema.json → (not in agentrt.yaml)
+      config-audit-log.schema.json  → (not in agentrt.yaml)
       sanitizer-rules.schema.json   → security (indirect)
-      _metadata.schema.json         → (not in agentos.yaml)
+      _metadata.schema.json         → (not in agentrt.yaml)
     """
 
-    def __init__(self, agentos_root: Optional[str] = None):
-        if agentos_root:
-            self._root = Path(agentos_root)
+    def __init__(self, agentrt_root: Optional[str] = None):
+        if agentrt_root:
+            self._root = Path(agentrt_root)
         else:
             self._root = Path(__file__).parent.parent.parent.parent.parent
-        self._yaml_path = self._root / "configs" / "agentos.yaml"
+        self._yaml_path = self._root / "configs" / "agentrt.yaml"
         self._schema_dir = self._root / "ecosystem" / "manager" / "schema"
 
     def run(self) -> DiffReport:
@@ -147,8 +147,8 @@ class SchemaDiffer:
         yaml_data = self._load_yaml()
         if yaml_data is None:
             report.add(DiffEntry(
-                DiffSeverity.ERROR, "agentos.yaml", "",
-                "Cannot load agentos.yaml",
+                DiffSeverity.ERROR, "agentrt.yaml", "",
+                "Cannot load agentrt.yaml",
             ))
             return report
 
@@ -161,7 +161,7 @@ class SchemaDiffer:
         return report
 
     def _load_yaml(self) -> Optional[Dict[str, Any]]:
-        """Load agentos.yaml."""
+        """Load agentrt.yaml."""
         try:
             with open(self._yaml_path, 'r', encoding='utf-8') as f:
                 return yaml.safe_load(f)
@@ -193,7 +193,7 @@ class SchemaDiffer:
     # ─── Kernel Schema Check ───
 
     def _check_kernel_schema(self, yaml_data: Dict) -> DiffReport:
-        """Check kernel-settings.schema.json against agentos.yaml kernel section."""
+        """Check kernel-settings.schema.json against agentrt.yaml kernel section."""
         report = DiffReport()
         schema = self._load_schema("kernel-settings.schema.json")
         yaml_kernel = yaml_data.get("kernel", {})
@@ -214,10 +214,10 @@ class SchemaDiffer:
             schema_props.get("ipc", {}).get("properties", {})
         )
 
-        # Field mapping: agentos.yaml → schema
+        # Field mapping: agentrt.yaml → schema
         ipc_mappings = {
             "max_message_size": "max_connections",  # Different names, similar purpose
-            # agentos.yaml has shm_pool_size_mb, schema has buffer_size_kb
+            # agentrt.yaml has shm_pool_size_mb, schema has buffer_size_kb
         }
 
         # Check that yaml fields exist in schema
@@ -226,7 +226,7 @@ class SchemaDiffer:
                 report.add(DiffEntry(
                     DiffSeverity.WARNING, "kernel-settings.schema.json",
                     f"kernel.ipc.{yaml_key}",
-                    f"Field in agentos.yaml but not in Manager schema",
+                    f"Field in agentrt.yaml but not in Manager schema",
                     yaml_value=str(yaml_ipc[yaml_key]),
                 ))
 
@@ -236,10 +236,10 @@ class SchemaDiffer:
             schema_props.get("scheduler", {}).get("properties", {})
         )
 
-        # Field mapping: agentos.yaml → schema
+        # Field mapping: agentrt.yaml → schema
         scheduler_mappings = {
             "max_tasks": "max_concurrency",  # Different names
-            "default_priority": None,  # Only in agentos.yaml
+            "default_priority": None,  # Only in agentrt.yaml
         }
 
         for yaml_key in yaml_scheduler:
@@ -247,7 +247,7 @@ class SchemaDiffer:
                 report.add(DiffEntry(
                     DiffSeverity.WARNING, "kernel-settings.schema.json",
                     f"kernel.scheduler.{yaml_key}",
-                    f"Field in agentos.yaml but not in Manager schema",
+                    f"Field in agentrt.yaml but not in Manager schema",
                     yaml_value=str(yaml_scheduler[yaml_key]),
                 ))
             else:
@@ -266,10 +266,10 @@ class SchemaDiffer:
         for yaml_key in yaml_memory:
             if yaml_key not in schema_memory:
                 alt_name = memory_field_mapping.get(yaml_key)
-                msg = "Field in agentos.yaml but not in Manager schema"
+                msg = "Field in agentrt.yaml but not in Manager schema"
                 if alt_name and alt_name in schema_memory:
                     msg = (
-                        f"Field name mismatch: agentos.yaml uses "
+                        f"Field name mismatch: agentrt.yaml uses "
                         f"'{yaml_key}', Manager schema uses '{alt_name}'"
                     )
                     report.add(DiffEntry(
@@ -296,7 +296,7 @@ class SchemaDiffer:
                 report.add(DiffEntry(
                     DiffSeverity.WARNING, "kernel-settings.schema.json",
                     f"kernel.{req}",
-                    "Field required by Manager schema but missing from agentos.yaml",
+                    "Field required by Manager schema but missing from agentrt.yaml",
                     schema_value=req,
                 ))
 
@@ -305,7 +305,7 @@ class SchemaDiffer:
     # ─── Model Schema Check ───
 
     def _check_model_schema(self, yaml_data: Dict) -> DiffReport:
-        """Check model.schema.json against agentos.yaml llm section."""
+        """Check model.schema.json against agentrt.yaml llm section."""
         report = DiffReport()
         schema = self._load_schema("model.schema.json")
         yaml_llm = yaml_data.get("llm", {})
@@ -319,7 +319,7 @@ class SchemaDiffer:
 
         schema_props = schema.get("properties", {})
 
-        # Check global section vs agentos.yaml llm top-level
+        # Check global section vs agentrt.yaml llm top-level
         yaml_llm_keys = set(yaml_llm.keys())
         schema_global = schema_props.get("global", {}).get("properties", {})
 
@@ -330,7 +330,7 @@ class SchemaDiffer:
                 report.add(DiffEntry(
                     DiffSeverity.WARNING, "model.schema.json",
                     f"llm.{yaml_key}",
-                    "Field in agentos.yaml but not in model schema global section",
+                    "Field in agentrt.yaml but not in model schema global section",
                     yaml_value=str(yaml_llm[yaml_key]),
                 ))
             else:
@@ -367,7 +367,7 @@ class SchemaDiffer:
                     report.add(DiffEntry(
                         DiffSeverity.INFO, "model.schema.json",
                         f"llm.routing.{yaml_key}",
-                        "Field in agentos.yaml not in model schema routing",
+                        "Field in agentrt.yaml not in model schema routing",
                         yaml_value=str(yaml_routing[yaml_key]),
                     ))
             else:
@@ -378,7 +378,7 @@ class SchemaDiffer:
     # ─── Security Schema Check ───
 
     def _check_security_schema(self, yaml_data: Dict) -> DiffReport:
-        """Check security-policy.schema.json against agentos.yaml security section."""
+        """Check security-policy.schema.json against agentrt.yaml security section."""
         report = DiffReport()
         schema = self._load_schema("security-policy.schema.json")
         yaml_security = yaml_data.get("security", {})
@@ -393,13 +393,13 @@ class SchemaDiffer:
 
         schema_security = schema.get("properties", {}).get("security", {}).get("properties", {})
 
-        # Check agentos.yaml security fields exist in schema
+        # Check agentrt.yaml security fields exist in schema
         for yaml_key in yaml_security:
             if yaml_key not in schema_security:
                 report.add(DiffEntry(
                     DiffSeverity.WARNING, "security-policy.schema.json",
                     f"security.{yaml_key}",
-                    "Field in agentos.yaml but not in Manager security schema",
+                    "Field in agentrt.yaml but not in Manager security schema",
                     yaml_value=str(yaml_security[yaml_key]),
                 ))
             else:
@@ -412,7 +412,7 @@ class SchemaDiffer:
                 report.add(DiffEntry(
                     DiffSeverity.WARNING, "security-policy.schema.json",
                     f"security.{req}",
-                    "Field required by Manager schema but missing from agentos.yaml",
+                    "Field required by Manager schema but missing from agentrt.yaml",
                     schema_value=req,
                 ))
 
@@ -456,7 +456,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Schema Diff: Manager Schemas ↔ agentos.yaml",
+        description="Schema Diff: Manager Schemas ↔ agentrt.yaml",
     )
     parser.add_argument(
         "--json", action="store_true",

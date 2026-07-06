@@ -36,14 +36,14 @@ security:
     # 文件系统权限
     # -----------------------------------------------------------------------
     - id: "file_read_tmp"
-      resource: "file:read:${AGENTOS_TEMP_DIR}/*"
+      resource: "file:read:${AGENTRT_TEMP_DIR}/*"
       action: "read"
       effect: "allow"
       priority: 10
       audit: false
     
     - id: "file_write_tmp"
-      resource: "file:write:${AGENTOS_TEMP_DIR}/agentos/*"
+      resource: "file:write:${AGENTRT_TEMP_DIR}/agentos/*"
       action: "write"
       effect: "allow"
       priority: 10
@@ -51,13 +51,13 @@ security:
       audit_level: "low"
     
     - id: "file_read_data"
-      resource: "file:read:${AGENTOS_DATA_DIR}/*"
+      resource: "file:read:${AGENTRT_DATA_DIR}/*"
       action: "read"
       effect: "allow"
       priority: 10
     
     - id: "file_write_data"
-      resource: "file:write:${AGENTOS_DATA_DIR}/workspace/*"
+      resource: "file:write:${AGENTRT_DATA_DIR}/workspace/*"
       action: "write"
       effect: "allow"
       priority: 10
@@ -162,7 +162,7 @@ security:
       priority: 10
     
     - id: "env_read_agentos"
-      resource: "env:read:AGENTOS_*"
+      resource: "env:read:AGENTRT_*"
       action: "read"
       effect: "allow"
       priority: 10
@@ -235,14 +235,14 @@ security:
     
     # 允许挂载的路径
     allowed_mounts:
-      - "${AGENTOS_TEMP_DIR}"
-      - "${AGENTOS_DATA_DIR}/workspace"
+      - "${AGENTRT_TEMP_DIR}"
+      - "${AGENTRT_DATA_DIR}/workspace"
     
     # Seccomp 安全配置
     seccomp_profile: "default"
     
     # AppArmor 配置
-    apparmor_profile: "agentos-sandbox"
+    apparmor_profile: "agentrt-sandbox"
     
     # 只读根文件系统
     read_only_root: true
@@ -297,7 +297,7 @@ security:
     key_rotation_days: 90
     
     # 密钥存储路径（当 provider 为 file 时）
-    file_path: "${AGENTOS_DATA_DIR}/secrets"
+    file_path: "${AGENTRT_DATA_DIR}/secrets"
 
   # ===========================================================================
   # 会话安全
@@ -313,7 +313,7 @@ security:
     token:
       algorithm: "HS256"
       issuer: "agentos"
-      audience: "agentos-api"
+      audience: "agentrt-api"
       expiry_sec: 3600
       refresh_expiry_sec: 86400
 

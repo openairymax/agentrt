@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: Apache-2.0 */
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
@@ -17,7 +17,7 @@
  *   P99 < 1ms (单项净化)
  *   P99 < 5ms (完整管线)
  *
- * 使用 agentos_time_monotonic_ns() 或 clock_gettime(CLOCK_MONOTONIC, ...) 计时
+ * 使用 agentrt_time_monotonic_ns() 或 clock_gettime(CLOCK_MONOTONIC, ...) 计时
  * 每项测试运行 1000 次迭代并计算百分位数
  */
 
@@ -150,9 +150,9 @@ static void print_result_us(const bench_result_t *result)
  * ============================================================================ */
 static int init_cupolas_framework(void)
 {
-    agentos_error_t error = AGENTOS_OK;
+    agentrt_error_t error = AGENTRT_OK;
     int ret = cupolas_init(NULL, &error);
-    if (ret != AGENTOS_OK) {
+    if (ret != AGENTRT_OK) {
         TEST_FAIL("cupolas_init", "initialization failed");
         return -1;
     }

@@ -114,11 +114,11 @@
           "compatibility": {
             "type": "object",
             "properties": {
-              "min_agentos_version": {
+              "min_agentrt_version": {
                 "type": "string",
                 "pattern": "^\\d+\\.\\d+\\.\\d+$"
               },
-              "max_agentos_version": {
+              "max_agentrt_version": {
                 "type": "string",
                 "pattern": "^\\d+\\.\\d+\\.\\d+$"
               },

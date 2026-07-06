@@ -326,12 +326,12 @@
         "key_env_var": {
           "type": "string",
           "description": "Environment variable name for encryption key",
-          "examples": ["AGENTOS_ENCRYPTION_KEY"]
+          "examples": ["AGENTRT_ENCRYPTION_KEY"]
         },
         "key_file": {
           "type": "string",
           "description": "Path to encryption key file",
-          "examples": ["/etc/agentos/keys/encryption.key"]
+          "examples": ["/etc/agentrt/keys/encryption.key"]
         },
         "encrypted_fields": {
           "type": "array",

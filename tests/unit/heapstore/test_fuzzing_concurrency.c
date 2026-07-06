@@ -3,7 +3,7 @@
  * @brief heapstore 模糊测试 (Fuzz Testing) 和并发压力测试
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  *
  * "From data intelligence emerges."
  *
@@ -161,10 +161,10 @@ static void test_fuzz_config_params(void) {
     heapstore_config_t config;
     
     for (int i = 0; i < 1000; i++) {
-        AGENTOS_MEMSET(&config, 0, sizeof(config));
+        AGENTRT_MEMSET(&config, 0, sizeof(config));
         
         /* 生成随机但合理的配置 */
-        config.root_path = AGENTOS_TMP_DIR "/agentos_heapstore_test";
+        config.root_path = AGENTRT_TMP_DIR "/agentrt_heapstore_test";
         config.max_log_size_mb = rand() % 10000 + 1;  /* 1-10000 MB */
         config.log_retention_days = rand() % 3650 + 1;  /* 1-3650 days */
         config.trace_retention_days = rand() % 3650 + 1;
@@ -351,7 +351,7 @@ static void test_concurrent_init_shutdown_race(void) {
     /* 多次快速初始化/关闭循环 */
     for (int round = 0; round < 100; round++) {
         heapstore_config_t config = {
-            .root_path = AGENTOS_TMP_DIR "/agentos_heapstore_race_test",
+            .root_path = AGENTRT_TMP_DIR "/agentrt_heapstore_race_test",
             .max_log_size_mb = 10,
             .log_retention_days = 7,
             .trace_retention_days = 3,
@@ -426,7 +426,7 @@ int main(int argc, char* argv[]) {
     /* 初始化模块 */
     printf("--- Initializing heapstore module ---\n");
     heapstore_config_t config = {
-        .root_path = AGENTOS_TMP_DIR "/agentos_heapstore_fuzz_test",
+        .root_path = AGENTRT_TMP_DIR "/agentrt_heapstore_fuzz_test",
         .max_log_size_mb = 50,
         .log_retention_days = 1,
         .trace_retention_days = 1,

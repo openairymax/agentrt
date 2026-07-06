@@ -14,7 +14,7 @@ Manager 模块配置加载集成测试
 使用方法:
     python test_config_integration.py [--verbose] [--config-dir <path>]
 
-作者: Spharx AgentRT Team
+作者: SPHARX Ltd. - Airymax Team
 版本: v1.0.0
 日期: 2026-04-01
 """
@@ -55,12 +55,12 @@ class ConfigIntegrationTester:
     
     # 环境变量定义（从 .env.template 提取）
     EXPECTED_ENV_VARS = {
-        'AGENTOS_ROOT': {'required': True, 'description': 'AgentRT 根目录'},
-        'AGENTOS_DATA_DIR': {'required': True, 'description': '数据存储目录'},
-        'AGENTOS_LOG_DIR': {'required': True, 'description': '日志存储目录'},
-        'AGENTOS_TEMP_DIR': {'required': True, 'description': '临时文件目录'},
-        'AGENTOS_CACHE_DIR': {'required': True, 'description': '缓存目录'},
-        'AGENTOS_CONFIG_DIR': {'required': True, 'description': '配置管理目录'},
+        'AGENTRT_ROOT': {'required': True, 'description': 'AgentRT 根目录'},
+        'AGENTRT_DATA_DIR': {'required': True, 'description': '数据存储目录'},
+        'AGENTRT_LOG_DIR': {'required': True, 'description': '日志存储目录'},
+        'AGENTRT_TEMP_DIR': {'required': True, 'description': '临时文件目录'},
+        'AGENTRT_CACHE_DIR': {'required': True, 'description': '缓存目录'},
+        'AGENTRT_CONFIG_DIR': {'required': True, 'description': '配置管理目录'},
         'OPENAI_API_KEY': {'required': False, 'description': 'OpenAI API 密钥'},
         'ANTHROPIC_API_KEY': {'required': False, 'description': 'Anthropic API 密钥'},
         'SECURITY_WEBHOOK_URL': {'required': False, 'description': '安全告警 Webhook URL'},

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Fix SEC-22 violations: Add ptr = NULL after AGENTOS_FREE(ptr) calls.
+"""Fix SEC-22 violations: Add ptr = NULL after AGENTRT_FREE(ptr) calls.
 
-自动检测并修复 SEC-22 违规：在 AGENTOS_FREE(ptr) 之后缺少 ptr = NULL 赋值。
+自动检测并修复 SEC-22 违规：在 AGENTRT_FREE(ptr) 之后缺少 ptr = NULL 赋值。
 
 排除规则（不添加 NULL 赋值的情况）：
   Rule 1: 下一行已有 ptr = NULL
@@ -59,11 +59,11 @@ def find_function_bounds(lines, line_idx, depths):
     func_name = ''
     for i in range(func_open, max(func_open - 15, -1), -1):
         m = re.search(r'(\w+)\s*\(', lines[i])
-        if m and 'AGENTOS_FREE' not in lines[i]:
+        if m and 'AGENTRT_FREE' not in lines[i]:
             word = m.group(1)
             if word not in ('if', 'for', 'while', 'switch', 'return', 'sizeof',
-                           'AGENTOS_FREE', 'AGENTOS_CALLOC', 'AGENTOS_MALLOC',
-                           'AGENTOS_REALLOC', 'AGENTOS_STRDUP'):
+                           'AGENTRT_FREE', 'AGENTRT_CALLOC', 'AGENTRT_MALLOC',
+                           'AGENTRT_REALLOC', 'AGENTRT_STRDUP'):
                 func_name = word
                 break
 
@@ -114,13 +114,13 @@ def get_containing_struct(ptr_name):
 
 
 def is_freed_in_function(lines, func_start, func_end, name):
-    """Check if a variable/struct is freed within the function via AGENTOS_FREE."""
+    """Check if a variable/struct is freed within the function via AGENTRT_FREE."""
     for i in range(func_start, func_end + 1):
         line = lines[i]
-        pattern = rf'AGENTOS_FREE\s*\(\s*(?:\(.*?\)\s*)?{re.escape(name)}\s*\)\s*;'
+        pattern = rf'AGENTRT_FREE\s*\(\s*(?:\(.*?\)\s*)?{re.escape(name)}\s*\)\s*;'
         if re.search(pattern, line):
             if DEBUG:
-                print(f'    DEBUG: Found AGENTOS_FREE({name}) at line {i+1}')
+                print(f'    DEBUG: Found AGENTRT_FREE({name}) at line {i+1}')
             return True
     return False
 
@@ -150,7 +150,7 @@ def process_file(filepath):
         line = lines[i]
         result.append(line)
 
-        match = re.search(r'AGENTOS_FREE\s*\(\s*(.+?)\s*\)\s*;', line)
+        match = re.search(r'AGENTRT_FREE\s*\(\s*(.+?)\s*\)\s*;', line)
         if not match:
             i += 1
             continue
@@ -211,9 +211,9 @@ def process_file(filepath):
             indent_match = re.match(r'^(\s*)', line)
             indent = indent_match.group(1) if indent_match else ''
             stripped_line = line.lstrip()
-            if not stripped_line.startswith('AGENTOS_FREE'):
-                agentos_pos = line.find('AGENTOS_FREE')
-                indent = line[:agentos_pos]
+            if not stripped_line.startswith('AGENTRT_FREE'):
+                agentrt_pos = line.find('AGENTRT_FREE')
+                indent = line[:agentrt_pos]
             null_line = f'{indent}{ptr_name} = NULL;\n'
             result.append(null_line)
             changes += 1

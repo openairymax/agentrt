@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: Apache-2.0 */
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
@@ -65,9 +65,9 @@ static int g_tests_failed = 0;
  * ============================================================================ */
 static int init_cupolas_framework(void)
 {
-    agentos_error_t error = AGENTOS_OK;
+    agentrt_error_t error = AGENTRT_OK;
     int ret = cupolas_init(NULL, &error);
-    if (ret != AGENTOS_OK) {
+    if (ret != AGENTRT_OK) {
         TEST_FAIL("cupolas_init", "initialization failed");
         return -1;
     }

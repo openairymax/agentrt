@@ -15,14 +15,14 @@ int test_time_monotonic() {
     printf("Testing monotonic time functions...\n");
 
     // 测试单调时间（纳秒）
-    uint64_t start_ns = agentos_time_monotonic_ns();
+    uint64_t start_ns = agentrt_time_monotonic_ns();
     if (start_ns == 0) {
         printf("Failed to get monotonic time (ns)\n");
         return 1;
     }
 
     // 测试单调时间（毫秒）
-    uint64_t start_ms = agentos_time_monotonic_ms();
+    uint64_t start_ms = agentrt_time_monotonic_ms();
     if (start_ms == 0) {
         printf("Failed to get monotonic time (ms)\n");
         return 1;
@@ -30,13 +30,13 @@ int test_time_monotonic() {
     }
 
     // 验证时间递增
-    uint64_t end_ns = agentos_time_monotonic_ns();
+    uint64_t end_ns = agentrt_time_monotonic_ns();
     if (end_ns < start_ns) {
         printf("Monotonic time (ns) did not increase\n");
         return 1;
     }
 
-    uint64_t end_ms = agentos_time_monotonic_ms();
+    uint64_t end_ms = agentrt_time_monotonic_ms();
     if (end_ms < start_ms) {
         printf("Monotonic time (ms) did not increase\n");
         return 1;
@@ -56,14 +56,14 @@ int test_time_current() {
     printf("Testing current time functions...\n");
 
     // 测试当前时间（纳秒）
-    uint64_t start_ns = agentos_time_current_ns();
+    uint64_t start_ns = agentrt_time_current_ns();
     if (start_ns == 0) {
         printf("Failed to get current time (ns)\n");
         return 1;
     }
 
     // 测试当前时间（毫秒）
-    uint64_t start_ms = agentos_time_current_ms();
+    uint64_t start_ms = agentrt_time_current_ms();
     if (start_ms == 0) {
         printf("Failed to get current time (ms)\n");
         return 1;
@@ -76,7 +76,7 @@ int test_time_current() {
     }
 
     // 测试 realtime 函数（应该与 current 函数结果一致）
-    uint64_t realtime_ns = agentos_time_realtime_ns();
+    uint64_t realtime_ns = agentrt_time_realtime_ns();
     if (realtime_ns == 0) {
         printf("Failed to get realtime (ns)\n");
         return 1;
@@ -96,13 +96,13 @@ int test_time_sleep() {
     printf("Testing sleep function...\n");
 
     // 测试纳秒睡眠
-    uint64_t start = agentos_time_monotonic_ns();
-    agentos_error_t err = agentos_time_nanosleep(100000000ULL); // 100ms
-    if (err != AGENTOS_SUCCESS) {
+    uint64_t start = agentrt_time_monotonic_ns();
+    agentrt_error_t err = agentrt_time_nanosleep(100000000ULL); // 100ms
+    if (err != AGENTRT_SUCCESS) {
         printf("Failed to sleep: %d\n", err);
         return 1;
     }
-    uint64_t end = agentos_time_monotonic_ns();
+    uint64_t end = agentrt_time_monotonic_ns();
     uint64_t elapsed = end - start;
 
     // 允许一定的误差（最�?50ms�?
@@ -126,40 +126,40 @@ int test_timer() {
     printf("Testing timer functionality...\n");
 
     // 创建定时�?
-    agentos_timer_t* timer = agentos_timer_create(timer_callback, NULL);
+    agentrt_timer_t* timer = agentrt_timer_create(timer_callback, NULL);
     if (!timer) {
         printf("Failed to create timer\n");
         return 1;
     }
 
     // 测试启动定时�?
-    agentos_error_t err = agentos_timer_start(timer, 100, 1); // 100ms, one-shot
-    if (err != AGENTOS_SUCCESS) {
+    agentrt_error_t err = agentrt_timer_start(timer, 100, 1); // 100ms, one-shot
+    if (err != AGENTRT_SUCCESS) {
         printf("Failed to start timer: %d\n", err);
-        agentos_timer_destroy(timer);
+        agentrt_timer_destroy(timer);
         return 1;
     }
 
     // 等待定时器触�?
-    agentos_task_sleep(200);
+    agentrt_task_sleep(200);
 
     // 检查回调是否被调用
     if (!timer_callback_called) {
         printf("Timer callback not called\n");
-        agentos_timer_destroy(timer);
+        agentrt_timer_destroy(timer);
         return 1;
     }
 
     // 测试停止定时�?
-    err = agentos_timer_stop(timer);
-    if (err != AGENTOS_SUCCESS) {
+    err = agentrt_timer_stop(timer);
+    if (err != AGENTRT_SUCCESS) {
         printf("Failed to stop timer: %d\n", err);
-        agentos_timer_destroy(timer);
+        agentrt_timer_destroy(timer);
         return 1;
     }
 
     // 测试销毁定时器
-    agentos_timer_destroy(timer);
+    agentrt_timer_destroy(timer);
 
     printf("Timer test passed\n");
     return 0;
@@ -169,46 +169,46 @@ int test_event() {
     printf("Testing event functionality...\n");
 
     // 创建事件
-    agentos_event_t* event = agentos_event_create();
+    agentrt_event_t* event = agentrt_event_create();
     if (!event) {
         printf("Failed to create event\n");
         return 1;
     }
 
     // 测试等待事件（超时）
-    agentos_error_t err = agentos_event_wait(event, 100);
-    if (err != AGENTOS_ETIMEDOUT) {
+    agentrt_error_t err = agentrt_event_wait(event, 100);
+    if (err != AGENTRT_ETIMEDOUT) {
         printf("Event wait should have timed out: %d\n", err);
-        agentos_event_destroy(event);
+        agentrt_event_destroy(event);
         return 1;
     }
 
     // 测试触发事件
-    err = agentos_event_signal(event);
-    if (err != AGENTOS_SUCCESS) {
+    err = agentrt_event_signal(event);
+    if (err != AGENTRT_SUCCESS) {
         printf("Failed to signal event: %d\n", err);
-        agentos_event_destroy(event);
+        agentrt_event_destroy(event);
         return 1;
     }
 
     // 测试等待事件（应该立即返回）
-    err = agentos_event_wait(event, 100);
-    if (err != AGENTOS_SUCCESS) {
+    err = agentrt_event_wait(event, 100);
+    if (err != AGENTRT_SUCCESS) {
         printf("Failed to wait for event: %d\n", err);
-        agentos_event_destroy(event);
+        agentrt_event_destroy(event);
         return 1;
     }
 
     // 测试重置事件
-    err = agentos_event_reset(event);
-    if (err != AGENTOS_SUCCESS) {
+    err = agentrt_event_reset(event);
+    if (err != AGENTRT_SUCCESS) {
         printf("Failed to reset event: %d\n", err);
-        agentos_event_destroy(event);
+        agentrt_event_destroy(event);
         return 1;
     }
 
     // 测试销毁事�?
-    agentos_event_destroy(event);
+    agentrt_event_destroy(event);
 
     printf("Event test passed\n");
     return 0;

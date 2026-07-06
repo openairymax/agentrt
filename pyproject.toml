@@ -2,8 +2,8 @@
 name = "agentrt"
 version = "0.1.0"
 description = "AgentRT - Agent Runtime Platform"
-authors = ["Spharx AgentRT Team"]
-license = "Apache-2.0"
+authors = ["SPHARX Ltd. - Airymax Team"]
+license = "AGPL-3.0-or-later OR Apache-2.0"
 readme = "README.md"
 homepage = "https://spharx.cn"
 repository = "https://gitee.com/spharx/agentrt"
@@ -20,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Environment :: Console",
@@ -148,7 +149,7 @@ check_untyped_defs = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
-exclude = ["agentos/atoms/", "agentos/daemon/", "build/", "dist/"]
+exclude = ["agentrt/atoms/", "agentrt/daemon/", "build/", "dist/"]
 
 [[tool.mypy.overrides]]
 module = "faiss.*"

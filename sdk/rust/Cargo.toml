@@ -3,10 +3,10 @@ name = "agentrt-rs"
 version = "0.1.0"
 edition = "2021"
 description = "AgentRT Rust SDK"
-license = "MIT"
+license = "AGPL-3.0-or-later OR Apache-2.0"
 homepage = "https://github.com/spharx/agentrt"
 repository = "https://github.com/spharx/agentrt"
-authors = ["Spharx AgentRT Team"]
+authors = ["SPHARX Ltd."]
 
 [dependencies]
 # HTTP 客户端

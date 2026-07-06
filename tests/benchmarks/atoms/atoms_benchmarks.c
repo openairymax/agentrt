@@ -7,7 +7,7 @@
  * - 任务切换延迟: <1ms (1,000,000ns)
  * - 记忆检索延迟: <10ms (10,000,000ns)
  *
- * @note 本文件从 agentos/atoms/benchmarks/ 迁移至 tests/benchmarks/agentos/atoms/
+ * @note 本文件从 agentrt/atoms/benchmarks/ 迁移至 tests/benchmarks/agentrt/atoms/
  *       符合项目原始设计规范：atoms仅包含5个核心子模块
  *
  * @copyright Copyright (c) 2026 SPHARX. All Rights Reserved.
@@ -51,7 +51,7 @@ static uint64_t get_time_ns(void) {
 
 static void init_benchmark_result(benchmark_result_t* result, const char* test_name) {
     if (result) {
-        AGENTOS_MEMSET(result, 0, sizeof(benchmark_result_t));
+        AGENTRT_MEMSET(result, 0, sizeof(benchmark_result_t));
         result->test_name = test_name;
     }
 }
@@ -137,7 +137,7 @@ int benchmark_ipc_latency(benchmark_result_t* result, const benchmark_config_t* 
         result->failure_reason = reason;
     }
 
-    AGENTOS_FREE(times);
+    AGENTRT_FREE(times);
     return 0;
 }
 
@@ -168,7 +168,7 @@ int benchmark_task_switch_latency(benchmark_result_t* result, const benchmark_co
     calculate_benchmark_stats(result, times, test_count);
     result->passed = benchmark_verify_sla(result, 1000000);
 
-    AGENTOS_FREE(times);
+    AGENTRT_FREE(times);
     return 0;
 }
 
@@ -188,9 +188,9 @@ int benchmark_memory_retrieval_latency(benchmark_result_t* result, const benchma
         return -1;
     }
 
-    char* test_data = (char*)AGENTOS_MALLOC(1024);
-    if (!test_data) { AGENTOS_FREE(times); return -1; }
-    AGENTOS_MEMSET(test_data, 'A', 1024);
+    char* test_data = (char*)AGENTRT_MALLOC(1024);
+    if (!test_data) { AGENTRT_FREE(times); return -1; }
+    AGENTRT_MEMSET(test_data, 'A', 1024);
 
     for (size_t i = 0; i < test_count; i++) {
         uint64_t start = get_time_ns();
@@ -202,8 +202,8 @@ int benchmark_memory_retrieval_latency(benchmark_result_t* result, const benchma
 
     calculate_benchmark_stats(result, times, test_count);
     result->passed = benchmark_verify_sla(result, 10000000);
-    AGENTOS_FREE(test_data);
-    AGENTOS_FREE(times);
+    AGENTRT_FREE(test_data);
+    AGENTRT_FREE(times);
     return 0;
 }
 
@@ -219,9 +219,9 @@ int benchmark_memory_write_throughput(benchmark_result_t* result, const benchmar
     SAFE_MALLOC_ARRAY(times, test_count, sizeof(uint64_t));
     if (!times) return -1;
 
-    char* test_data = (char*)AGENTOS_MALLOC(256);
-    if (!test_data) { AGENTOS_FREE(times); return -1; }
-    AGENTOS_MEMSET(test_data, 'A', 256);
+    char* test_data = (char*)AGENTRT_MALLOC(256);
+    if (!test_data) { AGENTRT_FREE(times); return -1; }
+    AGENTRT_MEMSET(test_data, 'A', 256);
 
     for (size_t i = 0; i < test_count; i++) {
         uint64_t start = get_time_ns();
@@ -233,8 +233,8 @@ int benchmark_memory_write_throughput(benchmark_result_t* result, const benchmar
     calculate_benchmark_stats(result, times, test_count);
     result->throughput = (double)test_count * 1000000000.0 / result->total_time_ns;
     result->passed = result->throughput > 10000;
-    AGENTOS_FREE(test_data);
-    AGENTOS_FREE(times);
+    AGENTRT_FREE(test_data);
+    AGENTRT_FREE(times);
     return 0;
 }
 
@@ -261,7 +261,7 @@ int benchmark_scheduler_throughput(benchmark_result_t* result, const benchmark_c
     calculate_benchmark_stats(result, times, test_count);
     result->throughput = (double)test_count * 1000000000.0 / result->total_time_ns;
     result->passed = result->throughput > 100000;
-    AGENTOS_FREE(times);
+    AGENTRT_FREE(times);
     return 0;
 }
 
@@ -289,7 +289,7 @@ int benchmark_execution_throughput(benchmark_result_t* result, const benchmark_c
     calculate_benchmark_stats(result, times, test_count);
     result->throughput = (double)test_count * 1000000000.0 / result->total_time_ns;
     result->passed = result->throughput > 10000;
-    AGENTOS_FREE(times);
+    AGENTRT_FREE(times);
     return 0;
 }
 
@@ -316,7 +316,7 @@ int benchmark_concurrent_performance(benchmark_result_t* result, const benchmark
 
     calculate_benchmark_stats(result, times, test_count);
     result->passed = result->avg_time_ns <= 50000000;
-    AGENTOS_FREE(times);
+    AGENTRT_FREE(times);
     return 0;
 }
 
@@ -334,16 +334,16 @@ int benchmark_memory_efficiency(benchmark_result_t* result, const benchmark_conf
 
     void** allocations;
     SAFE_MALLOC_ARRAY(allocations, 1024, sizeof(void*));
-    if (!allocations) { AGENTOS_FREE(times); return -1; }
+    if (!allocations) { AGENTRT_FREE(times); return -1; }
 
     size_t alloc_count = 0;
     for (size_t i = 0; i < test_count; i++) {
         uint64_t start = get_time_ns();
-        allocations[alloc_count] = AGENTOS_MALLOC(256);
+        allocations[alloc_count] = AGENTRT_MALLOC(256);
         if (allocations[alloc_count]) {
             alloc_count++;
             if (alloc_count >= 1024) {
-                for (size_t j = 0; j < alloc_count; j++) AGENTOS_FREE(allocations[j]);
+                for (size_t j = 0; j < alloc_count; j++) AGENTRT_FREE(allocations[j]);
                 alloc_count = 0;
             }
         }
@@ -351,11 +351,11 @@ int benchmark_memory_efficiency(benchmark_result_t* result, const benchmark_conf
         times[i] = end - start;
     }
 
-    for (size_t j = 0; j < alloc_count; j++) AGENTOS_FREE(allocations[j]);
+    for (size_t j = 0; j < alloc_count; j++) AGENTRT_FREE(allocations[j]);
     calculate_benchmark_stats(result, times, test_count);
     result->passed = benchmark_verify_sla(result, 100);
-    AGENTOS_FREE(allocations);
-    AGENTOS_FREE(times);
+    AGENTRT_FREE(allocations);
+    AGENTRT_FREE(times);
     return 0;
 }
 
@@ -393,7 +393,7 @@ int benchmark_generate_json_report(const benchmark_result_t* results, size_t cou
     if (!results || !json_output || count == 0) return -1;
 
     size_t buf_size = 8192;
-    char* buf = (char*)AGENTOS_MALLOC(buf_size);
+    char* buf = (char*)AGENTRT_MALLOC(buf_size);
     if (!buf) return -1;
 
     size_t off = 0;

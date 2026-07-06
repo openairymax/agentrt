@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 SPHARX.
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 /**
  * @file test_protocol_compatibility.c
  * @brief Protocol Compatibility Integration Tests
@@ -252,7 +252,7 @@ void test_multi_protocol_registration(void) {
 
 void test_openjiuwen_message_conversion(void) {
     unified_message_t msg;
-    AGENTOS_MEMSET(&msg, 0, sizeof(msg));
+    AGENTRT_MEMSET(&msg, 0, sizeof(msg));
 
     msg.protocol_type = UNIFIED_PROTOCOL_OPENJIUWEN;
     msg.message_id = 12345;

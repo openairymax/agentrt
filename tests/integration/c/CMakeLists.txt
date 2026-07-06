@@ -1,6 +1,6 @@
 # AgentRT 集成测试 CMake 配置
 # 测试代码豁免 BAN 严格合规：测试允许使用裸 malloc/free/memset 等函数
-add_compile_definitions(AGENTOS_COMPLIANCE_IMPL)
+add_compile_definitions(AGENTRT_COMPLIANCE_IMPL)
 # @owner: team-C
 # P1.16m: 12 条连接线集成测试 + P2.8: Hook 系统集成测试
 #
@@ -13,33 +13,32 @@ add_compile_definitions(AGENTOS_COMPLIANCE_IMPL)
 # 公共 include 路径
 # ============================================================================
 set(INTEGRATION_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/coreloopthree/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/corekern/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/syscall/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/memory
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/memory/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/llm_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/tool_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/common/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/monit_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/gateway_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/hook_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/market_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/memory/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/error/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/config_unified/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/logging/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/sync/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/string/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/cache/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/compat/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/network/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/ipc/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/platform/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/cupolas/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/cupolas/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/coreloopthree/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/corekern/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/syscall/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/memory
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/memory/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/llm_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/tool_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/common/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/monit_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/gateway_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/market_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/memory/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/error/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/config_unified/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/logging/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/sync/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/string/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/cache/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/compat/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/network/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/ipc/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/platform/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/cupolas/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/cupolas/src
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
@@ -64,7 +63,7 @@ function(configure_real_lib_test test_name)
             ${TEST_LIBS}
             "-Wl,--end-group"
             Threads::Threads
-            agentos_platform_libs
+            agentrt_platform_libs
             m
         )
     else()
@@ -80,7 +79,7 @@ function(configure_real_lib_test test_name)
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
 
-    agentos_print_ok("  [integration] ${test_name}: configured (real libs, no stubs)")
+    agentrt_print_ok("  [integration] ${test_name}: configured (real libs, no stubs)")
 endfunction()
 
 # ============================================================================
@@ -89,31 +88,31 @@ endfunction()
 
 # C-L03: market_d → OpenLab（自包含 mock，仅需头文件）
 configure_real_lib_test(test_c_link_03_market_openlab
-    LIBS agentos_common
+    LIBS agentrt_common
 )
 
 # C-L06: Orchestrator → CoreLoopThree（orchestrator 真实实现）
-# 注意：agentos_coreloopthree 已 PUBLIC 链接 svc_common（含 orchestrator.c），
+# 注意：agentrt_coreloopthree 已 PUBLIC 链接 svc_common（含 orchestrator.c），
 # 链接器自动处理重复符号（仅从首个库提取 .o）
 # LTO 链接下 --start-group/--end-group 必须包裹所有传递依赖，
 # 否则组外库引用组内库符号时无法回溯解析。
 # 显式列出所有传递依赖：
-#   - agentos_coreloopthree: 主库（含 cognition/engine.c, execution/tool_svc_adapter.c）
-#   - agentos_llm_service:   提供 llm_service_complete[_stream]/llm_response_free
-#   - agentos_tool_service:  提供 tool_service_execute/tool_approval_check/tool_result_free
-#   - agentos_cognition:     传递依赖（引用 tool/llm 符号）
-#   - agentos_execution:     传递依赖（引用 tool_approval_check）
-#   - agentos_core:          atoms 内核
-#   - agentos_memory:        记忆模块
+#   - agentrt_coreloopthree: 主库（含 cognition/engine.c, execution/tool_svc_adapter.c）
+#   - agentrt_llm_service:   提供 llm_service_complete[_stream]/llm_response_free
+#   - agentrt_tool_service:  提供 tool_service_execute/tool_approval_check/tool_result_free
+#   - agentrt_cognition:     传递依赖（引用 tool/llm 符号）
+#   - agentrt_execution:     传递依赖（引用 tool_approval_check）
+#   - agentrt_core:          atoms 内核
+#   - agentrt_memory:        记忆模块
 #   - svc_common:            daemon 公共库（含 orchestrator.c, checkpoint.c）
 configure_real_lib_test(test_c_link_06_orchestrator_loop
-    LIBS agentos_coreloopthree agentos_llm_service agentos_tool_service
-         agentos_cognition agentos_execution agentos_core agentos_memory svc_common
+    LIBS agentrt_coreloopthree agentrt_llm_service agentrt_tool_service
+         agentrt_cognition agentrt_execution agentrt_core agentrt_memory svc_common
 )
 
 # C-L07: Checkpoint → CoreLoopThree（checkpoint_adapter 真实实现）
 configure_real_lib_test(test_c_link_07_checkpoint_loop
-    LIBS agentos_coreloopthree
+    LIBS agentrt_coreloopthree
 )
 
 # C-L08: ServiceDiscovery → All Daemons（service_discovery 真实实现）
@@ -128,12 +127,13 @@ configure_real_lib_test(test_c_link_09_ipc_bus
 
 # C-L10: monit_d → Prometheus（prometheus_exporter 真实实现）
 configure_real_lib_test(test_c_link_10_monit_prometheus
-    LIBS agentos_monit_service
+    LIBS agentrt_monit_service
 )
 
 # P2.8: Hook System Integration（hook_registry/executor/interceptor/timeout 真实实现）
+# SP04: hook 系统核心已迁移到 agentrt_coreloopthree，不再链接 agentrt_hook_service
 configure_real_lib_test(test_hook_system
-    LIBS agentos_hook_service
+    LIBS agentrt_coreloopthree
 )
 
 # ============================================================================
@@ -147,13 +147,13 @@ configure_real_lib_test(test_hook_system
 #   test_12 ✅ memoryrovol_bridge builtin 降级
 # ============================================================================
 
-# C-L01: Manager → CoreLoopThree（已迁移到真实库 agentos_common）
+# C-L01: Manager → CoreLoopThree（已迁移到真实库 agentrt_common）
 # v0.1.1 修复：memory_source_load 补全 yaml 分支（Bug A），env_source_load
 # 使用双分隔符 __ 作为层级分隔符 + lowercase + int 优先解析（Bug B），
-# 对齐桩函数行为。测试 env var 从 AGENTOS_KERNEL_MAX_ALLOC_MB 改为
-# AGENTOS_KERNEL__MAX_ALLOC_MB（双下划线分隔层级）。
+# 对齐桩函数行为。测试 env var 从 AGENTRT_KERNEL_MAX_ALLOC_MB 改为
+# AGENTRT_KERNEL__MAX_ALLOC_MB（双下划线分隔层级）。
 configure_real_lib_test(test_c_link_01_manager_loop
-    LIBS agentos_common
+    LIBS agentrt_common
 )
 
 # C-L02: llm_d → CoreLoopThree（已迁移到真实库）
@@ -161,7 +161,7 @@ configure_real_lib_test(test_c_link_01_manager_loop
 # llm_svc_adapter.h 提供 llm_svc_adapter_* API（与测试一致），真实实现完整存在。
 # 真实 create 会启动 SD+IPC 引导，与 test_04 同模式。
 configure_real_lib_test(test_c_link_02_llm_loop
-    LIBS agentos_cognition agentos_core svc_common
+    LIBS agentrt_cognition agentrt_core svc_common
 )
 
 # C-L04: tool_d → CoreLoopThree（已迁移到真实库）
@@ -169,7 +169,7 @@ configure_real_lib_test(test_c_link_02_llm_loop
 # 真实 create 会启动 SD+IPC 引导，但 ipc_bus_helper_register_channel 按 ibh 实例
 # 独立注册（非全局 channel 名唯一性检查），多实例同 channel 名不冲突。
 configure_real_lib_test(test_c_link_04_tool_loop
-    LIBS agentos_execution agentos_core svc_common agentos_tool_service
+    LIBS agentrt_execution agentrt_core svc_common agentrt_tool_service
 )
 
 # C-L05: Cupolas SafetyGuard → tool_d（已迁移到真实库）
@@ -178,15 +178,15 @@ configure_real_lib_test(test_c_link_04_tool_loop
 # (agent_id, tool_name) 组合授权，"restricted-agent"+"shell_exec" 不注册以验证拒绝路径。
 # 并发测试改用固定 tool_name（真实 ACL 精确匹配，不支持通配符）。
 configure_real_lib_test(test_c_link_05_safety_tool
-    LIBS agentos_tool_service svc_common cupolas
+    LIBS agentrt_tool_service svc_common cupolas
 )
 
-# C-L11: gateway_d → Gateway（已迁移到真实库 agentos_gateway_service）
+# C-L11: gateway_d → Gateway（已迁移到真实库 agentrt_gateway_service）
 # v0.1.1 修复：detect_proto 真实实现用 strncmp 前缀匹配 + body 检测，
 # 默认返回 JSONRPC（非桩的 COUNT）。测试 CHECK 用 `|| proto < COUNT` 宽泛条件，
 # 真实实现下仍通过。forward 调用不检查 ret（无后端 daemon 时超时返回错误）。
 configure_real_lib_test(test_c_link_11_gateway_forward
-    LIBS agentos_gateway_service
+    LIBS agentrt_gateway_service
 )
 
 # C-L12: CoreLoopThree → MemoryRovol（已迁移到真实库）
@@ -194,8 +194,16 @@ configure_real_lib_test(test_c_link_11_gateway_forward
 # 测试环境无 MemoryRovol 库时优雅降级到 builtin（弱符号机制）。
 # config_path 为 NULL 时使用默认路径，builtin_storage_create 会创建目录。
 configure_real_lib_test(test_c_link_12_memoryrovol_bridge
-    LIBS agentos_coreloopthree agentos_memory agentos_core svc_common
+    LIBS agentrt_coreloopthree agentrt_memory agentrt_core svc_common
 )
+
+# C2: L3 公共 API 测试需要 memoryrovol.h — 通过 agentrt_memoryrovol_bridge
+# 接口库的 include 路径获取（或直接指向 MemoryRovol include 目录）
+if(TARGET agentrt_memoryrovol_bridge)
+    target_link_libraries(test_c_link_12_memoryrovol_bridge PRIVATE agentrt_memoryrovol_bridge)
+elseif(DEFINED MEMORYROVOL_DIR AND EXISTS "${MEMORYROVOL_DIR}/include")
+    target_include_directories(test_c_link_12_memoryrovol_bridge PRIVATE ${MEMORYROVOL_DIR}/include)
+endif()
 
 # ============================================================================
 # 已有测试 (保留)
@@ -206,36 +214,36 @@ if(TARGET svc_common)
     add_executable(test_e2e_core test_e2e_core.c)
 
     target_include_directories(test_e2e_core PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/corekern/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/coreloopthree/tests/unit
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/coreloopthree/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/common/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/common/src
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms/syscall/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/error/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/memory/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/platform/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/string/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons/utils/cache/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/corekern/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/coreloopthree/tests/unit
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/coreloopthree/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/common/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/common/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms/syscall/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/error/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/memory/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/platform/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/string/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons/utils/cache/include
     )
 
     target_link_libraries(test_e2e_core PRIVATE
-        agentos_core
-        agentos_syscall
+        agentrt_core
+        agentrt_syscall
         -Wl,--whole-archive
-        agentos_coreloopthree
+        agentrt_coreloopthree
         -Wl,--no-whole-archive
         svc_common
         -Wl,--start-group
-        agentos_cognition
-        agentos_execution
-        agentos_memory
-        agentos_atoms
-        agentos_llm_service
-        agentos_tool_service
+        agentrt_cognition
+        agentrt_execution
+        agentrt_memory
+        agentrt_atoms
+        agentrt_llm_service
+        agentrt_tool_service
         -Wl,--end-group
         Threads::Threads
-        agentos_platform_libs
+        agentrt_platform_libs
         m
     )
 
@@ -251,15 +259,15 @@ if(TARGET svc_common)
     add_test(NAME e2e_core COMMAND test_e2e_core
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-    agentos_print_ok("  [integration] test_e2e_core: P2-C01 E2E integration tests configured")
+    agentrt_print_ok("  [integration] test_e2e_core: P2-C01 E2E integration tests configured")
 else()
-    agentos_print_warn("  [integration] Skipping test_e2e_core: svc_common not available (BUILD_DAEMON=OFF)")
+    agentrt_print_warn("  [integration] Skipping test_e2e_core: svc_common not available (BUILD_DAEMON=OFF)")
 endif()
 
 # LLM Routing Integration Test (INT-15)
-set(LLM_D_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/llm_d)
-set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/commons)
-set(ATOMIC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/atoms)
+set(LLM_D_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/llm_d)
+set(COMMONS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/commons)
+set(ATOMIC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/atoms)
 set(SYSCALL_INCLUDE_DIR ${ATOMIC_DIR}/syscall/include)
 set(COREKERN_INCLUDE_DIR ${ATOMIC_DIR}/corekern/include)
 
@@ -296,7 +304,7 @@ target_include_directories(test_llm_d_routing PRIVATE
     ${COMMONS_DIR}/utils/compat/include
     ${SYSCALL_INCLUDE_DIR}
     ${COREKERN_INCLUDE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentos/daemon/common/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../agentrt/daemons/common/include
 )
 
 target_link_libraries(test_llm_d_routing PRIVATE
@@ -331,4 +339,4 @@ target_compile_options(test_llm_d_routing PRIVATE
 add_test(NAME llm_d_routing COMMAND test_llm_d_routing
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-agentos_print_ok("  [integration] test_llm_d_routing: INT-15 LLM routing integration tests configured")
+agentrt_print_ok("  [integration] test_llm_d_routing: INT-15 LLM routing integration tests configured")

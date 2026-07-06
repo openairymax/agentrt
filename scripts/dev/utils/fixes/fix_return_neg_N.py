@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fix return -N to AGENTOS_ERR_* + agentos_error_push_ex in protocols/ and gateway/."""
+"""Fix return -N to AGENTRT_ERR_* + agentrt_error_push_ex in protocols/ and gateway/."""
 
 import re
 import os
@@ -10,52 +10,52 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.pa
 # Context keywords → error code mapping
 # Priority: check preceding lines for these keywords (order matters!)
 CONTEXT_MAP = [
-    (r'agentos_error_push_ex\(.*AGENTOS_ERR_UNKNOWN.*operation failed',
-     'AGENTOS_ERR_OUT_OF_MEMORY'),  # fix the UNKNOWN fallback for allocation contexts
-    (r'AGENTOS_CALLOC|AGENTOS_MALLOC|AGENTOS_REALLOC\b|proto_ext_framework_create',
-     'AGENTOS_ERR_OUT_OF_MEMORY'),
+    (r'agentrt_error_push_ex\(.*AGENTRT_ERR_UNKNOWN.*operation failed',
+     'AGENTRT_ERR_OUT_OF_MEMORY'),  # fix the UNKNOWN fallback for allocation contexts
+    (r'AGENTRT_CALLOC|AGENTRT_MALLOC|AGENTRT_REALLOC\b|proto_ext_framework_create',
+     'AGENTRT_ERR_OUT_OF_MEMORY'),
     (r'out\s*of\s*memory|memory\s*(allocation|exhausted)\s*failed',
-     'AGENTOS_ERR_OUT_OF_MEMORY'),
+     'AGENTRT_ERR_OUT_OF_MEMORY'),
     (r'not\s*initialized|initialized\s*==\s*false|!\s*\w*initialized|NOT_INITIALIZED',
-     'AGENTOS_ERR_STATE_ERROR'),
+     'AGENTRT_ERR_STATE_ERROR'),
     (r'not\s*found|no\s*such|does\s*n.t\s*exist|could\s*n.t\s*find',
-     'AGENTOS_ERR_NOT_FOUND'),
+     'AGENTRT_ERR_NOT_FOUND'),
     (r'>=.*MAX|>=.*CAPACITY|too\s*many|full|limit|exceeded|>=.*_COUNT',
-     'AGENTOS_ERR_BUFFER_TOO_SMALL'),
+     'AGENTRT_ERR_BUFFER_TOO_SMALL'),
     (r'already\s*exists|already\s*registered|duplicate|already\s*loaded',
-     'AGENTOS_ERR_ALREADY_EXISTS'),
+     'AGENTRT_ERR_ALREADY_EXISTS'),
     (r'timeout|timed\s*out|deadline',
-     'AGENTOS_ERR_TIMEOUT'),
+     'AGENTRT_ERR_TIMEOUT'),
     (r'not\s*supported|unsupported|not\s*implemented',
-     'AGENTOS_ERR_NOT_SUPPORTED'),
+     'AGENTRT_ERR_NOT_SUPPORTED'),
     (r'permission|access\s*denied|forbidden',
-     'AGENTOS_ERR_PERMISSION_DENIED'),
+     'AGENTRT_ERR_PERMISSION_DENIED'),
     (r'invalid|bad\s*(param|argument|config|input)',
-     'AGENTOS_ERR_INVALID_PARAM'),
+     'AGENTRT_ERR_INVALID_PARAM'),
     (r'read\s*failed|write\s*failed|socket\s*error|network',
-     'AGENTOS_ERR_IO'),
+     'AGENTRT_ERR_IO'),
     (r'null\s*ptr|null\s*pointer|empty\s*handle|handle\s*is\s*null|returned\s*NULL',
-     'AGENTOS_ERR_NULL_POINTER'),
+     'AGENTRT_ERR_NULL_POINTER'),
 ]
 
 # Default mapping by numeric value (fallback)
 NUMERIC_MAP = {
-    -2: 'AGENTOS_ERR_INVALID_PARAM',
-    -3: 'AGENTOS_ERR_NULL_POINTER',
-    -4: 'AGENTOS_ERR_OUT_OF_MEMORY',
-    -5: 'AGENTOS_ERR_BUFFER_TOO_SMALL',
-    -6: 'AGENTOS_ERR_NOT_FOUND',
-    -7: 'AGENTOS_ERR_ALREADY_EXISTS',
-    -8: 'AGENTOS_ERR_TIMEOUT',
-    -9: 'AGENTOS_ERR_NOT_SUPPORTED',
-    -10: 'AGENTOS_ERR_PERMISSION_DENIED',
-    -11: 'AGENTOS_ERR_IO',
-    -12: 'AGENTOS_ERR_PARSE_ERROR',
-    -13: 'AGENTOS_ERR_STATE_ERROR',
-    -14: 'AGENTOS_ERR_OVERFLOW',
-    -15: 'AGENTOS_ERR_UNDERFLOW',
-    -16: 'AGENTOS_ERR_CANCELED',
-    -17: 'AGENTOS_ERR_BUSY',
+    -2: 'AGENTRT_ERR_INVALID_PARAM',
+    -3: 'AGENTRT_ERR_NULL_POINTER',
+    -4: 'AGENTRT_ERR_OUT_OF_MEMORY',
+    -5: 'AGENTRT_ERR_BUFFER_TOO_SMALL',
+    -6: 'AGENTRT_ERR_NOT_FOUND',
+    -7: 'AGENTRT_ERR_ALREADY_EXISTS',
+    -8: 'AGENTRT_ERR_TIMEOUT',
+    -9: 'AGENTRT_ERR_NOT_SUPPORTED',
+    -10: 'AGENTRT_ERR_PERMISSION_DENIED',
+    -11: 'AGENTRT_ERR_IO',
+    -12: 'AGENTRT_ERR_PARSE_ERROR',
+    -13: 'AGENTRT_ERR_STATE_ERROR',
+    -14: 'AGENTRT_ERR_OVERFLOW',
+    -15: 'AGENTRT_ERR_UNDERFLOW',
+    -16: 'AGENTRT_ERR_CANCELED',
+    -17: 'AGENTRT_ERR_BUSY',
 }
 
 def determine_error_code(lines_before, neg_value):
@@ -67,7 +67,7 @@ def determine_error_code(lines_before, neg_value):
             return code
     
     # Fallback to numeric map
-    return NUMERIC_MAP.get(abs(neg_value), 'AGENTOS_ERR_UNKNOWN')
+    return NUMERIC_MAP.get(abs(neg_value), 'AGENTRT_ERR_UNKNOWN')
 
 def make_context_description(lines_before, neg_value, error_code):
     """Create a description string from context."""
@@ -80,9 +80,9 @@ def make_context_description(lines_before, neg_value, error_code):
     func_name = func_match.group(1) if func_match else ''
     
     # Determine more specific context
-    if 'AGENTOS_CALLOC' in context or 'AGENTOS_MALLOC' in context:
+    if 'AGENTRT_CALLOC' in context or 'AGENTRT_MALLOC' in context:
         return f'{func_name}: allocation failed' if func_name else 'allocation failed'
-    if 'AGENTOS_REALLOC' in context:
+    if 'AGENTRT_REALLOC' in context:
         return f'{func_name}: reallocation failed' if func_name else 'reallocation failed'
     if 'initialized' in context.lower() or 'NOT_INITIALIZED' in context:
         return f'{func_name}: not initialized' if func_name else 'not initialized'
@@ -126,7 +126,7 @@ def fix_file(filepath):
             desc = make_context_description(ctx_lines, neg_val, error_code)
             
             result_lines.append(
-                f'{indent}agentos_error_push_ex({error_code}, __FILE__, __LINE__, __func__, '
+                f'{indent}agentrt_error_push_ex({error_code}, __FILE__, __LINE__, __func__, '
                 f'"{desc}");\n'
             )
             result_lines.append(f'{indent}return {error_code};\n')
@@ -144,14 +144,14 @@ def fix_file(filepath):
     return count
 
 def ensure_error_h_include(filepath):
-    """Add #include 'error.h' if not present and AGENTOS_ERR_* is used."""
+    """Add #include 'error.h' if not present and AGENTRT_ERR_* is used."""
     with open(filepath, 'r', encoding='utf-8') as f:
         content = f.read()
     
     if '#include "error.h"' in content or '#include <error.h>' in content:
         return False
     
-    if 'AGENTOS_ERR_' not in content:
+    if 'AGENTRT_ERR_' not in content:
         return False
     
     # Find the last existing #include line
@@ -170,19 +170,19 @@ def ensure_error_h_include(filepath):
     return False
 
 def remove_local_compat_defines(filepath):
-    """Remove local AGENTOS_EFAIL, AGENTOS_EINVAL, etc. compat defines that conflict with error.h."""
+    """Remove local AGENTRT_EFAIL, AGENTRT_EINVAL, etc. compat defines that conflict with error.h."""
     with open(filepath, 'r', encoding='utf-8') as f:
         content = f.read()
     
     original = content
     
     patterns = [
-        r'#ifndef\s+AGENTOS_SUCCESS\s*\n\s*#define\s+AGENTOS_SUCCESS\s+\d+\s*\n\s*#endif\s*\n?',
-        r'#ifndef\s+AGENTOS_EFAIL\s*\n\s*#define\s+AGENTOS_EFAIL\s+\(?-?\d+\)?\s*\n\s*#endif\s*\n?',
-        r'#ifndef\s+AGENTOS_EINVAL\s*\n\s*#define\s+AGENTOS_EINVAL\s+\(?-?\d+\)?\s*\n\s*#endif\s*\n?',
-        r'#ifndef\s+AGENTOS_ENOMEM\s*\n\s*#define\s+AGENTOS_ENOMEM\s+\(?-?\d+\)?\s*\n\s*#endif\s*\n?',
-        r'#ifndef\s+AGENTOS_ENOTSUP\s*\n\s*#define\s+AGENTOS_ENOTSUP\s+\(?-?\d+\)?\s*\n\s*#endif\s*\n?',
-        r'#ifndef\s+AGENTOS_EACCES\s*\n\s*#define\s+AGENTOS_EACCES\s+\(?-?\d+\)?\s*\n\s*#endif\s*\n?',
+        r'#ifndef\s+AGENTRT_SUCCESS\s*\n\s*#define\s+AGENTRT_SUCCESS\s+\d+\s*\n\s*#endif\s*\n?',
+        r'#ifndef\s+AGENTRT_EFAIL\s*\n\s*#define\s+AGENTRT_EFAIL\s+\(?-?\d+\)?\s*\n\s*#endif\s*\n?',
+        r'#ifndef\s+AGENTRT_EINVAL\s*\n\s*#define\s+AGENTRT_EINVAL\s+\(?-?\d+\)?\s*\n\s*#endif\s*\n?',
+        r'#ifndef\s+AGENTRT_ENOMEM\s*\n\s*#define\s+AGENTRT_ENOMEM\s+\(?-?\d+\)?\s*\n\s*#endif\s*\n?',
+        r'#ifndef\s+AGENTRT_ENOTSUP\s*\n\s*#define\s+AGENTRT_ENOTSUP\s+\(?-?\d+\)?\s*\n\s*#endif\s*\n?',
+        r'#ifndef\s+AGENTRT_EACCES\s*\n\s*#define\s+AGENTRT_EACCES\s+\(?-?\d+\)?\s*\n\s*#endif\s*\n?',
     ]
     
     for pattern in patterns:

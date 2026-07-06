@@ -48,7 +48,7 @@ CI_MODULE="${CI_MODULE:-all}"
 CI_PARALLEL="${CI_PARALLEL:-auto}"
 CI_ARTIFACT_DIR="${CI_ARTIFACT_DIR:-${PROJECT_ROOT}/ci-artifacts}"
 CI_LOG_DIR="${CI_LOG_DIR:-${PROJECT_ROOT}/ci-logs}"
-CI_BUILD_DIR="${AGENTOS_BUILD_DIR:-${PROJECT_ROOT}/../AgentRT-build}"
+CI_BUILD_DIR="${AGENTRT_BUILD_DIR:-${PROJECT_ROOT}/../AgentRT-build}"
 
 # 时间统计
 declare -A PHASE_TIMINGS
@@ -422,7 +422,7 @@ package_artifacts_fallback() {
     local timestamp
     timestamp=$(date +%Y%m%d-%H%M%S)
     local version="v1.0.${timestamp}"
-    local artifact_name="agentos-${version}.tar.gz"
+    local artifact_name="agentrt-${version}.tar.gz"
 
     log_info "Packaging artifacts as: $artifact_name"
 

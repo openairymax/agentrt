@@ -4,7 +4,7 @@
  *
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  *
  * "From data intelligence emerges."
  */
@@ -55,7 +55,7 @@ static int test_error_message_format(void) {
 
 static int test_null_pointer_handling(void) {
     heapstore_config_t config = {0};
-    config.root_path = AGENTOS_TMP_DIR "/heapstore_edge_test";
+    config.root_path = AGENTRT_TMP_DIR "/heapstore_edge_test";
 
     heapstore_error_t err = heapstore_init(&config);
     if (err != heapstore_SUCCESS) {
@@ -84,7 +84,7 @@ static int test_null_pointer_handling(void) {
 
 static int test_empty_string_handling(void) {
     heapstore_config_t config = {0};
-    config.root_path = AGENTOS_TMP_DIR "/heapstore_edge_test2";
+    config.root_path = AGENTRT_TMP_DIR "/heapstore_edge_test2";
 
     heapstore_error_t err = heapstore_init(&config);
     if (err != heapstore_SUCCESS) {
@@ -113,7 +113,7 @@ static int test_empty_string_handling(void) {
 
 static int test_very_long_input(void) {
     heapstore_config_t config = {0};
-    config.root_path = AGENTOS_TMP_DIR "/heapstore_edge_test3";
+    config.root_path = AGENTRT_TMP_DIR "/heapstore_edge_test3";
 
     heapstore_error_t err = heapstore_init(&config);
     if (err != heapstore_SUCCESS) {
@@ -122,7 +122,7 @@ static int test_very_long_input(void) {
     }
 
     char long_service[10000];
-    AGENTOS_MEMSET(long_service, 'A', sizeof(long_service));
+    AGENTRT_MEMSET(long_service, 'A', sizeof(long_service));
     long_service[sizeof(long_service) - 1] = '\0';
 
     err = heapstore_log_write_fast(long_service, 0, "test");
@@ -133,7 +133,7 @@ static int test_very_long_input(void) {
     }
 
     char long_message[100000];
-    AGENTOS_MEMSET(long_message, 'B', sizeof(long_message));
+    AGENTRT_MEMSET(long_message, 'B', sizeof(long_message));
     long_message[sizeof(long_message) - 1] = '\0';
 
     err = heapstore_log_write_fast("test_service", 0, long_message);
@@ -150,7 +150,7 @@ static int test_very_long_input(void) {
 
 static int test_special_characters_in_service_name(void) {
     heapstore_config_t config = {0};
-    config.root_path = AGENTOS_TMP_DIR "/heapstore_edge_test4";
+    config.root_path = AGENTRT_TMP_DIR "/heapstore_edge_test4";
 
     heapstore_error_t err = heapstore_init(&config);
     if (err != heapstore_SUCCESS) {
@@ -217,7 +217,7 @@ static int test_sanitize_function_edge_cases(void) {
     }
 
     char very_long[10000];
-    AGENTOS_MEMSET(very_long, 'A', sizeof(very_long) - 1);
+    AGENTRT_MEMSET(very_long, 'A', sizeof(very_long) - 1);
     very_long[sizeof(very_long) - 1] = '\0';
 
     if (heapstore_sanitize_path_component(output, very_long, sizeof(output)) != -1) {
@@ -231,7 +231,7 @@ static int test_sanitize_function_edge_cases(void) {
 
 static int test_initialization_edge_cases(void) {
     heapstore_config_t config = {0};
-    config.root_path = AGENTOS_TMP_DIR "/heapstore_edge_test5";
+    config.root_path = AGENTRT_TMP_DIR "/heapstore_edge_test5";
 
     heapstore_error_t err = heapstore_init(&config);
     if (err != heapstore_SUCCESS) {
@@ -260,7 +260,7 @@ static int test_initialization_edge_cases(void) {
 
 static int test_stats_and_metrics(void) {
     heapstore_config_t config = {0};
-    config.root_path = AGENTOS_TMP_DIR "/heapstore_edge_test6";
+    config.root_path = AGENTRT_TMP_DIR "/heapstore_edge_test6";
 
     heapstore_error_t err = heapstore_init(&config);
     if (err != heapstore_SUCCESS) {
@@ -297,7 +297,7 @@ static int test_stats_and_metrics(void) {
 
 static int test_health_check(void) {
     heapstore_config_t config = {0};
-    config.root_path = AGENTOS_TMP_DIR "/heapstore_edge_test7";
+    config.root_path = AGENTRT_TMP_DIR "/heapstore_edge_test7";
 
     heapstore_error_t err = heapstore_init(&config);
     if (err != heapstore_SUCCESS) {

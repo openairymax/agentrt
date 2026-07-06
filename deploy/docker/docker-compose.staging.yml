@@ -6,14 +6,14 @@ version: '3.8'
 
 services:
   # ==================== AgentRT Scripts 服务 ====================
-  agentos-scripts:
+  agentrt-scripts:
     build:
       context: ..
       dockerfile: docker/Dockerfile
       target: runtime
-    image: ${DOCKER_REGISTRY:-spharx}/agentos-scripts:0.1.0-staging
-    container_name: agentos-scripts
-    hostname: agentos-scripts-staging
+    image: ${DOCKER_REGISTRY:-spharx}/agentrt-scripts:0.1.0-staging
+    container_name: agentrt-scripts
+    hostname: agentrt-scripts-staging
     restart: unless-stopped
 
     # 资源限制
@@ -29,12 +29,12 @@ services:
     # 环境变量
     environment:
       - TZ=Asia/Shanghai
-      - AGENTOS_ENV=staging
-      - AGENTOS_LOG_LEVEL=INFO
-      - AGENTOS_LOG_FORMAT=json
-      - AGENTOS_ENABLE_TRACING=true
-      - AGENTOS_TELEMETRY_ENDPOINT=http://otel-collector:4317
-      - AGENTOS_DEPLOYMENT_TYPE=staging
+      - AGENTRT_ENV=staging
+      - AGENTRT_LOG_LEVEL=INFO
+      - AGENTRT_LOG_FORMAT=json
+      - AGENTRT_ENABLE_TRACING=true
+      - AGENTRT_TELEMETRY_ENDPOINT=http://otel-collector:4317
+      - AGENTRT_DEPLOYMENT_TYPE=staging
 
     # 端口映射
     ports:
@@ -43,12 +43,12 @@ services:
     # 数据卷挂载
     volumes:
       - staging-logs:/var/log/agentos:rw
-      - staging-data:/var/lib/agentos:rw
-      - ../../ecosystem/manager/staging:/etc/agentos:ro
+      - staging-data:/var/lib/agentrt:rw
+      - ../../ecosystem/manager/staging:/etc/agentrt:ro
 
     # 网络配置
     networks:
-      - agentos-staging-network
+      - agentrt-staging-network
 
     # 健康检查
     healthcheck:
@@ -62,14 +62,14 @@ services:
     command: >
       bash -c "
         echo 'Starting AgentRT Scripts (Staging)...';
-        python3 -m scripts.core.cli --manager /etc/agentos/manager.yaml;
+        python3 -m scripts.core.cli --manager /etc/agentrt/manager.yaml;
       "
 
   # ==================== 辅助服务 ====================
   redis-staging:
     image: redis:7-alpine
-    container_name: agentos-redis-staging
-    hostname: agentos-redis-staging
+    container_name: agentrt-redis-staging
+    hostname: agentrt-redis-staging
     restart: unless-stopped
 
     # 资源限制
@@ -85,7 +85,7 @@ services:
 
     # 网络配置
     networks:
-      - agentos-staging-network
+      - agentrt-staging-network
 
     # 健康检查
     healthcheck:
@@ -99,8 +99,8 @@ services:
 
   postgres-staging:
     image: postgres:15-alpine
-    container_name: agentos-postgres-staging
-    hostname: agentos-postgres-staging
+    container_name: agentrt-postgres-staging
+    hostname: agentrt-postgres-staging
     restart: unless-stopped
 
     # 资源限制
@@ -112,7 +112,7 @@ services:
 
     # 环境变量
     environment:
-      - POSTGRES_DB=agentos_staging
+      - POSTGRES_DB=agentrt_staging
       - POSTGRES_USER=agentos
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_INITDB_ARGS=--encoding=UTF-8
@@ -123,7 +123,7 @@ services:
 
     # 网络配置
     networks:
-      - agentos-staging-network
+      - agentrt-staging-network
 
     # 健康检查
     healthcheck:
@@ -135,8 +135,8 @@ services:
   # OpenTelemetry Collector (可观测性)
   otel-collector-staging:
     image: otel/opentelemetry-collector-contrib:0.90.0
-    container_name: agentos-otel-staging
-    hostname: agentos-otel-staging
+    container_name: agentrt-otel-staging
+    hostname: agentrt-otel-staging
     restart: unless-stopped
 
     # 配置文件
@@ -145,7 +145,7 @@ services:
 
     # 网络配置
     networks:
-      - agentos-staging-network
+      - agentrt-staging-network
 
     # 端口暴露
     ports:
@@ -159,8 +159,8 @@ services:
 
   jaeger-staging:
     image: jaegertracing/all-in-one:1.50
-    container_name: agentos-jaeger-staging
-    hostname: agentos-jaeger-staging
+    container_name: agentrt-jaeger-staging
+    hostname: agentrt-jaeger-staging
     restart: unless-stopped
 
     # 环境变量
@@ -169,7 +169,7 @@ services:
 
     # 网络配置
     networks:
-      - agentos-staging-network
+      - agentrt-staging-network
 
     # 端口暴露
     ports:
@@ -196,7 +196,7 @@ volumes:
 
 # ==================== 网络配置 ====================
 networks:
-  agentos-staging-network:
+  agentrt-staging-network:
     driver: bridge
     ipam:
       config:

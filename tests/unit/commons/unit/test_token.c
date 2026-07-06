@@ -23,18 +23,18 @@
 static int passed_tests = 0, failed_tests = 0;
 
 static int test_token_count(void) {
-    agentos_token_counter_t* counter = agentos_token_counter_create("gpt-4");
+    agentrt_token_counter_t* counter = agentrt_token_counter_create("gpt-4");
     if (!counter) { printf("  Token count: Skipped\n"); return 0; }
     
-    size_t count = agentos_token_counter_count(counter, "Hello, World!");
+    size_t count = agentrt_token_counter_count(counter, "Hello, World!");
     printf("  Token count: %zu tokens\n", count);
     
-    agentos_token_counter_destroy(counter);
+    agentrt_token_counter_destroy(counter);
     return 0;
 }
 
 int main(void) {
-    printf("agentos/commons/token 单元测试\n");
+    printf("agentrt/commons/token 单元测试\n");
     TEST_RUN(test_token_count);
     printf("测试结果�?d 通过�?d 失败\n", passed_tests, failed_tests);
     return failed_tests > 0 ? 1 : 0;

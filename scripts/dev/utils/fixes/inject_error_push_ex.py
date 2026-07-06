@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 注入 error_push_ex 到 atoms/ 层文件
-为所有 return AGENTOS_E* 返回点自动注入 error_push_ex 上下文追踪
+为所有 return AGENTRT_E* 返回点自动注入 error_push_ex 上下文追踪
 
 用法: python3 inject_error_push_ex.py <file.c>
 """
@@ -11,13 +11,13 @@ import sys
 MACRO_NAME = "ATM_RET_ERR"
 MACRO_DEF = (
     f"#define {MACRO_NAME}(c) \\\n"
-    f"    do {{ agentos_error_push_ex((c), __FILE__, __LINE__, __func__, "
-    f'"%s", agentos_error_str(c)); return (c); }} while(0)\n'
+    f"    do {{ agentrt_error_push_ex((c), __FILE__, __LINE__, __func__, "
+    f'"%s", agentrt_error_str(c)); return (c); }} while(0)\n'
 )
 
 INCLUDE_LINE = '#include "error_compat.h"\n'
 
-RET_PATTERN = re.compile(r"return\s+(AGENTOS_E\w+)\s*;")
+RET_PATTERN = re.compile(r"return\s+(AGENTRT_E\w+)\s*;")
 
 
 def inject(filepath):
@@ -65,7 +65,7 @@ def inject(filepath):
         lines.insert(insert_at + 1, MACRO_DEF)
         lines.insert(insert_at + 2, "\n")
 
-    # 2. Count and replace return AGENTOS_E*;
+    # 2. Count and replace return AGENTRT_E*;
     count = 0
     new_lines = []
     for line in lines:
@@ -90,11 +90,11 @@ def main():
     total = 0
     for filepath in sys.argv[1:]:
         total += inject(filepath)
-    print(f"\nTotal: {total} AGENTOS_E_* → error_push_ex injections")
+    print(f"\nTotal: {total} AGENTRT_E_* → error_push_ex injections")
 
 
 if __name__ == "__main__":
     total = 0
     for filepath in sys.argv[1:]:
         total += inject(filepath)
-    print(f"\nTotal: {total} AGENTOS_E_* → error_push_ex injections")
+    print(f"\nTotal: {total} AGENTRT_E_* → error_push_ex injections")

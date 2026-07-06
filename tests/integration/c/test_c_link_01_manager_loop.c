@@ -1,12 +1,12 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 // @owner: team-C
 /**
  * @file test_c_link_01_manager_loop.c
  * @brief C-L01 Integration Test: Manager → CoreLoopThree
  *
  * Tests the configuration loading pipeline:
- * 1. Normal path: Load valid agentos.yaml → config propagated to CoreLoopThree
+ * 1. Normal path: Load valid agentrt.yaml → config propagated to CoreLoopThree
  * 2. Error path: Invalid YAML → proper error codes returned
  * 3. Timeout path: Slow config loading → timeout handling
  * 4. Concurrent path: Multiple config reloads → no race conditions
@@ -64,7 +64,7 @@ static int g_tests_total = 0;
  * ============================================================================ */
 
 static void test_normal_config_load(void) {
-    TEST("C-L01 Normal: Load valid agentos.yaml");
+    TEST("C-L01 Normal: Load valid agentrt.yaml");
 
     config_context_t *ctx = config_service_create("test_normal", NULL, false, false);
     CHECK(ctx != NULL, "config_service_create returned NULL");
@@ -327,8 +327,8 @@ static void test_env_var_override(void) {
     /* Set an environment variable for testing.
      * v0.1.1 BEHAVIOR_DIFF 修正：env_source_load 使用双分隔符（__）作为层级分隔符，
      * 单分隔符（_）保留为键内词边界（Viper/Django 等配置系统通用惯例）。
-     * 因此 AGENTOS_KERNEL__MAX_ALLOC_MB 映射到 kernel.max_alloc_mb。 */
-    setenv("AGENTOS_KERNEL__MAX_ALLOC_MB", "8192", 1);
+     * 因此 AGENTRT_KERNEL__MAX_ALLOC_MB 映射到 kernel.max_alloc_mb。 */
+    setenv("AGENTRT_KERNEL__MAX_ALLOC_MB", "8192", 1);
 
     config_context_t *ctx = config_service_create("test_env_override", NULL, false, false);
     CHECK(ctx != NULL, "config_service_create returned NULL");
@@ -345,7 +345,7 @@ static void test_env_var_override(void) {
 
     /* Also load from env source */
     config_env_source_options_t env_opts = {
-        .prefix = "AGENTOS_",
+        .prefix = "AGENTRT_",
         .case_sensitive = false,
         .separator = "_",
         .expand_vars = true
@@ -360,7 +360,7 @@ static void test_env_var_override(void) {
     /* Env var should override YAML value */
     CHECK_EQ(val, 8192, "Environment variable should override YAML (8192)");
 
-    unsetenv("AGENTOS_KERNEL__MAX_ALLOC_MB");
+    unsetenv("AGENTRT_KERNEL__MAX_ALLOC_MB");
     if (source) config_source_destroy(source);
     if (env_source) config_source_destroy(env_source);
     config_context_destroy(ctx);

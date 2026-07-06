@@ -94,14 +94,14 @@
         },
         "fallback_chain": {
           "type": "array",
-          "description": "Ordered fallback provider chain (from agentos.yaml)",
+          "description": "Ordered fallback provider chain (from agentrt.yaml)",
           "items": {"type": "string"},
           "examples": [["openai", "anthropic", "deepseek"]]
         },
         "cost_budget_daily_usd": {
           "type": "number",
           "minimum": 0,
-          "description": "Daily cost budget in USD (from agentos.yaml)",
+          "description": "Daily cost budget in USD (from agentrt.yaml)",
           "examples": [5.0, 10.0, 25.0, 50.0, 100.0]
         }
       }

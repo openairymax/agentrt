@@ -20,7 +20,7 @@
           "minLength": 1,
           "maxLength": 64,
           "description": "Service name",
-          "examples": ["tool-daemon", "agentos-tool-service"]
+          "examples": ["tool-daemon", "agentrt-tool-service"]
         },
         "version": {
           "type": "string",

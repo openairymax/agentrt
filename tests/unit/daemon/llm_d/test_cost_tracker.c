@@ -32,7 +32,7 @@ static void test_cost_tracker_with_rules(void) {
     printf("  test_cost_tracker_with_rules...\n");
 
     pricing_rule_t rules[2];
-    AGENTOS_MEMSET(rules, 0, sizeof(rules));
+    AGENTRT_MEMSET(rules, 0, sizeof(rules));
     
     rules[0].model_pattern = strdup("gpt-4*");
     rules[0].input_price_per_k = 0.03;
@@ -78,7 +78,7 @@ static void test_cost_tracker_export(void) {
     printf("  test_cost_tracker_export...\n");
 
     pricing_rule_t rule;
-    AGENTOS_MEMSET(&rule, 0, sizeof(rule));
+    AGENTRT_MEMSET(&rule, 0, sizeof(rule));
     rule.model_pattern = strdup("gpt-4");
     rule.input_price_per_k = 0.03;
     rule.output_price_per_k = 0.06;
@@ -164,7 +164,7 @@ static void test_cost_tracker_rule_matching(void) {
     printf("  test_cost_tracker_rule_matching...\n");
 
     pricing_rule_t rules[2];
-    AGENTOS_MEMSET(rules, 0, sizeof(rules));
+    AGENTRT_MEMSET(rules, 0, sizeof(rules));
     
     rules[0].model_pattern = strdup("gpt-4*");
     rules[0].input_price_per_k = 0.03;

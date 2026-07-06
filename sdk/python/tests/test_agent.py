@@ -10,8 +10,8 @@ import os
 # Add the parent directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from agentos import AgentRT, AsyncAgentRT
-from agentos.exceptions import AgentOSError, NetworkError, AgentOSTimeoutError
+from agentrt import AgentRT, AsyncAgentRT
+from agentrt.exceptions import AgentOSError, NetworkError, AgentOSTimeoutError
 
 class TestAgentRT(unittest.TestCase):
     """Test AgentRT client"""
@@ -20,7 +20,7 @@ class TestAgentRT(unittest.TestCase):
         """Set up test fixtures"""
         self.endpoint = "http://localhost:18789"
 
-    @patch('agentos.agent.requests.Session')
+    @patch('agentrt.agent.requests.Session')
     def test_submit_task(self, mock_session):
         """Test submit_task method"""
         # Mock the response
@@ -41,7 +41,7 @@ class TestAgentRT(unittest.TestCase):
         self.assertEqual(task.task_id, "test-task-id")
         mock_session_instance.post.assert_called_once()
 
-    @patch('agentos.agent.requests.Session')
+    @patch('agentrt.agent.requests.Session')
     def test_write_memory(self, mock_session):
         """Test write_memory method"""
         # Mock the response
@@ -62,7 +62,7 @@ class TestAgentRT(unittest.TestCase):
         self.assertEqual(memory_id, "test-memory-id")
         mock_session_instance.post.assert_called_once()
 
-    @patch('agentos.agent.requests.Session')
+    @patch('agentrt.agent.requests.Session')
     def test_search_memory(self, mock_session):
         """Test search_memory method"""
         # Mock the response
@@ -93,7 +93,7 @@ class TestAgentRT(unittest.TestCase):
         self.assertEqual(memories[0].memory_id, "test-memory-id")
         mock_session_instance.get.assert_called_once()
 
-    @patch('agentos.agent.requests.Session')
+    @patch('agentrt.agent.requests.Session')
     def test_get_memory(self, mock_session):
         """Test get_memory method"""
         # Mock the response
@@ -120,7 +120,7 @@ class TestAgentRT(unittest.TestCase):
         self.assertEqual(memory.content, "Test memory")
         mock_session_instance.get.assert_called_once()
 
-    @patch('agentos.agent.requests.Session')
+    @patch('agentrt.agent.requests.Session')
     def test_delete_memory(self, mock_session):
         """Test delete_memory method"""
         # Mock the response
@@ -141,7 +141,7 @@ class TestAgentRT(unittest.TestCase):
         self.assertTrue(result)
         mock_session_instance.delete.assert_called_once()
 
-    @patch('agentos.agent.requests.Session')
+    @patch('agentrt.agent.requests.Session')
     def test_create_session(self, mock_session):
         """Test create_session method"""
         # Mock the response

@@ -13,7 +13,7 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from agentos.framework.plugin import (
+from agentrt.framework.plugin import (
     PluginRegistry, PluginState, BasePlugin, get_plugin_registry
 )
 

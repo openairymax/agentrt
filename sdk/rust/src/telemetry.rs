@@ -218,7 +218,7 @@ impl Telemetry {
 
     /// 创建带默认服务名的遥测聚合器
     pub fn default_telemetry() -> Self {
-        Telemetry::new("agentos-sdk")
+        Telemetry::new("agentrt-sdk")
     }
 
     /// 获取服务名

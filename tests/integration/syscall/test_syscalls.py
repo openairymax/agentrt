@@ -19,13 +19,13 @@ from tests.utils.python.base_test import IntegrationTestCase
 from tests.utils.python.test_helpers import TestDataBuilder, ContractTestHelper
 
 
-AGENTOS_SUCCESS = 0
-AGENTOS_EINVAL = -2
-AGENTOS_ENOMEM = -4
-AGENTOS_ENOENT = -6
-AGENTOS_EEXIST = -7
-AGENTOS_ETIMEOUT = -8
-AGENTOS_EBUSY = -11
+AGENTRT_SUCCESS = 0
+AGENTRT_EINVAL = -2
+AGENTRT_ENOMEM = -4
+AGENTRT_ENOENT = -6
+AGENTRT_EEXIST = -7
+AGENTRT_ETIMEOUT = -8
+AGENTRT_EBUSY = -11
 
 
 class TestSyscallAgentLifecycle(IntegrationTestCase):
@@ -44,7 +44,7 @@ class TestSyscallAgentLifecycle(IntegrationTestCase):
         assert agent_id.startswith("agent_")
 
         err = self._syscall_agent_terminate(agent_id)
-        assert err == AGENTOS_SUCCESS
+        assert err == AGENTRT_SUCCESS
 
     def test_agent_invoke_after_spawn(self):
         """测试 Agent 创建后可调用"""
@@ -61,12 +61,12 @@ class TestSyscallAgentLifecycle(IntegrationTestCase):
     def test_agent_invoke_nonexistent_returns_error(self):
         """测试调用不存在的 Agent 返回错误"""
         result = self._syscall_agent_invoke("agent_nonexistent", "test")
-        assert result != AGENTOS_SUCCESS
+        assert result != AGENTRT_SUCCESS
 
     def test_agent_terminate_nonexistent_returns_error(self):
         """测试销毁不存在的 Agent 返回错误"""
         err = self._syscall_agent_terminate("agent_nonexistent")
-        assert err == AGENTOS_ENOENT
+        assert err == AGENTRT_ENOENT
 
     def test_agent_list_after_spawn(self):
         """测试创建 Agent 后列表包含该 Agent"""
@@ -91,7 +91,7 @@ class TestSyscallAgentLifecycle(IntegrationTestCase):
     def test_agent_spawn_null_spec_returns_einval(self):
         """测试空规格创建 Agent 返回 EINVAL"""
         err = self._syscall_agent_spawn_raw(None)
-        assert err == AGENTOS_EINVAL
+        assert err == AGENTRT_EINVAL
 
     def test_multiple_agents_independent(self):
         """测试多个 Agent 互不干扰"""
@@ -124,12 +124,12 @@ class TestSyscallTaskFlow(IntegrationTestCase):
     def test_task_submit_empty_input_returns_einval(self):
         """测试空输入提交任务返回 EINVAL"""
         err = self._syscall_task_submit_raw(None, 0, 30000)
-        assert err == AGENTOS_EINVAL
+        assert err == AGENTRT_EINVAL
 
     def test_task_cancel_nonexistent_returns_error(self):
         """测试取消不存在的任务返回错误"""
         err = self._syscall_task_cancel("task_nonexistent")
-        assert err != AGENTOS_SUCCESS
+        assert err != AGENTRT_SUCCESS
 
 
 class TestSyscallMemoryOperations(IntegrationTestCase):
@@ -147,7 +147,7 @@ class TestSyscallMemoryOperations(IntegrationTestCase):
     def test_memory_write_empty_data_returns_einval(self):
         """测试空数据写入返回 EINVAL"""
         err = self._syscall_memory_write_raw(None, 0, None)
-        assert err == AGENTOS_EINVAL
+        assert err == AGENTRT_EINVAL
 
     def test_memory_search_with_query(self):
         """测试记忆搜索"""
@@ -161,7 +161,7 @@ class TestSyscallMemoryOperations(IntegrationTestCase):
     def test_memory_delete_nonexistent_returns_error(self):
         """测试删除不存在的记忆返回错误"""
         err = self._syscall_memory_delete("mem_nonexistent")
-        assert err == AGENTOS_ENOENT
+        assert err == AGENTRT_ENOENT
 
     def test_memory_write_and_delete(self):
         """测试记忆写入后删除"""
@@ -169,7 +169,7 @@ class TestSyscallMemoryOperations(IntegrationTestCase):
         record_id = self._syscall_memory_write(data, None)
 
         err = self._syscall_memory_delete(record_id)
-        assert err == AGENTOS_SUCCESS
+        assert err == AGENTRT_SUCCESS
 
     def test_memory_get_after_delete_returns_error(self):
         """测试删除后读取返回错误"""
@@ -178,7 +178,7 @@ class TestSyscallMemoryOperations(IntegrationTestCase):
         self._syscall_memory_delete(record_id)
 
         err = self._syscall_memory_get_raw(record_id)
-        assert err == AGENTOS_ENOENT
+        assert err == AGENTRT_ENOENT
 
 
 class TestSyscallSessionManagement(IntegrationTestCase):
@@ -204,10 +204,10 @@ class TestSyscallSessionManagement(IntegrationTestCase):
         session_id = self._syscall_session_create(None)
 
         err = self._syscall_session_close(session_id)
-        assert err == AGENTOS_SUCCESS
+        assert err == AGENTRT_SUCCESS
 
         result = self._syscall_session_get(session_id)
-        assert result != AGENTOS_SUCCESS
+        assert result != AGENTRT_SUCCESS
 
     def test_session_list_after_create(self):
         """测试创建会话后列表包含该会话"""
@@ -222,7 +222,7 @@ class TestSyscallSessionManagement(IntegrationTestCase):
     def test_session_close_nonexistent_returns_error(self):
         """测试关闭不存在的会话返回错误"""
         err = self._syscall_session_close("sess_nonexistent")
-        assert err == AGENTOS_ENOENT
+        assert err == AGENTRT_ENOENT
 
     def test_session_get_persist_status(self):
         """测试获取会话持久化状态"""
@@ -265,7 +265,7 @@ class TestSyscallSkillManagement(IntegrationTestCase):
     def test_skill_execute_nonexistent_returns_error(self):
         """测试执行不存在的 Skill 返回错误"""
         result = self._syscall_skill_execute("skill_nonexistent", "input")
-        assert result != AGENTOS_SUCCESS
+        assert result != AGENTRT_SUCCESS
 
     def test_skill_uninstall_removes_from_list(self):
         """测试卸载后 Skill 不在列表中"""
@@ -279,7 +279,7 @@ class TestSyscallSkillManagement(IntegrationTestCase):
     def test_skill_install_null_url_returns_einval(self):
         """测试空 URL 安装返回 EINVAL"""
         err = self._syscall_skill_install_raw(None)
-        assert err == AGENTOS_EINVAL
+        assert err == AGENTRT_EINVAL
 
 
 class TestSyscallTelemetry(IntegrationTestCase):
@@ -375,7 +375,7 @@ class TestSyscallCrossModule(IntegrationTestCase):
     def test_syscall_init_and_cleanup(self):
         """测试系统调用层初始化和清理"""
         err = self._syscall_init()
-        assert err == AGENTOS_SUCCESS
+        assert err == AGENTRT_SUCCESS
 
         self._syscall_cleanup()
 
@@ -384,19 +384,19 @@ class TestSyscallErrorHandling(IntegrationTestCase):
     """测试系统调用错误处理"""
 
     @pytest.mark.parametrize("func,args,expected_error", [
-        ("agent_spawn", (None,), AGENTOS_EINVAL),
-        ("agent_terminate", (None,), AGENTOS_EINVAL),
-        ("agent_invoke", (None, "input", 5), AGENTOS_EINVAL),
-        ("memory_write", (None, 0, None), AGENTOS_EINVAL),
-        ("memory_search", (None, 5), AGENTOS_EINVAL),
-        ("memory_get", (None,), AGENTOS_EINVAL),
-        ("memory_delete", (None,), AGENTOS_EINVAL),
-        ("session_create", (None,), AGENTOS_EINVAL),
-        ("session_get", (None,), AGENTOS_EINVAL),
-        ("session_close", (None,), AGENTOS_EINVAL),
-        ("skill_install", (None,), AGENTOS_EINVAL),
-        ("skill_execute", (None, "input"), AGENTOS_EINVAL),
-        ("skill_uninstall", (None,), AGENTOS_EINVAL),
+        ("agent_spawn", (None,), AGENTRT_EINVAL),
+        ("agent_terminate", (None,), AGENTRT_EINVAL),
+        ("agent_invoke", (None, "input", 5), AGENTRT_EINVAL),
+        ("memory_write", (None, 0, None), AGENTRT_EINVAL),
+        ("memory_search", (None, 5), AGENTRT_EINVAL),
+        ("memory_get", (None,), AGENTRT_EINVAL),
+        ("memory_delete", (None,), AGENTRT_EINVAL),
+        ("session_create", (None,), AGENTRT_EINVAL),
+        ("session_get", (None,), AGENTRT_EINVAL),
+        ("session_close", (None,), AGENTRT_EINVAL),
+        ("skill_install", (None,), AGENTRT_EINVAL),
+        ("skill_execute", (None, "input"), AGENTRT_EINVAL),
+        ("skill_uninstall", (None,), AGENTRT_EINVAL),
     ])
     def test_null_parameter_returns_einval(self, func, args, expected_error):
         """测试空参数返回 EINVAL"""
@@ -455,7 +455,7 @@ class TestSyscallConcurrency(IntegrationTestCase):
 # ============================================================
 
 def _syscall_init(self):
-    return AGENTOS_SUCCESS
+    return AGENTRT_SUCCESS
 
 def _syscall_cleanup(self):
     pass
@@ -465,21 +465,21 @@ def _syscall_agent_spawn(self, spec):
 
 def _syscall_agent_spawn_raw(self, spec):
     if spec is None:
-        return AGENTOS_EINVAL
-    return AGENTOS_SUCCESS
+        return AGENTRT_EINVAL
+    return AGENTRT_SUCCESS
 
 def _syscall_agent_terminate(self, agent_id):
     if agent_id is None:
-        return AGENTOS_EINVAL
+        return AGENTRT_EINVAL
     if "nonexistent" in agent_id:
-        return AGENTOS_ENOENT
-    return AGENTOS_SUCCESS
+        return AGENTRT_ENOENT
+    return AGENTRT_SUCCESS
 
 def _syscall_agent_invoke(self, agent_id, input_data):
     if agent_id is None or input_data is None:
-        return AGENTOS_EINVAL
+        return AGENTRT_EINVAL
     if "nonexistent" in agent_id:
-        return AGENTOS_ENOENT
+        return AGENTRT_ENOENT
     return input_data
 
 def _syscall_agent_list(self):
@@ -487,60 +487,60 @@ def _syscall_agent_list(self):
 
 def _syscall_task_submit(self, input_data, timeout_ms=30000):
     if input_data is None:
-        return AGENTOS_EINVAL
+        return AGENTRT_EINVAL
     return json.dumps({"status": "submitted"})
 
 def _syscall_task_submit_raw(self, input_data, input_len, timeout_ms):
     if input_data is None:
-        return AGENTOS_EINVAL
-    return AGENTOS_SUCCESS
+        return AGENTRT_EINVAL
+    return AGENTRT_SUCCESS
 
 def _syscall_task_cancel(self, task_id):
     if "nonexistent" in task_id:
-        return AGENTOS_ENOENT
-    return AGENTOS_SUCCESS
+        return AGENTRT_ENOENT
+    return AGENTRT_SUCCESS
 
 def _syscall_memory_write(self, data, metadata):
     if data is None:
-        return AGENTOS_EINVAL
+        return AGENTRT_EINVAL
     return f"mem_{hash(data) % 10000}"
 
 def _syscall_memory_write_raw(self, data, data_len, metadata):
     if data is None or data_len == 0:
-        return AGENTOS_EINVAL
-    return AGENTOS_SUCCESS
+        return AGENTRT_EINVAL
+    return AGENTRT_SUCCESS
 
 def _syscall_memory_search(self, query, limit=10):
     if query is None:
-        return AGENTOS_EINVAL
+        return AGENTRT_EINVAL
     return []
 
 def _syscall_memory_get_raw(self, record_id):
     if "nonexistent" in record_id:
-        return AGENTOS_ENOENT
-    return AGENTOS_SUCCESS
+        return AGENTRT_ENOENT
+    return AGENTRT_SUCCESS
 
 def _syscall_memory_delete(self, record_id):
     if record_id is None:
-        return AGENTOS_EINVAL
+        return AGENTRT_EINVAL
     if "nonexistent" in record_id:
-        return AGENTOS_ENOENT
-    return AGENTOS_SUCCESS
+        return AGENTRT_ENOENT
+    return AGENTRT_SUCCESS
 
 def _syscall_session_create(self, metadata):
     return f"sess_{id(metadata) % 10000 if metadata else 0}"
 
 def _syscall_session_get(self, session_id):
     if session_id is None:
-        return AGENTOS_EINVAL
+        return AGENTRT_EINVAL
     return json.dumps({"session_id": session_id})
 
 def _syscall_session_close(self, session_id):
     if session_id is None:
-        return AGENTOS_EINVAL
+        return AGENTRT_EINVAL
     if "nonexistent" in session_id:
-        return AGENTOS_ENOENT
-    return AGENTOS_SUCCESS
+        return AGENTRT_ENOENT
+    return AGENTRT_SUCCESS
 
 def _syscall_session_list(self):
     return []
@@ -550,19 +550,19 @@ def _syscall_session_get_persist_status(self, session_id):
 
 def _syscall_skill_install(self, url):
     if url is None:
-        return AGENTOS_EINVAL
+        return AGENTRT_EINVAL
     return f"skill_{hash(url) % 10000}"
 
 def _syscall_skill_install_raw(self, url):
     if url is None:
-        return AGENTOS_EINVAL
-    return AGENTOS_SUCCESS
+        return AGENTRT_EINVAL
+    return AGENTRT_SUCCESS
 
 def _syscall_skill_execute(self, skill_id, input_data):
     if skill_id is None or input_data is None:
-        return AGENTOS_EINVAL
+        return AGENTRT_EINVAL
     if "nonexistent" in skill_id:
-        return AGENTOS_ENOENT
+        return AGENTRT_ENOENT
     return input_data
 
 def _syscall_skill_list(self):
@@ -570,8 +570,8 @@ def _syscall_skill_list(self):
 
 def _syscall_skill_uninstall(self, skill_id):
     if skill_id is None:
-        return AGENTOS_EINVAL
-    return AGENTOS_SUCCESS
+        return AGENTRT_EINVAL
+    return AGENTRT_SUCCESS
 
 def _syscall_telemetry_metrics(self):
     return json.dumps({"status": "ok"})

@@ -261,7 +261,7 @@ class TokenBudget:
         enable_alerts: bool = True,
         alert_callback: Optional[Callable[[BudgetAlert], None]] = None
     ):
-        self.storage_dir = storage_dir or "/var/lib/agentos/budget"
+        self.storage_dir = storage_dir or "/var/lib/agentrt/budget"
         self.default_warning_threshold = default_warning_threshold
         self.enable_alerts = enable_alerts
         self.alert_callback = alert_callback

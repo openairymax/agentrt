@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: Apache-2.0 */
+/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */
 /*
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  *
@@ -63,9 +63,9 @@ static int g_tests_failed = 0;
  * ============================================================================ */
 static int init_cupolas_framework(void)
 {
-    agentos_error_t error = AGENTOS_OK;
+    agentrt_error_t error = AGENTRT_OK;
     int ret = cupolas_init(NULL, &error);
-    if (ret != AGENTOS_OK) {
+    if (ret != AGENTRT_OK) {
         TEST_FAIL("cupolas_init", "initialization failed");
         return -1;
     }
@@ -101,7 +101,7 @@ TEST(int11_1_sandbox_isolation)
                                           stderr_buf, sizeof(stderr_buf));
         printf("    Safe command: ret=%d, exit_code=%d, stdout=%.60s\n",
                ret, exit_code, stdout_buf);
-        if (ret == AGENTOS_OK) {
+        if (ret == AGENTRT_OK) {
             TEST_PASS("D1: safe command executed in sandbox");
         } else {
             TEST_PASS("D1: safe command sandbox check completed (sandbox may restrict execution)");
@@ -123,7 +123,7 @@ TEST(int11_1_sandbox_isolation)
         printf("    Dangerous command: ret=%d, exit_code=%d\n", ret, exit_code);
 
         /* 预期: 命令被阻止或返回非零退出码 */
-        if (ret != AGENTOS_OK || exit_code != 0) {
+        if (ret != AGENTRT_OK || exit_code != 0) {
             TEST_PASS("D1: dangerous command blocked/restricted in sandbox");
         } else {
             /* 即使执行了，输出应为空（沙箱隔离文件系统） */
@@ -171,24 +171,24 @@ TEST(int11_2_permission_arbitration)
 
     /* Agent A: 只读访问 /data/reports/ */
     ret = cupolas_add_permission_rule("agent_A", "read", "/data/reports/*", 1, 100);
-    if (ret == AGENTOS_OK)
+    if (ret == AGENTRT_OK)
         TEST_PASS("D2: agent_A read rule added");
     else
         TEST_FAIL("D2: agent_A read rule", "add failed");
 
     /* Agent A: 拒绝写入 /data/reports/ */
     ret = cupolas_add_permission_rule("agent_A", "write", "/data/reports/*", 0, 100);
-    if (ret == AGENTOS_OK)
+    if (ret == AGENTRT_OK)
         TEST_PASS("D2: agent_A write deny rule added");
 
     /* Agent B: 完全访问 /system/config/ */
     ret = cupolas_add_permission_rule("agent_B", "*", "/system/config/*", 1, 200);
-    if (ret == AGENTOS_OK)
+    if (ret == AGENTRT_OK)
         TEST_PASS("D2: agent_B wildcard rule added");
 
     /* Agent C: 拒绝所有访问 /secure/ */
     ret = cupolas_add_permission_rule("agent_C", "*", "/secure/*", 0, 300);
-    if (ret == AGENTOS_OK)
+    if (ret == AGENTRT_OK)
         TEST_PASS("D2: agent_C deny-all rule added");
 
     /* 2. 验证授权操作被允许 */
@@ -601,7 +601,7 @@ TEST(int11_6_signature_verification_integration)
 
     /* 1. 初始化签名验证模块 */
     int ret = cupolas_signature_init(NULL);
-    if (ret == AGENTOS_OK) {
+    if (ret == AGENTRT_OK) {
         TEST_PASS("Signature: module initialized");
     } else {
         TEST_PASS("Signature: init skipped (may require cupolas framework)");

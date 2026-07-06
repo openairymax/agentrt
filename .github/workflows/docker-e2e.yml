@@ -4,7 +4,7 @@
 # 职责: Docker 镜像 lint/build/push + Desktop TypeScript 构建 + Docker 服务健康检查
 #
 # 触发条件:
-#   - push 到 main/develop/release/* (paths: deploy/**, sdk/typescript/**, agentos/gateway/**, agentos/daemon/**)
+#   - push 到 main/develop/release/* (paths: deploy/**, sdk/typescript/**, agentrt/gateway/**, agentrt/daemons/**)
 #   - PR 到 main/develop
 #   - workflow_dispatch (可选推送镜像、选择目标平台)
 
@@ -16,16 +16,16 @@ on:
     paths:
       - "deploy/docker/**"
       - "sdk/typescript/**"
-      - "agentos/gateway/**"
-      - "agentos/daemon/**"
+      - "agentrt/gateway/**"
+      - "agentrt/daemons/**"
       - ".github/workflows/docker-e2e.yml"
   pull_request:
     branches: [main, develop]
     paths:
       - "deploy/docker/**"
       - "sdk/typescript/**"
-      - "agentos/gateway/**"
-      - "agentos/daemon/**"
+      - "agentrt/gateway/**"
+      - "agentrt/daemons/**"
   workflow_dispatch:
     inputs:
       push_images:
@@ -220,7 +220,7 @@ jobs:
         with:
           images: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BASE }}-runtime
-            ${{ secrets.DOCKERHUB_USERNAME }}/agentos-runtime
+            ${{ secrets.DOCKERHUB_USERNAME }}/agentrt-runtime
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
@@ -318,7 +318,7 @@ jobs:
         run: |
           mkdir -p secrets
           echo "ci-test-jwt-secret-not-for-production" > secrets/jwt_secret
-          echo "postgres://agentos:test@localhost:5432/agentos" > secrets/database_url
+          echo "postgres://agentrt:test@localhost:5432/agentrt" > secrets/database_url
           echo "redis://localhost:6379/0" > secrets/redis_url
 
       - name: Validate Docker Compose Config

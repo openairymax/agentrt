@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  * 
  * @file test_network.c
  * @brief 网络通信模块单元测试
@@ -88,8 +88,8 @@ static void test_network_null_handling(void **state) {
     network_connection_destroy(NULL);
     
     /* NULL 连接操作应返回错误 */
-    assert_int_equal(network_connect(NULL), AGENTOS_EINVAL);
-    assert_int_equal(network_disconnect(NULL), AGENTOS_EINVAL);
+    assert_int_equal(network_connect(NULL), AGENTRT_EINVAL);
+    assert_int_equal(network_disconnect(NULL), AGENTRT_EINVAL);
     assert_int_equal(network_get_status(NULL), NETWORK_STATUS_ERROR);
 }
 
@@ -312,10 +312,10 @@ static void test_dns_resolve_exists(void **state) {
     
     network_dns_result_t result = {0};
     
-    agentos_error_t err = network_dns_resolve("localhost", NETWORK_AF_INET, &result);
+    agentrt_error_t err = network_dns_resolve("localhost", NETWORK_AF_INET, &result);
     
     /* 无论成功与否，都不应崩溃 */
-    if (err == AGENTOS_SUCCESS && result.count > 0) {
+    if (err == AGENTRT_SUCCESS && result.count > 0) {
         assert_non_null(result.addresses);
         network_dns_result_free(&result);
     }
@@ -328,10 +328,10 @@ static void test_dns_resolve_null_handling(void **state) {
     (void)state;
     
     /* NULL 参数应返回错误 */
-    assert_int_equal(network_dns_resolve(NULL, NETWORK_AF_INET, NULL), AGENTOS_EINVAL);
+    assert_int_equal(network_dns_resolve(NULL, NETWORK_AF_INET, NULL), AGENTRT_EINVAL);
     
     network_dns_result_t result = {0};
-    assert_int_equal(network_dns_resolve(NULL, NETWORK_AF_INET, &result), AGENTOS_EINVAL);
+    assert_int_equal(network_dns_resolve(NULL, NETWORK_AF_INET, &result), AGENTRT_EINVAL);
     
     /* 释放 NULL 结果不应崩溃 */
     network_dns_result_free(NULL);
@@ -347,12 +347,12 @@ static void test_dns_resolve_null_handling(void **state) {
 static void test_network_init_cleanup(void **state) {
     (void)state;
     
-    agentos_error_t err = network_init();
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = network_init();
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     /* 多次初始化应该是安全的 */
     err = network_init();
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     network_cleanup();
     /* 多次清理也应是安全的 */
@@ -383,11 +383,11 @@ static void test_network_get_local_ip(void **state) {
     char buffer[64] = {0};
     
     /* NULL 缓冲区应返回错误 */
-    assert_int_equal(network_get_local_ip(NETWORK_AF_INET, NULL, 0), AGENTOS_EINVAL);
+    assert_int_equal(network_get_local_ip(NETWORK_AF_INET, NULL, 0), AGENTRT_EINVAL);
     
     /* 正常调用应成功 */
-    agentos_error_t err = network_get_local_ip(NETWORK_AF_INET, buffer, sizeof(buffer));
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = network_get_local_ip(NETWORK_AF_INET, buffer, sizeof(buffer));
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     /* 应该得到有效的 IP 字符串 */
     if (buffer[0] != '\0') {
@@ -413,17 +413,17 @@ static void test_network_addr_to_string(void **state) {
     addr.sin_family = AF_INET;
     inet_pton(AF_INET, "192.168.1.1", &addr.sin_addr);
     
-    agentos_error_t err = network_addr_to_string(
+    agentrt_error_t err = network_addr_to_string(
         NETWORK_AF_INET, &addr, buffer, sizeof(buffer)
     );
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     /* NULL 参数处理 */
     err = network_addr_to_string(NETWORK_AF_INET, NULL, buffer, sizeof(buffer));
-    assert_int_equal(err, AGENTOS_EINVAL);
+    assert_int_equal(err, AGENTRT_EINVAL);
     
     err = network_addr_to_string(NETWORK_AF_INET, &addr, NULL, 0);
-    assert_int_equal(err, AGENTOS_EINVAL);
+    assert_int_equal(err, AGENTRT_EINVAL);
 }
 
 /**

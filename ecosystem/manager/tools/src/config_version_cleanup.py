@@ -305,7 +305,7 @@ def main():
     parser.add_argument(
         "--history-dir",
         type=str,
-        default="${AGENTOS_DATA_DIR}/manager-history",
+        default="${AGENTRT_DATA_DIR}/manager-history",
         help="版本历史目录路径"
     )
     parser.add_argument(

@@ -15,7 +15,7 @@
 
 /* 包含必要的头文件 */
 #include "syscalls.h"
-#include "agentos.h"
+#include "agentrt.h"
 
 /**
  * @brief 测试任务提交基本工作�?
@@ -29,9 +29,9 @@ int main(void) {
     {
         /* 创建一个简单的任务JSON */
         const char* task_json = "{\"nodes\": [{\"id\": \"task1\", \"depends_on\": []}]}";
-        agentos_error_t err = agentos_sys_task_submit(task_json, strlen(task_json));
+        agentrt_error_t err = agentrt_sys_task_submit(task_json, strlen(task_json));
 
-        if (err != AGENTOS_SUCCESS) {
+        if (err != AGENTRT_SUCCESS) {
             printf("    基本任务提交失败: %d\n", err);
             return 1;
         }
@@ -45,9 +45,9 @@ int main(void) {
         /* 创建一个可能导致问题的依赖�?*/
         /* 注意：这里只是一个示例，实际可能需要更复杂的图来触发边界情�?*/
         const char* task_json = "{\"nodes\": [{\"id\": \"task1\", \"depends_on\": []}, {\"id\": \"task2\", \"depends_on\": [\"0\"]}]}";
-        agentos_error_t err = agentos_sys_task_submit(task_json, strlen(task_json));
+        agentrt_error_t err = agentrt_sys_task_submit(task_json, strlen(task_json));
 
-        if (err != AGENTOS_SUCCESS) {
+        if (err != AGENTRT_SUCCESS) {
             printf("    带依赖任务提交失�? %d\n", err);
             return 1;
         }
@@ -59,15 +59,15 @@ int main(void) {
     printf("  测试3：无效输入测�?..\n");
     {
         /* NULL指针测试 */
-        agentos_error_t err = agentos_sys_task_submit(NULL, 0);
-        if (err != AGENTOS_EINVAL) {
+        agentrt_error_t err = agentrt_sys_task_submit(NULL, 0);
+        if (err != AGENTRT_EINVAL) {
             printf("    NULL输入应该返回EINVAL，实际返�? %d\n", err);
             return 1;
         }
 
         /* 无效JSON测试 */
         const char* invalid_json = "{invalid json";
-        err = agentos_sys_task_submit(invalid_json, strlen(invalid_json));
+        err = agentrt_sys_task_submit(invalid_json, strlen(invalid_json));
         /* 可能返回解析错误，至少不应该崩溃 */
         printf("    无效JSON处理测试通过（返回码: %d）\n", err);
     }

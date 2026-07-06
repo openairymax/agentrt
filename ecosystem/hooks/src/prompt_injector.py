@@ -13,7 +13,7 @@ Injection capabilities:
   - Positional injection: before/after system message, before user message
   - Priority-based fragment ordering for deterministic output
 
-Hook configuration in agentos.yaml:
+Hook configuration in agentrt.yaml:
   hooks:
     global_hooks:
       on_llm_request:

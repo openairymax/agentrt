@@ -78,7 +78,7 @@
           },
           "contract_path": {
             "type": "string",
-            "description": "Path to agent contract file (relative to AGENTOS_ROOT)",
+            "description": "Path to agent contract file (relative to AGENTRT_ROOT)",
             "examples": ["contracts/agents/product_manager.yaml", "contracts/agents/frontend.yaml"]
           },
           "preferred_model": {

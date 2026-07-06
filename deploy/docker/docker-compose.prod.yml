@@ -9,15 +9,15 @@ version: '3.8'
 services:
   gateway:
     # 生产环境使用预构建镜像
-    image: ghcr.io/spharx/agentos/gateway:${BUILD_VERSION:-0.1.0}
+    image: ghcr.io/spharx/agentrt/gateway:${BUILD_VERSION:-0.1.0}
     
     # 生产环境不暴露端口，通过反向代理访问
     ports: []
     
     # 生产环境配置
     environment:
-      - AGENTOS_LOG_LEVEL=INFO
-      - AGENTOS_ENABLE_AUTH=true
+      - AGENTRT_LOG_LEVEL=INFO
+      - AGENTRT_ENABLE_AUTH=true
     
     # 生产环境资源限制
     deploy:
@@ -98,7 +98,7 @@ services:
   # 生产环境添加反向代理
   nginx:
     image: nginx:1.27-alpine
-    container_name: agentos-nginx
+    container_name: agentrt-nginx
     hostname: nginx
     restart: unless-stopped
     
@@ -126,7 +126,7 @@ services:
           memory: 64M
     
     networks:
-      - agentos-network
+      - agentrt-network
     
     healthcheck:
       test: ["CMD", "nginx", "-t"]

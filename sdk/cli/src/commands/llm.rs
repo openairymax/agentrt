@@ -17,7 +17,7 @@ pub async fn list(gateway_url: &str) -> Result<()> {
 
     if providers.is_empty() {
         println!("{} No LLM providers configured.", "ℹ".yellow());
-        println!("  Add providers to your agentos.yaml under 'llm.providers'.");
+        println!("  Add providers to your agentrt.yaml under 'llm.providers'.");
         return Ok(());
     }
 

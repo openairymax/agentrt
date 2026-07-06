@@ -105,14 +105,14 @@ static void test_null_safety(void) {
     TEST_BEGIN("null_pointer_safety");
 
     /* lifecycle APIs */
-    ASSERT_EQ(gateway_start(NULL), AGENTOS_EINVAL);
-    ASSERT_EQ(gateway_stop(NULL), AGENTOS_SUCCESS);     /* 静默忽略 */
-    ASSERT_EQ(gateway_get_stats(NULL, NULL), AGENTOS_EINVAL);
+    ASSERT_EQ(gateway_start(NULL), AGENTRT_EINVAL);
+    ASSERT_EQ(gateway_stop(NULL), AGENTRT_SUCCESS);     /* 静默忽略 */
+    ASSERT_EQ(gateway_get_stats(NULL, NULL), AGENTRT_EINVAL);
 
     /* query APIs */
     ASSERT_FALSE(gateway_is_running(NULL));
     ASSERT_EQ(gateway_get_type(NULL), GATEWAY_TYPE_HTTP);  /* 默认值 */
-    ASSERT_EQ(gateway_set_handler(NULL, NULL, NULL), AGENTOS_EINVAL);
+    ASSERT_EQ(gateway_set_handler(NULL, NULL, NULL), AGENTRT_EINVAL);
 
     const char* name = gateway_get_name(NULL);
     ASSERT_NOT_NULL(name);

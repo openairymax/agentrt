@@ -58,7 +58,7 @@
 # 项目根目录配置文件
 #   - .clang-format / .clang-tidy / .clangd : C/C++ 格式化与诊断
 #   - .editorconfig                        : 跨IDE基础规范
-#   - configs/                             : 集中配置目录（agentos.yaml + env.example）
+#   - configs/                             : 集中配置目录（agentrt.yaml + env.example）
 #   - .gitattributes                       : Git 换行符处理
 #   - .pre-commit-config.yaml             : Pre-commit 钩子
 #   - vcpkg.json                           : C++ 依赖清单
@@ -674,7 +674,7 @@ coverage_reports/
 
 # 环境模板
 !configs/env.example
-!configs/agentos.yaml
+!configs/agentrt.yaml
 
 # =============================================================================
 # 根目录配置文件

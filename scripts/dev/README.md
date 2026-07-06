@@ -20,29 +20,29 @@
 
 | scripts/dev/ 模块 | 支持的 agentos/ 模块 | 用途 |
 |-------------------|---------------------|------|
-| `build/build.sh` | `atoms/`, `commons/`, `cupolas/`, `daemon/`, `gateway/`, `heapstore/` | 跨平台自动化构建（BAN-33 源外构建） |
-| `build/install.sh` | `atoms/`, `commons/`, `cupolas/`, `daemon/`, `gateway/`, `heapstore/` | 自动化安装（Linux/macOS） |
-| `build/install.ps1` | `atoms/`, `commons/`, `cupolas/`, `daemon/`, `gateway/`, `heapstore/` | 自动化安装（Windows） |
+| `build/build.sh` | `atoms/`, `commons/`, `cupolas/`, `daemons/`, `gateway/`, `heapstore/` | 跨平台自动化构建（BAN-33 源外构建） |
+| `build/install.sh` | `atoms/`, `commons/`, `cupolas/`, `daemons/`, `gateway/`, `heapstore/` | 自动化安装（Linux/macOS） |
+| `build/install.ps1` | `atoms/`, `commons/`, `cupolas/`, `daemons/`, `gateway/`, `heapstore/` | 自动化安装（Windows） |
 | `setup/setup.sh` | 全部模块 | 交互式开发环境配置（Linux/macOS） |
 | `setup/setup.ps1` | 全部模块 | 开发环境配置（Windows PowerShell） |
-| `cli/agentos` | `daemon/`, `manager/`, `openlab/` | 统一 CLI 命令行入口（服务管理/智能体管理/任务管理） |
+| `cli/agentos` | `daemons/`, `manager/`, `openlab/` | 统一 CLI 命令行入口（服务管理/智能体管理/任务管理） |
 | `cmake/windows_preinclude.h` | `atoms/`, `commons/`, `cupolas/` | CMake 辅助配置（Windows MSVC 兼容性头） |
 | `cmake/Sanitizers.cmake` | `atoms/`, `commons/`, `cupolas/` | CMake Sanitizers 配置（ASan/MSan/UBSan） |
 | `docs/Doxyfile` | 全部模块 | Doxygen 文档生成配置 |
 | `utils/quickstart.sh` | 全部模块 | 一键快速启动脚本 |
 | `utils/validate.sh` | 全部模块 | 环境完整性验证脚本 |
 | `utils/run_all_fixes.sh` | 全部模块 | BAN 规则批量自动修复入口 |
-| `utils/fixes/add_error_push_ex.py` | `commons/`, `daemon/` | 错误码推送扩展生成工具 |
-| `utils/fixes/inject_error_push_ex.py` | `commons/`, `daemon/` | 错误码推送注入工具 |
+| `utils/fixes/add_error_push_ex.py` | `commons/`, `daemons/` | 错误码推送扩展生成工具 |
+| `utils/fixes/inject_error_push_ex.py` | `commons/`, `daemons/` | 错误码推送注入工具 |
 | `utils/fixes/fix_strncpy.py` | `atoms/`, `commons/` | strncpy 安全修复工具 |
 | `utils/fixes/fix_return_neg_N.py` | `atoms/`, `commons/` | 负返回值修复工具 |
-| `utils/fixes/fix_error_push_ex_order.py` | `commons/`, `daemon/` | 错误码推送顺序修复工具 |
+| `utils/fixes/fix_error_push_ex_order.py` | `commons/`, `daemons/` | 错误码推送顺序修复工具 |
 | `utils/fixes/fix_braces_and_codes.py` | `atoms/`, `commons/` | 大括号与错误码修复工具 |
-| `utils/fixes/fix_agentos_efail_macro.py` | `atoms/`, `commons/` | AGENTOS_EFAIL 宏修复工具 |
-| `utils/fixes/fix_agentos_efail.py` | `atoms/`, `commons/` | AGENTOS_EFAIL 修复工具 |
+| `utils/fixes/fix_agentrt_efail_macro.py` | `atoms/`, `commons/` | AGENTRT_EFAIL 宏修复工具 |
+| `utils/fixes/fix_agentrt_efail.py` | `atoms/`, `commons/` | AGENTRT_EFAIL 修复工具 |
 | `utils/fixes/fix_indent_and_codes.py` | `atoms/`, `commons/` | 缩进与错误码修复工具 |
 | `utils/fixes/fix_includes_and_braces.py` | `atoms/`, `commons/` | 包含与大括号修复工具 |
-| `utils/fixes/fix_error_handle.py` | `commons/`, `daemon/` | 错误处理修复工具 |
+| `utils/fixes/fix_error_handle.py` | `commons/`, `daemons/` | 错误处理修复工具 |
 | `utils/fixes/check_memory_compat.py` | `atoms/`, `commons/` | 内存兼容性检查工具 |
 
 ## 目录结构
@@ -75,8 +75,8 @@ dev/
     │   ├── fix_return_neg_N.py        #   负返回值修复工具
     │   ├── fix_error_push_ex_order.py #   错误码推送顺序修复工具
     │   ├── fix_braces_and_codes.py    #   大括号与错误码修复工具
-    │   ├── fix_agentos_efail_macro.py #   AGENTOS_EFAIL 宏修复工具
-    │   ├── fix_agentos_efail.py       #   AGENTOS_EFAIL 修复工具
+    │   ├── fix_agentrt_efail_macro.py #   AGENTRT_EFAIL 宏修复工具
+    │   ├── fix_agentrt_efail.py       #   AGENTRT_EFAIL 修复工具
     │   ├── fix_indent_and_codes.py    #   缩进与错误码修复工具
     │   ├── fix_includes_and_braces.py #   包含与大括号修复工具
     │   ├── fix_error_handle.py        #   错误处理修复工具
@@ -132,8 +132,8 @@ dev/
   - **fix_return_neg_N.py**：负返回值修复工具，修复返回负数常量的错误码模式。
   - **fix_error_push_ex_order.py**：错误码推送顺序修复工具，确保错误码推送语句的正确顺序。
   - **fix_braces_and_codes.py**：大括号与错误码修复工具，统一代码风格和错误码格式。
-  - **fix_agentos_efail_macro.py**：AGENTOS_EFAIL 宏修复工具，规范化 AGENTOS_EFAIL 宏的使用方式。
-  - **fix_agentos_efail.py**：AGENTOS_EFAIL 修复工具，修复 AGENTOS_EFAIL 调用的常见问题。
+  - **fix_agentrt_efail_macro.py**：AGENTRT_EFAIL 宏修复工具，规范化 AGENTRT_EFAIL 宏的使用方式。
+  - **fix_agentrt_efail.py**：AGENTRT_EFAIL 修复工具，修复 AGENTRT_EFAIL 调用的常见问题。
   - **fix_indent_and_codes.py**：缩进与错误码修复工具，统一代码缩进和错误码格式。
   - **fix_includes_and_braces.py**：包含与大括号修复工具，修复头文件包含顺序和大括号风格。
   - **fix_error_handle.py**：错误处理修复工具，统一错误处理模式。

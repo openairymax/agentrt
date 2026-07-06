@@ -1,5 +1,5 @@
 {
-  "name": "@agentos/sdk",
+  "name": "@agentrt/sdk",
   "version": "0.1.0",
   "description": "AgentRT TypeScript SDK",
   "main": "dist/index.js",
@@ -31,14 +31,14 @@
     "typescript": "^5.0.0"
   },
   "keywords": [
-    "agentos",
+    "agentrt",
     "sdk",
     "typescript"
   ],
-  "author": "Spharx AgentRT Team",
-  "license": "MIT",
+  "author": "SPHARX Ltd. - Airymax Team",
+  "license": "AGPL-3.0-or-later OR Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/spharx/agentos"
+    "url": "https://github.com/spharx/agentrt"
   }
 }

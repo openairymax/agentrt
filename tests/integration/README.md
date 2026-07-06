@@ -19,10 +19,10 @@
 | tests/integration/ 目录 | 对应的 agentos/ 模块 | 测试内容 |
 |-------------------------|---------------------|----------|
 | `c/` | `atoms/`, `commons/`, `gateway/` | C 层端到端核心集成与协议兼容性 |
-| `python/` | `daemon/`, `gateway/`, `heapstore/` | Python 层端到端工作流与协议兼容性 |
-| `commons/` | `agentos/commons/` | Commons 统一基础库集成测试（公共模块跨组件协作） |
+| `python/` | `daemons/`, `gateway/`, `heapstore/` | Python 层端到端工作流与协议兼容性 |
+| `commons/` | `agentrt/commons/` | Commons 统一基础库集成测试（公共模块跨组件协作） |
 | `coreloopthree/` | `atoms/coreloopthree/` | 三环系统集成（认知-执行联动、记忆演化） |
-| `cupolas/` | `agentos/cupolas/` | Cupolas 安全穹顶集成测试（跨模块防护链路） |
+| `cupolas/` | `agentrt/cupolas/` | Cupolas 安全穹顶集成测试（跨模块防护链路） |
 | `memoryrovol/` | `atoms/memoryrovol/` | MemoryRovol 记忆系统集成（层级检索与缓存） |
 | `platform/` | `atoms/`, `commons/` | 跨平台 API 兼容性验证（目录递归创建、平台抽象） |
 | `syscall/` | `atoms/syscall/` | 系统调用层端到端流程（5 类接口完整调用链） |
@@ -120,7 +120,7 @@ pytest tests/integration/ -v -n auto -m integration
 
 | 场景 | 涉及的 agentos/ 模块 | 验证目标 | 测试文件 |
 |------|---------------------|----------|---------|
-| **端到端核心** | `atoms/` → `daemon/` → `gateway/` | 完整请求链路 | `c/test_e2e_core.c`, `python/test_e2e_workflows.py` |
+| **端到端核心** | `atoms/` → `daemons/` → `gateway/` | 完整请求链路 | `c/test_e2e_core.c`, `python/test_e2e_workflows.py` |
 | **协议兼容** | `gateway/`, `protocols/` | HTTP/WS/Stdio → JSON-RPC 2.0 转换 | `c/test_protocol_compatibility.c`, `python/test_protocol_compatibility.py` |
 | **三环系统** | `atoms/coreloopthree/` | 认知环/执行环/学习环协作 | `coreloopthree/test_cognition_execution.py` |
 | **记忆演化** | `atoms/coreloopthree/` | 学习环驱动记忆层级更新 | `coreloopthree/test_memory_evolution.py` |
@@ -141,7 +141,7 @@ pytest tests/integration/ -v -n auto -m integration
 | `commons/` | `commons/` | CMocka | 公共模块跨组件集成、统一模块协作 |
 | `cupolas/` | `cupolas/test_cupolas_integration.c` | CMocka | 防护→清洗→权限→审计完整链路 |
 | `gateway/` | `c/`, `python/` | CMocka + pytest | 协议转换、路由分发、请求处理 |
-| `daemon/` | `python/test_e2e_workflows.py` | pytest | 守护进程间协作、服务发现、任务分发 |
+| `daemons/` | `python/test_e2e_workflows.py` | pytest | 守护进程间协作、服务发现、任务分发 |
 | `heapstore/` | `python/test_e2e_workflows.py` | pytest | 数据存储在工作流中的读写一致性 |
 
 ---

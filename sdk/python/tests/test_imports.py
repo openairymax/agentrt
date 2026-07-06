@@ -7,7 +7,7 @@ AgentRT Python SDK 模块导入测试脚本
 import sys
 import os
 
-# 添加父目录到路径（agentos 包所在目录）
+# 添加父目录到路径（agentrt 包所在目录）
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 def test_imports():
@@ -19,7 +19,7 @@ def test_imports():
     # 测试 client 模块
     print("\n[1/5] 测试 client 模块...")
     try:
-        from agentos.client import Client, APIClient, MockClient
+        from agentrt.client import Client, APIClient, MockClient
         print("  OK client 模块导入成功")
         print(f"    - Client: {Client}")
         print(f"    - APIClient: {APIClient}")
@@ -31,7 +31,7 @@ def test_imports():
     # 测试 types 模块
     print("\n[2/5] 测试 types 模块...")
     try:
-        from agentos.types import (
+        from agentrt.types import (
             TaskStatus, MemoryLayer, SessionStatus, SkillStatus,
             Task, Memory, Session, Skill
         )
@@ -46,7 +46,7 @@ def test_imports():
     # 测试 utils 模块
     print("\n[3/5] 测试 utils 模块...")
     try:
-        from agentos.utils import (
+        from agentrt.utils import (
             get_string, get_int, get_float, get_bool,
             build_url, generate_id, extract_data_map
         )
@@ -61,7 +61,7 @@ def test_imports():
     # 测试 modules 模块
     print("\n[4/5] 测试 modules 模块...")
     try:
-        from agentos.modules import (
+        from agentrt.modules import (
             TaskManager, MemoryManager, SessionManager, SkillManager
         )
         print("  OK modules 模块导入成功")
@@ -76,7 +76,7 @@ def test_imports():
     # 测试顶层模块导入
     print("\n[5/5] 测试顶层模块导入...")
     try:
-        from agentos import (
+        from agentrt import (
             Client, TaskManager, MemoryManager, SessionManager, SkillManager,
             TaskStatus, MemoryLayer, Task, Memory, Session, Skill,
             CODE_TASK_FAILED, AgentOSError, MockClient
@@ -89,7 +89,7 @@ def test_imports():
     # 测试向后兼容
     print("\n[向后兼容] 测试向后兼容导入...")
     try:
-        from agentos import AgentRT, AsyncAgentRT
+        from agentrt import AgentRT, AsyncAgentRT
         print("  OK 向后兼容导入成功")
         print(f"    - AgentRT: {AgentRT}")
         print(f"    - AsyncAgentRT: {AsyncAgentRT}")
@@ -111,7 +111,7 @@ def test_functionality():
     
     # 测试类型
     print("\n[类型测试]")
-    from agentos.types import TaskStatus, MemoryLayer
+    from agentrt.types import TaskStatus, MemoryLayer
     print(f"  TaskStatus.PENDING: {TaskStatus.PENDING}")
     print(f"  TaskStatus.PENDING.is_terminal(): {TaskStatus.PENDING.is_terminal()}")
     print(f"  TaskStatus.COMPLETED.is_terminal(): {TaskStatus.COMPLETED.is_terminal()}")
@@ -120,7 +120,7 @@ def test_functionality():
     
     # 测试工具函数
     print("\n[工具函数测试]")
-    from agentos.utils import get_string, get_int, build_url, generate_id
+    from agentrt.utils import get_string, get_int, build_url, generate_id
     test_dict = {"name": "test", "count": 42}
     print(f"  get_string({{'name': 'test', 'count': 42}}, 'name'): {get_string(test_dict, 'name')}")
     print(f"  get_int({{'name': 'test', 'count': 42}}, 'count'): {get_int(test_dict, 'count')}")
@@ -129,7 +129,7 @@ def test_functionality():
     
     # 测试 Mock 客户端
     print("\n[Mock 客户端测试]")
-    from agentos.client import MockClient, APIResponse
+    from agentrt.client import MockClient, APIResponse
     mock = MockClient()
     mock.get_handler = lambda path, opts: APIResponse(success=True, data={"id": "123"})
     response = mock.get("/api/v1/test")

@@ -21,7 +21,7 @@
 
 | scripts/ops/ 模块 | 对应的 agentos/ 模块 | 用途 |
 |-------------------|---------------------|------|
-| `bin/agentrt-bootstrap.sh` | `daemon/`, `gateway/` | 按 DAG 层级顺序一键启动所有 daemon |
+| `bin/agentrt-bootstrap.sh` | `daemons/`, `gateway/` | 按 DAG 层级顺序一键启动所有 daemon |
 | `bin/quickstart.sh` | 全部模块 | 5 分钟快速创建示例 Agent 项目 |
 | `benchmark/benchmark_core.py` | `atoms/` | 测试框架核心（测试定义/执行/监控/结果收集） |
 | `benchmark/statistics_engine.py` | `atoms/corekern/`, `atoms/coreloopthree/` | 统计计算引擎（分布拟合/显著性检验/回归分析） |
@@ -32,11 +32,11 @@
 | `lib/error.sh` | 全部模块 | 统一错误码体系（1000-2999+） |
 | `lib/log.sh` | 全部模块 | 多级别日志输出（DEBUG/INFO/WARN/ERROR/FATAL） |
 | `lib/platform.sh` | 全部模块 | 平台检测（OS 类型/CPU 架构） |
-| `tests/python/test_core.py` | `daemon/`, `cupolas/`, `manager/` | 插件/事件/安全/遥测模块测试 |
-| `tests/python/test_checkpoint_manager.py` | `daemon/` | 检查点管理器测试 |
-| `tests/python/test_memory_manager.py` | `daemon/` | 记忆管理器测试 |
-| `tests/python/test_token_budget.py` | `daemon/` | Token 预算管理测试 |
-| `tests/python/test_token_counter.py` | `daemon/` | Token 计数器测试 |
+| `tests/python/test_core.py` | `daemons/`, `cupolas/`, `manager/` | 插件/事件/安全/遥测模块测试 |
+| `tests/python/test_checkpoint_manager.py` | `daemons/` | 检查点管理器测试 |
+| `tests/python/test_memory_manager.py` | `daemons/` | 记忆管理器测试 |
+| `tests/python/test_token_budget.py` | `daemons/` | Token 预算管理测试 |
+| `tests/python/test_token_counter.py` | `daemons/` | Token 计数器测试 |
 | `tests/shell/test_common_utils.sh` | 全部模块 | 通用工具函数测试 |
 | `tests/shell/test_framework.sh` | 全部模块 | Shell 测试框架（bats-core） |
 

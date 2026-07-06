@@ -86,7 +86,7 @@ static void test_token_counter_messages(void) {
     assert(counter != NULL);
 
     llm_message_t messages[3];
-    AGENTOS_MEMSET(messages, 0, sizeof(messages));
+    AGENTRT_MEMSET(messages, 0, sizeof(messages));
 
     messages[0].role = "system";
     messages[0].content = "You are a helpful assistant.";

@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2025-2026 SPHARX Ltd. All Rights Reserved.
  * SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  * 
  * @file test_ipc.c
  * @brief 进程间通信模块单元测试
@@ -41,8 +41,8 @@
 static void test_ipc_init_success(void **state) {
     (void)state;
     
-    agentos_error_t err = ipc_init();
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = ipc_init();
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     ipc_cleanup();
 }
@@ -53,8 +53,8 @@ static void test_ipc_init_success(void **state) {
 static void test_ipc_init_multiple(void **state) {
     (void)state;
     
-    assert_int_equal(ipc_init(), AGENTOS_SUCCESS);
-    assert_int_equal(ipc_init(), AGENTOS_SUCCESS);
+    assert_int_equal(ipc_init(), AGENTRT_SUCCESS);
+    assert_int_equal(ipc_init(), AGENTRT_SUCCESS);
     
     ipc_cleanup();
 }
@@ -154,8 +154,8 @@ static void test_channel_open_success(void **state) {
     ipc_config_t config = ipc_create_default_config(IPC_TYPE_PIPE);
     ipc_channel_t* channel = ipc_channel_create(&config);
     
-    agentos_error_t err = ipc_channel_open(channel);
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = ipc_channel_open(channel);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     assert_int_equal(ipc_channel_get_state(channel), IPC_STATE_OPEN);
     
     ipc_channel_close(channel);
@@ -172,8 +172,8 @@ static void test_channel_close_already_closed(void **state) {
     ipc_channel_t* channel = ipc_channel_create(&config);
     
     /* 关闭未打开的通道应返回成功 */
-    agentos_error_t err = ipc_channel_close(channel);
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = ipc_channel_close(channel);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     ipc_channel_destroy(channel);
 }
@@ -184,11 +184,11 @@ static void test_channel_close_already_closed(void **state) {
 static void test_channel_operations_null(void **state) {
     (void)state;
     
-    assert_int_equal(ipc_channel_open(NULL), AGENTOS_EINVAL);
-    assert_int_equal(ipc_channel_close(NULL), AGENTOS_EINVAL);
+    assert_int_equal(ipc_channel_open(NULL), AGENTRT_EINVAL);
+    assert_int_equal(ipc_channel_close(NULL), AGENTRT_EINVAL);
     assert_int_equal(ipc_channel_get_state(NULL), IPC_STATE_ERROR);
     assert_null(ipc_channel_get_name(NULL));
-    assert_int_equal(ipc_channel_set_timeout(NULL, 1000), AGENTOS_EINVAL);
+    assert_int_equal(ipc_channel_set_timeout(NULL, 1000), AGENTRT_EINVAL);
 }
 
 /* ============================================================================
@@ -234,8 +234,8 @@ static void test_channel_set_timeout(void **state) {
     ipc_config_t config = ipc_create_default_config(IPC_TYPE_PIPE);
     ipc_channel_t* channel = ipc_channel_create(&config);
     
-    agentos_error_t err = ipc_channel_set_timeout(channel, 5000);
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = ipc_channel_set_timeout(channel, 5000);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     ipc_channel_destroy(channel);
 }
@@ -259,10 +259,10 @@ static void test_channel_set_event_callback(void **state) {
         }
     }
     
-    agentos_error_t err = ipc_channel_set_event_callback(
+    agentrt_error_t err = ipc_channel_set_event_callback(
         channel, test_event_cb, &callback_called
     );
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     /* 打开通道会触发 CONNECTED 事件 */
     ipc_channel_open(channel);
@@ -282,14 +282,14 @@ static void test_channel_stats(void **state) {
     ipc_channel_t* channel = ipc_channel_create(&config);
     
     ipc_stats_t stats;
-    agentos_error_t err = ipc_channel_get_stats(channel, &stats);
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = ipc_channel_get_stats(channel, &stats);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     assert_int_equal(stats.messages_sent, 0);
     assert_int_equal(stats.bytes_sent, 0);
     
     /* 重置统计 */
     err = ipc_channel_reset_stats(channel);
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     ipc_channel_destroy(channel);
 }
@@ -317,8 +317,8 @@ static void test_send_message_success(void **state) {
     msg.payload = malloc(10);
     msg.payload_size = 10;
     
-    agentos_error_t err = ipc_send(channel, &msg);
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = ipc_send(channel, &msg);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     free(msg.payload);
     ipc_channel_close(channel);
@@ -338,8 +338,8 @@ static void test_send_data_success(void **state) {
     const char* data = "Hello, IPC!";
     size_t sent = 0;
     
-    agentos_error_t err = ipc_send_data(channel, data, strlen(data), &sent);
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = ipc_send_data(channel, data, strlen(data), &sent);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     assert_int_equal(sent, strlen(data));
     
     ipc_channel_close(channel);
@@ -365,8 +365,8 @@ static void test_send_request_response(void **state) {
     request.payload_size = 0;
     
     ipc_message_t response = {0};
-    agentos_error_t err = ipc_send_request(channel, &request, &response, 5000);
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = ipc_send_request(channel, &request, &response, 5000);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     ipc_channel_close(channel);
     ipc_channel_destroy(channel);
@@ -388,8 +388,8 @@ static void test_broadcast_message(void **state) {
     msg.header.type = IPC_MSG_DATA;
     msg.header.msg_id = 200;
     
-    agentos_error_t err = ipc_broadcast(channel, &msg);
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = ipc_broadcast(channel, &msg);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     ipc_channel_close(channel);
     ipc_channel_destroy(channel);
@@ -406,8 +406,8 @@ static void test_notify_message(void **state) {
     ipc_channel_open(channel);
     
     const char* notification = "Test notification";
-    agentos_error_t err = ipc_notify(channel, notification, strlen(notification));
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = ipc_notify(channel, notification, strlen(notification));
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     ipc_channel_close(channel);
     ipc_channel_destroy(channel);
@@ -422,14 +422,14 @@ static void test_send_error_cases(void **state) {
     ipc_message_t msg = {0};
     
     /* NULL 通道 */
-    assert_int_equal(ipc_send(NULL, &msg), AGENTOS_EINVAL);
-    assert_int_equal(ipc_send_data(NULL, "data", 4, NULL), AGENTOS_EINVAL);
+    assert_int_equal(ipc_send(NULL, &msg), AGENTRT_EINVAL);
+    assert_int_equal(ipc_send_data(NULL, "data", 4, NULL), AGENTRT_EINVAL);
     
     /* 未打开的通道 */
     ipc_config_t config = ipc_create_default_config(IPC_TYPE_PIPE);
     ipc_channel_t* closed_channel = ipc_channel_create(&config);
     
-    assert_int_equal(ipc_send(closed_channel, &msg), AGENTOS_ENOTCONN);
+    assert_int_equal(ipc_send(closed_channel, &msg), AGENTRT_ENOTCONN);
     
     ipc_channel_destroy(closed_channel);
 }
@@ -449,8 +449,8 @@ static void test_receive_message(void **state) {
     ipc_channel_open(channel);
     
     ipc_message_t received_msg;
-    agentos_error_t err = ipc_receive(channel, &received_msg, 1000);
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = ipc_receive(channel, &received_msg, 1000);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     ipc_channel_close(channel);
     ipc_channel_destroy(channel);
@@ -467,9 +467,9 @@ static void test_try_receive_message(void **state) {
     ipc_channel_open(channel);
     
     ipc_message_t msg;
-    agentos_error_t err = ipc_try_receive(channel, &msg);
+    agentrt_error_t err = ipc_try_receive(channel, &msg);
     /* 超时或忙都是可接受的 */
-    assert_true(err == AGENTOS_SUCCESS || err == AGENTOS_EBUSY);
+    assert_true(err == AGENTRT_SUCCESS || err == AGENTRT_EBUSY);
     
     ipc_channel_close(channel);
     ipc_channel_destroy(channel);
@@ -489,8 +489,8 @@ static void test_set_message_callback(void **state) {
         return 0; /* 返回 0 表示成功处理 */
     }
     
-    agentos_error_t err = ipc_set_message_callback(channel, test_msg_cb, NULL);
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = ipc_set_message_callback(channel, test_msg_cb, NULL);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     ipc_channel_destroy(channel);
 }
@@ -532,11 +532,11 @@ static void test_server_start_stop(void **state) {
     ipc_config_t config = ipc_create_default_config(IPC_TYPE_NAMED_PIPE);
     ipc_server_t* server = ipc_server_create(&config);
     
-    agentos_error_t err = ipc_server_start(server);
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = ipc_server_start(server);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     err = ipc_server_stop(server);
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     ipc_server_destroy(server);
 }
@@ -605,8 +605,8 @@ static void test_client_connect_disconnect(void **state) {
     ipc_config_t config = ipc_create_default_config(IPC_TYPE_NAMED_PIPE);
     ipc_client_t* client = ipc_client_create(&config);
     
-    agentos_error_t err = ipc_client_connect(client, 5000);
-    if (err == AGENTOS_SUCCESS) {
+    agentrt_error_t err = ipc_client_connect(client, 5000);
+    if (err == AGENTRT_SUCCESS) {
         ipc_client_disconnect(client);
     } else {
         /* 连接失败也是可接受的（没有真实的服务器） */
@@ -642,7 +642,7 @@ static void test_shm_create(void **state) {
     (void)state;
     
     ipc_shm_config_t config = {0};
-    config.name = "/test_agentos_shm";
+    config.name = "/test_agentrt_shm";
     config.size = 4096;
     config.create = true;
     config.read_only = false;
@@ -728,8 +728,8 @@ static void test_mq_clear(void **state) {
     ipc_mq_t* mq = ipc_mq_create(&config);
     assert_non_null(mq);
     
-    agentos_error_t err = ipc_mq_clear(mq);
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = ipc_mq_clear(mq);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     assert_int_equal(ipc_mq_count(mq), 0);
     
@@ -867,14 +867,14 @@ static void test_message_serialize_deserialize(void **state) {
     void* buffer = malloc(buffer_size);
     size_t written = 0;
     
-    agentos_error_t err = ipc_message_serialize(original, buffer, buffer_size, &written);
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = ipc_message_serialize(original, buffer, buffer_size, &written);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     assert_true(written > 0);
     
     /* 反序列化 */
     ipc_message_t deserialized;
     err = ipc_message_deserialize(buffer, written, &deserialized);
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     assert_int_equal(deserialized.header.magic, original->header.magic);
     assert_int_equal(deserialized.header.type, original->header.type);
     assert_int_equal(deserialized.payload_size, original->payload_size);
@@ -897,8 +897,8 @@ static void test_serialize_buffer_too_small(void **state) {
     char small_buffer[10];
     size_t written = 0;
     
-    agentos_error_t err = ipc_message_serialize(msg, small_buffer, sizeof(small_buffer), &written);
-    assert_int_equal(err, AGENTOS_EOVERFLOW);
+    agentrt_error_t err = ipc_message_serialize(msg, small_buffer, sizeof(small_buffer), &written);
+    assert_int_equal(err, AGENTRT_EOVERFLOW);
     
     ipc_message_free(msg);
 }
@@ -970,8 +970,8 @@ static void test_flush(void **state) {
     ipc_config_t config = ipc_create_default_config(IPC_TYPE_PIPE);
     ipc_channel_t* channel = ipc_channel_create(&config);
     
-    agentos_error_t err = ipc_flush(channel);
-    assert_int_equal(err, AGENTOS_SUCCESS);
+    agentrt_error_t err = ipc_flush(channel);
+    assert_int_equal(err, AGENTRT_SUCCESS);
     
     ipc_channel_destroy(channel);
 }
