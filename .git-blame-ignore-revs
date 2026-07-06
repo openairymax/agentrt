@@ -1,7 +1,0 @@
-# .git-blame-ignore-revs
-# 此文件列出应被 git blame 忽略的提交记录
-# 使用方式: git blame --ignore-revs-file .git-blame-ignore-revs <file>
-# 或配置: git config blame.ignoreRevsFile .git-blame-ignore-revs
-#
-# SE-03: clang-format 全量格式化提交（此提交之后的所有格式化变更将被 blame 忽略）
-# 将 clang-format 提交的 hash 添加至此列表，避免格式化变更污染 git blame 结果
