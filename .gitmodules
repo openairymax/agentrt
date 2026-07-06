@@ -1,28 +1,28 @@
-[submodule "agentrt/atoms"]
-	path = agentrt/atoms
-	url = git@atomgit.com:openairymax/atoms.git
-	branch = feature/official-hubs-01
-[submodule "agentrt/commons"]
-	path = agentrt/commons
-	url = git@atomgit.com:openairymax/commons.git
-	branch = feature/official-hubs-01
-[submodule "agentrt/cupolas"]
-	path = agentrt/cupolas
-	url = git@atomgit.com:openairymax/cupolas.git
-	branch = feature/official-hubs-01
-[submodule "agentrt/daemons"]
-	path = agentrt/daemons
-	url = git@atomgit.com:openairymax/daemons.git
-	branch = feature/official-hubs-01
-[submodule "agentrt/gateway"]
-	path = agentrt/gateway
-	url = git@atomgit.com:openairymax/gateway.git
-	branch = feature/official-hubs-01
-[submodule "agentrt/protocols"]
-	path = agentrt/protocols
-	url = git@atomgit.com:openairymax/protocols.git
-	branch = feature/official-hubs-01
-[submodule "agentrt/heapstore"]
-	path = agentrt/heapstore
-	url = git@atomgit.com:openairymax/heapstore.git
-	branch = feature/official-hubs-01
+[submodule "atoms"]
+        path = atoms
+        url = git@atomgit.com:openairymax/atoms.git
+        branch = feature/official-hubs-01
+[submodule "commons"]
+        path = commons
+        url = git@atomgit.com:openairymax/commons.git
+        branch = feature/official-hubs-01
+[submodule "cupolas"]
+        path = cupolas
+        url = git@atomgit.com:openairymax/cupolas.git
+        branch = feature/official-hubs-01
+[submodule "daemons"]
+        path = daemons
+        url = git@atomgit.com:openairymax/daemons.git
+        branch = feature/official-hubs-01
+[submodule "gateway"]
+        path = gateway
+        url = git@atomgit.com:openairymax/gateway.git
+        branch = feature/official-hubs-01
+[submodule "protocols"]
+        path = protocols
+        url = git@atomgit.com:openairymax/protocols.git
+        branch = feature/official-hubs-01
+[submodule "heapstore"]
+        path = heapstore
+        url = git@atomgit.com:openairymax/heapstore.git
+        branch = feature/official-hubs-01
