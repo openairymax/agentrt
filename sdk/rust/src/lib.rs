@@ -3,7 +3,7 @@
 // Last updated: 2026-03-24
 //
 // SDK 顶层统一入口，提供版本信息并导出所有公共 API。
-// 对应 Go SDK: agentos.go
+// 对应 Go SDK: agentrt.go
 
 // ============================================================
 // 模块声明
@@ -160,7 +160,7 @@ pub use error::{
 ///
 /// # 示例
 /// ```rust
-/// use agentos_rs::new_client;
+/// use agentrt_rs::new_client;
 ///
 /// let client = new_client("http://localhost:18789");
 /// ```

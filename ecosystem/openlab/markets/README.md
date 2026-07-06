@@ -177,16 +177,16 @@ if errors:
 
 ```bash
 # Agent 安装
-agentos-agent install ./agent_contract.json
-agentos-agent install https://github.com/user/agent-repo.git --type git
-agentos-agent list --detailed
-agentos-agent uninstall architect-agent --version 1.0.0
+agentrt-agent install ./agent_contract.json
+agentrt-agent install https://github.com/user/agent-repo.git --type git
+agentrt-agent list --detailed
+agentrt-agent uninstall architect-agent --version 1.0.0
 
 # Skill 安装
-agentos-skill-installer install ./my_skill.zip
-agentos-skill-installer install ./my_skill_dir/ --force
-agentos-skill-installer list
-agentos-skill-installer remove my-skill
+agentrt-skill-installer install ./my_skill.zip
+agentrt-skill-installer install ./my_skill_dir/ --force
+agentrt-skill-installer list
+agentrt-skill-installer remove my-skill
 ```
 
 ### 使用模板创建项目

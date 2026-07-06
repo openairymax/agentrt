@@ -6,7 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
-AGENTOS_ROOT="$PROJECT_ROOT/agentos"
+AGENTRT_ROOT="$PROJECT_ROOT/agentos"
 ARTIFACTS_DIR="${PROJECT_ROOT}/ci-artifacts/security-scan"
 
 # ============================================================================
@@ -81,7 +81,7 @@ check_cve_scan() {
 
     if check_tool grype; then
         log_info "Running grype scan..."
-        if grype "dir:${AGENTOS_ROOT}" --fail-on high 2>&1 | tail -20; then
+        if grype "dir:${AGENTRT_ROOT}" --fail-on high 2>&1 | tail -20; then
             pass "CVE scan (grype): No HIGH+ vulnerabilities"
         else
             local grype_exit=$?
@@ -93,7 +93,7 @@ check_cve_scan() {
         fi
     elif check_tool trivy; then
         log_info "Running trivy fs scan..."
-        if trivy fs --severity HIGH,CRITICAL --exit-code 1 "${AGENTOS_ROOT}" 2>&1 | tail -20; then
+        if trivy fs --severity HIGH,CRITICAL --exit-code 1 "${AGENTRT_ROOT}" 2>&1 | tail -20; then
             pass "CVE scan (trivy): No HIGH+ vulnerabilities"
         else
             fail "CVE scan (trivy): HIGH+ vulnerabilities found"
@@ -112,7 +112,7 @@ check_static_analysis() {
     # flawfinder Level 4+
     if check_tool flawfinder; then
         local l4_hits
-        l4_hits=$(flawfinder --minlevel 4 "${AGENTOS_ROOT}/atoms/" "${AGENTOS_ROOT}/commons/" "${AGENTOS_ROOT}/cupolas/" 2>&1 | grep -c "\[4\]" || true)
+        l4_hits=$(flawfinder --minlevel 4 "${AGENTRT_ROOT}/atoms/" "${AGENTRT_ROOT}/commons/" "${AGENTRT_ROOT}/cupolas/" 2>&1 | grep -c "\[4\]" || true)
         if [ "$l4_hits" -le 10 ]; then
             pass "flawfinder L4: ${l4_hits} hits (threshold: <=10)"
         else
@@ -127,9 +127,9 @@ check_static_analysis() {
         local cppcheck_errors
         cppcheck_errors=$(cppcheck --enable=all --suppress=missingInclude --suppress=unusedFunction \
             --error-exitcode=0 \
-            "${AGENTOS_ROOT}/atoms/corekern/" "${AGENTOS_ROOT}/atoms/coreloopthree/" \
-            "${AGENTOS_ROOT}/atoms/syscall/" "${AGENTOS_ROOT}/atoms/commons/" \
-            "${AGENTOS_ROOT}/cupolas/" \
+            "${AGENTRT_ROOT}/atoms/corekern/" "${AGENTRT_ROOT}/atoms/coreloopthree/" \
+            "${AGENTRT_ROOT}/atoms/syscall/" "${AGENTRT_ROOT}/atoms/commons/" \
+            "${AGENTRT_ROOT}/cupolas/" \
             2>&1 | grep -c "error:" || true)
         if [ "$cppcheck_errors" -eq 0 ]; then
             pass "cppcheck: 0 errors"
@@ -218,14 +218,14 @@ check_sbom() {
 
     if check_tool syft; then
         log_info "Generating SBOM via syft..."
-        if syft "dir:${AGENTOS_ROOT}" -o "spdx-json=${sbom_path}" 2>&1 | tail -3; then
+        if syft "dir:${AGENTRT_ROOT}" -o "spdx-json=${sbom_path}" 2>&1 | tail -3; then
             pass "SBOM generated: $(basename "$sbom_path")"
         else
             fail "SBOM generation (syft) failed"
         fi
     elif check_tool trivy; then
         log_info "Generating SBOM via trivy..."
-        if trivy fs --format spdx-json --output "${sbom_path}" "${AGENTOS_ROOT}" 2>&1 | tail -3; then
+        if trivy fs --format spdx-json --output "${sbom_path}" "${AGENTRT_ROOT}" 2>&1 | tail -3; then
             pass "SBOM generated via trivy: $(basename "$sbom_path")"
         else
             fail "SBOM generation (trivy) failed"
@@ -398,7 +398,7 @@ check_supply_chain() {
     fi
 
     # 检查 external/ 依赖的完整性
-    local external_dir="${AGENTOS_ROOT}/external"
+    local external_dir="${AGENTRT_ROOT}/external"
     if [ -d "$external_dir" ]; then
         local external_count
         external_count=$(find "$external_dir" -maxdepth 2 -name "*.sha256" -o -name "*.sha512" 2>/dev/null | wc -l)

@@ -49,11 +49,11 @@ environments:
     
     endpoints:
       api: "${CUPOLAS_API_URL:-https://staging.agentos.example.com/cupolas}"
-      metrics: "${CUPOLAS_METRICS_URL:-https://staging.agentos.example.com/agentos/cupolas/metrics}"
+      metrics: "${CUPOLAS_METRICS_URL:-https://staging.agentos.example.com/agentrt/cupolas/metrics}"
     
     notifications:
       slack: true
-      slack_channel: "#agentos-staging"
+      slack_channel: "#agentrt-staging"
       email: true
       email_recipients:
         - "${NOTIFICATION_EMAIL:-team@example.com}"
@@ -85,11 +85,11 @@ environments:
     
     endpoints:
       api: "${CUPOLAS_API_URL:-https://agentos.example.com/cupolas}"
-      metrics: "${CUPOLAS_METRICS_URL:-https://agentos.example.com/agentos/cupolas/metrics}"
+      metrics: "${CUPOLAS_METRICS_URL:-https://agentos.example.com/agentrt/cupolas/metrics}"
     
     notifications:
       slack: true
-      slack_channel: "#agentos-production"
+      slack_channel: "#agentrt-production"
       email: true
       email_recipients:
         - "${ONCALL_EMAIL:-oncall@example.com}"
@@ -124,7 +124,7 @@ deployment:
     endpoint: "/ready"
 
 artifacts:
-  naming_convention: "agentos-cupolas-{version}-{os}-{arch}"
+  naming_convention: "agentrt-cupolas-{version}-{os}-{arch}"
   
   formats:
     linux:

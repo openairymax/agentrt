@@ -86,7 +86,7 @@ impl HookResult {
 /// # Example
 ///
 /// ```rust
-/// use agentos_rs::hook::{Hook, HookContext, HookResult};
+/// use agentrt_rs::hook::{Hook, HookContext, HookResult};
 ///
 /// struct AuditHook;
 ///

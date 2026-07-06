@@ -71,7 +71,7 @@ class SkillInstallerCLI:
 
         print(f"[AgentRT] Installing skill from: {package_path}")
 
-        with tempfile.TemporaryDirectory(prefix="agentos_skill_") as tmp_dir:
+        with tempfile.TemporaryDirectory(prefix="agentrt_skill_") as tmp_dir:
             tmp_path = Path(tmp_dir)
             if not self._extract_package(package_path, tmp_path):
                 return False
@@ -144,7 +144,7 @@ class SkillInstallerCLI:
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
     parser = argparse.ArgumentParser(
-        prog="agentos-skill-installer",
+        prog="agentrt-skill-installer",
         description="AgentRT Skill Installer CLI",
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")

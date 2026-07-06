@@ -13,7 +13,7 @@
 #
 # 使用方式（在 CMakeLists.txt 中）:
 #   include(scripts/dev/cmake/Sanitizers.cmake)
-#   enable_agentos_sanitizers(TARGET my_target SCOPE PRIVATE)
+#   enable_agentrt_sanitizers(TARGET my_target SCOPE PRIVATE)
 # =============================================================================
 
 include_guard(GLOBAL)
@@ -21,37 +21,37 @@ include_guard(GLOBAL)
 # =============================================================================
 # 顶层选项定义（供 cmake -D 覆盖）
 # =============================================================================
-option(AGENTOS_ENABLE_ASAN  "Enable AddressSanitizer + LeakSanitizer" ON)
-option(AGENTOS_ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer" ON)
-option(AGENTOS_ENABLE_TSAN  "Enable ThreadSanitizer (disables ASan/LSan)" OFF)
-option(AGENTOS_ENABLE_STACK_PROTECTOR "Enable -fstack-protector-strong" ON)
-option(AGENTOS_ENABLE_FORTIFY "Enable _FORTIFY_SOURCE=2" ON)
+option(AGENTRT_ENABLE_ASAN  "Enable AddressSanitizer + LeakSanitizer" ON)
+option(AGENTRT_ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer" ON)
+option(AGENTRT_ENABLE_TSAN  "Enable ThreadSanitizer (disables ASan/LSan)" OFF)
+option(AGENTRT_ENABLE_STACK_PROTECTOR "Enable -fstack-protector-strong" ON)
+option(AGENTRT_ENABLE_FORTIFY "Enable _FORTIFY_SOURCE=2" ON)
 
 # 兼容旧版选项名（过渡期，v0.2.0 后移除）
-if(DEFINED ENABLE_SANITIZERS AND NOT DEFINED AGENTOS_ENABLE_ASAN)
-    set(AGENTOS_ENABLE_ASAN ${ENABLE_SANITIZERS})
+if(DEFINED ENABLE_SANITIZERS AND NOT DEFINED AGENTRT_ENABLE_ASAN)
+    set(AGENTRT_ENABLE_ASAN ${ENABLE_SANITIZERS})
 endif()
 if(DEFINED ENABLE_TSAN)
-    set(AGENTOS_ENABLE_TSAN ${ENABLE_TSAN})
+    set(AGENTRT_ENABLE_TSAN ${ENABLE_TSAN})
 endif()
 
 # =============================================================================
 # 平台检查
 # =============================================================================
-function(agentos_check_sanitizer_support)
+function(agentrt_check_sanitizer_support)
     if(MSVC)
         message(WARNING "Sanitizers are not supported on MSVC. Disabling all sanitizers.")
-        set(AGENTOS_ENABLE_ASAN OFF PARENT_SCOPE)
-        set(AGENTOS_ENABLE_UBSAN OFF PARENT_SCOPE)
-        set(AGENTOS_ENABLE_TSAN OFF PARENT_SCOPE)
+        set(AGENTRT_ENABLE_ASAN OFF PARENT_SCOPE)
+        set(AGENTRT_ENABLE_UBSAN OFF PARENT_SCOPE)
+        set(AGENTRT_ENABLE_TSAN OFF PARENT_SCOPE)
         return()
     endif()
 
     if(NOT CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         message(WARNING "Sanitizers require GCC or Clang. Found: ${CMAKE_C_COMPILER_ID}")
-        set(AGENTOS_ENABLE_ASAN OFF PARENT_SCOPE)
-        set(AGENTOS_ENABLE_UBSAN OFF PARENT_SCOPE)
-        set(AGENTOS_ENABLE_TSAN OFF PARENT_SCOPE)
+        set(AGENTRT_ENABLE_ASAN OFF PARENT_SCOPE)
+        set(AGENTRT_ENABLE_UBSAN OFF PARENT_SCOPE)
+        set(AGENTRT_ENABLE_TSAN OFF PARENT_SCOPE)
         return()
     endif()
 endfunction()
@@ -59,8 +59,8 @@ endfunction()
 # =============================================================================
 # AddressSanitizer + LeakSanitizer (SEC-05)
 # =============================================================================
-function(agentos_enable_asan target scope)
-    if(NOT AGENTOS_ENABLE_ASAN)
+function(agentrt_enable_asan target scope)
+    if(NOT AGENTRT_ENABLE_ASAN)
         return()
     endif()
 
@@ -88,8 +88,8 @@ endfunction()
 # =============================================================================
 # UndefinedBehaviorSanitizer (SEC-09)
 # =============================================================================
-function(agentos_enable_ubsan target scope)
-    if(NOT AGENTOS_ENABLE_UBSAN)
+function(agentrt_enable_ubsan target scope)
+    if(NOT AGENTRT_ENABLE_UBSAN)
         return()
     endif()
 
@@ -118,8 +118,8 @@ endfunction()
 # ThreadSanitizer (SEC-08)
 # 注意：TSan 不能与 ASan 同时使用，需要独立编译
 # =============================================================================
-function(agentos_enable_tsan target scope)
-    if(NOT AGENTOS_ENABLE_TSAN)
+function(agentrt_enable_tsan target scope)
+    if(NOT AGENTRT_ENABLE_TSAN)
         return()
     endif()
 
@@ -143,8 +143,8 @@ endfunction()
 # =============================================================================
 # 栈保护 (SEC-12 — INF-05 合规)
 # =============================================================================
-function(agentos_enable_stack_protector target scope)
-    if(NOT AGENTOS_ENABLE_STACK_PROTECTOR OR MSVC)
+function(agentrt_enable_stack_protector target scope)
+    if(NOT AGENTRT_ENABLE_STACK_PROTECTOR OR MSVC)
         return()
     endif()
 
@@ -159,8 +159,8 @@ endfunction()
 # =============================================================================
 # FORTIFY_SOURCE 编译时缓冲区溢出检测
 # =============================================================================
-function(agentos_enable_fortify target scope)
-    if(NOT AGENTOS_ENABLE_FORTIFY OR MSVC)
+function(agentrt_enable_fortify target scope)
+    if(NOT AGENTRT_ENABLE_FORTIFY OR MSVC)
         return()
     endif()
 
@@ -181,65 +181,65 @@ endfunction()
 # =============================================================================
 # 一键启用所有安全检测（推荐在顶级 CMakeLists.txt 调用）
 # =============================================================================
-function(enable_agentos_sanitizers target)
+function(enable_agentrt_sanitizers target)
     # 可选参数: scope 默认为 PRIVATE
     set(_scope "PRIVATE")
     if(ARGC GREATER 1)
         set(_scope "${ARGV1}")
     endif()
 
-    agentos_check_sanitizer_support()
+    agentrt_check_sanitizer_support()
 
     # 将结果传回父作用域
-    set(AGENTOS_ENABLE_ASAN ${AGENTOS_ENABLE_ASAN} PARENT_SCOPE)
-    set(AGENTOS_ENABLE_UBSAN ${AGENTOS_ENABLE_UBSAN} PARENT_SCOPE)
-    set(AGENTOS_ENABLE_TSAN ${AGENTOS_ENABLE_TSAN} PARENT_SCOPE)
+    set(AGENTRT_ENABLE_ASAN ${AGENTRT_ENABLE_ASAN} PARENT_SCOPE)
+    set(AGENTRT_ENABLE_UBSAN ${AGENTRT_ENABLE_UBSAN} PARENT_SCOPE)
+    set(AGENTRT_ENABLE_TSAN ${AGENTRT_ENABLE_TSAN} PARENT_SCOPE)
 
     # 安全编译基础选项（始终启用，无论 sanitizer）
-    agentos_enable_stack_protector(${target} ${_scope})
-    agentos_enable_fortify(${target} ${_scope})
+    agentrt_enable_stack_protector(${target} ${_scope})
+    agentrt_enable_fortify(${target} ${_scope})
 
     # TSan 与其他 sanitizer 互斥
-    if(AGENTOS_ENABLE_TSAN)
+    if(AGENTRT_ENABLE_TSAN)
         message(STATUS "ThreadSanitizer mode: ASan + UBSan disabled (mutual exclusion)")
-        agentos_enable_tsan(${target} ${_scope})
+        agentrt_enable_tsan(${target} ${_scope})
     else()
-        if(AGENTOS_ENABLE_ASAN)
-            agentos_enable_asan(${target} ${_scope})
+        if(AGENTRT_ENABLE_ASAN)
+            agentrt_enable_asan(${target} ${_scope})
         endif()
-        if(AGENTOS_ENABLE_UBSAN)
-            agentos_enable_ubsan(${target} ${_scope})
+        if(AGENTRT_ENABLE_UBSAN)
+            agentrt_enable_ubsan(${target} ${_scope})
         endif()
     endif()
 
     # 输出检测矩阵
     message(STATUS "Runtime Detection Matrix for ${target}:")
-    message(STATUS "  ASan:    ${AGENTOS_ENABLE_ASAN}")
-    message(STATUS "  LSan:    ${AGENTOS_ENABLE_ASAN}  (bundled with ASan)")
-    message(STATUS "  UBSan:   ${AGENTOS_ENABLE_UBSAN}")
-    message(STATUS "  TSan:    ${AGENTOS_ENABLE_TSAN}")
-    message(STATUS "  Stack:   ${AGENTOS_ENABLE_STACK_PROTECTOR}")
-    message(STATUS "  Fortify: ${AGENTOS_ENABLE_FORTIFY}")
+    message(STATUS "  ASan:    ${AGENTRT_ENABLE_ASAN}")
+    message(STATUS "  LSan:    ${AGENTRT_ENABLE_ASAN}  (bundled with ASan)")
+    message(STATUS "  UBSan:   ${AGENTRT_ENABLE_UBSAN}")
+    message(STATUS "  TSan:    ${AGENTRT_ENABLE_TSAN}")
+    message(STATUS "  Stack:   ${AGENTRT_ENABLE_STACK_PROTECTOR}")
+    message(STATUS "  Fortify: ${AGENTRT_ENABLE_FORTIFY}")
 endfunction()
 
 # =============================================================================
 # 打印 sanitizer 配置摘要
 # =============================================================================
-function(agentos_print_sanitizer_summary)
+function(agentrt_print_sanitizer_summary)
     message(STATUS "=========================================")
     message(STATUS "  AgentOS Runtime Detection Configuration")
     message(STATUS "=========================================")
-    message(STATUS "AddressSanitizer (ASan):       ${AGENTOS_ENABLE_ASAN}")
-    message(STATUS "LeakSanitizer (LSan):          ${AGENTOS_ENABLE_ASAN}")
-    message(STATUS "UndefinedBehaviorSanitizer:    ${AGENTOS_ENABLE_UBSAN}")
-    message(STATUS "ThreadSanitizer (TSan):        ${AGENTOS_ENABLE_TSAN}")
-    message(STATUS "Stack Protector:               ${AGENTOS_ENABLE_STACK_PROTECTOR}")
-    message(STATUS "FORTIFY_SOURCE=2:              ${AGENTOS_ENABLE_FORTIFY}")
-    if(AGENTOS_ENABLE_ASAN)
+    message(STATUS "AddressSanitizer (ASan):       ${AGENTRT_ENABLE_ASAN}")
+    message(STATUS "LeakSanitizer (LSan):          ${AGENTRT_ENABLE_ASAN}")
+    message(STATUS "UndefinedBehaviorSanitizer:    ${AGENTRT_ENABLE_UBSAN}")
+    message(STATUS "ThreadSanitizer (TSan):        ${AGENTRT_ENABLE_TSAN}")
+    message(STATUS "Stack Protector:               ${AGENTRT_ENABLE_STACK_PROTECTOR}")
+    message(STATUS "FORTIFY_SOURCE=2:              ${AGENTRT_ENABLE_FORTIFY}")
+    if(AGENTRT_ENABLE_ASAN)
         message(STATUS "ASan halt_on_error:            YES (CI will fail on detection)")
         message(STATUS "LSan suppressions:             agentos/manager/sanitizer/lsan-suppressions")
     endif()
-    if(AGENTOS_ENABLE_TSAN)
+    if(AGENTRT_ENABLE_TSAN)
         message(STATUS "TSan history_size:             7")
         message(STATUS "TSan halt_on_error:            YES")
     endif()

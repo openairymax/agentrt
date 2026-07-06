@@ -2,7 +2,7 @@
 // Version: 0.1.0
 // Last updated: 2026-04-27
 
-use agentos_rs::*;
+use agentrt_rs::*;
 
 #[test]
 fn test_error_code_mapping() {

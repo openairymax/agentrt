@@ -6,12 +6,12 @@ groups:
   # ==========================================================================
   # 可用性告警
   # ==========================================================================
-  - name: agentos-gateway.availability
+  - name: agentrt-gateway.availability
     interval: 30s
     rules:
       # 实例宕机告警
       - alert: DynamicModuleDown
-        expr: up{job="agentos-gateway"} == 0
+        expr: up{job="agentrt-gateway"} == 0
         for: 1m
         labels:
           severity: critical
@@ -22,7 +22,7 @@ groups:
       
       # 健康检查失败
       - alert: HealthCheckFailed
-        expr: agentos_health_status != 1
+        expr: agentrt_health_status != 1
         for: 2m
         labels:
           severity: warning
@@ -34,7 +34,7 @@ groups:
   # ==========================================================================
   # 性能告警
   # ==========================================================================
-  - name: agentos-gateway.performance
+  - name: agentrt-gateway.performance
     interval: 30s
     rules:
       # 高延迟告警
@@ -84,12 +84,12 @@ groups:
   # ==========================================================================
   # 会话管理告警
   # ==========================================================================
-  - name: agentos-gateway.sessions
+  - name: agentrt-gateway.sessions
     interval: 30s
     rules:
       # 会话数过多
       - alert: TooManySessions
-        expr: agentos_session_count > 10000
+        expr: agentrt_session_count > 10000
         for: 5m
         labels:
           severity: warning
@@ -100,7 +100,7 @@ groups:
       
       # 会话创建失败率高
       - alert: SessionCreationFailure
-        expr: rate(agentos_session_creation_failed_total[5m]) > 10
+        expr: rate(agentrt_session_creation_failed_total[5m]) > 10
         for: 5m
         labels:
           severity: warning
@@ -111,7 +111,7 @@ groups:
       
       # 会话清理过慢
       - alert: SessionCleanupSlow
-        expr: rate(agentos_session_cleanup_total[5m]) < 1 and agentos_session_count > 1000
+        expr: rate(agentrt_session_cleanup_total[5m]) < 1 and agentrt_session_count > 1000
         for: 10m
         labels:
           severity: info
@@ -123,12 +123,12 @@ groups:
   # ==========================================================================
   # 连接管理告警
   # ==========================================================================
-  - name: agentos-gateway.connections
+  - name: agentrt-gateway.connections
     interval: 30s
     rules:
       # 连接池耗尽
       - alert: ConnectionPoolExhausted
-        expr: agentos_connection_pool_available == 0
+        expr: agentrt_connection_pool_available == 0
         for: 2m
         labels:
           severity: critical
@@ -139,7 +139,7 @@ groups:
       
       # WebSocket 连接数过多
       - alert: TooManyWebSocketConnections
-        expr: agentos_websocket_connections > 5000
+        expr: agentrt_websocket_connections > 5000
         for: 5m
         labels:
           severity: warning
@@ -150,7 +150,7 @@ groups:
       
       # 连接失败率高
       - alert: HighConnectionFailureRate
-        expr: rate(agentos_connection_failed_total[5m]) / rate(agentos_connection_total[5m]) > 0.1
+        expr: rate(agentrt_connection_failed_total[5m]) / rate(agentrt_connection_total[5m]) > 0.1
         for: 5m
         labels:
           severity: warning
@@ -162,12 +162,12 @@ groups:
   # ==========================================================================
   # 安全告警
   # ==========================================================================
-  - name: agentos-gateway.security
+  - name: agentrt-gateway.security
     interval: 30s
     rules:
       # 认证失败率高
       - alert: HighAuthenticationFailure
-        expr: rate(agentos_auth_failed_total[5m]) > 100
+        expr: rate(agentrt_auth_failed_total[5m]) > 100
         for: 5m
         labels:
           severity: warning
@@ -178,7 +178,7 @@ groups:
       
       # 限流触发过多
       - alert: RateLimitTriggered
-        expr: rate(agentos_ratelimit_triggered_total[5m]) > 50
+        expr: rate(agentrt_ratelimit_triggered_total[5m]) > 50
         for: 5m
         labels:
           severity: info
@@ -189,7 +189,7 @@ groups:
       
       # JWT 令牌过期过多
       - alert: JWTTokenExpired
-        expr: rate(agentos_jwt_expired_total[5m]) > 100
+        expr: rate(agentrt_jwt_expired_total[5m]) > 100
         for: 10m
         labels:
           severity: info
@@ -201,12 +201,12 @@ groups:
   # ==========================================================================
   # 网关告警
   # ==========================================================================
-  - name: agentos-gateway.gateway
+  - name: agentrt-gateway.gateway
     interval: 30s
     rules:
       # HTTP 网关错误
       - alert: HTTPGatewayError
-        expr: rate(agentos_http_gateway_errors_total[5m]) > 10
+        expr: rate(agentrt_http_gateway_errors_total[5m]) > 10
         for: 5m
         labels:
           severity: warning
@@ -217,7 +217,7 @@ groups:
       
       # WebSocket 网关错误
       - alert: WebSocketGatewayError
-        expr: rate(agentos_websocket_gateway_errors_total[5m]) > 10
+        expr: rate(agentrt_websocket_gateway_errors_total[5m]) > 10
         for: 5m
         labels:
           severity: warning
@@ -228,7 +228,7 @@ groups:
       
       # 请求大小超限
       - alert: RequestSizeExceeded
-        expr: rate(agentos_request_size_exceeded_total[5m]) > 5
+        expr: rate(agentrt_request_size_exceeded_total[5m]) > 5
         for: 5m
         labels:
           severity: warning
@@ -240,12 +240,12 @@ groups:
   # ==========================================================================
   # 依赖服务告警
   # ==========================================================================
-  - name: agentos-gateway.dependencies
+  - name: agentrt-gateway.dependencies
     interval: 30s
     rules:
       # Redis 连接失败
       - alert: RedisConnectionFailed
-        expr: agentos_redis_connection_status != 1
+        expr: agentrt_redis_connection_status != 1
         for: 2m
         labels:
           severity: critical
@@ -256,7 +256,7 @@ groups:
       
       # Redis 延迟过高
       - alert: RedisHighLatency
-        expr: histogram_quantile(0.95, rate(agentos_redis_command_duration_seconds_bucket[5m])) > 0.1
+        expr: histogram_quantile(0.95, rate(agentrt_redis_command_duration_seconds_bucket[5m])) > 0.1
         for: 5m
         labels:
           severity: warning

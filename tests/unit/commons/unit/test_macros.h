@@ -8,8 +8,8 @@
  * 参考 CMocka 和 Unity 测试框架设计。
  */
 
-#ifndef __AGENTOS_TEST_MACROS_H__
-#define __AGENTOS_TEST_MACROS_H__
+#ifndef __AGENTRT_TEST_MACROS_H__
+#define __AGENTRT_TEST_MACROS_H__
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -302,4 +302,4 @@ static TestStats g_test_stats = {0, 0, 0};
 #define TEST_GROUP_END() \
     printf("\n")
 
-#endif /* __AGENTOS_TEST_MACROS_H__ */
+#endif /* __AGENTRT_TEST_MACROS_H__ */

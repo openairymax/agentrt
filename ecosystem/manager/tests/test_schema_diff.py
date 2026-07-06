@@ -180,7 +180,7 @@ class TestSchemaDiffer:
     """Tests for SchemaDiffer class."""
 
     def test_init_with_root(self, tmp_path):
-        differ = SchemaDiffer(agentos_root=str(tmp_path))
+        differ = SchemaDiffer(agentrt_root=str(tmp_path))
         assert differ._root == tmp_path
 
     def test_init_default_root(self):
@@ -189,22 +189,22 @@ class TestSchemaDiffer:
         assert differ._root.exists()
 
     def test_load_yaml_not_found(self, tmp_path):
-        differ = SchemaDiffer(agentos_root=str(tmp_path))
+        differ = SchemaDiffer(agentrt_root=str(tmp_path))
         result = differ._load_yaml()
         assert result is None
 
     def test_load_yaml_valid(self, tmp_path):
         configs_dir = tmp_path / "configs"
         configs_dir.mkdir()
-        yaml_path = configs_dir / "agentos.yaml"
+        yaml_path = configs_dir / "agentrt.yaml"
         yaml_path.write_text("kernel:\n  ipc:\n    max_message_size: 4096\n")
-        differ = SchemaDiffer(agentos_root=str(tmp_path))
+        differ = SchemaDiffer(agentrt_root=str(tmp_path))
         result = differ._load_yaml()
         assert result is not None
         assert result["kernel"]["ipc"]["max_message_size"] == 4096
 
     def test_load_schema_not_found(self, tmp_path):
-        differ = SchemaDiffer(agentos_root=str(tmp_path))
+        differ = SchemaDiffer(agentrt_root=str(tmp_path))
         result = differ._load_schema("nonexistent.json")
         assert result is None
 
@@ -214,7 +214,7 @@ class TestSchemaDiffer:
         schema_file = schema_dir / "kernel-settings.schema.json"
         schema_file.write_text('{"type": "object", "properties": {}}')
 
-        differ = SchemaDiffer(agentos_root=str(tmp_path))
+        differ = SchemaDiffer(agentrt_root=str(tmp_path))
         result = differ._load_schema("kernel-settings.schema.json")
         assert result is not None
         assert result["type"] == "object"
@@ -253,7 +253,7 @@ class TestSchemaDiffer:
         assert merged.summary["ok"] == 2
 
     def test_run_with_missing_yaml(self, tmp_path):
-        differ = SchemaDiffer(agentos_root=str(tmp_path))
+        differ = SchemaDiffer(agentrt_root=str(tmp_path))
         report = differ.run()
         assert report.has_errors() is True
 
@@ -261,7 +261,7 @@ class TestSchemaDiffer:
         schema_dir = tmp_path / "ecosystem" / "manager" / "schema"
         schema_dir.mkdir(parents=True)
 
-        differ = SchemaDiffer(agentos_root=str(tmp_path))
+        differ = SchemaDiffer(agentrt_root=str(tmp_path))
         report = differ._check_schema_files_exist()
         # All 11 expected schema files are missing
         assert report.summary["error"] == 11
@@ -286,7 +286,7 @@ class TestSchemaDiffer:
         for name in expected:
             (schema_dir / name).write_text("{}")
 
-        differ = SchemaDiffer(agentos_root=str(tmp_path))
+        differ = SchemaDiffer(agentrt_root=str(tmp_path))
         report = differ._check_schema_files_exist()
         assert report.summary["error"] == 0
         assert report.summary["ok"] == 11

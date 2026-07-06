@@ -8,9 +8,9 @@ import time
 import random
 from typing import Dict, Any, List
 
-from agentos.client import Client
-from agentos.modules.task.manager import TaskManager
-from agentos.modules.task.checkpoint import CheckpointManager
+from agentrt.client import Client
+from agentrt.modules.task.manager import TaskManager
+from agentrt.modules.task.checkpoint import CheckpointManager
 
 
 def long_running_task_example(
@@ -162,7 +162,7 @@ def resume_failed_task(task_id: str, total_steps: int = 1000):
     Example:
         >>> resume_failed_task("task-123")
     """
-    checkpoint_mgr = CheckpointManager("/tmp/agentos_checkpoints")
+    checkpoint_mgr = CheckpointManager("/tmp/agentrt_checkpoints")
     
     # 查找失败的检查点
     checkpoints = checkpoint_mgr.list_checkpoints(task_id)
@@ -217,7 +217,7 @@ def batch_processing_with_checkpoints(
         >>> items = list(range(10000))
         >>> batch_processing_with_checkpoints("batch-123", items)
     """
-    checkpoint_mgr = CheckpointManager("/tmp/agentos_checkpoints")
+    checkpoint_mgr = CheckpointManager("/tmp/agentrt_checkpoints")
     
     # 恢复进度
     last_checkpoint = checkpoint_mgr.load_checkpoint(task_id)

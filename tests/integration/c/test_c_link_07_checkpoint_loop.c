@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 // @owner: team-C
 /**
  * @file test_c_link_07_checkpoint_loop.c
@@ -7,7 +7,7 @@
  *
  * Tests the checkpoint adapter connecting CoreLoopThree to persistent storage:
  * 1. Normal path: Save snapshot → restore → verify state
- * 2. Error path: Restore non-existent checkpoint → AGENTOS_ENOENT
+ * 2. Error path: Restore non-existent checkpoint → AGENTRT_ENOENT
  * 3. Error path: NULL adapter handling
  * 4. Timeout path: Checkpoint save/restore with timeout
  * 5. Concurrent path: Multiple simultaneous checkpoint operations
@@ -27,7 +27,7 @@
 
 #include "memory_compat.h"
 #include "checkpoint_adapter.h"
-#include "agentos_types.h"
+#include "agentrt_types.h"
 
 /* ============================================================================
  * Test Helpers
@@ -118,8 +118,8 @@ static void free_snapshot_fields(checkpoint_snapshot_t *snap) {
 /* ============================================================================
  * Test storage path helpers
  *
- * 生产代码默认存储路径为 /var/lib/agentos/checkpoints/，在普通用户测试环境
- * 下不存在（errno=ENOENT），导致 agentos_checkpoint_save → fopen 失败。
+ * 生产代码默认存储路径为 /var/lib/agentrt/checkpoints/，在普通用户测试环境
+ * 下不存在（errno=ENOENT），导致 agentrt_checkpoint_save → fopen 失败。
  * 测试使用 /tmp/test_ckpt_<pid>/ 作为可写临时目录，并在退出时清理。
  * ============================================================================ */
 
@@ -298,7 +298,7 @@ cleanup:
  * ============================================================================ */
 
 static void test_error_restore_nonexistent(void) {
-    TEST("C-L07 Error: Restore non-existent checkpoint → AGENTOS_ENOENT");
+    TEST("C-L07 Error: Restore non-existent checkpoint → AGENTRT_ENOENT");
 
     checkpoint_adapter_t *adapter = create_test_adapter();
     CHECK_GOTO(adapter != NULL, "checkpoint_adapter_create returned NULL", cleanup);

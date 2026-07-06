@@ -6,8 +6,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
-AGENTOS_ROOT="$PROJECT_ROOT/agentos"
-BUILD_DIR="${AGENTOS_ROOT}/build/leak-detection"
+AGENTRT_ROOT="$PROJECT_ROOT/agentos"
+BUILD_DIR="${AGENTRT_ROOT}/build/leak-detection"
 ARTIFACTS_DIR="${PROJECT_ROOT}/ci-artifacts/leak-detection"
 SUPPRESSIONS_DIR="${PROJECT_ROOT}/ecosystem/manager/sanitizer"
 
@@ -96,13 +96,13 @@ run_asan_tests() {
     cd "${BUILD_DIR}"
 
     # 配置 Debug + ASan 构建
-    cmake "${AGENTOS_ROOT}" \
+    cmake "${AGENTRT_ROOT}" \
         -DCMAKE_BUILD_TYPE=Debug \
         -DCMAKE_C_COMPILER=gcc \
         -DCMAKE_CXX_COMPILER=g++ \
         -DENABLE_SANITIZERS=ON \
         -DBUILD_TESTS=ON \
-        -DAGENTOS_MEMORY_BACKEND=system \
+        -DAGENTRT_MEMORY_BACKEND=system \
         -Wno-dev 2>&1 | tail -5
 
     # 编译
@@ -164,7 +164,7 @@ run_valgrind_tests() {
     cd "${BUILD_DIR}"
 
     # 重新配置 Release 构建（Valgrind 不需要 sanitizer 标志）
-    cmake "${AGENTOS_ROOT}" \
+    cmake "${AGENTRT_ROOT}" \
         -DCMAKE_BUILD_TYPE=Debug \
         -DCMAKE_C_COMPILER=gcc \
         -DCMAKE_CXX_COMPILER=g++ \

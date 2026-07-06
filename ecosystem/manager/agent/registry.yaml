@@ -3,7 +3,7 @@
 # 版本: v1.1.0
 # 最后更新: 2026-04-02
 # Schema: schema/agent-registry.schema.json
-# 规范依据: specifications/agentos_contract/agent_contract.md
+# 规范依据: specifications/agentrt_contract/agent_contract.md
 # =============================================================================
 # Copyright (c) 2026 SPHARX. All Rights Reserved. "From data intelligence emerges."
 
@@ -105,8 +105,8 @@ agents:
     # 权限声明（按 agent_contract.md 第 2.5 节）
     # =========================================================================
     required_permissions:
-      - "file:read:${AGENTOS_ROOT}/docs/*"
-      - "file:write:${AGENTOS_DATA_DIR}/workspace/docs/*"
+      - "file:read:${AGENTRT_ROOT}/docs/*"
+      - "file:write:${AGENTRT_DATA_DIR}/workspace/docs/*"
       - "agent:invoke:architect_v1"
       - "agent:invoke:coordinator_v1"
 
@@ -195,8 +195,8 @@ agents:
         priority: 2
 
     required_permissions:
-      - "file:read:${AGENTOS_ROOT}/**/*"
-      - "file:write:${AGENTOS_DATA_DIR}/workspace/architecture/*"
+      - "file:read:${AGENTRT_ROOT}/**/*"
+      - "file:write:${AGENTRT_DATA_DIR}/workspace/architecture/*"
       - "agent:invoke:*"
 
     cost_profile:
@@ -275,8 +275,8 @@ agents:
         priority: 2
 
     required_permissions:
-      - "file:read:${AGENTOS_ROOT}/**/*.{js,jsx,ts,tsx,css,html}"
-      - "file:write:${AGENTOS_DATA_DIR}/workspace/frontend/*"
+      - "file:read:${AGENTRT_ROOT}/**/*.{js,jsx,ts,tsx,css,html}"
+      - "file:write:${AGENTRT_DATA_DIR}/workspace/frontend/*"
       - "skill:invoke:filesystem_skill"
       - "skill:invoke:http_skill"
 
@@ -356,8 +356,8 @@ agents:
         priority: 2
 
     required_permissions:
-      - "file:read:${AGENTOS_ROOT}/**/*.{py,go,rs,java,c,cpp,h}"
-      - "file:write:${AGENTOS_DATA_DIR}/workspace/backend/*"
+      - "file:read:${AGENTRT_ROOT}/**/*.{py,go,rs,java,c,cpp,h}"
+      - "file:write:${AGENTRT_DATA_DIR}/workspace/backend/*"
       - "network:connect:*.googleapis.com:443"
       - "skill:invoke:database_skill"
       - "skill:invoke:http_skill"
@@ -438,7 +438,7 @@ agents:
         priority: 2
 
     required_permissions:
-      - "file:read:${AGENTOS_ROOT}/**/*"
+      - "file:read:${AGENTRT_ROOT}/**/*"
       - "code:execute:*"
       - "skill:invoke:shell_skill"
       - "skill:invoke:python_skill"
@@ -519,7 +519,7 @@ agents:
         priority: 2
 
     required_permissions:
-      - "file:read:${AGENTOS_ROOT}/**/*"
+      - "file:read:${AGENTRT_ROOT}/**/*"
       - "code:execute:shell"
       - "network:connect:*"
       - "skill:invoke:shell_skill"
@@ -601,7 +601,7 @@ agents:
         priority: 2
 
     required_permissions:
-      - "file:read:${AGENTOS_DATA_DIR}/logs/*"
+      - "file:read:${AGENTRT_DATA_DIR}/logs/*"
       - "file:read:/var/log/*"
       - "network:connect:*"
       - "code:execute:*"
@@ -682,8 +682,8 @@ agents:
         priority: 2
 
     required_permissions:
-      - "file:read:${AGENTOS_DATA_DIR}/*"
-      - "file:write:${AGENTOS_DATA_DIR}/workspace/*"
+      - "file:read:${AGENTRT_DATA_DIR}/*"
+      - "file:write:${AGENTRT_DATA_DIR}/workspace/*"
       - "skill:invoke:database_skill"
       - "skill:invoke:python_skill"
 
@@ -843,7 +843,7 @@ agents:
         priority: 2
 
     required_permissions:
-      - "file:read:${AGENTOS_ROOT}/**/*"
+      - "file:read:${AGENTRT_ROOT}/**/*"
       - "skill:invoke:git_skill"
 
     cost_profile:
@@ -922,8 +922,8 @@ agents:
         priority: 2
 
     required_permissions:
-      - "file:read:${AGENTOS_DATA_DIR}/*"
-      - "file:write:${AGENTOS_DATA_DIR}/reports/*"
+      - "file:read:${AGENTRT_DATA_DIR}/*"
+      - "file:write:${AGENTRT_DATA_DIR}/reports/*"
       - "skill:invoke:database_skill"
       - "skill:invoke:python_skill"
 

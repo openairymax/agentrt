@@ -119,7 +119,7 @@ export class Telemetry {
   private serviceName: string;
 
   /** ﮒﮒﭨﭦﮔﺍﻝﻠ۴ﮔﭖﻟﮒﮒ?*/
-  constructor(serviceName: string = 'agentos-sdk') {
+  constructor(serviceName: string = 'agentrt-sdk') {
     this.serviceName = serviceName;
     this.meter = new Meter();
     this.tracer = new Tracer();

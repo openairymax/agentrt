@@ -103,7 +103,7 @@ async fn main() {
         Err(e) => {
             warn!("Gateway health check failed: {}", e);
             warn!("TUI will start but commands won't work until gateway is up.");
-            warn!("  → Start gateway:  docker compose up -d  or  agentos-gateway_d");
+            warn!("  → Start gateway:  docker compose up -d  or  agentrt-gateway_d");
         }
     }
 

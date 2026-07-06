@@ -33,7 +33,7 @@ class SDKRestructurer:
             base_path: agentos 包的基础路径
         """
         self.base_path = Path(base_path)
-        self.backup_path = self.base_path.parent / "agentos_backup"
+        self.backup_path = self.base_path.parent / "agentrt_backup"
 
         # 新的目录结构
         self.new_structure = {
@@ -308,7 +308,7 @@ For more information, see the documentation at https://agentos.dev
 """
 
 __version__ = "0.1.0"
-__author__ = "Spharx AgentRT Team"
+__author__ = "SPHARX Ltd. - Airymax Team"
 __license__ = "Apache-2.0"
 
 # Import version info

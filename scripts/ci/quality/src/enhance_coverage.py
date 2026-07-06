@@ -161,7 +161,7 @@ class CoverageAnalyzer:
                             break
                 
                 # 如果函数较长且看起来重要，标记为需要测试
-                if func_length > 20 and func_name.startswith('agentos_'):
+                if func_length > 20 and func_name.startswith('agentrt_'):
                     uncovered.append(func_name)
                     
         except Exception as e:
@@ -207,10 +207,10 @@ void test_{func_name}_valid_params(void) {{
     // TODO-PHASE2: Setup test data (延期到第二阶段)
     
     // Act
-    // agentos_error_t result = {func_name}(params);
+    // agentrt_error_t result = {func_name}(params);
     
     // Assert
-    // assert(result == AGENTOS_SUCCESS);
+    // assert(result == AGENTRT_SUCCESS);
     
     printf("✅ test_{func_name}_valid_params passed\\n");
 }}

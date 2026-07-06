@@ -21,21 +21,21 @@ AgentRT 脚本工具集是项目全生命周期管理的核心基础设施，涵
 
 | scripts/ 模块 | 对应的 agentos/ 模块 | 用途 |
 |---------------|---------------------|------|
-| `ci/pipeline/` | `atoms/`, `commons/`, `cupolas/`, `daemon/`, `gateway/`, `heapstore/` | 全模块 CI/CD 流水线（构建→测试→质量→部署） |
+| `ci/pipeline/` | `atoms/`, `commons/`, `cupolas/`, `daemons/`, `gateway/`, `heapstore/` | 全模块 CI/CD 流水线（构建→测试→质量→部署） |
 | `ci/quality/` | `toolkit/` | 多语言 SDK 质量分析（C/C++/Python/Go/Rust/TypeScript） |
 | `ci/verify/` | `toolkit/python/`, `toolkit/go/`, `toolkit/rust/`, `toolkit/typescript/` | SDK 构建验证、MemoryRovol 构建模式、安全扫描 |
 | `ci/release/` | 全部模块 | 版本发布与构建产物清理 |
-| `dev/build/` | `atoms/`, `commons/`, `cupolas/`, `daemon/`, `gateway/`, `heapstore/` | 跨平台自动化构建（BAN-33 源外构建） |
+| `dev/build/` | `atoms/`, `commons/`, `cupolas/`, `daemons/`, `gateway/`, `heapstore/` | 跨平台自动化构建（BAN-33 源外构建） |
 | `dev/setup/` | 全部模块 | 交互式开发环境配置（依赖安装、工具链设置） |
-| `dev/cli/` | `daemon/`, `manager/`, `openlab/` | 统一 CLI 入口（服务管理/智能体管理/任务管理） |
+| `dev/cli/` | `daemons/`, `manager/`, `openlab/` | 统一 CLI 入口（服务管理/智能体管理/任务管理） |
 | `dev/cmake/` | `atoms/`, `commons/`, `cupolas/` | CMake 辅助配置（Windows MSVC 兼容性头） |
 | `dev/utils/` | 全部模块 | 快速启动/环境验证/BAN 规则批量修复/代码修复工具集 |
-| `ops/bin/` | `daemon/`, `gateway/` | 运维入口脚本（daemon 一键启动/示例项目快速创建） |
-| `ops/deploy/` | `daemon/`, `gateway/` | Docker 容器化部署（gateway_d, llm_d, sched_d, heapstore, monit_d 等） |
+| `ops/bin/` | `daemons/`, `gateway/` | 运维入口脚本（daemon 一键启动/示例项目快速创建） |
+| `ops/deploy/` | `daemons/`, `gateway/` | Docker 容器化部署（gateway_d, llm_d, sched_d, heapstore, monit_d 等） |
 | `ops/benchmark/` | `atoms/coreloopthree/`, `atoms/corekern/` | 性能基准测试覆盖核心内核组件 |
 | `ops/lib/` | 全部模块 | Shell 脚本公共库（日志/错误码/平台检测） |
-| `ops/tests/` | `daemon/`, `cupolas/`, `manager/` | 运维集成测试（核心/检查点/记忆/Token/安全/遥测） |
-| `toolkit/` | `commons/`, `daemon/`, `manager/` | Python 运维工具集（诊断/记忆/Token/契约/CLI/插件/遥测） |
+| `ops/tests/` | `daemons/`, `cupolas/`, `manager/` | 运维集成测试（核心/检查点/记忆/Token/安全/遥测） |
+| `toolkit/` | `commons/`, `daemons/`, `manager/` | Python 运维工具集（诊断/记忆/Token/契约/CLI/插件/遥测） |
 | `resources/demos/` | 全部模块 | 技术演示（服务框架/基准测试/工具链/开源治理） |
 | `resources/tutorial/` | `openlab/` | 交互式教程引擎与新贡献者引导 |
 

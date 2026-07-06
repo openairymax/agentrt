@@ -14,38 +14,38 @@
 
 | 测试目录 | 对应的 agentos/ 模块 | 测试框架 |
 |----------|---------------------|----------|
-| `unit/atoms/corekern/` | `agentos/atoms/corekern/` | CMocka — 微核心核心（IPC/Binder、内存管理、任务调度、定时器） |
-| `unit/atoms/coreloopthree/` | `agentos/atoms/coreloopthree/` | CMocka + pytest — 三环运行时（认知环/执行环/学习环） |
-| `unit/atoms/memory/` | `agentos/atoms/memory/` | CMocka — 内置记忆子系统（L1+L2 层） |
-| `unit/atoms/syscall/` | `agentos/atoms/syscall/` | CMocka — 系统调用接口（5 类接口 + 4 层保护） |
-| `unit/commons/` | `agentos/commons/` | CMocka + pytest — 统一基础库（平台抽象/日志/配置/内存/同步等 20+ 子模块） |
-| `unit/cupolas/` | `agentos/cupolas/` | CMocka — 安全穹顶单元测试（防护/清洗/权限/审计/守卫框架） |
-| `unit/daemon/common/` | `agentos/daemon/common/` | CMocka — 公共服务库（19 个组件） |
-| `unit/daemon/gateway_d/` | `agentos/daemon/gateway_d/` | CMocka + pytest — API 网关守护进程 |
-| `unit/daemon/llm_d/` | `agentos/daemon/llm_d/` | CMocka + pytest — LLM 服务守护进程（多 Provider） |
-| `unit/daemon/sched_d/` | `agentos/daemon/sched_d/` | CMocka — 任务调度守护进程 |
-| `unit/daemon/market_d/` | `agentos/daemon/market_d/` | CMocka — 应用市场守护进程 |
-| `unit/daemon/monit_d/` | `agentos/daemon/monit_d/` | CMocka — 监控告警守护进程 |
-| `unit/daemon/tool_d/` | `agentos/daemon/tool_d/` | CMocka + pytest — 工具执行守护进程 |
-| `unit/heapstore/` | `agentos/heapstore/` | CMocka — 运行时数据存储（SQLite + 内存后端混合存储） |
+| `unit/atoms/corekern/` | `agentrt/atoms/corekern/` | CMocka — 微核心核心（IPC/Binder、内存管理、任务调度、定时器） |
+| `unit/atoms/coreloopthree/` | `agentrt/atoms/coreloopthree/` | CMocka + pytest — 三环运行时（认知环/执行环/学习环） |
+| `unit/atoms/memory/` | `agentrt/atoms/memory/` | CMocka — 内置记忆子系统（L1+L2 层） |
+| `unit/atoms/syscall/` | `agentrt/atoms/syscall/` | CMocka — 系统调用接口（5 类接口 + 4 层保护） |
+| `unit/commons/` | `agentrt/commons/` | CMocka + pytest — 统一基础库（平台抽象/日志/配置/内存/同步等 20+ 子模块） |
+| `unit/cupolas/` | `agentrt/cupolas/` | CMocka — 安全穹顶单元测试（防护/清洗/权限/审计/守卫框架） |
+| `unit/daemons/common/` | `agentrt/daemons/common/` | CMocka — 公共服务库（19 个组件） |
+| `unit/daemons/gateway_d/` | `agentrt/daemons/gateway_d/` | CMocka + pytest — API 网关守护进程 |
+| `unit/daemons/llm_d/` | `agentrt/daemons/llm_d/` | CMocka + pytest — LLM 服务守护进程（多 Provider） |
+| `unit/daemons/sched_d/` | `agentrt/daemons/sched_d/` | CMocka — 任务调度守护进程 |
+| `unit/daemons/market_d/` | `agentrt/daemons/market_d/` | CMocka — 应用市场守护进程 |
+| `unit/daemons/monit_d/` | `agentrt/daemons/monit_d/` | CMocka — 监控告警守护进程 |
+| `unit/daemons/tool_d/` | `agentrt/daemons/tool_d/` | CMocka + pytest — 工具执行守护进程 |
+| `unit/heapstore/` | `agentrt/heapstore/` | CMocka — 运行时数据存储（SQLite + 内存后端混合存储） |
 | `unit/manager/` | `ecosystem/manager/` | pytest — 统一配置管理中心（多模块 Schema + 热重载） |
 | `unit/openlab/` | `ecosystem/openlab/` | pytest — 开放生态系统（Apps/Contrib/Markets） |
 | `unit/toolkit/` | `sdk/` + `scripts/toolkit/` | pytest — 运维工具包与多语言 SDK（Python/Rust） |
-| `integration/c/` | `agentos/atoms/`, `agentos/commons/`, `agentos/gateway/` | CMocka — C 层端到端核心集成与协议兼容性 |
-| `integration/python/` | `agentos/daemon/`, `agentos/gateway/`, `agentos/heapstore/` | pytest — Python 层端到端工作流与协议兼容性 |
-| `integration/commons/` | `agentos/commons/` | CMocka — Commons 统一基础库集成测试 |
-| `integration/coreloopthree/` | `agentos/atoms/coreloopthree/` | pytest — 三环系统集成（认知-执行联动） |
-| `integration/cupolas/` | `agentos/cupolas/` | CMocka — Cupolas 安全穹顶集成测试 |
-| `integration/memoryrovol/` | `agentos/atoms/memoryrovol/` | pytest — 记忆系统检索与层级测试 |
-| `integration/platform/` | `agentos/atoms/`, `agentos/commons/` | CMocka — 跨平台 API 兼容性验证 |
-| `integration/syscall/` | `agentos/atoms/syscall/` | pytest — 系统调用端到端流程 |
-| `benchmarks/atoms/` | `agentos/atoms/` | C — Atoms 层性能基准 |
-| `benchmarks/concurrency/` | `agentos/daemon/`, `agentos/gateway/` | pytest-benchmark — 并发压力测试 |
-| `benchmarks/cupolas/` | `agentos/cupolas/` | C — Cupolas 安全基准与压力测试 |
-| `security/c/` | `agentos/cupolas/` | CMocka — C 层安全审计 |
-| `security/cupolas/` | `agentos/cupolas/` | C — Cupolas 安全模糊测试 |
-| `security/python/` | `agentos/cupolas/` | pytest — Python 层安全测试 |
-| `contract/python/` | `agentos/daemon/`, `ecosystem/openlab/` | pytest — 接口契约验证 |
+| `integration/c/` | `agentrt/atoms/`, `agentrt/commons/`, `agentrt/gateway/` | CMocka — C 层端到端核心集成与协议兼容性 |
+| `integration/python/` | `agentrt/daemons/`, `agentrt/gateway/`, `agentrt/heapstore/` | pytest — Python 层端到端工作流与协议兼容性 |
+| `integration/commons/` | `agentrt/commons/` | CMocka — Commons 统一基础库集成测试 |
+| `integration/coreloopthree/` | `agentrt/atoms/coreloopthree/` | pytest — 三环系统集成（认知-执行联动） |
+| `integration/cupolas/` | `agentrt/cupolas/` | CMocka — Cupolas 安全穹顶集成测试 |
+| `integration/memoryrovol/` | `agentrt/atoms/memoryrovol/` | pytest — 记忆系统检索与层级测试 |
+| `integration/platform/` | `agentrt/atoms/`, `agentrt/commons/` | CMocka — 跨平台 API 兼容性验证 |
+| `integration/syscall/` | `agentrt/atoms/syscall/` | pytest — 系统调用端到端流程 |
+| `benchmarks/atoms/` | `agentrt/atoms/` | C — Atoms 层性能基准 |
+| `benchmarks/concurrency/` | `agentrt/daemons/`, `agentrt/gateway/` | pytest-benchmark — 并发压力测试 |
+| `benchmarks/cupolas/` | `agentrt/cupolas/` | C — Cupolas 安全基准与压力测试 |
+| `security/c/` | `agentrt/cupolas/` | CMocka — C 层安全审计 |
+| `security/cupolas/` | `agentrt/cupolas/` | C — Cupolas 安全模糊测试 |
+| `security/python/` | `agentrt/cupolas/` | pytest — Python 层安全测试 |
+| `contract/python/` | `agentrt/daemons/`, `ecosystem/openlab/` | pytest — 接口契约验证 |
 
 ## 目录结构
 
@@ -73,7 +73,7 @@ tests/
 │   │   └── unit/                #     公共工具单元测试
 │   ├── cupolas/                 #   Cupolas 安全模块（10 个文件）
 │   │   └── unit/                #     安全单元测试
-│   ├── daemon/                  #   Daemon 守护进程测试（39 个文件）
+│   ├── daemons/                  #   Daemon 守护进程测试（39 个文件）
 │   │   ├── common/              #     公共服务库（9 个文件）
 │   │   ├── gateway_d/           #     网关守护进程（5 个文件）
 │   │   ├── llm_d/               #     LLM 服务（7 个文件）
@@ -224,7 +224,7 @@ cd build && ctest -R security
 | `atoms/syscall/` | ✅ CMocka | ✅ pytest | — | — |
 | `commons/` | ✅ CMocka | ✅ CMocka | — | — |
 | `cupolas/` | ✅ CMocka | ✅ CMocka | ✅ C + pytest | ✅ C |
-| `daemon/` | ✅ CMocka + pytest | ✅ pytest | ✅ pytest | ✅ pytest-benchmark |
+| `daemons/` | ✅ CMocka + pytest | ✅ pytest | ✅ pytest | ✅ pytest-benchmark |
 | `heapstore/` | ✅ CMocka | ✅ pytest | — | ✅ CMocka |
 | `manager/` | ✅ pytest | — | — | — |
 | `openlab/` | ✅ pytest | — | — | — |

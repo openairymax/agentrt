@@ -73,7 +73,7 @@ LABEL org.opencontainers.image.vendor="SPHARX"
 ENV AGENTOS_VERSION=${BUILD_VERSION} \
     AGENTOS_LOG_LEVEL=INFO \
     AGENTOS_TEST_MODE=0 \
-    AGENTOS_CONFIG_PATH=/etc/agentrt/agentos.yaml \
+    AGENTOS_CONFIG_PATH=/etc/agentrt/agentrt.yaml \
     AGENTOS_DEPLOY_ENV=production
 
 RUN apk add --no-cache \

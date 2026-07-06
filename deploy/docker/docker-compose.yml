@@ -20,8 +20,8 @@ services:
         BUILD_VERSION: ${BUILD_VERSION:-0.1.0}
         BUILD_DATE: ${BUILD_DATE:-2026-03-24}
       target: runtime
-    image: ghcr.io/spharx/agentos/gateway:${BUILD_VERSION:-latest}
-    container_name: agentos-gateway
+    image: ghcr.io/spharx/agentrt/gateway:${BUILD_VERSION:-latest}
+    container_name: agentrt-gateway
     hostname: gateway
     restart: unless-stopped
     
@@ -33,19 +33,19 @@ services:
     
     # 环境变量
     environment:
-      - AGENTOS_LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - AGENTOS_SERVER_HOST=0.0.0.0
-      - AGENTOS_HTTP_PORT=8080
-      - AGENTOS_WS_PORT=8081
-      - AGENTOS_METRICS_PORT=9090
-      - AGENTOS_REDIS_HOST=redis
-      - AGENTOS_REDIS_PORT=6379
-      - AGENTOS_JWT_SECRET=${JWT_SECRET}
-      - AGENTOS_ENABLE_AUTH=${ENABLE_AUTH:-true}
+      - AGENTRT_LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - AGENTRT_SERVER_HOST=0.0.0.0
+      - AGENTRT_HTTP_PORT=8080
+      - AGENTRT_WS_PORT=8081
+      - AGENTRT_METRICS_PORT=9090
+      - AGENTRT_REDIS_HOST=redis
+      - AGENTRT_REDIS_PORT=6379
+      - AGENTRT_JWT_SECRET=${JWT_SECRET}
+      - AGENTRT_ENABLE_AUTH=${ENABLE_AUTH:-true}
     
     # 配置文件挂载
     volumes:
-      - ../manager:/etc/agentos/gateway:ro
+      - ../manager:/etc/agentrt/gateway:ro
       - gateway-logs:/var/log/agentos
       - gateway-run:/var/run/agentos
     
@@ -74,7 +74,7 @@ services:
     
     # 网络配置
     networks:
-      - agentos-network
+      - agentrt-network
     
     # 日志配置
     logging:
@@ -88,7 +88,7 @@ services:
   # ==========================================================================
   redis:
     image: redis:7-alpine
-    container_name: agentos-redis
+    container_name: agentrt-redis
     hostname: redis
     restart: unless-stopped
     
@@ -116,7 +116,7 @@ services:
           memory: 64M
     
     networks:
-      - agentos-network
+      - agentrt-network
     
     logging:
       driver: "json-file"
@@ -129,7 +129,7 @@ services:
   # ==========================================================================
   prometheus:
     image: prom/prometheus:v2.45.0
-    container_name: agentos-prometheus
+    container_name: agentrt-prometheus
     hostname: prometheus
     restart: unless-stopped
     
@@ -149,7 +149,7 @@ services:
       - prometheus-data:/prometheus
     
     networks:
-      - agentos-network
+      - agentrt-network
     
     logging:
       driver: "json-file"
@@ -162,7 +162,7 @@ services:
   # ==========================================================================
   grafana:
     image: grafana/grafana:10.2.0
-    container_name: agentos-grafana
+    container_name: agentrt-grafana
     hostname: grafana
     restart: unless-stopped
     
@@ -184,7 +184,7 @@ services:
       - prometheus
     
     networks:
-      - agentos-network
+      - agentrt-network
     
     logging:
       driver: "json-file"
@@ -196,7 +196,7 @@ services:
 # 网络配置
 # ==========================================================================
 networks:
-  agentos-network:
+  agentrt-network:
     driver: bridge
     ipam:
       manager:

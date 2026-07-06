@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "agentrt.labels" . | nindent 4 }}
 data:
-  agentos.yaml: |
+  agentrt.yaml: |
     # AgentRT Configuration — managed by Helm
     # ConfigMap: {{ include "agentrt.fullname" . }}-config
     agentos:

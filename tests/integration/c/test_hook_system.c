@@ -12,7 +12,7 @@
  * Copyright (c) 2026 SPHARX Ltd. All Rights Reserved.
  */
 
-#include "agentos_hook.h"
+#include "agentrt_hook.h"
 #include "hook_registry.h"
 #include "hook_interceptor.h"
 #include "hook_timeout.h"
@@ -118,35 +118,35 @@ static hook_decision_t retry_callback(hook_context_t *ctx) {
 static void test_shell_hook_register(void) {
     TEST("P2.8.1a: Register Shell Hook");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
-    ret = agentos_hook_register_shell(
+    ret = agentrt_hook_register_shell(
         "test_shell_hook",
         HOOK_TYPE_PRE_TOOL,
         "/usr/local/bin/agentrt-audit-log.sh",
         100,
         true);
-    CHECK_EQ(ret, 0, "agentos_hook_register_shell failed");
+    CHECK_EQ(ret, 0, "agentrt_hook_register_shell failed");
 
-    const hook_entry_t *entry = agentos_hook_get("test_shell_hook");
+    const hook_entry_t *entry = agentrt_hook_get("test_shell_hook");
     CHECK(entry != NULL, "Hook not found after registration");
     CHECK_EQ(entry->impl_type, HOOK_IMPL_SHELL, "Hook impl_type should be SHELL");
     CHECK_EQ(entry->type, HOOK_TYPE_PRE_TOOL, "Hook type should be PRE_TOOL");
     CHECK(entry->enabled, "Hook should be enabled");
     CHECK_EQ(entry->priority, 100, "Hook priority should be 100");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
 static void test_shell_hook_unregister(void) {
     TEST("P2.8.1b: Unregister Shell Hook");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
-    ret = agentos_hook_register_shell(
+    ret = agentrt_hook_register_shell(
         "temp_shell_hook",
         HOOK_TYPE_PRE_EXEC,
         "/tmp/test.sh",
@@ -154,26 +154,26 @@ static void test_shell_hook_unregister(void) {
         true);
     CHECK_EQ(ret, 0, "Register should succeed");
 
-    const hook_entry_t *entry = agentos_hook_get("temp_shell_hook");
+    const hook_entry_t *entry = agentrt_hook_get("temp_shell_hook");
     CHECK(entry != NULL, "Hook should exist before unregister");
 
-    ret = agentos_hook_unregister("temp_shell_hook");
+    ret = agentrt_hook_unregister("temp_shell_hook");
     CHECK_EQ(ret, 0, "Unregister should succeed");
 
-    entry = agentos_hook_get("temp_shell_hook");
+    entry = agentrt_hook_get("temp_shell_hook");
     CHECK(entry == NULL, "Hook should not exist after unregister");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
 static void test_shell_hook_enable_disable(void) {
     TEST("P2.8.1c: Enable/Disable Shell Hook");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
-    ret = agentos_hook_register_shell(
+    ret = agentrt_hook_register_shell(
         "toggle_hook",
         HOOK_TYPE_PRE_LLM,
         "/tmp/toggle.sh",
@@ -181,35 +181,35 @@ static void test_shell_hook_enable_disable(void) {
         true);
     CHECK_EQ(ret, 0, "Register should succeed");
 
-    const hook_entry_t *entry = agentos_hook_get("toggle_hook");
+    const hook_entry_t *entry = agentrt_hook_get("toggle_hook");
     CHECK(entry != NULL, "Hook should exist");
     CHECK(entry->enabled, "Hook should be enabled initially");
 
-    ret = agentos_hook_set_enabled("toggle_hook", false);
+    ret = agentrt_hook_set_enabled("toggle_hook", false);
     CHECK_EQ(ret, 0, "Disable should succeed");
 
-    entry = agentos_hook_get("toggle_hook");
+    entry = agentrt_hook_get("toggle_hook");
     CHECK(entry != NULL, "Hook should still exist");
     CHECK(!entry->enabled, "Hook should be disabled");
 
-    ret = agentos_hook_set_enabled("toggle_hook", true);
+    ret = agentrt_hook_set_enabled("toggle_hook", true);
     CHECK_EQ(ret, 0, "Re-enable should succeed");
 
-    entry = agentos_hook_get("toggle_hook");
+    entry = agentrt_hook_get("toggle_hook");
     CHECK(entry->enabled, "Hook should be re-enabled");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
 static void test_shell_hook_trigger_intercept(void) {
     TEST("P2.8.1d: Shell Hook Trigger and Intercept via SafetyGuard");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
     /* 注册一个 C 回调 Hook 用于拦截验证 */
-    ret = agentos_hook_register(
+    ret = agentrt_hook_register(
         "audit_interceptor",
         HOOK_TYPE_PRE_TOOL,
         audit_callback,
@@ -219,7 +219,7 @@ static void test_shell_hook_trigger_intercept(void) {
     CHECK_EQ(ret, 0, "Register audit hook failed");
 
     /* 注册一个阻断 Hook */
-    ret = agentos_hook_register(
+    ret = agentrt_hook_register(
         "block_interceptor",
         HOOK_TYPE_PRE_TOOL,
         block_callback,
@@ -254,13 +254,13 @@ static void test_shell_hook_trigger_intercept(void) {
     ctx.operation = "file_write";
     ctx.timestamp_ns = (uint64_t)time(NULL) * 1000000000ULL;
 
-    hook_decision_t decision = agentos_hook_trigger(&ctx);
+    hook_decision_t decision = agentrt_hook_trigger(&ctx);
     /* 高优先级 block hook 应返回 ABORT */
     CHECK(decision == HOOK_DECISION_ABORT || decision == HOOK_DECISION_CONTINUE,
           "Hook trigger should return a valid decision");
 
     hook_interceptor_destroy();
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
@@ -269,8 +269,8 @@ static void test_shell_hook_trigger_intercept(void) {
 static void test_python_hook_register(void) {
     TEST("P2.8.2a: Register Python Hook");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
     /* Python Hook 通过 shell 脚本路径注册，但 impl_type 标记为 PYTHON */
     hook_entry_t entry;
@@ -286,23 +286,23 @@ static void test_python_hook_register(void) {
     ret = hook_registry_register(&entry);
     CHECK_EQ(ret, 0, "hook_registry_register for Python hook failed");
 
-    const hook_entry_t *found = agentos_hook_get("prompt_injector");
+    const hook_entry_t *found = agentrt_hook_get("prompt_injector");
     CHECK(found != NULL, "Python hook not found after registration");
     CHECK_EQ(found->impl_type, HOOK_IMPL_PYTHON, "Impl type should be PYTHON");
     CHECK_EQ(found->type, HOOK_TYPE_PRE_LLM, "Type should be PRE_LLM");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
 static void test_python_hook_modify_prompt(void) {
     TEST("P2.8.2b: Python Hook modifies LLM prompt");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
     /* 注册一个会修改 prompt 的 C 回调来模拟 Python Hook 行为 */
-    ret = agentos_hook_register(
+    ret = agentrt_hook_register(
         "prompt_modifier",
         HOOK_TYPE_PRE_LLM,
         modify_prompt_callback,
@@ -322,23 +322,23 @@ static void test_python_hook_modify_prompt(void) {
     ctx.input_data_len = strlen("Hello, world!");
     ctx.timestamp_ns = (uint64_t)time(NULL) * 1000000000ULL;
 
-    hook_decision_t decision = agentos_hook_trigger(&ctx);
+    hook_decision_t decision = agentrt_hook_trigger(&ctx);
     /* Prompt modifier should return MODIFY */
     CHECK(decision == HOOK_DECISION_MODIFY,
           "Prompt modifier should return MODIFY decision");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
 static void test_python_hook_multiple_modifiers(void) {
     TEST("P2.8.2c: Multiple Python hooks chain modify prompt");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
     /* 注册多个 prompt 修改 Hook */
-    ret = agentos_hook_register(
+    ret = agentrt_hook_register(
         "security_reminder",
         HOOK_TYPE_PRE_LLM,
         modify_prompt_callback,
@@ -347,7 +347,7 @@ static void test_python_hook_multiple_modifiers(void) {
         true);
     CHECK_EQ(ret, 0, "Register security_reminder failed");
 
-    ret = agentos_hook_register(
+    ret = agentrt_hook_register(
         "cost_tracker",
         HOOK_TYPE_PRE_LLM,
         audit_callback,
@@ -357,7 +357,7 @@ static void test_python_hook_multiple_modifiers(void) {
     CHECK_EQ(ret, 0, "Register cost_tracker failed");
 
     /* 验证注册数量 */
-    size_t count = agentos_hook_count_by_type(HOOK_TYPE_PRE_LLM);
+    size_t count = agentrt_hook_count_by_type(HOOK_TYPE_PRE_LLM);
     CHECK(count >= 2, "Should have at least 2 PRE_LLM hooks");
 
     /* 触发 Hook 链 */
@@ -369,12 +369,12 @@ static void test_python_hook_multiple_modifiers(void) {
     ctx.operation = "chat_completion";
     ctx.timestamp_ns = (uint64_t)time(NULL) * 1000000000ULL;
 
-    hook_decision_t decision = agentos_hook_trigger(&ctx);
+    hook_decision_t decision = agentrt_hook_trigger(&ctx);
     /* 聚合决策：MODIFY 优先级高于 CONTINUE */
     CHECK(decision == HOOK_DECISION_MODIFY || decision == HOOK_DECISION_CONTINUE,
           "Multi-modifier chain should return valid decision");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
@@ -383,11 +383,11 @@ static void test_python_hook_multiple_modifiers(void) {
 static void test_hook_timeout_config(void) {
     TEST("P2.8.3a: Hook timeout configuration");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
     /* 注册一个 Hook */
-    ret = agentos_hook_register(
+    ret = agentrt_hook_register(
         "timeout_test_hook",
         HOOK_TYPE_PRE_TOOL,
         audit_callback,
@@ -416,18 +416,18 @@ static void test_hook_timeout_config(void) {
     timeout = hook_timeout_get("timeout_test_hook");
     CHECK_EQ(timeout, HOOK_TIMEOUT_MAX_MS, "Timeout should be MAX_MS (30000ms)");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
 static void test_hook_timeout_default(void) {
     TEST("P2.8.3b: Default timeout for unconfigured hook");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
     /* 注册 Hook 但不设置超时 */
-    ret = agentos_hook_register(
+    ret = agentrt_hook_register(
         "default_timeout_hook",
         HOOK_TYPE_POST_TOOL,
         audit_callback,
@@ -441,18 +441,18 @@ static void test_hook_timeout_default(void) {
     CHECK_EQ(timeout, HOOK_TIMEOUT_DEFAULT_MS,
              "Default timeout should be 500ms");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
 static void test_hook_timeout_abort(void) {
     TEST("P2.8.3c: Hook timeout triggers ABORT");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
     /* 注册一个会超时的慢 Hook */
-    ret = agentos_hook_register(
+    ret = agentrt_hook_register(
         "slow_blocking_hook",
         HOOK_TYPE_PRE_TOOL,
         slow_callback,
@@ -475,7 +475,7 @@ static void test_hook_timeout_abort(void) {
     ctx.timestamp_ns = (uint64_t)time(NULL) * 1000000000ULL;
 
     /* 执行带超时保护的回调 */
-    const hook_entry_t *entry = agentos_hook_get("slow_blocking_hook");
+    const hook_entry_t *entry = agentrt_hook_get("slow_blocking_hook");
     CHECK(entry != NULL, "Slow hook should be registered");
 
     uint64_t duration_ns = 0;
@@ -489,17 +489,17 @@ static void test_hook_timeout_abort(void) {
     int timeout_count = hook_timeout_get_count("slow_blocking_hook");
     CHECK(timeout_count >= 1, "Timeout count should be at least 1");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
 static void test_hook_timeout_reset_count(void) {
     TEST("P2.8.3d: Reset timeout counter");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
-    ret = agentos_hook_register(
+    ret = agentrt_hook_register(
         "reset_count_hook",
         HOOK_TYPE_PRE_TOOL,
         slow_callback,
@@ -512,7 +512,7 @@ static void test_hook_timeout_reset_count(void) {
     CHECK_EQ(ret, 0, "Set timeout failed");
 
     /* 触发一次超时 */
-    const hook_entry_t *entry = agentos_hook_get("reset_count_hook");
+    const hook_entry_t *entry = agentrt_hook_get("reset_count_hook");
     hook_context_t ctx;
     memset(&ctx, 0, sizeof(ctx));
     ctx.type = HOOK_TYPE_PRE_TOOL;
@@ -532,7 +532,7 @@ static void test_hook_timeout_reset_count(void) {
     count = hook_timeout_get_count("reset_count_hook");
     CHECK_EQ(count, 0, "Timeout count should be 0 after reset");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
@@ -541,35 +541,35 @@ static void test_hook_timeout_reset_count(void) {
 static void test_webhook_register(void) {
     TEST("P2.8.4a: Register Webhook Hook");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
-    ret = agentos_hook_register_webhook(
+    ret = agentrt_hook_register_webhook(
         "audit_webhook",
         HOOK_TYPE_POST_TOOL,
         "https://hooks.example.com/agentrt/audit",
         80,
         true);
-    CHECK_EQ(ret, 0, "agentos_hook_register_webhook failed");
+    CHECK_EQ(ret, 0, "agentrt_hook_register_webhook failed");
 
-    const hook_entry_t *entry = agentos_hook_get("audit_webhook");
+    const hook_entry_t *entry = agentrt_hook_get("audit_webhook");
     CHECK(entry != NULL, "Webhook not found after registration");
     CHECK_EQ(entry->impl_type, HOOK_IMPL_WEBHOOK, "Impl type should be WEBHOOK");
     CHECK_STR_EQ(entry->script_path, "https://hooks.example.com/agentrt/audit",
                  "Webhook URL should match");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
 static void test_webhook_retry_mechanism(void) {
     TEST("P2.8.4b: Webhook retry mechanism");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
     /* 注册一个带重试的 Webhook（模拟） */
-    ret = agentos_hook_register_webhook(
+    ret = agentrt_hook_register_webhook(
         "retry_webhook",
         HOOK_TYPE_ON_ERROR,
         "https://hooks.example.com/agentrt/error",
@@ -577,28 +577,28 @@ static void test_webhook_retry_mechanism(void) {
         true);
     CHECK_EQ(ret, 0, "Register retry_webhook failed");
 
-    const hook_entry_t *entry = agentos_hook_get("retry_webhook");
+    const hook_entry_t *entry = agentrt_hook_get("retry_webhook");
     CHECK(entry != NULL, "Retry webhook should be registered");
 
     /* 验证 Webhook URL 已存储 */
     CHECK(strlen(entry->script_path) > 0, "Webhook URL should be set");
 
     /* 验证 Webhook 可以禁用 */
-    ret = agentos_hook_set_enabled("retry_webhook", false);
+    ret = agentrt_hook_set_enabled("retry_webhook", false);
     CHECK_EQ(ret, 0, "Disable webhook should succeed");
 
-    entry = agentos_hook_get("retry_webhook");
+    entry = agentrt_hook_get("retry_webhook");
     CHECK(!entry->enabled, "Webhook should be disabled");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
 static void test_webhook_signature_config(void) {
     TEST("P2.8.4c: Webhook signature configuration");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
     /* 注册带签名的 Webhook */
     hook_entry_t entry;
@@ -616,20 +616,20 @@ static void test_webhook_signature_config(void) {
     ret = hook_registry_register(&entry);
     CHECK_EQ(ret, 0, "Register signed webhook failed");
 
-    const hook_entry_t *found = agentos_hook_get("signed_webhook");
+    const hook_entry_t *found = agentrt_hook_get("signed_webhook");
     CHECK(found != NULL, "Signed webhook should be registered");
     CHECK(strstr(found->script_path, "HMAC_SHA256") != NULL,
           "Webhook URL should contain signature placeholder");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
 static void test_webhook_disable_and_reenable(void) {
     TEST("P2.8.4d: Webhook disable and re-enable for retry control");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
     /* 注册多个 Webhook */
     const char *webhooks[] = {
@@ -644,30 +644,30 @@ static void test_webhook_disable_and_reenable(void) {
     };
 
     for (int i = 0; i < 3; i++) {
-        ret = agentos_hook_register_webhook(
+        ret = agentrt_hook_register_webhook(
             webhooks[i], HOOK_TYPE_ON_ERROR, urls[i], 100 - i * 10, true);
         CHECK_EQ(ret, 0, "Register webhook chain failed");
     }
 
     /* 验证所有 Webhook 已注册 */
-    size_t total = agentos_hook_count();
+    size_t total = agentrt_hook_count();
     CHECK(total >= 3, "Should have at least 3 registered hooks");
 
     /* 禁用 fallback webhook */
-    ret = agentos_hook_set_enabled("fallback_webhook", false);
+    ret = agentrt_hook_set_enabled("fallback_webhook", false);
     CHECK_EQ(ret, 0, "Disable fallback webhook should succeed");
 
-    const hook_entry_t *fallback = agentos_hook_get("fallback_webhook");
+    const hook_entry_t *fallback = agentrt_hook_get("fallback_webhook");
     CHECK(!fallback->enabled, "Fallback webhook should be disabled");
 
     /* 重新启用 fallback webhook */
-    ret = agentos_hook_set_enabled("fallback_webhook", true);
+    ret = agentrt_hook_set_enabled("fallback_webhook", true);
     CHECK_EQ(ret, 0, "Re-enable fallback webhook should succeed");
 
-    fallback = agentos_hook_get("fallback_webhook");
+    fallback = agentrt_hook_get("fallback_webhook");
     CHECK(fallback->enabled, "Fallback webhook should be re-enabled");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
@@ -676,10 +676,10 @@ static void test_webhook_disable_and_reenable(void) {
 static void test_hook_statistics(void) {
     TEST("P2.8-Stats: Hook statistics tracking");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
-    ret = agentos_hook_register(
+    ret = agentrt_hook_register(
         "stats_test_hook",
         HOOK_TYPE_PRE_TOOL,
         audit_callback,
@@ -698,21 +698,21 @@ static void test_hook_statistics(void) {
 
     for (int i = 0; i < 5; i++) {
         ctx.timestamp_ns = (uint64_t)time(NULL) * 1000000000ULL;
-        agentos_hook_trigger(&ctx);
+        agentrt_hook_trigger(&ctx);
     }
 
     /* 获取统计信息 */
     hook_stats_t stats;
-    ret = agentos_hook_get_stats("stats_test_hook", &stats);
-    CHECK_EQ(ret, 0, "agentos_hook_get_stats should succeed");
+    ret = agentrt_hook_get_stats("stats_test_hook", &stats);
+    CHECK_EQ(ret, 0, "agentrt_hook_get_stats should succeed");
     CHECK(stats.invoke_count >= 5, "Invoke count should be at least 5");
     CHECK(stats.total_duration_ns > 0, "Total duration should be non-zero");
 
     /* 获取不存在的 Hook 统计 */
-    ret = agentos_hook_get_stats("nonexistent_hook", &stats);
+    ret = agentrt_hook_get_stats("nonexistent_hook", &stats);
     CHECK_EQ(ret, -1, "Get stats for nonexistent hook should return -1");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
@@ -721,10 +721,10 @@ static void test_hook_statistics(void) {
 static void test_error_duplicate_register(void) {
     TEST("P2.8-Error: Duplicate hook registration");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
-    ret = agentos_hook_register(
+    ret = agentrt_hook_register(
         "unique_hook",
         HOOK_TYPE_PRE_TOOL,
         audit_callback,
@@ -734,7 +734,7 @@ static void test_error_duplicate_register(void) {
     CHECK_EQ(ret, 0, "First registration should succeed");
 
     /* 尝试重复注册同名 Hook */
-    ret = agentos_hook_register(
+    ret = agentrt_hook_register(
         "unique_hook",
         HOOK_TYPE_POST_TOOL,
         audit_callback,
@@ -743,41 +743,41 @@ static void test_error_duplicate_register(void) {
         true);
     CHECK(ret != 0, "Duplicate registration should fail");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
 static void test_error_unregister_nonexistent(void) {
     TEST("P2.8-Error: Unregister nonexistent hook");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
-    ret = agentos_hook_unregister("ghost_hook");
+    ret = agentrt_hook_unregister("ghost_hook");
     CHECK(ret != 0, "Unregistering nonexistent hook should fail");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
 static void test_error_invalid_hook_name(void) {
     TEST("P2.8-Error: Operations on invalid hook name");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
     /* 查找不存在的 Hook */
-    const hook_entry_t *entry = agentos_hook_get("");
+    const hook_entry_t *entry = agentrt_hook_get("");
     CHECK(entry == NULL, "Empty name should return NULL");
 
-    entry = agentos_hook_get(NULL);
+    entry = agentrt_hook_get(NULL);
     CHECK(entry == NULL, "NULL name should return NULL");
 
     /* 禁用不存在的 Hook */
-    ret = agentos_hook_set_enabled("nonexistent_hook", false);
+    ret = agentrt_hook_set_enabled("nonexistent_hook", false);
     CHECK(ret != 0, "Set enabled on nonexistent hook should fail");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 
@@ -786,8 +786,8 @@ static void test_error_invalid_hook_name(void) {
 static void test_concurrent_hook_registration(void) {
     TEST("P2.8-Concurrent: Multiple hook registrations");
 
-    int ret = agentos_hook_init();
-    CHECK_EQ(ret, 0, "agentos_hook_init failed");
+    int ret = agentrt_hook_init();
+    CHECK_EQ(ret, 0, "agentrt_hook_init failed");
 
     /* 批量注册不同类型的 Hook */
     const char *hook_names[] = {
@@ -804,22 +804,22 @@ static void test_concurrent_hook_registration(void) {
     };
 
     for (int i = 0; i < 8; i++) {
-        ret = agentos_hook_register(
+        ret = agentrt_hook_register(
             hook_names[i], hook_types[i], audit_callback, NULL, 100 - i, true);
         CHECK_EQ(ret, 0, "Register hook type failed");
     }
 
     /* 验证每种类型都有 Hook */
     for (int i = 0; i < HOOK_TYPE_COUNT; i++) {
-        size_t count = agentos_hook_count_by_type((hook_type_t)i);
+        size_t count = agentrt_hook_count_by_type((hook_type_t)i);
         CHECK(count >= 1, "Each hook type should have at least 1 entry");
     }
 
     /* 验证总数 */
-    size_t total = agentos_hook_count();
+    size_t total = agentrt_hook_count();
     CHECK_EQ(total, 8, "Total should be 8 hooks");
 
-    agentos_hook_shutdown();
+    agentrt_hook_shutdown();
     PASS();
 }
 

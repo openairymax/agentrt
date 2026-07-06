@@ -2,7 +2,7 @@
   "name": "agentrt-dependencies",
   "version-string": "0.1.1",
   "description": "AgentRT C project dependencies for Windows builds via vcpkg",
-  "license": "Apache-2.0",
+  "license": "AGPL-3.0-or-later OR Apache-2.0",
   "homepage": "https://spharx.cn",
   "dependencies": {
     "curl": {

@@ -100,7 +100,7 @@ fn test_init_creates_directory_structure() {
         let project_dir = tmp.join("test-project");
         assert!(project_dir.exists(), "Project directory should exist");
         assert!(project_dir.join("agents").exists(), "agents/ should exist");
-        assert!(project_dir.join("agentos.yaml").exists(), "agentos.yaml should exist");
+        assert!(project_dir.join("agentrt.yaml").exists(), "agentrt.yaml should exist");
         assert!(project_dir.join("prompts").exists(), "prompts/ should exist");
         assert!(project_dir.join("tools").exists(), "tools/ should exist");
         assert!(project_dir.join("hooks").exists(), "hooks/ should exist");
@@ -140,7 +140,7 @@ fn test_init_creates_config_file() {
     with_temp_dir(|tmp| {
         run_cli_ok_in(&["init", "cfg-test"], tmp);
 
-        let config_path = tmp.join("cfg-test/agentos.yaml");
+        let config_path = tmp.join("cfg-test/agentrt.yaml");
         assert!(config_path.exists(), "Config file should exist");
 
         let content = fs::read_to_string(config_path).unwrap();

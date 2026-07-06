@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2026 SPHARX. All Rights Reserved.
  * SPDX-FileCopyrightText: 2026 SPHARX
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
  *
  * @file test_memoryrov_throughput.c
  * @brief INT-07: MemoryRovol L1 Write Throughput Benchmark
@@ -95,17 +95,17 @@ static inline double timespec_diff_s(struct timespec *start, struct timespec *en
 
 /* ==================== Helpers ==================== */
 
-static agentos_memoryrov_handle_t *create_handle(void)
+static agentrt_memoryrov_handle_t *create_handle(void)
 {
-    agentos_memoryrov_config_t *cfg = NULL;
-    agentos_error_t err = agentos_memoryrov_config_default(&cfg);
-    if (err != AGENTOS_OK || cfg == NULL) {
+    agentrt_memoryrov_config_t *cfg = NULL;
+    agentrt_error_t err = agentrt_memoryrov_config_default(&cfg);
+    if (err != AGENTRT_OK || cfg == NULL) {
         return NULL;
     }
-    agentos_memoryrov_handle_t *handle = NULL;
-    err = agentos_memoryrov_init(cfg, &handle);
-    agentos_memoryrov_config_free(cfg);
-    if (err != AGENTOS_OK) {
+    agentrt_memoryrov_handle_t *handle = NULL;
+    err = agentrt_memoryrov_init(cfg, &handle);
+    agentrt_memoryrov_config_free(cfg);
+    if (err != AGENTRT_OK) {
         return NULL;
     }
     return handle;
@@ -132,7 +132,7 @@ static void test_sequential_write_throughput(void)
 {
     TEST_CASE_START("07.1 Sequential write throughput");
 
-    agentos_memoryrov_handle_t *handle = create_handle();
+    agentrt_memoryrov_handle_t *handle = create_handle();
     TEST_ASSERT(handle != NULL, "Handle creation succeeded");
 
     /* Warmup */
@@ -140,9 +140,9 @@ static void test_sequential_write_throughput(void)
     char *warmup_id = NULL;
     for (int i = 0; i < WARMUP_RECORDS; i++) {
         generate_payload(warmup_buf, sizeof(warmup_buf), i);
-        agentos_error_t err = agentos_memoryrov_write_raw(
+        agentrt_error_t err = agentrt_memoryrov_write_raw(
             handle, warmup_buf, strlen(warmup_buf), NULL, &warmup_id);
-        if (err == AGENTOS_OK && warmup_id) {
+        if (err == AGENTRT_OK && warmup_id) {
             free(warmup_id);
             warmup_id = NULL;
         }
@@ -159,9 +159,9 @@ static void test_sequential_write_throughput(void)
 
     for (int i = 0; i < SEQ_RECORDS; i++) {
         generate_payload(buf, sizeof(buf), i);
-        agentos_error_t err = agentos_memoryrov_write_raw(
+        agentrt_error_t err = agentrt_memoryrov_write_raw(
             handle, buf, strlen(buf), NULL, &record_ids[i]);
-        if (err == AGENTOS_OK) {
+        if (err == AGENTRT_OK) {
             write_ok++;
         }
     }
@@ -181,11 +181,11 @@ static void test_sequential_write_throughput(void)
     /* Cleanup */
     for (int i = 0; i < SEQ_RECORDS; i++) {
         if (record_ids[i]) {
-            agentos_memoryrov_delete_raw(handle, record_ids[i]);
+            agentrt_memoryrov_delete_raw(handle, record_ids[i]);
             free(record_ids[i]);
         }
     }
-    agentos_memoryrov_cleanup(handle);
+    agentrt_memoryrov_cleanup(handle);
 
     TEST_CASE_END();
 }
@@ -196,7 +196,7 @@ static void test_batch_write_throughput(void)
 {
     TEST_CASE_START("07.2 Batch write throughput");
 
-    agentos_memoryrov_handle_t *handle = create_handle();
+    agentrt_memoryrov_handle_t *handle = create_handle();
     TEST_ASSERT(handle != NULL, "Handle creation succeeded");
 
     /* Warmup */
@@ -204,9 +204,9 @@ static void test_batch_write_throughput(void)
     char *wid = NULL;
     for (int i = 0; i < WARMUP_RECORDS; i++) {
         generate_payload(warmup_buf, sizeof(warmup_buf), i);
-        agentos_error_t err = agentos_memoryrov_write_raw(
+        agentrt_error_t err = agentrt_memoryrov_write_raw(
             handle, warmup_buf, strlen(warmup_buf), NULL, &wid);
-        if (err == AGENTOS_OK && wid) {
+        if (err == AGENTRT_OK && wid) {
             free(wid);
             wid = NULL;
         }
@@ -226,9 +226,9 @@ static void test_batch_write_throughput(void)
         for (int j = 0; j < BATCH_SIZE; j++) {
             int idx = b * BATCH_SIZE + j;
             generate_payload(buf, sizeof(buf), idx);
-            agentos_error_t err = agentos_memoryrov_write_raw(
+            agentrt_error_t err = agentrt_memoryrov_write_raw(
                 handle, buf, strlen(buf), NULL, &record_ids[idx]);
-            if (err == AGENTOS_OK) {
+            if (err == AGENTRT_OK) {
                 write_ok++;
             }
         }
@@ -249,11 +249,11 @@ static void test_batch_write_throughput(void)
     /* Cleanup */
     for (int i = 0; i < BATCH_TOTAL; i++) {
         if (record_ids[i]) {
-            agentos_memoryrov_delete_raw(handle, record_ids[i]);
+            agentrt_memoryrov_delete_raw(handle, record_ids[i]);
             free(record_ids[i]);
         }
     }
-    agentos_memoryrov_cleanup(handle);
+    agentrt_memoryrov_cleanup(handle);
 
     TEST_CASE_END();
 }
@@ -264,7 +264,7 @@ static void test_mixed_read_write_throughput(void)
 {
     TEST_CASE_START("07.3 Mixed read/write throughput");
 
-    agentos_memoryrov_handle_t *handle = create_handle();
+    agentrt_memoryrov_handle_t *handle = create_handle();
     TEST_ASSERT(handle != NULL, "Handle creation succeeded");
 
     /* Pre-populate some records for reads */
@@ -276,9 +276,9 @@ static void test_mixed_read_write_throughput(void)
 
     for (int i = 0; i < PREPOP_COUNT; i++) {
         generate_payload(prepop_buf, sizeof(prepop_buf), i);
-        agentos_error_t err = agentos_memoryrov_write_raw(
+        agentrt_error_t err = agentrt_memoryrov_write_raw(
             handle, prepop_buf, strlen(prepop_buf), NULL, &prepop_ids[i]);
-        if (err == AGENTOS_OK) {
+        if (err == AGENTRT_OK) {
             prepop_ok++;
         }
     }
@@ -288,9 +288,9 @@ static void test_mixed_read_write_throughput(void)
     char *wid = NULL;
     for (int i = 0; i < WARMUP_RECORDS; i++) {
         generate_payload(warmup_buf, sizeof(warmup_buf), i + PREPOP_COUNT);
-        agentos_error_t err = agentos_memoryrov_write_raw(
+        agentrt_error_t err = agentrt_memoryrov_write_raw(
             handle, warmup_buf, strlen(warmup_buf), NULL, &wid);
-        if (err == AGENTOS_OK && wid) {
+        if (err == AGENTRT_OK && wid) {
             free(wid);
             wid = NULL;
         }
@@ -312,9 +312,9 @@ static void test_mixed_read_write_throughput(void)
         if ((i % 10) < 7) {
             /* Write */
             generate_payload(buf, sizeof(buf), i + PREPOP_COUNT + WARMUP_RECORDS);
-            agentos_error_t err = agentos_memoryrov_write_raw(
+            agentrt_error_t err = agentrt_memoryrov_write_raw(
                 handle, buf, strlen(buf), NULL, &new_ids);
-            if (err == AGENTOS_OK) {
+            if (err == AGENTRT_OK) {
                 ops_ok++;
                 if (new_ids) {
                     free(new_ids);
@@ -325,9 +325,9 @@ static void test_mixed_read_write_throughput(void)
             /* Read from pre-populated records */
             int ridx = i % prepop_ok;
             if (prepop_ids[ridx]) {
-                agentos_error_t err = agentos_memoryrov_get_raw(
+                agentrt_error_t err = agentrt_memoryrov_get_raw(
                     handle, prepop_ids[ridx], &read_data, &read_len);
-                if (err == AGENTOS_OK) {
+                if (err == AGENTRT_OK) {
                     ops_ok++;
                     if (read_data) {
                         free(read_data);
@@ -353,11 +353,11 @@ static void test_mixed_read_write_throughput(void)
     /* Cleanup */
     for (int i = 0; i < PREPOP_COUNT; i++) {
         if (prepop_ids[i]) {
-            agentos_memoryrov_delete_raw(handle, prepop_ids[i]);
+            agentrt_memoryrov_delete_raw(handle, prepop_ids[i]);
             free(prepop_ids[i]);
         }
     }
-    agentos_memoryrov_cleanup(handle);
+    agentrt_memoryrov_cleanup(handle);
 
     #undef PREPOP_COUNT
     TEST_CASE_END();
@@ -366,7 +366,7 @@ static void test_mixed_read_write_throughput(void)
 /* ==================== INT-07.4 Concurrent Write Throughput ==================== */
 
 typedef struct {
-    agentos_memoryrov_handle_t *handle;
+    agentrt_memoryrov_handle_t *handle;
     int record_count;
     int writes_ok;
     int thread_id;
@@ -381,9 +381,9 @@ static void *concurrent_write_worker(void *arg)
 
     for (int i = 0; i < args->record_count; i++) {
         generate_payload(buf, sizeof(buf), args->thread_id * 100000 + i);
-        agentos_error_t err = agentos_memoryrov_write_raw(
+        agentrt_error_t err = agentrt_memoryrov_write_raw(
             args->handle, buf, strlen(buf), NULL, &rid);
-        if (err == AGENTOS_OK) {
+        if (err == AGENTRT_OK) {
             ok++;
             if (rid) {
                 free(rid);
@@ -400,7 +400,7 @@ static void test_concurrent_write_throughput(void)
 {
     TEST_CASE_START("07.4 Concurrent write throughput");
 
-    agentos_memoryrov_handle_t *handle = create_handle();
+    agentrt_memoryrov_handle_t *handle = create_handle();
     TEST_ASSERT(handle != NULL, "Handle creation succeeded");
 
     /* Warmup (single-threaded) */
@@ -408,9 +408,9 @@ static void test_concurrent_write_throughput(void)
     char *wid = NULL;
     for (int i = 0; i < WARMUP_RECORDS; i++) {
         generate_payload(warmup_buf, sizeof(warmup_buf), i);
-        agentos_error_t err = agentos_memoryrov_write_raw(
+        agentrt_error_t err = agentrt_memoryrov_write_raw(
             handle, warmup_buf, strlen(warmup_buf), NULL, &wid);
-        if (err == AGENTOS_OK && wid) {
+        if (err == AGENTRT_OK && wid) {
             free(wid);
             wid = NULL;
         }
@@ -455,7 +455,7 @@ static void test_concurrent_write_throughput(void)
     TEST_ASSERT(throughput > THROUGHPUT_TARGET,
                 "Concurrent write throughput > 10K records/s");
 
-    agentos_memoryrov_cleanup(handle);
+    agentrt_memoryrov_cleanup(handle);
 
     TEST_CASE_END();
 }
@@ -473,7 +473,7 @@ static void test_write_latency_distribution(void)
 {
     TEST_CASE_START("07.5 Write latency distribution");
 
-    agentos_memoryrov_handle_t *handle = create_handle();
+    agentrt_memoryrov_handle_t *handle = create_handle();
     TEST_ASSERT(handle != NULL, "Handle creation succeeded");
 
     /* Warmup */
@@ -481,9 +481,9 @@ static void test_write_latency_distribution(void)
     char *wid = NULL;
     for (int i = 0; i < WARMUP_RECORDS; i++) {
         generate_payload(warmup_buf, sizeof(warmup_buf), i);
-        agentos_error_t err = agentos_memoryrov_write_raw(
+        agentrt_error_t err = agentrt_memoryrov_write_raw(
             handle, warmup_buf, strlen(warmup_buf), NULL, &wid);
-        if (err == AGENTOS_OK && wid) {
+        if (err == AGENTRT_OK && wid) {
             free(wid);
             wid = NULL;
         }
@@ -503,12 +503,12 @@ static void test_write_latency_distribution(void)
         struct timespec ts, te;
         clock_gettime(CLOCK_MONOTONIC, &ts);
 
-        agentos_error_t err = agentos_memoryrov_write_raw(
+        agentrt_error_t err = agentrt_memoryrov_write_raw(
             handle, buf, strlen(buf), NULL, &rid);
 
         clock_gettime(CLOCK_MONOTONIC, &te);
 
-        if (err == AGENTOS_OK) {
+        if (err == AGENTRT_OK) {
             latencies[valid_samples++] = timespec_diff_us(&ts, &te);
             if (rid) {
                 free(rid);
@@ -539,7 +539,7 @@ static void test_write_latency_distribution(void)
     TEST_ASSERT(p50 < 100.0, "P50 latency < 100 us");
 
     free(latencies);
-    agentos_memoryrov_cleanup(handle);
+    agentrt_memoryrov_cleanup(handle);
 
     TEST_CASE_END();
 }
@@ -550,7 +550,7 @@ static void test_large_record_throughput(void)
 {
     TEST_CASE_START("07.6 Large record throughput");
 
-    agentos_memoryrov_handle_t *handle = create_handle();
+    agentrt_memoryrov_handle_t *handle = create_handle();
     TEST_ASSERT(handle != NULL, "Handle creation succeeded");
 
     /* Warmup with small records */
@@ -558,9 +558,9 @@ static void test_large_record_throughput(void)
     char *wid = NULL;
     for (int i = 0; i < WARMUP_RECORDS; i++) {
         generate_payload(warmup_buf, sizeof(warmup_buf), i);
-        agentos_error_t err = agentos_memoryrov_write_raw(
+        agentrt_error_t err = agentrt_memoryrov_write_raw(
             handle, warmup_buf, strlen(warmup_buf), NULL, &wid);
-        if (err == AGENTOS_OK && wid) {
+        if (err == AGENTRT_OK && wid) {
             free(wid);
             wid = NULL;
         }
@@ -577,9 +577,9 @@ static void test_large_record_throughput(void)
 
     for (int i = 0; i < LARGE_TOTAL; i++) {
         generate_payload(buf_1k, LARGE_RECORD_1K, i);
-        agentos_error_t err = agentos_memoryrov_write_raw(
+        agentrt_error_t err = agentrt_memoryrov_write_raw(
             handle, buf_1k, LARGE_RECORD_1K - 1, NULL, &rid);
-        if (err == AGENTOS_OK) {
+        if (err == AGENTRT_OK) {
             ok_1k++;
             if (rid) {
                 free(rid);
@@ -606,9 +606,9 @@ static void test_large_record_throughput(void)
 
     for (int i = 0; i < LARGE_TOTAL; i++) {
         generate_payload(buf_10k, LARGE_RECORD_10K, i);
-        agentos_error_t err = agentos_memoryrov_write_raw(
+        agentrt_error_t err = agentrt_memoryrov_write_raw(
             handle, buf_10k, LARGE_RECORD_10K - 1, NULL, &rid);
-        if (err == AGENTOS_OK) {
+        if (err == AGENTRT_OK) {
             ok_10k++;
             if (rid) {
                 free(rid);
@@ -640,7 +640,7 @@ static void test_large_record_throughput(void)
 
     free(buf_1k);
     free(buf_10k);
-    agentos_memoryrov_cleanup(handle);
+    agentrt_memoryrov_cleanup(handle);
 
     TEST_CASE_END();
 }

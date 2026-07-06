@@ -33,7 +33,7 @@ static void test_trace_write_span(void) {
     assert(err == heapstore_SUCCESS);
 
     heapstore_span_t span;
-    AGENTOS_MEMSET(&span, 0, sizeof(span));
+    AGENTRT_MEMSET(&span, 0, sizeof(span));
 
     snprintf(span.trace_id, sizeof(span.trace_id), "trace_%ld", (long)time(NULL));
     snprintf(span.span_id, sizeof(span.span_id), "span_001");
@@ -59,7 +59,7 @@ static void test_trace_write_batch(void) {
     assert(err == heapstore_SUCCESS);
 
     heapstore_span_t spans[5];
-    AGENTOS_MEMSET(spans, 0, sizeof(spans));
+    AGENTRT_MEMSET(spans, 0, sizeof(spans));
 
     for (int i = 0; i < 5; i++) {
         snprintf(spans[i].trace_id, sizeof(spans[i].trace_id), "trace_batch_%ld", (long)time(NULL));
@@ -86,7 +86,7 @@ static void test_trace_flush(void) {
     assert(err == heapstore_SUCCESS);
 
     heapstore_span_t span;
-    AGENTOS_MEMSET(&span, 0, sizeof(span));
+    AGENTRT_MEMSET(&span, 0, sizeof(span));
 
     snprintf(span.trace_id, sizeof(span.trace_id), "trace_flush_%ld", (long)time(NULL));
     snprintf(span.span_id, sizeof(span.span_id), "span_flush");
@@ -117,7 +117,7 @@ static void test_trace_invalid_params(void) {
     assert(err == heapstore_ERR_INVALID_PARAM);
 
     heapstore_span_t invalid_span;
-    AGENTOS_MEMSET(&invalid_span, 0, sizeof(invalid_span));
+    AGENTRT_MEMSET(&invalid_span, 0, sizeof(invalid_span));
     err = heapstore_trace_write_span(&invalid_span);
     assert(err == heapstore_ERR_INVALID_PARAM);
 
@@ -144,7 +144,7 @@ static void test_trace_stats(void) {
     assert(err == heapstore_SUCCESS);
 
     heapstore_span_t span;
-    AGENTOS_MEMSET(&span, 0, sizeof(span));
+    AGENTRT_MEMSET(&span, 0, sizeof(span));
 
     snprintf(span.trace_id, sizeof(span.trace_id), "trace_stats_%ld", (long)time(NULL));
     snprintf(span.span_id, sizeof(span.span_id), "span_stats");

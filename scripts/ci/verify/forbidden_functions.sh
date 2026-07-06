@@ -80,10 +80,10 @@ check_ban_151() {
     local hits=0
     while IFS= read -r -d '' file; do
         # 简化检测：检查文件中是否有MALLOC但没有goto cleanup模式
-        if grep -q 'AGENTOS_MALLOC\|AGENTOS_CALLOC\|AGENTOS_REALLOC' "$file" 2>/dev/null; then
+        if grep -q 'AGENTRT_MALLOC\|AGENTRT_CALLOC\|AGENTRT_REALLOC' "$file" 2>/dev/null; then
             # 检查是否有MALLOC后直接return的情况（简化版）
             local has_malloc
-            has_malloc=$(grep -c 'AGENTOS_MALLOC\|AGENTOS_CALLOC\|AGENTOS_REALLOC' "$file" 2>/dev/null || echo "0")
+            has_malloc=$(grep -c 'AGENTRT_MALLOC\|AGENTRT_CALLOC\|AGENTRT_REALLOC' "$file" 2>/dev/null || echo "0")
             has_malloc=${has_malloc##*[!0-9]} has_malloc=${has_malloc:-0}
             local has_cleanup
             has_cleanup=$(grep -c 'goto cleanup' "$file" 2>/dev/null || echo "0")
@@ -166,8 +166,8 @@ check_ban_154() {
         lineno=$(echo "$line" | cut -d: -f2)
         content=$(echo "$line" | cut -d: -f3-)
 
-        # 排除：已使用 AGENTOS_MEMCPY_SAFE
-        echo "$content" | grep -q 'AGENTOS_MEMCPY_SAFE' && continue || true
+        # 排除：已使用 AGENTRT_MEMCPY_SAFE
+        echo "$content" | grep -q 'AGENTRT_MEMCPY_SAFE' && continue || true
         # 排除：sizeof()
         echo "$content" | grep -q 'sizeof' && continue || true
         # 排除：纯数字常量（如 256, 0x100）
@@ -206,8 +206,8 @@ check_ban_155() {
         file=$(echo "$line" | cut -d: -f1)
         lineno=$(echo "$line" | cut -d: -f2)
 
-        # 已使用 AGENTOS_STRNCPY_TERM 安全宏 → 跳过
-        echo "$line" | grep -q 'AGENTOS_STRNCPY_TERM' && continue || true
+        # 已使用 AGENTRT_STRNCPY_TERM 安全宏 → 跳过
+        echo "$line" | grep -q 'AGENTRT_STRNCPY_TERM' && continue || true
 
         # 裸 strncpy → 检查调用后3行内是否有手动 null 终止
         ((hits++)) || true
@@ -226,7 +226,7 @@ check_ban_155() {
         | grep -v "/tests/")
 
     if [[ $hits -eq 0 ]]; then
-        log_ok "BAN-155: No bare strncpy calls (all use AGENTOS_STRNCPY_TERM)"
+        log_ok "BAN-155: No bare strncpy calls (all use AGENTRT_STRNCPY_TERM)"
     elif [[ $unsafe_hits -eq 0 ]]; then
         log_ok "BAN-155: $hits strncpy call(s) all have manual null termination ($unsafe_hits unsafe)"
     else
@@ -241,7 +241,7 @@ check_ban_156() {
     log_info "BAN-156: Checking sprintf usage..."
     local hits=0
     hits=$(grep -rn '\bsprintf\b' --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
-        | grep -v "/tests/" | grep -v 'AGENTOS_SNPRINTF' | wc -l) || true
+        | grep -v "/tests/" | grep -v 'AGENTRT_SNPRINTF' | wc -l) || true
     hits=${hits:-0}
     if [[ $hits -eq 0 ]]; then
         log_ok "BAN-156: No sprintf usage (all use snprintf)"
@@ -318,12 +318,12 @@ check_ban_159_162() {
 
     # BAN-160: malloc/free配对
     local alloc_hits=0
-    alloc_hits=$(grep -rl 'AGENTOS_MALLOC\|AGENTOS_CALLOC' --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+    alloc_hits=$(grep -rl 'AGENTRT_MALLOC\|AGENTRT_CALLOC' --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
         | grep -v "/tests/" | while IFS= read -r file; do
         local allocs frees
-        allocs=$(grep -c 'AGENTOS_MALLOC\|AGENTOS_CALLOC' "$file" 2>/dev/null || echo "0")
+        allocs=$(grep -c 'AGENTRT_MALLOC\|AGENTRT_CALLOC' "$file" 2>/dev/null || echo "0")
         allocs=${allocs##*[!0-9]} allocs=${allocs:-0}
-        frees=$(grep -c 'AGENTOS_FREE' "$file" 2>/dev/null || echo "0")
+        frees=$(grep -c 'AGENTRT_FREE' "$file" 2>/dev/null || echo "0")
         frees=${frees##*[!0-9]} frees=${frees:-0}
         if [[ $allocs -gt $frees ]]; then
             echo "$file"
@@ -418,16 +418,16 @@ check_ban_163_168() {
         log_warn "BAN-164: $ban164_no_take ownership transfer annotations (review recommended)"
     fi
 
-    # BAN-165: AGENTOS_FREE 后置 NULL 检查
+    # BAN-165: AGENTRT_FREE 后置 NULL 检查
     local ban165_no_null=0
-    ban165_no_null=$(grep -rc 'AGENTOS_FREE(' --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
+    ban165_no_null=$(grep -rc 'AGENTRT_FREE(' --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
         | grep -v "/tests/" | grep -v ":0$" | wc -l) || true
     ban165_no_null=${ban165_no_null:-0}
-    # 简化：统计使用 AGENTOS_FREE 的文件数（完整 NULL 后置检查需人工审计）
+    # 简化：统计使用 AGENTRT_FREE 的文件数（完整 NULL 后置检查需人工审计）
     if [[ $ban165_no_null -le 50 ]]; then
-        log_ok "BAN-165: AGENTOS_FREE usage within limits ($ban165_no_null files)"
+        log_ok "BAN-165: AGENTRT_FREE usage within limits ($ban165_no_null files)"
     else
-        log_warn "BAN-165: $ban165_no_null files use AGENTOS_FREE (review NULL assignment)"
+        log_warn "BAN-165: $ban165_no_null files use AGENTRT_FREE (review NULL assignment)"
     fi
 
     # BAN-166: 禁止多级指针传递（>2级）
@@ -448,7 +448,7 @@ check_ban_163_168() {
     # 检查 #include 跨模块引用中是否有 void* 裸指针
     local ban167_bare=0
     ban167_bare=$(grep -rP 'void\s*\*' --include="*.h" "${PROJECT_ROOT}/agentos/" 2>/dev/null \
-        | grep -v "/tests/" | grep -v 'typedef' | grep -v 'agentos_' | wc -l) || true
+        | grep -v "/tests/" | grep -v 'typedef' | grep -v 'agentrt_' | wc -l) || true
     ban167_bare=${ban167_bare:-0}
     if [[ $ban167_bare -le 5 ]]; then
         log_ok "BAN-167: Bare void* usage within limits ($ban167_bare)"
@@ -482,7 +482,7 @@ check_ban_169_174() {
 
     # BAN-169: OOM 处理函数实现检查
     log_info "BAN-169: Checking OOM handler implementation..."
-    if grep -rq 'oom_handler\|agentos_oom_determine_response\|agentos_oom_handle' \
+    if grep -rq 'oom_handler\|agentrt_oom_determine_response\|agentrt_oom_handle' \
         --include="*.h" --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null; then
         log_ok "BAN-169: OOM handler interfaces defined"
     else
@@ -501,7 +501,7 @@ check_ban_169_174() {
 
     # BAN-171: 降级处理器注册检查
     log_info "BAN-171: Checking degradation handler registration..."
-    if grep -rq 'degradation_handler\|on_degrade\|on_restore\|agentos_register_degradation' \
+    if grep -rq 'degradation_handler\|on_degrade\|on_restore\|agentrt_register_degradation' \
         --include="*.h" --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null; then
         log_ok "BAN-171: Degradation handler interfaces defined"
     else
@@ -510,7 +510,7 @@ check_ban_169_174() {
 
     # BAN-172: 内存水位检查
     log_info "BAN-172: Checking memory watermark checks..."
-    if grep -rq 'watermark\|memory_watermark\|agentos_memory_check_watermark\|memory_pressure' \
+    if grep -rq 'watermark\|memory_watermark\|agentrt_memory_check_watermark\|memory_pressure' \
         --include="*.h" --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null; then
         log_ok "BAN-172: Memory watermark checks found"
     else
@@ -519,7 +519,7 @@ check_ban_169_174() {
 
     # BAN-173: 内存统计上报
     log_info "BAN-173: Checking memory stats reporting..."
-    if grep -rq 'memory_stats_extended\|agentos_check_leaks_scheduled\|leak_suspected' \
+    if grep -rq 'memory_stats_extended\|agentrt_check_leaks_scheduled\|leak_suspected' \
         --include="*.h" --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null; then
         log_ok "BAN-173: Extended memory stats found"
     else
@@ -528,7 +528,7 @@ check_ban_169_174() {
 
     # BAN-174: 优雅降级机制
     log_info "BAN-174: Checking graceful degradation..."
-    if grep -rq 'agentos_oom_degrade\|graceful_degradation\|degrade_to\|reduce_functionality' \
+    if grep -rq 'agentrt_oom_degrade\|graceful_degradation\|degrade_to\|reduce_functionality' \
         --include="*.h" --include="*.c" "${PROJECT_ROOT}/agentos/" 2>/dev/null; then
         log_ok "BAN-174: Graceful degradation interfaces found"
     else
@@ -553,15 +553,15 @@ check_ban_175_180() {
     log_info "BAN-175: Checking dual thinking system contracts..."
     local dt_contracts=0
     grep -rq 'thinking_chain_create\|thinking_chain_destroy' \
-        --include="*.h" "${PROJECT_ROOT}/agentos/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
+        --include="*.h" "${PROJECT_ROOT}/agentrt/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
     grep -rq 'triple_coordinator' \
-        --include="*.h" "${PROJECT_ROOT}/agentos/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
+        --include="*.h" "${PROJECT_ROOT}/agentrt/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
     grep -rq 'stream_critic' \
-        --include="*.h" "${PROJECT_ROOT}/agentos/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
+        --include="*.h" "${PROJECT_ROOT}/agentrt/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
     grep -rq 'metacognition' \
-        --include="*.h" "${PROJECT_ROOT}/agentos/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
+        --include="*.h" "${PROJECT_ROOT}/agentrt/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
     grep -rq 'semantic_unit' \
-        --include="*.h" "${PROJECT_ROOT}/agentos/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
+        --include="*.h" "${PROJECT_ROOT}/agentrt/atoms/coreloopthree/" 2>/dev/null && ((dt_contracts++)) || true
     if [[ $dt_contracts -ge 4 ]]; then
         log_ok "BAN-175: Dual thinking system contracts defined ($dt_contracts/5 modules)"
     else
@@ -573,9 +573,9 @@ check_ban_175_180() {
     log_info "BAN-176: Checking MemoryRovol contracts..."
     local mr_contracts=0
     grep -rq 'layer1_raw\|layer2_feature\|layer3_structure\|layer4_pattern' \
-        --include="*.h" "${PROJECT_ROOT}/agentos/atoms/memoryrovol/include/" 2>/dev/null && ((mr_contracts++)) || true
+        --include="*.h" "${PROJECT_ROOT}/agentrt/atoms/memoryrovol/include/" 2>/dev/null && ((mr_contracts++)) || true
     grep -rq 'memory_bridge\|memoryrovol_integration' \
-        --include="*.h" "${PROJECT_ROOT}/agentos/atoms/" 2>/dev/null && ((mr_contracts++)) || true
+        --include="*.h" "${PROJECT_ROOT}/agentrt/atoms/" 2>/dev/null && ((mr_contracts++)) || true
     if [[ $mr_contracts -ge 1 ]]; then
         log_ok "BAN-176: MemoryRovol contracts defined ($mr_contracts interfaces)"
     else
@@ -586,13 +586,13 @@ check_ban_175_180() {
     log_info "BAN-177: Checking cupolas contracts..."
     local cp_contracts=0
     grep -rq 'sanitizer_core\|sanitize_input\|SANITIZE_FULL' \
-        --include="*.h" "${PROJECT_ROOT}/agentos/cupolas/" 2>/dev/null && ((cp_contracts++)) || true
+        --include="*.h" "${PROJECT_ROOT}/agentrt/cupolas/" 2>/dev/null && ((cp_contracts++)) || true
     grep -rq 'permission_engine\|permission_check\|RBAC' \
-        --include="*.h" "${PROJECT_ROOT}/agentos/cupolas/" 2>/dev/null && ((cp_contracts++)) || true
+        --include="*.h" "${PROJECT_ROOT}/agentrt/cupolas/" 2>/dev/null && ((cp_contracts++)) || true
     grep -rq 'audit_logger\|audit.*hash\|hash_chain' \
-        --include="*.h" "${PROJECT_ROOT}/agentos/cupolas/" 2>/dev/null && ((cp_contracts++)) || true
+        --include="*.h" "${PROJECT_ROOT}/agentrt/cupolas/" 2>/dev/null && ((cp_contracts++)) || true
     grep -rq 'AES.*GCM\|vault_encrypt\|cupolas_vault' \
-        --include="*.h" "${PROJECT_ROOT}/agentos/cupolas/" 2>/dev/null && ((cp_contracts++)) || true
+        --include="*.h" "${PROJECT_ROOT}/agentrt/cupolas/" 2>/dev/null && ((cp_contracts++)) || true
     if [[ $cp_contracts -ge 3 ]]; then
         log_ok "BAN-177: Cupolas contracts defined ($cp_contracts/4 modules)"
     else
@@ -604,9 +604,9 @@ check_ban_175_180() {
     log_info "BAN-178: Checking llm_d contracts..."
     local llm_contracts=0
     grep -rq 'llm_provider_find\|llm_provider_registry\|llm_routing' \
-        --include="*.h" "${PROJECT_ROOT}/agentos/daemon/llm_d/" 2>/dev/null && ((llm_contracts++)) || true
+        --include="*.h" "${PROJECT_ROOT}/agentrt/daemons/llm_d/" 2>/dev/null && ((llm_contracts++)) || true
     grep -rq 'llm_cache\|token_counter\|cost_tracker' \
-        --include="*.h" "${PROJECT_ROOT}/agentos/daemon/llm_d/" 2>/dev/null && ((llm_contracts++)) || true
+        --include="*.h" "${PROJECT_ROOT}/agentrt/daemons/llm_d/" 2>/dev/null && ((llm_contracts++)) || true
     if [[ $llm_contracts -ge 1 ]]; then
         log_ok "BAN-178: llm_d contracts defined"
     else

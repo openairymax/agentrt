@@ -204,12 +204,12 @@ def check_file(file_path: str) -> List[Finding]:
 
         if PATH_TRAVERSAL_PATTERN.search(stripped):
             prev_lines = ''.join(lines[max(0, line_num - 5):line_num])
-            if 'is_path_component_safe' not in prev_lines and 'is_path_traversal_attempt' not in prev_lines and 'agentos_validate_file_path' not in prev_lines:
+            if 'is_path_component_safe' not in prev_lines and 'is_path_traversal_attempt' not in prev_lines and 'agentrt_validate_file_path' not in prev_lines:
                 findings.append(Finding(
                     file_path=file_path, line_number=line_num, column=0,
                     severity=Severity.HIGH, rule_id='SEC008',
                     message='Path component used in file path without traversal check (SEC-012)',
-                    suggestion='Add is_path_component_safe() or agentos_validate_file_path() check'
+                    suggestion='Add is_path_component_safe() or agentrt_validate_file_path() check'
                 ))
 
         if SQL_INJECTION_PATTERN.search(stripped):
@@ -224,12 +224,12 @@ def check_file(file_path: str) -> List[Finding]:
 
         if SHELL_ESCAPE_PATTERN.search(stripped):
             prev_lines = ''.join(lines[max(0, line_num - 10):line_num])
-            if 'is_shell_command_allowed' not in prev_lines and 'escape_shell_arg' not in prev_lines and 'agentos_validate_shell_command' not in prev_lines and 'flawfinder: ignore' not in prev_lines:
+            if 'is_shell_command_allowed' not in prev_lines and 'escape_shell_arg' not in prev_lines and 'agentrt_validate_shell_command' not in prev_lines and 'flawfinder: ignore' not in prev_lines:
                 findings.append(Finding(
                     file_path=file_path, line_number=line_num, column=0,
                     severity=Severity.HIGH, rule_id='SEC010',
                     message='execl with variable argument without validation (SEC-011)',
-                    suggestion='Add is_shell_command_allowed() or agentos_validate_shell_command() check'
+                    suggestion='Add is_shell_command_allowed() or agentrt_validate_shell_command() check'
                 ))
 
         stack_match = BUFFER_STACK_PATTERN.search(stripped)

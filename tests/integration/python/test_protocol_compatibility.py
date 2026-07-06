@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 """
 AgentRT Protocol Compatibility Integration Test Suite
 
@@ -30,7 +30,7 @@ import argparse
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 
-GATEWAY_URL = os.environ.get("AGENTOS_GATEWAY_URL", "http://localhost:18789")
+GATEWAY_URL = os.environ.get("AGENTRT_GATEWAY_URL", "http://localhost:18789")
 
 PASS = "\033[32mPASS\033[0m"
 FAIL = "\033[31mFAIL\033[0m"
@@ -436,7 +436,7 @@ class ProtocolTestSuite:
 
         is_prometheus = False
         if isinstance(body_text, str):
-            is_prometheus = "# TYPE" in body_text or "agentos_" in body_text
+            is_prometheus = "# TYPE" in body_text or "agentrt_" in body_text
         elif isinstance(body_text, dict):
             is_prometheus = False
 

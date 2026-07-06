@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 SPHARX Ltd.
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 // @owner: team-C
 /**
  * @file test_protocol_e2e.c
@@ -87,7 +87,7 @@ void test_a2a_agent_registration(void) {
 
     /* Register analyst agent */
     a2a_agent_card_t analyst;
-    AGENTOS_MEMSET(&analyst, 0, sizeof(analyst));
+    AGENTRT_MEMSET(&analyst, 0, sizeof(analyst));
     analyst.name = "analyst-agent";
     analyst.url = "a2a://analyst:8080";
     analyst.capabilities_json = "data_analysis,reporting,visualization";
@@ -97,7 +97,7 @@ void test_a2a_agent_registration(void) {
 
     /* Register executor agent */
     a2a_agent_card_t executor;
-    AGENTOS_MEMSET(&executor, 0, sizeof(executor));
+    AGENTRT_MEMSET(&executor, 0, sizeof(executor));
     executor.name = "executor-agent";
     executor.url = "a2a://executor:8081";
     executor.capabilities_json = "task_execution,code_generation,deployment";
@@ -134,7 +134,7 @@ void test_a2a_task_delegation(void) {
 
     /* Register two agents */
     a2a_agent_card_t analyst;
-    AGENTOS_MEMSET(&analyst, 0, sizeof(analyst));
+    AGENTRT_MEMSET(&analyst, 0, sizeof(analyst));
     analyst.name = "analyst-agent";
     analyst.url = "a2a://analyst:8080";
     analyst.capabilities_json = "data_analysis";
@@ -142,7 +142,7 @@ void test_a2a_task_delegation(void) {
     a2a_v03_register_agent(ctx, &analyst);
 
     a2a_agent_card_t executor;
-    AGENTOS_MEMSET(&executor, 0, sizeof(executor));
+    AGENTRT_MEMSET(&executor, 0, sizeof(executor));
     executor.name = "executor-agent";
     executor.url = "a2a://executor:8081";
     executor.capabilities_json = "task_execution";
@@ -193,7 +193,7 @@ void test_a2a_message_exchange(void) {
 
     /* Register agents */
     a2a_agent_card_t analyst;
-    AGENTOS_MEMSET(&analyst, 0, sizeof(analyst));
+    AGENTRT_MEMSET(&analyst, 0, sizeof(analyst));
     analyst.name = "analyst-agent";
     analyst.url = "a2a://analyst:8080";
     analyst.capabilities_json = "data_analysis";
@@ -201,7 +201,7 @@ void test_a2a_message_exchange(void) {
     a2a_v03_register_agent(ctx, &analyst);
 
     a2a_agent_card_t executor;
-    AGENTOS_MEMSET(&executor, 0, sizeof(executor));
+    AGENTRT_MEMSET(&executor, 0, sizeof(executor));
     executor.name = "executor-agent";
     executor.url = "a2a://executor:8081";
     executor.capabilities_json = "task_execution";
@@ -210,7 +210,7 @@ void test_a2a_message_exchange(void) {
 
     /* Send a structured message from analyst to executor */
     a2a_message_t msg;
-    AGENTOS_MEMSET(&msg, 0, sizeof(msg));
+    AGENTRT_MEMSET(&msg, 0, sizeof(msg));
     msg.role = "user";
     msg.type = A2A_MSG_STRUCTURED;
     msg.content_json = "{\"action\":\"analyze\",\"target\":\"sales_data\",\"timeframe\":\"monthly\"}";
@@ -241,7 +241,7 @@ void test_a2a_negotiation(void) {
 
     /* Register agents */
     a2a_agent_card_t analyst;
-    AGENTOS_MEMSET(&analyst, 0, sizeof(analyst));
+    AGENTRT_MEMSET(&analyst, 0, sizeof(analyst));
     analyst.name = "analyst-agent";
     analyst.url = "a2a://analyst:8080";
     analyst.capabilities_json = "data_analysis";
@@ -255,7 +255,7 @@ void test_a2a_negotiation(void) {
 
     /* Negotiate task cost */
     a2a_negotiation_t proposal;
-    AGENTOS_MEMSET(&proposal, 0, sizeof(proposal));
+    AGENTRT_MEMSET(&proposal, 0, sizeof(proposal));
     proposal.action = A2A_NEGOTIATE_PROPOSE;
     proposal.task_id = task->id;
     proposal.agent_id = "analyst-agent";
@@ -281,7 +281,7 @@ void test_a2a_consensus(void) {
     const char *names[] = {"agent-a", "agent-b", "agent-c", "agent-d", "agent-e"};
     for (int i = 0; i < 5; i++) {
         a2a_agent_card_t card;
-        AGENTOS_MEMSET(&card, 0, sizeof(card));
+        AGENTRT_MEMSET(&card, 0, sizeof(card));
         card.name = (char *)names[i];
         card.url = "a2a://localhost";
         card.capabilities_json = "consensus";
@@ -322,7 +322,7 @@ void test_a2a_notifications(void) {
 
     /* Create a task that triggers notification via handler */
     a2a_agent_card_t agent;
-    AGENTOS_MEMSET(&agent, 0, sizeof(agent));
+    AGENTRT_MEMSET(&agent, 0, sizeof(agent));
     agent.name = "notifier";
     agent.url = "a2a://notifier:8080";
     agent.capabilities_json = "notifications";
@@ -331,7 +331,7 @@ void test_a2a_notifications(void) {
 
     /* Send a notification */
     a2a_notification_t notif;
-    AGENTOS_MEMSET(&notif, 0, sizeof(notif));
+    AGENTRT_MEMSET(&notif, 0, sizeof(notif));
     notif.event_type = "task.status.changed";
     notif.task_id = "task-001";
     notif.agent_id = "notifier";
@@ -358,7 +358,7 @@ void test_a2a_streaming(void) {
     CHECK(ctx != NULL, "Failed to create A2A context");
 
     a2a_agent_card_t agent;
-    AGENTOS_MEMSET(&agent, 0, sizeof(agent));
+    AGENTRT_MEMSET(&agent, 0, sizeof(agent));
     agent.name = "streamer";
     agent.url = "a2a://streamer:8080";
     agent.capabilities_json = "streaming";
@@ -407,7 +407,7 @@ void test_a2a_authentication(void) {
 
     /* Initialize auth */
     a2a_auth_config_t auth_cfg;
-    AGENTOS_MEMSET(&auth_cfg, 0, sizeof(auth_cfg));
+    AGENTRT_MEMSET(&auth_cfg, 0, sizeof(auth_cfg));
     auth_cfg.method = A2A_AUTH_API_KEY;
     strncpy(auth_cfg.shared_secret, "test-api-key-12345", sizeof(auth_cfg.shared_secret) - 1);
     auth_cfg.secret_len = strlen(auth_cfg.shared_secret);
@@ -480,11 +480,11 @@ static void mcp_tool_echo_handler(const char *tool_name, const char *arguments_j
     (void)user_data;
 
     *result_count = 1;
-    *results = (mcp_content_t *)AGENTOS_CALLOC(1, sizeof(mcp_content_t));
+    *results = (mcp_content_t *)AGENTRT_CALLOC(1, sizeof(mcp_content_t));
     if (*results) {
         (*results)[0].type = MCP_CONTENT_TEXT;
         size_t len = snprintf(NULL, 0, "Echo: %s", arguments_json ? arguments_json : "{}");
-        (*results)[0].text = (char *)AGENTOS_MALLOC(len + 1);
+        (*results)[0].text = (char *)AGENTRT_MALLOC(len + 1);
         if ((*results)[0].text) {
             snprintf((*results)[0].text, len + 1, "Echo: %s",
                      arguments_json ? arguments_json : "{}");
@@ -497,8 +497,8 @@ static void mcp_resource_file_handler(const char *uri, char **content, char **mi
                                       void *user_data) {
     (void)uri;
     (void)user_data;
-    *content = AGENTOS_STRDUP("This is a test resource content.");
-    *mime_type = AGENTOS_STRDUP("text/plain");
+    *content = AGENTRT_STRDUP("This is a test resource content.");
+    *mime_type = AGENTRT_STRDUP("text/plain");
 }
 
 static void mcp_prompt_greeting_handler(const char *name, const char *arguments_json,
@@ -508,13 +508,13 @@ static void mcp_prompt_greeting_handler(const char *name, const char *arguments_
     (void)arguments_json;
     (void)user_data;
     *message_count = 1;
-    *messages = (mcp_sampling_message_t *)AGENTOS_CALLOC(1, sizeof(mcp_sampling_message_t));
+    *messages = (mcp_sampling_message_t *)AGENTRT_CALLOC(1, sizeof(mcp_sampling_message_t));
     if (*messages) {
-        (*messages)[0].role = AGENTOS_STRDUP("assistant");
-        (*messages)[0].content = (mcp_content_t *)AGENTOS_CALLOC(1, sizeof(mcp_content_t));
+        (*messages)[0].role = AGENTRT_STRDUP("assistant");
+        (*messages)[0].content = (mcp_content_t *)AGENTRT_CALLOC(1, sizeof(mcp_content_t));
         if ((*messages)[0].content) {
             (*messages)[0].content[0].type = MCP_CONTENT_TEXT;
-            (*messages)[0].content[0].text = AGENTOS_STRDUP("Hello from MCP prompt!");
+            (*messages)[0].content[0].text = AGENTRT_STRDUP("Hello from MCP prompt!");
         }
         (*messages)[0].content_count = 1;
     }
@@ -554,7 +554,7 @@ void test_mcp_tool_registration_and_call(void) {
 
     /* Register echo tool */
     mcp_tool_t tool;
-    AGENTOS_MEMSET(&tool, 0, sizeof(tool));
+    AGENTRT_MEMSET(&tool, 0, sizeof(tool));
     tool.name = "echo";
     tool.description = "Echoes back the input arguments";
     tool.input_schema_json = "{\"type\":\"object\",\"properties\":{\"message\":{\"type\":\"string\"}}}";
@@ -599,7 +599,7 @@ void test_mcp_resource_management(void) {
 
     /* Register a resource */
     mcp_resource_t resource;
-    AGENTOS_MEMSET(&resource, 0, sizeof(resource));
+    AGENTRT_MEMSET(&resource, 0, sizeof(resource));
     resource.uri = "file:///data/config.json";
     resource.name = "Configuration";
     resource.description = "Application configuration";
@@ -624,7 +624,7 @@ void test_mcp_resource_management(void) {
 
     /* Register resource template */
     mcp_resource_template_t tmpl;
-    AGENTOS_MEMSET(&tmpl, 0, sizeof(tmpl));
+    AGENTRT_MEMSET(&tmpl, 0, sizeof(tmpl));
     tmpl.uri_template = "file:///data/{name}.json";
     tmpl.name = "Data Files";
     tmpl.description = "Data files by name";
@@ -651,7 +651,7 @@ void test_mcp_prompt_management(void) {
 
     /* Register a prompt */
     mcp_prompt_t prompt;
-    AGENTOS_MEMSET(&prompt, 0, sizeof(prompt));
+    AGENTRT_MEMSET(&prompt, 0, sizeof(prompt));
     prompt.name = "greeting";
     prompt.description = "Generates a greeting message";
     prompt.arguments_schema_json = "[{\"name\":\"user\",\"type\":\"string\"}]";
@@ -778,7 +778,7 @@ void test_protocol_routing_mixed(void) {
 
     /* Register an A2A agent */
     a2a_agent_card_t agent;
-    AGENTOS_MEMSET(&agent, 0, sizeof(agent));
+    AGENTRT_MEMSET(&agent, 0, sizeof(agent));
     agent.name = "router-agent";
     agent.url = "a2a://router:8080";
     agent.capabilities_json = "routing,multi_protocol";
@@ -788,7 +788,7 @@ void test_protocol_routing_mixed(void) {
 
     /* Register an MCP tool */
     mcp_tool_t tool;
-    AGENTOS_MEMSET(&tool, 0, sizeof(tool));
+    AGENTRT_MEMSET(&tool, 0, sizeof(tool));
     tool.name = "router_tool";
     tool.description = "Protocol routing test tool";
     tool.input_schema_json = "{}";
@@ -842,7 +842,7 @@ void test_protocol_routing_task_lifecycle(void) {
     CHECK(ctx != NULL, "Failed to create A2A context");
 
     a2a_agent_card_t agent;
-    AGENTOS_MEMSET(&agent, 0, sizeof(agent));
+    AGENTRT_MEMSET(&agent, 0, sizeof(agent));
     agent.name = "lifecycle-agent";
     agent.url = "a2a://lifecycle:8080";
     agent.capabilities_json = "task_lifecycle";
@@ -875,7 +875,7 @@ void test_protocol_routing_mcp_methods(void) {
     CHECK(ctx != NULL, "Failed to create MCP context");
 
     mcp_tool_t tool;
-    AGENTOS_MEMSET(&tool, 0, sizeof(tool));
+    AGENTRT_MEMSET(&tool, 0, sizeof(tool));
     tool.name = "routing_test";
     tool.description = "Routing test tool";
     tool.input_schema_json = "{\"type\":\"object\"}";
@@ -919,7 +919,7 @@ void test_multi_agent_orchestrator(void) {
 
     /* Register orchestrator */
     a2a_agent_card_t orchestrator;
-    AGENTOS_MEMSET(&orchestrator, 0, sizeof(orchestrator));
+    AGENTRT_MEMSET(&orchestrator, 0, sizeof(orchestrator));
     orchestrator.name = "orchestrator";
     orchestrator.url = "a2a://orchestrator:8080";
     orchestrator.capabilities_json = "orchestration,planning";
@@ -931,7 +931,7 @@ void test_multi_agent_orchestrator(void) {
     const char *sub_caps[] = {"research,search", "analysis,statistics", "writing,editing"};
     for (int i = 0; i < 3; i++) {
         a2a_agent_card_t sub;
-        AGENTOS_MEMSET(&sub, 0, sizeof(sub));
+        AGENTRT_MEMSET(&sub, 0, sizeof(sub));
         sub.name = (char *)sub_names[i];
         sub.url = "a2a://localhost";
         sub.capabilities_json = (char *)sub_caps[i];
@@ -967,7 +967,7 @@ void test_multi_agent_debate(void) {
 
     /* Register 2 debate agents */
     a2a_agent_card_t pro;
-    AGENTOS_MEMSET(&pro, 0, sizeof(pro));
+    AGENTRT_MEMSET(&pro, 0, sizeof(pro));
     pro.name = "pro-arguer";
     pro.url = "a2a://pro:8080";
     pro.capabilities_json = "debate,argumentation,pro";
@@ -975,7 +975,7 @@ void test_multi_agent_debate(void) {
     a2a_v03_register_agent(ctx, &pro);
 
     a2a_agent_card_t con;
-    AGENTOS_MEMSET(&con, 0, sizeof(con));
+    AGENTRT_MEMSET(&con, 0, sizeof(con));
     con.name = "con-arguer";
     con.url = "a2a://con:8080";
     con.capabilities_json = "debate,argumentation,con";
@@ -984,7 +984,7 @@ void test_multi_agent_debate(void) {
 
     /* Exchange debate messages */
     a2a_message_t pro_msg;
-    AGENTOS_MEMSET(&pro_msg, 0, sizeof(pro_msg));
+    AGENTRT_MEMSET(&pro_msg, 0, sizeof(pro_msg));
     pro_msg.role = "assistant";
     pro_msg.type = A2A_MSG_STRUCTURED;
     pro_msg.content_json = "{\"argument\":\"AI will benefit humanity\",\"position\":\"pro\"}";
@@ -1013,7 +1013,7 @@ void test_multi_agent_hierarchy(void) {
 
     /* Register parent (supervisor) */
     a2a_agent_card_t parent;
-    AGENTOS_MEMSET(&parent, 0, sizeof(parent));
+    AGENTRT_MEMSET(&parent, 0, sizeof(parent));
     parent.name = "supervisor";
     parent.url = "a2a://supervisor:8080";
     parent.capabilities_json = "supervision,delegation";
@@ -1022,7 +1022,7 @@ void test_multi_agent_hierarchy(void) {
 
     /* Register child (worker) */
     a2a_agent_card_t child;
-    AGENTOS_MEMSET(&child, 0, sizeof(child));
+    AGENTRT_MEMSET(&child, 0, sizeof(child));
     child.name = "worker";
     child.url = "a2a://worker:8080";
     child.capabilities_json = "execution,reporting";
@@ -1059,7 +1059,7 @@ void test_multi_agent_market(void) {
     const char *bidder_names[] = {"bidder-alpha", "bidder-beta", "bidder-gamma"};
     for (int i = 0; i < 3; i++) {
         a2a_agent_card_t bidder;
-        AGENTOS_MEMSET(&bidder, 0, sizeof(bidder));
+        AGENTRT_MEMSET(&bidder, 0, sizeof(bidder));
         bidder.name = (char *)bidder_names[i];
         bidder.url = "a2a://localhost";
         bidder.capabilities_json = "bidding,execution";
@@ -1077,7 +1077,7 @@ void test_multi_agent_market(void) {
 
     /* Each bidder negotiates (bids) */
     a2a_negotiation_t bid;
-    AGENTOS_MEMSET(&bid, 0, sizeof(bid));
+    AGENTRT_MEMSET(&bid, 0, sizeof(bid));
     bid.action = A2A_NEGOTIATE_PROPOSE;
     bid.task_id = task->id;
     bid.terms_json = "{\"bid\":150,\"estimated_time_ms\":3000}";
