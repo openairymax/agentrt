@@ -61,12 +61,12 @@ elseif(APPLE)
 endif()
 
 if(MSVC)
-    if(EXISTS "${CMAKE_SOURCE_DIR}/scripts/dev/cmake/windows_preinclude.h")
-        agentrt_print_ok("[MSVC] Force-include file found: scripts/dev/cmake/windows_preinclude.h")
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows_preinclude.h")
+        agentrt_print_ok("[MSVC] Force-include file found: cmake/windows_preinclude.h")
     else()
-        agentrt_print_warn("[MSVC] Force-include file NOT FOUND: scripts/dev/cmake/windows_preinclude.h")
+        agentrt_print_warn("[MSVC] Force-include file NOT FOUND: cmake/windows_preinclude.h")
     endif()
-    add_compile_options(/FI"${CMAKE_SOURCE_DIR}/scripts/dev/cmake/windows_preinclude.h")
+    add_compile_options(/FI"${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows_preinclude.h")
 endif()
 
 # 选项设置
