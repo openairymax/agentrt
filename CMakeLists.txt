@@ -157,7 +157,7 @@ else()
 
     if(AGENTRT_COMPLIANCE_STRICT)
         add_compile_definitions(AGENTRT_COMPLIANCE_STRICT AGENTRT_COMPLIANCE_STRICT)
-        add_compile_options(-include ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/utils/compliance/include/banned_functions.h)
+        add_compile_options("-include" "${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/utils/compliance/include/banned_functions.h")
 
         # 注意：内存子系统实现层的 AGENTRT_COMPLIANCE_IMPL 豁免由各子目录的
         # CMakeLists.txt 中的 set_source_files_properties 设置，因为该属性
