@@ -1,1 +1,0 @@
-"""Contrib strategies package."""
