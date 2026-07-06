@@ -52,8 +52,8 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # 引入统一构建打印系统（彩色 + 时间戳 + 级别）
-# v4.0: 29 仓拆分后 scripts/dev/cmake/ 已移除，agentrt 特有 CMake 模块归位至 agentrt/cmake/
-include(${CMAKE_CURRENT_SOURCE_DIR}/agentrt/cmake/agentrt_print.cmake)
+# v4.0: 29 仓拆分后 scripts/dev/cmake/ 已移除，agentrt 特有 CMake 模块归位至 cmake/
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/agentrt_print.cmake)
 
 # 项目范围选项
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" OFF)
@@ -107,7 +107,7 @@ agentrt_print_info("Sanitizers:       ${ENABLE_SANITIZERS}")
 
 # 关键路径验证：确认核心目录存在
 agentrt_print_info("Path check: Source root = ${CMAKE_CURRENT_SOURCE_DIR}")
-foreach(_dir agentrt agentrt/atoms agentrt/commons agentrt/protocols agentrt/gateway agentrt/daemons agentrt/cupolas agentrt/heapstore)
+foreach(_dir atoms commons protocols gateway daemons cupolas heapstore)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_dir}")
         agentrt_print_ok("  ${_dir}/")
     else()
@@ -157,14 +157,14 @@ else()
 
     if(AGENTRT_COMPLIANCE_STRICT)
         add_compile_definitions(AGENTRT_COMPLIANCE_STRICT AGENTRT_COMPLIANCE_STRICT)
-        add_compile_options("-include" "${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/utils/compliance/include/banned_functions.h")
+        add_compile_options("-include" "${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/compliance/include/banned_functions.h")
 
         # 注意：内存子系统实现层的 AGENTRT_COMPLIANCE_IMPL 豁免由各子目录的
         # CMakeLists.txt 中的 set_source_files_properties 设置，因为该属性
         # 仅在目标创建的目录作用域内生效。
-        # 详见：agentrt/atoms/corekern/CMakeLists.txt
-        #       agentrt/cupolas/CMakeLists.txt
-        #       agentrt/commons/CMakeLists.txt
+        # 详见：atoms/corekern/CMakeLists.txt
+        #       cupolas/CMakeLists.txt
+        #       commons/CMakeLists.txt
     endif()
 
     # 链接器安全选项
@@ -462,35 +462,35 @@ if(AGENTRT_BUILD_ALL)
 
     # 全局include路径（确保所有模块都能找到commons的头文件）
     include_directories(
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/utils/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/utils/compat/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/utils/memory/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/utils/string/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/utils/logging/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/utils/error/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/platform/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/atoms/corekern/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/protocols/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/daemons/common/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/agentrt/gateway/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/compat/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/memory/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/string/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/logging/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/error/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/platform/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/atoms/corekern/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/protocols/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/daemons/common/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/gateway/src
     )
 
     # 验证全局 include 路径是否存在
     agentrt_print_info("Verifying global include directories...")
     set(_global_inc_dirs
-        agentrt/commons
-        agentrt/commons/utils/include
-        agentrt/commons/utils/compat/include
-        agentrt/commons/utils/memory/include
-        agentrt/commons/utils/string/include
-        agentrt/commons/utils/logging/include
-        agentrt/commons/utils/error/include
-        agentrt/commons/platform/include
-        agentrt/atoms/corekern/include
-        agentrt/protocols/include
-        agentrt/daemons/common/include
-        agentrt/gateway/src
+        commons
+        commons/utils/include
+        commons/utils/compat/include
+        commons/utils/memory/include
+        commons/utils/string/include
+        commons/utils/logging/include
+        commons/utils/error/include
+        commons/platform/include
+        atoms/corekern/include
+        protocols/include
+        daemons/common/include
+        gateway/src
     )
     foreach(_inc ${_global_inc_dirs})
         if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_inc}")
@@ -518,12 +518,139 @@ if(AGENTRT_BUILD_ALL)
         endif()
     endforeach()
 
-    # 主要AgentRT组件
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/agentrt")
-        add_subdirectory(agentrt)
-    else()
-        agentrt_print_error("agentrt directory not found, core components will not be built")
+    # 主要AgentRT组件（原 agentrt/agentrt/CMakeLists.txt，取消嵌套后合并至此）
+    agentrt_print_info("Configuring AgentRT core components...")
+
+    # 从根 CMakeLists.txt 传播依赖可用性标志
+    if(AGENTRT_HAS_CJSON)
+        set(AGENTRT_HAS_CJSON TRUE CACHE BOOL "cJSON available for agentrt")
     endif()
+    if(AGENTRT_HAS_CURL)
+        set(AGENTRT_HAS_CURL TRUE CACHE BOOL "CURL available for agentrt")
+    endif()
+    if(AGENTRT_HAS_YAML)
+        set(AGENTRT_HAS_YAML TRUE CACHE BOOL "libyaml available for agentrt")
+    endif()
+    if(AGENTRT_HAS_OPENSSL)
+        set(AGENTRT_HAS_OPENSSL TRUE CACHE BOOL "OpenSSL available for agentrt")
+    endif()
+    if(AGENTRT_HAS_MICROHTTPD)
+        set(AGENTRT_HAS_MICROHTTPD TRUE CACHE BOOL "libmicrohttpd available for agentrt")
+    endif()
+    if(AGENTRT_HAS_LIBWEBSOCKETS)
+        set(AGENTRT_HAS_LIBWEBSOCKETS TRUE CACHE BOOL "libwebsockets available for agentrt")
+    endif()
+
+    # 子模块启用状态汇总
+    agentrt_print_info("[MODULE] Submodule build status:")
+    agentrt_print_info("[MODULE]   atoms:    ${BUILD_ATOMS}")
+    agentrt_print_info("[MODULE]   commons:  ${BUILD_COMMONS}")
+    agentrt_print_info("[MODULE]   cupolas:  ${BUILD_CUPOLAS}")
+    agentrt_print_info("[MODULE]   daemon:   ${BUILD_DAEMON}")
+    agentrt_print_info("[MODULE]   gateway:  ${BUILD_GATEWAY}")
+    agentrt_print_info("[MODULE]   heapstore: ${BUILD_HEAPSTORE}")
+    agentrt_print_info("[MODULE]   toolkit:  ${BUILD_TOOLKIT}")
+    agentrt_print_info("[MODULE]   Memory backend: ${AGENTRT_MEMORY_BACKEND}")
+    agentrt_print_info("[MODULE]   With MemoryRovol: ${AGENTRT_WITH_MEMORYROVOL}")
+
+    # 全局特性测试宏定义 - 必须在所有其他配置之前
+    if(UNIX AND NOT APPLE)
+        add_compile_definitions(
+            _POSIX_C_SOURCE=200809L
+            _XOPEN_SOURCE=700
+            _GNU_SOURCE
+        )
+        agentrt_print_ok("POSIX feature test macros enabled for Linux")
+    elseif(APPLE)
+        add_compile_definitions(
+            _POSIX_C_SOURCE=200112L
+            _DARWIN_C_SOURCE
+        )
+        agentrt_print_ok("POSIX feature test macros enabled for macOS")
+    endif()
+
+    if(MSVC)
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows_preinclude.h")
+            agentrt_print_ok("[MSVC] Force-include file found: cmake/windows_preinclude.h")
+        else()
+            agentrt_print_warn("[MSVC] Force-include file NOT FOUND: cmake/windows_preinclude.h")
+        endif()
+        add_compile_options(/FI"${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows_preinclude.h")
+    endif()
+
+    # 模块选项设置
+    option(BUILD_ATOMS "Build atoms module (core kernel components)" ON)
+    option(BUILD_COMMONS "Build commons module (common utilities)" ON)
+    option(BUILD_CUPOLAS "Build cupolas module (security framework)" ON)
+    option(BUILD_DAEMON "Build daemon modules (system services)" ON)
+    option(BUILD_GATEWAY "Build gateway module (API gateway)" ON)
+    option(BUILD_HEAPSTORE "Build heapstore module (persistent storage)" ON)
+    option(BUILD_TOOLKIT "Build toolkit modules (language SDKs)" OFF)
+
+    # 包含子目录（构建顺序：commons 优先于 atoms）
+    if(BUILD_COMMONS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/commons/CMakeLists.txt")
+        add_subdirectory(commons)
+    else()
+        agentrt_print_warn("commons module not found or disabled")
+    endif()
+
+    if(BUILD_ATOMS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/atoms/CMakeLists.txt")
+        add_subdirectory(atoms)
+    else()
+        agentrt_print_warn("atoms module not found or disabled")
+    endif()
+
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/protocols/CMakeLists.txt")
+        add_subdirectory(protocols)
+    endif()
+
+    if(BUILD_CUPOLAS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cupolas/CMakeLists.txt")
+        add_subdirectory(cupolas)
+    else()
+        agentrt_print_warn("cupolas module not found or disabled")
+    endif()
+
+    if(BUILD_DAEMON AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/daemons/CMakeLists.txt")
+        add_subdirectory(daemons)
+    else()
+        agentrt_print_warn("daemons module not found or disabled")
+    endif()
+
+    if(BUILD_GATEWAY AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/gateway/CMakeLists.txt")
+        add_subdirectory(gateway)
+    else()
+        agentrt_print_warn("gateway module not found or disabled")
+    endif()
+
+    if(BUILD_HEAPSTORE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/heapstore/CMakeLists.txt")
+        add_subdirectory(heapstore)
+    else()
+        agentrt_print_warn("heapstore module not found or disabled")
+    endif()
+
+    # toolkit 包含多种语言 SDK，需要特殊处理
+    if(BUILD_TOOLKIT)
+        agentrt_print_info("Toolkit modules require additional configuration for each language SDK")
+    endif()
+
+    # 创建聚合目标
+    add_custom_target(agentrt-all
+        DEPENDS
+            $<IF:$<TARGET_EXISTS:agentrt_atoms>,agentrt_atoms,>
+            $<IF:$<TARGET_EXISTS:agentrt_commons>,agentrt_commons,>
+            $<IF:$<TARGET_EXISTS:agentrt_cupolas>,agentrt_cupolas,>
+        COMMENT "Build all AgentRT core components"
+    )
+
+    # 安装头文件
+    install(DIRECTORY atoms/corekern/include/ DESTINATION include/agentrt/corekern)
+    install(DIRECTORY atoms/coreloopthree/include/ DESTINATION include/agentrt/coreloopthree)
+    install(DIRECTORY atoms/syscall/include/ DESTINATION include/agentrt/syscall)
+    install(DIRECTORY commons/utils/memory/include/ DESTINATION include/agentrt/commons/memory)
+    install(DIRECTORY commons/utils/string/include/ DESTINATION include/agentrt/commons/string)
+    install(DIRECTORY commons/utils/logging/include/ DESTINATION include/agentrt/commons/logging)
+
+    agentrt_print_ok("AgentRT core components configuration complete")
 
     # 测试组件（可选）
     if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
@@ -578,7 +705,7 @@ include(CPack)
 # 这里我们通过 configure_file 生成一个 ctest 包装脚本
 if(BUILD_TESTS AND ENABLE_SANITIZERS AND NOT MSVC)
     configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/agentrt/cmake/ctest_wrapper.sh.in"
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ctest_wrapper.sh.in"
         "${CMAKE_BINARY_DIR}/run_tests.sh"
         @ONLY
     )
@@ -606,10 +733,10 @@ if(MSVC AND CMAKE_C_STANDARD EQUAL 11)
     agentrt_print_warn("MSVC may have limited C11 support. Consider Visual Studio 2019+.")
 endif()
 
-if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/agentrt/atoms/CMakeLists.txt")
-    agentrt_print_warn("agentrt/atoms/CMakeLists.txt not found - atoms module may not build correctly")
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/atoms/CMakeLists.txt")
+    agentrt_print_warn("atoms/CMakeLists.txt not found - atoms module may not build correctly")
 endif()
 
-if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/agentrt/commons/CMakeLists.txt")
-    agentrt_print_warn("agentrt/commons/CMakeLists.txt not found - commons module may not build correctly")
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/commons/CMakeLists.txt")
+    agentrt_print_warn("commons/CMakeLists.txt not found - commons module may not build correctly")
 endif()
