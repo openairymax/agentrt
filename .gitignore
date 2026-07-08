@@ -22,7 +22,7 @@
 # - 更新项目模块结构说明
 #
 # 项目模块结构（2026-06-15 V12.0 当前）：
-# 核心源码 (agentos/) — 仅含源码，构建产物严禁在此
+# 核心源码 (agentrt/) — 仅含源码，构建产物严禁在此
 #   - atoms/       : 微内核原子组件层（corekern/coreloopthree/memory/syscall/taskflow/frameworks）
 #   - commons/     : 统一基础库（平台抽象/日志/配置/内存/同步等 20+ 子模块）
 #   - cupolas/     : 安全穹顶层（防护/清洗/权限/审计/守卫框架）
@@ -123,9 +123,9 @@ build_ci*/
 !scripts/dev/build/
 **/_build/
 **/build-test/
-agentos/build/
-agentos/*/build/
-agentos/*/*/build/
+agentrt/build/
+agentrt/*/build/
+agentrt/*/*/build/
 
 # IDE构建目录
 cmake-build*/
@@ -139,8 +139,8 @@ AgentRT-build-*/
 ci-artifacts/
 
 # CMake 构建输出目录（库和可执行文件）
-agentos/lib/
-agentos/bin/
+agentrt/lib/
+agentrt/bin/
 
 # 编译器数据库（IDE 工具生成）
 compile_commands.json
@@ -382,7 +382,7 @@ bld/
 *.log
 logs/
 *.logs
-agentos/heapstore/logs/
+agentrt/heapstore/logs/
 
 # 数据库文件
 *.db
@@ -392,14 +392,14 @@ agentos/heapstore/logs/
 *.sqlite3
 *.db.sqlite
 *.db-journal
-agentos/heapstore/registry/*.db
-agentos/heapstore/registry/*.sqlite
-agentos/heapstore/db/
+agentrt/heapstore/registry/*.db
+agentrt/heapstore/registry/*.sqlite
+agentrt/heapstore/db/
 registry.db
 registry.sqlite
 
 # 追踪和性能数据
-agentos/heapstore/traces/
+agentrt/heapstore/traces/
 *.trace
 *.spans
 *.prof
@@ -417,44 +417,44 @@ temp/
 *.orig
 
 # =============================================================================
-# agentos/heapstore/ 运行时目录（运行时生成，仅保留空路径）
+# agentrt/heapstore/ 运行时目录（运行时生成，仅保留空路径）
 # =============================================================================
 
 # kernel/ 子目录（排除内容，保留 .gitkeep）
-agentos/heapstore/kernel/ipc/binder/*
-!agentos/heapstore/kernel/ipc/binder/.gitkeep
-agentos/heapstore/kernel/ipc/channels/*
-!agentos/heapstore/kernel/ipc/channels/.gitkeep
-agentos/heapstore/kernel/memory/index/*
-!agentos/heapstore/kernel/memory/index/.gitkeep
-agentos/heapstore/kernel/memory/meta/*
-!agentos/heapstore/kernel/memory/meta/.gitkeep
-agentos/heapstore/kernel/memory/raw/*
-!agentos/heapstore/kernel/memory/raw/.gitkeep
-agentos/heapstore/kernel/memory/patterns/*
-!agentos/heapstore/kernel/memory/patterns/.gitkeep
+agentrt/heapstore/kernel/ipc/binder/*
+!agentrt/heapstore/kernel/ipc/binder/.gitkeep
+agentrt/heapstore/kernel/ipc/channels/*
+!agentrt/heapstore/kernel/ipc/channels/.gitkeep
+agentrt/heapstore/kernel/memory/index/*
+!agentrt/heapstore/kernel/memory/index/.gitkeep
+agentrt/heapstore/kernel/memory/meta/*
+!agentrt/heapstore/kernel/memory/meta/.gitkeep
+agentrt/heapstore/kernel/memory/raw/*
+!agentrt/heapstore/kernel/memory/raw/.gitkeep
+agentrt/heapstore/kernel/memory/patterns/*
+!agentrt/heapstore/kernel/memory/patterns/.gitkeep
 
 # services/ 子目录（排除内容，保留 .gitkeep）
-agentos/heapstore/services/llm_d/*
-!agentos/heapstore/services/llm_d/.gitkeep
-agentos/heapstore/services/market_d/*
-!agentos/heapstore/services/market_d/.gitkeep
-agentos/heapstore/services/tool_d/*
-!agentos/heapstore/services/tool_d/.gitkeep
+agentrt/heapstore/services/llm_d/*
+!agentrt/heapstore/services/llm_d/.gitkeep
+agentrt/heapstore/services/market_d/*
+!agentrt/heapstore/services/market_d/.gitkeep
+agentrt/heapstore/services/tool_d/*
+!agentrt/heapstore/services/tool_d/.gitkeep
 
 # models/ 子目录（排除内容，保留 .gitkeep）
-agentos/heapstore/models/*
-!agentos/heapstore/models/.gitkeep
+agentrt/heapstore/models/*
+!agentrt/heapstore/models/.gitkeep
 
 # 其他运行时目录
-agentos/heapstore/logs/*
-agentos/heapstore/traces/*
-agentos/heapstore/registry/*
-agentos/heapstore/db/*
-!agentos/heapstore/logs/.gitkeep
-!agentos/heapstore/traces/.gitkeep
-!agentos/heapstore/registry/.gitkeep
-!agentos/heapstore/db/.gitkeep
+agentrt/heapstore/logs/*
+agentrt/heapstore/traces/*
+agentrt/heapstore/registry/*
+agentrt/heapstore/db/*
+!agentrt/heapstore/logs/.gitkeep
+!agentrt/heapstore/traces/.gitkeep
+!agentrt/heapstore/registry/.gitkeep
+!agentrt/heapstore/db/.gitkeep
 
 # =============================================================================
 # 测试相关（测试结果不追踪，测试代码保留）
@@ -478,9 +478,9 @@ tests/fuzz/seeds/
 tests/fuzz/hangs/
 
 # MemoryRovol 运行时记忆数据（测试或运行时生成的 .bin 记录文件）
-**/agentos/memory/
+**/agentrt/memory/
 # CoreLoopThree 检查点数据（运行时生成）
-**/agentos/checkpoints/
+**/agentrt/checkpoints/
 
 # 基准测试结果
 tests/benchmarks/**/results/
@@ -554,18 +554,18 @@ Carthage/Build/
 # =============================================================================
 
 # FAISS 索引
-agentos/heapstore/models/*.faiss
-agentos/heapstore/models/*.index
-agentos/heapstore/models/*.pkl
-agentos/heapstore/models/*.pickle
+agentrt/heapstore/models/*.faiss
+agentrt/heapstore/models/*.index
+agentrt/heapstore/models/*.pkl
+agentrt/heapstore/models/*.pickle
 
 # 模型权重
-agentos/heapstore/model/
-agentos/heapstore/models/*.bin
-agentos/heapstore/models/*.pth
-agentos/heapstore/models/*.h5
-agentos/heapstore/models/*.pt
-agentos/heapstore/models/*.onnx
+agentrt/heapstore/model/
+agentrt/heapstore/models/*.bin
+agentrt/heapstore/models/*.pth
+agentrt/heapstore/models/*.h5
+agentrt/heapstore/models/*.pt
+agentrt/heapstore/models/*.onnx
 *.tflite
 
 # 向量和嵌入
@@ -656,7 +656,7 @@ override.local
 docs/local/
 docs/private/
 wiki/
-agentos/heapstore/reports/
+agentrt/heapstore/reports/
 reports/
 test_reports/
 coverage_reports/
@@ -792,19 +792,19 @@ coverage_reports/
 !docker-compose*.yaml
 !ecosystem/openlab/Dockerfile
 !deploy/docker/Dockerfile*
-!agentos/daemon/Dockerfile.ci
+!agentrt/daemon/Dockerfile.ci
 
 # =============================================================================
 # CMake 构建配置
 # =============================================================================
 
-!agentos/atoms/**/CMakeLists.txt
-!agentos/commons/**/CMakeLists.txt
-!agentos/commons/tests/CMakeLists.txt
-!agentos/cupolas/CMakeLists.txt
-!agentos/daemon/**/CMakeLists.txt
-!agentos/gateway/CMakeLists.txt
-!agentos/heapstore/**/CMakeLists.txt
+!agentrt/atoms/**/CMakeLists.txt
+!agentrt/commons/**/CMakeLists.txt
+!agentrt/commons/tests/CMakeLists.txt
+!agentrt/cupolas/CMakeLists.txt
+!agentrt/daemon/**/CMakeLists.txt
+!agentrt/gateway/CMakeLists.txt
+!agentrt/heapstore/**/CMakeLists.txt
 !tests/unit/**/CMakeLists.txt
 
 # 根目录项目配置
@@ -851,7 +851,7 @@ coverage_reports/
 
 !ecosystem/openlab/pyproject.toml
 !ecosystem/openlab/requirements.txt
-!agentos/commons/utils/types/.gitkeep
+!agentrt/commons/utils/types/.gitkeep
 !LICENSE
 !NOTICE
 !.github/CODEOWNERS
@@ -903,13 +903,13 @@ coverage_reports/
 #
 # V12.0.0 维护说明：
 # 1. scripts/ 子目录变更时需同步更新 scripts/ 肯定规则节
-# 2. agentos/ 新增模块时需在 CMake 配置节添加否定规则
+# 2. agentrt/ 新增模块时需在 CMake 配置节添加否定规则
 # 3. 根目录新增配置文件时需在根目录配置节添加否定规则
 # 4. 添加新规则时，必须验证不会误排除项目必需文件
 # 5. 使用 git check-ignore -v <file> 验证规则生效
 # 6. 定期运行 git status --porcelain 检查是否有意外追踪的文件
 # 7. 项目必需文件必须在肯定规则节有明确的 ! 前缀规则
-# 8. agentos/ 路径仅含源码，构建产物输出至 AgentRT-build/
+# 8. agentrt/ 路径仅含源码，构建产物输出至 AgentRT-build/
 # 9. ecosystem/ 包含 openlab/manager/prompts/hooks/skills，配置文件需保留
 # 10. sdk/ 包含四语言 SDK，各语言构建产物需排除但配置文件需保留
 # 11. contracts/ 本地开发辅助文件，不追踪（.h/.c 合约草稿）
