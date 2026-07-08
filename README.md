@@ -16,7 +16,7 @@
 
 **AgentRT** (full name: **AirymaxAgentRT**, *AI Agent Runtime Platform Engineering*) is the runtime engineering layer of the Airymax platform — an OS-grade runtime substrate for AI Agent teams, positioned analogously to the JVM for languages and containerd for containers. Where the JVM provides a virtual machine for bytecode and containerd provides a runtime for containers, AgentRT provides the platform engineering mechanisms for orchestrating, scheduling, isolating, and observing teams of AI agents. The **0.1.1** release is the sole foundational version (奠基版本) on which all subsequent Airymax releases are built.
 
-This repository is a **management repo** (git superproject). It aggregates **7 leaf repositories** as git submodules and inherits the **complete git history** of the original AgentRT monorepo. The repository URL retains its historical name `git@atomgit.com:openairymax/agentrt.git` to preserve commit continuity. AgentRT exposes the OS-level mechanisms required to run agent teams at scale: microkernel primitives, cognitive loops, memory stratification, security domes, IPC protocols, gateway services, and long-running daemon processes.
+This repository is a **management repo** (git superproject). It aggregates **7 leaf repositories** as git submodules and inherits the **complete git history** of the original AgentRT monorepo. The repository URL retains its historical name `git@atomgit.com:openairymax/agentrt.git` to preserve commit continuity. AgentRT exposes the OS-level mechanisms required to run agent teams at scale: micro-core primitives, cognitive loops, memory stratification, security domes, IPC protocols, gateway services, and long-running daemon processes.
 
 AgentRT is **one of five management repositories** under the `airymaxhub` umbrella (the other four being `sdk`, `ecosystem`, `products`, and `agentrt-linux`). The Airymax workspace is partitioned into 38 repositories in total: 1 umbrella repo + 5 management repos + 29 leaf repos + 3 top-level repos. Each leaf repo is independently buildable and version-controlled, while the management repo pins them together via git submodules to produce a coherent, reproducible runtime platform.
 
@@ -25,7 +25,7 @@ AgentRT is **one of five management repositories** under the `airymaxhub` umbrel
 ```
 airymaxhub/                     ← Umbrella repo (git superproject root)
 ├── agentrt/                    ← THIS REPO (management repo)
-│   ├── atoms/                  ← submodule: microkernel primitives (A-class)
+│   ├── atoms/                  ← submodule: micro-core primitives (A-class)
 │   ├── commons/                ← submodule: shared foundation utilities (A-class)
 │   ├── cupolas/                ← submodule: safety dome (B-class)
 │   ├── heapstore/              ← submodule: heap-backed storage (A-class)
@@ -49,7 +49,7 @@ airymaxhub/                     ← Umbrella repo (git superproject root)
 
 | Module | Repository URL | Class | Description |
 |--------|---------------|-------|-------------|
-| **atoms** | `git@atomgit.com:openairymax/atoms.git` | A | Microkernel primitives: `corekern`, `coreloopthree`, `syscall`, `taskflow`, `frameworks`, `memory` |
+| **atoms** | `git@atomgit.com:openairymax/atoms.git` | A | Micro-core primitives: `corekern`, `coreloopthree`, `syscall`, `taskflow`, `frameworks`, `memory` |
 | **commons** | `git@atomgit.com:openairymax/commons.git` | A | Shared foundation library: 24+ util modules (logging, sync, memory, string, ipc, etc.) |
 | **cupolas** | `git@atomgit.com:openairymax/cupolas.git` | B | Safety dome: 4-layer inherent security (sandbox, RBAC, sanitization, audit) |
 | **heapstore** | `git@atomgit.com:openairymax/heapstore.git` | A | Heap-backed runtime data persistence |

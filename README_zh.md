@@ -16,7 +16,7 @@
 
 **AgentRT**（全称：**极境智能体运行底座平台工程**，英文 **AirymaxAgentRT**，*AI Agent Runtime Platform Engineering*）是 Airymax 平台的运行时工程层 — 面向 AI 智能体团队的操作系统级运行底座，定位对标 JVM 之于编程语言、containerd 之于容器。JVM 为字节码提供虚拟机，containerd 为容器提供运行时，AgentRT 则为智能体团队提供编排、调度、隔离与观测的平台工程机制。**0.1.1** 是唯一奠基版本，所有后续 Airymax 发行版均在此基础上构建。
 
-本仓库是**管理仓**（git superproject），以 git submodule 形式聚合 **7 个叶子仓**，并继承原 AgentRT 单体仓库的**全部 git 历史**。仓库 URL 沿用历史名称 `git@atomgit.com:openairymax/agentos.git` 以保持提交连续性。AgentRT 暴露大规模运行智能体团队所需的操作系统级机制：微内核原语、认知循环、记忆分层、安全穹顶、IPC 协议、网关服务与长驻守护进程。
+本仓库是**管理仓**（git superproject），以 git submodule 形式聚合 **7 个叶子仓**，并继承原 AgentRT 单体仓库的**全部 git 历史**。仓库 URL 沿用历史名称 `git@atomgit.com:openairymax/agentos.git` 以保持提交连续性。AgentRT 暴露大规模运行智能体团队所需的操作系统级机制：微核心原语、认知循环、记忆分层、安全穹顶、IPC 协议、网关服务与长驻守护进程。
 
 AgentRT 是 `airymaxhub` 伞仓下**五个管理仓之一**（其余四个为 `sdk`、`ecosystem`、`products`、`agentrt-linux`）。Airymax 工作区共拆分为 38 个仓库：1 个伞仓 + 5 个管理仓 + 29 个叶子仓 + 3 个顶层仓。每个叶子仓可独立构建与版本控制，管理仓通过 git submodule 将它们钉合在一起，产出连贯、可复现的运行时平台。
 
@@ -25,7 +25,7 @@ AgentRT 是 `airymaxhub` 伞仓下**五个管理仓之一**（其余四个为 `s
 ```
 airymaxhub/                     ← 伞仓（git superproject 根）
 ├── agentrt/                    ← 本仓库（管理仓）
-│   ├── atoms/                  ← submodule：微内核原语（A 类）
+│   ├── atoms/                  ← submodule：微核心原语（A 类）
 │   ├── commons/                ← submodule：共享基础工具库（A 类）
 │   ├── cupolas/                ← submodule：安全穹顶（B 类）
 │   ├── heapstore/              ← submodule：堆式存储（A 类）
@@ -49,7 +49,7 @@ airymaxhub/                     ← 伞仓（git superproject 根）
 
 | 模块 | 仓库 URL | 分类 | 说明 |
 |------|---------|------|------|
-| **atoms** | `git@atomgit.com:openairymax/atoms.git` | A | 微内核原语：`corekern`、`coreloopthree`、`syscall`、`taskflow`、`frameworks`、`memory` |
+| **atoms** | `git@atomgit.com:openairymax/atoms.git` | A | 微核心原语：`corekern`、`coreloopthree`、`syscall`、`taskflow`、`frameworks`、`memory` |
 | **commons** | `git@atomgit.com:openairymax/commons.git` | A | 共享基础库：24+ 工具模块（logging、sync、memory、string、ipc 等） |
 | **cupolas** | `git@atomgit.com:openairymax/cupolas.git` | B | 安全穹顶：四层内生安全（沙箱、RBAC、净化、审计） |
 | **heapstore** | `git@atomgit.com:openairymax/heapstore.git` | A | 堆式运行时数据持久化 |
