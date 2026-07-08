@@ -5,7 +5,7 @@
 
 **Language:** English | [简体中文](README_zh.md)
 
-[![Version](https://img.shields.io/badge/version-0.1.1-5a6b7e)](https://atomgit.com/openairymax/agentos)
+[![Version](https://img.shields.io/badge/version-0.1.1-5a6b7e)](https://atomgit.com/openairymax/agentrt)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=c%2B%2B&logoColor=white)](https://isocpp.org)
@@ -16,7 +16,7 @@
 
 **AgentRT** (full name: **AirymaxAgentRT**, *AI Agent Runtime Platform Engineering*) is the runtime engineering layer of the Airymax platform — an OS-grade runtime substrate for AI Agent teams, positioned analogously to the JVM for languages and containerd for containers. Where the JVM provides a virtual machine for bytecode and containerd provides a runtime for containers, AgentRT provides the platform engineering mechanisms for orchestrating, scheduling, isolating, and observing teams of AI agents. The **0.1.1** release is the sole foundational version (奠基版本) on which all subsequent Airymax releases are built.
 
-This repository is a **management repo** (git superproject). It aggregates **7 leaf repositories** as git submodules and inherits the **complete git history** of the original AgentRT monorepo. The repository URL retains its historical name `git@atomgit.com:openairymax/agentos.git` to preserve commit continuity. AgentRT exposes the OS-level mechanisms required to run agent teams at scale: microkernel primitives, cognitive loops, memory stratification, security domes, IPC protocols, gateway services, and long-running daemon processes.
+This repository is a **management repo** (git superproject). It aggregates **7 leaf repositories** as git submodules and inherits the **complete git history** of the original AgentRT monorepo. The repository URL retains its historical name `git@atomgit.com:openairymax/agentrt.git` to preserve commit continuity. AgentRT exposes the OS-level mechanisms required to run agent teams at scale: microkernel primitives, cognitive loops, memory stratification, security domes, IPC protocols, gateway services, and long-running daemon processes.
 
 AgentRT is **one of five management repositories** under the `airymaxhub` umbrella (the other four being `sdk`, `ecosystem`, `products`, and `agentrt-linux`). The Airymax workspace is partitioned into 38 repositories in total: 1 umbrella repo + 5 management repos + 29 leaf repos + 3 top-level repos. Each leaf repo is independently buildable and version-controlled, while the management repo pins them together via git submodules to produce a coherent, reproducible runtime platform.
 
