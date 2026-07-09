@@ -678,6 +678,15 @@ if(AGENTRT_BUILD_ALL)
     if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
         add_subdirectory(tests)
     endif()
+
+    # 集成测试：当从伞仓构建时，包含 devtools 中的连接线集成测试（12 条 C-L 测试 + 端到端测试）
+    # Task #38: 将 devtools/tests/integration/c/ 的 12 个连接线测试纳入构建系统
+    if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../devtools/tests/integration/c/CMakeLists.txt")
+        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../devtools/tests/integration/c integration_c_tests)
+        agentrt_print_ok("Integration tests (devtools/tests/integration/c) included — 12 C-L link tests + E2E")
+    else()
+        agentrt_print_info("Integration tests skipped: devtools/tests/integration/c not found (standalone agentrt build)")
+    endif()
 endif()
 
 # 安装配置
