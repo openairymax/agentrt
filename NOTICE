@@ -11,7 +11,7 @@ The following core architectures, technologies and modules are original
 intellectual property of SPHARX Ltd., protected by copyright law and
 relevant international treaties:
 
-- MicroCoreRT (微核心): Abstracted Microkernel Component Layer
+- MicroCoreRT (微核心): Abstracted Micro-core Component Layer
 - AgentsIPC: Inter-Process Communication framework
 - CoreLoopThree (三层认知循环): Cognition-Action-Memory three-in-one
   core architecture
