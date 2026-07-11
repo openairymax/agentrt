@@ -53,7 +53,7 @@ endif()
 
 # 引入统一构建打印系统（彩色 + 时间戳 + 级别）
 # v4.0: cmake 模块统一归位至伞仓直属 cmake/（消除 agentrt/cmake 与伞仓 cmake 命名冲突）
-include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/agentrt_print.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/airy_print.cmake)
 
 # 项目范围选项
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" OFF)
@@ -61,15 +61,15 @@ option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(BUILD_TESTS "Build unit tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
 option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" ON)
-option(AGENTRT_BUILD_ALL "Build all AgentRT components" ON)
-option(AGENTRT_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" OFF)
-# 兼容别名：允许使用 AGENTRT_WITH_MEMORYROVOL（旧名）
-if(DEFINED AGENTRT_WITH_MEMORYROVOL AND NOT DEFINED AGENTRT_WITH_MEMORYROVOL)
-    set(AGENTRT_WITH_MEMORYROVOL ${AGENTRT_WITH_MEMORYROVOL})
+option(AIRY_BUILD_ALL "Build all AgentRT components" ON)
+option(AIRY_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" OFF)
+# 兼容别名：允许使用 AIRY_WITH_MEMORYROVOL（旧名）
+if(DEFINED AIRY_WITH_MEMORYROVOL AND NOT DEFINED AIRY_WITH_MEMORYROVOL)
+    set(AIRY_WITH_MEMORYROVOL ${AIRY_WITH_MEMORYROVOL})
 endif()
-option(AGENTRT_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe functions)" ON)
-set(AGENTRT_MEMORY_BACKEND "builtin" CACHE STRING "Memory backend (builtin|memoryrovol)")
-set(AGENTRT_DOCKER_BUILD OFF CACHE BOOL "Docker build mode")
+option(AIRY_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe functions)" ON)
+set(AIRY_MEMORY_BACKEND "builtin" CACHE STRING "Memory backend (builtin|memoryrovol)")
+set(AIRY_DOCKER_BUILD OFF CACHE BOOL "Docker build mode")
 
 # CTest必须在顶级启用（在任何add_subdirectory之前）
 # R-09-SEC: Strict compliance mode and tests are now independent.
@@ -77,41 +77,41 @@ set(AGENTRT_DOCKER_BUILD OFF CACHE BOOL "Docker build mode")
 # Previously, strict mode forced BUILD_TESTS=OFF, which prevented test execution
 # in the default configuration. This was a design error (BAN-181 compliance fix).
 if(BUILD_TESTS)
-    if(AGENTRT_COMPLIANCE_STRICT)
-        agentrt_print_ok("Tests enabled with strict compliance (AGENTRT_COMPLIANCE_STRICT=ON)")
+    if(AIRY_COMPLIANCE_STRICT)
+        airy_print_ok("Tests enabled with strict compliance (AIRY_COMPLIANCE_STRICT=ON)")
     endif()
 endif()
 if(BUILD_TESTS)
     enable_testing()
-    agentrt_print_info("CTest enabled at root level (before subdirectories)")
+    airy_print_info("CTest enabled at root level (before subdirectories)")
     # 为所有测试设置 sanitizer 环境变量（set(ENV{}) 不会传递给 ctest）
     if(ENABLE_SANITIZERS AND NOT MSVC)
-        set(AGENTRT_ASAN_OPTIONS "halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1:allocator_may_return_null=1")
-        set(AGENTRT_LSAN_OPTIONS "suppressions=${CMAKE_SOURCE_DIR}/../ecosystem/manager/sanitizer/lsan-suppressions:print_suppressions=0")
-        set(AGENTRT_UBSAN_OPTIONS "halt_on_error=1:print_stacktrace=1")
+        set(AIRY_ASAN_OPTIONS "halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1:allocator_may_return_null=1")
+        set(AIRY_LSAN_OPTIONS "suppressions=${CMAKE_SOURCE_DIR}/../ecosystem/manager/sanitizer/lsan-suppressions:print_suppressions=0")
+        set(AIRY_UBSAN_OPTIONS "halt_on_error=1:print_stacktrace=1")
     endif()
 endif()
 
 # 输出构建配置信息
-agentrt_print_section("AgentRT v${PROJECT_VERSION} Build Configuration")
-agentrt_print_info("Build type:       ${CMAKE_BUILD_TYPE}")
-agentrt_print_info("Platform:         ${CMAKE_SYSTEM_NAME} (${CMAKE_SYSTEM_PROCESSOR})")
-agentrt_print_info("Compiler:         ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
-agentrt_print_info("Shared libs:      ${BUILD_SHARED_LIBS}")
-agentrt_print_info("Build tests:      ${BUILD_TESTS}")
-agentrt_print_info("Compliance strict:${AGENTRT_COMPLIANCE_STRICT}")
-agentrt_print_info("Memory backend:   ${AGENTRT_MEMORY_BACKEND}")
-agentrt_print_info("MemoryRovol Pro:  ${AGENTRT_WITH_MEMORYROVOL}")
-agentrt_print_info("Docker build:     ${AGENTRT_DOCKER_BUILD}")
-agentrt_print_info("Sanitizers:       ${ENABLE_SANITIZERS}")
+airy_print_section("AgentRT v${PROJECT_VERSION} Build Configuration")
+airy_print_info("Build type:       ${CMAKE_BUILD_TYPE}")
+airy_print_info("Platform:         ${CMAKE_SYSTEM_NAME} (${CMAKE_SYSTEM_PROCESSOR})")
+airy_print_info("Compiler:         ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
+airy_print_info("Shared libs:      ${BUILD_SHARED_LIBS}")
+airy_print_info("Build tests:      ${BUILD_TESTS}")
+airy_print_info("Compliance strict:${AIRY_COMPLIANCE_STRICT}")
+airy_print_info("Memory backend:   ${AIRY_MEMORY_BACKEND}")
+airy_print_info("MemoryRovol Pro:  ${AIRY_WITH_MEMORYROVOL}")
+airy_print_info("Docker build:     ${AIRY_DOCKER_BUILD}")
+airy_print_info("Sanitizers:       ${ENABLE_SANITIZERS}")
 
 # 关键路径验证：确认核心目录存在
-agentrt_print_info("Path check: Source root = ${CMAKE_CURRENT_SOURCE_DIR}")
+airy_print_info("Path check: Source root = ${CMAKE_CURRENT_SOURCE_DIR}")
 foreach(_dir atoms commons protocols gateway daemons cupolas heapstore)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_dir}")
-        agentrt_print_ok("  ${_dir}/")
+        airy_print_ok("  ${_dir}/")
     else()
-        agentrt_print_error("  ${_dir}/ — MISSING!")
+        airy_print_error("  ${_dir}/ — MISSING!")
     endif()
 endforeach()
 
@@ -155,11 +155,11 @@ else()
         add_compile_definitions(_FORTIFY_SOURCE=2)
     endif()
 
-    if(AGENTRT_COMPLIANCE_STRICT)
-        add_compile_definitions(AGENTRT_COMPLIANCE_STRICT AGENTRT_COMPLIANCE_STRICT)
+    if(AIRY_COMPLIANCE_STRICT)
+        add_compile_definitions(AIRY_COMPLIANCE_STRICT AIRY_COMPLIANCE_STRICT)
         add_compile_options("-include" "${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/compliance/include/banned_functions.h")
 
-        # 注意：内存子系统实现层的 AGENTRT_COMPLIANCE_IMPL 豁免由各子目录的
+        # 注意：内存子系统实现层的 AIRY_COMPLIANCE_IMPL 豁免由各子目录的
         # CMakeLists.txt 中的 set_source_files_properties 设置，因为该属性
         # 仅在目标创建的目录作用域内生效。
         # 详见：atoms/corekern/CMakeLists.txt
@@ -186,9 +186,9 @@ if(ENABLE_SANITIZERS AND NOT MSVC)
         set(ENV{ASAN_OPTIONS} "halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1")
         set(ENV{LSAN_OPTIONS} "suppressions=${CMAKE_SOURCE_DIR}/../ecosystem/manager/sanitizer/lsan-suppressions")
         set(ENV{UBSAN_OPTIONS} "halt_on_error=1:print_stacktrace=1")
-        agentrt_print_ok("Sanitizers enabled: ASan + LSan + UBSan")
+        airy_print_ok("Sanitizers enabled: ASan + LSan + UBSan")
     else()
-        agentrt_print_warn("Sanitizers only supported for GCC/Clang compilers")
+        airy_print_warn("Sanitizers only supported for GCC/Clang compilers")
     endif()
 endif()
 
@@ -199,7 +199,7 @@ if(ENABLE_TSAN AND NOT MSVC)
         add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
         add_link_options(-fsanitize=thread)
         set(ENV{TSAN_OPTIONS} "halt_on_error=1:history_size=7:second_deadlock_stack=1")
-        agentrt_print_ok("ThreadSanitizer enabled")
+        airy_print_ok("ThreadSanitizer enabled")
     endif()
 endif()
 
@@ -208,7 +208,7 @@ if(MSVC AND CMAKE_BUILD_TYPE STREQUAL "Release")
     # 移除默认的/RTC1标志（如果存在），因为与/O2不兼容
     string(REPLACE "/RTC1" "" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
     string(REPLACE "/RTC1" "" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
-    agentrt_print_info("Adjusted MSVC Release flags to avoid /O2 and /RTC1 conflict")
+    airy_print_info("Adjusted MSVC Release flags to avoid /O2 and /RTC1 conflict")
 endif()
 
 # 调试符号（由构建类型控制）
@@ -239,20 +239,20 @@ if(ENABLE_COVERAGE)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         add_compile_options(-fprofile-arcs -ftest-coverage)
         add_link_options(-fprofile-arcs -ftest-coverage -lgcov)
-        agentrt_print_ok("Code coverage enabled for ${CMAKE_C_COMPILER_ID}")
+        airy_print_ok("Code coverage enabled for ${CMAKE_C_COMPILER_ID}")
     elseif(MSVC)
-        agentrt_print_warn("Code coverage for MSVC requires Visual Studio professional edition")
+        airy_print_warn("Code coverage for MSVC requires Visual Studio professional edition")
     else()
-        agentrt_print_warn("Code coverage only supported for GCC/Clang and MSVC compilers")
+        airy_print_warn("Code coverage only supported for GCC/Clang and MSVC compilers")
     endif()
 endif()
 
 # 查找必需的系统依赖
 if(WIN32)
-    agentrt_print_info("Using Windows built-in thread support")
+    airy_print_info("Using Windows built-in thread support")
 else()
     find_package(Threads REQUIRED)
-    agentrt_print_ok("Threads found: ${CMAKE_THREAD_LIBS_INIT}")
+    airy_print_ok("Threads found: ${CMAKE_THREAD_LIBS_INIT}")
 endif()
 
 # ============================================================
@@ -277,11 +277,11 @@ if(NOT SQLite3_FOUND AND NOT SQLITE3_FOUND)
     endif()
 endif()
 if(SQLite3_FOUND OR SQLITE3_FOUND)
-    set(AGENTRT_HAS_SQLITE3 TRUE CACHE BOOL "SQLite3 available")
-    agentrt_print_ok("SQLite3 found: ${SQLite3_LIBRARIES}${SQLITE3_LIBRARIES}")
+    set(AIRY_HAS_SQLITE3 TRUE CACHE BOOL "SQLite3 available")
+    airy_print_ok("SQLite3 found: ${SQLite3_LIBRARIES}${SQLITE3_LIBRARIES}")
 else()
-    set(AGENTRT_HAS_SQLITE3 FALSE CACHE BOOL "SQLite3 available")
-    agentrt_print_warn("SQLite3 not found, registry/vector-store features disabled")
+    set(AIRY_HAS_SQLITE3 FALSE CACHE BOOL "SQLite3 available")
+    airy_print_warn("SQLite3 not found, registry/vector-store features disabled")
 endif()
 
 # --- cJSON ---
@@ -290,11 +290,11 @@ if(NOT cJSON_FOUND AND PkgConfig_FOUND)
     pkg_check_modules(CJSON QUIET libcjson)
 endif()
 if(cJSON_FOUND OR CJSON_FOUND)
-    set(AGENTRT_HAS_CJSON TRUE CACHE BOOL "cJSON available")
-    agentrt_print_ok("cJSON found: ${cJSON_VERSION}${CJSON_VERSION}")
+    set(AIRY_HAS_CJSON TRUE CACHE BOOL "cJSON available")
+    airy_print_ok("cJSON found: ${cJSON_VERSION}${CJSON_VERSION}")
 else()
-    set(AGENTRT_HAS_CJSON FALSE CACHE BOOL "cJSON available")
-    agentrt_print_warn("cJSON not found, JSON features disabled")
+    set(AIRY_HAS_CJSON FALSE CACHE BOOL "cJSON available")
+    airy_print_warn("cJSON not found, JSON features disabled")
 endif()
 
 # --- libyaml ---
@@ -306,21 +306,21 @@ if(NOT YAML_FOUND AND PkgConfig_FOUND)
     pkg_check_modules(YAML QUIET libyaml)
 endif()
 if(YAML_FOUND)
-    set(AGENTRT_HAS_YAML TRUE CACHE BOOL "libyaml available")
-    agentrt_print_ok("libyaml found: ${YAML_LIBRARIES}")
+    set(AIRY_HAS_YAML TRUE CACHE BOOL "libyaml available")
+    airy_print_ok("libyaml found: ${YAML_LIBRARIES}")
 else()
-    set(AGENTRT_HAS_YAML FALSE CACHE BOOL "libyaml available")
-    agentrt_print_warn("libyaml not found, YAML config features disabled")
+    set(AIRY_HAS_YAML FALSE CACHE BOOL "libyaml available")
+    airy_print_warn("libyaml not found, YAML config features disabled")
 endif()
 
 # --- OpenSSL ---
 find_package(OpenSSL QUIET)
 if(OpenSSL_FOUND)
-    set(AGENTRT_HAS_OPENSSL TRUE CACHE BOOL "OpenSSL available")
-    agentrt_print_ok("OpenSSL found: ${OpenSSL_VERSION}")
+    set(AIRY_HAS_OPENSSL TRUE CACHE BOOL "OpenSSL available")
+    airy_print_ok("OpenSSL found: ${OpenSSL_VERSION}")
 else()
-    set(AGENTRT_HAS_OPENSSL FALSE CACHE BOOL "OpenSSL available")
-    agentrt_print_warn("OpenSSL not found, crypto features disabled")
+    set(AIRY_HAS_OPENSSL FALSE CACHE BOOL "OpenSSL available")
+    airy_print_warn("OpenSSL not found, crypto features disabled")
 endif()
 
 # --- libcurl ---
@@ -329,11 +329,11 @@ if(NOT CURL_FOUND AND PkgConfig_FOUND)
     pkg_check_modules(LIBCURL QUIET libcurl)
 endif()
 if(CURL_FOUND OR LIBCURL_FOUND)
-    set(AGENTRT_HAS_CURL TRUE CACHE BOOL "libcurl available")
-    agentrt_print_ok("libcurl found: ${CURL_LIBRARIES}${LIBCURL_LIBRARIES}")
+    set(AIRY_HAS_CURL TRUE CACHE BOOL "libcurl available")
+    airy_print_ok("libcurl found: ${CURL_LIBRARIES}${LIBCURL_LIBRARIES}")
 else()
-    set(AGENTRT_HAS_CURL FALSE CACHE BOOL "libcurl available")
-    agentrt_print_warn("libcurl not found, HTTP client features disabled")
+    set(AIRY_HAS_CURL FALSE CACHE BOOL "libcurl available")
+    airy_print_warn("libcurl not found, HTTP client features disabled")
 endif()
 
 # --- libmicrohttpd ---
@@ -342,11 +342,11 @@ if(NOT libmicrohttpd_FOUND AND PkgConfig_FOUND)
     pkg_check_modules(MICROHTTPD QUIET libmicrohttpd)
 endif()
 if(libmicrohttpd_FOUND OR MICROHTTPD_FOUND)
-    set(AGENTRT_HAS_MICROHTTPD TRUE CACHE BOOL "libmicrohttpd available")
-    agentrt_print_ok("libmicrohttpd found")
+    set(AIRY_HAS_MICROHTTPD TRUE CACHE BOOL "libmicrohttpd available")
+    airy_print_ok("libmicrohttpd found")
 else()
-    set(AGENTRT_HAS_MICROHTTPD FALSE CACHE BOOL "libmicrohttpd available")
-    agentrt_print_warn("libmicrohttpd not found, HTTP gateway may be limited")
+    set(AIRY_HAS_MICROHTTPD FALSE CACHE BOOL "libmicrohttpd available")
+    airy_print_warn("libmicrohttpd not found, HTTP gateway may be limited")
 endif()
 
 # --- libwebsockets ---
@@ -355,11 +355,11 @@ if(NOT libwebsockets_FOUND AND PkgConfig_FOUND)
     pkg_check_modules(LIBWEBSOCKETS QUIET libwebsockets)
 endif()
 if(libwebsockets_FOUND OR LIBWEBSOCKETS_FOUND)
-    set(AGENTRT_HAS_LIBWEBSOCKETS TRUE CACHE BOOL "libwebsockets available")
-    agentrt_print_ok("libwebsockets found")
+    set(AIRY_HAS_LIBWEBSOCKETS TRUE CACHE BOOL "libwebsockets available")
+    airy_print_ok("libwebsockets found")
 else()
-    set(AGENTRT_HAS_LIBWEBSOCKETS FALSE CACHE BOOL "libwebsockets available")
-    agentrt_print_warn("libwebsockets not found, WebSocket features disabled")
+    set(AIRY_HAS_LIBWEBSOCKETS FALSE CACHE BOOL "libwebsockets available")
+    airy_print_warn("libwebsockets not found, WebSocket features disabled")
 endif()
 
 # --- libevent ---
@@ -368,22 +368,22 @@ if(NOT libevent_FOUND AND PkgConfig_FOUND)
     pkg_check_modules(LIBEVENT QUIET libevent)
 endif()
 if(libevent_FOUND OR LIBEVENT_FOUND)
-    set(AGENTRT_HAS_LIBEVENT TRUE CACHE BOOL "libevent available")
-    agentrt_print_ok("libevent found")
+    set(AIRY_HAS_LIBEVENT TRUE CACHE BOOL "libevent available")
+    airy_print_ok("libevent found")
 else()
-    set(AGENTRT_HAS_LIBEVENT FALSE CACHE BOOL "libevent available")
-    agentrt_print_warn("libevent not found, event-loop features disabled")
+    set(AIRY_HAS_LIBEVENT FALSE CACHE BOOL "libevent available")
+    airy_print_warn("libevent not found, event-loop features disabled")
 endif()
 
 # --- GTest ---
 if(BUILD_TESTS)
     find_package(GTest QUIET)
     if(GTest_FOUND)
-        set(AGENTRT_HAS_GTEST TRUE CACHE BOOL "GTest available")
-        agentrt_print_ok("GTest found: ${GTEST_LIBRARIES}")
+        set(AIRY_HAS_GTEST TRUE CACHE BOOL "GTest available")
+        airy_print_ok("GTest found: ${GTEST_LIBRARIES}")
     else()
-        set(AGENTRT_HAS_GTEST FALSE CACHE BOOL "GTest available")
-        agentrt_print_warn("GTest not found, tests will use custom framework")
+        set(AIRY_HAS_GTEST FALSE CACHE BOOL "GTest available")
+        airy_print_warn("GTest not found, tests will use custom framework")
     endif()
 endif()
 
@@ -394,71 +394,71 @@ if(BUILD_TESTS)
         find_package(Cmocka QUIET)
     endif()
     if(cmocka_FOUND OR CMOCKA_FOUND)
-        set(AGENTRT_HAS_CMOCKA TRUE CACHE BOOL "cmocka available")
+        set(AIRY_HAS_CMOCKA TRUE CACHE BOOL "cmocka available")
         if(NOT CMOCKA_LIBRARIES)
             set(CMOCKA_LIBRARIES ${cmocka_LIBRARIES} CACHE STRING "cmocka libraries" FORCE)
         endif()
         if(NOT CMOCKA_INCLUDE_DIRS)
             set(CMOCKA_INCLUDE_DIRS ${cmocka_INCLUDE_DIRS} CACHE STRING "cmocka include dirs" FORCE)
         endif()
-        agentrt_print_ok("cmocka found")
+        airy_print_ok("cmocka found")
     else()
-        set(AGENTRT_HAS_CMOCKA FALSE CACHE BOOL "cmocka available")
-        agentrt_print_warn("cmocka not found, some tests may use stub framework")
+        set(AIRY_HAS_CMOCKA FALSE CACHE BOOL "cmocka available")
+        airy_print_warn("cmocka not found, some tests may use stub framework")
     endif()
 endif()
 
 # 创建 INTERFACE 库用于传递全局依赖编译定义
-add_library(agentrt_compile_defs INTERFACE)
-if(AGENTRT_HAS_SQLITE3)
-    target_compile_definitions(agentrt_compile_defs INTERFACE AGENTRT_HAS_SQLITE3)
+add_library(airy_compile_defs INTERFACE)
+if(AIRY_HAS_SQLITE3)
+    target_compile_definitions(airy_compile_defs INTERFACE AIRY_HAS_SQLITE3)
 endif()
-if(AGENTRT_HAS_CJSON)
-    target_compile_definitions(agentrt_compile_defs INTERFACE AGENTRT_HAS_CJSON)
+if(AIRY_HAS_CJSON)
+    target_compile_definitions(airy_compile_defs INTERFACE AIRY_HAS_CJSON)
 endif()
-if(AGENTRT_HAS_YAML)
-    target_compile_definitions(agentrt_compile_defs INTERFACE AGENTRT_HAS_YAML)
+if(AIRY_HAS_YAML)
+    target_compile_definitions(airy_compile_defs INTERFACE AIRY_HAS_YAML)
 endif()
-if(AGENTRT_HAS_OPENSSL)
-    target_compile_definitions(agentrt_compile_defs INTERFACE AGENTRT_HAS_OPENSSL)
+if(AIRY_HAS_OPENSSL)
+    target_compile_definitions(airy_compile_defs INTERFACE AIRY_HAS_OPENSSL)
 endif()
-if(AGENTRT_HAS_CURL)
-    target_compile_definitions(agentrt_compile_defs INTERFACE AGENTRT_HAS_CURL)
+if(AIRY_HAS_CURL)
+    target_compile_definitions(airy_compile_defs INTERFACE AIRY_HAS_CURL)
 endif()
-if(AGENTRT_HAS_MICROHTTPD)
-    target_compile_definitions(agentrt_compile_defs INTERFACE AGENTRT_HAS_MICROHTTPD)
+if(AIRY_HAS_MICROHTTPD)
+    target_compile_definitions(airy_compile_defs INTERFACE AIRY_HAS_MICROHTTPD)
 endif()
-if(AGENTRT_HAS_LIBWEBSOCKETS)
-    target_compile_definitions(agentrt_compile_defs INTERFACE AGENTRT_HAS_LIBWEBSOCKETS)
+if(AIRY_HAS_LIBWEBSOCKETS)
+    target_compile_definitions(airy_compile_defs INTERFACE AIRY_HAS_LIBWEBSOCKETS)
 endif()
-if(AGENTRT_HAS_LIBEVENT)
-    target_compile_definitions(agentrt_compile_defs INTERFACE AGENTRT_HAS_LIBEVENT)
+if(AIRY_HAS_LIBEVENT)
+    target_compile_definitions(airy_compile_defs INTERFACE AIRY_HAS_LIBEVENT)
 endif()
 
 # ============================================================
 # 跨平台系统库统一管理（BAN-15: 禁止硬编码平台库）
-# agentrt_platform_libs, dl, pthread, m, ws2_32 等通过此 INTERFACE 库统一提供
+# airy_platform_libs, dl, pthread, m, ws2_32 等通过此 INTERFACE 库统一提供
 # ============================================================
-add_library(agentrt_platform_libs INTERFACE)
+add_library(airy_platform_libs INTERFACE)
 if(UNIX AND NOT APPLE)
-    target_link_libraries(agentrt_platform_libs INTERFACE dl)
+    target_link_libraries(airy_platform_libs INTERFACE dl)
 endif()
 if(WIN32)
-    target_link_libraries(agentrt_platform_libs INTERFACE ws2_32)
+    target_link_libraries(airy_platform_libs INTERFACE ws2_32)
 endif()
 
 # ============================================================
 # 测试链接选项统一管理（BAN-26: 禁止硬编码链接器标志）
 # --allow-multiple-definition 仅在 Linux/GNU ld 下有效
 # ============================================================
-add_library(agentrt_test_ldflags INTERFACE)
+add_library(airy_test_ldflags INTERFACE)
 if(UNIX AND NOT APPLE)
-    target_link_options(agentrt_test_ldflags INTERFACE -Wl,--allow-multiple-definition)
+    target_link_options(airy_test_ldflags INTERFACE -Wl,--allow-multiple-definition)
 endif()
 
 # 包含子目录
-if(AGENTRT_BUILD_ALL)
-    agentrt_print_section("Building AgentRT core components")
+if(AIRY_BUILD_ALL)
+    airy_print_section("Building AgentRT core components")
 
     # 全局include路径（确保所有模块都能找到commons的头文件）
     # P0.17 IRON-6 跨层耦合禁令修复:
@@ -484,7 +484,7 @@ if(AGENTRT_BUILD_ALL)
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/sd/include
         # P0.17 阶段 5: thread_pool.h 迁移至 commons/utils/sync/include
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/sync/include
-        # P0.17 阶段 1: agentrt_defaults.h 位于 commons/include
+        # P0.17 阶段 1: airy_defaults.h 位于 commons/include
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/include
         ${CMAKE_CURRENT_SOURCE_DIR}/atoms/corekern/include
         ${CMAKE_CURRENT_SOURCE_DIR}/protocols/include
@@ -495,7 +495,7 @@ if(AGENTRT_BUILD_ALL)
     )
 
     # 验证全局 include 路径是否存在
-    agentrt_print_info("Verifying global include directories...")
+    airy_print_info("Verifying global include directories...")
     set(_global_inc_dirs
         commons
         commons/utils/include
@@ -516,64 +516,64 @@ if(AGENTRT_BUILD_ALL)
     )
     foreach(_inc ${_global_inc_dirs})
         if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_inc}")
-            agentrt_print_ok("  ${_inc}")
+            airy_print_ok("  ${_inc}")
         else()
-            agentrt_print_error("  ${_inc} — MISSING!")
+            airy_print_error("  ${_inc} — MISSING!")
         endif()
     endforeach()
 
     # 依赖检测汇总
-    agentrt_print_section("Dependency Detection Summary")
+    airy_print_section("Dependency Detection Summary")
     foreach(_dep_info
-            "SQLite3:       ${AGENTRT_HAS_SQLITE3}"
-            "cJSON:         ${AGENTRT_HAS_CJSON}"
-            "libyaml:       ${AGENTRT_HAS_YAML}"
-            "OpenSSL:       ${AGENTRT_HAS_OPENSSL}"
-            "libcurl:       ${AGENTRT_HAS_CURL}"
-            "libmicrohttpd: ${AGENTRT_HAS_MICROHTTPD}"
-            "libwebsockets: ${AGENTRT_HAS_LIBWEBSOCKETS}"
-            "libevent:      ${AGENTRT_HAS_LIBEVENT}")
+            "SQLite3:       ${AIRY_HAS_SQLITE3}"
+            "cJSON:         ${AIRY_HAS_CJSON}"
+            "libyaml:       ${AIRY_HAS_YAML}"
+            "OpenSSL:       ${AIRY_HAS_OPENSSL}"
+            "libcurl:       ${AIRY_HAS_CURL}"
+            "libmicrohttpd: ${AIRY_HAS_MICROHTTPD}"
+            "libwebsockets: ${AIRY_HAS_LIBWEBSOCKETS}"
+            "libevent:      ${AIRY_HAS_LIBEVENT}")
         if(_dep_info MATCHES ": +(ON|YES|TRUE|1)")
-            agentrt_print_ok("  ${_dep_info}")
+            airy_print_ok("  ${_dep_info}")
         else()
-            agentrt_print_warn("  ${_dep_info}")
+            airy_print_warn("  ${_dep_info}")
         endif()
     endforeach()
 
     # 主要AgentRT组件（原 agentrt/agentrt/CMakeLists.txt，取消嵌套后合并至此）
-    agentrt_print_info("Configuring AgentRT core components...")
+    airy_print_info("Configuring AgentRT core components...")
 
     # 从根 CMakeLists.txt 传播依赖可用性标志
-    if(AGENTRT_HAS_CJSON)
-        set(AGENTRT_HAS_CJSON TRUE CACHE BOOL "cJSON available for agentrt")
+    if(AIRY_HAS_CJSON)
+        set(AIRY_HAS_CJSON TRUE CACHE BOOL "cJSON available for agentrt")
     endif()
-    if(AGENTRT_HAS_CURL)
-        set(AGENTRT_HAS_CURL TRUE CACHE BOOL "CURL available for agentrt")
+    if(AIRY_HAS_CURL)
+        set(AIRY_HAS_CURL TRUE CACHE BOOL "CURL available for agentrt")
     endif()
-    if(AGENTRT_HAS_YAML)
-        set(AGENTRT_HAS_YAML TRUE CACHE BOOL "libyaml available for agentrt")
+    if(AIRY_HAS_YAML)
+        set(AIRY_HAS_YAML TRUE CACHE BOOL "libyaml available for agentrt")
     endif()
-    if(AGENTRT_HAS_OPENSSL)
-        set(AGENTRT_HAS_OPENSSL TRUE CACHE BOOL "OpenSSL available for agentrt")
+    if(AIRY_HAS_OPENSSL)
+        set(AIRY_HAS_OPENSSL TRUE CACHE BOOL "OpenSSL available for agentrt")
     endif()
-    if(AGENTRT_HAS_MICROHTTPD)
-        set(AGENTRT_HAS_MICROHTTPD TRUE CACHE BOOL "libmicrohttpd available for agentrt")
+    if(AIRY_HAS_MICROHTTPD)
+        set(AIRY_HAS_MICROHTTPD TRUE CACHE BOOL "libmicrohttpd available for agentrt")
     endif()
-    if(AGENTRT_HAS_LIBWEBSOCKETS)
-        set(AGENTRT_HAS_LIBWEBSOCKETS TRUE CACHE BOOL "libwebsockets available for agentrt")
+    if(AIRY_HAS_LIBWEBSOCKETS)
+        set(AIRY_HAS_LIBWEBSOCKETS TRUE CACHE BOOL "libwebsockets available for agentrt")
     endif()
 
     # 子模块启用状态汇总
-    agentrt_print_info("[MODULE] Submodule build status:")
-    agentrt_print_info("[MODULE]   atoms:    ${BUILD_ATOMS}")
-    agentrt_print_info("[MODULE]   commons:  ${BUILD_COMMONS}")
-    agentrt_print_info("[MODULE]   cupolas:  ${BUILD_CUPOLAS}")
-    agentrt_print_info("[MODULE]   daemon:   ${BUILD_DAEMON}")
-    agentrt_print_info("[MODULE]   gateway:  ${BUILD_GATEWAY}")
-    agentrt_print_info("[MODULE]   heapstore: ${BUILD_HEAPSTORE}")
-    agentrt_print_info("[MODULE]   toolkit:  ${BUILD_TOOLKIT}")
-    agentrt_print_info("[MODULE]   Memory backend: ${AGENTRT_MEMORY_BACKEND}")
-    agentrt_print_info("[MODULE]   With MemoryRovol: ${AGENTRT_WITH_MEMORYROVOL}")
+    airy_print_info("[MODULE] Submodule build status:")
+    airy_print_info("[MODULE]   atoms:    ${BUILD_ATOMS}")
+    airy_print_info("[MODULE]   commons:  ${BUILD_COMMONS}")
+    airy_print_info("[MODULE]   cupolas:  ${BUILD_CUPOLAS}")
+    airy_print_info("[MODULE]   daemon:   ${BUILD_DAEMON}")
+    airy_print_info("[MODULE]   gateway:  ${BUILD_GATEWAY}")
+    airy_print_info("[MODULE]   heapstore: ${BUILD_HEAPSTORE}")
+    airy_print_info("[MODULE]   toolkit:  ${BUILD_TOOLKIT}")
+    airy_print_info("[MODULE]   Memory backend: ${AIRY_MEMORY_BACKEND}")
+    airy_print_info("[MODULE]   With MemoryRovol: ${AIRY_WITH_MEMORYROVOL}")
 
     # 全局特性测试宏定义 - 必须在所有其他配置之前
     if(UNIX AND NOT APPLE)
@@ -582,20 +582,20 @@ if(AGENTRT_BUILD_ALL)
             _XOPEN_SOURCE=700
             _GNU_SOURCE
         )
-        agentrt_print_ok("POSIX feature test macros enabled for Linux")
+        airy_print_ok("POSIX feature test macros enabled for Linux")
     elseif(APPLE)
         add_compile_definitions(
             _POSIX_C_SOURCE=200112L
             _DARWIN_C_SOURCE
         )
-        agentrt_print_ok("POSIX feature test macros enabled for macOS")
+        airy_print_ok("POSIX feature test macros enabled for macOS")
     endif()
 
     if(MSVC)
         if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/windows_preinclude.h")
-            agentrt_print_ok("[MSVC] Force-include file found: ../cmake/windows_preinclude.h")
+            airy_print_ok("[MSVC] Force-include file found: ../cmake/windows_preinclude.h")
         else()
-            agentrt_print_warn("[MSVC] Force-include file NOT FOUND: ../cmake/windows_preinclude.h")
+            airy_print_warn("[MSVC] Force-include file NOT FOUND: ../cmake/windows_preinclude.h")
         endif()
         add_compile_options(/FI"${CMAKE_CURRENT_SOURCE_DIR}/../cmake/windows_preinclude.h")
     endif()
@@ -613,13 +613,13 @@ if(AGENTRT_BUILD_ALL)
     if(BUILD_COMMONS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/commons/CMakeLists.txt")
         add_subdirectory(commons)
     else()
-        agentrt_print_warn("commons module not found or disabled")
+        airy_print_warn("commons module not found or disabled")
     endif()
 
     if(BUILD_ATOMS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/atoms/CMakeLists.txt")
         add_subdirectory(atoms)
     else()
-        agentrt_print_warn("atoms module not found or disabled")
+        airy_print_warn("atoms module not found or disabled")
     endif()
 
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/protocols/CMakeLists.txt")
@@ -629,38 +629,38 @@ if(AGENTRT_BUILD_ALL)
     if(BUILD_CUPOLAS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cupolas/CMakeLists.txt")
         add_subdirectory(cupolas)
     else()
-        agentrt_print_warn("cupolas module not found or disabled")
+        airy_print_warn("cupolas module not found or disabled")
     endif()
 
     if(BUILD_DAEMON AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/daemons/CMakeLists.txt")
         add_subdirectory(daemons)
     else()
-        agentrt_print_warn("daemons module not found or disabled")
+        airy_print_warn("daemons module not found or disabled")
     endif()
 
     if(BUILD_GATEWAY AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/gateway/CMakeLists.txt")
         add_subdirectory(gateway)
     else()
-        agentrt_print_warn("gateway module not found or disabled")
+        airy_print_warn("gateway module not found or disabled")
     endif()
 
     if(BUILD_HEAPSTORE AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/heapstore/CMakeLists.txt")
         add_subdirectory(heapstore)
     else()
-        agentrt_print_warn("heapstore module not found or disabled")
+        airy_print_warn("heapstore module not found or disabled")
     endif()
 
     # toolkit 包含多种语言 SDK，需要特殊处理
     if(BUILD_TOOLKIT)
-        agentrt_print_info("Toolkit modules require additional configuration for each language SDK")
+        airy_print_info("Toolkit modules require additional configuration for each language SDK")
     endif()
 
     # 创建聚合目标
     add_custom_target(agentrt-all
         DEPENDS
-            $<IF:$<TARGET_EXISTS:agentrt_atoms>,agentrt_atoms,>
-            $<IF:$<TARGET_EXISTS:agentrt_commons>,agentrt_commons,>
-            $<IF:$<TARGET_EXISTS:agentrt_cupolas>,agentrt_cupolas,>
+            $<IF:$<TARGET_EXISTS:airy_atoms>,airy_atoms,>
+            $<IF:$<TARGET_EXISTS:airy_commons>,airy_commons,>
+            $<IF:$<TARGET_EXISTS:airy_cupolas>,airy_cupolas,>
         COMMENT "Build all AgentRT core components"
     )
 
@@ -672,7 +672,7 @@ if(AGENTRT_BUILD_ALL)
     install(DIRECTORY commons/utils/string/include/ DESTINATION include/agentrt/commons/string)
     install(DIRECTORY commons/utils/logging/include/ DESTINATION include/agentrt/commons/logging)
 
-    agentrt_print_ok("AgentRT core components configuration complete")
+    airy_print_ok("AgentRT core components configuration complete")
 
     # 测试组件（可选）
     if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
@@ -683,14 +683,14 @@ if(AGENTRT_BUILD_ALL)
     # Task #38: 将 devtools/tests/integration/c/ 的 12 个连接线测试纳入构建系统
     if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../devtools/tests/integration/c/CMakeLists.txt")
         add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../devtools/tests/integration/c integration_c_tests)
-        agentrt_print_ok("Integration tests (devtools/tests/integration/c) included — 12 C-L link tests + E2E")
+        airy_print_ok("Integration tests (devtools/tests/integration/c) included — 12 C-L link tests + E2E")
     else()
-        agentrt_print_info("Integration tests skipped: devtools/tests/integration/c not found (standalone agentrt build)")
+        airy_print_info("Integration tests skipped: devtools/tests/integration/c not found (standalone agentrt build)")
     endif()
 endif()
 
 # 安装配置
-if(AGENTRT_BUILD_ALL)
+if(AIRY_BUILD_ALL)
     # 创建安装目标
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs")
         install(DIRECTORY docs/ DESTINATION share/doc/agentrt
@@ -740,7 +740,7 @@ if(BUILD_TESTS AND ENABLE_SANITIZERS AND NOT MSVC)
         "${CMAKE_BINARY_DIR}/run_tests.sh"
         @ONLY
     )
-    agentrt_print_info("Test wrapper script: ${CMAKE_BINARY_DIR}/run_tests.sh")
+    airy_print_info("Test wrapper script: ${CMAKE_BINARY_DIR}/run_tests.sh")
 endif()
 
 # 自定义目标：清理构建
@@ -751,23 +751,23 @@ add_custom_target(clean-all
 )
 
 # 构建后信息
-agentrt_print_ok("AgentRT v${PROJECT_VERSION} configured successfully!")
-agentrt_print_info("  Build directory: ${CMAKE_BINARY_DIR}")
-agentrt_print_info("  Install prefix:  ${CMAKE_INSTALL_PREFIX}")
-agentrt_print_info("Next steps:")
-agentrt_print_info("  cmake --build . --config Release   # Build")
-agentrt_print_info("  cmake --install . --config Release # Install")
-agentrt_print_info("  ctest --output-on-failure          # Test")
+airy_print_ok("AgentRT v${PROJECT_VERSION} configured successfully!")
+airy_print_info("  Build directory: ${CMAKE_BINARY_DIR}")
+airy_print_info("  Install prefix:  ${CMAKE_INSTALL_PREFIX}")
+airy_print_info("Next steps:")
+airy_print_info("  cmake --build . --config Release   # Build")
+airy_print_info("  cmake --install . --config Release # Install")
+airy_print_info("  ctest --output-on-failure          # Test")
 
 # 检查常见问题
 if(MSVC AND CMAKE_C_STANDARD EQUAL 11)
-    agentrt_print_warn("MSVC may have limited C11 support. Consider Visual Studio 2019+.")
+    airy_print_warn("MSVC may have limited C11 support. Consider Visual Studio 2019+.")
 endif()
 
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/atoms/CMakeLists.txt")
-    agentrt_print_warn("atoms/CMakeLists.txt not found - atoms module may not build correctly")
+    airy_print_warn("atoms/CMakeLists.txt not found - atoms module may not build correctly")
 endif()
 
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/commons/CMakeLists.txt")
-    agentrt_print_warn("commons/CMakeLists.txt not found - commons module may not build correctly")
+    airy_print_warn("commons/CMakeLists.txt not found - commons module may not build correctly")
 endif()
