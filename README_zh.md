@@ -5,7 +5,7 @@
 
 **语言:** [English](README.md) | 简体中文
 
-[![Version](https://img.shields.io/badge/version-0.1.1-5a6b7e)](https://atomgit.com/openairymax/agentos)
+[![Version](https://img.shields.io/badge/version-0.1.1-5a6b7e)](https://atomgit.com/openairymax/agentrt)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=c%2B%2B&logoColor=white)](https://isocpp.org)
@@ -105,7 +105,7 @@ cd airymaxhub/agentrt
 # 2. 配置（源树外构建为强制要求 — 由 BAN-33 强制执行）
 cmake -S . -B /tmp/agentrt-build \
     -DCMAKE_BUILD_TYPE=Release \
-    -DAGENTRT_WITH_MEMORYROVOL=ON
+    -DAIRY_WITH_MEMORYROVOL=ON
 
 # 3. 并行构建
 cmake --build /tmp/agentrt-build --parallel $(nproc)
@@ -122,14 +122,14 @@ cd /tmp/agentrt-build && ctest --output-on-failure
 |------|--------|------|
 | `BUILD_TESTS` | ON | 构建单元测试（在顶层启用 CTest） |
 | `BUILD_SHARED_LIBS` | OFF | 构建动态库而非静态库 |
-| `AGENTRT_BUILD_ALL` | ON | 构建全部 AgentRT 组件 |
-| `AGENTRT_WITH_MEMORYROVOL` | OFF | 启用 MemoryRovol 商业记忆提供者 |
-| `AGENTRT_MEMORY_BACKEND` | `builtin` | 记忆后端选择（`builtin` \| `memoryrovol`） |
-| `AGENTRT_COMPLIANCE_STRICT` | ON | 严格合规模式（投毒不安全函数，如 `strcpy`） |
+| `AIRY_BUILD_ALL` | ON | 构建全部 AgentRT 组件 |
+| `AIRY_WITH_MEMORYROVOL` | OFF | 启用 MemoryRovol 商业记忆提供者 |
+| `AIRY_MEMORY_BACKEND` | `builtin` | 记忆后端选择（`builtin` \| `memoryrovol`） |
+| `AIRY_COMPLIANCE_STRICT` | ON | 严格合规模式（投毒不安全函数，如 `strcpy`） |
 | `ENABLE_SANITIZERS` | ON | 启用 ASan + LSan + UBSan |
 | `ENABLE_COVERAGE` | OFF | 启用代码覆盖率报告 |
 | `WARNINGS_AS_ERRORS` | OFF | 将编译器警告视为错误 |
-| `AGENTRT_DOCKER_BUILD` | OFF | Docker 构建模式 |
+| `AIRY_DOCKER_BUILD` | OFF | Docker 构建模式 |
 
 ## 分支策略
 
