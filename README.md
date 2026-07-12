@@ -105,7 +105,7 @@ cd airymaxhub/agentrt
 # 2. Configure (out-of-source build is MANDATORY — enforced by BAN-33)
 cmake -S . -B /tmp/agentrt-build \
     -DCMAKE_BUILD_TYPE=Release \
-    -DAGENTRT_WITH_MEMORYROVOL=ON
+    -DAIRY_WITH_MEMORYROVOL=ON
 
 # 3. Build (parallel)
 cmake --build /tmp/agentrt-build --parallel $(nproc)
@@ -122,14 +122,14 @@ cd /tmp/agentrt-build && ctest --output-on-failure
 |--------|---------|-------------|
 | `BUILD_TESTS` | ON | Build unit tests (CTest enabled at the top level) |
 | `BUILD_SHARED_LIBS` | OFF | Build shared libraries instead of static libraries |
-| `AGENTRT_BUILD_ALL` | ON | Build all AgentRT components |
-| `AGENTRT_WITH_MEMORYROVOL` | OFF | Enable MemoryRovol commercial memory provider |
-| `AGENTRT_MEMORY_BACKEND` | `builtin` | Memory backend selection (`builtin` \| `memoryrovol`) |
-| `AGENTRT_COMPLIANCE_STRICT` | ON | Strict compliance mode (poisons unsafe functions, e.g. `strcpy`) |
+| `AIRY_BUILD_ALL` | ON | Build all AgentRT components |
+| `AIRY_WITH_MEMORYROVOL` | OFF | Enable MemoryRovol commercial memory provider |
+| `AIRY_MEMORY_BACKEND` | `builtin` | Memory backend selection (`builtin` \| `memoryrovol`) |
+| `AIRY_COMPLIANCE_STRICT` | ON | Strict compliance mode (poisons unsafe functions, e.g. `strcpy`) |
 | `ENABLE_SANITIZERS` | ON | Enable ASan + LSan + UBSan |
 | `ENABLE_COVERAGE` | OFF | Enable code coverage reporting |
 | `WARNINGS_AS_ERRORS` | OFF | Treat compiler warnings as errors |
-| `AGENTRT_DOCKER_BUILD` | OFF | Docker build mode |
+| `AIRY_DOCKER_BUILD` | OFF | Docker build mode |
 
 ## Branch Strategy
 
