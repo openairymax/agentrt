@@ -14,7 +14,7 @@ AgentRT 项目采用分层架构，关键目录如下：
 
 | 目录 | 说明 |
 |------|------|
-| `agentos/` | 核心系统层，包含 atoms 原子模块、protocols 协议栈、cupolas 安全穹顶、commons 基础库 |
+| `agentrt/` | 核心系统层，包含 atoms 原子模块、protocols 协议栈、cupolas 安全穹顶、commons 基础库 |
 | `ecosystem/` | 生态系统层，包含 OpenLab 开放实验室、Manager 配置管理器等应用 |
 | `sdk/` | 多语言 SDK 层，提供 Python / Go / Rust / TypeScript 开发工具包 |
 | `scripts/` | 脚本工具集，包含 dev 开发工具、ci 持续集成流水线、release 发布脚本 |
@@ -42,8 +42,9 @@ AgentRT 项目采用分层架构，关键目录如下：
 
 ```bash
 # 1. 克隆仓库
-git clone https://atomgit.com/openairymax/agentos.git
-cd agentos
+# 注：git 远端名沿用历史名称 agentos.git 以保持提交连续性（见 README §概述）
+git clone https://atomgit.com/openairymax/agentos.git agentrt
+cd agentrt
 
 # 2. 安装系统依赖 (Ubuntu)
 sudo apt install -y build-essential cmake gcc g++ libssl-dev \
@@ -82,11 +83,11 @@ cd ../AgentRT-build && ctest --output-on-failure
 ### 3.1 C 代码风格
 
 - 遵循项目 `.clang-format` 配置，提交前运行 `clang-format -i` 格式化
-- 函数命名：`agentrt_动词_名词()` 风格
+- 函数命名：`airy_动词_名词()` 风格
 - 类型命名：`名词_t` 风格
-- 常量：`AGENTRT_大写` 宏风格
+- 常量：`AIRY_大写` 宏风格
 - 所有公共 API 必须有 Doxygen 注释
-- 使用项目统一内存分配器 `AGENTRT_MALLOC` / `AGENTRT_FREE`，禁止直接使用裸 `malloc` / `free`
+- 使用项目统一内存分配器 `AIRY_MALLOC` / `AIRY_FREE`，禁止直接使用裸 `malloc` / `free`
 - 使用安全字符串函数（`strncpy`、`snprintf`），禁止使用 `strcpy`、`gets`、`sprintf`
 
 ### 3.2 Python 代码风格
@@ -316,10 +317,12 @@ cd ../AgentRT-build && ctest -R benchmark
 | 渠道 | 用途 | 链接 |
 |------|------|------|
 | GitHub Issues | Bug 报告 / 功能建议 | [SpharxTeam/AgentRT](https://github.com/SpharxTeam/AgentRT/issues) |
-| AtomGit Issues | Bug 报告 / 功能建议 | [openairymax/agentos](https://atomgit.com/openairymax/agentos/issues) |
-| Gitee Issues | Bug 报告 / 功能建议 | [spharx/agentos](https://gitee.com/spharx/agentos/issues) |
+| AtomGit Issues | Bug 报告 / 功能建议 | [openairymax/agentrt](https://atomgit.com/openairymax/agentrt/issues) |
+| Gitee Issues | Bug 报告 / 功能建议 | [spharx/agentrt](https://gitee.com/spharx/agentrt/issues) |
 | 飞书社群 | 技术交流与社区讨论 | 扫描 README 中飞书社群二维码加入 |
 | 官方网站 | 项目动态与文档 | [spharx.cn](https://spharx.cn) |
+
+> **注**：AtomGit/Gitee 仓库 URL 沿用历史名称 `agentos`（历史保留决策，见 README §概述），项目实际名称为 AgentRT。
 
 ---
 
