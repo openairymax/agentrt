@@ -1,28 +1,28 @@
 [submodule "atoms"]
         path = atoms
-        url = git@atomgit.com:openairymax/atoms.git
+        url = ../atoms.git
         branch = feature/official-hubs-01
 [submodule "commons"]
         path = commons
-        url = git@atomgit.com:openairymax/commons.git
+        url = ../commons.git
         branch = feature/official-hubs-01
 [submodule "cupolas"]
         path = cupolas
-        url = git@atomgit.com:openairymax/cupolas.git
+        url = ../cupolas.git
         branch = feature/official-hubs-01
 [submodule "daemons"]
         path = daemons
-        url = git@atomgit.com:openairymax/daemons.git
+        url = ../daemons.git
         branch = feature/official-hubs-01
 [submodule "gateway"]
         path = gateway
-        url = git@atomgit.com:openairymax/gateway.git
+        url = ../gateway.git
         branch = feature/official-hubs-01
 [submodule "protocols"]
         path = protocols
-        url = git@atomgit.com:openairymax/protocols.git
+        url = ../protocols.git
         branch = feature/official-hubs-01
 [submodule "heapstore"]
         path = heapstore
-        url = git@atomgit.com:openairymax/heapstore.git
+        url = ../heapstore.git
         branch = feature/official-hubs-01
