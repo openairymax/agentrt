@@ -661,7 +661,10 @@ if(AIRY_BUILD_ALL)
             $<IF:$<TARGET_EXISTS:airy_atoms>,airy_atoms,>
             $<IF:$<TARGET_EXISTS:airy_commons>,airy_commons,>
             $<IF:$<TARGET_EXISTS:airy_cupolas>,airy_cupolas,>
-        COMMENT "Build all AgentRT core components"
+            $<IF:$<TARGET_EXISTS:agentrt_daemons>,agentrt_daemons,>
+            $<IF:$<TARGET_EXISTS:agentrt_gateway>,agentrt_gateway,>
+            $<IF:$<TARGET_EXISTS:agentrt_heapstore>,agentrt_heapstore,>
+        COMMENT "Build all AgentRT core components (atoms/commons/cupolas/daemons/gateway/heapstore)"
     )
 
     # 安装头文件
