@@ -31,7 +31,7 @@
  * Task #39: 补充 BAN-073/BAN-154 编译期验证测试
  */
 
-#include "memory_compat.h"   /* AIRY_MEMSET/MEMCPY/STRNCPY_TERM/MALLOC/FREE */
+#include "airy_memory.h"   /* AIRY_MEMSET/MEMCPY/STRNCPY_TERM/MALLOC/FREE */
 #include "error.h"           /* AIRY_ERR_* 错误码 */
 
 #include <assert.h>
