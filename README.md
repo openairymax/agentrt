@@ -144,4 +144,21 @@ Dual-licensed under **AGPL v3 + Apache 2.0** (SPDX identifier: `AGPL-3.0-or-late
 
 Recipients may choose either license to govern their use of AgentRT. The AGPL v3 applies to derivative network services; the Apache 2.0 applies to proprietary integrations.
 
+### Dual License Guide
+
+You may choose **either** license at your option — not both, not neither.
+
+**SPDX Expression**: `AGPL-3.0-or-later OR Apache-2.0`
+
+| If you are... | Choose | Why |
+|---------------|--------|-----|
+| Building a **SaaS** or network service that modifies AgentRT | **AGPL v3** | Network service clause requires source disclosure |
+| Developing **open-source** derivative works (copyleft) | **AGPL v3** | Derivatives must remain open-source under AGPL |
+| Using AgentRT in **commercial closed-source** products | **Apache 2.0** | Permissive, allows proprietary derivatives |
+| Building **enterprise internal tools** | **Apache 2.0** | No source disclosure required |
+| Needing **patent protection** | **Apache 2.0** | Explicit patent grant from contributors |
+| Just learning or researching | **Either** | Both permit personal use |
+
+For the authoritative license policy, see [12-license-policy.md](../docs/AirymaxOS/50-engineering-standards/12-license-policy.md).
+
 Copyright (c) 2025-2026 **SPHARX Ltd.** All Rights Reserved.

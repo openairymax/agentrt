@@ -144,4 +144,21 @@ cd /tmp/agentrt-build && ctest --output-on-failure
 
 接收方可选择任一许可证来约束其对 AgentRT 的使用：AGPL v3 适用于衍生网络服务；Apache 2.0 适用于专有集成。
 
+### 双许可证使用指南
+
+你可以**任选其一**适用——不是同时遵守两个，也不是都不遵守。
+
+**SPDX 表达式**：`AGPL-3.0-or-later OR Apache-2.0`
+
+| 你的场景 | 选择 | 原因 |
+|----------|------|------|
+| 构建**SaaS 网络服务**并修改 AgentRT | **AGPL v3** | 网络服务条款要求公开修改后的源代码 |
+| 开发**开源衍生作品**（copyleft 项目） | **AGPL v3** | 衍生作品必须同样以 AGPL 开源 |
+| 在**商业闭源产品**中集成 AgentRT | **Apache 2.0** | 宽松许可证，允许闭源衍生 |
+| 构建**企业内部工具** | **Apache 2.0** | 无需公开源代码 |
+| 需要**专利保护** | **Apache 2.0** | 贡献者明确授予专利使用权 |
+| 仅用于学习与研究 | **任一** | 两者均允许个人使用 |
+
+权威许可证政策见 [12-license-policy.md](../docs/AirymaxOS/50-engineering-standards/12-license-policy.md)。
+
 Copyright (c) 2025-2026 **SPHARX Ltd.** All Rights Reserved.
