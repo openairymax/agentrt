@@ -17,6 +17,7 @@ target_include_directories(test_banned_functions PRIVATE
 )
 
 target_compile_features(test_banned_functions PRIVATE c_std_11)
+target_compile_definitions(test_banned_functions PRIVATE AIRY_COMPLIANCE_STRICT)
 target_compile_options(test_banned_functions PRIVATE
     -Wall -Wextra -Wpedantic -Wno-type-limits
 )
