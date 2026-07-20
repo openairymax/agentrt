@@ -1,28 +1,28 @@
 [submodule "atoms"]
         path = atoms
         url = ../atoms.git
-        branch = feature/official-hubs-01
+        branch = develop/hubs-01
 [submodule "commons"]
         path = commons
         url = ../commons.git
-        branch = feature/official-hubs-01
+        branch = develop/hubs-01
 [submodule "cupolas"]
         path = cupolas
         url = ../cupolas.git
-        branch = feature/official-hubs-01
+        branch = develop/hubs-01
 [submodule "daemons"]
         path = daemons
         url = ../daemons.git
-        branch = feature/official-hubs-01
+        branch = develop/hubs-01
 [submodule "gateway"]
         path = gateway
         url = ../gateway.git
-        branch = feature/official-hubs-01
+        branch = develop/hubs-01
 [submodule "protocols"]
         path = protocols
         url = ../protocols.git
-        branch = feature/official-hubs-01
+        branch = develop/hubs-01
 [submodule "heapstore"]
         path = heapstore
         url = ../heapstore.git
-        branch = feature/official-hubs-01
+        branch = develop/hubs-01
