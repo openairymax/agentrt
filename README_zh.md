@@ -1,22 +1,22 @@
-# AgentRT — 极境智能体运行底座平台工程 (AirymaxAgentRT)
+# AgentRT 极境智能体运行底座平台工程 (AirymaxRT)
 
-> 面向 AI 智能体团队的奠基级运行时平台工程 — 定位对标 JVM/containerd 之于语言/容器。
+> 面向 AI 智能体团队的奠基级运行时平台工程 — 定位对标 Kubernetes 之于微服务：为 Agent 团队提供标准化编排、调度、通信、记忆与安全的完整平台范式。
 > [airymaxhub](https://atomgit.com/openairymax/airymaxhub) 伞仓下的管理仓之一，以 git submodule 形式聚合 7 个叶子仓。
 
 **语言:** [English](README.md) | 简体中文
 
 [![Version](https://img.shields.io/badge/version-0.1.1-5a6b7e)](https://atomgit.com/openairymax/agentrt)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
-[![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
-[![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=c%2B%2B&logoColor=white)](https://isocpp.org)
+[![C11](https://img.shields.io/badge/C-11-00599C?logo=c\&logoColor=white)](https://en.cppreference.com/w/c/11)
+[![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=c%2B%2B\&logoColor=white)](https://isocpp.org)
 
----
+***
 
 ## 概述
 
-**AgentRT**（全称：**极境智能体运行底座平台工程**，英文 **AirymaxAgentRT**，*AI Agent Runtime Platform Engineering*）是 Airymax 平台的运行时工程层 — 面向 AI 智能体团队的操作系统级运行底座，定位对标 JVM 之于编程语言、containerd 之于容器。JVM 为字节码提供虚拟机，containerd 为容器提供运行时，AgentRT 则为智能体团队提供编排、调度、隔离与观测的平台工程机制。**0.1.1** 是唯一奠基版本，所有后续 Airymax 发行版均在此基础上构建。
+**AgentRT**（全称：**极境智能体运行底座平台工程**，英文 **AirymaxAgentRT**，*AI Agent Runtime Platform Engineering*）是 Airymax 平台的运行时工程层 — 面向 AI 智能体团队的操作系统级运行底座。定位对标 Kubernetes 之于微服务：AgentRT 将多智能体的认知循环、记忆演化、安全隔离、协议互通标准化为一套运行时平台，定义了 AI Agent 团队的运行方式。
 
-本仓库是**管理仓**（git superproject），以 git submodule 形式聚合 **7 个叶子仓**，并继承原 AgentRT 单体仓库的**全部 git 历史**。仓库 URL 沿用历史名称 `git@atomgit.com:openairymax/agentos.git` 以保持提交连续性。AgentRT 暴露大规模运行智能体团队所需的操作系统级机制：微核心原语、认知循环、记忆分层、安全穹顶、IPC 协议、网关服务与长驻守护进程。
+本仓库是**管理仓**（git superproject），以 git submodule 形式聚合 **7 个叶子仓**，并继承原 AgentRT 单体仓库的**全部 git 历史**，以保持提交连续性。
 
 AgentRT 是 `airymaxhub` 伞仓下**五个管理仓之一**（其余四个为 `sdk`、`ecosystem`、`products`、`agentrt-linux`）。Airymax 工作区共拆分为 38 个仓库：1 个伞仓 + 5 个管理仓 + 29 个叶子仓 + 3 个顶层仓。每个叶子仓可独立构建与版本控制，管理仓通过 git submodule 将它们钉合在一起，产出连贯、可复现的运行时平台。
 
@@ -42,20 +42,20 @@ airymaxhub/                     ← 伞仓（git superproject 根）
 ├── cmake/                      ← 共享 CMake 模块（5 通用 + 4 AgentRT 专用）
 ├── devtools/                   ← 开发工具
 ├── docs/                       ← 开放文档
-└── docs-closed/                ← 内部文档
+└── other/                      ← 其他文档
 ```
 
 ## 叶子仓
 
-| 模块 | 仓库 URL | 分类 | 说明 |
-|------|---------|------|------|
-| **atoms** | `git@atomgit.com:openairymax/atoms.git` | A | 微核心原语：`corekern`、`coreloopthree`、`syscall`、`taskflow`、`frameworks`、`memory` |
-| **commons** | `git@atomgit.com:openairymax/commons.git` | A | 共享基础库：24+ 工具模块（logging、sync、memory、string、ipc 等） |
-| **cupolas** | `git@atomgit.com:openairymax/cupolas.git` | B | 安全穹顶：四层内生安全（沙箱、RBAC、净化、审计） |
-| **heapstore** | `git@atomgit.com:openairymax/heapstore.git` | A | 堆式运行时数据持久化 |
-| **protocols** | `git@atomgit.com:openairymax/protocols.git` | — | AgentsIPC（128 字节消息头）& A2A/A2T 协议栈 |
-| **gateway** | `git@atomgit.com:openairymax/gateway.git` | — | HTTP/WS/Stdio → JSON-RPC 2.0 网关守护进程（`gateway_d`） |
-| **daemons** | `git@atomgit.com:openairymax/daemons.git` | — | 12 个运行时守护进程：`gateway_d`、`llm_d`、`tool_d`、`sched_d`、`market_d`、`monit_d`、`channel_d`、`info_d`、`notify_d`、`observe_d`、`hook_d`、`plugin_d` |
+| 模块            | 仓库 URL                                      | 分类 | 说明                                                                                                                                      |
+| ------------- | ------------------------------------------- | -- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **atoms**     | `git@atomgit.com:openairymax/atoms.git`     | A  | 微核心原语：`corekern`、`coreloopthree`、`syscall`、`taskflow`、`frameworks`、`memory`                                                             |
+| **commons**   | `git@atomgit.com:openairymax/commons.git`   | A  | 共享基础库：24+ 工具模块（logging、sync、memory、string、ipc 等）                                                                                        |
+| **cupolas**   | `git@atomgit.com:openairymax/cupolas.git`   | B  | 安全穹顶：四层内生安全（沙箱、RBAC、净化、审计）                                                                                                              |
+| **heapstore** | `git@atomgit.com:openairymax/heapstore.git` | A  | 堆式运行时数据持久化                                                                                                                              |
+| **protocols** | `git@atomgit.com:openairymax/protocols.git` | —  | AgentsIPC（128 字节消息头）& A2A/A2T 协议栈                                                                                                       |
+| **gateway**   | `git@atomgit.com:openairymax/gateway.git`   | —  | HTTP/WS/Stdio → JSON-RPC 2.0 网关守护进程（`gateway_d`）                                                                                        |
+| **daemons**   | `git@atomgit.com:openairymax/daemons.git`   | —  | 12 个运行时守护进程：`gateway_d`、`llm_d`、`tool_d`、`sched_d`、`market_d`、`monit_d`、`channel_d`、`info_d`、`notify_d`、`observe_d`、`hook_d`、`plugin_d` |
 
 > **分类说明：** A = 基础/原子层（被上层依赖）；B = 行为/安全层；— = 服务/组合层。
 
@@ -118,18 +118,18 @@ cd /tmp/agentrt-build && ctest --output-on-failure
 
 ### 关键 CMake 选项
 
-| 选项 | 默认值 | 说明 |
-|------|--------|------|
-| `BUILD_TESTS` | ON | 构建单元测试（在顶层启用 CTest） |
-| `BUILD_SHARED_LIBS` | OFF | 构建动态库而非静态库 |
-| `AIRY_BUILD_ALL` | ON | 构建全部 AgentRT 组件 |
-| `AIRY_WITH_MEMORYROVOL` | OFF | 启用 MemoryRovol 商业记忆提供者 |
-| `AIRY_MEMORY_BACKEND` | `builtin` | 记忆后端选择（`builtin` \| `memoryrovol`） |
-| `AIRY_COMPLIANCE_STRICT` | ON | 严格合规模式（投毒不安全函数，如 `strcpy`） |
-| `ENABLE_SANITIZERS` | ON | 启用 ASan + LSan + UBSan |
-| `ENABLE_COVERAGE` | OFF | 启用代码覆盖率报告 |
-| `WARNINGS_AS_ERRORS` | OFF | 将编译器警告视为错误 |
-| `AIRY_DOCKER_BUILD` | OFF | Docker 构建模式 |
+| 选项                       | 默认值       | 说明                                 |
+| ------------------------ | --------- | ---------------------------------- |
+| `BUILD_TESTS`            | ON        | 构建单元测试（在顶层启用 CTest）                |
+| `BUILD_SHARED_LIBS`      | OFF       | 构建动态库而非静态库                         |
+| `AIRY_BUILD_ALL`         | ON        | 构建全部 AgentRT 组件                    |
+| `AIRY_WITH_MEMORYROVOL`  | OFF       | 启用 MemoryRovol 商业记忆提供者             |
+| `AIRY_MEMORY_BACKEND`    | `builtin` | 记忆后端选择（`builtin` \| `memoryrovol`） |
+| `AIRY_COMPLIANCE_STRICT` | ON        | 严格合规模式（投毒不安全函数，如 `strcpy`）         |
+| `ENABLE_SANITIZERS`      | ON        | 启用 ASan + LSan + UBSan             |
+| `ENABLE_COVERAGE`        | OFF       | 启用代码覆盖率报告                          |
+| `WARNINGS_AS_ERRORS`     | OFF       | 将编译器警告视为错误                         |
+| `AIRY_DOCKER_BUILD`      | OFF       | Docker 构建模式                        |
 
 ## 分支策略
 
@@ -150,14 +150,14 @@ cd /tmp/agentrt-build && ctest --output-on-failure
 
 **SPDX 表达式**：`AGPL-3.0-or-later OR Apache-2.0`
 
-| 你的场景 | 选择 | 原因 |
-|----------|------|------|
-| 构建**SaaS 网络服务**并修改 AgentRT | **AGPL v3** | 网络服务条款要求公开修改后的源代码 |
-| 开发**开源衍生作品**（copyleft 项目） | **AGPL v3** | 衍生作品必须同样以 AGPL 开源 |
-| 在**商业闭源产品**中集成 AgentRT | **Apache 2.0** | 宽松许可证，允许闭源衍生 |
-| 构建**企业内部工具** | **Apache 2.0** | 无需公开源代码 |
-| 需要**专利保护** | **Apache 2.0** | 贡献者明确授予专利使用权 |
-| 仅用于学习与研究 | **任一** | 两者均允许个人使用 |
+| 你的场景                       | 选择             | 原因                |
+| -------------------------- | -------------- | ----------------- |
+| 构建**SaaS 网络服务**并修改 AgentRT | **AGPL v3**    | 网络服务条款要求公开修改后的源代码 |
+| 开发**开源衍生作品**（copyleft 项目）  | **AGPL v3**    | 衍生作品必须同样以 AGPL 开源 |
+| 在**商业闭源产品**中集成 AgentRT     | **Apache 2.0** | 宽松许可证，允许闭源衍生      |
+| 构建**企业内部工具**               | **Apache 2.0** | 无需公开源代码           |
+| 需要**专利保护**                 | **Apache 2.0** | 贡献者明确授予专利使用权      |
+| 仅用于学习与研究                   | **任一**         | 两者均允许个人使用         |
 
 权威许可证政策见 [12-license-policy.md](../docs/AirymaxOS/50-engineering-standards/12-license-policy.md)。
 
