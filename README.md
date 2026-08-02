@@ -20,6 +20,18 @@ This repository is a **management repo** (git superproject). It aggregates **7 l
 
 AgentRT is **one of five management repositories** under the `airymaxhub` umbrella (the other four being `sdk`, `ecosystem`, `products`, and `agentrt-linux`). The Airymax workspace is partitioned into 38 repositories in total: 1 umbrella repo + 5 management repos + 29 leaf repos + 3 top-level repos. Each leaf repo is independently buildable and version-controlled, while the management repo pins them together via git submodules to produce a coherent, reproducible runtime platform.
 
+### 0.1.1 Framework-ization (Mechanism/Policy Separation)
+
+The 0.1.1 foundation release brings **mechanism/policy framework-ization** into the cognition pipeline, closing the product loop of "understanding user intent" and "driving real agents":
+
+| Capability | Mechanism layer (agentrt) | Policy layer (product/caller) |
+|------------|---------------------------|-------------------------------|
+| **GCCP goal confirmation** | Two-phase protocol (probe/confirm) + 5-question goal model + heuristic fallback | Interaction callback (ask endpoint/start/bottleneck/audience) |
+| **Work Hall** | Task-graph registration / status board / cancel + `airy_orch_ops_t` injection | Plan→DAG adaptation + handler binding |
+| **Interactive product CLI** | `tools/airy_cli` (CMake option `BUILD_CLI`, default ON) | Product-level interaction policy |
+
+Product loop: **natural-language big-task instruction → GCCP intent confirmation → cognition planning → Plan→TaskFlow DAG adaptation → Work Hall submit/board → agent_d drives ecosystem/agents for real execution**.
+
 ## Repository Structure
 
 ```
@@ -125,6 +137,7 @@ cd /tmp/agentrt-build && ctest --output-on-failure
 | `AIRY_BUILD_ALL` | ON | Build all AgentRT components |
 | `AIRY_WITH_MEMORYROVOL` | OFF | Enable MemoryRovol commercial memory provider |
 | `AIRY_MEMORY_BACKEND` | `builtin` | Memory backend selection (`builtin` \| `memoryrovol`) |
+| `BUILD_CLI` | ON | Build the interactive product CLI (GCCP + Work Hall loop) |
 | `AIRY_COMPLIANCE_STRICT` | ON | Strict compliance mode (poisons unsafe functions, e.g. `strcpy`) |
 | `ENABLE_SANITIZERS` | ON | Enable ASan + LSan + UBSan |
 | `ENABLE_COVERAGE` | OFF | Enable code coverage reporting |

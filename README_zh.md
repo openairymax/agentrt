@@ -20,6 +20,18 @@
 
 AgentRT 是 `airymaxhub` 伞仓下**五个管理仓之一**（其余四个为 `sdk`、`ecosystem`、`products`、`agentrt-linux`）。Airymax 工作区共拆分为 38 个仓库：1 个伞仓 + 5 个管理仓 + 29 个叶子仓 + 3 个顶层仓。每个叶子仓可独立构建与版本控制，管理仓通过 git submodule 将它们钉合在一起，产出连贯、可复现的运行时平台。
 
+### 0.1.1 框架化能力（机制/策略分离）
+
+0.1.1 奠基版本在认知管线中落地了**机制/策略框架化**改造，将"理解用户意图"与"驱动 Agent 干活"的产品闭环纳入运行时：
+
+| 能力 | 机制层（agentrt） | 策略层（产品/调用方） |
+|------|------------------|----------------------|
+| **GCCP 目标完备确认** | 两阶段协议（probe/confirm）+ 五问目标模型 + 启发式降级 | 交互回调（向用户询问终点/起点/卡点/受众） |
+| **工作大厅 (Work Hall)** | 任务图注册/看板/取消 + `airy_orch_ops_t` 注入 | Plan→DAG 适配 + handler 绑定 |
+| **交互式产品 CLI** | `tools/airy_cli`（CMake 选项 `BUILD_CLI`，默认 ON） | 产品层交互策略 |
+
+产品闭环：**用户自然语言大任务指令 → GCCP 意图完备确认 → 认知规划 → Plan→TaskFlow DAG 适配 → 工作大厅提交/看板 → agent_d 驱动 ecosystem/agents 真实执行**。
+
 ## 仓库结构
 
 ```
@@ -125,6 +137,7 @@ cd /tmp/agentrt-build && ctest --output-on-failure
 | `AIRY_BUILD_ALL`         | ON        | 构建全部 AgentRT 组件                    |
 | `AIRY_WITH_MEMORYROVOL`  | OFF       | 启用 MemoryRovol 商业记忆提供者             |
 | `AIRY_MEMORY_BACKEND`    | `builtin` | 记忆后端选择（`builtin` \| `memoryrovol`） |
+| `BUILD_CLI`              | ON        | 构建交互式产品 CLI（GCCP + 工作大厅闭环）   |
 | `AIRY_COMPLIANCE_STRICT` | ON        | 严格合规模式（投毒不安全函数，如 `strcpy`）         |
 | `ENABLE_SANITIZERS`      | ON        | 启用 ASan + LSan + UBSan             |
 | `ENABLE_COVERAGE`        | OFF       | 启用代码覆盖率报告                          |

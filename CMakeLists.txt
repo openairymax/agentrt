@@ -607,6 +607,7 @@ if(AIRY_BUILD_ALL)
     option(BUILD_DAEMON "Build daemon modules (system services)" ON)
     option(BUILD_GATEWAY "Build gateway module (API gateway)" ON)
     option(BUILD_HEAPSTORE "Build heapstore module (persistent storage)" ON)
+    option(BUILD_CLI "Build interactive CLI product (GCCP + WorkHall)" ON)
     option(BUILD_TOOLKIT "Build toolkit modules (language SDKs)" OFF)
 
     # 包含子目录（构建顺序：commons 优先于 atoms）
@@ -648,6 +649,13 @@ if(AIRY_BUILD_ALL)
         add_subdirectory(heapstore)
     else()
         airy_print_warn("heapstore module not found or disabled")
+    endif()
+
+    # 产品化交互式 CLI（GCCP 意图确认 + 工作大厅 + agent 驱动闭环）
+    if(BUILD_CLI AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/airy_cli/CMakeLists.txt")
+        add_subdirectory(tools/airy_cli)
+    else()
+        airy_print_warn("airy_cli module not found or disabled")
     endif()
 
     # toolkit 包含多种语言 SDK，需要特殊处理
