@@ -4,7 +4,8 @@
 
 ## 📋 目录
 
-- [v0.1.1](#v011---2026-07-12) ⭐ 最新 — 奠基版本（Foundation Release）
+- [v0.1.1 框架化改造](#v011-框架化改造---2026-08-02) ⭐ 最新 — GCCP / 工作大厅 / 双思考 / CLI
+- [v0.1.1](#v011---2026-07-12) — 奠基版本（Foundation Release）
 - [v0.1.0](#v010---2026-05-29) — 首个正式发行版
 - [v0.0.5](#v005---2026-05-24) — C 运行时深度审计与质量加固
 - [v0.0.12](#v0012---2026-04-11)
@@ -16,6 +17,58 @@
 - [v0.0.4](#v004---生产就绪-2026-03-25)
 - [v0.0.3](#v003---开发中-2026)
 - [历史版本](#历史版本)
+
+---
+
+## [v0.1.1 框架化改造] - 2026-08-02
+
+### 🎯 机制/策略框架化（1.0.1 前置任务）
+
+在 0.1.1 奠基版本之上完成认知管线的**机制/策略框架化**改造：将"理解用户意图"与"驱动 Agent 干活"的产品闭环纳入运行时。机制在 agentrt 内实现，策略由产品层（CLI/UI）注入。
+
+### Added
+- **GCCP 目标完备确认协议**（`coreloopthree/include/gccp.h` + `src/cognition/gccp.c`）
+  - 两阶段交互协议：`airy_gccp_probe()`（目标探测）→ 产品层交互回调 → `airy_gccp_confirm()`（回答融合补全）
+  - 五问目标模型：终点（Φ）/ 起点（x₀）/ 卡点（U）/ 受众（w）+ Q5 可验证完成判据，经庞特里亚金最小值原理映射
+  - 状态机：`CONFIRMED / DEGRADED / AMBIGUOUS`；LLM 不可用时启发式降级（固定四问）
+  - 认知引擎 Phase 0 拆解后插入确认阶段；结果挂载 `intent.intent_gccp_goal` 并写入 working_mem `gccp_goal`
+- **工作大厅 Work Hall**（`coreloopthree/include/work_hall.h` + `src/work_hall.c`）
+  - 任务图注册 / 状态看板（查询/列表）/ 取消 / 等待，线程安全
+  - 节点 handler 路由到 `agent_d`（daemon_rpc_call spawn/invoke），驱动 ecosystem/agents 真实执行
+  - `airy_work_hall_bind_ops()` 实现 `airy_orch_ops_t` 并注入全局 ops_injection 表（接通断链）
+- **Plan→TaskFlow DAG 适配层**（`coreloopthree/include/plan_to_dag.h` + `src/plan_to_dag.c`）
+  - `airy_plan_to_workflow()`：`airy_task_plan_t` → `taskflow_workflow_t`（节点/边/入口转换 + `agent:` 前缀规范化）
+- **产品化交互式 CLI**（`tools/airy_cli`，CMake 选项 `BUILD_CLI` 默认 ON）
+  - 完整闭环：自然语言大任务指令 → GCCP 四问交互 → 认知规划 → Plan→DAG 适配 → 工作大厅提交/看板 → agent_d 驱动
+- **双思考 TC3 三独立模型激活** + **dual_coordinate 交叉验证接线**
+  - `airy_cognition_set_tc3_models()` 注入 t2 / t1-f / t1-p 三模型；TC3 成功后激活 `coord_strat->coordinate` 双模型交叉验证（接通断链）
+- **GRAD 计划级批判循环**（`coreloopthree/src/cognition/critique/grad_*.{h,c}`）
+  - **用户决策：放弃文本级批判循环，全面采用 GRAD**——GRAD 启用时跳过 Phase 2 文本批判循环（`enable_grad` 开关，默认 1）
+  - 三权分立：模型 A（t2）构造/修正计划、模型 C（t1-p）确定性四验（E-01 因果 / E-02 死锁 Kahn / E-03 资源 / E-04 目的漂移，零生成 Token）、模型 B（t1-f）语境终裁
+  - 差分熵削减：`airy_grad_verify_scope()` 仅验证 Δ_k 一阶闭包，O(M×N) → O(N+M·Δ)
+  - 双思考工作空间：`$AIRY_RUNTIME_DIR/workspace/<plan_id>/` 落盘 t2 原始计划、c_verify 四验报告、b_arbiter 终裁意见、trace/chain.jsonl 决策链（所有工作有迹可循）
+  - 显式 model 优先路由（llm_d `select_provider_via_router`）：用户指定模型精确匹配 registry，失败才走 COST_AWARE 降级
+- **`airy_loop_dag_cancel()`** — 取消 DAG 执行实例（供工作大厅取消）
+
+### Changed
+- `airy_intent_t` 新增 `intent_gccp_goal` 字段（OWNER，由 `airy_intent_free` 释放）
+- `airy_task_node_t` 扩展 GRAD 元数据：`task_node_inputs/outputs`（类型签名）、`task_node_cost_time_ms/cost_mem_mb`（资源）、`task_node_invariant_guard`（不变式）
+- 认知引擎新增 setter：`airy_cognition_set_gccp_enabled` / `airy_cognition_set_gccp_interact` / `airy_cognition_set_tc3_models` / `airy_cognition_set_grad_enabled`
+- 顶层 CMakeLists 新增 `BUILD_CLI` 选项（默认 ON）+ `tools/airy_cli` 子目录
+
+### Fixed
+- 接通断链：`airy_orch_ops_t` 注入（工作大厅 bind_ops）与 `dual_coordinate` 调用点（TC3 成功后接线）
+- `security_types.h` `cap_t` 与 libcap 冲突 → `airy_cap_t`
+- `syscall_router.c` 2 处 `memcpy` 违反 BAN-154 → `AIRY_MEMCPY` + 补齐遥测字段
+- GCCP / Plan→DAG 中 `memcpy` 投毒规避
+- 工作大厅 double-free（`airy_work_hall_destroy` 值数组释放）、`-Waddress` 告警（定长数组三元判断）
+- ecosystem 配置 SSoT：`agentrt.yaml` llm 段收敛为 runtime、`model.yaml` 补 providers 段、`contract.json` agent_id → `coding_rs_v1`
+
+### Tested
+- `test_gccp_workhall.c`（6/6 通过）+ 既存 coreloopthree 测试全绿；ASAN 复验无 double-free/UAF
+- `test_grad.c`（8/8 通过）：E-01/E-02/E-03 四验、seed 收敛、驳回重生成、差分范围
+- 端到端冒烟：CLI 任务集 GCCP → 规划 → GRAD 轮回（round0 reject → 重新生成 → round1 accept 收敛）→ DAG → 工作大厅 → 执行；工作空间 `workspace/<plan_id>/` 决策链落盘完整
+- 终端冒烟实测：GCCP 四问交互正常展示、LLM/agent_d 不可用时降级路径日志正确
 
 ---
 
