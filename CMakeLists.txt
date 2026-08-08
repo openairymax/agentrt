@@ -62,7 +62,10 @@ option(BUILD_TESTS "Build unit tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
 option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" ON)
 option(AIRY_BUILD_ALL "Build all AgentRT components" ON)
-option(AIRY_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" OFF)
+# IRON-8 生产就绪：MemoryRovol 为默认记忆提供商（L1-L4 四层记忆卷载），
+# 默认启用而非显式开关。外部源缺失时 atoms/memoryrovol/CMakeLists.txt
+# 自动降级为 builtin provider，不会破坏构建。
+option(AIRY_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" ON)
 # 兼容别名：允许使用 AIRY_WITH_MEMORYROVOL（旧名）
 if(DEFINED AIRY_WITH_MEMORYROVOL AND NOT DEFINED AIRY_WITH_MEMORYROVOL)
     set(AIRY_WITH_MEMORYROVOL ${AIRY_WITH_MEMORYROVOL})
