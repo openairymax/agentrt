@@ -26,9 +26,12 @@
 !SUPPORT.md
 !tests/
 # ---------------------------------------------------------------------------
-# P2-3: syscall.xml SSoT codegen 生成器（CMake 构建与 CI 防漂移校验依赖，
-# 属管理仓必要工具，须入库；其余 tools/ 内容仍按默认忽略）
+# 管理仓必要工具（CMake/README/CHANGELOG 正式引用，须入库）：
+# - tools/codegen: syscall.xml SSoT codegen 生成器（CMake 构建与 CI 防漂移校验依赖）
+# - tools/airy_cli: 交互式产品 CLI（BUILD_CLI 默认 ON，产品层交互策略）
 # ---------------------------------------------------------------------------
 !tools/
 !tools/codegen/
 !tools/codegen/**
+!tools/airy_cli/
+!tools/airy_cli/**
