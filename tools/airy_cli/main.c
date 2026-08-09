@@ -20,9 +20,12 @@
 
 #include "airy_rt.h"
 #include "loop.h"
+#include "roadmap_sched.h" /* 蓝图调度：执行结果回灌钩子（协同点1） */
+#include "platform.h"      /* airy_data_dir()：L2 持久化快照路径（P1e 双写） */
 #include "cognition.h"
 #include "gccp.h"
 #include "work_hall.h"
+#include "hall_store.h"   /* 决策 C：任务文件模型（全流程可见性存储） */
 #include "plan_to_dag.h"
 #include "taskflow_advanced.h"
 #include "llm_svc_adapter.h"
@@ -252,7 +255,7 @@ static int cli_llm_classify(const char *input)
 
     llm_request_config_t cfg;
     __builtin_memset(&cfg, 0, sizeof(cfg));
-    cfg.model = NULL; /* 使用 provider 默认模型 */
+    cfg.model = getenv("AIRY_MODEL_T1F"); /* 决策 A：任务/对话分流由 B 模型（t1-f）执行 */
     cfg.messages = msgs;
     cfg.message_count = 2;
     cfg.temperature = 0.0f;
@@ -307,9 +310,10 @@ static int cli_classify_input(const char *input)
 /**
  * @brief 对话集处理：以超级智能体身份直接回复用户
  *
- * 分级思考（GRAD）：非任务集对话仅启用 t1-f（模型 B 语境终裁）轻量验证，
- * 不启动全量双思考（t2/t1-f/t1-p 三模型批判循环）。
- * 实现：t2 生成回复 → t1-f 验证一次 → 不合格则基于批判意见重生成一次。
+ * 决策 A（2026-08-09）：日常对话全部由 B 模型（t1-f）生成与分流，
+ * 不启动全量双思考（t2/t1-f/t1-p 三模型批判循环）；t2（A）仅保留
+ * 规划/生成职责（L3 多方案、GRAD 修正、改进6 深度复核）。
+ * 实现：t1-f 单模型生成回复（AIRY_MODEL_T1F，未设置回落 provider 默认）。
  */
 static void cli_chat_reply(const char *input)
 {
@@ -319,14 +323,17 @@ static void cli_chat_reply(const char *input)
         return;
     }
 
-    const char *t2_model = getenv("AIRY_MODEL_T2");
     const char *t1f_model = getenv("AIRY_MODEL_T1F");
-    const char *t1f_verify_env = getenv("AIRY_CHAT_T1F_VERIFY");
 
-    /* t1-f 轻量验证默认关闭（环境变量 AIRY_CHAT_T1F_VERIFY=1 启用）。
-     * 启用时对话集走 t2→t1-f 单次验证→按需重生成的分级路径；
-     * 关闭时保持直接回复（零额外 LLM 调用，兼容现有交互）。 */
-    int t1f_verify = (t1f_verify_env && t1f_verify_env[0] == '1') ? 1 : 0;
+    /* 决策 B（2026-08-09）：配置环节提醒——t1-f（B 模型）最先激活。
+     * 未配置时提示三配置点与激活顺序，但不阻断对话（回落 provider 默认）。 */
+    if (!t1f_model || !t1f_model[0]) {
+        printf("  %s[配置]%s 未检测到 t1-f（B 模型，日常对话/意图分流）配置：\n"
+               "        建议先配置 AIRY_MODEL_T1F（本地 Ollama/vLLM 或云端 API），\n"
+               "        再按需配置 AIRY_MODEL_T2（A，规划/修正）与 AIRY_MODEL_T1P\n"
+               "        （C，逻辑验证）；当前对话将使用 llm_d 默认模型。\n",
+               CLR_YELLOW, CLR_RESET);
+    }
 
     /* 消息数组：[system] + 会话历史 + [当前用户输入]，让 LLM 记住上下文。
      * 指针指向全局历史缓冲与栈上 input，在 complete 调用期间保持有效。 */
@@ -352,7 +359,7 @@ static void cli_chat_reply(const char *input)
 
     llm_request_config_t cfg;
     __builtin_memset(&cfg, 0, sizeof(cfg));
-    cfg.model = t2_model; /* t2（模型 A）生成；未设置时 provider 默认 */
+    cfg.model = t1f_model; /* 决策 A：B 模型（t1-f）生成；未设置时 provider 默认 */
     cfg.messages = msgs;
     cfg.message_count = msg_n;
     cfg.temperature = 0.7f;
@@ -369,75 +376,8 @@ static void cli_chat_reply(const char *input)
         return;
     }
 
-    /* t1-f 轻量验证（仅对话集分级启用时） */
-    if (t1f_verify) {
-        const char *reply = resp->choices[0].content;
-        size_t reply_len = strlen(reply);
-
-        /* 构造 t1-f 验证 prompt：原始对话 + 待验证回复 */
-        llm_message_t vmsgs[2];
-        vmsgs[0].role = "system";
-        vmsgs[0].content =
-            "You are the fast verifier (t1-f) in a dual-thinking system. "
-            "Check whether the reply to the user message is coherent, "
-            "helpful, and not off-topic. "
-            "Reply with ONLY a JSON object: "
-            "{\"score\": <float 0.0-1.0>, \"acceptable\": <true|false>, "
-            "\"critique\": \"<issues found, or empty>\"}";
-        char vprompt[4096];
-        snprintf(vprompt, sizeof(vprompt),
-                 "User message:\n%.*s\n\nReply to verify:\n%.*s",
-                 (int)(strlen(input) > 1000 ? 1000 : strlen(input)), input,
-                 (int)(reply_len > 2000 ? 2000 : reply_len), reply);
-        vmsgs[1].role = "user";
-        vmsgs[1].content = vprompt;
-
-        llm_request_config_t vcfg;
-        __builtin_memset(&vcfg, 0, sizeof(vcfg));
-        vcfg.model = t1f_model; /* t1-f（模型 B）；未设置时 provider 默认 */
-        vcfg.messages = vmsgs;
-        vcfg.message_count = 2;
-        vcfg.temperature = 0.0f;
-        vcfg.max_tokens = 256;
-
-        llm_response_t *vresp = NULL;
-        int vret = llm_svc_adapter_complete(g_chat_adapter, &vcfg, &vresp);
-        int acceptable = 1;
-        if (vret == 0 && vresp && vresp->choices && vresp->choice_count > 0 &&
-            vresp->choices[0].content) {
-            const char *vcontent = vresp->choices[0].content;
-            if (strstr(vcontent, "\"acceptable\":false") ||
-                strstr(vcontent, "\"acceptable\": false")) {
-                acceptable = 0;
-            }
-        }
-        if (vresp)
-            llm_response_free(vresp);
-
-        if (!acceptable) {
-            /* 重生成一次（基于批判，最多一次，避免无界循环） */
-            llm_response_free(resp);
-            resp = NULL;
-            char re_prompt[8192];
-            snprintf(re_prompt, sizeof(re_prompt),
-                     "Original user message:\n%s\n\n"
-                     "Your previous reply was flagged as not acceptable by the "
-                     "fast verifier. Improve the reply to be coherent, helpful, "
-                     "and on-topic.",
-                     input);
-            msgs[msg_n - 1].content = re_prompt; /* 替换最后一条 user 消息 */
-            ret = llm_svc_adapter_complete(g_chat_adapter, &cfg, &resp);
-            if (ret != 0 || !resp || !resp->choices || resp->choice_count == 0 ||
-                !resp->choices[0].content) {
-                if (resp)
-                    llm_response_free(resp);
-                AIRY_FREE(msgs);
-                printf("  %s[对话]%s 回复重生成失败（err=%d）\n",
-                       CLR_RED, CLR_RESET, ret);
-                return;
-            }
-        }
-    }
+    /* 决策 A：无 t1-f 验证段——生成者即 B 模型（t1-f），不再需要
+     * "t2 生成 → t1-f 验证 → 重生成"路径（AIRY_CHAT_T1F_VERIFY 已废弃）。 */
 
     /* 会话历史：记录本轮 user/assistant，供下一轮上下文使用 */
     cli_history_add("user", input);
@@ -706,18 +646,83 @@ int main(void)
                           m_expert ? m_expert : "(default)");
         }
 
+        /* 决策 B（2026-08-09）：模型三配置点提醒——t2=A（生成者，云端为主）、
+         * t1-f=B（语境终裁者/日常对话，最先激活，本地为主）、t1-p=C（逻辑验证者）；
+         * 每点既可用云端 API 又可用本地端点（Ollama/vLLM），开关由用户决定。 */
+        printf("  %s[模型配置]%s t2(A)=%s | t1-f(B)=%s | t1-p(C)=%s\n",
+               CLR_GREEN, CLR_RESET,
+               m_s2 ? m_s2 : "(未配置，llm_d 默认)",
+               m_verify ? m_verify : "(未配置，llm_d 默认)",
+               m_expert ? m_expert : "(未配置，llm_d 默认)");
+        printf("    %s提示：%s 每点均可指向云端 API 或本地（Ollama/vLLM）；"
+               "激活顺序 t1-f（B）最先（日常对话/意图分流）。\n",
+               CLR_YELLOW, CLR_RESET);
+
         /* GRAD 计划级批判循环：任务集默认启用（放弃文本级批判循环） */
         airy_cognition_set_grad_enabled(cog, 1);
     }
 
-    /* 3. 创建工作大厅并注入 orchestration ops */
+    /* 3. 蓝图调度（Roadmap Sched）：执行结果回灌钩子（协同点1）。
+     * 工作大厅节点终态经 progress_cb 回灌 L2 缓存 / 失败指纹 / 取消联动 L1。
+     * P1e：L2 双写持久化（$AIRY_HOME/data/agentrt/roadmap/l2_semantic_cache.json，
+     * 重启恢复）；Embedding + HNSW 向量索引（MemoryRovol，未链接自动降级）。
+     * 创建失败仅降级（无回灌），不阻断交互式 CLI 主流程。 */
+    airy_rs_config_t rs_cfg;
+    __builtin_memset(&rs_cfg, 0, sizeof(rs_cfg));
+    {
+        static char rs_persist_path[512];
+        snprintf(rs_persist_path, sizeof(rs_persist_path), "%s/agentrt/roadmap/l2_semantic_cache.json",
+                 airy_data_dir());
+        rs_cfg.l2_persist_path = rs_persist_path;
+    }
+    airy_roadmap_sched_t *rsched = NULL;
+    err = airy_roadmap_sched_create(&rs_cfg, &rsched);
+    if (err != AIRY_EOK || !rsched) {
+        AIRY_LOG_WARN("airy_cli: roadmap_sched create failed (err=%d), "
+                      "execution feed-back disabled", (int)err);
+        rsched = NULL;
+    }
+
+    /* 4. 创建工作大厅并注入 orchestration ops */
+    /* 决策 G（2026-08-09）：验证门禁落地——注入产物验证器。
+     * 规则来自 AIRY_VALIDATOR_RULES（JSON），缺省 exit_code=0；
+     * 节点级门禁由 sched_d write_back 前置验证承担，CLI 侧在 wait 后标注 FAIL。 */
+    airy_artifact_validator_t *cli_validator = NULL;
+    const char *rules_json = getenv("AIRY_VALIDATOR_RULES");
+    if (!rules_json || !rules_json[0])
+        rules_json = "{\"exit_code\":0}";
+    airy_err_t vrc = airy_artifact_validator_from_json(&cli_validator, rules_json);
+    if (vrc != AIRY_SUCCESS) {
+        AIRY_LOG_WARN("airy_cli: output_validator create failed (err=%d), gate disabled",
+                      (int)vrc);
+        cli_validator = NULL;
+    }
     airy_work_hall_config_t wh_cfg;
     __builtin_memset(&wh_cfg, 0, sizeof(wh_cfg));
     wh_cfg.progress_cb = cli_progress_cb; /* 节点级进度实时反馈 */
+    wh_cfg.roadmap_sched = rsched;        /* BORROW：执行结果回灌蓝图调度 */
+    wh_cfg.output_validator = cli_validator; /* BORROW：产物验证门禁（决策 G） */
+    /* 决策 C（2026-08-09）：任务文件模型——全流程可见性存储（$AIRY_HOME/data/agentrt/hall）。
+     * 进度/结果/问题事件写入大厅存储，支持检索回放与记忆层经验提取。 */
+    airy_hall_store_t *hall_store = airy_hall_store_create(NULL);
+    if (!hall_store)
+        AIRY_LOG_WARN("airy_cli: hall store create failed, full visibility disabled");
+    wh_cfg.hall_store = hall_store; /* BORROW：任务文件模型（决策 C） */
+    /* 决策 E（2026-08-09）：工作区隔离主工作区路径。
+     * AIRY_WORKSPACE_MAIN_DIR 显式指定时启用（节点执行快照主工作区 → 独立沙箱目录
+     * → 产物 merge 回主工作区）；未指定则保持现状（执行体直接操作主工作区）。
+     * AIRY_WORKSPACE_ISOLATION=0 可进一步关闭隔离（快照/合并返回 ENOTSUP）。 */
+    {
+        const char *ws_main = getenv("AIRY_WORKSPACE_MAIN_DIR");
+        if (ws_main && ws_main[0])
+            wh_cfg.main_workspace_dir = ws_main;
+    }
     airy_work_hall_t *hall = NULL;
     err = airy_work_hall_create(&wh_cfg, loop, &hall);
     if (err != AIRY_EOK || !hall) {
         AIRY_LOG_ERROR("airy_cli: work hall create failed (err=%d)", (int)err);
+        if (rsched)
+            airy_roadmap_sched_destroy(rsched);
         airy_loop_destroy(loop);
         return 1;
     }
@@ -729,7 +734,7 @@ int main(void)
     if (err != AIRY_EOK)
         AIRY_LOG_WARN("airy_cli: set cancel flag failed (err=%d)", (int)err);
 
-    /* 3.1 创建对话适配器（任务集/对话集分流用，独立于 loop 内部 adapter） */
+    /* 5. 创建对话适配器（任务集/对话集分流用，独立于 loop 内部 adapter） */
     llm_svc_adapter_config_t chat_cfg;
     __builtin_memset(&chat_cfg, 0, sizeof(chat_cfg));
     chat_cfg.llm_d_service_name = "llm_d";
@@ -739,7 +744,7 @@ int main(void)
         AIRY_LOG_WARN("airy_cli: chat adapter create failed, "
                          "falling back to task-only mode");
 
-    /* 4. 主交互循环 */
+    /* 6. 主交互循环 */
     char input[8192];
     int quit_flag = 0;
     cli_cmd_ctx_t cmd_ctx = {.hall = hall, .quit = &quit_flag};
@@ -772,6 +777,34 @@ int main(void)
             continue;
         }
 
+        /* 4.0b 蓝图调度三级路由（§3.1 接线：认知入口之前挂接）。
+         * L1 状态机命中（零 Token）→ 输出下一步；L2 语义缓存命中（低 Token）→
+         * 输出建议；两者均不进入 LLM 管线。仅 MISS_L3 走五阶段认知管线。
+         * L3 收敛图纸经 absorb 登记状态机（§3.5），后续"继续/下一步"L1 命中。 */
+        if (rsched) {
+            char *rs_out = NULL;
+            airy_rs_dispatch_t rs_disp = AIRY_RS_DISPATCH_MISS_L3;
+            airy_err_t rs_err = airy_roadmap_sched_process(
+                rsched, input, NULL, &rs_out, &rs_disp);
+            if (rs_err == AIRY_EOK &&
+                rs_disp == AIRY_RS_DISPATCH_HIT_L1) {
+                printf("  %s[蓝图]%s L1 状态机命中（零 Token）：%s%s%s\n",
+                       CLR_GREEN, CLR_RESET, CLR_YELLOW,
+                       rs_out ? rs_out : "{}", CLR_RESET);
+                AIRY_FREE(rs_out);
+                continue;
+            }
+            if (rs_err == AIRY_EOK &&
+                rs_disp == AIRY_RS_DISPATCH_HIT_L2) {
+                printf("  %s[蓝图]%s L2 语义缓存命中（低 Token）：%s\n",
+                       CLR_GREEN, CLR_RESET,
+                       rs_out ? rs_out : "{}");
+                AIRY_FREE(rs_out);
+                continue;
+            }
+            AIRY_FREE(rs_out); /* MISS_L3 或错误：进入认知管线 */
+        }
+
         /* 4.1 认知处理（任务集：GCCP 意图确认在 Phase 0 后自动发生） */
         g_cli_cancel = 0; /* 新任务开始，复位取消标志 */
         printf("  %s[认知]%s 正在分析任务（LLM 拆解 + 意图确认）...\n",
@@ -783,6 +816,10 @@ int main(void)
                    CLR_RED, CLR_RESET, (int)err);
             continue;
         }
+        /* 4.1.5 收敛图纸 absorb（§3.5）：登记 L1 状态机 + 重置 TTL，
+         * 使后续"继续/下一步"指令 L1 命中（零 Token 推进）。失败仅降级。 */
+        if (rsched)
+            airy_roadmap_sched_absorb(rsched, plan, NULL, NULL);
         printf("  %s[认知]%s 计划已生成：%splan_id=%s%s 节点=%zu 入口=%zu\n",
                CLR_GREEN, CLR_RESET, CLR_YELLOW,
                plan->task_plan_id ? plan->task_plan_id : "?",
@@ -894,7 +931,9 @@ int main(void)
             printf("  %s[看板]%s 状态无推进，驱动执行完成...\n",
                    CLR_YELLOW, CLR_RESET);
 
-        /* 4.5 获取结果（若期间收到 Ctrl+C 取消，优先提示已中止） */
+        /* 6.5 获取结果（若期间收到 Ctrl+C 取消，优先提示已中止） */
+        uint32_t vf_before = 0, vf_after = 0;
+        airy_work_hall_verify_stats(hall, NULL, &vf_before, NULL); /* 决策 G：基线 */
         char *result = NULL;
         err = airy_work_hall_wait(hall, exec_id, 0, &result);
         if (g_cli_cancel) {
@@ -905,6 +944,15 @@ int main(void)
         } else {
             printf("  %s[结果]%s （未获取到结果，err=%d）\n",
                    CLR_YELLOW, CLR_RESET, (int)err);
+        }
+        /* 决策 G：验证门禁标注——本次执行产物验证 FAIL 时明确标注，
+         * 供用户决定重新规划/重试（节点级门禁重试由 sched_d 承担）。 */
+        if (!g_cli_cancel) {
+            airy_work_hall_verify_stats(hall, NULL, &vf_after, NULL);
+            if (vf_after > vf_before)
+                printf("  %s[验证]%s 本次执行产物验证失败——结果已标注，"
+                       "可通过重新规划或重试处理\n",
+                       CLR_RED, CLR_RESET);
         }
 
         if (result)
@@ -918,10 +966,16 @@ int main(void)
         airy_task_plan_free(plan);
     }
 
-    /* 5. 清理 */
+    /* 7. 清理（先 hall 后 rsched：hall BORROW 不拥有蓝图调度） */
     if (g_chat_adapter)
         llm_svc_adapter_destroy(g_chat_adapter);
     airy_work_hall_destroy(hall);
+    if (cli_validator) /* 决策 G：验证器 OWNER，hall destroy 后释放 */
+        airy_artifact_validator_destroy(cli_validator);
+    if (hall_store) /* 决策 C：任务文件存储 OWNER，hall destroy 后释放 */
+        airy_hall_store_destroy(hall_store);
+    if (rsched)
+        airy_roadmap_sched_destroy(rsched);
     airy_loop_destroy(loop);
     printf("\n%sAgentRT 已退出，感谢使用。%s\n", CLR_CYAN, CLR_RESET);
     return 0;

@@ -70,6 +70,37 @@
 - 端到端冒烟：CLI 任务集 GCCP → 规划 → GRAD 轮回（round0 reject → 重新生成 → round1 accept 收敛）→ DAG → 工作大厅 → 执行；工作空间 `workspace/<plan_id>/` 决策链落盘完整
 - 终端冒烟实测：GCCP 四问交互正常展示、LLM/agent_d 不可用时降级路径日志正确
 
+### 2026-08-09 追加：对话 B 模型决策 + 三配置点 + 执行中图纸复核设计
+- **决策 A**：日常对话全部由 B 模型（t1-f）进行——`cli_chat_reply` 生成模型 t2 → t1-f；`cli_llm_classify` 任务/对话分流改用 t1-f；废弃 `AIRY_CHAT_T1F_VERIFY` 的"t2 生成 → t1-f 验证 → 重生成"路径
+- **决策 B**：模型三配置点提醒（t2=A / t1-f=B / t1-p=C，每点可用云端 API 或本地 Ollama/vLLM，开关由用户决定，t1-f 最先激活）——CLI 启动打印三配置点状态，未配置 t1-f 时对话入口给出激活提醒
+- **设计新增**：改进 6 执行中图纸复核回路（`09-roadmap-sched-exec.md` §4.7，P3 规划）——执行中经 `wh_progress_cb` 由 t1-f 快速复核产物是否偏离图纸（DRIFT）、t2 按 GRAD Δ patch 增量修正图纸，补全"执行前设计 / 执行中复核 / 执行后回灌"三段闭环
+
+### 2026-08-09 追加（第二批）：作战指挥中心 + 模型分层 + 工作区隔离 + 统一治理
+- **决策 C**：任务大厅 = 作战指挥中心（P1）——认知层发布任务命令 → 执行体领取 → 记忆层从结果与过程提取经验（mem_d + L2 缓存 + L1 状态机）；**深化（全流程可见性）**：大厅为系统唯一事实源（类比 K8s etcd）——任务文件模型（图纸+命令+进度+结果+问题+验证+决策链）、`wh_progress_cb` 升级为全量事件发布、可观测性 API、过程经验提取，控制论依据"没有观测就没有控制"；**任务文件模型与分级可见性详细设计见 `09-roadmap-sched-exec.md` §4.9**（命名规范 `{tenant}.{task}.{category}.{ts}.{seq}.json`、七类文件 JSON 结构、RBAC 权限矩阵 + 三层隔离：命名空间 / 应用层 ACL / 写权限单一来源；检索回放见 §4.9.7）
+- **决策 D**：模型分层落地（P0）——执行体主推理 t1-p（C）→ t2（A）复核 → t1-f（B）终裁；ecosystem agents 接入三模型配置，经 llm_d 路由
+- **决策 E**：工作区隔离（P1）——**沙箱工作目录为主**（不依赖 git、契合行业底座），git 仓库场景叠加 git worktree；DAG 并行分支独立工作目录 + 产物 merge/冲突检测；借鉴 Codex PR 的"隔离→验证→审查→合并"流程形态而非 git PR 本身
+- **决策 F**：统一治理（P1）——GRAD R_total 预算从规划期扩展到执行期（全局 Token 预算 + 资源感知并发调度）；**并行不设硬上限**（资源预算约束，支持成千上万执行体）
+- **决策 G**：验证门禁落地（P0）——`output_validator` 注入 CLI，确定性门禁 FAIL 阻断节点提交，触发重试/标注
+- **决策 H**：执行体嵌套委派（P3+ 路线图）——`spawn_agent` 等价物，走 CAID 结构化任务单委派
+- **改进 6 修订**：复核管线对齐模型分层——执行体交付协议（ADP：产物+自验证报告+变更清单）→ 确定性门禁 → t2 语义复核（DRIFT）→ t1-f 终裁 → t2 增量修正重入
+- **回归修复（Release/NDEBUG 下 assert 包裹必要调用被优化掉的同族根因）**：
+  - `cl3_execution` execution engine tcb 生命周期竞态 UAF：`LOG_DEBUG` 移到 `cond_signal` 之前（engine.c），signal 后不再访问 tcb
+  - `test_taskflow_advanced` LSan 泄漏 + RTC 空转：`taskflow_engine_register_workflow` 独立于 assert 执行（NDEBUG 下 assert 参数不求值），RTC 三测试实际执行、23/23 全绿
+  - `test_tool_test_executor` ASan `ThreadArgRetval::BeforeJoin` CHECK：`pthread_create/join` 独立于 assert，READ 并发/WRITE 串行真实执行全过
+  - 全量回归 146/146 全绿（ASan/LSan）
+
+### 2026-08-09 追加（第三批）：全面改进执行落地（P0 全部 + P1 决策 C 核心）
+- **决策 D 落地（P0）**：ecosystem agents 模型分层——Rust `coding_agent`（`agent.rs` 默认模型与调用模型）与 Python `AirymaxAgent`（`base.py` `make_llm_client(default_model=...)`）均优先读 `AIRY_MODEL_T1P`（执行体 worker 主推理 t1-p），未设置回落既有默认；Rust `cargo check` 通过
+- **决策 G 落地（P0）**：CLI 注入 `output_validator`（`AIRY_VALIDATOR_RULES` JSON 或默认 `{"exit_code":0}`）+ wait 后验证 FAIL 标注（`airy_work_hall_verify_stats` 前后对比）；节点级门禁重试由 sched_d write_back 承担（已落地）
+- **决策 C 落地（P1 核心）**：任务文件模型 `hall_store.h/.c`（`atoms/coreloopthree/src/dispatch/`）——七类文件（blueprint/command/progress/result/issue/verify/chain）、命名 `{tenant}.{task}.{category}.{ts_utc}.{seq:04d}.json`（UTC 毫秒时间戳 + 事件溯源 seq）、ACL 分级可见（cognition 全量 / executor 本任务、图纸命令决策链仅 cognition）、`list/get/replay` 检索回放 API（list 倒序 / replay seq 正序）；work_hall 挂接（progress/result/issue 事件写入，独立于 roadmap_sched）；CLI 注入（`$AIRY_HOME/data/agentrt/hall`）；单测 `test_cl3_hall_store` 31/31 全绿（ASan 无泄漏）
+- 全量回归：147 项（含新增 hall_store），cl3_execution 在 -j4 下偶发一次（串行 5/5 稳定，与本次改动无关），重跑通过
+
+### 2026-08-09 追加（第四批）：P1 决策 E 工作区隔离完成
+- **决策 E 机制层（workspace.h/.c）**：沙箱工作目录隔离——快照（主工作区 → 独立沙箱目录递归复制 + 快照基线 `.airy_baseline/`，作为 merge 三方判定的基准）、合并（三方判定：目标==基线→应用 / ==工作区→跳过 / 外部改动→冲突不覆盖，删除不传播）、降级开关 `AIRY_WORKSPACE_ISOLATION=0 → ENOTSUP`（保持现状语义）、execution_id 目录穿越防护（拒绝 `/` `\`）、路径收敛 `$AIRY_HOME/data/agentrt/workspaces`；跨平台（POSIX dirent / Windows FindFirstFile + `_stat`）
+- **work_hall 挂接（节点执行边界）**：`config.main_workspace_dir`（BORROW，NULL=不隔离）；节点执行前快照主工作区 → 独立沙箱目录（`{sanitize(node_id)}-{seq}` 唯一命名）；invoke 注入 `workspace_dir` + `workspace_mode=isolated`（独立 params 字段，不污染 input，向后兼容）；执行成功 merge 回主工作区，冲突不覆盖并写 hall_store issue 事件（`WS_MERGE_CONFLICT`，task_id=工作区名可审计）；执行失败保留隔离区供审计
+- **CLI 挂接**：`AIRY_WORKSPACE_MAIN_DIR` 显式指定时启用隔离（默认保持现状，降级开关维持现状原则）；`AIRY_WORKSPACE_ISOLATION=0` 可整体关闭
+- **测试**：`test_cl3_workspace` 19/19 全绿（生命周期/降级 ENOTSUP/快照含子目录/三方 merge 更新/冲突检测不覆盖/新增应用/删除不传播，ASan 无泄漏）；`test_cl3_gccp_workhall` 9/9（新增决策 E 端到端：mock agent_d Unix socket + spawn/invoke 协议 + 断言 invoke 注入 workspace_dir、工作区收敛 AIRY_HOME、mock 隔离区产物 merge 回主工作区）；全量回归 148/148 通过（ASan/LSan）
+
 ---
 
 ## [v0.1.1] - 2026-07-12
