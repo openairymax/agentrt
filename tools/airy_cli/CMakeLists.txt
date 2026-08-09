@@ -69,6 +69,7 @@ target_include_directories(airy_cli PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/string/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/logging/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/sync/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/ipc/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/sd/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/platform/include
