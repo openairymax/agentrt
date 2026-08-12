@@ -10,6 +10,13 @@ endif()
 
 add_executable(airy_cli
     main.c
+    daemon_cmds.c
+    cli_internal.h
+    cli_chat.c
+    cli_think.c
+    cli_dag.c
+    cli_display.c
+    cli_cmds.c
 )
 
 # 链接模式：coreloopthree 与 llm/tool service 存在交叉引用（静态库 + 全局

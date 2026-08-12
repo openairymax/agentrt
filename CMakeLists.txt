@@ -152,6 +152,13 @@ else()
     endif()
     add_compile_options(-fstack-protector-strong -fno-omit-frame-pointer)
     add_compile_definitions(_GNU_SOURCE)
+    # IRON-12 路径隐私：日志 __FILE__ 不暴露构建机绝对路径（社区用户可安装任意路径，
+    # 日志中的绝对源码路径即信息泄露）。-ffile-prefix-map 将源码前缀映射为相对标识，
+    # 映射按最长前缀优先生效，故先映射伞仓根再映射 agentrt 源码树。
+    # get_filename_component 规范化前缀，避免 'agentrt/..' 未展开导致前缀失配。
+    get_filename_component(_AIRY_HUB_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+    add_compile_options(-ffile-prefix-map=${_AIRY_HUB_ROOT}=agentrt-hub)
+    add_compile_options(-ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=agentrt)
     # _FORTIFY_SOURCE=2 需要 -O1 或更高优化级别，Debug 构建时跳过以避免
     # "_FORTIFY_SOURCE requires compiling with optimization" 警告
     if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" AND NOT "${CMAKE_BUILD_TYPE}" STREQUAL "")
@@ -497,6 +504,27 @@ if(AIRY_BUILD_ALL)
         ${CMAKE_CURRENT_SOURCE_DIR}/gateway/src
     )
 
+    # 闭源 atoms 预编译模式：头文件树镜像源码相对结构（atoms/<...>/include 等）。
+    # 追加在全局 include 末尾（不做 BEFORE）：commons 等公开源码路径优先，
+    # 避免 atoms 与 commons 同名头（如 tcache.h）被遮蔽；atoms 公共头由
+    # prebuilt 路径补缺。源码路径缺失时编译器自动忽略对应 -I，
+    # 因此该注入对源码构建零影响（仅当 AIRY_ATOMS_PREBUILT_DIR 设置时生效）。
+    if(AIRY_ATOMS_PREBUILT_DIR)
+        airy_print_ok("Atoms prebuilt include dirs: ${AIRY_ATOMS_PREBUILT_DIR}")
+        include_directories(
+            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/corekern/include
+            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/include
+            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/src/cognition
+            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/src/cognition/critique
+            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/src/cognition/foundation
+            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/memory
+            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/memory/src
+            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/taskflow/include
+            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/syscall/include
+            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/frameworks/include
+        )
+    endif()
+
     # 验证全局 include 路径是否存在
     airy_print_info("Verifying global include directories...")
     set(_global_inc_dirs
@@ -666,16 +694,19 @@ if(AIRY_BUILD_ALL)
         airy_print_info("Toolkit modules require additional configuration for each language SDK")
     endif()
 
-    # 创建聚合目标
+    # 创建聚合目标（目标名按各子目录实际定义：
+    #   atoms→airy_atoms、commons→airy_commons、cupolas→cupolas、
+    #   daemons→各 daemon 可执行文件（无统一 agentrt_daemons 目标）、
+    #   gateway→gateway 库、heapstore→airy_heapstore）
     add_custom_target(agentrt-all
         DEPENDS
             $<IF:$<TARGET_EXISTS:airy_atoms>,airy_atoms,>
             $<IF:$<TARGET_EXISTS:airy_commons>,airy_commons,>
-            $<IF:$<TARGET_EXISTS:airy_cupolas>,airy_cupolas,>
-            $<IF:$<TARGET_EXISTS:agentrt_daemons>,agentrt_daemons,>
-            $<IF:$<TARGET_EXISTS:agentrt_gateway>,agentrt_gateway,>
-            $<IF:$<TARGET_EXISTS:agentrt_heapstore>,agentrt_heapstore,>
-        COMMENT "Build all AgentRT core components (atoms/commons/cupolas/daemons/gateway/heapstore)"
+            $<IF:$<TARGET_EXISTS:cupolas>,cupolas,>
+            $<IF:$<TARGET_EXISTS:gateway>,gateway,>
+            $<IF:$<TARGET_EXISTS:airy_heapstore>,airy_heapstore,>
+            $<IF:$<TARGET_EXISTS:svc_common>,svc_common,>
+        COMMENT "Build all AgentRT core components (atoms/commons/cupolas/gateway/heapstore/svc_common)"
     )
 
     # 安装头文件

@@ -44,9 +44,10 @@ AGENTRT_ROOT = SCRIPT_DIR.parents[1]
 DEFAULT_INPUT = AGENTRT_ROOT / "atoms" / "syscall" / "include" / "syscall.xml"
 DEFAULT_OUTPUT_DIR = AGENTRT_ROOT / "atoms" / "syscall" / "include"
 
+# 生成产物均为 .h 头文件，版权声明遵循 Linux 社区 SPDX 规范（/* */ 块注释风格）
 SPDX_HEADER = [
-    "// SPDX-FileCopyrightText: 2026 SPHARX Ltd.",
-    "// SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0",
+    "/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */",
+    "/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */",
 ]
 
 
@@ -183,16 +184,12 @@ def render_ids(data):
     # 符号列宽对齐：含哨兵符号取最大长度
     max_sym = max([len(sc["symbol"]) for sc in syscalls] + [len(sentry)])
 
-    def emit(sym, value, note):
-        body = "    %s = %d," % (sym.ljust(max_sym), value)
-        pad = 52 - len(body)
-        if pad < 1:
-            pad = 1
-        lines.append(body + " " * pad + "/**< %s */" % note)
+    def emit(sym, value):
+        lines.append("    %s = %d," % (sym.ljust(max_sym), value))
 
     for sc in syscalls:
-        emit(sc["symbol"], sc["number"], sc["doc"])
-    emit(sentry, data["max"], "哨兵值：合法 syscall 号 < %s" % sentry)
+        emit(sc["symbol"], sc["number"])
+    emit(sentry, data["max"])
 
     lines.append("} %s;" % enum_type)
     lines.append("")
