@@ -33,27 +33,13 @@
 #include "string_compat.h"
 #include "daemon_rpc_client.h"
 #include "daemon_cmds.h"
+#include "cli_render.h"
 
 #include <signal.h>
 #include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
-#endif
-
-#ifdef _WIN32
-
-#define CLR_CYAN ""
-#define CLR_GREEN ""
-#define CLR_YELLOW ""
-#define CLR_RED ""
-#define CLR_RESET ""
-#else
-#define CLR_CYAN "\033[36m"
-#define CLR_GREEN "\033[32m"
-#define CLR_YELLOW "\033[33m"
-#define CLR_RED "\033[31m"
-#define CLR_RESET "\033[0m"
 #endif
 
 #define CLI_SEP "  ──────────────────────────────────────────────"
@@ -102,18 +88,19 @@ airy_err_t cli_think_process_remote(const char *think_sock, const char *input, s
                                     airy_task_plan_t **out_plan);
 
 airy_err_t cli_dag_submit_remote(const char *sched_sock, const taskflow_workflow_t *wf,
-                                 char **out_dag_id);
+                                 const char *task_input, char **out_dag_id);
 cli_dag_poll_rc_t cli_dag_poll_remote(const char *sched_sock, const char *dag_id,
                                       double *out_progress, char *out_state, size_t state_cap,
                                       char **out_result);
 airy_err_t cli_dag_wait_remote(const char *sched_sock, const char *dag_id, char **out_result);
 
 void cli_print_banner(void);
+void cli_print_model_config(const char *t2, const char *t1f, const char *t1p);
 void cli_print_result(const char *result);
+void cli_print_plan_list(const taskflow_workflow_t *wf);
 void cli_progress_cb(const char *execution_id, const char *node_id, taskflow_state_t state,
                      double progress, void *user_data);
 void cli_board_line(const char *tag, const char *id, const char *state, double progress);
-
 int cmd_help(const char *arg, void *ctx);
 int cmd_clear(const char *arg, void *ctx);
 int cmd_status(const char *arg, void *ctx);

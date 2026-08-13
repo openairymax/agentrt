@@ -43,19 +43,22 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
     if (!probe || probe->question_count == 0)
         return NULL;
 
-    printf("\n%s[GCCP] 该任务需进一步确认，请回答以下问题（直接回车跳过）：%s\n", CLR_YELLOW,
-           CLR_RESET);
+    cli_render_role_line(CLI_ROLE_SUPER_THINK, CLI_ACTOR_SUPER_THINK, "gccp",
+                         "Intent confirmation: answer the questions below (Enter to skip):");
+    /* The planning spinner may be animating; pause it so the questions
+     * render on clean lines, then resume after the answers. */
+    cli_spinner_pause();
     cJSON *answers = cJSON_CreateObject();
     if (!answers)
         return NULL;
 
     for (size_t i = 0; i < probe->question_count; i++) {
         const airy_gccp_question_t *q = &probe->questions[i];
-        printf("  %sQ%zu%s [%s]%s %s\n", CLR_CYAN, i + 1, CLR_RESET, q->id,
+        printf("  %sQ%zu%s [%s]%s %s\n", cli_c(CLR_CYAN), i + 1, cli_c(CLR_RESET), q->id,
                q->required ? "（必答）" : "", q->question);
         if (q->hint[0])
-            printf("      %s提示：%s%s\n", CLR_GREEN, q->hint, CLR_RESET);
-        printf("  %s>%s ", CLR_GREEN, CLR_RESET);
+            printf("      %s提示：%s%s\n", cli_c(CLR_GREEN), q->hint, cli_c(CLR_RESET));
+        printf("  %s>%s ", cli_c(CLR_GREEN), cli_c(CLR_RESET));
         fflush(stdout);
 
         char line[1024];
@@ -68,6 +71,7 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
 
     char *json = cJSON_PrintUnformatted(answers);
     cJSON_Delete(answers);
+    cli_spinner_resume();
     return json;
 }
 
@@ -78,6 +82,7 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
     if (!probe || probe->question_count == 0)
         return NULL;
 
+    cli_spinner_pause();
     size_t cap = 512;
     for (size_t i = 0; i < probe->question_count; i++)
         cap += strlen(probe->questions[i].id) + 1024;
@@ -103,6 +108,7 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
         p += n;
     }
     snprintf(p, cap - (size_t)(p - json), "}");
+    cli_spinner_resume();
     return json;
 }
 
@@ -243,7 +249,8 @@ int cli_classify_input(const char *input)
 void cli_chat_reply(const char *input)
 {
     if (!g_chat_adapter) {
-        printf("  %s[对话]%s 智能体对话不可用（llm_d 未连接）\n", CLR_YELLOW, CLR_RESET);
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "chat",
+                             "Chat unavailable (llm_d not connected).");
         return;
     }
 
@@ -252,11 +259,11 @@ void cli_chat_reply(const char *input)
     /* Decision B (2026-08-09): config reminder - t1-f (B model) activates first.
       * If unset, hint the three config points and order without blocking (provider default). */
     if (!t1f_model || !t1f_model[0]) {
-        printf("  %s[配置]%s 未检测到 t1-f（B 模型，日常对话/意图分流）配置：\n"
-               "        建议先配置 AIRY_MODEL_T1F（本地 Ollama/vLLM 或云端 API），\n"
-               "        再按需配置 AIRY_MODEL_T2（A，规划/修正）与 AIRY_MODEL_T1P\n"
-               "        （C，逻辑验证）；当前对话将使用 llm_d 默认模型。\n",
-               CLR_YELLOW, CLR_RESET);
+        cli_render_role_line(
+            CLI_ROLE_STATUS, CLI_ACTOR_SUPER_THINK, "config",
+            "t1-f (B model) not configured; set AIRY_MODEL_T1F (local Ollama/vLLM or "
+            "cloud API), then AIRY_MODEL_T2 (A) and AIRY_MODEL_T1P (C) as needed. "
+            "Chat will use the llm_d default model for now.");
     }
 
     /* Message array: [system] + history + [current input], so the LLM keeps context.
@@ -264,7 +271,8 @@ void cli_chat_reply(const char *input)
     size_t msg_n = g_history_count + 2;
     llm_message_t *msgs = (llm_message_t *)AIRY_MALLOC(msg_n * sizeof(llm_message_t));
     if (!msgs) {
-        printf("  %s[对话]%s 内存不足，无法回复\n", CLR_RED, CLR_RESET);
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "chat",
+                             "Out of memory, cannot reply.");
         return;
     }
     size_t mi = 0;
@@ -288,24 +296,46 @@ void cli_chat_reply(const char *input)
     cfg.temperature = 0.7f;
     cfg.max_tokens = 1024;
 
+    /* Super Think status line while the LLM is generating (spinner on a TTY,
+      * a plain "• Thinking" line when piped/logged). */
+    const char *think_model = t1f_model ? t1f_model : "default";
+    char think_title[128];
+    snprintf(think_title, sizeof(think_title), "Thinking (%s)", think_model);
+    cli_spinner_start(think_title);
+
     llm_response_t *resp = NULL;
     int ret = llm_svc_adapter_complete(g_chat_adapter, &cfg, &resp);
     if (ret != 0 || !resp || !resp->choices || resp->choice_count == 0 ||
         !resp->choices[0].content) {
+        cli_spinner_stop(0, "reply failed");
         if (resp)
             llm_response_free(resp);
         AIRY_FREE(msgs);
-        printf("  %s[对话]%s 回复失败（err=%d）\n", CLR_RED, CLR_RESET, ret);
+        char line[128];
+        snprintf(line, sizeof(line), "Reply failed (err=%d).", ret);
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "chat", line);
         return;
     }
+    cli_spinner_stop(1, NULL);
 
     /* Decision A: no t1-f verification phase - the generator is already t1-f;
       * the "t2 -> t1-f verify -> regenerate" path is gone (AIRY_CHAT_T1F_VERIFY deprecated). */
 
+    /* Reasoning models (DeepSeek-R1/Kimi-K2) return the chain-of-thought in
+     * reasoning_content; surface it as a Super Think trace before the reply
+     * so the user can follow the model's reasoning. Long traces are collapsed
+     * (Claude Code progressive disclosure): only the first lines render, the
+     * rest stays available in the logs. */
+    if (resp->choices[0].reasoning_content && resp->choices[0].reasoning_content[0]) {
+        cli_render_role_line(CLI_ROLE_SUPER_THINK, CLI_ACTOR_SUPER_THINK, "reasoning", "");
+        /* Content column: 2-space gutter + 24-char role header (CLI_ROLE_HDR_W). */
+        cli_render_collapsed(resp->choices[0].reasoning_content, 26, 10);
+    }
+
     cli_history_add("user", input);
     cli_history_add("assistant", resp->choices[0].content);
 
-    printf("  %sAgentRT >%s %s\n", CLR_GREEN, CLR_RESET, resp->choices[0].content);
+    cli_render_super_agent(resp->choices[0].content);
     llm_response_free(resp);
     AIRY_FREE(msgs);
 }

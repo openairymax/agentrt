@@ -19,16 +19,11 @@
 
 #include "daemon_rpc_client.h"
 #include "airy_memory.h"
+#include "cli_render.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define CLR_CYAN "\033[36m"
-#define CLR_GREEN "\033[32m"
-#define CLR_YELLOW "\033[33m"
-#define CLR_RED "\033[31m"
-#define CLR_RESET "\033[0m"
 
 #define CLI_RPC_TIMEOUT_MS 10000
 
@@ -90,11 +85,13 @@ static void cli_rpc_print(const char *ns, const char *method, const char *params
     char *result = NULL;
     int rc = daemon_rpc_call(cli_ns_sock(ns), method, params_json, &result, CLI_RPC_TIMEOUT_MS);
     if (rc != 0 || !result) {
-        printf("  %s[%s.%s]%s 调用失败（err=%d）\n", CLR_RED, ns, method, CLR_RESET, rc);
+        char line[160];
+        snprintf(line, sizeof(line), "%s.%s call failed (err=%d)", ns, method, rc);
+        cli_render_sub_agent_line(CLI_ROLE_ERROR, ns, line);
         AIRY_FREE(result);
         return;
     }
-    printf("  %s[%s.%s]%s %s\n", CLR_GREEN, ns, method, CLR_RESET, result);
+    cli_render_sub_agent(ns, result);
     AIRY_FREE(result);
 }
 
@@ -102,7 +99,8 @@ int cmd_rpc(const char *arg, void *ctx)
 {
     (void)ctx;
     if (!arg || arg[0] == '\0') {
-        printf("  %s用法%s: /rpc <ns>.<method> [json参数]\n", CLR_YELLOW, CLR_RESET);
+        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
+                              "/rpc <ns>.<method> [json参数]");
         printf("    例: /rpc mem.search {\"query\":\"hello\"}\n");
         printf("        /rpc cupolas.check_permission {\"agent_id\":\"a\",\"action\":\"read\","
                "\"resource\":\"fs:///tmp/x\"}\n");
@@ -111,7 +109,8 @@ int cmd_rpc(const char *arg, void *ctx)
 
     const char *dot = strchr(arg, '.');
     if (!dot) {
-        printf("  %s格式错误%s: 需要 <ns>.<method> 形式\n", CLR_RED, CLR_RESET);
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "usage",
+                              "需要 <ns>.<method> 形式");
         return 0;
     }
     char ns[64];
@@ -144,21 +143,25 @@ int cmd_daemons(const char *arg, void *ctx)
     (void)arg;
     (void)ctx;
     int online = 0;
-    printf("  %s[daemon 巡检]%s\n", CLR_GREEN, CLR_RESET);
+    cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "daemon",
+                         "health check");
     for (size_t i = 0; i < CLI_DAEMONS_COUNT; i++) {
         char *result = NULL;
         int rc = daemon_rpc_call(cli_ns_sock(CLI_DAEMONS[i].ns), CLI_DAEMONS[i].health_method, NULL,
                                  &result, 6000);
         if (rc == 0 && result) {
-            printf("    %s%-10s%s 在线  %s%.60s%s\n", CLR_CYAN, CLI_DAEMONS[i].ns, CLR_RESET,
-                   CLR_GREEN, result, CLR_RESET);
+            cli_render_task_line(NULL, CLI_DAEMONS[i].ns, "online", 1.0);
             online++;
         } else {
-            printf("    %s%-10s%s 离线（err=%d）\n", CLR_CYAN, CLI_DAEMONS[i].ns, CLR_RESET, rc);
+            cli_render_task_line(NULL, CLI_DAEMONS[i].ns, "offline", 0.0);
         }
         AIRY_FREE(result);
     }
-    printf("  %s[daemon]%s 在线 %d/%zu\n", CLR_GREEN, CLR_RESET, online, CLI_DAEMONS_COUNT);
+    {
+        char line[64];
+        snprintf(line, sizeof(line), "online %d/%zu", online, CLI_DAEMONS_COUNT);
+        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "daemon", line);
+    }
     return 0;
 }
 
@@ -279,12 +282,14 @@ int cmd_notify(const char *arg, void *ctx)
 {
     (void)ctx;
     if (!arg || arg[0] == '\0') {
-        printf("  %s用法%s: /notify <channel> <message>\n", CLR_YELLOW, CLR_RESET);
+        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
+                              "/notify <channel> <message>");
         return 0;
     }
     const char *space = strchr(arg, ' ');
     if (!space) {
-        printf("  %s用法%s: /notify <channel> <message>\n", CLR_YELLOW, CLR_RESET);
+        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
+                              "/notify <channel> <message>");
         return 0;
     }
     char channel[128];
@@ -314,7 +319,8 @@ int cmd_perm(const char *arg, void *ctx)
 {
     (void)ctx;
     if (!arg || arg[0] == '\0') {
-        printf("  %s用法%s: /perm <agent_id> <action> <resource>\n", CLR_YELLOW, CLR_RESET);
+        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
+                              "/perm <agent_id> <action> <resource>");
         printf("    例: /perm agent-1 read fs:///tmp/x\n");
         return 0;
     }
@@ -323,7 +329,8 @@ int cmd_perm(const char *arg, void *ctx)
     const char *r1 = arg;
     const char *s1 = strchr(r1, ' ');
     if (!s1) {
-        printf("  %s用法%s: /perm <agent_id> <action> <resource>\n", CLR_YELLOW, CLR_RESET);
+        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
+                              "/perm <agent_id> <action> <resource>");
         return 0;
     }
     size_t a1 = (size_t)(s1 - r1);
@@ -334,7 +341,8 @@ int cmd_perm(const char *arg, void *ctx)
     const char *r2 = s1 + 1;
     const char *s2 = strchr(r2, ' ');
     if (!s2) {
-        printf("  %s用法%s: /perm <agent_id> <action> <resource>\n", CLR_YELLOW, CLR_RESET);
+        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
+                              "/perm <agent_id> <action> <resource>");
         return 0;
     }
     size_t a2 = (size_t)(s2 - r2);
@@ -354,7 +362,8 @@ int cmd_sanitize(const char *arg, void *ctx)
 {
     (void)ctx;
     if (!arg || arg[0] == '\0') {
-        printf("  %s用法%s: /sanitize <input>\n", CLR_YELLOW, CLR_RESET);
+        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
+                              "/sanitize <input>");
         return 0;
     }
     char params[2048];

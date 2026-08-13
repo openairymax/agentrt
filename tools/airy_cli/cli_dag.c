@@ -55,7 +55,13 @@ static const char *cli_handler_role(const char *handler)
     return handler;
 }
 
-static char *cli_workflow_to_dag_json(const taskflow_workflow_t *wf)
+/* Serialize a CLI workflow into the remote DAG JSON protocol.
+ *
+ * task_input is the raw user task text (same value the embedded hall passes to
+ * airy_work_hall_submit). It travels as a top-level "input" field; sched_d
+ * falls back to it for nodes whose goal is only a plan label (goal==id), so
+ * remote agents receive the actual task instead of "reactive_1_step1". */
+static char *cli_workflow_to_dag_json(const taskflow_workflow_t *wf, const char *task_input)
 {
     if (!wf || wf->node_count == 0 || !wf->nodes)
         return NULL;
@@ -65,6 +71,8 @@ static char *cli_workflow_to_dag_json(const taskflow_workflow_t *wf)
         return NULL;
     cJSON_AddStringToObject(root, "name",
                             wf->name[0] ? wf->name : (wf->id[0] ? wf->id : "airy_cli_dag"));
+    if (task_input && task_input[0])
+        cJSON_AddStringToObject(root, "input", task_input);
 
     cJSON *nodes = cJSON_CreateArray();
     if (!nodes) {
@@ -79,7 +87,10 @@ static char *cli_workflow_to_dag_json(const taskflow_workflow_t *wf)
         if (!nj)
             continue;
         cJSON_AddStringToObject(nj, "id", nd->id);
-        cJSON_AddStringToObject(nj, "goal", nd->name[0] ? nd->name : nd->id);
+        const char *goal = nd->name[0] ? nd->name : nd->id;
+        if (strcmp(goal, nd->id) == 0 && task_input && task_input[0])
+            goal = task_input;
+        cJSON_AddStringToObject(nj, "goal", goal);
         cJSON_AddStringToObject(nj, "role", cli_handler_role(nd->task_handler_name));
 
         cJSON *deps = cJSON_CreateArray();
@@ -104,13 +115,13 @@ static char *cli_workflow_to_dag_json(const taskflow_workflow_t *wf)
 }
 
 airy_err_t cli_dag_submit_remote(const char *sched_sock, const taskflow_workflow_t *wf,
-                                        char **out_dag_id)
+                                        const char *task_input, char **out_dag_id)
 {
     if (!sched_sock || !sched_sock[0] || !wf || !out_dag_id)
         return AIRY_ERR_INVALID_PARAM;
     *out_dag_id = NULL;
 
-    char *dag_json = cli_workflow_to_dag_json(wf);
+    char *dag_json = cli_workflow_to_dag_json(wf, task_input);
     if (!dag_json)
         return AIRY_ERR_OUT_OF_MEMORY;
 

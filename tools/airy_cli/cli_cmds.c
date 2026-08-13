@@ -20,13 +20,14 @@ int cmd_help(const char *arg, void *ctx)
 {
     (void)arg;
     (void)ctx;
-    printf("  %s可用命令：%s\n", CLR_GREEN, CLR_RESET);
+    cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, NULL, "可用命令");
     size_t ncmds = cli_commands_count();
     for (size_t i = 0; i < ncmds; i++) {
-        printf("    %s%-8s%s  %s\n", CLR_CYAN, CLI_COMMANDS[i].name, CLR_RESET,
+        printf("    %s%-8s%s  %s\n", cli_c(CLR_CYAN), CLI_COMMANDS[i].name, cli_c(CLR_RESET),
                CLI_COMMANDS[i].desc);
     }
-    printf("  %s普通输入%s 直接对话或下达任务指令。\n", CLR_GREEN, CLR_RESET);
+    cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, NULL,
+                         "普通输入直接对话或下达任务指令。");
     return 0;
 }
 
@@ -49,10 +50,35 @@ int cmd_status(const char *arg, void *ctx)
     (void)arg;
     cli_cmd_ctx_t *c = (cli_cmd_ctx_t *)ctx;
     if (!c || !c->hall) {
-        printf("  %s[状态]%s 大厅不可用\n", CLR_YELLOW, CLR_RESET);
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "status",
+                             "Hall unavailable");
         return 0;
     }
-    printf("  %s[状态]%s 执行大厅已就绪（WorkHall）\n", CLR_GREEN, CLR_RESET);
+
+    airy_work_hall_entry_t **entries = NULL;
+    size_t count = 0;
+    airy_err_t err = airy_work_hall_list(c->hall, &entries, &count);
+    if (err != AIRY_SUCCESS) {
+        char line[128];
+        snprintf(line, sizeof(line), "Hall query failed (err=%d)", (int)err);
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "status", line);
+        return 0;
+    }
+
+    if (count == 0) {
+        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "status",
+                             "任务大厅空闲，尚无执行实例");
+        return 0;
+    }
+
+    char line[160];
+    snprintf(line, sizeof(line), "任务大厅 · %zu 个执行实例", count);
+    cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "status", line);
+    for (size_t i = 0; i < count; i++) {
+        airy_work_hall_entry_t *e = entries[i];
+        cli_render_task_line("hall", e->execution_id, e->state, e->progress);
+    }
+    airy_work_hall_list_free(entries, count);
     return 0;
 }
 
