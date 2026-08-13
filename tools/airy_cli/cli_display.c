@@ -301,8 +301,9 @@ void cli_print_banner(void)
 
     cli_outf("\n");
     cli_box_line(g, inner, "┌", "─", "┐");
-    cli_box_row(g, inner, "AgentRT · 智能体运行时", CLR_BOLD CLR_CYAN);
-    cli_box_row(g, inner, "AI Agent Runtime Platform  ·  v" AIRY_CLI_VERSION, CLR_DIM);
+    cli_box_row(g, inner, "Airymax Agent RT   极境智能体运行平台工程", CLR_BOLD CLR_CYAN);
+    cli_box_row(g, inner, "AI Agent Runtime Platform Engineering  ·  v" AIRY_CLI_VERSION,
+                CLR_DIM);
     cli_box_line(g, inner, "│", "═", "│");
     cli_box_row(g, inner, "对话 · 任务 · 蓝图调度 · 双思考 · GCCP · 工具执行", CLR_YELLOW);
     cli_box_line(g, inner, "│", "═", "│");
@@ -311,7 +312,7 @@ void cli_print_banner(void)
 
     cli_banner_legend(g);
 
-    cli_outf("%s%sAgentRT v%s%s %s·%s 输入 %s/help%s 查看命令 · %squit%s/%sexit%s 退出%s\n",
+    cli_outf("%s%sAirymax Agent RT v%s%s %s·%s 输入 %s/help%s 查看命令 · %squit%s/%sexit%s 退出%s\n",
            g, cli_c(CLR_GREEN), AIRY_CLI_VERSION, cli_c(CLR_RESET), cli_c(CLR_DIM),
            cli_c(CLR_DIM), cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_YELLOW),
            cli_c(CLR_RESET), cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_RESET));
@@ -360,29 +361,45 @@ void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
     const char *b = (t1f && t1f[0]) ? t1f : "默认";
     const char *c = (t1p && t1p[0]) ? t1p : "默认";
 
-    /* Full-screen TUI page: render a compact pinned header (brand + model
-     * panel on shared rows) so the conversation viewport keeps most of the
-     * screen. The banner box is intentionally skipped — the TUI redraws
-     * everything itself, a full ASCII box would eat the viewport. */
+    /* Full-screen TUI page: render a compact pinned header so the
+     * conversation viewport keeps most of the screen. Structure: brand line
+     * (name only) -> three-model panel -> separator -> hint. */
     if (cli_tui_active(cli_tui_get_default())) {
         const char *g = cli_gutter_pad(2);
-        cli_outf("%s%s%s", g, cli_c(CLR_BOLD), cli_c(CLR_CYAN));
-        cli_out("AgentRT · 智能体运行时");
+
+        /* Brand line: the platform name alone (Terminal feedback), bold
+         * cyan, version kept off the brand line. */
+        cli_out(g);
+        cli_out(cli_c(CLR_BOLD));
+        cli_out(cli_c(CLR_CYAN));
+        cli_out("Airymax Agent RT   极境智能体运行平台工程");
         cli_out(cli_c(CLR_RESET));
-        cli_outf("%s%s  ·  v%s%s\n", cli_c(CLR_DIM), "AI Agent Runtime Platform",
-                 AIRY_CLI_VERSION, cli_c(CLR_RESET));
+        cli_outc('\n');
 
-        cli_outf("%s%s模型配置%s  %sA %s%s%s  ·  %sB %s%s%s  ·  %sC %s%s%s\n",
-                 g, cli_c(CLR_GREEN), cli_c(CLR_RESET),
-                 cli_c(CLR_CYAN), a, cli_c(CLR_DIM), cli_c(CLR_RESET),
-                 cli_c(CLR_CYAN), b, cli_c(CLR_DIM), cli_c(CLR_RESET),
-                 cli_c(CLR_CYAN), c, cli_c(CLR_DIM), cli_c(CLR_RESET));
+        /* Model panel: three parallel roles, each clearly framed with its
+         * key, role label and resolved model. */
+        cli_out(g);
+        cli_outf("%sA%s %s· t2%s  %s生成器%s  →  %s%s%s      "
+                 "%sB%s %s· t1-f%s  %s仲裁/日常%s  →  %s%s%s      "
+                 "%sC%s %s· t1-p%s  %s校验%s  →  %s%s%s\n",
+                 cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_RESET),
+                 cli_c(CLR_DIM), cli_c(CLR_RESET),
+                 cli_c(CLR_YELLOW), a, cli_c(CLR_RESET),
+                 cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_RESET),
+                 cli_c(CLR_DIM), cli_c(CLR_RESET),
+                 cli_c(CLR_YELLOW), b, cli_c(CLR_RESET),
+                 cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_RESET),
+                 cli_c(CLR_DIM), cli_c(CLR_RESET),
+                 cli_c(CLR_YELLOW), c, cli_c(CLR_RESET));
 
+        /* Separator, then a hint line (version tucked into its tail so the
+         * brand line stays clean). */
         cli_outf("%s%s%s\n", g, cli_c(CLR_DIM),
                  "──────────────────────────────────────────────────────────────");
-        cli_outf("%s%sAgentRT v%s%s  %s输入 /help 查看命令 · quit 退出%s\n",
-                 g, cli_c(CLR_GREEN), AIRY_CLI_VERSION, cli_c(CLR_RESET),
-                 cli_c(CLR_DIM), cli_c(CLR_RESET));
+        cli_outf("%s%s?%s  %s输入 /help 查看命令 · quit 退出%s      %sv%s%s\n",
+                 g, cli_c(CLR_YELLOW), cli_c(CLR_RESET),
+                 cli_c(CLR_DIM), cli_c(CLR_RESET),
+                 cli_c(CLR_DIM), AIRY_CLI_VERSION, cli_c(CLR_RESET));
         return;
     }
 
