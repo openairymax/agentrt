@@ -101,8 +101,8 @@ int cmd_rpc(const char *arg, void *ctx)
     if (!arg || arg[0] == '\0') {
         cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
                               "/rpc <ns>.<method> [json参数]");
-        printf("    例: /rpc mem.search {\"query\":\"hello\"}\n");
-        printf("        /rpc cupolas.check_permission {\"agent_id\":\"a\",\"action\":\"read\","
+        cli_outf("    例: /rpc mem.search {\"query\":\"hello\"}\n");
+        cli_outf("        /rpc cupolas.check_permission {\"agent_id\":\"a\",\"action\":\"read\","
                "\"resource\":\"fs:///tmp/x\"}\n");
         return 0;
     }
@@ -321,7 +321,7 @@ int cmd_perm(const char *arg, void *ctx)
     if (!arg || arg[0] == '\0') {
         cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
                               "/perm <agent_id> <action> <resource>");
-        printf("    例: /perm agent-1 read fs:///tmp/x\n");
+        cli_outf("    例: /perm agent-1 read fs:///tmp/x\n");
         return 0;
     }
     char agent[128];

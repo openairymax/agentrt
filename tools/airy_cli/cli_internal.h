@@ -34,6 +34,7 @@
 #include "daemon_rpc_client.h"
 #include "daemon_cmds.h"
 #include "cli_render.h"
+#include "cli_tui.h"
 
 #include <signal.h>
 #include <stddef.h>

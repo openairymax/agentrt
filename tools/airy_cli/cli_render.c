@@ -18,9 +18,11 @@
  */
 
 #include "cli_render.h"
+#include "cli_tui.h"
 
 #include "airy_memory.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,6 +36,66 @@
 
 #define CLI_GUTTER_MAX 64
 #define CLI_DEFAULT_WIDTH 100
+
+/* Attached full-screen TUI engine (NULL = plain stdout streaming). Set by
+ * cli_render_set_tui before the header renders; every cli_out*() call below
+ * routes through it so output lands in the TUI line history. */
+static struct cli_tui_s *g_cli_tui;
+
+void cli_render_set_tui(struct cli_tui_s *tui)
+{
+    g_cli_tui = tui;
+}
+
+void cli_out(const char *s)
+{
+    if (!s)
+        return;
+    cli_outn(s, strlen(s));
+}
+
+void cli_outn(const char *s, size_t n)
+{
+    if (!s || n == 0)
+        return;
+    if (g_cli_tui && cli_tui_active(g_cli_tui))
+        cli_tui_emit(g_cli_tui, s, n);
+    else
+        fwrite(s, 1, n, stdout);
+}
+
+void cli_outc(char c)
+{
+    if (g_cli_tui && cli_tui_active(g_cli_tui))
+        cli_tui_emit(g_cli_tui, &c, 1);
+    else
+        fputc(c, stdout);
+}
+
+void cli_outf(const char *fmt, ...)
+{
+    if (!fmt)
+        return;
+    va_list ap;
+    va_start(ap, fmt);
+    char stack_buf[1024];
+    int need = vsnprintf(stack_buf, sizeof(stack_buf), fmt, ap);
+    va_end(ap);
+    if (need < 0)
+        return;
+    if ((size_t)need < sizeof(stack_buf)) {
+        cli_outn(stack_buf, (size_t)need);
+        return;
+    }
+    char *big = (char *)AIRY_MALLOC((size_t)need + 1);
+    if (!big)
+        return;
+    va_start(ap, fmt);
+    vsnprintf(big, (size_t)need + 1, fmt, ap);
+    va_end(ap);
+    cli_outn(big, (size_t)need);
+    AIRY_FREE(big);
+}
 
 /* Runtime color gate (shared): every ANSI sequence flows through cli_c() so
  * NO_COLOR / piped output produces clean monochrome text (server-grade).
@@ -152,9 +214,9 @@ static void cli_emit_inline(const char *text)
         if (p[0] == '*' && p[1] == '*') {
             const char *e = strstr(p + 2, "**");
             if (e && cli_emph_has_letter(p + 2, (size_t)(e - (p + 2)))) {
-                fputs(cli_c(CLR_BOLD), stdout);
-                fwrite(p + 2, 1, (size_t)(e - (p + 2)), stdout);
-                fputs(cli_c(CLR_RESET), stdout);
+                cli_out(cli_c(CLR_BOLD));
+                cli_outn(p + 2, (size_t)(e - (p + 2)));
+                cli_out(cli_c(CLR_RESET));
                 p = e + 2;
                 continue;
             }
@@ -163,9 +225,9 @@ static void cli_emit_inline(const char *text)
             const char *e = strchr(p + 1, '*');
             if (e && e > p + 1 && cli_emph_is_letter(e[-1]) &&
                 cli_emph_has_letter(p + 1, (size_t)(e - (p + 1)))) {
-                fputs(cli_c(CLR_BOLD), stdout);
-                fwrite(p + 1, 1, (size_t)(e - (p + 1)), stdout);
-                fputs(cli_c(CLR_RESET), stdout);
+                cli_out(cli_c(CLR_BOLD));
+                cli_outn(p + 1, (size_t)(e - (p + 1)));
+                cli_out(cli_c(CLR_RESET));
                 p = e + 1;
                 continue;
             }
@@ -173,14 +235,14 @@ static void cli_emit_inline(const char *text)
         if (p[0] == '`') {
             const char *e = strchr(p + 1, '`');
             if (e) {
-                fputs(cli_c(CLR_BG_GRAY), stdout);
-                fwrite(p + 1, 1, (size_t)(e - (p + 1)), stdout);
-                fputs(cli_c(CLR_RESET), stdout);
+                cli_out(cli_c(CLR_BG_GRAY));
+                cli_outn(p + 1, (size_t)(e - (p + 1)));
+                cli_out(cli_c(CLR_RESET));
                 p = e + 1;
                 continue;
             }
         }
-        fputc(*p, stdout);
+        cli_outc(*p);
         p++;
     }
 }
@@ -304,22 +366,22 @@ static void cli_table_flush(cli_table_row_t *table, size_t *table_rows, const ch
         for (size_t t = 0; t < rows; t++) {
             if (cli_table_is_separator(&table[t]))
                 continue;
-            fputs(g, stdout);
+            cli_out(g);
             for (size_t c = 0; c < table[t].cell_count; c++) {
                 const char *cell = table[t].cells[c];
-                fputs(cli_c(CLR_DIM), stdout);
-                fputs("│ ", stdout);
-                fputs(cli_c(CLR_RESET), stdout);
+                cli_out(cli_c(CLR_DIM));
+                cli_out("│ ");
+                cli_out(cli_c(CLR_RESET));
                 if (t == 0)
-                    fputs(cli_c(CLR_BOLD), stdout);
-                fputs(cell, stdout);
+                    cli_out(cli_c(CLR_BOLD));
+                cli_out(cell);
                 if (t == 0)
-                    fputs(cli_c(CLR_RESET), stdout);
+                    cli_out(cli_c(CLR_RESET));
                 size_t pad = widths[c] - strlen(cell);
                 for (size_t q = 0; q < pad + 1; q++)
-                    fputc(' ', stdout);
+                    cli_outc(' ');
             }
-            fputc('\n', stdout);
+            cli_outc('\n');
         }
         AIRY_FREE(widths);
     }
@@ -364,20 +426,20 @@ void cli_render_markdown(const char *text, size_t indent)
                 in_table = 0;
             }
             in_code = !in_code;
-            fputs(g, stdout);
-            fputs(cli_c(CLR_DIM), stdout);
-            fputs(in_code ? "[code]" : "[/code]", stdout);
-            fputs(cli_c(CLR_RESET), stdout);
-            fputc('\n', stdout);
+            cli_out(g);
+            cli_out(cli_c(CLR_DIM));
+            cli_out(in_code ? "[code]" : "[/code]");
+            cli_out(cli_c(CLR_RESET));
+            cli_outc('\n');
             AIRY_FREE(line);
             continue;
         }
         if (in_code) {
-            fputs(g, stdout);
-            fputs(cli_c(CLR_BG_GRAY), stdout);
-            fputs(line, stdout);
-            fputs(cli_c(CLR_RESET), stdout);
-            fputc('\n', stdout);
+            cli_out(g);
+            cli_out(cli_c(CLR_BG_GRAY));
+            cli_out(line);
+            cli_out(cli_c(CLR_RESET));
+            cli_outc('\n');
             AIRY_FREE(line);
             continue;
         }
@@ -391,7 +453,7 @@ void cli_render_markdown(const char *text, size_t indent)
                 cli_table_flush(table, &table_rows, g);
                 in_table = 0;
             }
-            fputc('\n', stdout);
+            cli_outc('\n');
             AIRY_FREE(line);
             continue;
         }
@@ -430,13 +492,13 @@ void cli_render_markdown(const char *text, size_t indent)
                 level++;
             if (level <= 4 && (content[level] == ' ' || content[level] == '\0')) {
                 const char *h = content[level] ? content + level + 1 : content + level;
-                fputs(g, stdout);
-                fputs(cli_c(CLR_BOLD), stdout);
+                cli_out(g);
+                cli_out(cli_c(CLR_BOLD));
                 if (level == 1)
-                    fputs(cli_c(CLR_UNDERLINE), stdout);
-                fputs(h, stdout);
-                fputs(cli_c(CLR_RESET), stdout);
-                fputc('\n', stdout);
+                    cli_out(cli_c(CLR_UNDERLINE));
+                cli_out(h);
+                cli_out(cli_c(CLR_RESET));
+                cli_outc('\n');
                 AIRY_FREE(line);
                 continue;
             }
@@ -444,12 +506,12 @@ void cli_render_markdown(const char *text, size_t indent)
 
         /* blockquote */
         if (content[0] == '>') {
-            fputs(g, stdout);
-            fputs(cli_c(CLR_DIM), stdout);
-            fputs("│ ", stdout);
-            fputs(cli_c(CLR_RESET), stdout);
+            cli_out(g);
+            cli_out(cli_c(CLR_DIM));
+            cli_out("│ ");
+            cli_out(cli_c(CLR_RESET));
             cli_emit_inline(content + 1);
-            fputc('\n', stdout);
+            cli_outc('\n');
             AIRY_FREE(line);
             continue;
         }
@@ -460,21 +522,21 @@ void cli_render_markdown(const char *text, size_t indent)
             const char *rest = content + 5;
             if (rest[0] == ' ')
                 rest++;
-            fputs(g, stdout);
+            cli_out(g);
             if (mark == 'x' || mark == 'X') {
-                fputs(cli_c(CLR_GREEN), stdout);
-                fputs(CLI_ICON_DONE " ", stdout);
-                fputs(cli_c(CLR_RESET), stdout);
-                fputs(cli_c(CLR_DIM), stdout);
+                cli_out(cli_c(CLR_GREEN));
+                cli_out(CLI_ICON_DONE " ");
+                cli_out(cli_c(CLR_RESET));
+                cli_out(cli_c(CLR_DIM));
                 cli_emit_inline(rest);
-                fputs(cli_c(CLR_RESET), stdout);
+                cli_out(cli_c(CLR_RESET));
             } else {
-                fputs(cli_c(CLR_CYAN), stdout);
-                fputs(CLI_ICON_TODO " ", stdout);
-                fputs(cli_c(CLR_RESET), stdout);
+                cli_out(cli_c(CLR_CYAN));
+                cli_out(CLI_ICON_TODO " ");
+                cli_out(cli_c(CLR_RESET));
                 cli_emit_inline(rest);
             }
-            fputc('\n', stdout);
+            cli_outc('\n');
             AIRY_FREE(line);
             continue;
         }
@@ -482,12 +544,12 @@ void cli_render_markdown(const char *text, size_t indent)
         /* unordered list */
         if ((content[0] == '-' || content[0] == '*') &&
             (content[1] == ' ' || content[1] == '\0')) {
-            fputs(g, stdout);
-            fputs(cli_c(CLR_GREEN), stdout);
-            fputs(CLI_ICON_BULLET " ", stdout);
-            fputs(cli_c(CLR_RESET), stdout);
+            cli_out(g);
+            cli_out(cli_c(CLR_GREEN));
+            cli_out(CLI_ICON_BULLET " ");
+            cli_out(cli_c(CLR_RESET));
             cli_emit_inline(content + (content[1] == ' ' ? 2 : 1));
-            fputc('\n', stdout);
+            cli_outc('\n');
             AIRY_FREE(line);
             continue;
         }
@@ -503,13 +565,13 @@ void cli_render_markdown(const char *text, size_t indent)
                 if (nlen < sizeof(num)) {
                     AIRY_MEMCPY(num, content, nlen);
                     num[nlen] = '\0';
-                    fputs(g, stdout);
-                    fputs(cli_c(CLR_GREEN), stdout);
-                    fputs(num, stdout);
-                    fputs(". ", stdout);
-                    fputs(cli_c(CLR_RESET), stdout);
+                    cli_out(g);
+                    cli_out(cli_c(CLR_GREEN));
+                    cli_out(num);
+                    cli_out(". ");
+                    cli_out(cli_c(CLR_RESET));
                     cli_emit_inline(d + (d[1] == ' ' ? 2 : 1));
-                    fputc('\n', stdout);
+                    cli_outc('\n');
                     AIRY_FREE(line);
                     continue;
                 }
@@ -518,19 +580,19 @@ void cli_render_markdown(const char *text, size_t indent)
 
         /* horizontal rule */
         if (strncmp(content, "---", 3) == 0) {
-            fputs(g, stdout);
-            fputs(cli_c(CLR_DIM), stdout);
-            fputs("────────────────────────────", stdout);
-            fputs(cli_c(CLR_RESET), stdout);
-            fputc('\n', stdout);
+            cli_out(g);
+            cli_out(cli_c(CLR_DIM));
+            cli_out("────────────────────────────");
+            cli_out(cli_c(CLR_RESET));
+            cli_outc('\n');
             AIRY_FREE(line);
             continue;
         }
 
         /* plain paragraph */
-        fputs(g, stdout);
+        cli_out(g);
         cli_emit_inline(line + s);
-        fputc('\n', stdout);
+        cli_outc('\n');
         AIRY_FREE(line);
     }
     if (in_table) {
@@ -575,7 +637,7 @@ void cli_render_collapsed(const char *text, size_t indent, size_t max_lines, int
     /* Internal traces (weak) render dim so they read as background context
      * and never compete with the actual reply. */
     if (weak)
-        fputs(cli_c(CLR_DIM), stdout);
+        cli_out(cli_c(CLR_DIM));
     if (cut > text) {
         size_t plen = (size_t)(cut - text);
         char *prefix = (char *)AIRY_MALLOC(plen + 1);
@@ -592,12 +654,12 @@ void cli_render_collapsed(const char *text, size_t indent, size_t max_lines, int
         snprintf(trailer, sizeof(trailer), "└ … %zu more lines (full text in logs)",
                  total - shown);
         const char *g = cli_gutter(indent);
-        fputs(g, stdout);
-        fputs(trailer, stdout);
-        fputc('\n', stdout);
+        cli_out(g);
+        cli_out(trailer);
+        cli_outc('\n');
     }
     if (weak)
-        fputs(cli_c(CLR_RESET), stdout);
+        cli_out(cli_c(CLR_RESET));
 }
 
 /* ---- role-tagged conversation line ---- */
@@ -611,7 +673,7 @@ static void cli_pad_role_header(const char *hdr)
 {
     size_t w = strlen(hdr);
     for (size_t i = w; i < CLI_ROLE_HDR_W; i++)
-        fputc(' ', stdout);
+        cli_outc(' ');
 }
 
 /* Build a fixed-width role header, always keeping the closing "]" intact.
@@ -643,16 +705,16 @@ void cli_render_role_line(cli_role_t role, cli_actor_t actor, const char *tag,
 
     cli_build_role_header(hdr, sizeof(hdr), name, tag);
 
-    fputs(g, stdout);
-    fputs(col, stdout);
-    fputs(hdr, stdout);
-    fputs(cli_c(CLR_RESET), stdout);
+    cli_out(g);
+    cli_out(col);
+    cli_out(hdr);
+    cli_out(cli_c(CLR_RESET));
     cli_pad_role_header(hdr);
 
     if (content)
         cli_render_markdown(content, 2);
     else
-        fputc('\n', stdout);
+        cli_outc('\n');
 }
 
 void cli_render_super_agent(const char *content)
@@ -669,10 +731,10 @@ void cli_render_super_agent_begin(void)
 
     cli_build_role_header(hdr, sizeof(hdr), name, NULL);
 
-    fputs(g, stdout);
-    fputs(col, stdout);
-    fputs(hdr, stdout);
-    fputs(cli_c(CLR_RESET), stdout);
+    cli_out(g);
+    cli_out(col);
+    cli_out(hdr);
+    cli_out(cli_c(CLR_RESET));
     cli_pad_role_header(hdr);
 }
 
@@ -684,11 +746,11 @@ void cli_render_stream_fold_trailer(size_t more_lines)
     snprintf(trailer, sizeof(trailer), "└ … %zu more lines (full text in logs)",
              more_lines);
     const char *g = cli_gutter(2 + CLI_ROLE_HDR_W);
-    fputs(g, stdout);
-    fputs(cli_c(CLR_DIM), stdout);
-    fputs(trailer, stdout);
-    fputs(cli_c(CLR_RESET), stdout);
-    fputc('\n', stdout);
+    cli_out(g);
+    cli_out(cli_c(CLR_DIM));
+    cli_out(trailer);
+    cli_out(cli_c(CLR_RESET));
+    cli_outc('\n');
 }
 
 void cli_render_user_message(const char *content)
@@ -704,24 +766,24 @@ void cli_render_user_message(const char *content)
     /* The user message renders as one visual block: a leading blank line, a
      * background-tinted header, the content also on the background, then a
      * trailing blank line (Codex user-message grouping). */
-    fputc('\n', stdout);
-    fputs(g, stdout);
-    fputs(bg, stdout);
-    fputs(col, stdout);
-    fputs(hdr, stdout);
-    fputs(cli_c(CLR_RESET), stdout);
+    cli_outc('\n');
+    cli_out(g);
+    cli_out(bg);
+    cli_out(col);
+    cli_out(hdr);
+    cli_out(cli_c(CLR_RESET));
     cli_pad_role_header(hdr);
-    fputs(bg, stdout);
-    fputs(col, stdout);
-    fputs(CLI_ICON_USER " ", stdout);
-    fputs(cli_c(CLR_RESET), stdout);
+    cli_out(bg);
+    cli_out(col);
+    cli_out(CLI_ICON_USER " ");
+    cli_out(cli_c(CLR_RESET));
     if (content && content[0]) {
-        fputs(bg, stdout);
-        fputs(content, stdout);
-        fputs(cli_c(CLR_RESET), stdout);
+        cli_out(bg);
+        cli_out(content);
+        cli_out(cli_c(CLR_RESET));
     }
-    fputc('\n', stdout);
-    fputc('\n', stdout);
+    cli_outc('\n');
+    cli_outc('\n');
 }
 
 void cli_render_sub_agent_line(cli_role_t role, const char *tag, const char *content)
@@ -741,20 +803,20 @@ void cli_render_sub_agent_line(cli_role_t role, const char *tag, const char *con
     const char *col = cli_render_role_color(role);
     const char *icon = (role == CLI_ROLE_ERROR) ? CLI_ICON_CROSS : CLI_ICON_DIAMOND;
 
-    fputs(g, stdout);
-    fputs(col, stdout);
-    fputs(hdr, stdout);
-    fputs(cli_c(CLR_RESET), stdout);
+    cli_out(g);
+    cli_out(col);
+    cli_out(hdr);
+    cli_out(cli_c(CLR_RESET));
     cli_pad_role_header(hdr);
-    fputs(col, stdout);
-    fputs(icon, stdout);
-    fputs(" ", stdout);
-    fputs(cli_c(CLR_RESET), stdout);
+    cli_out(col);
+    cli_out(icon);
+    cli_out(" ");
+    cli_out(cli_c(CLR_RESET));
 
     if (content)
         cli_render_markdown(content, 2);
     else
-        fputc('\n', stdout);
+        cli_outc('\n');
 }
 
 void cli_render_sub_agent(const char *tag, const char *content)
@@ -775,21 +837,21 @@ void cli_render_turn_separator(uint64_t elapsed_ms, const char *metrics)
                  (unsigned long long)(secs % 60));
 
     const char *g = cli_gutter(2);
-    fputs(g, stdout);
-    fputs(cli_c(CLR_DIM), stdout);
-    fputs("──────────────── ", stdout);
-    fputs(cli_c(CLR_RESET), stdout);
-    fputs(label, stdout);
+    cli_out(g);
+    cli_out(cli_c(CLR_DIM));
+    cli_out("──────────────── ");
+    cli_out(cli_c(CLR_RESET));
+    cli_out(label);
     if (metrics && metrics[0]) {
-        fputs(cli_c(CLR_DIM), stdout);
-        fputs(" · ", stdout);
-        fputs(metrics, stdout);
-        fputs(cli_c(CLR_RESET), stdout);
+        cli_out(cli_c(CLR_DIM));
+        cli_out(" · ");
+        cli_out(metrics);
+        cli_out(cli_c(CLR_RESET));
     }
-    fputs(cli_c(CLR_DIM), stdout);
-    fputs(" ─────────────────", stdout);
-    fputs(cli_c(CLR_RESET), stdout);
-    fputc('\n', stdout);
+    cli_out(cli_c(CLR_DIM));
+    cli_out(" ─────────────────");
+    cli_out(cli_c(CLR_RESET));
+    cli_outc('\n');
 }
 
 void cli_render_footer_hint(void)
@@ -798,24 +860,24 @@ void cli_render_footer_hint(void)
     if (!cli_term_is_tty())
         return;
     const char *g = cli_gutter(2);
-    fputs(g, stdout);
-    fputs(cli_c(CLR_DIM), stdout);
-    fputs("? ", stdout);
-    fputs(cli_c(CLR_YELLOW), stdout);
-    fputs("/help", stdout);
-    fputs(cli_c(CLR_RESET), stdout);
-    fputs(cli_c(CLR_DIM), stdout);
-    fputs(" 查看命令 · ", stdout);
-    fputs(cli_c(CLR_YELLOW), stdout);
-    fputs("quit", stdout);
-    fputs(cli_c(CLR_RESET), stdout);
-    fputs(cli_c(CLR_DIM), stdout);
-    fputs("/exit", stdout);
-    fputs(cli_c(CLR_RESET), stdout);
-    fputs(cli_c(CLR_DIM), stdout);
-    fputs(" 退出", stdout);
-    fputs(cli_c(CLR_RESET), stdout);
-    fputc('\n', stdout);
+    cli_out(g);
+    cli_out(cli_c(CLR_DIM));
+    cli_out("? ");
+    cli_out(cli_c(CLR_YELLOW));
+    cli_out("/help");
+    cli_out(cli_c(CLR_RESET));
+    cli_out(cli_c(CLR_DIM));
+    cli_out(" 查看命令 · ");
+    cli_out(cli_c(CLR_YELLOW));
+    cli_out("quit");
+    cli_out(cli_c(CLR_RESET));
+    cli_out(cli_c(CLR_DIM));
+    cli_out("/exit");
+    cli_out(cli_c(CLR_RESET));
+    cli_out(cli_c(CLR_DIM));
+    cli_out(" 退出");
+    cli_out(cli_c(CLR_RESET));
+    cli_outc('\n');
 }
 
 /* ---- progress bar ---- */
@@ -835,19 +897,19 @@ void cli_render_progress_bar(double progress, size_t width, const char *label)
 
     const char *g = cli_gutter(4);
     if (label && label[0]) {
-        fputs(g, stdout);
-        fputs(cli_c(CLR_DIM), stdout);
-        fputs(label, stdout);
-        fputs(cli_c(CLR_RESET), stdout);
-        fputs(": ", stdout);
+        cli_out(g);
+        cli_out(cli_c(CLR_DIM));
+        cli_out(label);
+        cli_out(cli_c(CLR_RESET));
+        cli_out(": ");
     } else {
-        fputs(g, stdout);
+        cli_out(g);
     }
 
-    fputs("[", stdout);
+    cli_out("[");
     for (size_t i = 0; i < width; i++)
-        fputs(i < filled ? "█" : "░", stdout);
-    printf("] %3.0f%%\n", progress * 100.0);
+        cli_out(i < filled ? "█" : "░");
+    cli_outf("] %3.0f%%\n", progress * 100.0);
 }
 
 /* ---- compact task line for the work-hall board ---- */
@@ -894,11 +956,11 @@ void cli_render_task_line(const char *tag, const char *id, const char *state,
 
     const char *g = cli_gutter(2);
     if (tag && tag[0])
-        printf("%s%s[%s]%s ", g, cli_c(CLR_DIM), tag, cli_c(CLR_RESET));
-    printf("%s%s %s%s%s ", st_col, st_icon, cli_c(CLR_RESET), cli_c(CLR_DIM),
+        cli_outf("%s%s[%s]%s ", g, cli_c(CLR_DIM), tag, cli_c(CLR_RESET));
+    cli_outf("%s%s %s%s%s ", st_col, st_icon, cli_c(CLR_RESET), cli_c(CLR_DIM),
            id ? id : "?");
-    printf("%s%s%s ", st_col, st, cli_c(CLR_RESET));
-    printf("%s[%s]%s %s%3.0f%%%s\n", cli_c(bar_bright ? CLR_GREEN : CLR_DIM), bar,
+    cli_outf("%s%s%s ", st_col, st, cli_c(CLR_RESET));
+    cli_outf("%s[%s]%s %s%3.0f%%%s\n", cli_c(bar_bright ? CLR_GREEN : CLR_DIM), bar,
            cli_c(CLR_RESET), cli_c(bar_bright ? CLR_GREEN : CLR_DIM), progress * 100.0,
            cli_c(CLR_RESET));
 }
@@ -945,7 +1007,7 @@ uint64_t cli_now_ms(void)
 static void cli_spinner_erase(void)
 {
     if (g_spinner.printed) {
-        fputs("\r\033[K", stdout);
+        cli_out("\r\033[K");
         fflush(stdout);
     }
 }
@@ -958,12 +1020,13 @@ int cli_spinner_start(const char *title)
     AIRY_STRNCPY_TERM(g_spinner.title, title, sizeof(g_spinner.title));
     g_spinner.start_ns = cli_time_ns();
 
-    if (!cli_term_is_tty()) {
-        /* Non-TTY: print a static line; the caller keeps the elapsed text. */
+    if (!cli_term_is_tty() || cli_tui_active(cli_tui_get_default())) {
+        /* Non-TTY, or full-screen TUI (which repaints itself): print a static
+         * line and keep the elapsed text; no \r animation in either mode. */
         g_spinner.degraded = 1;
         g_spinner.active = 1;
         const char *g = cli_gutter(2);
-        printf("%s%s%s %s\n", g, cli_c(CLR_DIM), CLI_ICON_BULLET, title);
+        cli_outf("%s%s%s %s\n", g, cli_c(CLR_DIM), CLI_ICON_BULLET, title);
         return 0;
     }
 
@@ -994,7 +1057,7 @@ void cli_spinner_tick(void)
 
     const char *g = cli_gutter(2);
     cli_spinner_erase();
-    printf("%s%s%s %s%s %s(%s)%s", g,
+    cli_outf("%s%s%s %s%s %s(%s)%s", g,
            cli_c(elapsed >= CLI_SPINNER_AMBER_MS ? CLR_AMBER : CLR_YELLOW), frame,
            cli_c(CLR_RESET), g_spinner.title, cli_c(CLR_DIM), elapsed_s, cli_c(CLR_RESET));
     fflush(stdout);
@@ -1036,12 +1099,12 @@ void cli_spinner_stop(int ok, const char *detail)
     /* Both modes print the same completion line; in static (non-TTY) mode the
      * erase is a no-op because nothing was animated. */
     cli_spinner_erase();
-    printf("%s%s%s%s %s", cli_gutter(2), ok ? cli_c(CLR_GREEN) : cli_c(CLR_RED),
+    cli_outf("%s%s%s%s %s", cli_gutter(2), ok ? cli_c(CLR_GREEN) : cli_c(CLR_RED),
            ok ? CLI_ICON_CHECK : CLI_ICON_CROSS, cli_c(CLR_RESET), g_spinner.title);
-    printf(" %s(%s)%s", cli_c(CLR_DIM), elapsed_s, cli_c(CLR_RESET));
+    cli_outf(" %s(%s)%s", cli_c(CLR_DIM), elapsed_s, cli_c(CLR_RESET));
     if (detail && detail[0])
-        printf(" %s%s%s", cli_c(CLR_DIM), detail, cli_c(CLR_RESET));
-    fputc('\n', stdout);
+        cli_outf(" %s%s%s", cli_c(CLR_DIM), detail, cli_c(CLR_RESET));
+    cli_outc('\n');
     fflush(stdout);
     AIRY_MEMSET(&g_spinner, 0, sizeof(g_spinner));
 }

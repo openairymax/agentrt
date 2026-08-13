@@ -39,6 +39,39 @@
 extern "C" {
 #endif
 
+/* Opaque TUI engine handle (full definition in cli_tui.h). */
+struct cli_tui_s;
+
+/**
+ * @brief Attach (or detach, tui=NULL) the full-screen TUI engine.
+ *
+ * Once attached, every cli_out*() call below routes through the engine so
+ * the output lands in the TUI line history (full-screen page). Detaching
+ * restores plain stdout streaming. Call before the banner render so the
+ * header lines are captured for the pinned header.
+ */
+void cli_render_set_tui(struct cli_tui_s *tui);
+
+/**
+ * @brief Unified output primitives.
+ *
+ * These are the single exit point for every conversation/render line:
+ *   - cli_out(s)      writes a NUL-terminated string
+ *   - cli_outn(s, n)  writes n bytes
+ *   - cli_outc(c)     writes one char
+ *   - cli_outf(fmt…)  formatted output
+ * With an attached TUI they flow into the full-screen history; otherwise
+ * they stream straight to stdout (stream-safe, pipe/log friendly).
+ */
+void cli_out(const char *s);
+void cli_outn(const char *s, size_t n);
+void cli_outc(char c);
+void cli_outf(const char *fmt, ...);
+
+/* Shortcuts mirroring the historical fputs/fputc(stdout) call sites. */
+#define cli_puts(s) cli_out(s)
+#define cli_putc(c) cli_outc(c)
+
 /* ANSI color helpers (no-op on Windows). */
 #define CLR_BOLD "\033[1m"
 #define CLR_DIM "\033[2m"

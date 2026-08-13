@@ -166,7 +166,7 @@ void cli_print_plan_list(const taskflow_workflow_t *wf)
         /* Whole plan is background trace: node id keeps a cyan accent for
          * quick scanning, the rest renders dim so the plan cannot compete
          * with the reply (Claude Code keeps execution detail subtle). */
-        printf("%s%s%2zu.%s %s◇%s %s%s%s %s%s%s %s%s%s",
+        cli_outf("%s%s%2zu.%s %s◇%s %s%s%s %s%s%s %s%s%s",
                g, cli_c(CLR_DIM), r + 1, cli_c(CLR_RESET), cli_c(CLR_DIM),
                cli_c(CLR_RESET), cli_c(CLR_CYAN), nd->id, cli_c(CLR_RESET),
                cli_c(CLR_DIM), nd->task_handler_name ? nd->task_handler_name : "?",
@@ -191,7 +191,7 @@ void cli_print_plan_list(const taskflow_workflow_t *wf)
                 dlen += (size_t)snprintf(deps + dlen, sizeof(deps) - dlen, "%s",
                                          ed->source_node_id);
         }
-        printf("%s\n", first ? "" : deps);
+        cli_outf("%s\n", first ? "" : deps);
     }
 
     AIRY_FREE(order);
@@ -233,10 +233,10 @@ void cli_board_line(const char *tag, const char *id, const char *state, double p
 static void cli_box_line(const char *g, size_t inner, const char *left,
                          const char *fill, const char *right)
 {
-    printf("%s%s%s", g, cli_c(CLR_CYAN), left);
+    cli_outf("%s%s%s", g, cli_c(CLR_CYAN), left);
     for (size_t i = 0; i < inner; i++)
-        fputs(fill, stdout);
-    printf("%s%s\n", right, cli_c(CLR_RESET));
+        cli_out(fill);
+    cli_outf("%s%s\n", right, cli_c(CLR_RESET));
 }
 
 /* Centered content row: │ <text> │ with CJK-aware padding so the right
@@ -248,15 +248,15 @@ static void cli_box_row(const char *g, size_t inner, const char *text,
     size_t l = w < inner ? (inner - w) / 2 : 0;
     size_t r = w < inner ? inner - w - l : 0;
 
-    printf("%s%s│%s", g, cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_outf("%s%s│%s", g, cli_c(CLR_CYAN), cli_c(CLR_RESET));
     for (size_t i = 0; i < l; i++)
-        fputc(' ', stdout);
-    fputs(cli_c(color), stdout);
-    fputs(text, stdout);
-    fputs(cli_c(CLR_RESET), stdout);
+        cli_outc(' ');
+    cli_out(cli_c(color));
+    cli_out(text);
+    cli_out(cli_c(CLR_RESET));
     for (size_t i = 0; i < r; i++)
-        fputc(' ', stdout);
-    printf("%s│%s\n", cli_c(CLR_CYAN), cli_c(CLR_RESET));
+        cli_outc(' ');
+    cli_outf("%s│%s\n", cli_c(CLR_CYAN), cli_c(CLR_RESET));
 }
 
 /* Four-role conversation legend rendered under the brand box.  Each bracket
@@ -275,23 +275,23 @@ static void cli_banner_legend(const char *g)
         {CLR_MAGENTA, "Sub Agent", "执行体"},
     };
 
-    fputs(g, stdout);
+    cli_out(g);
     for (size_t i = 0; i < sizeof(roles) / sizeof(roles[0]); i++) {
         if (i > 0) {
-            fputs(cli_c(CLR_DIM), stdout);
-            fputs(" · ", stdout);
-            fputs(cli_c(CLR_RESET), stdout);
+            cli_out(cli_c(CLR_DIM));
+            cli_out(" · ");
+            cli_out(cli_c(CLR_RESET));
         }
-        fputs("[", stdout);
-        fputs(cli_c(roles[i].color), stdout);
-        fputs(roles[i].name, stdout);
-        fputs(cli_c(CLR_DIM), stdout);
-        fputs("]", stdout);
-        fputs(cli_c(CLR_RESET), stdout);
-        printf(" %s", roles[i].label);
+        cli_out("[");
+        cli_out(cli_c(roles[i].color));
+        cli_out(roles[i].name);
+        cli_out(cli_c(CLR_DIM));
+        cli_out("]");
+        cli_out(cli_c(CLR_RESET));
+        cli_outf(" %s", roles[i].label);
     }
-    fputs(cli_c(CLR_RESET), stdout);
-    fputc('\n', stdout);
+    cli_out(cli_c(CLR_RESET));
+    cli_outc('\n');
 }
 
 void cli_print_banner(void)
@@ -299,7 +299,7 @@ void cli_print_banner(void)
     const char *g = cli_gutter_pad(2);
     const size_t inner = 53; /* same content width as the installer banner */
 
-    printf("\n");
+    cli_outf("\n");
     cli_box_line(g, inner, "┌", "─", "┐");
     cli_box_row(g, inner, "AgentRT · 智能体运行时", CLR_BOLD CLR_CYAN);
     cli_box_row(g, inner, "AI Agent Runtime Platform  ·  v" AIRY_CLI_VERSION, CLR_DIM);
@@ -311,7 +311,7 @@ void cli_print_banner(void)
 
     cli_banner_legend(g);
 
-    printf("%s%sAgentRT v%s%s %s·%s 输入 %s/help%s 查看命令 · %squit%s/%sexit%s 退出%s\n",
+    cli_outf("%s%sAgentRT v%s%s %s·%s 输入 %s/help%s 查看命令 · %squit%s/%sexit%s 退出%s\n",
            g, cli_c(CLR_GREEN), AIRY_CLI_VERSION, cli_c(CLR_RESET), cli_c(CLR_DIM),
            cli_c(CLR_DIM), cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_YELLOW),
            cli_c(CLR_RESET), cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_RESET));
@@ -340,18 +340,18 @@ static void cli_model_row_at(int col, const char *key, const char *role,
     size_t kw = cli_disp_width(key);
     size_t rw = cli_disp_width(role);
 
-    printf("%s%s%s", cli_c(CLR_CYAN), key, cli_c(CLR_RESET));
+    cli_outf("%s%s%s", cli_c(CLR_CYAN), key, cli_c(CLR_RESET));
     for (size_t i = kw; i < 10; i++)
-        fputc(' ', stdout);
-    fputs(cli_c(CLR_DIM), stdout);
-    fputs(role, stdout);
-    fputs(cli_c(CLR_RESET), stdout);
+        cli_outc(' ');
+    cli_out(cli_c(CLR_DIM));
+    cli_out(role);
+    cli_out(cli_c(CLR_RESET));
     for (size_t i = rw; i < 10; i++)
-        fputc(' ', stdout);
-    printf("%s→%s %s%s%s", cli_c(CLR_DIM), cli_c(CLR_RESET), cli_c(CLR_YELLOW), model,
+        cli_outc(' ');
+    cli_outf("%s→%s %s%s%s", cli_c(CLR_DIM), cli_c(CLR_RESET), cli_c(CLR_YELLOW), model,
            cli_c(CLR_RESET));
     if (note && note[0])
-        printf("  %s%s%s", cli_c(CLR_DIM), note, cli_c(CLR_RESET));
+        cli_outf("  %s%s%s", cli_c(CLR_DIM), note, cli_c(CLR_RESET));
 }
 
 void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
@@ -359,6 +359,32 @@ void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
     const char *a = (t2 && t2[0]) ? t2 : "默认";
     const char *b = (t1f && t1f[0]) ? t1f : "默认";
     const char *c = (t1p && t1p[0]) ? t1p : "默认";
+
+    /* Full-screen TUI page: render a compact pinned header (brand + model
+     * panel on shared rows) so the conversation viewport keeps most of the
+     * screen. The banner box is intentionally skipped — the TUI redraws
+     * everything itself, a full ASCII box would eat the viewport. */
+    if (cli_tui_active(cli_tui_get_default())) {
+        const char *g = cli_gutter_pad(2);
+        cli_outf("%s%s%s", g, cli_c(CLR_BOLD), cli_c(CLR_CYAN));
+        cli_out("AgentRT · 智能体运行时");
+        cli_out(cli_c(CLR_RESET));
+        cli_outf("%s%s  ·  v%s%s\n", cli_c(CLR_DIM), "AI Agent Runtime Platform",
+                 AIRY_CLI_VERSION, cli_c(CLR_RESET));
+
+        cli_outf("%s%s模型配置%s  %sA %s%s%s  ·  %sB %s%s%s  ·  %sC %s%s%s\n",
+                 g, cli_c(CLR_GREEN), cli_c(CLR_RESET),
+                 cli_c(CLR_CYAN), a, cli_c(CLR_DIM), cli_c(CLR_RESET),
+                 cli_c(CLR_CYAN), b, cli_c(CLR_DIM), cli_c(CLR_RESET),
+                 cli_c(CLR_CYAN), c, cli_c(CLR_DIM), cli_c(CLR_RESET));
+
+        cli_outf("%s%s%s\n", g, cli_c(CLR_DIM),
+                 "──────────────────────────────────────────────────────────────");
+        cli_outf("%s%sAgentRT v%s%s  %s输入 /help 查看命令 · quit 退出%s\n",
+                 g, cli_c(CLR_GREEN), AIRY_CLI_VERSION, cli_c(CLR_RESET),
+                 cli_c(CLR_DIM), cli_c(CLR_RESET));
+        return;
+    }
 
     int rows = 0, cols = 0;
     cli_term_size(&rows, &cols);
@@ -375,7 +401,7 @@ void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
     cli_print_banner(); /* cursor lands at line 12 (header is 11 lines tall) */
 
     cli_term_cursor_to(2, CLI_HDR_MODEL_COL);
-    printf("%s模型配置%s  %sA 生成 · B 仲裁/日常 · C 校验%s\n", cli_c(CLR_GREEN),
+    cli_outf("%s模型配置%s  %sA 生成 · B 仲裁/日常 · C 校验%s\n", cli_c(CLR_GREEN),
            cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_RESET));
     cli_term_cursor_to(3, CLI_HDR_MODEL_COL);
     cli_model_row_at(CLI_HDR_MODEL_COL, "A · t2", "生成器", a, NULL);
@@ -384,10 +410,10 @@ void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
     cli_term_cursor_to(5, CLI_HDR_MODEL_COL);
     cli_model_row_at(CLI_HDR_MODEL_COL, "C · t1-p", "校验", c, NULL);
     cli_term_cursor_to(6, CLI_HDR_MODEL_COL);
-    printf("%s%s%s%s", cli_c(CLR_DIM), "env: ", cli_c(CLR_YELLOW),
+    cli_outf("%s%s%s%s", cli_c(CLR_DIM), "env: ", cli_c(CLR_YELLOW),
            "AIRY_MODEL_T2 · T1F · T1P");
-    printf("%s%s", cli_c(CLR_RESET), cli_c(CLR_DIM));
-    printf("  云端 API 或本地 Ollama/vLLM%s\n", cli_c(CLR_RESET));
+    cli_outf("%s%s", cli_c(CLR_RESET), cli_c(CLR_DIM));
+    cli_outf("  云端 API 或本地 Ollama/vLLM%s\n", cli_c(CLR_RESET));
 
     /* Back to the first scrollable line, then pin the 11-line header. */
     cli_term_header_pin(11);
@@ -403,19 +429,19 @@ static void cli_model_row(const char *g, const char *key, const char *role,
     size_t kw = cli_disp_width(key);
     size_t rw = cli_disp_width(role);
 
-    printf("%s%s%s%s", g, cli_c(CLR_CYAN), key, cli_c(CLR_RESET));
+    cli_outf("%s%s%s%s", g, cli_c(CLR_CYAN), key, cli_c(CLR_RESET));
     for (size_t i = kw; i < 10; i++)
-        fputc(' ', stdout);
-    fputs(cli_c(CLR_DIM), stdout);
-    fputs(role, stdout);
-    fputs(cli_c(CLR_RESET), stdout);
+        cli_outc(' ');
+    cli_out(cli_c(CLR_DIM));
+    cli_out(role);
+    cli_out(cli_c(CLR_RESET));
     for (size_t i = rw; i < 10; i++)
-        fputc(' ', stdout);
-    printf("%s→%s %s%s%s", cli_c(CLR_DIM), cli_c(CLR_RESET), cli_c(CLR_YELLOW), model,
+        cli_outc(' ');
+    cli_outf("%s→%s %s%s%s", cli_c(CLR_DIM), cli_c(CLR_RESET), cli_c(CLR_YELLOW), model,
            cli_c(CLR_RESET));
     if (note && note[0])
-        printf("  %s%s%s", cli_c(CLR_DIM), note, cli_c(CLR_RESET));
-    fputc('\n', stdout);
+        cli_outf("  %s%s%s", cli_c(CLR_DIM), note, cli_c(CLR_RESET));
+    cli_outc('\n');
 }
 
 /* Three-model startup panel (GRAD separation of powers):
@@ -430,13 +456,13 @@ void cli_print_model_config(const char *t2, const char *t1f, const char *t1p)
     const char *b = (t1f && t1f[0]) ? t1f : "默认";
     const char *c = (t1p && t1p[0]) ? t1p : "默认";
 
-    printf("\n");
-    printf("%s%s模型配置%s  %sA 生成 · B 仲裁/日常 · C 校验%s\n", g, cli_c(CLR_GREEN),
+    cli_outf("\n");
+    cli_outf("%s%s模型配置%s  %sA 生成 · B 仲裁/日常 · C 校验%s\n", g, cli_c(CLR_GREEN),
            cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_RESET));
     cli_model_row(g, "A · t2", "生成器", a, NULL);
     cli_model_row(g, "B · t1-f", "仲裁/日常", b, "(最先激活)");
     cli_model_row(g, "C · t1-p", "校验", c, NULL);
-    printf("%s%senv 覆盖: %sAIRY_MODEL_T2%s · %sAIRY_MODEL_T1F%s · %sAIRY_MODEL_T1P%s"
+    cli_outf("%s%senv 覆盖: %sAIRY_MODEL_T2%s · %sAIRY_MODEL_T1F%s · %sAIRY_MODEL_T1P%s"
            "  云端 API 或本地 Ollama/vLLM%s\n",
            g, cli_c(CLR_DIM), cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_YELLOW),
            cli_c(CLR_RESET), cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_RESET));
