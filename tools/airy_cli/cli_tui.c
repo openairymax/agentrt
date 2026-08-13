@@ -337,12 +337,14 @@ static void tui_render_input(cli_tui_t *t)
     fputs(cli_c(CLR_RESET), stdout);
     if (t->input_len > 0)
         fwrite(t->input, 1, t->input_len, stdout);
-    /* Place the cursor after the input text. */
+    /* Place the cursor after the input text, using the display width (CJK
+     * chars occupy two columns) so the caret never drifts on CJK input. */
+    size_t col = 7 + cli_disp_width(t->input ? t->input : "");
     tui_write_literal("\033[");
     snprintf(num, sizeof(num), "%zu", row);
     tui_write_literal(num);
     tui_write_literal(";");
-    snprintf(num, sizeof(num), "%zu", 7 + t->input_len);
+    snprintf(num, sizeof(num), "%zu", col);
     tui_write_literal(num);
     tui_write_literal("H");
     fflush(stdout);
@@ -444,10 +446,17 @@ static void tui_input_append(cli_tui_t *t, char c)
 
 static void tui_input_backspace(cli_tui_t *t)
 {
-    if (t->input_len > 0) {
-        t->input_len--;
-        t->input[t->input_len] = '\0';
-    }
+    if (t->input_len == 0)
+        return;
+    /* Delete one full UTF-8 character: rewind trailing continuation bytes
+     * (0x80..0xBF) plus the leading byte, so CJK input is not torn apart. */
+    size_t n = t->input_len;
+    while (n > 1 && ((unsigned char)t->input[n - 1] & 0xC0) == 0x80)
+        n--;
+    if (n > 0)
+        n--;
+    t->input_len = n;
+    t->input[t->input_len] = '\0';
 }
 
 int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
@@ -536,7 +545,11 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
             cli_tui_redraw(t);
             break;
         default:
-            if (key >= 0x20 && key < 0x7f) {
+            /* Accept every byte >= 0x20, including UTF-8 multi-byte
+             * sequences (CJK input arrives byte-by-byte at 0x80..0xFF).
+             * Control bytes and the escape-derived key codes are handled
+             * above; anything else is literal text. */
+            if (key >= 0x20 && key <= 0xFF) {
                 tui_input_append(t, (char)key);
                 tui_render_input(t);
                 fflush(stdout);
