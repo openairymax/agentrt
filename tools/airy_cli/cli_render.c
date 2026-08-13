@@ -660,6 +660,37 @@ void cli_render_super_agent(const char *content)
     cli_render_role_line(CLI_ROLE_SUPER_AGENT, CLI_ACTOR_SUPER_AGENT, NULL, content);
 }
 
+void cli_render_super_agent_begin(void)
+{
+    const char *g = cli_gutter(2);
+    const char *col = cli_render_role_color(CLI_ROLE_SUPER_AGENT);
+    const char *name = cli_render_actor_name(CLI_ACTOR_SUPER_AGENT);
+    char hdr[CLI_ROLE_HDR_W + 1];
+
+    cli_build_role_header(hdr, sizeof(hdr), name, NULL);
+
+    fputs(g, stdout);
+    fputs(col, stdout);
+    fputs(hdr, stdout);
+    fputs(cli_c(CLR_RESET), stdout);
+    cli_pad_role_header(hdr);
+}
+
+void cli_render_stream_fold_trailer(size_t more_lines)
+{
+    if (more_lines == 0)
+        return;
+    char trailer[96];
+    snprintf(trailer, sizeof(trailer), "└ … %zu more lines (full text in logs)",
+             more_lines);
+    const char *g = cli_gutter(2 + CLI_ROLE_HDR_W);
+    fputs(g, stdout);
+    fputs(cli_c(CLR_DIM), stdout);
+    fputs(trailer, stdout);
+    fputs(cli_c(CLR_RESET), stdout);
+    fputc('\n', stdout);
+}
+
 void cli_render_user_message(const char *content)
 {
     const char *g = cli_gutter(2);
@@ -1012,5 +1043,13 @@ void cli_spinner_stop(int ok, const char *detail)
         printf(" %s%s%s", cli_c(CLR_DIM), detail, cli_c(CLR_RESET));
     fputc('\n', stdout);
     fflush(stdout);
+    AIRY_MEMSET(&g_spinner, 0, sizeof(g_spinner));
+}
+
+void cli_spinner_cancel(void)
+{
+    if (!g_spinner.active)
+        return;
+    cli_spinner_erase();
     AIRY_MEMSET(&g_spinner, 0, sizeof(g_spinner));
 }

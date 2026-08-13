@@ -42,6 +42,46 @@ int cli_term_is_tty(void);
  * sequences (Trojan-Source hardening, same intent as Codex terminal_title). */
 void cli_term_title(const char *title);
 
+/* ---- fixed header support (TTY only, ANSI scroll region) ---- */
+
+/**
+ * @brief Query the terminal size (rows x cols), 0 when unknown / not a TTY.
+ *
+ * Uses TIOCGWINSZ on POSIX; returns 0,0 on Windows or when stdout is not a
+ * terminal (callers then fall back to the line-oriented layout).
+ *
+ * @param out_rows terminal rows (>= 1) or 0
+ * @param out_cols terminal columns (>= 1) or 0
+ */
+void cli_term_size(int *out_rows, int *out_cols);
+
+/**
+ * @brief Lock the scrolling region below the fixed header.
+ *
+ * Prints "\033[<top>;<bottom>r" then homes the cursor to the first line of
+ * the region, so every subsequent newline scrolls only inside the region and
+ * the header lines above it stay pinned. No-op when stdout is not a TTY.
+ *
+ * @param header_lines number of pinned header lines (>= 1)
+ */
+void cli_term_header_pin(int header_lines);
+
+/**
+ * @brief Release the pinned header: restore full-screen scrolling.
+ *
+ * Prints "\033[r" (entire screen scrolls again). No-op when stdout is not a
+ * TTY. Safe to call even when no region was pinned.
+ */
+void cli_term_header_unpin(void);
+
+/**
+ * @brief Move the cursor to an absolute 1-based position.
+ *
+ * @param row 1-based row
+ * @param col 1-based column
+ */
+void cli_term_cursor_to(int row, int col);
+
 #ifdef __cplusplus
 }
 #endif

@@ -102,3 +102,72 @@ void cli_term_title(const char *title)
     fputs("\007", stdout);
     fflush(stdout);
 }
+
+#ifndef _WIN32
+#include <sys/ioctl.h>
+#endif
+
+void cli_term_size(int *out_rows, int *out_cols)
+{
+    if (out_rows)
+        *out_rows = 0;
+    if (out_cols)
+        *out_cols = 0;
+    if (!cli_term_is_tty())
+        return;
+
+#ifdef _WIN32
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi)) {
+        if (out_rows)
+            *out_rows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+        if (out_cols)
+            *out_cols = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+    }
+#else
+    struct winsize ws;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0) {
+        if (out_rows && ws.ws_row > 0)
+            *out_rows = ws.ws_row;
+        if (out_cols && ws.ws_col > 0)
+            *out_cols = ws.ws_col;
+    }
+#endif
+}
+
+void cli_term_cursor_to(int row, int col)
+{
+    if (!cli_term_is_tty())
+        return;
+    if (row < 1)
+        row = 1;
+    if (col < 1)
+        col = 1;
+    printf("\033[%d;%dH", row, col);
+}
+
+void cli_term_header_pin(int header_lines)
+{
+    if (!cli_term_is_tty() || header_lines < 1)
+        return;
+    int rows = 0, cols = 0;
+    cli_term_size(&rows, &cols);
+    if (rows <= header_lines + 1) {
+        /* Terminal too short for a pinned header: keep full-screen scroll. */
+        return;
+    }
+    /* Scroll region = header+1 .. rows; then home the cursor to the first
+     * scrollable line so subsequent output stays below the pinned header. */
+    printf("\033[%d;%dr", header_lines + 1, rows);
+    cli_term_cursor_to(header_lines + 1, 1);
+    fflush(stdout);
+}
+
+void cli_term_header_unpin(void)
+{
+    if (!cli_term_is_tty())
+        return;
+    fputs("\033[r", stdout);
+    fflush(stdout);
+}
+

@@ -168,7 +168,18 @@ int main(void)
     }
 #endif
 
-    cli_print_banner();
+    /* Dual-thinking three-model injection (GRAD separation of powers; user-chosen models):
+      *   AIRY_MODEL_T2    -> model A (generator)
+      *   AIRY_MODEL_T1F   -> model B (context arbiter)
+      *   AIRY_MODEL_T1P   -> model C (logic verifier)
+      * Unset variables use the provider default model (backward compatible).
+      * Read early so the combined header (banner + model panel) can render
+      * them side by side in one pinned startup block. */
+    const char *m_s2 = getenv("AIRY_MODEL_T2");
+    const char *m_verify = getenv("AIRY_MODEL_T1F");
+    const char *m_expert = getenv("AIRY_MODEL_T1P");
+
+    cli_print_system_header(m_s2, m_verify, m_expert);
 
     airy_core_loop_t *loop = NULL;
     airy_err_t err = airy_loop_create(NULL, &loop);
@@ -187,10 +198,8 @@ int main(void)
           *   AIRY_MODEL_T2    -> model A (generator)
           *   AIRY_MODEL_T1F   -> model B (context arbiter)
           *   AIRY_MODEL_T1P   -> model C (logic verifier)
-          * Unset variables use the provider default model (backward compatible). */
-        const char *m_s2 = getenv("AIRY_MODEL_T2");
-        const char *m_verify = getenv("AIRY_MODEL_T1F");
-        const char *m_expert = getenv("AIRY_MODEL_T1P");
+          * Unset variables use the provider default model (backward compatible).
+          * Values were read above for the combined system header. */
         airy_cognition_set_tc3_models(cog, m_s2, m_verify, m_expert);
         if (m_s2 || m_verify || m_expert) {
             AIRY_LOG_INFO("airy_cli: TC3 models injected (s2=%s verify=%s expert=%s)",
@@ -200,8 +209,9 @@ int main(void)
 
         /* Decision B (2026-08-09): three model config points - t2=A (generator, cloud-first),
           * t1-f=B (arbiter/daily chat, first to activate, local-first), t1-p=C (verifier);
-          * each may use cloud APIs or local endpoints (Ollama/vLLM); the user decides. */
-        cli_print_model_config(m_s2, m_verify, m_expert);
+          * each may use cloud APIs or local endpoints (Ollama/vLLM); the user decides.
+          * The model panel was already rendered side-by-side in the pinned
+          * system header above (cli_print_system_header); only inject. */
         cli_render_footer_hint();
 
         airy_cognition_set_grad_enabled(cog, 1);
@@ -735,6 +745,10 @@ int main(void)
     if (rsched)
         airy_roadmap_sched_destroy(rsched);
     airy_loop_destroy(loop);
+    /* Release the pinned header before the final farewell line so the
+     * farewell renders in the full terminal again (and the shell prompt
+     * after exit is not trapped below a stale scroll region). */
+    cli_term_header_unpin();
     cli_render_role_line(CLI_ROLE_SUPER_AGENT, CLI_ACTOR_SUPER_AGENT, NULL,
                          "AgentRT has exited. Thank you for using it.");
     return 0;
