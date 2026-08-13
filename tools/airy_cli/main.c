@@ -383,7 +383,7 @@ int main(void)
                     snprintf(line, sizeof(line), "L1 blueprint state machine: advance to step "
                                                  "%s%s%s (zero token)",
                              cli_c(CLR_CYAN), next_buf, cli_c(CLR_RESET));
-                    cli_render_role_line(CLI_ROLE_SUPER_THINK, CLI_ACTOR_SUPER_THINK, "blueprint",
+                    cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "blueprint",
                                          line);
                 } else
 #endif /* AIRY_HAS_CJSON */
@@ -391,7 +391,7 @@ int main(void)
                     char line[1024];
                     snprintf(line, sizeof(line), "L1 state machine hit (zero token): %s",
                              rs_out ? rs_out : "{}");
-                    cli_render_role_line(CLI_ROLE_SUPER_THINK, CLI_ACTOR_SUPER_THINK, "blueprint",
+                    cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "blueprint",
                                          line);
                 }
                 AIRY_FREE(rs_out);
@@ -411,7 +411,7 @@ int main(void)
                     }
                 }
                 if (sugg && sugg[0]) {
-                    cli_render_role_line(CLI_ROLE_SUPER_THINK, CLI_ACTOR_SUPER_THINK, "blueprint",
+                    cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "blueprint",
                                          "L2 semantic cache hit (low token): replaying last result");
                     cli_render_super_agent(sugg);
                     AIRY_FREE(sugg);
@@ -421,7 +421,7 @@ int main(void)
                     char line[1024];
                     snprintf(line, sizeof(line), "L2 semantic cache hit (low token): %s",
                              rs_out ? rs_out : "{}");
-                    cli_render_role_line(CLI_ROLE_SUPER_THINK, CLI_ACTOR_SUPER_THINK, "blueprint",
+                    cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "blueprint",
                                          line);
                 }
                 AIRY_FREE(rs_out);
@@ -451,7 +451,7 @@ int main(void)
                 plan = NULL;
             } else {
                 cli_spinner_stop(1, NULL);
-                cli_render_sub_agent("think_d", "Remote plan generated.");
+                cli_render_sub_agent_line(CLI_ROLE_TRACE, "think_d", "Remote plan generated.");
             }
         }
         if (!plan) {
@@ -475,7 +475,7 @@ int main(void)
             snprintf(line, sizeof(line), "Plan generated: plan_id=%s nodes=%zu entry=%zu",
                      plan->task_plan_id ? plan->task_plan_id : "?", plan->task_plan_node_count,
                      plan->task_plan_entry_count);
-            cli_render_sub_agent("cognition", line);
+            cli_render_sub_agent_line(CLI_ROLE_TRACE, "cognition", line);
         }
 
         taskflow_workflow_t *wf = NULL;
@@ -491,7 +491,7 @@ int main(void)
             char line[256];
             snprintf(line, sizeof(line), "Workflow adapted: id=%s nodes=%zu edges=%zu", wf->id,
                      wf->node_count, wf->edge_count);
-            cli_render_sub_agent("DAG", line);
+            cli_render_sub_agent_line(CLI_ROLE_TRACE, "DAG", line);
         }
 
         cli_print_plan_list(wf);
@@ -515,7 +515,7 @@ int main(void)
             } else {
                 char line[256];
                 snprintf(line, sizeof(line), "Submitted: dag=%s", exec_id);
-                cli_render_sub_agent("sched_d", line);
+                cli_render_sub_agent_line(CLI_ROLE_TRACE, "sched_d", line);
             }
         }
         if (!sched_remote) {
@@ -531,7 +531,7 @@ int main(void)
             {
                 char line[256];
                 snprintf(line, sizeof(line), "Submitted: exec=%s", exec_id);
-                cli_render_sub_agent("hall", line);
+                cli_render_sub_agent_line(CLI_ROLE_TRACE, "hall", line);
             }
         }
 
@@ -645,12 +645,13 @@ int main(void)
         if (spin_running) {
             /* Polling exhausted without a terminal state (stale board):
              * leave the status line running and fall into the blocking wait,
-             * which drives the engine to the real completion. */
+             * which drives the engine to the real completion. A single dim
+             * trace line, no internal jargon. */
             if (board_polls > 0 && stale_polls >= 10) {
                 cli_spinner_pause();
-                cli_render_role_line(CLI_ROLE_SUPER_THINK, CLI_ACTOR_SUPER_THINK,
+                cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK,
                                      sched_remote ? "sched_d" : "hall",
-                                     "Status stalled, driving execution to completion ...");
+                                     "still running, waiting for completion ...");
                 cli_spinner_resume();
             }
         }

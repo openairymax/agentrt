@@ -72,6 +72,7 @@ typedef enum {
     CLI_ROLE_SUPER_THINK,     /* [Super Think]  yellow   */
     CLI_ROLE_SUB_AGENT,       /* [Sub xxx Agent] magenta  */
     CLI_ROLE_STATUS,          /* status / info  dim      */
+    CLI_ROLE_TRACE,           /* internal trace  dim-gray */
     CLI_ROLE_ERROR,           /* error / warn   red      */
 } cli_role_t;
 
@@ -117,8 +118,10 @@ size_t cli_disp_width(const char *s);
  * @param text      raw text (may contain \n and markdown markers)
  * @param indent    left gutter width in spaces
  * @param max_lines maximum fully rendered lines (>= 1)
+ * @param weak      non-zero renders the body dim (internal trace, e.g.
+ *                  chain-of-thought) so it never competes with the reply
  */
-void cli_render_collapsed(const char *text, size_t indent, size_t max_lines);
+void cli_render_collapsed(const char *text, size_t indent, size_t max_lines, int weak);
 
 /**
  * @brief Print a dim footer hint line (TTY only).
