@@ -856,8 +856,9 @@ void cli_render_turn_separator(uint64_t elapsed_ms, const char *metrics)
 
 void cli_render_footer_hint(void)
 {
-    /* TTY only: keep piped / logged output free of UI chrome. */
-    if (!cli_term_is_tty())
+    /* TTY only: keep piped / logged output free of UI chrome. The full-screen
+     * TUI already carries this hint in its pinned header, so skip it there. */
+    if (!cli_term_is_tty() || cli_tui_active(cli_tui_get_default()))
         return;
     const char *g = cli_gutter(2);
     cli_out(g);
