@@ -21,6 +21,8 @@ add_executable(airy_cli
     cli_render.c
     cli_term.h
     cli_term.c
+    cli_tui.h
+    cli_tui.c
 )
 
 # 链接模式：coreloopthree 与 llm/tool service 存在交叉引用（静态库 + 全局

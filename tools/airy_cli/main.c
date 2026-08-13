@@ -122,7 +122,7 @@ static int cli_dispatch_command(const char *input, void *ctx)
             if (*rest == '\0' || *rest == ' ') {
                 const char *arg = (*rest == ' ') ? rest + 1 : NULL;
                 if (cmd->needs_args && (!arg || arg[0] == '\0')) {
-                    printf("  %s%s%s 需要参数。%s\n", cli_c(CLR_YELLOW), cmd->name,
+                    cli_outf("  %s%s%s 需要参数。%s\n", cli_c(CLR_YELLOW), cmd->name,
                            cli_c(CLR_RESET), cmd->desc);
                     return 1;
                 }
@@ -138,7 +138,7 @@ static int cli_dispatch_command(const char *input, void *ctx)
         }
     }
 
-    printf("  %s未知命令%s %s，输入 %s/help%s 查看可用命令。\n", cli_c(CLR_YELLOW),
+    cli_outf("  %s未知命令%s %s，输入 %s/help%s 查看可用命令。\n", cli_c(CLR_YELLOW),
            cli_c(CLR_RESET), input, cli_c(CLR_CYAN), cli_c(CLR_RESET));
     return 1;
 }
@@ -168,6 +168,14 @@ int main(void)
     }
 #endif
 
+    /* Full-screen TUI page on interactive terminals (Claude Code style):
+     * pinned header + scrollable history + bottom input line. Piped/logged
+     * output keeps the line-oriented renderer (cli_tui stays inactive). */
+    cli_tui_t *tui = NULL;
+    cli_tui_create(&tui);
+    if (cli_tui_active(tui))
+        cli_render_set_tui(tui);
+
     /* Dual-thinking three-model injection (GRAD separation of powers; user-chosen models):
       *   AIRY_MODEL_T2    -> model A (generator)
       *   AIRY_MODEL_T1F   -> model B (context arbiter)
@@ -180,6 +188,10 @@ int main(void)
     const char *m_expert = getenv("AIRY_MODEL_T1P");
 
     cli_print_system_header(m_s2, m_verify, m_expert);
+    if (cli_tui_active(tui))
+        cli_tui_pin_header(tui);
+    else
+        cli_term_header_pin(11);
 
     airy_core_loop_t *loop = NULL;
     airy_err_t err = airy_loop_create(NULL, &loop);
@@ -342,17 +354,18 @@ int main(void)
     int quit_flag = 0;
     cli_cmd_ctx_t cmd_ctx = {.hall = hall, .quit = &quit_flag};
     for (;;) {
-        printf("\n%sairy>%s ", cli_c(CLR_CYAN), cli_c(CLR_RESET));
-        fflush(stdout);
-        if (!fgets(input, sizeof(input), stdin))
+        if (!cli_tui_active(tui)) {
+            /* Line-oriented mode: print the prompt ourselves. */
+            cli_outf("\n%sairy>%s ", cli_c(CLR_CYAN), cli_c(CLR_RESET));
+            fflush(stdout);
+        }
+        size_t input_len = 0;
+        if (!cli_tui_readline(tui, input, sizeof(input), &input_len))
             break;
-        input[strcspn(input, "\r\n")] = '\0';
-        if (input[0] == '\0')
+        if (input_len == 0)
             continue;
         if (strcmp(input, "quit") == 0 || strcmp(input, "exit") == 0)
             break;
-
-        size_t input_len = strlen(input);
 
         if (cli_dispatch_command(input, &cmd_ctx)) {
             if (quit_flag)
@@ -745,9 +758,11 @@ int main(void)
     if (rsched)
         airy_roadmap_sched_destroy(rsched);
     airy_loop_destroy(loop);
-    /* Release the pinned header before the final farewell line so the
-     * farewell renders in the full terminal again (and the shell prompt
-     * after exit is not trapped below a stale scroll region). */
+    /* Leave the full-screen TUI page (restore alt screen + raw mode) before
+     * the farewell so it renders in the normal terminal again. The pinned
+     * header scroll region only applies to the line-oriented mode. */
+    cli_render_set_tui(NULL);
+    cli_tui_destroy(tui);
     cli_term_header_unpin();
     cli_render_role_line(CLI_ROLE_SUPER_AGENT, CLI_ACTOR_SUPER_AGENT, NULL,
                          "AgentRT has exited. Thank you for using it.");

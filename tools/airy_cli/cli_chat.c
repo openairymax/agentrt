@@ -54,18 +54,22 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
 
     for (size_t i = 0; i < probe->question_count; i++) {
         const airy_gccp_question_t *q = &probe->questions[i];
-        printf("  %sQ%zu%s [%s]%s %s\n", cli_c(CLR_CYAN), i + 1, cli_c(CLR_RESET), q->id,
+        cli_outf("  %sQ%zu%s [%s]%s %s\n", cli_c(CLR_CYAN), i + 1, cli_c(CLR_RESET), q->id,
                q->required ? "（必答）" : "", q->question);
         if (q->hint[0])
-            printf("      %s提示：%s%s\n", cli_c(CLR_GREEN), q->hint, cli_c(CLR_RESET));
-        printf("  %s>%s ", cli_c(CLR_GREEN), cli_c(CLR_RESET));
-        fflush(stdout);
+            cli_outf("      %s提示：%s%s\n", cli_c(CLR_GREEN), q->hint, cli_c(CLR_RESET));
+        if (!cli_tui_active(cli_tui_get_default())) {
+            /* Line-oriented mode: print an inline prompt. In full-screen TUI
+             * mode the bottom input line is the prompt itself. */
+            cli_outf("  %s>%s ", cli_c(CLR_GREEN), cli_c(CLR_RESET));
+            fflush(stdout);
+        }
 
         char line[1024];
-        if (!fgets(line, sizeof(line), stdin))
+        size_t line_len = 0;
+        if (!cli_tui_readline(cli_tui_get_default(), line, sizeof(line), &line_len))
             break;
-        line[strcspn(line, "\r\n")] = '\0';
-        if (line[0] != '\0')
+        if (line_len > 0)
             cJSON_AddStringToObject(answers, q->id, line);
     }
 
@@ -94,14 +98,16 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
     p += n;
     for (size_t i = 0; i < probe->question_count; i++) {
         const airy_gccp_question_t *q = &probe->questions[i];
-        printf("  Q%zu [%s]%s %s\n  > ", i + 1, q->id, q->required ? "（必答）" : "", q->question);
+        cli_outf("  Q%zu [%s]%s %s\n", i + 1, q->id, q->required ? "（必答）" : "", q->question);
         if (q->hint[0])
-            printf("      提示：%s\n", q->hint);
+            cli_outf("      提示：%s\n", q->hint);
+        if (!cli_tui_active(cli_tui_get_default()))
+            cli_outf("  > ");
         fflush(stdout);
         char line[1024];
-        if (!fgets(line, sizeof(line), stdin))
+        size_t line_len = 0;
+        if (!cli_tui_readline(cli_tui_get_default(), line, sizeof(line), &line_len))
             break;
-        line[strcspn(line, "\r\n")] = '\0';
         if (i > 0)
             *p++ = ',';
         n = snprintf(p, cap - (size_t)(p - json), "\"%s\":\"%s\"", q->id, line);
@@ -271,8 +277,8 @@ static void cli_chat_stream_flush_line(cli_chat_stream_ctx_t *c)
         return;
     }
     if (c->pending_len > 0)
-        fwrite(c->pending, 1, c->pending_len, stdout);
-    fputc('\n', stdout);
+        cli_outn(c->pending, c->pending_len);
+    cli_outc('\n');
     c->lines_shown++;
     if (c->lines_shown >= c->fold_at)
         c->folding = 1;
