@@ -246,6 +246,97 @@ int cli_classify_input(const char *input)
   * planning/generation (L3 alternatives, GRAD refinement, deep review).
   * Implementation: single t1-f model replies (AIRY_MODEL_T1F; falls back to the provider default).
  */
+/* ---- streaming reply context (token-level chunks, progressive disclosure) ----
+ * Shared by cli_chat_reply: the accumulator keeps the full reply (history +
+ * fold counting), `pending` line-buffers chunks so UTF-8 sequences split at
+ * arbitrary recv() boundaries stay intact on screen, and folding stops
+ * printing the body after AIRY_CHAT_FOLD_LINES lines (default 20). */
+typedef struct {
+    char *pending;      /* current line not yet flushed (partial chunk) */
+    size_t pending_len;
+    size_t pending_cap;
+    char *acc;          /* full accumulated reply (history + fold count) */
+    size_t acc_len;
+    size_t acc_cap;
+    size_t lines_shown; /* fully flushed lines */
+    size_t fold_at;     /* fold threshold */
+    int folding;        /* exceeded threshold: stop printing the body */
+    int header_printed;
+} cli_chat_stream_ctx_t;
+
+static void cli_chat_stream_flush_line(cli_chat_stream_ctx_t *c)
+{
+    if (c->folding) {
+        c->pending_len = 0;
+        return;
+    }
+    if (c->pending_len > 0)
+        fwrite(c->pending, 1, c->pending_len, stdout);
+    fputc('\n', stdout);
+    c->lines_shown++;
+    if (c->lines_shown >= c->fold_at)
+        c->folding = 1;
+    c->pending_len = 0;
+}
+
+static void cli_chat_stream_on_chunk(const char *chunk, void *user_data)
+{
+    cli_chat_stream_ctx_t *c = (cli_chat_stream_ctx_t *)user_data;
+    if (!c || !chunk)
+        return;
+    size_t len = strlen(chunk);
+
+    /* First chunk: drop the spinner and print the [Super Agent] header
+     * (no newline) so the streamed text starts on the header line. */
+    if (!c->header_printed) {
+        cli_spinner_cancel();
+        cli_render_super_agent_begin();
+        c->header_printed = 1;
+    }
+
+    /* Append to the full accumulator (always) so history and the fold count
+     * see the complete reply even when the body was truncated. */
+    if (c->acc_len + len + 1 > c->acc_cap) {
+        size_t new_cap = c->acc_cap ? c->acc_cap * 2 : 4096;
+        while (new_cap < c->acc_len + len + 1)
+            new_cap *= 2;
+        char *grown = (char *)AIRY_REALLOC(c->acc, new_cap);
+        if (grown) {
+            c->acc = grown;
+            c->acc_cap = new_cap;
+        }
+    }
+    if (c->acc) {
+        AIRY_MEMCPY(c->acc + c->acc_len, chunk, len);
+        c->acc_len += len;
+        c->acc[c->acc_len] = '\0';
+    }
+
+    /* Line-buffered streaming: flush on '\n'. Chunks may split UTF-8
+     * sequences at arbitrary byte boundaries; buffering the current line
+     * until its '\n' keeps multi-byte characters intact on screen. */
+    for (size_t i = 0; i < len; i++) {
+        char ch = chunk[i];
+        if (ch == '\n') {
+            cli_chat_stream_flush_line(c);
+            continue;
+        }
+        if (c->pending_len + 1 > c->pending_cap) {
+            size_t new_cap = c->pending_cap ? c->pending_cap * 2 : 256;
+            while (new_cap < c->pending_len + 2)
+                new_cap *= 2;
+            char *grown = (char *)AIRY_REALLOC(c->pending, new_cap);
+            if (!grown)
+                continue;
+            c->pending = grown;
+            c->pending_cap = new_cap;
+        }
+        c->pending[c->pending_len++] = ch;
+        c->pending[c->pending_len] = '\0';
+    }
+    fflush(stdout);
+}
+
 void cli_chat_reply(const char *input)
 {
     if (!g_chat_adapter) {
@@ -308,41 +399,58 @@ void cli_chat_reply(const char *input)
     snprintf(think_title, sizeof(think_title), "Thinking (%s)", think_model);
     cli_spinner_start(think_title);
 
+    /* Streaming fold threshold: AIRY_CHAT_FOLD_LINES (default 20). */
+    static size_t s_fold_lines = 0;
+    if (s_fold_lines == 0) {
+        const char *env = getenv("AIRY_CHAT_FOLD_LINES");
+        long v = env ? strtol(env, NULL, 10) : 0;
+        s_fold_lines = (v >= 4 && v <= 200) ? (size_t)v : 20;
+    }
+
+    cli_chat_stream_ctx_t sc;
+    __builtin_memset(&sc, 0, sizeof(sc));
+    sc.fold_at = s_fold_lines;
+
     llm_response_t *resp = NULL;
-    int ret = llm_svc_adapter_complete(g_chat_adapter, &cfg, &resp);
-    if (ret != 0 || !resp || !resp->choices || resp->choice_count == 0 ||
-        !resp->choices[0].content) {
+    int ret = llm_svc_adapter_complete_stream(g_chat_adapter, &cfg, cli_chat_stream_on_chunk, &sc,
+                                              &resp);
+    if (ret != 0 || !resp || !resp->choices || resp->choice_count == 0) {
         cli_spinner_stop(0, "reply failed");
+        if (sc.header_printed) {
+            /* Partial stream already on screen: close the line before the
+             * error banner so the fold/error lines do not merge with it. */
+            cli_chat_stream_flush_line(&sc);
+        }
         if (resp)
             llm_response_free(resp);
+        AIRY_FREE(sc.pending);
+        AIRY_FREE(sc.acc);
         AIRY_FREE(msgs);
         char line[128];
         snprintf(line, sizeof(line), "Reply failed (err=%d).", ret);
         cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "chat", line);
         return;
     }
-    cli_spinner_stop(1, NULL);
 
-    /* Decision A: no t1-f verification phase - the generator is already t1-f;
-      * the "t2 -> t1-f verify -> regenerate" path is gone (AIRY_CHAT_T1F_VERIFY deprecated). */
-
-    /* Reasoning models (DeepSeek-R1/Kimi-K2) return the chain-of-thought in
-     * reasoning_content; surface it as a Super Think trace before the reply
-     * so the user can follow the model's reasoning. Long traces are collapsed
-     * (Claude Code progressive disclosure): only the first lines render, the
-     * rest stays available in the logs. */
-    if (resp->choices[0].reasoning_content && resp->choices[0].reasoning_content[0]) {
-        cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "reasoning", "");
-        /* Content column: 2-space gutter + 24-char role header (CLI_ROLE_HDR_W).
-         * A weak (dim) collapsed trace of 3 lines keeps the chain-of-thought
-         * visible without drowning the reply (Claude Code progressive disclosure). */
-        cli_render_collapsed(resp->choices[0].reasoning_content, 26, 3, 1);
-    }
+    /* Finalize the streamed turn: flush the trailing line, then fold trailer
+     * if the body was truncated (progressive disclosure). Hidden lines =
+     * total lines in the accumulated text − lines already flushed. */
+    cli_chat_stream_flush_line(&sc);
+    size_t total = 0;
+    for (size_t i = 0; i < sc.acc_len; i++)
+        if (sc.acc[i] == '\n')
+            total++;
+    if (sc.acc_len > 0 && sc.acc[sc.acc_len - 1] != '\n')
+        total++;
+    size_t folded = total > sc.lines_shown ? total - sc.lines_shown : 0;
+    if (folded > 0)
+        cli_render_stream_fold_trailer(folded);
 
     cli_history_add("user", input);
     cli_history_add("assistant", resp->choices[0].content);
 
-    cli_render_super_agent(resp->choices[0].content);
     llm_response_free(resp);
+    AIRY_FREE(sc.pending);
+    AIRY_FREE(sc.acc);
     AIRY_FREE(msgs);
 }

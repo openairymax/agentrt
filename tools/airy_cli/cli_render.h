@@ -183,6 +183,25 @@ void cli_render_role_line(cli_role_t role, cli_actor_t actor, const char *tag,
 void cli_render_super_agent(const char *content);
 
 /**
+ * @brief Begin a streaming super-agent reply: print the role header without
+ * a newline so streamed chunks can follow on the same line.
+ *
+ * The header renders exactly like cli_render_role_line's "[Super Agent]" but
+ * the trailing newline is omitted; the caller then prints the streamed text
+ * and finishes the line itself (newline or fold trailer).
+ */
+void cli_render_super_agent_begin(void);
+
+/**
+ * @brief Print a dim fold trailer after a streamed reply was truncated:
+ * "└ … N more lines (full text in logs)". Mirrors cli_render_collapsed's
+ * trailer so streaming and collapsed rendering share one visual language.
+ *
+ * @param more_lines number of hidden lines (>= 1)
+ */
+void cli_render_stream_fold_trailer(size_t more_lines);
+
+/**
  * @brief Print the user's own message: "[For Thee] › text".
  *
  * Uses the CLI_ICON_USER prefix and cyan accent so the human side of the
@@ -289,6 +308,16 @@ void cli_spinner_resume(void);
  * @param detail optional trailing detail text appended dim after the elapsed
  */
 void cli_spinner_stop(int ok, const char *detail);
+
+/**
+ * @brief Cancel the status line silently (no completion line).
+ *
+ * Erases the animated line (or leaves the degraded static line in place) and
+ * clears the spinner state without printing a ✓/✗ line. Used by the
+ * streaming chat path, where the spinner hands over to the streamed reply
+ * and a separate completion line would duplicate the output.
+ */
+void cli_spinner_cancel(void);
 
 #ifdef __cplusplus
 }

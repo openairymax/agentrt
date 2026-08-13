@@ -96,6 +96,7 @@ airy_err_t cli_dag_wait_remote(const char *sched_sock, const char *dag_id, char 
 
 void cli_print_banner(void);
 void cli_print_model_config(const char *t2, const char *t1f, const char *t1p);
+void cli_print_system_header(const char *t2, const char *t1f, const char *t1p);
 void cli_print_result(const char *result);
 void cli_print_plan_list(const taskflow_workflow_t *wf);
 void cli_progress_cb(const char *execution_id, const char *node_id, taskflow_state_t state,

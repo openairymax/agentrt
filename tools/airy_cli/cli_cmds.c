@@ -41,7 +41,11 @@ int cmd_clear(const char *arg, void *ctx)
 #else
     printf("\033[2J\033[H");
 #endif
-    cli_print_banner();
+    /* Re-render the pinned system header (banner + model panel) so the clear
+     * keeps the fixed-header layout consistent (narrow terminals get the
+     * stacked banner + model config instead). */
+    cli_print_system_header(getenv("AIRY_MODEL_T2"), getenv("AIRY_MODEL_T1F"),
+                            getenv("AIRY_MODEL_T1P"));
     return 0;
 }
 
