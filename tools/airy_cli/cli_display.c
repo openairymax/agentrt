@@ -127,7 +127,7 @@ void cli_print_plan_list(const taskflow_workflow_t *wf)
     const size_t n = wf->node_count;
     char line[256];
     snprintf(line, sizeof(line), "Execution plan (%zu nodes, topo order):", n);
-    cli_render_sub_agent("plan", line);
+    cli_render_sub_agent_line(CLI_ROLE_TRACE, "plan", line);
 
     size_t *order = (size_t *)AIRY_MALLOC(n * sizeof(size_t));
     unsigned char *ordered = (unsigned char *)AIRY_CALLOC(n, 1);
@@ -163,11 +163,15 @@ void cli_print_plan_list(const taskflow_workflow_t *wf)
     for (size_t r = 0; r < n; r++) {
         const taskflow_node_t *nd = &wf->nodes[order[r]];
         const char *g = cli_gutter_pad(4);
-        printf("%s%s%2zu.%s %s◇%s %s%s%s %s%-16s%s %s",
-               g, cli_c(CLR_DIM), r + 1, cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_RESET),
-               cli_c(CLR_CYAN), nd->id, cli_c(CLR_RESET), cli_c(CLR_GREEN),
-               nd->task_handler_name ? nd->task_handler_name : "?", cli_c(CLR_RESET),
-               nd->name[0] ? nd->name : "");
+        /* Whole plan is background trace: node id keeps a cyan accent for
+         * quick scanning, the rest renders dim so the plan cannot compete
+         * with the reply (Claude Code keeps execution detail subtle). */
+        printf("%s%s%2zu.%s %s◇%s %s%s%s %s%s%s %s%s%s",
+               g, cli_c(CLR_DIM), r + 1, cli_c(CLR_RESET), cli_c(CLR_DIM),
+               cli_c(CLR_RESET), cli_c(CLR_CYAN), nd->id, cli_c(CLR_RESET),
+               cli_c(CLR_DIM), nd->task_handler_name ? nd->task_handler_name : "?",
+               cli_c(CLR_RESET), cli_c(CLR_DIM), nd->name[0] ? nd->name : "",
+               cli_c(CLR_RESET));
 
         /* incoming deps, best effort */
         char deps[128];

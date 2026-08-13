@@ -98,6 +98,8 @@ const char *cli_render_role_color(cli_role_t role)
         return CLR_MAGENTA;
     case CLI_ROLE_STATUS:
         return CLR_DIM;
+    case CLI_ROLE_TRACE:
+        return CLR_DIM;
     case CLI_ROLE_ERROR:
         return CLR_RED;
     default:
@@ -539,7 +541,7 @@ void cli_render_markdown(const char *text, size_t indent)
 
 /* ---- progressive disclosure: long text collapsed to N lines ---- */
 
-void cli_render_collapsed(const char *text, size_t indent, size_t max_lines)
+void cli_render_collapsed(const char *text, size_t indent, size_t max_lines, int weak)
 {
     if (!text)
         return;
@@ -570,6 +572,10 @@ void cli_render_collapsed(const char *text, size_t indent, size_t max_lines)
             total++;
     }
 
+    /* Internal traces (weak) render dim so they read as background context
+     * and never compete with the actual reply. */
+    if (weak)
+        fputs(cli_c(CLR_DIM), stdout);
     if (cut > text) {
         size_t plen = (size_t)(cut - text);
         char *prefix = (char *)AIRY_MALLOC(plen + 1);
@@ -587,11 +593,11 @@ void cli_render_collapsed(const char *text, size_t indent, size_t max_lines)
                  total - shown);
         const char *g = cli_gutter(indent);
         fputs(g, stdout);
-        fputs(cli_c(CLR_DIM), stdout);
         fputs(trailer, stdout);
-        fputs(cli_c(CLR_RESET), stdout);
         fputc('\n', stdout);
     }
+    if (weak)
+        fputs(cli_c(CLR_RESET), stdout);
 }
 
 /* ---- role-tagged conversation line ---- */
@@ -835,29 +841,35 @@ void cli_render_task_line(const char *tag, const char *id, const char *state,
     const char *st = state ? state : "?";
     const char *st_col = cli_c(CLR_DIM);
     const char *st_icon = CLI_ICON_BULLET;
+    int bar_bright = 0;
     if (strcmp(st, "completed") == 0) {
         st_col = cli_c(CLR_GREEN);
         st_icon = CLI_ICON_CHECK;
+        bar_bright = 1;
     } else if (strcmp(st, "failed") == 0 || strcmp(st, "canceled") == 0) {
         st_col = cli_c(CLR_RED);
         st_icon = CLI_ICON_CROSS;
     } else if (strcmp(st, "running") == 0 || strcmp(st, "active") == 0 ||
                strcmp(st, "queued") == 0) {
-        /* cyan = live/interactive state (Claude Code / Codex semantic);
-         * yellow is reserved for warnings and pending. */
-        st_col = cli_c(CLR_CYAN);
+        /* In-flight board lines are background trace (dim): the running state
+         * is already visible through the spinner, a bright line per progress
+         * change would flood the terminal. Completion stays green. */
+        st_col = cli_c(CLR_DIM);
         st_icon = CLI_ICON_DIAMOND;
     } else if (strcmp(st, "pending") == 0) {
-        st_col = cli_c(CLR_YELLOW);
+        st_col = cli_c(CLR_DIM);
         st_icon = CLI_ICON_TODO;
     }
 
     const char *g = cli_gutter(2);
     if (tag && tag[0])
         printf("%s%s[%s]%s ", g, cli_c(CLR_DIM), tag, cli_c(CLR_RESET));
-    printf("%s%s %s%s%s ", st_col, st_icon, cli_c(CLR_RESET), cli_c(CLR_CYAN), id ? id : "?");
-    printf("%s%-10s%s ", st_col, st, cli_c(CLR_RESET));
-    printf("%s[%s]%s %3.0f%%\n", cli_c(CLR_GREEN), bar, cli_c(CLR_RESET), progress * 100.0);
+    printf("%s%s %s%s%s ", st_col, st_icon, cli_c(CLR_RESET), cli_c(CLR_DIM),
+           id ? id : "?");
+    printf("%s%s%s ", st_col, st, cli_c(CLR_RESET));
+    printf("%s[%s]%s %s%3.0f%%%s\n", cli_c(bar_bright ? CLR_GREEN : CLR_DIM), bar,
+           cli_c(CLR_RESET), cli_c(bar_bright ? CLR_GREEN : CLR_DIM), progress * 100.0,
+           cli_c(CLR_RESET));
 }
 
 /* ---- one-line status indicator (spinner) ---- */

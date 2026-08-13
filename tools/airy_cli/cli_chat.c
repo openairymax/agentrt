@@ -257,10 +257,15 @@ void cli_chat_reply(const char *input)
     const char *t1f_model = getenv("AIRY_MODEL_T1F");
 
     /* Decision B (2026-08-09): config reminder - t1-f (B model) activates first.
-      * If unset, hint the three config points and order without blocking (provider default). */
-    if (!t1f_model || !t1f_model[0]) {
+      * If unset, hint the three config points and order without blocking (provider default).
+      * The hint prints once per session only: repeating it on every turn floods the
+      * conversation with the same advisory line (Claude Code keeps such setup hints
+      * out of the chat column entirely). */
+    static int s_t1f_hint_shown = 0;
+    if (!s_t1f_hint_shown && (!t1f_model || !t1f_model[0])) {
+        s_t1f_hint_shown = 1;
         cli_render_role_line(
-            CLI_ROLE_STATUS, CLI_ACTOR_SUPER_THINK, "config",
+            CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "config",
             "t1-f (B model) not configured; set AIRY_MODEL_T1F (local Ollama/vLLM or "
             "cloud API), then AIRY_MODEL_T2 (A) and AIRY_MODEL_T1P (C) as needed. "
             "Chat will use the llm_d default model for now.");
@@ -327,9 +332,11 @@ void cli_chat_reply(const char *input)
      * (Claude Code progressive disclosure): only the first lines render, the
      * rest stays available in the logs. */
     if (resp->choices[0].reasoning_content && resp->choices[0].reasoning_content[0]) {
-        cli_render_role_line(CLI_ROLE_SUPER_THINK, CLI_ACTOR_SUPER_THINK, "reasoning", "");
-        /* Content column: 2-space gutter + 24-char role header (CLI_ROLE_HDR_W). */
-        cli_render_collapsed(resp->choices[0].reasoning_content, 26, 10);
+        cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "reasoning", "");
+        /* Content column: 2-space gutter + 24-char role header (CLI_ROLE_HDR_W).
+         * A weak (dim) collapsed trace of 3 lines keeps the chain-of-thought
+         * visible without drowning the reply (Claude Code progressive disclosure). */
+        cli_render_collapsed(resp->choices[0].reasoning_content, 26, 3, 1);
     }
 
     cli_history_add("user", input);
