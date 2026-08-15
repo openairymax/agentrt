@@ -3,7 +3,7 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 cmake_minimum_required(VERSION 3.20)
-project(AgentRT VERSION 0.1.1 LANGUAGES C CXX)
+project(AgentRT VERSION 0.1.2 LANGUAGES C CXX)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR
@@ -190,13 +190,27 @@ endif()
 # 四重运行时检测：AddressSanitizer + LeakSanitizer + UndefinedBehaviorSanitizer + ThreadSanitizer
 if(ENABLE_SANITIZERS AND NOT MSVC)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-        add_compile_options(-fsanitize=address,undefined,leak,float-divide-by-zero -fno-omit-frame-pointer)
-        add_link_options(-fsanitize=address,undefined,leak,float-divide-by-zero)
+        # LSan（leak）仅 Linux 可用：macOS 的 clang 链接期报
+        # "unsupported option '-fsanitize=leak'"，Apple 平台排除 LSan
+        # 保留 ASan + UBSan（float-divide-by-zero 两个平台均支持）。
+        if(APPLE)
+            add_compile_options(-fsanitize=address,undefined,float-divide-by-zero -fno-omit-frame-pointer)
+            add_link_options(-fsanitize=address,undefined,float-divide-by-zero)
+        else()
+            add_compile_options(-fsanitize=address,undefined,leak,float-divide-by-zero -fno-omit-frame-pointer)
+            add_link_options(-fsanitize=address,undefined,leak,float-divide-by-zero)
+        endif()
         # CI环境变量：halt_on_error确保任何检测到的问题立即阻断
         set(ENV{ASAN_OPTIONS} "halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1")
-        set(ENV{LSAN_OPTIONS} "suppressions=${CMAKE_SOURCE_DIR}/../ecosystem/manager/sanitizer/lsan-suppressions")
+        if(NOT APPLE)
+            set(ENV{LSAN_OPTIONS} "suppressions=${CMAKE_SOURCE_DIR}/../ecosystem/manager/sanitizer/lsan-suppressions")
+        endif()
         set(ENV{UBSAN_OPTIONS} "halt_on_error=1:print_stacktrace=1")
-        airy_print_ok("Sanitizers enabled: ASan + LSan + UBSan")
+        if(APPLE)
+            airy_print_ok("Sanitizers enabled: ASan + UBSan (LSan not available on macOS)")
+        else()
+            airy_print_ok("Sanitizers enabled: ASan + LSan + UBSan")
+        endif()
     else()
         airy_print_warn("Sanitizers only supported for GCC/Clang compilers")
     endif()
@@ -258,10 +272,13 @@ if(ENABLE_COVERAGE)
 endif()
 
 # 查找必需的系统依赖
-if(WIN32)
-    airy_print_info("Using Windows built-in thread support")
-else()
-    find_package(Threads REQUIRED)
+# FindThreads 在 Linux/macOS/Windows 均可用：macOS 与 Linux 返回
+# pthread 库，Windows 返回空（线程支持内建于 CRT）。全树大量 target
+# 引用 Threads::Threads（airy_common/svc_common/cupolas/各 daemon），
+# 必须无条件查找，否则 Windows 配置阶段即报
+# "link interface contains Threads::Threads but the target was not found"。
+find_package(Threads REQUIRED)
+if(CMAKE_THREAD_LIBS_INIT)
     airy_print_ok("Threads found: ${CMAKE_THREAD_LIBS_INIT}")
 endif()
 
@@ -448,10 +465,21 @@ endif()
 # ============================================================
 # 跨平台系统库统一管理（BAN-15: 禁止硬编码平台库）
 # airy_platform_libs, dl, pthread, m, ws2_32 等通过此 INTERFACE 库统一提供
+# 平台映射：
+#   - m（libm）：POSIX 平台存在；MSVC 无独立 m.lib（数学函数在 CRT 内），
+#     直接链接裸 `m` 会报 LNK1104，故仅非 MSVC 提供。
+#   - dl：仅 Linux（macOS libSystem 内建，Windows 无）。
+#   - uuid：仅 Linux（macOS 无 uuid.h/无 uuid 库；Windows 走 97-101 行
+#     平台分支或系统库）。
+#   - ws2_32：仅 Windows。
 # ============================================================
 add_library(airy_platform_libs INTERFACE)
 if(UNIX AND NOT APPLE)
-    target_link_libraries(airy_platform_libs INTERFACE dl)
+    target_link_libraries(airy_platform_libs INTERFACE dl uuid)
+endif()
+if(NOT MSVC)
+    # macOS 的 libSystem 已内建 dl/uuid/m，无需独立库；此分支同时覆盖 Linux 的 m
+    target_link_libraries(airy_platform_libs INTERFACE m)
 endif()
 if(WIN32)
     target_link_libraries(airy_platform_libs INTERFACE ws2_32)

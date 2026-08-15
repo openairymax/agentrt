@@ -25,3 +25,60 @@ target_compile_options(test_banned_functions PRIVATE
 add_test(NAME test_banned_functions COMMAND test_banned_functions)
 
 airy_print_ok("  [compliance] test_banned_functions: BAN-030/155/154/073 compile-time + runtime verification")
+
+# Build smoke test: fast sanity check of the compliance build environment.
+add_executable(test_smoke test_smoke.c)
+
+target_include_directories(test_smoke PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/compliance/include
+)
+
+target_compile_features(test_smoke PRIVATE c_std_11)
+target_compile_definitions(test_smoke PRIVATE AIRY_COMPLIANCE_STRICT)
+target_compile_options(test_smoke PRIVATE
+    -Wall -Wextra -Wpedantic -Wno-type-limits
+)
+
+add_test(NAME test_smoke COMMAND test_smoke)
+
+airy_print_ok("  [smoke] test_smoke: compliance build environment sanity check")
+
+# Generic utils unit test: lightweight, self-contained tool semantics checks.
+add_executable(test_utils test_utils.c)
+
+target_include_directories(test_utils PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/compliance/include
+)
+
+target_compile_features(test_utils PRIVATE c_std_11)
+target_compile_definitions(test_utils PRIVATE AIRY_COMPLIANCE_STRICT)
+target_compile_options(test_utils PRIVATE
+    -Wall -Wextra -Wpedantic -Wno-type-limits
+)
+
+add_test(NAME test_utils COMMAND test_utils)
+
+airy_print_ok("  [utils] test_utils: generic utility semantics unit test")
+
+# String utility unit test: lightweight, self-contained safe string semantics checks.
+add_executable(test_string_utils test_string_utils.c)
+
+target_include_directories(test_string_utils PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/compliance/include
+)
+
+target_compile_features(test_string_utils PRIVATE c_std_11)
+target_compile_definitions(test_string_utils PRIVATE AIRY_COMPLIANCE_STRICT)
+target_compile_options(test_string_utils PRIVATE
+    -Wall -Wextra -Wpedantic -Wno-type-limits
+)
+
+add_test(NAME test_string_utils COMMAND test_string_utils)
+
+airy_print_ok("  [str-utils] test_string_utils: safe string utility semantics unit test")

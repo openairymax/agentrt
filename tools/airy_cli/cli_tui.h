@@ -38,6 +38,56 @@ extern "C" {
 
 typedef struct cli_tui_s cli_tui_t;
 
+/* ================================================================
+ * 阶段 4：TUI 视图模式（tab）+ 面板渲染回调
+ *
+ * 多视图切换（底部 tab 栏）：对话（默认）/ 任务看板 / 事件流。
+ * 看板与事件流是"数据面板"：内容由 main.c 注册的回调生成（面板数据
+ * 源），TUI 引擎只负责布局与滚动，不感知 work_hall/hall_store，保持
+ * 渲染层与机制层解耦。
+ * 按键：Ctrl+P 下一个 tab，Ctrl+O 上一个 tab；看板模式 200ms 轮询
+ * 重绘（实时刷新）；面板内 Up/Down/PageUp/PageDown 滚动回放。
+ * ================================================================ */
+
+typedef enum {
+    CLI_TUI_MODE_CHAT = 0,  /* 对话（默认视图） */
+    CLI_TUI_MODE_BOARD,     /* 任务看板（任务大厅实时状态） */
+    CLI_TUI_MODE_EVENTS,    /* 事件流（hall_store gseq 全局因果序回放） */
+    CLI_TUI_MODE_MAX
+} cli_tui_mode_t;
+
+/* 面板内容回调（mode=BOARD/EVENTS 时由 TUI 调用）：
+ *   count: 返回当前行数（调用方可借此重建/刷新缓存）
+ *   line:  将第 idx 行写入 out（TUI 提供 cap 字节缓冲），返回 1 成功 0 越界 */
+typedef size_t (*cli_tui_panel_count_fn)(void *ud);
+typedef int (*cli_tui_panel_line_fn)(void *ud, size_t idx, char *out, size_t cap);
+
+/**
+ * @brief 绑定一个视图模式的面板数据源（BOARD/EVENTS）。
+ *
+ * TUI 进入该模式时通过回调拉取内容渲染（引擎不持有面板数据）。
+ * ud/count/line 全为 BORROW 语义，生命周期由调用方（main.c）保证；
+ * 传 NULL 清除绑定（该模式回退为空面板）。
+ */
+void cli_tui_set_panel(cli_tui_t *t, cli_tui_mode_t mode, void *ud,
+                       cli_tui_panel_count_fn count, cli_tui_panel_line_fn line);
+
+/**
+ * @brief 当前视图模式。
+ */
+cli_tui_mode_t cli_tui_mode(const cli_tui_t *t);
+
+/**
+ * @brief 切换到下一个/上一个视图模式（Chat → Board → Events 循环）。
+ */
+void cli_tui_mode_next(cli_tui_t *t);
+void cli_tui_mode_prev(cli_tui_t *t);
+
+/**
+ * @brief 面板模式轮询间隔（毫秒）：看板实时刷新节拍（0 = 不轮询）。
+ */
+#define CLI_TUI_PANEL_POLL_MS 200
+
 /**
  * @brief Create and activate the full-screen TUI (if stdout is a TTY).
  *
@@ -102,11 +152,18 @@ void cli_tui_pin_header(cli_tui_t *tui);
 /**
  * @brief Read one full line of user input (TUI mode) or from stdin.
  *
- * TUI mode: raw-mode key handling. Printable chars edit the input line;
- * Backspace deletes; Enter submits; Up/Down / PageUp / PageDown / wheel
- * browse the conversation history (any editing key returns to the live
- * tail); Ctrl+C / Ctrl+D abort (returns 0, *out_len stays 0). The input
- * line and prompt are rendered as part of the full-screen layout.
+ * TUI mode: raw-mode key handling with full readline-style editing.
+ *   - printable chars insert at the cursor; Backspace / Delete / Ctrl+W edit
+ *   - Ctrl+A / Ctrl+E / Left / Right move the caret; Ctrl+U / Ctrl+K kill
+ *     to line start / end; Ctrl+T transposes; Alt+b/f or Ctrl+Left/Right
+ *     jump by word; Ctrl+W kills the previous word; Ctrl+Y yanks
+ *   - Up / Down browse the submitted-command history while typing, or the
+ *     conversation viewport on an empty line
+ *   - Ctrl+R reverse / Ctrl+S forward incremental search over past commands
+ *   - Tab completes "/" commands; PageUp / PageDown / Home / End scroll
+ *   - bracketed paste (ESC[200~..ESC[201~) inserts literally
+ *   - Ctrl+C / Ctrl+D abort (returns 0, *out_len stays 0)
+ * The input line and prompt are rendered as part of the full-screen layout.
  *
  * Non-TUI mode: behaves like fgets — reads a line from stdin.
  *

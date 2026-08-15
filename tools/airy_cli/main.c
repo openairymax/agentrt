@@ -60,6 +60,10 @@
   * Reset to 0 before each new task. */
 volatile sig_atomic_t g_cli_cancel = 0;
 
+/* Server one-shot mode (-p/--print) and --json structured output. */
+int g_cli_print_mode = 0;
+int g_cli_json_mode = 0;
+
 #if !defined(_WIN32)
 static void cli_sigint_handler(int sig)
 {
@@ -69,14 +73,18 @@ static void cli_sigint_handler(int sig)
 #endif
 
 llm_svc_adapter_t *g_chat_adapter = NULL;
+/* 阶段 4（2026-08-15）：决策链事件流句柄（hall_store 创建后赋值）。 */
+airy_hall_store_t *g_cli_hall_store = NULL;
 
 const cli_command_t CLI_COMMANDS[] = {
     {"/help", "显示所有命令", 0, cmd_help},
     {"/clear", "清屏并清空对话上下文", 0, cmd_clear},
     {"/status", "查看执行大厅状态", 0, cmd_status},
+    {"/chain", "决策链可视化：/chain [task_id]（默认列出最近任务）", 0, cmd_chain},
     {"/quit", "退出 agentrt", 0, cmd_quit},
     {"/daemons", "查看全部 daemon 在线状态", 0, cmd_daemons},
-    {"/rpc", "直接调用 daemon 方法：/rpc <ns>.<method> [json]", 1, cmd_rpc},
+    {"/daemon", "管理 daemon：/daemon start|stop|restart|status [ns...]（默认全部）", 0, cmd_daemon},
+    {"/rpc", "直接调用 daemon 方法：/rpc <ns>.<method> [json]（ns 或 ns_d 均可）", 1, cmd_rpc},
     {"/stats", "查看 daemon 统计：/stats [ns]", 0, cmd_stats},
     {"/agents", "列出已注册智能体", 0, cmd_agents},
     {"/tools", "列出可用工具", 0, cmd_tools},
@@ -143,8 +151,72 @@ static int cli_dispatch_command(const char *input, void *ctx)
     return 1;
 }
 
-int main(void)
+/* 阶段 4（2026-08-15）：任务提交 → 决策链 COMMAND 事件（exec_id 任务，
+ * "cognition" 角色，ACL 允许；plan_id 关联 preflight 计划事件）。 */
+static void cli_chain_record_submit(const char *exec_id, const airy_task_plan_t *plan,
+                                    const taskflow_workflow_t *wf)
 {
+    if (!g_cli_hall_store || !exec_id || !exec_id[0])
+        return;
+    char ev[384];
+    snprintf(ev, sizeof(ev),
+             "{\"dag_id\":\"%s\",\"plan_id\":\"%s\",\"nodes\":%zu,\"edges\":%zu}",
+             exec_id, (plan && plan->task_plan_id) ? plan->task_plan_id : "",
+             wf ? wf->node_count : 0, wf ? wf->edge_count : 0);
+    airy_hall_store_write(g_cli_hall_store, "default", exec_id, NULL, AIRY_HALL_CAT_COMMAND,
+                          "cognition", ev, NULL, 0);
+}
+
+static void cli_print_usage(void)
+{
+    cli_outf("用法: airy_cli [选项]\n");
+    cli_outf("  %s-p%s, %s--print%s [PROMPT]  服务器单轮模式：执行一条指令后退出\n",
+           cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_outf("                           （无 banner/提示符；省略 PROMPT 时从 stdin 读取）\n");
+    cli_outf("  %s--json%s                 结构化 JSON 输出（与 %s-p%s 组合使用）\n",
+           cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_outf("  %s-h%s, %s--help%s             显示本帮助\n",
+           cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_outf("交互模式：直接运行 airy_cli 进入对话；输入 /help 查看命令。\n");
+}
+
+int main(int argc, char *argv[])
+{
+    /* Server one-shot mode (-p/--print): run a single prompt then exit.
+     * 参数解析允许 -p/--print 之后的选项（如 --json）与 prompt 任意顺序：
+     * `-p --json "prompt"`、`--json -p "prompt"`、`-p "prompt" --json` 均合法，
+     * 首个非选项 token 作为 prompt（含空格的 prompt 须用引号包裹）。 */
+    const char *print_prompt = NULL;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--print") == 0) {
+            g_cli_print_mode = 1;
+        } else if (strcmp(argv[i], "--json") == 0) {
+            g_cli_json_mode = 1;
+        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            cli_print_usage();
+            return 0;
+        } else if (argv[i][0] == '-') {
+            cli_outf("airy_cli: 未知选项 %s%s%s\n", cli_c(CLR_YELLOW), argv[i],
+                   cli_c(CLR_RESET));
+            cli_print_usage();
+            return 1;
+        } else if (g_cli_print_mode && !print_prompt) {
+            /* -p 模式下首个非选项 token 作为 prompt。 */
+            print_prompt = argv[i];
+        } else if (g_cli_print_mode) {
+            cli_outf("airy_cli: 多出的参数 %s%s%s（-p 只接受一个 prompt）\n",
+                   cli_c(CLR_YELLOW), argv[i], cli_c(CLR_RESET));
+            cli_print_usage();
+            return 1;
+        } else {
+            cli_outf("airy_cli: 未知参数 %s%s%s（非选项参数仅可用于 %s-p%s 模式）\n",
+                   cli_c(CLR_YELLOW), argv[i], cli_c(CLR_RESET),
+                   cli_c(CLR_CYAN), cli_c(CLR_RESET));
+            cli_print_usage();
+            return 1;
+        }
+    }
+
     /* Terminal capability probe (TTY / color level / NO_COLOR) before any
      * output so every render call degrades consistently on servers and logs. */
     cli_term_init();
@@ -170,11 +242,14 @@ int main(void)
 
     /* Full-screen TUI page on interactive terminals (Claude Code style):
      * pinned header + scrollable history + bottom input line. Piped/logged
-     * output keeps the line-oriented renderer (cli_tui stays inactive). */
+     * output keeps the line-oriented renderer (cli_tui stays inactive).
+     * One-shot server mode (-p) never enters the TUI. */
     cli_tui_t *tui = NULL;
-    cli_tui_create(&tui);
-    if (cli_tui_active(tui))
-        cli_render_set_tui(tui);
+    if (!g_cli_print_mode) {
+        cli_tui_create(&tui);
+        if (cli_tui_active(tui))
+            cli_render_set_tui(tui);
+    }
 
     /* Dual-thinking three-model injection (GRAD separation of powers; user-chosen models):
       *   AIRY_MODEL_T2    -> model A (generator)
@@ -188,10 +263,14 @@ int main(void)
     const char *m_expert = getenv("AIRY_MODEL_T1P");
 
     cli_print_system_header(m_s2, m_verify, m_expert);
-    if (cli_tui_active(tui))
+    if (g_cli_print_mode) {
+        /* One-shot server mode: no banner, no pinned header, no footer hint. */
+        (void)0;
+    } else if (cli_tui_active(tui)) {
         cli_tui_pin_header(tui);
-    else
+    } else {
         cli_term_header_pin(11);
+    }
 
     airy_core_loop_t *loop = NULL;
     airy_err_t err = airy_loop_create(NULL, &loop);
@@ -273,15 +352,48 @@ int main(void)
     airy_hall_store_t *hall_store = airy_hall_store_create(NULL);
     if (!hall_store)
         AIRY_LOG_WARN("airy_cli: hall store create failed, full visibility disabled");
+    g_cli_hall_store = hall_store;
     wh_cfg.hall_store = hall_store;
+    /* P23 reconcile extension: execution-level failure auto re-dispatch
+     * (opt-in via AIRY_WORK_HALL_REDISPATCH_MAX, 0 = disabled).
+     * The main loop below calls airy_work_hall_redispatch_once() each
+     * iteration to drive the reconcile poll. */
+    {
+        const char *e_rd = getenv("AIRY_WORK_HALL_REDISPATCH_MAX");
+        const char *e_rd_delay = getenv("AIRY_WORK_HALL_REDISPATCH_DELAY_MS");
+        if (e_rd && e_rd[0] && strtol(e_rd, NULL, 10) > 0) {
+            wh_cfg.redispatch_max = (int32_t)strtol(e_rd, NULL, 10);
+            if (e_rd_delay && e_rd_delay[0])
+                wh_cfg.redispatch_delay_ms = (uint32_t)strtoul(e_rd_delay, NULL, 10);
+            AIRY_LOG_INFO("airy_cli: execution reconcile attached "
+                          "(redispatch_max=%d, delay_ms=%u)",
+                          wh_cfg.redispatch_max, wh_cfg.redispatch_delay_ms);
+        }
+    }
     /* Decision E (2026-08-09): workspace isolation of the main workspace path.
       * Enabled when AIRY_WORKSPACE_MAIN_DIR is set (snapshot the main workspace -> a sandbox
       * -> merge artifacts back); otherwise unchanged (the executor touches the main workspace).
-      * AIRY_WORKSPACE_ISOLATION=0 disables isolation further (snapshot/merge return ENOTSUP). */
+      * AIRY_WORKSPACE_ISOLATION=0 disables isolation further (snapshot/merge return ENOTSUP).
+      * When unset, default the main workspace to the CLI's cwd so the agent acts
+      * on the real project tree (snapshot-isolated) instead of an empty dir —
+      * otherwise the agent exhausts its tool rounds exploring a bare workspace
+      * (P0-1 end-to-end: "create a test file" -> tool loop exceeded). */
     {
         const char *ws_main = getenv("AIRY_WORKSPACE_MAIN_DIR");
-        if (ws_main && ws_main[0])
+        static char ws_main_buf[1024];
+        if (ws_main && ws_main[0]) {
             wh_cfg.main_workspace_dir = ws_main;
+        } else {
+#if AIRY_PLATFORM_POSIX
+            if (getcwd(ws_main_buf, sizeof(ws_main_buf)))
+                wh_cfg.main_workspace_dir = ws_main_buf;
+#else
+            if (_getcwd(ws_main_buf, (int)sizeof(ws_main_buf)))
+                wh_cfg.main_workspace_dir = ws_main_buf;
+#endif
+        }
+        if (wh_cfg.main_workspace_dir)
+            AIRY_LOG_INFO("airy_cli: main workspace = %s", wh_cfg.main_workspace_dir);
     }
     /* Decision F (2026-08-09): unified governance via environment variables (GRAD axiom II
       * R_total runtime projection). AIRY_GOV_TOKEN_BUDGET (global budget, 0=unlimited) /
@@ -353,24 +465,87 @@ int main(void)
     char input[8192];
     int quit_flag = 0;
     cli_cmd_ctx_t cmd_ctx = {.hall = hall, .quit = &quit_flag};
-    for (;;) {
-        if (!cli_tui_active(tui)) {
-            /* Line-oriented mode: print the prompt ourselves. */
-            cli_outf("\n%sairy>%s ", cli_c(CLR_CYAN), cli_c(CLR_RESET));
-            fflush(stdout);
-        }
-        size_t input_len = 0;
-        if (!cli_tui_readline(tui, input, sizeof(input), &input_len))
-            break;
-        if (input_len == 0)
-            continue;
-        if (strcmp(input, "quit") == 0 || strcmp(input, "exit") == 0)
-            break;
+    int print_consumed = 0;
 
-        if (cli_dispatch_command(input, &cmd_ctx)) {
-            if (quit_flag)
+    /* 阶段 2 生命周期层 reconcile：agent 自愈重启（AIRY_SELF_HEAL=1 或
+     * AIRY_SELF_HEAL_AGENTS 列表启用；主循环每轮 reconcile_once 驱动） */
+    {
+        const char *e_sh = getenv("AIRY_SELF_HEAL");
+        const char *e_sh_agents = getenv("AIRY_SELF_HEAL_AGENTS");
+        if ((e_sh && e_sh[0] && strcmp(e_sh, "0") != 0) || (e_sh_agents && e_sh_agents[0]))
+            cli_daemon_lifecycle_init(e_sh_agents);
+    }
+
+    /* 阶段 4：TUI 面板数据源绑定（任务看板 = work_hall 实时；事件流 =
+     * hall_store gseq 因果序）。面板 ud 生命周期与本函数共存，退出前销毁。 */
+    void *board_ud = NULL;
+    void *events_ud = NULL;
+    if (tui && cli_tui_active(tui)) {
+        cli_panel_board_create(hall, &board_ud);
+        cli_panel_events_create(hall_store, &events_ud);
+        if (board_ud)
+            cli_tui_set_panel(tui, CLI_TUI_MODE_BOARD, board_ud, cli_panel_board_count,
+                              cli_panel_board_line);
+        if (events_ud)
+            cli_tui_set_panel(tui, CLI_TUI_MODE_EVENTS, events_ud, cli_panel_events_count,
+                              cli_panel_events_line);
+    }
+
+    for (;;) {
+        /* P23 reconcile extension: fire due execution-level re-dispatches
+         * (no-op when redispatch_max == 0). Controller-driven reconcile —
+         * each turn polls the failed-execution queue. */
+        (void)airy_work_hall_redispatch_once(hall);
+        /* 阶段 2 生命周期层 reconcile：agent 自愈重启（AIRY_SELF_HEAL=1 或
+         * AIRY_SELF_HEAL_AGENTS 列表启用；未启用时 no-op）。与执行层
+         * redispatch 并列，构成声明式自愈第三层。 */
+        (void)cli_daemon_lifecycle_reconcile_once();
+        size_t input_len = 0;
+        if (g_cli_print_mode) {
+            /* One-shot server mode: source the prompt from -p (or stdin when
+             * omitted), run exactly one turn, then exit. No prompt echo. */
+            if (print_consumed)
                 break;
-            continue;
+            print_consumed = 1;
+            if (print_prompt && print_prompt[0]) {
+                AIRY_STRNCPY_TERM(input, print_prompt, sizeof(input));
+                input_len = strlen(input);
+            } else {
+                if (!fgets(input, sizeof(input), stdin))
+                    break;
+                input_len = strlen(input);
+                while (input_len > 0 &&
+                       (input[input_len - 1] == '\n' || input[input_len - 1] == '\r'))
+                    input[--input_len] = '\0';
+            }
+            if (input_len == 0)
+                break;
+            /* One-shot server mode still honors slash commands: /daemon etc.
+             * are dispatchable, so scripting `-p "/daemon status"` works the
+             * same as typing it in the interactive session. */
+            if (cli_dispatch_command(input, &cmd_ctx)) {
+                if (quit_flag)
+                    break;
+                continue;
+            }
+        } else {
+            if (!cli_tui_active(tui)) {
+                /* Line-oriented mode: print the prompt ourselves. */
+                cli_outf("\n%sairy>%s ", cli_c(CLR_CYAN), cli_c(CLR_RESET));
+                fflush(stdout);
+            }
+            if (!cli_tui_readline(tui, input, sizeof(input), &input_len))
+                break;
+            if (input_len == 0)
+                continue;
+            if (strcmp(input, "quit") == 0 || strcmp(input, "exit") == 0)
+                break;
+
+            if (cli_dispatch_command(input, &cmd_ctx)) {
+                if (quit_flag)
+                    break;
+                continue;
+            }
         }
 
         cli_render_user_message(input);
@@ -401,7 +576,19 @@ int main(void)
                         cJSON_Delete(r);
                     }
                 }
-                if (next_buf[0]) {
+                if (g_cli_json_mode) {
+                    cJSON *jroot = cJSON_CreateObject();
+                    cJSON_AddStringToObject(jroot, "role", "super_think");
+                    cJSON_AddStringToObject(jroot, "type", "l1_hit");
+                    cJSON_AddBoolToObject(jroot, "success", 1);
+                    cJSON_AddStringToObject(jroot, "next_step", next_buf);
+                    char *js = cJSON_PrintUnformatted(jroot);
+                    if (js) {
+                        cli_outf("%s\n", js);
+                        cJSON_free(js);
+                    }
+                    cJSON_Delete(jroot);
+                } else if (next_buf[0]) {
                     char line[1024];
                     snprintf(line, sizeof(line), "L1 blueprint state machine: advance to step "
                                                  "%s%s%s (zero token)",
@@ -417,8 +604,18 @@ int main(void)
                     cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "blueprint",
                                          line);
                 }
+                /* 阶段 4：蓝图 L1 状态机命中 → 决策链事件（preflight，cognition） */
+                if (g_cli_hall_store) {
+                    char ev[512];
+                    snprintf(ev, sizeof(ev),
+                             "{\"event\":\"blueprint_hit\",\"layer\":\"L1\",\"result\":%s}",
+                             rs_out ? rs_out : "null");
+                    airy_hall_store_write(g_cli_hall_store, "default", "preflight", NULL,
+                                          AIRY_HALL_CAT_CHAIN, "cognition", ev, NULL, 0);
+                }
                 AIRY_FREE(rs_out);
-                cli_render_turn_separator(cli_now_ms() - turn_start, NULL);
+                if (!g_cli_json_mode)
+                    cli_render_turn_separator(cli_now_ms() - turn_start, NULL);
                 continue;
             }
             if (rs_err == AIRY_EOK && rs_disp == AIRY_RS_DISPATCH_HIT_L2) {
@@ -434,9 +631,29 @@ int main(void)
                     }
                 }
                 if (sugg && sugg[0]) {
-                    cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "blueprint",
-                                         "L2 semantic cache hit (low token): replaying last result");
-                    cli_render_super_agent(sugg);
+                    if (g_cli_json_mode) {
+#ifdef AIRY_HAS_CJSON
+                        cJSON *jroot = cJSON_CreateObject();
+                        cJSON_AddStringToObject(jroot, "role", "super_agent");
+                        cJSON_AddStringToObject(jroot, "type", "l2_hit");
+                        cJSON_AddBoolToObject(jroot, "success", 1);
+                        cJSON_AddStringToObject(jroot, "result", sugg);
+                        char *js = cJSON_PrintUnformatted(jroot);
+                        if (js) {
+                            cli_outf("%s\n", js);
+                            cJSON_free(js);
+                        }
+                        cJSON_Delete(jroot);
+#else
+                        cli_outf("{\"role\":\"super_agent\",\"type\":\"l2_hit\",\"success\":true,"
+                                 "\"result\":\"%s\"}\n",
+                                 sugg);
+#endif /* AIRY_HAS_CJSON */
+                    } else {
+                        cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "blueprint",
+                                             "L2 semantic cache hit (low token): replaying last result");
+                        cli_render_super_agent(sugg);
+                    }
                     AIRY_FREE(sugg);
                 } else
 #endif /* AIRY_HAS_CJSON */
@@ -447,8 +664,18 @@ int main(void)
                     cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "blueprint",
                                          line);
                 }
+                /* 阶段 4：蓝图 L2 语义缓存命中 → 决策链事件（preflight，cognition） */
+                if (g_cli_hall_store) {
+                    char ev[512];
+                    snprintf(ev, sizeof(ev),
+                             "{\"event\":\"blueprint_hit\",\"layer\":\"L2\",\"result\":%s}",
+                             rs_out ? rs_out : "null");
+                    airy_hall_store_write(g_cli_hall_store, "default", "preflight", NULL,
+                                          AIRY_HALL_CAT_CHAIN, "cognition", ev, NULL, 0);
+                }
                 AIRY_FREE(rs_out);
-                cli_render_turn_separator(cli_now_ms() - turn_start, NULL);
+                if (!g_cli_json_mode)
+                    cli_render_turn_separator(cli_now_ms() - turn_start, NULL);
                 continue;
             }
             AIRY_FREE(rs_out);
@@ -500,6 +727,15 @@ int main(void)
                      plan->task_plan_entry_count);
             cli_render_sub_agent_line(CLI_ROLE_TRACE, "cognition", line);
         }
+        /* 阶段 4：计划生成 → 决策链 COMMAND 事件（preflight，cognition；plan_id
+         * 供提交事件关联，exec 链与 preflight 链由此可追溯） */
+        if (g_cli_hall_store && plan && plan->task_plan_id) {
+            char ev[256];
+            snprintf(ev, sizeof(ev), "{\"plan_id\":\"%s\",\"nodes\":%zu,\"entry\":%zu}",
+                     plan->task_plan_id, plan->task_plan_node_count, plan->task_plan_entry_count);
+            airy_hall_store_write(g_cli_hall_store, "default", "preflight", NULL,
+                                  AIRY_HALL_CAT_COMMAND, "cognition", ev, NULL, 0);
+        }
 
         taskflow_workflow_t *wf = NULL;
         err = airy_plan_to_workflow(plan, &wf);
@@ -539,6 +775,7 @@ int main(void)
                 char line[256];
                 snprintf(line, sizeof(line), "Submitted: dag=%s", exec_id);
                 cli_render_sub_agent_line(CLI_ROLE_TRACE, "sched_d", line);
+                cli_chain_record_submit(exec_id, plan, wf);
             }
         }
         if (!sched_remote) {
@@ -555,6 +792,7 @@ int main(void)
                 char line[256];
                 snprintf(line, sizeof(line), "Submitted: exec=%s", exec_id);
                 cli_render_sub_agent_line(CLI_ROLE_TRACE, "hall", line);
+                cli_chain_record_submit(exec_id, plan, wf);
             }
         }
 
@@ -573,6 +811,10 @@ int main(void)
                      sched_remote ? "sched_d" : "hall");
             cli_spinner_start(run_title);
         }
+        /* Node-level live board for remote DAGs: one icon+goal line per node,
+         * re-printed only when a node's state changes (Claude Code style). */
+        cli_dag_board_t *node_board =
+            sched_remote ? cli_dag_node_board_create() : NULL;
         int board_polls = 0;
         int stale_polls = 0;
         int done = 0;
@@ -609,6 +851,13 @@ int main(void)
                     cli_render_sub_agent_line(CLI_ROLE_ERROR, "sched_d",
                                               "Status query failed.");
                     break;
+                }
+                if (node_board) {
+                    cli_spinner_pause();
+                    int nb_terminal = cli_dag_node_board_tick(node_board, sched_sock, exec_id);
+                    cli_spinner_resume();
+                    if (nb_terminal)
+                        cli_dag_node_board_destroy(node_board), node_board = NULL;
                 }
                 if (prc == CLI_DAG_POLL_DONE) {
                     run_failed = (strcmp(cur_state, "failed") == 0 ||
@@ -665,6 +914,11 @@ int main(void)
             if (board_polls >= 300 || stale_polls >= 10)
                 break;
         }
+        /* Release any board not already freed by the terminal tick. */
+        if (node_board) {
+            cli_dag_node_board_destroy(node_board);
+            node_board = NULL;
+        }
         if (spin_running) {
             /* Polling exhausted without a terminal state (stale board):
              * leave the status line running and fall into the blocking wait,
@@ -698,15 +952,95 @@ int main(void)
                 cli_spinner_stop(0, "no result");
             spin_running = 0;
         }
+        /* 任务实际成败：远程 DAG 终态可能是 failed/canceled，此时
+         * cli_dag_wait_remote 仍返回 EOK + 结果 JSON，必须解析 status
+         * 而非仅看 err，否则失败结果会被误 absorb 为 SUCCESS 写入 L2
+         * 语义缓存（缓存中毒、错误记忆累积）。嵌入式路径的 result 也是
+         * JSON（含 success 字段），同样必须解析——agent 执行失败（如
+         * tool loop / 工具被拒）返回 {"success":false,...} 时 err 仍为
+         * EOK，若只看 err 会把失败当成功缓存（P0-1 L2 中毒根因）。 */
+        int task_succeeded = (err == AIRY_EOK && result) ? 1 : 0;
+        if (task_succeeded && result) {
+#ifdef AIRY_HAS_CJSON
+            cJSON *rstat = cJSON_Parse(result);
+            if (rstat) {
+                cJSON *st = cJSON_GetObjectItem(rstat, "status");
+                if (cJSON_IsString(st) && st->valuestring) {
+                    if (strcmp(st->valuestring, "completed") != 0)
+                        task_succeeded = 0;
+                } else {
+                    /* 嵌入式路径：result 可能是 agent 输出 JSON，含
+                     * success 字段；无 status 时按 success 判定 */
+                    cJSON *ok = cJSON_GetObjectItem(rstat, "success");
+                    if (cJSON_IsBool(ok) && !cJSON_IsTrue(ok))
+                        task_succeeded = 0;
+                    else if (cJSON_IsString(ok) && strcmp(ok->valuestring, "true") != 0)
+                        task_succeeded = 0;
+                    cJSON *errj = cJSON_GetObjectItem(rstat, "error");
+                    if (errj && cJSON_IsString(errj) && errj->valuestring &&
+                        errj->valuestring[0])
+                        task_succeeded = 0;
+                }
+                cJSON_Delete(rstat);
+            }
+#else
+            if (strstr(result, "\"failed\"") || strstr(result, "\"canceled\"") ||
+                strstr(result, "\"success\":false") || strstr(result, "\"error\":"))
+                task_succeeded = 0;
+#endif /* AIRY_HAS_CJSON */
+        }
         if (g_cli_cancel) {
             cli_render_sub_agent_line(CLI_ROLE_ERROR, "cancel",
                                       "Task aborted (stopped after the current node).");
         } else if (err == AIRY_EOK && result) {
-            cli_print_result(result);
+            if (g_cli_json_mode) {
+#ifdef AIRY_HAS_CJSON
+                cJSON *jroot = cJSON_CreateObject();
+                cJSON_AddStringToObject(jroot, "role", "super_agent");
+                cJSON_AddStringToObject(jroot, "type", "task");
+                cJSON_AddBoolToObject(jroot, "success", task_succeeded);
+                cJSON_AddStringToObject(jroot, "dag_id", exec_id ? exec_id : "");
+                cJSON_AddStringToObject(jroot, "result", result);
+                char *js = cJSON_PrintUnformatted(jroot);
+                if (js) {
+                    cli_outf("%s\n", js);
+                    cJSON_free(js);
+                }
+                cJSON_Delete(jroot);
+#else
+                cli_outf("{\"role\":\"super_agent\",\"type\":\"task\",\"success\":%s,"
+                         "\"dag_id\":\"%s\",\"result\":\"%s\"}\n",
+                         task_succeeded ? "true" : "false",
+                         exec_id ? exec_id : "", result);
+#endif /* AIRY_HAS_CJSON */
+            } else {
+                cli_print_result(result);
+            }
         } else {
-            char line[128];
-            snprintf(line, sizeof(line), "No result (err=%d)", (int)err);
-            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "result", line);
+            if (g_cli_json_mode) {
+#ifdef AIRY_HAS_CJSON
+                cJSON *jroot = cJSON_CreateObject();
+                cJSON_AddStringToObject(jroot, "role", "super_agent");
+                cJSON_AddStringToObject(jroot, "type", "task");
+                cJSON_AddBoolToObject(jroot, "success", 0);
+                cJSON_AddStringToObject(jroot, "dag_id", exec_id ? exec_id : "");
+                cJSON_AddNumberToObject(jroot, "code", (double)(int)err);
+                char *js = cJSON_PrintUnformatted(jroot);
+                if (js) {
+                    cli_outf("%s\n", js);
+                    cJSON_free(js);
+                }
+                cJSON_Delete(jroot);
+#else
+                cli_outf("{\"role\":\"super_agent\",\"type\":\"task\",\"success\":false,"
+                         "\"dag_id\":\"%s\",\"code\":%d}\n",
+                         exec_id ? exec_id : "", (int)err);
+#endif /* AIRY_HAS_CJSON */
+            } else {
+                char line[128];
+                snprintf(line, sizeof(line), "No result (err=%d)", (int)err);
+                cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "result", line);
+            }
         }
         /* Decision G: validation gate annotation - mark FAIL clearly when artifacts
           * fail validation, so the user can replan/retry (sched_d owns node-level retries). */
@@ -718,14 +1052,21 @@ int main(void)
         }
         /* L2 semantic cache write-back: register the executed blueprint under the
           * user's original intent, so a repeated or similar task hits L2 (low token)
-          * instead of a full L3 replan. Absorb requires PASS + SUCCESS to admit. */
+          * instead of a full L3 replan. Absorb requires PASS + SUCCESS to admit;
+          * a failed/canceled run is absorbed as a NORMAL_FAIL fingerprint instead
+          * (never cached as a success, avoiding L2 cache poisoning). */
         if (rsched && !g_cli_cancel && err == AIRY_EOK && result && input[0]) {
             airy_rs_absorb_meta_t rmeta;
             __builtin_memset(&rmeta, 0, sizeof(rmeta));
             rmeta.node_id = input;
             rmeta.output_json = result;
-            rmeta.result = AIRY_RS_RESULT_SUCCESS;
-            rmeta.verify = AIRY_RS_VERIFY_PASS;
+            if (task_succeeded) {
+                rmeta.result = AIRY_RS_RESULT_SUCCESS;
+                rmeta.verify = AIRY_RS_VERIFY_PASS;
+            } else {
+                rmeta.result = AIRY_RS_RESULT_NORMAL_FAIL;
+                rmeta.verify = AIRY_RS_VERIFY_FAIL;
+            }
             airy_roadmap_sched_absorb(rsched, NULL, exec_id, &rmeta);
         }
         {
@@ -761,10 +1102,16 @@ int main(void)
     /* Leave the full-screen TUI page (restore alt screen + raw mode) before
      * the farewell so it renders in the normal terminal again. The pinned
      * header scroll region only applies to the line-oriented mode. */
+    /* 阶段 4：面板数据源先于 TUI 引擎销毁（引擎不持有面板内存） */
+    if (events_ud)
+        cli_panel_events_destroy(events_ud);
+    if (board_ud)
+        cli_panel_board_destroy(board_ud);
     cli_render_set_tui(NULL);
     cli_tui_destroy(tui);
     cli_term_header_unpin();
-    cli_render_role_line(CLI_ROLE_SUPER_AGENT, CLI_ACTOR_SUPER_AGENT, NULL,
-                         "AgentRT has exited. Thank you for using it.");
+    if (!g_cli_print_mode)
+        cli_render_role_line(CLI_ROLE_SUPER_AGENT, CLI_ACTOR_SUPER_AGENT, NULL,
+                             "AgentRT has exited. Thank you for using it.");
     return 0;
 }

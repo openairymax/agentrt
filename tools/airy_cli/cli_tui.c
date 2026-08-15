@@ -31,7 +31,9 @@
 
 #include "cli_render.h"
 #include "cli_term.h"
+#include "cli_internal.h" /* CLI_COMMANDS (Tab 补全 SSoT) */
 #include "airy_memory.h"
+#include "platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,9 +45,25 @@
 #include <windows.h>
 #else
 #include <errno.h>
+#include <poll.h>
+#include <signal.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <termios.h>
 #include <unistd.h>
+#endif
+
+/* SIGWINCH notification: set by the handler (async-signal-safe), cleared by
+ * the read loop when a redraw happens. Kept as a plain sig_atomic_t flag so
+ * the handler never touches the TUI structure from signal context. */
+#ifndef _WIN32
+static volatile sig_atomic_t g_tui_resize_pending;
+
+static void tui_sigwinch_handler(int sig)
+{
+    (void)sig;
+    g_tui_resize_pending = 1;
+}
 #endif
 
 /* ---- history / viewport model ---- */
@@ -62,12 +80,23 @@ cli_tui_t *cli_tui_get_default(void)
 #define TUI_LINE_INIT_CAP 128
 #define TUI_BOTTOM_INPUT_LINES 2 /* input line + one spare row */
 
+#define TUI_TAB_CAND_MAX 64      /* Tab 补全候选上限（CLI_COMMANDS 索引） */
+#define TUI_CMD_HIST_MAX 500
+#define TUI_SEARCH_QUERY_MAX 256
+#define TUI_INPUT_PREFIX "airy> " /* input prompt, width tracked in bytes */
+
 typedef struct {
     char **lines;    /* committed history lines (no trailing '\n') */
     size_t count;    /* number of committed lines */
     size_t cap;      /* allocated slots */
     size_t pinned;   /* lines [0, pinned) form the fixed header */
 } tui_history_t;
+
+typedef struct {
+    char **entries;  /* submitted input lines, oldest first */
+    size_t count;
+    size_t cap;
+} tui_cmd_history_t;
 
 struct cli_tui_s {
     int active;      /* full-screen page active */
@@ -84,16 +113,105 @@ struct cli_tui_s {
     size_t viewport_rows; /* rows usable by the middle viewport */
     size_t scroll_off;    /* history lines scrolled back (0 = live tail) */
 
+    /* ---- 阶段 4：视图模式（tab）+ 面板数据源 ---- */
+    cli_tui_mode_t mode;
+    struct {
+        void *ud;
+        cli_tui_panel_count_fn count;
+        cli_tui_panel_line_fn line;
+    } panel[CLI_TUI_MODE_MAX];
+
+    /* ---- input line state ---- */
     char *input;     /* input line being edited */
     size_t input_len;
     size_t input_cap;
-    size_t input_col;   /* cursor column within input */
+    size_t input_col;   /* cursor column within input (byte offset) */
+
+    /* submitted-command history (Up/Down browse while typing) */
+    tui_cmd_history_t cmd_hist;
+    size_t cmd_hist_idx;     /* browsing index (count = past-newest) */
+    char *cmd_hist_edit;     /* preserved in-progress input while browsing */
+    size_t cmd_hist_edit_len;
+    size_t cmd_hist_edit_cap;
+
+    /* Ctrl+R reverse incremental search */
+    int search_active;
+    char search_query[TUI_SEARCH_QUERY_MAX];
+    size_t search_query_len;
+    ssize_t search_match;    /* index into cmd_hist.entries (-1 = none) */
+    int search_wrapped;
+    int search_forward;      /* Ctrl+S forward search (Ctrl+R = reverse) */
+
+    /* kill-ring: Ctrl+U/K/W stash the killed text, Ctrl+Y yanks it back.
+     * Single-slot is enough for the interactive line-editing model. */
+    char kill_buf[4096];
+    size_t kill_len;
+
+    /* bracketed paste: raw bytes between ESC[200~ and ESC[201~ are inserted
+     * literally (newlines folded to spaces), never interpreted as keys. */
+    int paste_active;
+
+    /* Tab completion (SSoT: CLI_COMMANDS in main.c) */
+    int tab_active;          /* 多候选轮转中 */
+    size_t tab_count;        /* 匹配候选数 */
+    size_t tab_sel;          /* 当前选中在候选流中的位置 */
+    size_t tab_cands[TUI_TAB_CAND_MAX]; /* CLI_COMMANDS 索引 */
 
 #ifndef _WIN32
     struct termios saved_termios;
     int termios_saved;
 #endif
 };
+
+/* ---- 阶段 4：视图模式（tab）+ 面板数据源（struct 定义后，可访问字段） ---- */
+
+void cli_tui_set_panel(cli_tui_t *t, cli_tui_mode_t mode, void *ud,
+                       cli_tui_panel_count_fn count, cli_tui_panel_line_fn line)
+{
+    if (!t || mode < 0 || mode >= CLI_TUI_MODE_MAX)
+        return;
+    t->panel[mode].ud = ud;
+    t->panel[mode].count = count;
+    t->panel[mode].line = line;
+    t->dirty = 1;
+}
+
+cli_tui_mode_t cli_tui_mode(const cli_tui_t *t)
+{
+    return t ? t->mode : CLI_TUI_MODE_CHAT;
+}
+
+static const char *tui_mode_name(cli_tui_mode_t m)
+{
+    switch (m) {
+    case CLI_TUI_MODE_CHAT:
+        return "对话";
+    case CLI_TUI_MODE_BOARD:
+        return "任务看板";
+    case CLI_TUI_MODE_EVENTS:
+        return "事件流";
+    default:
+        return "?";
+    }
+}
+
+void cli_tui_mode_next(cli_tui_t *t)
+{
+    if (!t)
+        return;
+    t->mode = (cli_tui_mode_t)(((int)t->mode + 1) % CLI_TUI_MODE_MAX);
+    t->scroll_off = 0;
+    t->dirty = 1;
+}
+
+void cli_tui_mode_prev(cli_tui_t *t)
+{
+    if (!t)
+        return;
+    t->mode = (cli_tui_mode_t)((((int)t->mode + CLI_TUI_MODE_MAX - 1)) % CLI_TUI_MODE_MAX);
+    t->scroll_off = 0;
+    t->dirty = 1;
+}
 
 static void tui_grow_history(tui_history_t *h)
 {
@@ -127,6 +245,261 @@ static void tui_history_reset(tui_history_t *h)
     h->count = 0;
     h->cap = 0;
     h->pinned = 0;
+}
+
+/* ---- submitted-command history (Ctrl+R search / Up browse) ---- */
+
+static void tui_cmd_hist_push(cli_tui_t *t, const char *line)
+{
+    if (!line || !line[0])
+        return;
+    /* Do not push consecutive duplicates (same as readline dedup). */
+    if (t->cmd_hist.count > 0 &&
+        strcmp(t->cmd_hist.entries[t->cmd_hist.count - 1], line) == 0)
+        return;
+    if (t->cmd_hist.count >= TUI_CMD_HIST_MAX) {
+        /* Ring: drop the oldest, shift down. */
+        AIRY_FREE(t->cmd_hist.entries[0]);
+        for (size_t i = 1; i < t->cmd_hist.count; i++)
+            t->cmd_hist.entries[i - 1] = t->cmd_hist.entries[i];
+        t->cmd_hist.count--;
+    }
+    if (t->cmd_hist.count >= t->cmd_hist.cap) {
+        size_t new_cap = t->cmd_hist.cap ? t->cmd_hist.cap * 2 : 32;
+        while (new_cap < t->cmd_hist.count + 1)
+            new_cap *= 2;
+        char **grown = (char **)AIRY_REALLOC(t->cmd_hist.entries,
+                                             new_cap * sizeof(char *));
+        if (!grown)
+            return;
+        t->cmd_hist.entries = grown;
+        t->cmd_hist.cap = new_cap;
+    }
+    char *copy = AIRY_STRDUP(line);
+    if (copy)
+        t->cmd_hist.entries[t->cmd_hist.count++] = copy;
+}
+
+static void tui_cmd_hist_reset(cli_tui_t *t)
+{
+    for (size_t i = 0; i < t->cmd_hist.count; i++)
+        AIRY_FREE(t->cmd_hist.entries[i]);
+    AIRY_FREE(t->cmd_hist.entries);
+    t->cmd_hist.entries = NULL;
+    t->cmd_hist.count = 0;
+    t->cmd_hist.cap = 0;
+    t->cmd_hist_idx = 0;
+    AIRY_FREE(t->cmd_hist_edit);
+    t->cmd_hist_edit = NULL;
+    t->cmd_hist_edit_len = 0;
+    t->cmd_hist_edit_cap = 0;
+}
+
+/* ---- submitted-command history persistence (cross-session recall) ----
+ * The command history lives at $AIRY_HOME/data/agentrt/cli/history, one
+ * command per line, so Up/Ctrl+R recall survives restarts (Claude Code /
+ * readline convention). Loaded at engine create; appended on every submit.
+ * File I/O is best-effort: a missing/unwritable file only degrades recall,
+ * never blocks input. */
+#define TUI_HISTORY_REL_PATH "agentrt/cli/history"
+
+static void tui_history_path(char *buf, size_t cap)
+{
+    const char *data = airy_data_dir();
+    if (!data || !data[0]) {
+        const char *home = getenv("AIRY_HOME");
+        data = (home && home[0]) ? home : NULL;
+    }
+    if (data && data[0])
+        snprintf(buf, cap, "%s/%s", data, TUI_HISTORY_REL_PATH);
+    else
+        snprintf(buf, cap, ".%s", TUI_HISTORY_REL_PATH);
+}
+
+#ifndef _WIN32
+/* Create the parent directories of `path` (path itself is a file). */
+static void tui_history_mkdir(const char *path)
+{
+    char dir[AIRY_PATH_MAX];
+    size_t n = strlen(path);
+    if (n >= sizeof(dir))
+        return;
+    AIRY_MEMCPY(dir, path, n + 1);
+    /* Drop the final component (the history file name). */
+    char *slash = strrchr(dir, '/');
+    if (slash)
+        *slash = '\0';
+    for (char *p = dir + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            mkdir(dir, 0755);
+            *p = '/';
+        }
+    }
+    mkdir(dir, 0755);
+}
+#endif
+
+static void tui_cmd_hist_load(cli_tui_t *t)
+{
+    if (!t)
+        return;
+#ifdef _WIN32
+    (void)t;
+    return;
+#else
+    char path[AIRY_PATH_MAX];
+    tui_history_path(path, sizeof(path));
+    FILE *f = fopen(path, "r");
+    if (!f)
+        return;
+    char line[TUI_CMD_HIST_MAX];
+    while (fgets(line, sizeof(line), f)) {
+        size_t n = strlen(line);
+        while (n > 0 && (line[n - 1] == '\n' || line[n - 1] == '\r'))
+            line[--n] = '\0';
+        if (n == 0)
+            continue;
+        tui_cmd_hist_push(t, line);
+    }
+    fclose(f);
+    t->cmd_hist_idx = t->cmd_hist.count;
+#endif
+}
+
+static void tui_cmd_hist_save(cli_tui_t *t)
+{
+    if (!t)
+        return;
+#ifdef _WIN32
+    (void)t;
+    return;
+#else
+    char path[AIRY_PATH_MAX];
+    tui_history_path(path, sizeof(path));
+    tui_history_mkdir(path);
+    char tmp[AIRY_PATH_MAX + 8];
+    snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+    FILE *f = fopen(tmp, "w");
+    if (!f)
+        return;
+    for (size_t i = 0; i < t->cmd_hist.count; i++)
+        fprintf(f, "%s\n", t->cmd_hist.entries[i]);
+    fclose(f);
+    rename(tmp, path);
+#endif
+}
+
+/* Preserve the current in-progress input so Up/Down browsing can return. */
+static void tui_cmd_hist_save_draft(cli_tui_t *t)
+{
+    if (t->cmd_hist_edit_len == t->input_len &&
+        (t->input_len == 0 ||
+         (t->cmd_hist_edit && memcmp(t->cmd_hist_edit, t->input, t->input_len) == 0)))
+        return;
+    if (t->input_len + 1 > t->cmd_hist_edit_cap) {
+        size_t new_cap = t->cmd_hist_edit_cap ? t->cmd_hist_edit_cap * 2 : 128;
+        while (new_cap < t->input_len + 1)
+            new_cap *= 2;
+        char *grown = (char *)AIRY_REALLOC(t->cmd_hist_edit, new_cap);
+        if (!grown)
+            return;
+        t->cmd_hist_edit = grown;
+        t->cmd_hist_edit_cap = new_cap;
+    }
+    AIRY_MEMCPY(t->cmd_hist_edit, t->input, t->input_len);
+    t->cmd_hist_edit[t->input_len] = '\0';
+    t->cmd_hist_edit_len = t->input_len;
+}
+
+/* Replace the input line with a history entry. */
+static void tui_cmd_hist_apply(cli_tui_t *t, size_t idx)
+{
+    const char *src = t->cmd_hist.entries[idx];
+    size_t n = strlen(src);
+    if (n + 1 > t->input_cap) {
+        size_t new_cap = t->input_cap ? t->input_cap * 2 : 256;
+        while (new_cap < n + 1)
+            new_cap *= 2;
+        char *grown = (char *)AIRY_REALLOC(t->input, new_cap);
+        if (!grown)
+            return;
+        t->input = grown;
+        t->input_cap = new_cap;
+    }
+    AIRY_MEMCPY(t->input, src, n);
+    t->input[n] = '\0';
+    t->input_len = n;
+    t->input_col = n;
+}
+
+/* Case-insensitive substring match (used by Ctrl+R search). */
+static int tui_search_match(const char *hay, const char *needle)
+{
+    if (!needle[0])
+        return 1;
+    if (!hay)
+        return 0;
+    size_t hn = strlen(hay);
+    size_t nn = strlen(needle);
+    if (nn > hn)
+        return 0;
+    for (size_t i = 0; i + nn <= hn; i++) {
+        size_t j = 0;
+        while (j < nn) {
+            char a = hay[i + j];
+            char b = needle[j];
+            if (a >= 'A' && a <= 'Z')
+                a = (char)(a - 'A' + 'a');
+            if (b >= 'A' && b <= 'Z')
+                b = (char)(b - 'A' + 'a');
+            if (a != b)
+                break;
+            j++;
+        }
+        if (j == nn)
+            return 1;
+    }
+    return 0;
+}
+
+/* Re-run the reverse search from the current match backward. */
+static void tui_search_step(cli_tui_t *t)
+{
+    if (t->cmd_hist.count == 0) {
+        t->search_match = -1;
+        return;
+    }
+    size_t start = (t->search_match >= 0) ? (size_t)t->search_match : t->cmd_hist.count;
+    for (size_t k = 1; k <= t->cmd_hist.count; k++) {
+        size_t idx = (start + t->cmd_hist.count - k) % t->cmd_hist.count;
+        if (tui_search_match(t->cmd_hist.entries[idx], t->search_query)) {
+            t->search_match = (ssize_t)idx;
+            t->search_wrapped = 0;
+            return;
+        }
+    }
+    t->search_match = -1;
+}
+
+/* Forward search (Ctrl+S): walk from the current match toward the newest
+ * entries. Initial call (no match yet) starts at the oldest entry. */
+static void tui_search_step_forward(cli_tui_t *t)
+{
+    if (t->cmd_hist.count == 0) {
+        t->search_match = -1;
+        return;
+    }
+    size_t start = (t->search_match >= 0) ? (size_t)t->search_match : t->cmd_hist.count - 1;
+    for (size_t k = 1; k <= t->cmd_hist.count; k++) {
+        size_t idx = (start + k) % t->cmd_hist.count;
+        if (tui_search_match(t->cmd_hist.entries[idx], t->search_query)) {
+            t->search_match = (ssize_t)idx;
+            t->search_wrapped = 0;
+            return;
+        }
+    }
+    t->search_match = -1;
 }
 
 static void tui_append_byte(cli_tui_t *t, char c)
@@ -282,11 +655,55 @@ static void tui_render_viewport(cli_tui_t *t)
 {
     size_t rows = tui_middle_rows(t);
     size_t start_row = t->hist.pinned + 1;
-    size_t total = t->hist.count;
-    int have_partial = t->cur && t->cur_len > 0;
 
     if (rows == 0)
         return;
+
+    /* 阶段 4：面板模式（任务看板/事件流）渲染面板内容；对话模式走历史 */
+    if (t->mode != CLI_TUI_MODE_CHAT) {
+        const cli_tui_panel_count_fn count = t->panel[t->mode].count;
+        const cli_tui_panel_line_fn line = t->panel[t->mode].line;
+        const void *ud = t->panel[t->mode].ud;
+        size_t total = (count && ud) ? count((void *)ud) : 0;
+        size_t lines = total + 1; /* 标题行 + 内容行 */
+
+        /* 滚动窗口：默认显示头部（看板最新在前 / 事件流从起点回放） */
+        size_t live = lines > rows ? rows : lines;
+        size_t max_off = lines > rows ? lines - rows : 0;
+        if (t->scroll_off > max_off)
+            t->scroll_off = max_off;
+        size_t start = t->scroll_off > 0 ? lines - t->scroll_off - live : 0;
+
+        for (size_t r = 0; r < rows; r++) {
+            tui_write_literal("\033[");
+            char num[16];
+            snprintf(num, sizeof(num), "%zu", start_row + r);
+            tui_write_literal(num);
+            tui_write_literal(";1H");
+            tui_clear_line();
+            size_t rel = start + r;
+            if (rel < lines) {
+                char buf[512];
+                if (rel == 0) {
+                    snprintf(buf, sizeof(buf), "%s%s%s  %s%zu 条%s  %s%s%s",
+                             cli_c(CLR_BOLD), cli_c(CLR_CYAN), tui_mode_name(t->mode),
+                             cli_c(CLR_DIM), total, cli_c(CLR_RESET),
+                             cli_c(CLR_DIM), "· Ctrl+P/O 切换 · ↑↓ 滚动",
+                             cli_c(CLR_RESET));
+                } else if (line && ud) {
+                    if (!line((void *)ud, rel - 1, buf, sizeof(buf)))
+                        buf[0] = '\0';
+                } else {
+                    buf[0] = '\0';
+                }
+                fputs(buf, stdout);
+            }
+        }
+        return;
+    }
+
+    size_t total = t->hist.count;
+    int have_partial = t->cur && t->cur_len > 0;
 
     /* Viewport window over the content (history minus header), plus the
      * in-progress partial line (streamed text not yet committed). */
@@ -332,19 +749,115 @@ static void tui_render_input(cli_tui_t *t)
     tui_write_literal(num);
     tui_write_literal(";1H");
     tui_clear_line();
+
+    /* 多候选 Tab 补全：在输入行上方显示候选列表（当前候选高亮）。 */
+    if (t->tab_active && t->tab_count > 1) {
+        size_t brow = row > 1 ? row - 1 : 1;
+        tui_write_literal("\033[");
+        snprintf(num, sizeof(num), "%zu", brow);
+        tui_write_literal(num);
+        tui_write_literal(";1H");
+        tui_clear_line();
+        fputs(cli_c(CLR_DIM), stdout);
+        fputs("candidates:", stdout);
+        fputs(cli_c(CLR_RESET), stdout);
+        size_t used = 0;
+        for (size_t i = 0; i < t->tab_count; i++) {
+            if (t->tab_cands[i] >= cli_commands_count())
+                break;
+            size_t w = cli_disp_width(CLI_COMMANDS[t->tab_cands[i]].name) + 1;
+            if (used + w > (size_t)t->cols)
+                break;
+            if (i == t->tab_sel) {
+                fputs(cli_c(CLR_CYAN), stdout);
+                fputs(CLI_COMMANDS[t->tab_cands[i]].name, stdout);
+                fputs(cli_c(CLR_RESET), stdout);
+            } else {
+                fputs(cli_c(CLR_DIM), stdout);
+                fputs(CLI_COMMANDS[t->tab_cands[i]].name, stdout);
+                fputs(cli_c(CLR_RESET), stdout);
+            }
+            fputs(" ", stdout);
+            used += w;
+        }
+        fflush(stdout);
+    } else if (t->mode != CLI_TUI_MODE_CHAT) {
+        /* 阶段 4：面板模式的 tab 栏（输入行上方一行，当前 tab 高亮） */
+        size_t brow = row > 1 ? row - 1 : 1;
+        tui_write_literal("\033[");
+        snprintf(num, sizeof(num), "%zu", brow);
+        tui_write_literal(num);
+        tui_write_literal(";1H");
+        tui_clear_line();
+        fputs(cli_c(CLR_DIM), stdout);
+        fputs("  tabs:", stdout);
+        fputs(cli_c(CLR_RESET), stdout);
+        for (int m = 0; m < CLI_TUI_MODE_MAX; m++) {
+            const char *name = tui_mode_name((cli_tui_mode_t)m);
+            if ((cli_tui_mode_t)m == t->mode) {
+                fputs(cli_c(CLR_BG_BLUE), stdout);
+                fputs(cli_c(CLR_BOLD), stdout);
+            } else {
+                fputs(cli_c(CLR_DIM), stdout);
+            }
+            fputs(" ", stdout);
+            fputs(name, stdout);
+            fputs(" ", stdout);
+            fputs(cli_c(CLR_RESET), stdout);
+        }
+        fputs(cli_c(CLR_DIM), stdout);
+        fputs("  Ctrl+P/O 切换", stdout);
+        fputs(cli_c(CLR_RESET), stdout);
+        fflush(stdout);
+    }
+
+    if (t->search_active) {
+        /* Search line (readline convention): "(reverse-i-search)`q': <match>"
+         * for Ctrl+R, "(i-search)`q': <match>" for Ctrl+S. The matched
+         * entry is shown dim after the prompt. */
+        const char *prompt = t->search_forward ? "(i-search)`" : "(reverse-i-search)`";
+        fputs(cli_c(CLR_DIM), stdout);
+        fputs(prompt, stdout);
+        fputs(cli_c(CLR_RESET), stdout);
+        fwrite(t->search_query, 1, t->search_query_len, stdout);
+        fputs(cli_c(CLR_DIM), stdout);
+        fputs("': ", stdout);
+        fputs(cli_c(CLR_RESET), stdout);
+        if (t->search_match >= 0 && (size_t)t->search_match < t->cmd_hist.count)
+            fputs(cli_c(CLR_CYAN), stdout);
+        if (t->search_match >= 0 && (size_t)t->search_match < t->cmd_hist.count)
+            fputs(t->cmd_hist.entries[t->search_match], stdout);
+        if (t->search_match >= 0 && (size_t)t->search_match < t->cmd_hist.count)
+            fputs(cli_c(CLR_RESET), stdout);
+        else if (t->search_query_len > 0)
+            fputs(cli_c(CLR_RED), stdout), fputs("(failed)", stdout), fputs(cli_c(CLR_RESET), stdout);
+        size_t col = 1 + cli_disp_width(prompt) +
+                     cli_disp_width(t->search_query) + cli_disp_width("': ") + 1;
+        tui_write_literal("\033[");
+        snprintf(num, sizeof(num), "%zu", row);
+        tui_write_literal(num);
+        tui_write_literal(";");
+        snprintf(num, sizeof(num), "%zu", col > 0 ? col : 1);
+        tui_write_literal(num);
+        tui_write_literal("H");
+        fflush(stdout);
+        return;
+    }
+
     fputs(cli_c(CLR_CYAN), stdout);
-    fputs("airy> ", stdout);
+    fputs(TUI_INPUT_PREFIX, stdout);
     fputs(cli_c(CLR_RESET), stdout);
     if (t->input_len > 0)
         fwrite(t->input, 1, t->input_len, stdout);
-    /* Place the cursor after the input text, using the display width (CJK
-     * chars occupy two columns) so the caret never drifts on CJK input. */
-    size_t col = 7 + cli_disp_width(t->input ? t->input : "");
+    /* Place the cursor at the edit position (byte offset -> display width).
+     * CJK chars occupy two columns, so the caret never drifts. */
+    size_t col = (size_t)strlen(TUI_INPUT_PREFIX) +
+                 cli_disp_width_of(t->input, t->input_col < t->input_len ? t->input_col : t->input_len);
     tui_write_literal("\033[");
     snprintf(num, sizeof(num), "%zu", row);
     tui_write_literal(num);
     tui_write_literal(";");
-    snprintf(num, sizeof(num), "%zu", col);
+    snprintf(num, sizeof(num), "%zu", col > 0 ? col : 1);
     tui_write_literal(num);
     tui_write_literal("H");
     fflush(stdout);
@@ -363,19 +876,42 @@ void cli_tui_redraw(cli_tui_t *t)
 
 /* ---- input ---- */
 
-static int tui_read_byte(cli_tui_t *t, char *out)
+/* 阶段 4：带超时的按键等待。timeout_ms < 0 无限等待（原阻塞语义）。
+ * 返回 1 有数据（*out 有效）；0 = 超时（*eof=0）或 EOF（*eof=1）。
+ * 看板模式用它做 200ms 轮询节拍实现"实时刷新"。 */
+static int tui_wait_byte(cli_tui_t *t, char *out, int timeout_ms, int *eof)
 {
 #ifdef _WIN32
     (void)t;
+    (void)timeout_ms;
+    (void)eof;
     (void)out;
-    return 0;
+    return 0; /* TUI 为 POSIX-only，Windows 不读键 */
 #else
-    (void)t;
+    struct pollfd pfd;
+    pfd.fd = STDIN_FILENO;
+    pfd.events = POLLIN;
+    pfd.revents = 0;
+    int r;
+    for (;;) {
+        r = poll(&pfd, 1, timeout_ms);
+        if (r >= 0 || errno != EINTR)
+            break;
+        /* SIGWINCH interrupted the wait: surface a resize tick so the caller
+         * refreshes the geometry and redraws. */
+        if (g_tui_resize_pending)
+            break;
+    }
+    if (r <= 0) {
+        *eof = 0; /* 超时 / poll 错误 / resize tick */
+        return 0;
+    }
     ssize_t n = read(STDIN_FILENO, out, 1);
-    if (n == 1)
+    if (n == 1) {
+        *eof = 0;
         return 1;
-    if (n < 0 && errno == EINTR)
-        return tui_read_byte(t, out);
+    }
+    *eof = 1; /* read 0 = EOF */
     return 0;
 #endif
 }
@@ -388,41 +924,120 @@ enum {
     TUI_KEY_PGDN,
     TUI_KEY_HOME,
     TUI_KEY_END,
+    TUI_KEY_LEFT,
+    TUI_KEY_RIGHT,
+    TUI_KEY_DEL,
+    TUI_KEY_CTRL_LEFT,   /* ESC [ 1 ; 5 D / ESC [ 5 D：词左移 */
+    TUI_KEY_CTRL_RIGHT,  /* ESC [ 1 ; 5 C / ESC [ 5 C：词右移 */
+    TUI_KEY_ALT_LEFT,    /* ESC [ 1 ; 3 D / ESC [ 3 D：词左移 */
+    TUI_KEY_ALT_RIGHT,   /* ESC [ 1 ; 3 C / ESC [ 3 C：词右移 */
+    TUI_KEY_ALT_B,       /* ESC b：词左移 */
+    TUI_KEY_ALT_F,       /* ESC f：词右移 */
+    TUI_KEY_PASTE_START, /* ESC [ 200 ~：bracketed paste 开始 */
     TUI_KEY_UNKNOWN,
 };
 
-static int tui_read_key(cli_tui_t *t)
+/* ---- bracketed paste (ESC [ 200 ~ ... ESC [ 201 ~) ---- */
+
+/* 读取 bracketed-paste 结束序列的剩余字节（ESC 已被调用方消费，
+ * 这里只读 "[201~" 5 字节）。返回 1 = 完整结束序列；0 = 不匹配。 */
+static int tui_paste_read_end(void)
+{
+    char want[] = {'[', '2', '0', '1', '~'};
+    char got[sizeof(want)];
+    for (size_t i = 0; i < sizeof(want); i++) {
+        ssize_t n = read(STDIN_FILENO, &got[i], 1);
+        if (n != 1 || got[i] != want[i])
+            return 0;
+    }
+    return 1;
+}
+
+/* 读取一个按键（带第一字节超时）。返回键码；0 = EOF；-1 = 轮询超时
+ * （*eof 保持 0；看板模式以此节拍刷新）。ESC 序列后续字节用 50ms
+ * 短超时，避免孤立 ESC 键阻塞。 */
+static int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
 {
     char c;
-    if (!tui_read_byte(t, &c))
-        return 0;
+    if (!tui_wait_byte(t, &c, timeout_ms, eof))
+        return *eof ? 0 : -1;
     if (c == 0x1b) {
         char b;
-        if (!tui_read_byte(t, &b))
+        if (!tui_wait_byte(t, &b, 50, eof))
             return 0x1b; /* lone ESC */
         if (b == '[') {
             char x;
-            if (!tui_read_byte(t, &x))
+            if (!tui_wait_byte(t, &x, 50, eof))
                 return TUI_KEY_UNKNOWN;
             switch (x) {
             case 'A': return TUI_KEY_UP;
             case 'B': return TUI_KEY_DOWN;
+            case 'C': return TUI_KEY_RIGHT;
+            case 'D': return TUI_KEY_LEFT;
             case 'H': return TUI_KEY_HOME;
             case 'F': return TUI_KEY_END;
-            case '5': /* page up: ESC [ 5 ~ */
-                if (tui_read_byte(t, &b) && b == '~')
+            case '3': /* ESC [ 3 ~ = Delete; ESC [ 3 D / C = Alt+Left/Right */
+                if (!tui_wait_byte(t, &b, 50, eof))
+                    return TUI_KEY_UNKNOWN;
+                if (b == '~')
+                    return TUI_KEY_DEL;
+                if (b == 'D')
+                    return TUI_KEY_ALT_LEFT;
+                if (b == 'C')
+                    return TUI_KEY_ALT_RIGHT;
+                return TUI_KEY_UNKNOWN;
+            case '5': /* ESC [ 5 D / C = Ctrl+Left/Right; ESC [ 5 ~ = PageUp */
+                if (!tui_wait_byte(t, &b, 50, eof))
+                    return TUI_KEY_UNKNOWN;
+                if (b == 'D')
+                    return TUI_KEY_CTRL_LEFT;
+                if (b == 'C')
+                    return TUI_KEY_CTRL_RIGHT;
+                if (b == '~')
                     return TUI_KEY_PGUP;
                 return TUI_KEY_UNKNOWN;
             case '6': /* page down: ESC [ 6 ~ */
-                if (tui_read_byte(t, &b) && b == '~')
+                if (tui_wait_byte(t, &b, 50, eof) && b == '~')
                     return TUI_KEY_PGDN;
                 return TUI_KEY_UNKNOWN;
+            case '1': /* ESC [ 1 ; 5 D/C = Ctrl+Left/Right; ESC [ 1 ; 3 D/C = Alt+Left/Right */
+            {
+                char semi, mod, dir;
+                if (!tui_wait_byte(t, &semi, 50, eof) || semi != ';')
+                    return TUI_KEY_UNKNOWN;
+                if (!tui_wait_byte(t, &mod, 50, eof))
+                    return TUI_KEY_UNKNOWN;
+                if (!tui_wait_byte(t, &dir, 50, eof))
+                    return TUI_KEY_UNKNOWN;
+                if (mod == '5' && dir == 'D')
+                    return TUI_KEY_CTRL_LEFT;
+                if (mod == '5' && dir == 'C')
+                    return TUI_KEY_CTRL_RIGHT;
+                if (mod == '3' && dir == 'D')
+                    return TUI_KEY_ALT_LEFT;
+                if (mod == '3' && dir == 'C')
+                    return TUI_KEY_ALT_RIGHT;
+                return TUI_KEY_UNKNOWN;
+            }
+            case '2': /* ESC [ 2 0 0 ~ = bracketed paste start */
+                if (!tui_wait_byte(t, &b, 50, eof) || b != '0')
+                    return TUI_KEY_UNKNOWN;
+                if (!tui_wait_byte(t, &b, 50, eof) || b != '0')
+                    return TUI_KEY_UNKNOWN;
+                if (!tui_wait_byte(t, &b, 50, eof) || b != '~')
+                    return TUI_KEY_UNKNOWN;
+                return TUI_KEY_PASTE_START;
             case '<': /* SGR mouse: ESC [ < b ; r ; c M  (ignore) */
                 return TUI_KEY_UNKNOWN;
             default:
                 return TUI_KEY_UNKNOWN;
             }
         }
+        /* Alt+letter: xterm sends ESC followed by the letter. */
+        if (b == 'b')
+            return TUI_KEY_ALT_B;
+        if (b == 'f')
+            return TUI_KEY_ALT_F;
         return TUI_KEY_UNKNOWN;
     }
     return (unsigned char)c;
@@ -430,6 +1045,7 @@ static int tui_read_key(cli_tui_t *t)
 
 static void tui_input_append(cli_tui_t *t, char c)
 {
+    t->tab_active = 0; /* 编辑输入即离开补全模式 */
     if (t->input_len + 2 > t->input_cap) {
         size_t new_cap = t->input_cap ? t->input_cap * 2 : 256;
         while (new_cap < t->input_len + 2)
@@ -440,23 +1056,269 @@ static void tui_input_append(cli_tui_t *t, char c)
         t->input = grown;
         t->input_cap = new_cap;
     }
-    t->input[t->input_len++] = c;
+    /* Insert at the edit position (mid-line typing) instead of appending,
+     * so Ctrl+A / Left-arrow editing works before committing. */
+    if (t->input_col >= t->input_len) {
+        t->input[t->input_len++] = c;
+    } else {
+        if (t->input_len + 2 > t->input_cap) {
+            size_t new_cap = t->input_cap ? t->input_cap * 2 : 256;
+            while (new_cap < t->input_len + 2)
+                new_cap *= 2;
+            char *grown = (char *)AIRY_REALLOC(t->input, new_cap);
+            if (!grown)
+                return;
+            t->input = grown;
+            t->input_cap = new_cap;
+        }
+        AIRY_MEMMOVE(t->input + t->input_col + 1, t->input + t->input_col,
+                t->input_len - t->input_col);
+        t->input[t->input_col] = c;
+        t->input_len++;
+    }
     t->input[t->input_len] = '\0';
+    t->input_col++;
 }
 
 static void tui_input_backspace(cli_tui_t *t)
 {
-    if (t->input_len == 0)
+    t->tab_active = 0; /* 编辑输入即离开补全模式 */
+    if (t->input_len == 0 || t->input_col == 0)
         return;
-    /* Delete one full UTF-8 character: rewind trailing continuation bytes
-     * (0x80..0xBF) plus the leading byte, so CJK input is not torn apart. */
-    size_t n = t->input_len;
+    /* Delete one full UTF-8 character before the cursor: rewind trailing
+     * continuation bytes (0x80..0xBF) plus the leading byte, so CJK input
+     * is not torn apart. */
+    size_t n = t->input_col;
     while (n > 1 && ((unsigned char)t->input[n - 1] & 0xC0) == 0x80)
         n--;
     if (n > 0)
         n--;
-    t->input_len = n;
+    AIRY_MEMMOVE(t->input + n, t->input + t->input_col, t->input_len - t->input_col + 1);
+    t->input_len -= (t->input_col - n);
+    t->input_col = n;
+}
+
+static void tui_input_delete_fwd(cli_tui_t *t)
+{
+    if (t->input_col >= t->input_len)
+        return;
+    /* Delete the UTF-8 character at the cursor. */
+    size_t n = t->input_col + 1;
+    while (n < t->input_len && ((unsigned char)t->input[n] & 0xC0) == 0x80)
+        n++;
+    AIRY_MEMMOVE(t->input + t->input_col, t->input + n, t->input_len - n + 1);
+    t->input_len -= (n - t->input_col);
+}
+
+static void tui_input_back_word(cli_tui_t *t)
+{
+    size_t p = t->input_col;
+    while (p > 0 && (t->input[p - 1] == ' ' || t->input[p - 1] == '\t'))
+        p--;
+    while (p > 0 && t->input[p - 1] != ' ' && t->input[p - 1] != '\t')
+        p--;
+    AIRY_MEMMOVE(t->input + p, t->input + t->input_col, t->input_len - t->input_col + 1);
+    t->input_len -= (t->input_col - p);
+    t->input_col = p;
+}
+
+/* Move the caret one word to the left (Alt+b / Ctrl+Left). Word = run of
+ * non-blank characters; leading blanks are skipped so the caret lands at the
+ * start of the previous word. */
+static void tui_input_word_left(cli_tui_t *t)
+{
+    size_t p = t->input_col;
+    if (p == 0)
+        return;
+    /* Skip the blanks immediately before the caret (if any). */
+    while (p > 0 && (t->input[p - 1] == ' ' || t->input[p - 1] == '\t'))
+        p--;
+    while (p > 0 && t->input[p - 1] != ' ' && t->input[p - 1] != '\t')
+        p--;
+    t->input_col = p;
+}
+
+/* Move the caret one word to the right (Alt+f / Ctrl+Right). */
+static void tui_input_word_right(cli_tui_t *t)
+{
+    size_t p = t->input_col;
+    if (p >= t->input_len)
+        return;
+    /* Skip the word the caret is in, then the following blanks. */
+    while (p < t->input_len && t->input[p] != ' ' && t->input[p] != '\t')
+        p++;
+    while (p < t->input_len && (t->input[p] == ' ' || t->input[p] == '\t'))
+        p++;
+    t->input_col = p;
+}
+
+/* Ctrl+T: transpose the two characters around the caret (readline
+ * semantics). At the line end the last two characters are swapped and the
+ * caret stays at the end; in the middle the char at the caret and the one
+ * before it are swapped and the caret moves past them. UTF-8 safe: whole
+ * characters are swapped, never torn. */
+static void tui_input_transpose(cli_tui_t *t)
+{
+    if (t->input_col == 0 || t->input_len < 2)
+        return;
+
+    size_t first, second, second_end;
+    if (t->input_col >= t->input_len) {
+        /* caret at line end: swap the last two characters */
+        second_end = t->input_len;
+        second = t->input_len - 1;
+        while (second > 0 && ((unsigned char)t->input[second] & 0xC0) == 0x80)
+            second--;
+        if (second == 0)
+            return;
+        first = second - 1;
+        while (((unsigned char)t->input[first] & 0xC0) == 0x80)
+            first--;
+    } else {
+        /* caret in the middle: swap the char at the caret and the one before */
+        second = t->input_col;
+        while (second < t->input_len && ((unsigned char)t->input[second] & 0xC0) == 0x80)
+            second++;
+        second_end = second + 1;
+        while (second_end < t->input_len &&
+               ((unsigned char)t->input[second_end] & 0xC0) == 0x80)
+            second_end++;
+        first = t->input_col - 1;
+        while (((unsigned char)t->input[first] & 0xC0) == 0x80)
+            first--;
+        if (first >= second)
+            return;
+    }
+
+    size_t first_len = second - first;
+    size_t second_len = second_end - second;
+    if (second_len >= 8)
+        return; /* UTF-8 单字符最长 4 字节，8 字节缓冲绝对安全 */
+
+    /* 前字符右移 second_len，后字符落到 first 位置。 */
+    char tmp[8];
+    AIRY_MEMCPY(tmp, t->input + second, second_len);
+    AIRY_MEMMOVE(t->input + first + second_len, t->input + first, first_len);
+    AIRY_MEMCPY(t->input + first, tmp, second_len);
+
+    t->input_col = (t->input_col >= t->input_len) ? t->input_len : second_end;
+}
+
+/* Stash the killed region for Ctrl+Y (simple single-slot kill-ring). */
+static void tui_input_kill_save(cli_tui_t *t, const char *text, size_t n)
+{
+    if (!text || n == 0) {
+        t->kill_len = 0;
+        return;
+    }
+    if (n >= sizeof(t->kill_buf))
+        n = sizeof(t->kill_buf) - 1;
+    AIRY_MEMCPY(t->kill_buf, text, n);
+    t->kill_buf[n] = '\0';
+    t->kill_len = n;
+}
+
+/* Ctrl+Y: insert the killed text at the caret. */
+static void tui_input_yank(cli_tui_t *t)
+{
+    if (t->kill_len == 0)
+        return;
+    size_t n = t->kill_len;
+    if (t->input_len + n + 1 > t->input_cap) {
+        size_t new_cap = t->input_cap ? t->input_cap * 2 : 256;
+        while (new_cap < t->input_len + n + 1)
+            new_cap *= 2;
+        char *grown = (char *)AIRY_REALLOC(t->input, new_cap);
+        if (!grown)
+            return;
+        t->input = grown;
+        t->input_cap = new_cap;
+    }
+    AIRY_MEMMOVE(t->input + t->input_col + n, t->input + t->input_col,
+            t->input_len - t->input_col);
+    AIRY_MEMCPY(t->input + t->input_col, t->kill_buf, n);
+    t->input_len += n;
     t->input[t->input_len] = '\0';
+    t->input_col += n;
+}
+
+/* Tab completion (SSoT): complete "/xxx" prefixes from CLI_COMMANDS in
+ * main.c (the authoritative command table — no hand-maintained mirror, so
+ * a new /command is immediately completable and an removed one never leaks
+ * into the candidates). Single match completes and appends a space; multiple
+ * matches cycle on repeated Tab and show the candidate list above the input
+ * line (Claude Code-style). Returns 1 when a completion was inserted, else 0. */
+static int tui_input_tab_complete(cli_tui_t *t)
+{
+    if (!t->input || t->input_len == 0)
+        return 0;
+
+    /* Only complete the token at the cursor when it starts with '/'. */
+    size_t tok_start = 0;
+    for (size_t i = 0; i < t->input_col; i++) {
+        if (t->input[i] == ' ' || t->input[i] == '\t')
+            tok_start = i + 1;
+    }
+    if (t->input[tok_start] != '/') {
+        t->tab_active = 0;
+        return 0;
+    }
+
+    size_t tok_len = t->input_col - tok_start;
+    size_t ncmds = cli_commands_count();
+
+    /* Collect candidates whose name starts with the typed prefix. */
+    size_t cand_idx[TUI_TAB_CAND_MAX];
+    size_t n_cand = 0;
+    for (size_t i = 0; i < ncmds && n_cand < TUI_TAB_CAND_MAX; i++) {
+        const char *name = CLI_COMMANDS[i].name;
+        if (strncmp(name, t->input + tok_start, tok_len) == 0)
+            cand_idx[n_cand++] = i;
+    }
+    if (n_cand == 0) {
+        t->tab_active = 0;
+        return 0;
+    }
+
+    /* Reset the cycle when the typed token changed since the last Tab. */
+    if (!t->tab_active || t->tab_sel >= n_cand)
+        t->tab_sel = 0;
+    t->tab_active = 1;
+    t->tab_count = n_cand;
+    for (size_t i = 0; i < n_cand; i++)
+        t->tab_cands[i] = cand_idx[i];
+
+    const char *match = CLI_COMMANDS[cand_idx[t->tab_sel]].name;
+    size_t mlen = strlen(match);
+
+    if (tok_start + mlen + 2 > t->input_cap) {
+        size_t new_cap = t->input_cap ? t->input_cap * 2 : 256;
+        while (new_cap < tok_start + mlen + 2)
+            new_cap *= 2;
+        char *grown = (char *)AIRY_REALLOC(t->input, new_cap);
+        if (!grown)
+            return 0;
+        t->input = grown;
+        t->input_cap = new_cap;
+    }
+    AIRY_MEMMOVE(t->input + tok_start + mlen, t->input + t->input_col,
+            t->input_len - t->input_col + 1);
+    AIRY_MEMCPY(t->input + tok_start, match, mlen);
+    t->input_len += (mlen - tok_len);
+    t->input_col = tok_start + mlen;
+
+    /* Single candidate: append a trailing space so typing continues.
+     * Multiple candidates: advance the cycle for the next Tab press. */
+    if (n_cand == 1) {
+        if (t->input_len + 1 < t->input_cap) {
+            t->input[t->input_len++] = ' ';
+            t->input[t->input_len] = '\0';
+            t->input_col = t->input_len;
+        }
+    } else {
+        t->tab_sel = (t->tab_sel + 1) % n_cand;
+    }
+    return 1;
 }
 
 int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
@@ -479,16 +1341,170 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
     }
 
     t->input_len = 0;
+    t->input_col = 0;
     if (t->input)
         t->input[0] = '\0';
+    t->tab_active = 0; /* 新一轮输入清空 Tab 补全状态 */
+    t->tab_count = 0;
+    t->tab_sel = 0;
     t->scroll_off = 0;
+    t->search_active = 0;
+    t->search_query_len = 0;
+    t->search_match = -1;
+    t->cmd_hist_idx = t->cmd_hist.count;
     tui_render_input(t);
     fflush(stdout);
 
     for (;;) {
-        int key = tui_read_key(t);
+        int eof = 0;
+        /* 看板模式 200ms 轮询节拍（实时刷新）；其余模式无限等待（原语义） */
+        int timeout = (t->mode == CLI_TUI_MODE_BOARD) ? CLI_TUI_PANEL_POLL_MS : -1;
+        int key = tui_read_key(t, timeout, &eof);
+        if (eof)
+            return 0;
         if (key == 0)
             return 0; /* EOF */
+        if (key == -1) {
+            /* 轮询超时：任务看板实时刷新（count 回调重建缓存 → 重绘）。
+             * SIGWINCH 到达：刷新几何尺寸并全量重绘。 */
+            if (t->mode == CLI_TUI_MODE_BOARD)
+                cli_tui_redraw(t);
+            else if (g_tui_resize_pending) {
+                g_tui_resize_pending = 0;
+                tui_get_size(t);
+                cli_tui_redraw(t);
+            }
+            continue;
+        }
+
+        /* ---- 阶段 4：视图模式（tab）切换 ---- */
+        if (key == 0x10) { /* Ctrl+P: 下一个 tab */
+            cli_tui_mode_next(t);
+            cli_tui_redraw(t);
+            fflush(stdout);
+            continue;
+        }
+        if (key == 0x0f) { /* Ctrl+O: 上一个 tab */
+            cli_tui_mode_prev(t);
+            cli_tui_redraw(t);
+            fflush(stdout);
+            continue;
+        }
+
+        /* ---- 面板模式（任务看板/事件流）：滚动回放 + Enter 返回对话 ---- */
+        if (t->mode != CLI_TUI_MODE_CHAT) {
+            if (key == '\n' || key == '\r') {
+                t->mode = CLI_TUI_MODE_CHAT;
+                cli_tui_redraw(t);
+                fflush(stdout);
+                continue;
+            }
+            switch (key) {
+            case TUI_KEY_UP:
+                t->scroll_off++;
+                cli_tui_redraw(t);
+                break;
+            case TUI_KEY_DOWN:
+                if (t->scroll_off > 0)
+                    t->scroll_off--;
+                cli_tui_redraw(t);
+                break;
+            case TUI_KEY_PGUP:
+                t->scroll_off += tui_middle_rows(t) - 1;
+                cli_tui_redraw(t);
+                break;
+            case TUI_KEY_PGDN:
+                t->scroll_off = (t->scroll_off > tui_middle_rows(t) - 1)
+                                    ? t->scroll_off - (tui_middle_rows(t) - 1)
+                                    : 0;
+                cli_tui_redraw(t);
+                break;
+            case TUI_KEY_HOME:
+                t->scroll_off = SIZE_MAX; /* 渲染时 clamp 到面板末尾 */
+                cli_tui_redraw(t);
+                break;
+            case TUI_KEY_END:
+                t->scroll_off = 0;
+                cli_tui_redraw(t);
+                break;
+            default:
+                /* 其他键：返回对话模式，保持输入焦点 */
+                t->mode = CLI_TUI_MODE_CHAT;
+                cli_tui_redraw(t);
+                fflush(stdout);
+                break;
+            }
+            continue;
+        }
+
+        /* ---- Ctrl+R / Ctrl+S incremental search mode ---- */
+        if (t->search_active) {
+            if (key == 0x12) { /* Ctrl+R: next older match */
+                t->search_forward = 0;
+                tui_search_step(t);
+                tui_render_input(t);
+                fflush(stdout);
+                continue;
+            }
+            if (key == 0x13) { /* Ctrl+S: next newer match */
+                t->search_forward = 1;
+                tui_search_step_forward(t);
+                tui_render_input(t);
+                fflush(stdout);
+                continue;
+            }
+            if (key == '\n' || key == '\r') {
+                /* Accept the matched line into the edit buffer. */
+                if (t->search_match >= 0 && (size_t)t->search_match < t->cmd_hist.count)
+                    tui_cmd_hist_apply(t, (size_t)t->search_match);
+                t->search_active = 0;
+                t->search_query_len = 0;
+                t->search_match = -1;
+                tui_render_input(t);
+                fflush(stdout);
+                continue;
+            }
+            if (key == 0x7f || key == 0x08) { /* Backspace: shrink query */
+                if (t->search_query_len > 0) {
+                    size_t n = t->search_query_len;
+                    while (n > 1 && ((unsigned char)t->search_query[n - 1] & 0xC0) == 0x80)
+                        n--;
+                    n--;
+                    t->search_query_len = n;
+                    t->search_query[t->search_query_len] = '\0';
+                    t->search_match = -1;
+                    tui_search_step(t);
+                } else {
+                    t->search_active = 0;
+                    t->search_match = -1;
+                }
+                tui_render_input(t);
+                fflush(stdout);
+                continue;
+            }
+            if (key == 0x1b || key == 0x03 || key == 0x04 || key == 0x07) {
+                /* ESC / Ctrl+C / Ctrl+D / Ctrl+G: cancel search. */
+                t->search_active = 0;
+                t->search_query_len = 0;
+                t->search_match = -1;
+                tui_render_input(t);
+                fflush(stdout);
+                continue;
+            }
+            if (key >= 0x20 && key <= 0xFF) { /* extend query */
+                if (t->search_query_len + 2 <= TUI_SEARCH_QUERY_MAX) {
+                    t->search_query[t->search_query_len++] = (char)key;
+                    t->search_query[t->search_query_len] = '\0';
+                    t->search_match = -1;
+                    tui_search_step(t);
+                }
+                tui_render_input(t);
+                fflush(stdout);
+                continue;
+            }
+            continue;
+        }
+
         if (key == '\n' || key == '\r') {
             size_t n = t->input_len;
             if (n >= cap)
@@ -498,15 +1514,101 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
             buf[n] = '\0';
             if (out_len)
                 *out_len = n;
+            /* Remember the submitted line for Up/Down browsing (readline
+             * semantics: history navigation + recall). Persist across
+             * sessions so Up/Ctrl+R work after a restart. */
+            tui_cmd_hist_push(t, buf);
+            tui_cmd_hist_save(t);
             /* Do NOT echo the raw line here: the caller renders the
              * submission (e.g. cli_render_user_message for chat input), so
              * committing it now would duplicate it in the history. */
             t->input_len = 0;
+            t->input_col = 0;
             t->scroll_off = 0;
             return 1;
         }
+        if (key == 0x12) { /* Ctrl+R: enter reverse search */
+            t->search_active = 1;
+            t->search_forward = 0;
+            t->search_query_len = 0;
+            t->search_query[0] = '\0';
+            t->search_match = -1;
+            tui_search_step(t);
+            tui_render_input(t);
+            fflush(stdout);
+            continue;
+        }
+        if (key == 0x13) { /* Ctrl+S: enter forward search */
+            t->search_active = 1;
+            t->search_forward = 1;
+            t->search_query_len = 0;
+            t->search_query[0] = '\0';
+            t->search_match = -1;
+            tui_search_step_forward(t);
+            tui_render_input(t);
+            fflush(stdout);
+            continue;
+        }
         if (key == 0x03 || key == 0x04) { /* Ctrl+C / Ctrl+D */
             return 0;
+        }
+        if (key == 0x15) { /* Ctrl+U: kill before the caret (to line start) */
+            if (t->input_col > 0) {
+                tui_input_kill_save(t, t->input, t->input_col);
+                AIRY_MEMMOVE(t->input, t->input + t->input_col, t->input_len - t->input_col + 1);
+                t->input_len -= t->input_col;
+                t->input_col = 0;
+            }
+            tui_render_input(t);
+            fflush(stdout);
+            continue;
+        }
+        if (key == 0x0b) { /* Ctrl+K: kill after the caret (to line end) */
+            if (t->input_col < t->input_len) {
+                tui_input_kill_save(t, t->input + t->input_col, t->input_len - t->input_col);
+                t->input[t->input_col] = '\0';
+                t->input_len = t->input_col;
+            }
+            tui_render_input(t);
+            fflush(stdout);
+            continue;
+        }
+        if (key == 0x01) { /* Ctrl+A: move to start */
+            t->input_col = 0;
+            tui_render_input(t);
+            fflush(stdout);
+            continue;
+        }
+        if (key == 0x05) { /* Ctrl+E: move to end */
+            t->input_col = t->input_len;
+            tui_render_input(t);
+            fflush(stdout);
+            continue;
+        }
+        if (key == 0x17) { /* Ctrl+W: kill previous word */
+            size_t kill_from = t->input_col;
+            tui_input_back_word(t);
+            if (t->input_col < kill_from)
+                tui_input_kill_save(t, t->input + t->input_col, kill_from - t->input_col);
+            tui_render_input(t);
+            fflush(stdout);
+            continue;
+        }
+        if (key == 0x14) { /* Ctrl+T: transpose chars at the caret */
+            tui_input_transpose(t);
+            tui_render_input(t);
+            fflush(stdout);
+            continue;
+        }
+        if (key == 0x19) { /* Ctrl+Y: yank the killed text */
+            tui_input_yank(t);
+            tui_render_input(t);
+            fflush(stdout);
+            continue;
+        }
+        if (key == 0x0c) { /* Ctrl+L: clear screen, re-render */
+            cli_tui_redraw(t);
+            continue;
         }
         if (key == 0x7f || key == 0x08) { /* Backspace */
             tui_input_backspace(t);
@@ -514,16 +1616,132 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
             fflush(stdout);
             continue;
         }
+        if (key == '\t') { /* Tab: complete the current token */
+            if (tui_input_tab_complete(t)) {
+                tui_render_input(t);
+                fflush(stdout);
+            }
+            continue;
+        }
         switch (key) {
         case TUI_KEY_UP:
-            if (t->scroll_off < t->hist.count)
-                t->scroll_off++;
-            cli_tui_redraw(t);
+            if (t->input_len > 0 || t->cmd_hist.count > 0) {
+                /* With typed text: browse the submitted-command history
+                 * (readline Up convention). Preserve the in-progress draft
+                 * so Down returns to it. */
+                if (t->cmd_hist_idx > 0) {
+                    tui_cmd_hist_save_draft(t);
+                    t->cmd_hist_idx--;
+                    tui_cmd_hist_apply(t, t->cmd_hist_idx);
+                    tui_render_input(t);
+                    fflush(stdout);
+                }
+            } else {
+                /* Empty input: browse the conversation viewport. */
+                if (t->scroll_off < t->hist.count)
+                    t->scroll_off++;
+                cli_tui_redraw(t);
+            }
             break;
         case TUI_KEY_DOWN:
-            if (t->scroll_off > 0)
-                t->scroll_off--;
-            cli_tui_redraw(t);
+            if (t->input_len > 0 || t->cmd_hist_idx < t->cmd_hist.count) {
+                if (t->cmd_hist_idx < t->cmd_hist.count) {
+                    t->cmd_hist_idx++;
+                    if (t->cmd_hist_idx >= t->cmd_hist.count) {
+                        /* Past the newest: restore the preserved draft. */
+                        if (t->cmd_hist_edit && t->cmd_hist_edit_len > 0) {
+                            t->input_len = t->cmd_hist_edit_len;
+                            AIRY_MEMCPY(t->input, t->cmd_hist_edit, t->cmd_hist_edit_len);
+                            t->input[t->input_len] = '\0';
+                            t->input_col = t->input_len;
+                        } else {
+                            t->input_len = 0;
+                            t->input_col = 0;
+                            if (t->input)
+                                t->input[0] = '\0';
+                        }
+                    } else {
+                        tui_cmd_hist_apply(t, t->cmd_hist_idx);
+                    }
+                    tui_render_input(t);
+                    fflush(stdout);
+                }
+            } else {
+                if (t->scroll_off > 0)
+                    t->scroll_off--;
+                cli_tui_redraw(t);
+            }
+            break;
+        case TUI_KEY_LEFT:
+            if (t->input_col > 0) {
+                /* Move one UTF-8 char left (rewind continuation bytes). */
+                size_t n = t->input_col;
+                while (n > 1 && ((unsigned char)t->input[n - 1] & 0xC0) == 0x80)
+                    n--;
+                if (n > 0)
+                    n--;
+                t->input_col = n;
+                tui_render_input(t);
+                fflush(stdout);
+            }
+            break;
+        case TUI_KEY_RIGHT:
+            if (t->input_col < t->input_len) {
+                /* Move one UTF-8 char right (skip continuation bytes). */
+                size_t n = t->input_col + 1;
+                while (n < t->input_len && ((unsigned char)t->input[n] & 0xC0) == 0x80)
+                    n++;
+                t->input_col = n;
+                tui_render_input(t);
+                fflush(stdout);
+            }
+            break;
+        case TUI_KEY_CTRL_LEFT:
+        case TUI_KEY_ALT_LEFT:
+        case TUI_KEY_ALT_B:
+            tui_input_word_left(t);
+            tui_render_input(t);
+            fflush(stdout);
+            break;
+        case TUI_KEY_CTRL_RIGHT:
+        case TUI_KEY_ALT_RIGHT:
+        case TUI_KEY_ALT_F:
+            tui_input_word_right(t);
+            tui_render_input(t);
+            fflush(stdout);
+            break;
+        case TUI_KEY_PASTE_START:
+            /* bracketed paste: insert raw bytes literally until ESC[201~.
+             * Newlines fold to spaces (single-line input model), and no byte
+             * is interpreted as a key, so pasted code never triggers editing
+             * shortcuts or corrupts the line. */
+            t->paste_active = 1;
+            while (t->paste_active) {
+                char pb;
+                int peof = 0;
+                if (!tui_wait_byte(t, &pb, -1, &peof)) {
+                    if (peof)
+                        return 0;
+                    continue; /* resize tick / EINTR: keep pasting */
+                }
+                if (pb == 0x1b) {
+                    if (tui_paste_read_end()) {
+                        t->paste_active = 0;
+                        break;
+                    }
+                    continue; /* stray ESC inside paste: skip */
+                }
+                if (pb == '\n' || pb == '\r')
+                    pb = ' ';
+                tui_input_append(t, pb);
+            }
+            tui_render_input(t);
+            fflush(stdout);
+            break;
+        case TUI_KEY_DEL:
+            tui_input_delete_fwd(t);
+            tui_render_input(t);
+            fflush(stdout);
             break;
         case TUI_KEY_PGUP:
             t->scroll_off += tui_middle_rows(t) - 1;
@@ -572,6 +1790,8 @@ int cli_tui_create(cli_tui_t **out_tui)
     *out_tui = t;
     if (!g_default_tui)
         g_default_tui = t;
+    /* Recall past submitted commands (Up / Ctrl+R) from the previous session. */
+    tui_cmd_hist_load(t);
     if (!cli_term_is_tty()) {
         /* Non-TTY: keep the handle but stay inactive (stream-safe). */
         return 0;
@@ -588,13 +1808,24 @@ int cli_tui_create(cli_tui_t **out_tui)
     t->active = 0; /* POSIX-only full-screen mode */
     return 0;
 #else
-    /* Enter alternate screen + raw mode. */
-    fputs("\033[?1049h\033[2J\033[H", stdout);
+    /* Enter alternate screen + bracketed paste + raw mode. */
+    fputs("\033[?1049h\033[?2004h\033[2J\033[H", stdout);
     fflush(stdout);
 
+    g_tui_resize_pending = 0;
+    signal(SIGWINCH, tui_sigwinch_handler);
+
     if (tcgetattr(STDIN_FILENO, &t->saved_termios) == 0) {
+        /* Full raw mode (cfmakeraw semantics): the CLI owns every byte of
+         * input. IXON must go so Ctrl+S (forward search) is not swallowed as
+         * terminal flow control; ISIG goes so Ctrl+C is delivered to the
+         * readline loop (0x03) instead of killing the process with SIGINT. */
         struct termios raw = t->saved_termios;
-        raw.c_lflag &= ~(ICANON | ECHO);
+        raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+        raw.c_oflag &= ~OPOST;
+        raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+        raw.c_cflag &= ~(CSIZE | PARENB);
+        raw.c_cflag |= CS8;
         raw.c_cc[VMIN] = 1;
         raw.c_cc[VTIME] = 0;
         if (tcsetattr(STDIN_FILENO, TCSANOW, &raw) == 0)
@@ -612,11 +1843,13 @@ void cli_tui_destroy(cli_tui_t *t)
 #ifndef _WIN32
         if (t->termios_saved)
             tcsetattr(STDIN_FILENO, TCSANOW, &t->saved_termios);
+        signal(SIGWINCH, SIG_DFL);
 #endif
-        fputs("\033[?1049l", stdout);
+        fputs("\033[?2004l\033[?1049l", stdout);
         fflush(stdout);
     }
     tui_history_reset(&t->hist);
+    tui_cmd_hist_reset(t);
     AIRY_FREE(t->cur);
     AIRY_FREE(t->input);
     if (g_default_tui == t)

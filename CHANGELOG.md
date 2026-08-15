@@ -4,7 +4,8 @@
 
 ## 📋 目录
 
-- [v0.1.1 框架化改造](#v011-框架化改造---2026-08-02) ⭐ 最新 — GCCP / 工作大厅 / 双思考 / CLI
+- [v0.1.2](#v012---2026-08-15) ⭐ 最新 — SSoT 收敛 / 平台本质补齐 / 品牌化 ID / CLI·TUI
+- [v0.1.1 框架化改造](#v011-框架化改造---2026-08-02) — GCCP / 工作大厅 / 双思考 / CLI
 - [v0.1.1](#v011---2026-07-12) — 奠基版本（Foundation Release）
 - [v0.1.0](#v010---2026-05-29) — 首个正式发行版
 - [v0.0.5](#v005---2026-05-24) — C 运行时深度审计与质量加固
@@ -17,6 +18,84 @@
 - [v0.0.4](#v004---生产就绪-2026-03-25)
 - [v0.0.3](#v003---开发中-2026)
 - [历史版本](#历史版本)
+
+---
+
+## [v0.1.2] - 2026-08-15
+
+### 🎯 发布主题：SSoT 收敛 + 平台本质补齐 + 品牌化 ID + CLI/TUI 优化
+
+0.1.2 以 **Unify Design SSoT 单一权威源收敛** 为方法论总纲，将 agentrt 内部的 8 个多权威源冲突点（S-1~S-8）逐点收敛为唯一权威实现，并在平台本质（声明式自愈 + 统一扩展机制）与产品体验（CLI/TUI）两个方向补齐。核心立场：**不砍功能，而是把"同一技术点的多个权威源"收敛为唯一权威**——corekern/commons 是收敛后的唯一权威源本身，保留并加强；五认知机制功能语义全保留，全功能运行。
+
+### Added
+
+- **品牌化 ID**（阶段 3，commons `utils/id/`）：`airy_trace_id_t` / `airy_msg_id_t` 不透明结构体（编译器阻止互赋，Branded\<B\> 语义）
+  - `splitmix64` 熵源 + C11 原子单调序列（trace_id = 时间+ASLR 地址种子，msg_id = 秒时间戳+序列）
+  - 命名 `tr-<16hex>` / `msg-<ts:08x>-<seq:08x>`；generate / eq / to_string / from_string 全套 API
+  - `are_ipc.c` header_init 零值自动生成品牌化 ID（IPC 头字段仍 `__u64` 冻结）
+- **统一扩展机制**（阶段 2，atoms `memory/` + `airy_ext.h`）：memory vtable 能力接缝模式推广到统一注册表（`AIRY_EXT_DOMAIN_MEMORY` 首个验证域），LLM/tool/storage/sandbox 四域扩展机制统一底座
+- **生命周期层 reconcile：agent 自愈重启**（阶段 2，CLI `daemon_cmds.c`）
+  - 声明式自愈第三层：期望在线（desired）的 daemon 实际离线（current）→ 自动拉起，带重启上限 + 退避，防重启风暴
+  - env 控制：`AIRY_SELF_HEAL` / `AIRY_SELF_HEAL_AGENTS` / `MAX_RESTARTS` / `BACKOFF_MS` / `POLL_MS`
+  - 复用既有 `cli_daemon_bin/online/start` 原语，二进制缺失静默跳过；与 work_hall redispatch 并列由主循环驱动
+- **graph_engine 检查点**（阶段 1 S-4 收敛）：Pregel BSP 删除后检查点职责折叠进 graph_engine——`graph_engine_checkpoint_create/restore/delete`（顶点状态深拷贝快照，上限 16 环形淘汰）
+- **TUI 多视图 + 看板 + 事件流**（阶段 4，CLI `cli_tui.c/h` + 新建 `cli_panel.c`）
+  - `cli_tui_mode_t`（CHAT/BOARD/EVENTS）+ 面板回调（count/line，BORROW ud）；Ctrl+P 下一个 / Ctrl+O 上一个 tab
+  - 任务看板面板（work_hall 实时，状态图标/色 + 8 格迷你进度条）；事件流面板（hall_store gseq 全局因果序合并，最新 512 条回放）
+  - `tui_wait_byte` poll 200ms 节拍实时刷新；面板模式 ↑↓/PgUp/PgDn/Home/End 滚动回放
+- **CLI 决策链可视化 `/chain`**（阶段 4，CLI `cli_cmds.c` + `hall_store`）：GCCP 确认/蓝图 L1/L2 命中/计划生成/任务提交真实决策链，跨 7 类别按 gseq 全局排序渲染；`-p` 纯文本模式
+- **`airy_hall_store_list_tasks`**（atoms `hall_store.c`）：去重任务枚举，最新在前
+- **`airy_ext.h`** 统一扩展头（domain 枚举 + 深拷贝注册表语义）
+- **认知并行审查（CPR）**（atoms `cognitive_review.h/c` + `engine_phase0.c`）：认知阶段（GCCP 后、规划前）排出多个认知子 agent 并行独立分析
+  - 认知确认子 agent（独立判定意图 task/chat/agent + 置信度）+ 问题审查子 agent（独立审查歧义/风险/缺失信息），经 `airy_platform_thread` 真并行（每次 complete 独立 llm_d socket 调用，线程创建失败串行兜底）
+  - 汇总认知决策：意图按置信度加权投票 + 风险合并 + clarify_needed，写入 working_mem `cog_review_decision` + feedback `cognitive_review_done`，供 Phase 1 规划参考；LLM 不可用降级（不虚构、不阻塞）
+- **聊天工具回路（联网搜索/抓取内置）**（CLI `cli_chat.c`）：LLM 见 `tools_json`（web_search/web_fetch）→ 模型返回 `tool_calls` → CLI 执行 tool_d `builtin_net.c` 真实实现（Bing 搜索 + URL 抓取）→ role="tool" 回填 → 续轮至无工具 → markdown 最终回复；`CLI_CHAT_TOOL_MAX_ROUNDS=4` 护栏 + 12KB 结果截断（UTF-8 边界）；Windows 平台提供能力边界降级（非桩）
+- **工具卡片渲染**（CLI `cli_render.c/h`）：`⛏ name(args)` 调用卡 + `✓/✗ name — summary` 折叠结果摘要（全量文本回填上下文，屏幕只展示折叠）
+- **TUI 输入交互增强**（readline/Claude Code 范式，CLI `cli_tui.c`）：词移动（Ctrl/Alt+←→、Alt+b/f）、Ctrl+T 转置、kill-ring + Ctrl+Y yank（Ctrl+U/K/W 入环）、Ctrl+S 正向搜索（与 Ctrl+R 对称，含 i-search 提示）、bracketed paste（`ESC[200~`）、SIGWINCH 重绘、完整 raw 模式（`IXON` 清流控使 Ctrl+S 不被吞、`IEXTEN`/`ISIG` 全清）
+- **GCCP 逐问交互**（atoms `gccp.c` `airy_gccp_step` + CLI `cli_chat.c`）：不再一次性抛全部问题——每次只问一个，用户回答后 LLM 对已答内容思考决定收敛（done=1）或生成针对性追问；追问上限 = 问题数+4；LLM 不可用降级为逐问机械推进；跳过某问即收敛不纠缠
+
+### Changed
+
+- **S-1 错误码收敛（A-UEF）**：`airy_types.h` 错误码统一收敛至 [SC] `airymax/error.h` 唯一权威源——用户态 POSIX errno 负值重定义（`#undef` + 负值），[SC] 专有码（`AIRY_EIPC_*`/`AIRY_ECAP_*`/`AIRY_FAULT_*`）保留正幅值跨态专用
+- **S-2 日志收敛（A-ULP）**：`AIRY_LOG_*` 为全仓唯一日志宏（logger.h 权威源），5 级 `LOG_*` 旧宏全量迁移
+- **S-3 双 IPC 协议头收敛**：corekern `are_ipc.h` 与内核 `uapi/airymax/ipc.h` 128B 布局分叉收敛（Layout C v4，`AIRY_IPC_MAGIC 'ARE1'` 统一）
+- **S-4 两套 DAG 引擎收敛**：删除半成品 Pregel BSP 超步路径（`taskflow/pregel_*` 全套 6 文件），`graph_engine` 为图执行权威、`taskflow_advanced` 为调度权威
+- **S-6 单一真相源事件流**：hall_store 任务文件模型 + gseq 全局单调事件序号成为权威事件流底座（CLI/TUI 决策链可视化建立其上）
+- **S-8 [SC] 契约对齐**：commons 与内核侧 11 头对齐（`error.h`/`log_types.h`/`ipc.h`/`sched.h`/`syscalls.h`/`uapi_compat.h`/`security_types.h`/`lsm_types.h`/`memory_types.h`/`bpf_struct_ops.h`/`cognition_types.h`）
+- **daemon RPC 错误语义修复**：`rpc_connect_unix` 返回普通负哨兵而非负化的 `AIRY_ERR_*` 码（错误码已为负值，二次取负会变成正值被误判为有效 fd 导致误报 "send failed"）；`rpc_recv_response` 错误码对齐
+- **跨平台构建**：macOS 排除 LSan（`-fsanitize=leak` 仅 Linux 可用）；`find_package(Threads)` 无条件化（Windows 配置期 `Threads::Threads` 缺失修复）；`airy_platform_libs` 平台映射（dl/uuid 仅 Linux、m 非 MSVC、ws2_32 仅 Windows）
+- **MemoryRovol 接入**：`coreloopthree` 弱符号链接修复（`--undefined=memoryrovol_init` 强制归档抽取）+ bridge `strcasecmp` 大小写匹配修复（HYBRID 模式 rovol 正确激活）
+- **reviewer 角色 ACL**：hall_store `hall_acl_allowed` 新增 reviewer 仅可写 VERIFY（复核/终裁事件此前从未落地）
+- **`AIRY_STRNCPY_TERM` 宏 dst 二次求值修复**：agent 列表/重入集解析先取 index 再写，消除 `agent_count++` 双递增产生空 ns 条目
+- **memoryrovol 默认路径 AIRY_HOME 收敛**（products `config.c`）：默认数据路径优先 `$AIRY_HOME/data/memoryrovol/<sub>`（回退 `$HOME/.airymaxrt/data/`），与 platform 路径体系一致，不再写入 CWD 相对路径污染源码区
+- **llm_svc_adapter 统计原子化**（atoms `llm_svc_adapter.c`）：`total_requests/total_errors/total_latency_us` 改 `_Atomic uint64_t`（CPR 等多线程并发调用无计数竞争）
+
+### Fixed
+
+- `rpc_connect_unix` connect 失败被误读为有效 fd（上述错误语义）导致的误导性 send failed 报告
+- 品牌化 ID 熵源数据竞争：静态变量改 `atomic_uint_fast64_t` + CAS（满足 `@threadsafe`）
+- `cli_daemon_lifecycle_init` CSV 解析 `AIRY_STRNCPY_TERM` 二次求值 bug（"info,notify" 解析出 4 条目含空 ns）
+- 蓝图命中标签重复（`蓝图命中 L%s` + layer="L1" → `蓝图命中 %s`）
+- cli_tui.c 不完整类型（面板访问器移到 struct 定义后）、`tui_read_byte` 未用删除、cli_panel.c 数组字段恒真判断与缺参格式串
+- memoryrovol 数据曾写入 CWD 相对路径 `./data/memoryrovol`（源码区污染）→ AIRY_HOME 收敛
+- Ctrl+S 被终端流控（`IXON`）吞掉无法触发正向搜索 → 完整 raw 模式清流控
+
+### Removed
+
+- **Pregel BSP 半成品超步路径**（阶段 1 S-4）：`taskflow/pregel_engine.c`、`pregel_checkpoint.c`、`pregel_message.c`、`pregel_superstep.c`、`pregel_internal.h`、`pregel_engine.h` 及 `test_pregel_engine.c` 全量删除（-1810 行），检查点职责折叠进 graph_engine
+
+### Tested
+
+- 全量构建 rc=0（无警告）+ ctest **162/162** 通过
+- `test_airy_id` 6 用例（生成/命名格式/往返/非法解析/缓冲安全）+ `test_are_ipc` 17/17（含 auto-branded-id 用例）
+- `test_hall_store` 47/47（list_tasks 3 用例 + reviewer ACL 3 用例）
+- `test_cl3_cognitive_review` 24/24（参数校验/无 LLM 降级/意图加权投票/风险合并/释放安全）
+- agent 自愈冒烟：离线 `info_d`/`notify_d` 被自动拉起生成 socket，渲染 `offline → auto-restarted (1/2)` 正确
+- TUI pty 冒烟：Ctrl+P×3 切换、tab 栏 `tabs: 对话 任务看板 事件流`、看板 55 条真实数据 + 事件流空态渲染
+- TUI 输入 pty 冒烟 10/11：词左移插入 / kill+yank / 转置 / bracketed paste / Ctrl+Right+Alt+b / Ctrl+S 正向搜索 / Ctrl+R 反向搜索 / Alt+f / Alt+b / SIGWINCH 重绘
+- 决策链探针验证：preflight 4 事件（GCCP→L1→L2→计划）+ exec-1 4 事件（提交→进度→复核→结果）gseq 严格递增
+- 聊天工具回路探针 2/2：web_search（Bing 搜索）+ web_fetch（kernel.org 抓取）真实执行
+- CPR 端到端：CLI 任务在无 LLM 环境下降级执行不阻塞（exit=0），memoryrovol 数据正确落于 `$AIRY_HOME/data/memoryrovol/`
 
 ---
 
