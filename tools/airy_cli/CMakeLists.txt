@@ -118,8 +118,6 @@ target_include_directories(airy_cli PRIVATE
 
 if(WIN32)
     target_link_libraries(airy_cli PRIVATE ws2_32)
-elseif(UNIX)
-    target_link_libraries(airy_cli PRIVATE uuid)
 endif()
 
 install(TARGETS airy_cli RUNTIME DESTINATION bin)

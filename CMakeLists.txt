@@ -469,13 +469,11 @@ endif()
 #   - m（libm）：POSIX 平台存在；MSVC 无独立 m.lib（数学函数在 CRT 内），
 #     直接链接裸 `m` 会报 LNK1104，故仅非 MSVC 提供。
 #   - dl：仅 Linux（macOS libSystem 内建，Windows 无）。
-#   - uuid：仅 Linux（macOS 无 uuid.h/无 uuid 库；Windows 走 97-101 行
-#     平台分支或系统库）。
 #   - ws2_32：仅 Windows。
 # ============================================================
 add_library(airy_platform_libs INTERFACE)
 if(UNIX AND NOT APPLE)
-    target_link_libraries(airy_platform_libs INTERFACE dl uuid)
+    target_link_libraries(airy_platform_libs INTERFACE dl)
 endif()
 if(NOT MSVC)
     # macOS 的 libSystem 已内建 dl/uuid/m，无需独立库；此分支同时覆盖 Linux 的 m
