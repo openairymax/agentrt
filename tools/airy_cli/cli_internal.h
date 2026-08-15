@@ -100,7 +100,8 @@ airy_err_t cli_think_process_remote(const char *think_sock, const char *input, s
                                     airy_task_plan_t **out_plan);
 
 airy_err_t cli_dag_submit_remote(const char *sched_sock, const taskflow_workflow_t *wf,
-                                 const char *task_input, char **out_dag_id);
+                                 const char *task_input, const char *workspace_dir,
+                                 char **out_dag_id);
 cli_dag_poll_rc_t cli_dag_poll_remote(const char *sched_sock, const char *dag_id,
                                       double *out_progress, char *out_state, size_t state_cap,
                                       char **out_result);

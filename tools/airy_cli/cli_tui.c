@@ -32,12 +32,21 @@
 #include "cli_render.h"
 #include "cli_term.h"
 #include "cli_internal.h" /* CLI_COMMANDS (Tab 补全 SSoT) */
+#include "airy_dirent.h"  /* 跨平台 opendir/readdir/closedir（文件补全） */
 #include "airy_memory.h"
 #include "platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#define TUI_PATH_SEP '\\'
+#define TUI_PATH_SEP_STR "\\"
+#else
+#define TUI_PATH_SEP '/'
+#define TUI_PATH_SEP_STR "/"
+#endif
 
 #ifdef _WIN32
 /* TUI is POSIX-only: everything degrades to line-oriented stdout. */
@@ -80,7 +89,8 @@ cli_tui_t *cli_tui_get_default(void)
 #define TUI_LINE_INIT_CAP 128
 #define TUI_BOTTOM_INPUT_LINES 2 /* input line + one spare row */
 
-#define TUI_TAB_CAND_MAX 64      /* Tab 补全候选上限（CLI_COMMANDS 索引） */
+#define TUI_TAB_CAND_MAX 64      /* Tab 补全候选上限 */
+#define TUI_TAB_NAME_MAX 192     /* 文件/目录候选字符串长度上限 */
 #define TUI_CMD_HIST_MAX 500
 #define TUI_SEARCH_QUERY_MAX 256
 #define TUI_INPUT_PREFIX "airy> " /* input prompt, width tracked in bytes */
@@ -155,7 +165,11 @@ struct cli_tui_s {
     int tab_active;          /* 多候选轮转中 */
     size_t tab_count;        /* 匹配候选数 */
     size_t tab_sel;          /* 当前选中在候选流中的位置 */
-    size_t tab_cands[TUI_TAB_CAND_MAX]; /* CLI_COMMANDS 索引 */
+    int tab_kind;            /* 0=命令索引候选；1=文件/目录字符串候选 */
+    size_t tab_cands[TUI_TAB_CAND_MAX];             /* 命令索引（tab_kind==0） */
+    char tab_cand_strs[TUI_TAB_CAND_MAX][TUI_TAB_NAME_MAX]; /* 文件候选（tab_kind==1） */
+
+    char status[96];         /* 会话状态（输入行右侧 dim 指示：模型/消息/耗时） */
 
 #ifndef _WIN32
     struct termios saved_termios;
@@ -210,6 +224,17 @@ void cli_tui_mode_prev(cli_tui_t *t)
         return;
     t->mode = (cli_tui_mode_t)((((int)t->mode + CLI_TUI_MODE_MAX - 1)) % CLI_TUI_MODE_MAX);
     t->scroll_off = 0;
+    t->dirty = 1;
+}
+
+void cli_tui_set_status(cli_tui_t *t, const char *status)
+{
+    if (!t)
+        return;
+    if (status && status[0])
+        AIRY_STRNCPY_TERM(t->status, status, sizeof(t->status));
+    else
+        t->status[0] = '\0';
     t->dirty = 1;
 }
 
@@ -763,18 +788,23 @@ static void tui_render_input(cli_tui_t *t)
         fputs(cli_c(CLR_RESET), stdout);
         size_t used = 0;
         for (size_t i = 0; i < t->tab_count; i++) {
-            if (t->tab_cands[i] >= cli_commands_count())
+            const char *nm = NULL;
+            if (t->tab_kind == 1)
+                nm = t->tab_cand_strs[i];
+            else if (t->tab_cands[i] < cli_commands_count())
+                nm = CLI_COMMANDS[t->tab_cands[i]].name;
+            if (!nm)
                 break;
-            size_t w = cli_disp_width(CLI_COMMANDS[t->tab_cands[i]].name) + 1;
+            size_t w = cli_disp_width(nm) + 1;
             if (used + w > (size_t)t->cols)
                 break;
             if (i == t->tab_sel) {
                 fputs(cli_c(CLR_CYAN), stdout);
-                fputs(CLI_COMMANDS[t->tab_cands[i]].name, stdout);
+                fputs(nm, stdout);
                 fputs(cli_c(CLR_RESET), stdout);
             } else {
                 fputs(cli_c(CLR_DIM), stdout);
-                fputs(CLI_COMMANDS[t->tab_cands[i]].name, stdout);
+                fputs(nm, stdout);
                 fputs(cli_c(CLR_RESET), stdout);
             }
             fputs(" ", stdout);
@@ -849,6 +879,27 @@ static void tui_render_input(cli_tui_t *t)
     fputs(cli_c(CLR_RESET), stdout);
     if (t->input_len > 0)
         fwrite(t->input, 1, t->input_len, stdout);
+    /* Session status (model · msgs · elapsed), right-aligned dim; hidden
+     * when the typed line would overlap it. Drawn before the caret is
+     * repositioned, so cursor math stays untouched. */
+    if (t->status[0] && t->mode == CLI_TUI_MODE_CHAT) {
+        size_t st_w = cli_disp_width(t->status) + 2;
+        size_t used_w = (size_t)strlen(TUI_INPUT_PREFIX) +
+                        cli_disp_width_of(t->input, t->input_len);
+        if (used_w + st_w < (size_t)t->cols) {
+            size_t scol = (size_t)t->cols - st_w + 2;
+            tui_write_literal("\033[");
+            snprintf(num, sizeof(num), "%zu", row);
+            tui_write_literal(num);
+            tui_write_literal(";");
+            snprintf(num, sizeof(num), "%zu", scol);
+            tui_write_literal(num);
+            tui_write_literal("H");
+            fputs(cli_c(CLR_DIM), stdout);
+            fputs(t->status, stdout);
+            fputs(cli_c(CLR_RESET), stdout);
+        }
+    }
     /* Place the cursor at the edit position (byte offset -> display width).
      * CJK chars occupy two columns, so the caret never drifts. */
     size_t col = (size_t)strlen(TUI_INPUT_PREFIX) +
@@ -1242,81 +1293,176 @@ static void tui_input_yank(cli_tui_t *t)
     t->input_col += n;
 }
 
-/* Tab completion (SSoT): complete "/xxx" prefixes from CLI_COMMANDS in
- * main.c (the authoritative command table — no hand-maintained mirror, so
- * a new /command is immediately completable and an removed one never leaks
- * into the candidates). Single match completes and appends a space; multiple
- * matches cycle on repeated Tab and show the candidate list above the input
- * line (Claude Code-style). Returns 1 when a completion was inserted, else 0. */
+/* ---- Tab 补全 ----
+ * 命令补全（SSoT）："/xxx" 前缀从 main.c 的 CLI_COMMANDS 权威命令表匹配
+ * （无手维护镜像——新增 /command 即刻可补全，删除的不再泄漏进候选）。
+ * 文件补全：普通文本 token 按目录遍历匹配 cwd 下文件/目录（Claude Code
+ * 风格），目录加平台分隔符后缀，支持 "src/cl" 这类目录前缀。
+ * 单候选直接替换（文件追加空格、目录不加以支持连续 Tab 深入）；多候选
+ * 轮转并在输入行上方显示候选列表（当前候选高亮）。 */
+
+/* 用候选文本替换输入缓冲区中的 token（tok_start..tok_start+tok_len），
+ * 光标落在替换文本末尾。 */
+static void tui_tab_replace(cli_tui_t *t, size_t tok_start, size_t tok_len,
+                            const char *text, size_t tlen)
+{
+    if (tok_start + tlen + 2 > t->input_cap) {
+        size_t new_cap = t->input_cap ? t->input_cap * 2 : 256;
+        while (new_cap < tok_start + tlen + 2)
+            new_cap *= 2;
+        char *grown = (char *)AIRY_REALLOC(t->input, new_cap);
+        if (!grown)
+            return;
+        t->input = grown;
+        t->input_cap = new_cap;
+    }
+    AIRY_MEMMOVE(t->input + tok_start + tlen, t->input + tok_start + tok_len,
+                 t->input_len - (tok_start + tok_len) + 1);
+    AIRY_MEMCPY(t->input + tok_start, text, tlen);
+    t->input_len += (tlen - tok_len);
+    t->input_col = tok_start + tlen;
+}
+
+/* 目录遍历补全：dir 为目录路径（空串表示当前目录），base 为匹配前缀。
+ * 匹配条目写入 t->tab_cand_strs，目录加平台分隔符后缀。返回候选数。 */
+static size_t tui_tab_complete_fs(cli_tui_t *t, const char *dir, const char *base)
+{
+    size_t n = 0;
+    const char *dpath = (dir && dir[0]) ? dir : ".";
+    DIR *d = opendir(dpath);
+    if (!d)
+        return 0;
+
+    size_t blen = strlen(base);
+    struct dirent *e;
+    while ((e = readdir(d)) != NULL && n < TUI_TAB_CAND_MAX) {
+        const char *nm = e->d_name;
+        if (nm[0] == '.') {
+            /* 隐藏文件仅当前缀以 '.' 开头时补全。 */
+            if (blen == 0 || base[0] != '.')
+                continue;
+        }
+        if (strncmp(nm, base, blen) != 0)
+            continue;
+
+        int is_dir = 0;
+        char full[TUI_TAB_NAME_MAX];
+        if (dir && dir[0])
+            snprintf(full, sizeof(full), "%s%c%s", dir, TUI_PATH_SEP, nm);
+        else
+            snprintf(full, sizeof(full), "%s", nm);
+        struct stat st;
+#ifdef _WIN32
+        if (stat(full, &st) == 0 && (st.st_mode & _S_IFDIR))
+            is_dir = 1;
+#else
+        if (stat(full, &st) == 0 && S_ISDIR(st.st_mode))
+            is_dir = 1;
+#endif
+        snprintf(t->tab_cand_strs[n], TUI_TAB_NAME_MAX, "%s%s", nm,
+                 is_dir ? (TUI_PATH_SEP_STR) : "");
+        n++;
+    }
+    closedir(d);
+    return n;
+}
+
 static int tui_input_tab_complete(cli_tui_t *t)
 {
     if (!t->input || t->input_len == 0)
         return 0;
 
-    /* Only complete the token at the cursor when it starts with '/'. */
+    /* 定位光标处的 token。 */
     size_t tok_start = 0;
     for (size_t i = 0; i < t->input_col; i++) {
         if (t->input[i] == ' ' || t->input[i] == '\t')
             tok_start = i + 1;
     }
-    if (t->input[tok_start] != '/') {
-        t->tab_active = 0;
-        return 0;
-    }
-
     size_t tok_len = t->input_col - tok_start;
-    size_t ncmds = cli_commands_count();
 
-    /* Collect candidates whose name starts with the typed prefix. */
-    size_t cand_idx[TUI_TAB_CAND_MAX];
-    size_t n_cand = 0;
-    for (size_t i = 0; i < ncmds && n_cand < TUI_TAB_CAND_MAX; i++) {
-        const char *name = CLI_COMMANDS[i].name;
-        if (strncmp(name, t->input + tok_start, tok_len) == 0)
-            cand_idx[n_cand++] = i;
+    if (t->input[tok_start] == '/') {
+        /* 命令补全：token 以 '/' 开头。 */
+        t->tab_kind = 0;
+        size_t ncmds = cli_commands_count();
+
+        /* Collect candidates whose name starts with the typed prefix. */
+        size_t cand_idx[TUI_TAB_CAND_MAX];
+        size_t n_cand = 0;
+        for (size_t i = 0; i < ncmds && n_cand < TUI_TAB_CAND_MAX; i++) {
+            const char *name = CLI_COMMANDS[i].name;
+            if (strncmp(name, t->input + tok_start, tok_len) == 0)
+                cand_idx[n_cand++] = i;
+        }
+        if (n_cand == 0) {
+            t->tab_active = 0;
+            return 0;
+        }
+
+        /* Reset the cycle when the typed token changed since the last Tab. */
+        if (!t->tab_active || t->tab_sel >= n_cand)
+            t->tab_sel = 0;
+        t->tab_active = 1;
+        t->tab_count = n_cand;
+        for (size_t i = 0; i < n_cand; i++)
+            t->tab_cands[i] = cand_idx[i];
+
+        const char *match = CLI_COMMANDS[cand_idx[t->tab_sel]].name;
+        size_t mlen = strlen(match);
+        tui_tab_replace(t, tok_start, tok_len, match, mlen);
+
+        /* Single candidate: append a trailing space so typing continues.
+         * Multiple candidates: advance the cycle for the next Tab press. */
+        if (n_cand == 1) {
+            if (t->input_len + 1 < t->input_cap) {
+                t->input[t->input_len++] = ' ';
+                t->input[t->input_len] = '\0';
+                t->input_col = t->input_len;
+            }
+        } else {
+            t->tab_sel = (t->tab_sel + 1) % n_cand;
+        }
+        return 1;
     }
-    if (n_cand == 0) {
+
+    /* 文件补全：token 为普通文本（Claude Code 风格 Tab 补全路径）。
+     * 拆分目录与 basename，支持 "src/cl" 这类前缀。 */
+    const char *tok = t->input + tok_start;
+    size_t slash = tok_len;
+    while (slash > 0 && tok[slash - 1] != '/' && tok[slash - 1] != '\\')
+        slash--;
+    char dir[TUI_TAB_NAME_MAX];
+    if (slash >= sizeof(dir))
+        return 0;
+    AIRY_MEMCPY(dir, tok, slash);
+    dir[slash] = '\0';
+
+    t->tab_kind = 1;
+    size_t n = tui_tab_complete_fs(t, dir, tok + slash);
+    if (n == 0) {
         t->tab_active = 0;
         return 0;
     }
-
-    /* Reset the cycle when the typed token changed since the last Tab. */
-    if (!t->tab_active || t->tab_sel >= n_cand)
+    if (!t->tab_active || t->tab_sel >= n)
         t->tab_sel = 0;
     t->tab_active = 1;
-    t->tab_count = n_cand;
-    for (size_t i = 0; i < n_cand; i++)
-        t->tab_cands[i] = cand_idx[i];
+    t->tab_count = n;
 
-    const char *match = CLI_COMMANDS[cand_idx[t->tab_sel]].name;
+    const char *match = t->tab_cand_strs[t->tab_sel];
     size_t mlen = strlen(match);
+    tui_tab_replace(t, tok_start, tok_len, match, mlen);
 
-    if (tok_start + mlen + 2 > t->input_cap) {
-        size_t new_cap = t->input_cap ? t->input_cap * 2 : 256;
-        while (new_cap < tok_start + mlen + 2)
-            new_cap *= 2;
-        char *grown = (char *)AIRY_REALLOC(t->input, new_cap);
-        if (!grown)
-            return 0;
-        t->input = grown;
-        t->input_cap = new_cap;
-    }
-    AIRY_MEMMOVE(t->input + tok_start + mlen, t->input + t->input_col,
-            t->input_len - t->input_col + 1);
-    AIRY_MEMCPY(t->input + tok_start, match, mlen);
-    t->input_len += (mlen - tok_len);
-    t->input_col = tok_start + mlen;
-
-    /* Single candidate: append a trailing space so typing continues.
-     * Multiple candidates: advance the cycle for the next Tab press. */
-    if (n_cand == 1) {
-        if (t->input_len + 1 < t->input_cap) {
-            t->input[t->input_len++] = ' ';
-            t->input[t->input_len] = '\0';
-            t->input_col = t->input_len;
+    /* 单候选：文件追加空格便于继续输入；目录不加（可继续 Tab 深入）。
+     * 多候选：推进轮转，下次 Tab 显示下一个。 */
+    if (n == 1) {
+        if (mlen > 0 && match[mlen - 1] != '/') {
+            if (t->input_len + 1 < t->input_cap) {
+                t->input[t->input_len++] = ' ';
+                t->input[t->input_len] = '\0';
+                t->input_col = t->input_len;
+            }
         }
     } else {
-        t->tab_sel = (t->tab_sel + 1) % n_cand;
+        t->tab_sel = (t->tab_sel + 1) % n;
     }
     return 1;
 }
@@ -1428,9 +1574,16 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
                 cli_tui_redraw(t);
                 break;
             default:
-                /* 其他键：返回对话模式，保持输入焦点 */
+                /* 其他键：返回对话模式，并把该击键送入输入框（"打字即
+                 * 退出浏览"的 Claude Code 风格）。若按键被吞掉，快速连
+                 * 击的命令（如 quit）会缺首字符。 */
                 t->mode = CLI_TUI_MODE_CHAT;
-                cli_tui_redraw(t);
+                if (key >= 0x20 && key <= 0xFF) {
+                    tui_input_append(t, (char)key);
+                    tui_render_input(t);
+                } else {
+                    cli_tui_redraw(t);
+                }
                 fflush(stdout);
                 break;
             }
@@ -1549,7 +1702,26 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
             fflush(stdout);
             continue;
         }
-        if (key == 0x03 || key == 0x04) { /* Ctrl+C / Ctrl+D */
+        if (key == 0x03) { /* Ctrl+C: clear the draft; exit only on empty line */
+            if (t->input_len > 0) {
+                t->input_len = 0;
+                t->input_col = 0;
+                t->tab_active = 0;
+                if (t->input)
+                    t->input[0] = '\0';
+                tui_render_input(t);
+                fflush(stdout);
+                continue;
+            }
+            return 0;
+        }
+        if (key == 0x04) { /* Ctrl+D: delete-fwd when text present; EOF on empty */
+            if (t->input_len > 0) {
+                tui_input_delete_fwd(t);
+                tui_render_input(t);
+                fflush(stdout);
+                continue;
+            }
             return 0;
         }
         if (key == 0x15) { /* Ctrl+U: kill before the caret (to line start) */
