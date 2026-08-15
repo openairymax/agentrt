@@ -286,11 +286,13 @@ static int cli_daemon_bin(const char *ns, char *buf, size_t cap)
 #endif
 }
 
-/* daemon 是否在线（health_check RPC 成功）。 */
+/* daemon 是否在线（health_check RPC 成功）。超时与 cmd_daemons 的 6000ms
+ * 对齐——observe_d/notify_d 的 health_check 偶发慢响应（实测 max~4.5s，
+ * 事件驱动下偶被长任务排队），2000ms 会误报 offline。 */
 static int cli_daemon_online(const char *ns)
 {
     char *result = NULL;
-    int rc = daemon_rpc_call(cli_ns_sock(ns), "health_check", NULL, &result, 2000);
+    int rc = daemon_rpc_call(cli_ns_sock(ns), "health_check", NULL, &result, 6000);
     AIRY_FREE(result);
     return (rc == 0) ? 1 : 0;
 }

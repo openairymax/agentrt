@@ -136,9 +136,10 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
         cJSON_free(answers_json);
         if (serr != AIRY_SUCCESS)
             break;
-        /* 展示 LLM 对上一答的思考（渐进披露，非阻塞） */
+        /* 展示 LLM 对上一答的思考（渐进披露：折叠为前 4 行，避免多轮
+         * 推理刷屏；完整文本保留在日志）。 */
         if (step.reasoning[0])
-            cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "gccp", step.reasoning);
+            cli_render_collapsed(step.reasoning, 4, 4, 1);
         if (step.done)
             break; /* 已收敛 */
         if (step.question[0]) {
@@ -687,6 +688,7 @@ void cli_chat_reply(const char *input)
      * 不再调用工具 → final_resp 即最终回复。护栏：轮次上限。 */
     llm_response_t *final_resp = NULL;
     int tool_rounds = 0;
+    int force_summary = 0; /* 工具轮次用尽：撤下工具定义，强制基于已有结果总结 */
     for (;;) {
         llm_request_config_t cfg;
         __builtin_memset(&cfg, 0, sizeof(cfg));
@@ -695,7 +697,7 @@ void cli_chat_reply(const char *input)
         cfg.message_count = buf.count;
         cfg.temperature = 0.7f;
         cfg.max_tokens = 2048;
-        cfg.tools_json = CLI_CHAT_TOOLS_JSON;
+        cfg.tools_json = force_summary ? NULL : CLI_CHAT_TOOLS_JSON;
 
         llm_response_t *resp = NULL;
         int ret = llm_svc_adapter_complete(g_chat_adapter, &cfg, &resp);
@@ -712,9 +714,21 @@ void cli_chat_reply(const char *input)
         }
         int has_tools =
             resp->choices[0].tool_calls_json && resp->choices[0].tool_calls_json[0];
-        if (has_tools && tool_rounds < CLI_CHAT_TOOL_MAX_ROUNDS &&
+        if (has_tools && !force_summary && tool_rounds < CLI_CHAT_TOOL_MAX_ROUNDS &&
             cli_chat_tool_round(&buf, resp) == 0) {
             tool_rounds++;
+            llm_response_free(resp);
+            continue;
+        }
+        /* 工具轮次用尽但模型仍想调用工具：不再放行工具，追加一条
+         * 总结提示并进入最终轮，保证用户拿到基于已获取信息的完整回答
+         * （此前直接采纳该过渡响应，用户只能看到一行半截文本）。 */
+        if (has_tools && !force_summary) {
+            force_summary = 1;
+            cli_msgbuf_push(&buf, "user",
+                            "（工具调用轮次已用尽。请仅基于以上已获取的信息给出最终回答，"
+                            "不要再调用任何工具。）",
+                            NULL, NULL, NULL);
             llm_response_free(resp);
             continue;
         }

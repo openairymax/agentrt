@@ -176,6 +176,15 @@ void cli_tui_pin_header(cli_tui_t *tui);
 int cli_tui_readline(cli_tui_t *tui, char *buf, size_t cap, size_t *out_len);
 
 /**
+ * @brief Set the session status text shown right-aligned on the input line.
+ *
+ * Claude-Code-style context indicator (model · messages · elapsed), rendered
+ * dim so it never competes with the prompt. Hidden automatically when the
+ * typed input would overlap it. Pass "" / NULL to clear.
+ */
+void cli_tui_set_status(cli_tui_t *tui, const char *status);
+
+/**
  * @brief Redraw the full screen immediately (e.g. before a long blocking
  * call that emits progress without reading input).
  */

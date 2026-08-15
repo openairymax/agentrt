@@ -76,6 +76,9 @@ llm_svc_adapter_t *g_chat_adapter = NULL;
 /* 阶段 4（2026-08-15）：决策链事件流句柄（hall_store 创建后赋值）。 */
 airy_hall_store_t *g_cli_hall_store = NULL;
 
+/* 会话开始时刻（TUI 状态栏耗时计算；交互模式才有意义）。 */
+static uint64_t g_session_start_ms;
+
 const cli_command_t CLI_COMMANDS[] = {
     {"/help", "显示所有命令", 0, cmd_help},
     {"/clear", "清屏并清空对话上下文", 0, cmd_clear},
@@ -250,6 +253,7 @@ int main(int argc, char *argv[])
         if (cli_tui_active(tui))
             cli_render_set_tui(tui);
     }
+    g_session_start_ms = cli_now_ms();
 
     /* Dual-thinking three-model injection (GRAD separation of powers; user-chosen models):
       *   AIRY_MODEL_T2    -> model A (generator)
@@ -492,6 +496,18 @@ int main(int argc, char *argv[])
     }
 
     for (;;) {
+        /* 会话状态栏（Claude Code 风格）：模型 · 消息数 · 已耗时，输入行
+         * 右侧 dim 显示。每轮开头刷新，覆盖 L1/L2/chat/plan 全部分支。 */
+        if (cli_tui_active(tui)) {
+            char st[96];
+            const char *mdl = getenv("AIRY_MODEL_T1F");
+            uint64_t sess_sec = (cli_now_ms() - g_session_start_ms) / 1000;
+            snprintf(st, sizeof(st), "\u25c7 %zu msgs \u00b7 %02llu:%02llu \u00b7 %s",
+                     g_history_count / 2, (unsigned long long)(sess_sec / 60),
+                     (unsigned long long)(sess_sec % 60),
+                     (mdl && mdl[0]) ? mdl : "default");
+            cli_tui_set_status(tui, st);
+        }
         /* P23 reconcile extension: fire due execution-level re-dispatches
          * (no-op when redispatch_max == 0). Controller-driven reconcile —
          * each turn polls the failed-execution queue. */
@@ -762,7 +778,7 @@ int main(int argc, char *argv[])
         const char *sched_sock = getenv("AIRY_SCHED_SOCK");
         int sched_remote = (sched_sock && sched_sock[0]) ? 1 : 0;
         if (sched_remote) {
-            err = cli_dag_submit_remote(sched_sock, wf, input, &exec_id);
+            err = cli_dag_submit_remote(sched_sock, wf, input, wh_cfg.main_workspace_dir, &exec_id);
             if (err != AIRY_EOK || !exec_id) {
                 char line[128];
                 snprintf(line, sizeof(line), "Remote DAG submit failed (err=%d), falling back.",
