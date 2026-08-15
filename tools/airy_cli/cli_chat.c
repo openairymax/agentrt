@@ -268,9 +268,14 @@ void cli_history_clear(void)
     g_history_count = 0;
 }
 
-#define CLI_SYSTEM_PROMPT                                                    \
-    "你是 AgentRT，一个智能体操作系统与超级智能体助手。请用中文简洁、友好地" \
-    "回答用户的问题；需要执行具体工程任务时，请引导用户描述为任务指令。"
+#define CLI_SYSTEM_PROMPT                                                       \
+    "你是 AgentRT，一个智能体操作系统与超级智能体助手。请用中文简洁、友好地"    \
+    "回答用户的问题；需要执行具体工程任务时，请引导用户描述为任务指令。\n"      \
+    "你具备两个联网工具：web_search（搜索引擎，参数 query/max_results）与 "    \
+    "web_fetch（抓取网页正文，参数 url）。当问题涉及实时信息、最新新闻、时效"   \
+    "性数据，或你知识截止日期（2025-05）之后发生的事件，必须调用 web_search "  \
+    "获取最新结果，必要时再用 web_fetch 深入抓取；不要凭过时知识硬答。"        \
+    "工具结果返回后，基于结果组织回答并标注信息时效。"
 
 #define CLI_CLASSIFY_PROMPT                                                    \
     "判断用户输入属于【任务指令】还是【普通对话】。任务指令：包含可执行动作"   \
@@ -383,7 +388,8 @@ static const char *cli_msgbuf_own(cli_chat_msgbuf_t *b, const char *s)
 }
 
 static void cli_msgbuf_push(cli_chat_msgbuf_t *b, const char *role, const char *content,
-                            const char *tool_call_id, const char *tool_calls_json)
+                            const char *tool_call_id, const char *tool_calls_json,
+                            const char *reasoning_content)
 {
     if (b->count >= b->cap) {
         size_t new_cap = b->cap ? b->cap * 2 : 16;
@@ -398,7 +404,9 @@ static void cli_msgbuf_push(cli_chat_msgbuf_t *b, const char *role, const char *
     m->content = cli_msgbuf_own(b, content);
     m->tool_call_id = cli_msgbuf_own(b, tool_call_id);
     m->tool_calls_json = cli_msgbuf_own(b, tool_calls_json);
-    m->reasoning_content = NULL;
+    /* DeepSeek thinking mode requires the assistant turn's reasoning_content
+     * to be echoed verbatim on tool-loop re-send (else HTTP 400). */
+    m->reasoning_content = cli_msgbuf_own(b, reasoning_content);
 }
 
 /* 执行一个工具调用，返回回填模型的 result JSON（OWNER，AIRY_FREE）。 */
@@ -464,9 +472,12 @@ static int cli_chat_tool_round(cli_chat_msgbuf_t *b, const llm_response_t *resp)
         return -1;
     }
 
-    /* assistant 消息：保留原 content，附 tool_calls（OpenAI 要求，续轮必需） */
+    /* assistant 消息：保留原 content 与 reasoning_content，附 tool_calls
+     * （OpenAI 要求续轮必需 tool_calls；DeepSeek thinking 要求回传
+     * reasoning_content，否则 tool 续轮 HTTP 400） */
     cli_msgbuf_push(b, "assistant", resp->choices[0].content, NULL,
-                    resp->choices[0].tool_calls_json);
+                    resp->choices[0].tool_calls_json,
+                    resp->choices[0].reasoning_content);
 
     cJSON *call = NULL;
     cJSON_ArrayForEach(call, calls)
@@ -517,7 +528,7 @@ static int cli_chat_tool_round(cli_chat_msgbuf_t *b, const llm_response_t *resp)
             trunc_buf[n] = '\0';
             feed = trunc_buf;
         }
-        cli_msgbuf_push(b, "tool", feed, call_id, NULL);
+        cli_msgbuf_push(b, "tool", feed, call_id, NULL, NULL);
         AIRY_FREE(result_json);
     }
     cJSON_Delete(calls);
@@ -657,10 +668,10 @@ void cli_chat_reply(const char *input)
      * （assistant tool_calls + role="tool" 结果），所有内容副本由缓冲统一管理。 */
     cli_chat_msgbuf_t buf;
     AIRY_MEMSET(&buf, 0, sizeof(buf));
-    cli_msgbuf_push(&buf, "system", CLI_SYSTEM_PROMPT, NULL, NULL);
+    cli_msgbuf_push(&buf, "system", CLI_SYSTEM_PROMPT, NULL, NULL, NULL);
     for (size_t hi = 0; hi < g_history_count; hi++)
-        cli_msgbuf_push(&buf, g_history_roles[hi], g_history_contents[hi], NULL, NULL);
-    cli_msgbuf_push(&buf, "user", input, NULL, NULL);
+        cli_msgbuf_push(&buf, g_history_roles[hi], g_history_contents[hi], NULL, NULL, NULL);
+    cli_msgbuf_push(&buf, "user", input, NULL, NULL, NULL);
 
     /* 交互模式的"思考中"状态行（spinner；-p/--json 抑制 chrome）。 */
     int spinner_on = !g_cli_print_mode && !g_cli_json_mode;
