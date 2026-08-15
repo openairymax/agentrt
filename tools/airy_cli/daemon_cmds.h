@@ -18,6 +18,7 @@ extern "C" {
 #endif
 
 int cmd_daemons(const char *arg, void *ctx);
+int cmd_daemon(const char *arg, void *ctx);
 int cmd_rpc(const char *arg, void *ctx);
 int cmd_stats(const char *arg, void *ctx);
 int cmd_agents(const char *arg, void *ctx);
@@ -38,6 +39,12 @@ int cmd_vault(const char *arg, void *ctx);
 int cmd_perm(const char *arg, void *ctx);
 int cmd_sanitize(const char *arg, void *ctx);
 int cmd_security(const char *arg, void *ctx);
+
+/* 阶段 2 生命周期层 reconcile：agent 自愈重启（声明式自愈第三层）。
+ * init 在 main 启动时调用（desired 集合 + 限流配置）；reconcile_once 由
+ * 主循环每轮驱动（与 work_hall redispatch_once 并列）。 */
+void cli_daemon_lifecycle_init(const char *agents_csv);
+int cli_daemon_lifecycle_reconcile_once(void);
 
 #ifdef __cplusplus
 }

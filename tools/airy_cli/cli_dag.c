@@ -315,7 +315,7 @@ airy_err_t cli_dag_wait_remote(const char *sched_sock, const char *dag_id, char 
             return AIRY_ERR_STATE_ERROR;
         }
         if (prc == CLI_DAG_POLL_ERROR)
-            return AIRY_ERR_FAIL;
+            return AIRY_ERR_GENERIC_FAIL;
 #ifdef _WIN32
         Sleep(200);
 #else
@@ -323,4 +323,143 @@ airy_err_t cli_dag_wait_remote(const char *sched_sock, const char *dag_id, char 
 #endif
     }
     return AIRY_ERR_TIMEOUT;
+}
+
+/* ==================== node-level progress board ====================
+ * Per-node live board for remote DAGs (Claude Code convention): the poll
+ * loop renders one compact line per node with a state icon and the goal,
+ * re-printing a node only when its state actually changed (no 200ms spam).
+ * State icons: □ pending · ◇ running · ✓ completed · ✗ failed/canceled.
+ * The board is created per DAG (cli_dag_node_board_create), driven from
+ * the polling loop and released when the DAG finishes. */
+
+#define CLI_DAG_BOARD_MAX_NODES 64
+
+typedef struct {
+    char id[64];
+    char status[16];
+    int printed;
+} cli_dag_board_node_t;
+
+struct cli_dag_board_s {
+    cli_dag_board_node_t nodes[CLI_DAG_BOARD_MAX_NODES];
+    size_t node_count;
+};
+
+static void cli_dag_board_icon_color(const char *status, const char **icon,
+                                     const char **color)
+{
+    if (strcmp(status, "completed") == 0) {
+        *icon = CLI_ICON_CHECK;
+        *color = CLR_GREEN;
+    } else if (strcmp(status, "failed") == 0 || strcmp(status, "canceled") == 0) {
+        *icon = CLI_ICON_CROSS;
+        *color = CLR_RED;
+    } else if (strcmp(status, "running") == 0 || strcmp(status, "active") == 0 ||
+               strcmp(status, "queued") == 0) {
+        *icon = CLI_ICON_DIAMOND;
+        *color = CLR_YELLOW;
+    } else {
+        *icon = CLI_ICON_TODO;
+        *color = CLR_DIM;
+    }
+}
+
+static void cli_dag_board_print(cli_dag_board_node_t *n, const char *goal)
+{
+    const char *icon, *color;
+    cli_dag_board_icon_color(n->status, &icon, &color);
+    cli_outf("%s%s%s%s %s%s%s %s%s%s\n", cli_gutter_pad(4), cli_c(color), icon,
+           cli_c(CLR_RESET), cli_c(CLR_CYAN), n->id, cli_c(CLR_RESET), cli_c(CLR_DIM),
+           goal ? goal : "", cli_c(CLR_RESET));
+}
+
+cli_dag_board_t *cli_dag_node_board_create(void)
+{
+    cli_dag_board_t *b = (cli_dag_board_t *)AIRY_CALLOC(1, sizeof(cli_dag_board_t));
+    return b;
+}
+
+void cli_dag_node_board_destroy(cli_dag_board_t *b)
+{
+    AIRY_FREE(b);
+}
+
+/* Query dag_status, diff node states against the last snapshot and print
+ * every node whose state changed. Returns 0 while the DAG is still active,
+ * 1 once a terminal state is observed (caller stops polling). */
+int cli_dag_node_board_tick(cli_dag_board_t *b, const char *sched_sock, const char *dag_id)
+{
+    if (!b || !sched_sock || !dag_id)
+        return 0;
+
+    cJSON *params = cJSON_CreateObject();
+    if (!params)
+        return 0;
+    cJSON_AddStringToObject(params, "dag_id", dag_id);
+    char *params_json = cJSON_PrintUnformatted(params);
+    cJSON_Delete(params);
+    if (!params_json)
+        return 0;
+
+    char *rpc_result = NULL;
+    int rc = daemon_rpc_call(sched_sock, "dag_status", params_json, &rpc_result, 10000);
+    AIRY_FREE(params_json);
+    if (rc != AIRY_SUCCESS || !rpc_result) {
+        AIRY_FREE(rpc_result);
+        return 0;
+    }
+
+    cJSON *root = cJSON_Parse(rpc_result);
+    AIRY_FREE(rpc_result);
+    if (!root)
+        return 0;
+
+    cJSON *st = cJSON_GetObjectItem(root, "status");
+    const char *status = (cJSON_IsString(st) && st->valuestring) ? st->valuestring : "unknown";
+    int terminal = (strcmp(status, "completed") == 0 || strcmp(status, "failed") == 0 ||
+                    strcmp(status, "canceled") == 0);
+
+    cJSON *nodes = cJSON_GetObjectItem(root, "nodes");
+    int nsz = (nodes && cJSON_IsArray(nodes)) ? cJSON_GetArraySize(nodes) : 0;
+    if (nsz > CLI_DAG_BOARD_MAX_NODES)
+        nsz = CLI_DAG_BOARD_MAX_NODES;
+
+    for (int i = 0; i < nsz; i++) {
+        cJSON *nj = cJSON_GetArrayItem(nodes, i);
+        if (!nj)
+            continue;
+        cJSON *nid = cJSON_GetObjectItem(nj, "id");
+        cJSON *nst = cJSON_GetObjectItem(nj, "status");
+        cJSON *goal = cJSON_GetObjectItem(nj, "goal");
+        const char *id_s = (cJSON_IsString(nid) && nid->valuestring) ? nid->valuestring : "?";
+        const char *st_s = (cJSON_IsString(nst) && nst->valuestring) ? nst->valuestring : "pending";
+        const char *goal_s = (cJSON_IsString(goal) && goal->valuestring) ? goal->valuestring : "";
+
+        /* Find or register the node slot. */
+        cli_dag_board_node_t *slot = NULL;
+        for (size_t k = 0; k < b->node_count; k++) {
+            if (strcmp(b->nodes[k].id, id_s) == 0) {
+                slot = &b->nodes[k];
+                break;
+            }
+        }
+        if (!slot && b->node_count < CLI_DAG_BOARD_MAX_NODES) {
+            slot = &b->nodes[b->node_count++];
+            AIRY_STRNCPY_TERM(slot->id, id_s, sizeof(slot->id));
+            slot->printed = 0;
+        }
+        if (!slot)
+            continue;
+
+        int changed = (strcmp(slot->status, st_s) != 0);
+        AIRY_STRNCPY_TERM(slot->status, st_s, sizeof(slot->status));
+        if (!slot->printed || changed) {
+            slot->printed = 1;
+            cli_dag_board_print(slot, goal_s);
+        }
+    }
+
+    cJSON_Delete(root);
+    return terminal ? 1 : 0;
 }

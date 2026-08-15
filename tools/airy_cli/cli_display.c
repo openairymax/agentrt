@@ -118,6 +118,9 @@ static int cli_plan_ready(const taskflow_workflow_t *wf, size_t idx,
  */
 void cli_print_plan_list(const taskflow_workflow_t *wf)
 {
+    /* One-shot server mode (-p): no plan list, only the final result. */
+    if (g_cli_print_mode)
+        return;
     if (!wf || wf->node_count == 0) {
         cli_render_sub_agent_line(CLI_ROLE_ERROR, "plan",
                                   "Empty plan, nothing to execute.");
@@ -357,6 +360,11 @@ static void cli_model_row_at(int col, const char *key, const char *role,
 
 void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
 {
+    /* One-shot server mode (-p): no startup banner/panel, output is the
+     * single-turn result only (Claude Code -p / Codex exec convention). */
+    if (g_cli_print_mode)
+        return;
+
     const char *a = (t2 && t2[0]) ? t2 : "默认";
     const char *b = (t1f && t1f[0]) ? t1f : "默认";
     const char *c = (t1p && t1p[0]) ? t1p : "默认";

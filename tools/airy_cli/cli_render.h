@@ -39,6 +39,13 @@
 extern "C" {
 #endif
 
+/* One-shot server mode flags (defined in main.c): -p/--print suppresses
+ * execution chrome; --json switches command/task output to structured JSON.
+ * Exported via the render header so command handlers (daemon_cmds/cli_cmds)
+ * can bypass the suppression for command *responses* (server scripting). */
+extern int g_cli_print_mode;
+extern int g_cli_json_mode;
+
 /* Opaque TUI engine handle (full definition in cli_tui.h). */
 struct cli_tui_s;
 
@@ -98,6 +105,7 @@ void cli_outf(const char *fmt, ...);
 #define CLI_ICON_INFO "\u24D8"          /* ⓘ info         */
 #define CLI_ICON_ERR "\u25A0"           /* ■ error        */
 #define CLI_ICON_BRANCH "\u2514"        /* └ detail indent */
+#define CLI_ICON_TOOL "\u26CF"          /* ⛏ tool invocation */
 
 typedef enum {
     CLI_ROLE_USER = 0,        /* [For Thee]     cyan     */
@@ -139,6 +147,15 @@ const char *cli_c(const char *seq);
  * the CLI emits.
  */
 size_t cli_disp_width(const char *s);
+
+/**
+ * @brief Terminal display width of the first `n` bytes of a UTF-8 string.
+ *
+ * Same width rules as cli_disp_width but stops at a byte boundary, so the
+ * cursor can be positioned mid-line (edit position) without miscounting
+ * partial multi-byte sequences.
+ */
+size_t cli_disp_width_of(const char *s, size_t n);
 
 /**
  * @brief Render a long text collapsed to at most `max_lines` lines.
@@ -258,6 +275,28 @@ void cli_render_sub_agent(const char *tag, const char *content);
  * keeping the "[Sub <tag> Agent]" identity.
  */
 void cli_render_sub_agent_line(cli_role_t role, const char *tag, const char *content);
+
+/**
+ * @brief Render an LLM tool invocation (Claude Code tool-use card):
+ *
+ *   ⛏ web_search("agentrt")        (magenta icon + cyan name + dim args)
+ *
+ * @param name tool name (web_search / web_fetch)
+ * @param args preview of the tool arguments (single line, trimmed)
+ */
+void cli_render_tool_use(const char *name, const char *args);
+
+/**
+ * @brief Render a tool-execution result, folded to a summary line:
+ *
+ *   [Sub search Agent] ✓ web_search — <first line of output>
+ *   [Sub search Agent] ✗ web_search — <error>
+ *
+ * @param name   tool name
+ * @param text   result output / error text
+ * @param ok     true when the tool returned success
+ */
+void cli_render_tool_result(const char *name, const char *text, int ok);
 
 /**
  * @brief Monotonic wall-clock in milliseconds (for turn separators).

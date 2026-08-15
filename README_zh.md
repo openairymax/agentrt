@@ -5,7 +5,7 @@
 
 **语言:** [English](README.md) | 简体中文
 
-[![Version](https://img.shields.io/badge/version-0.1.1-5a6b7e)](https://atomgit.com/openairymax/agentrt)
+[![Version](https://img.shields.io/badge/version-0.1.2-5a6b7e)](https://atomgit.com/openairymax/agentrt)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c\&logoColor=white)](https://en.cppreference.com/w/c/11)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=c%2B%2B\&logoColor=white)](https://isocpp.org)
@@ -19,6 +19,31 @@
 本仓库是**管理仓**（git superproject），以 git submodule 形式聚合 **7 个叶子仓**，并继承原 AgentRT 单体仓库的**全部 git 历史**，以保持提交连续性。
 
 AgentRT 是 `airymaxhub` 伞仓下**五个管理仓之一**（其余四个为 `sdk`、`ecosystem`、`products`、`agentrt-linux`）。Airymax 工作区共拆分为 38 个仓库：1 个伞仓 + 5 个管理仓 + 29 个叶子仓 + 3 个顶层仓。每个叶子仓可独立构建与版本控制，管理仓通过 git submodule 将它们钉合在一起，产出连贯、可复现的运行时平台。
+
+### 0.1.2 能力（SSoT 收敛 + 平台本质补齐）
+
+0.1.2 以 **Unify Design SSoT 单一权威源** 方法论，将 agentrt 内部的 8 个多权威源冲突点（S-1~S-8）逐点收敛为唯一权威实现——不是削减功能，而是消除冗余权威源：
+
+| 领域 | SSoT 收敛动作 |
+|------|--------------|
+| **错误码（A-UEF）** | `airy_types.h` 统一收敛至 [SC] `airymax/error.h` 唯一权威源 |
+| **日志（A-ULP）** | `AIRY_LOG_*` 成为全仓唯一日志宏族 |
+| **双 IPC 协议头（S-3）** | `are_ipc.h` 与内核 `uapi/airymax/ipc.h` 布局分叉收敛（Layout C v4，magic `'ARE1'`） |
+| **两套 DAG 引擎（S-4）** | 删除半成品 Pregel BSP 超步路径；`graph_engine` = 图执行权威、`taskflow_advanced` = 调度权威 |
+| **事件流（S-6）** | hall_store 任务文件模型 + gseq 全局单调事件序号成为权威事件流底座 |
+| **[SC] 契约（S-8）** | commons 11 头与内核侧逐字节对齐 |
+
+平台本质补齐（类比 K8s controller）：
+
+- **声明式自愈（reconcile）**：认知层（蓝图→GRAD→回灌 replan）、执行层（任务失败自动重调度）、生命周期层（agent daemon 自愈重启，`AIRY_SELF_HEAL` + 重启上限 + 退避）三层全部落地，由 CLI 主循环统一驱动。
+- **统一扩展机制**：memory vtable 能力接缝推广为统一注册表（`airy_ext.h`，memory 域首个验证），为 LLM/tool/storage/sandbox 四域扩展提供统一底座。
+
+品牌化 ID（`airy_trace_id_t` / `airy_msg_id_t` 不透明类型）与 CLI/TUI 体验升级共同构成 0.1.2 发布：
+
+- **认知并行审查（CPR）**：认知阶段（GCCP 后、规划前）排出多个认知子 agent 并行独立分析——认知确认子 agent（独立判定意图 task/chat/agent + 置信度）+ 问题审查子 agent（歧义/风险/缺失信息），汇总为认知决策（意图加权投票 + 风险合并）写入工作内存供 Phase 1 规划参考；LLM 不可用自动降级不阻塞。
+- **联网搜索/抓取工具回路（内置）**：聊天回路向 LLM 暴露 `web_search`/`web_fetch`（OpenAI function-calling）——CLI 执行 tool_d 真实实现（Bing 搜索 + URL 抓取）并以 `role="tool"` 回填，续轮至无工具调用后以 markdown 渲染最终回复；工具卡片（`⛏` + 折叠摘要）保持屏幕整洁。
+- **GCCP 逐问交互**：每次只问一个问题，用户回答后 LLM 对已答内容思考（`airy_gccp_step`）决定收敛或针对性追问，避免机械性提问（追问上限 = 问题数 + 4）。
+- **TUI 输入交互打磨（readline/Claude Code 范式）**：词移动（Ctrl/Alt+←→、Alt+b/f）、Ctrl+T 转置、kill-ring + Ctrl+Y yank、Ctrl+S 正向搜索（与 Ctrl+R 对称）、bracketed paste、SIGWINCH 重绘、完整 raw 模式（清流控使 Ctrl+S 不被吞）。
 
 ### 0.1.1 框架化能力（机制/策略分离）
 
@@ -149,7 +174,7 @@ cd /tmp/agentrt-build && ctest --output-on-failure
 - **本管理仓**：仅 `main` 分支 — 稳定，按发行版打标签。
 - **叶子仓**：`feature/official-hubs-01` — 各 submodule 跟踪的活跃开发分支。
 
-`.gitmodules` 中所有 7 个叶子仓的 submodule 钉均指向 `feature/official-hubs-01`。管理仓的 `main` 分支记录每个 submodule 应解析的确切提交，确保 Airymax 0.1.1 奠基版本构建的可复现性。
+`.gitmodules` 中所有 7 个叶子仓的 submodule 钉均指向 `feature/official-hubs-01`。管理仓的 `main` 分支记录每个 submodule 应解析的确切提交，确保每个 Airymax 发行版（0.1.1 奠基版本及 0.1.2 起）构建的可复现性。
 
 ## 许可证
 

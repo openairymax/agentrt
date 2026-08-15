@@ -22,6 +22,10 @@
 
 #include "airy_memory.h"
 
+/* One-shot server mode switch (defined in main.c): suppress status chrome
+ * and role chrome so -p output stays clean (Claude Code -p convention). */
+extern int g_cli_print_mode;
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -126,20 +130,29 @@ const char *cli_gutter_pad(size_t indent)
  * with the banner so all columns account for wide glyphs. */
 size_t cli_disp_width(const char *s)
 {
+    if (!s)
+        return 0;
+    return cli_disp_width_of(s, strlen(s));
+}
+
+size_t cli_disp_width_of(const char *s, size_t n)
+{
     size_t w = 0;
-    for (const unsigned char *p = (const unsigned char *)s; *p;) {
-        if (*p < 0x80) { /* ASCII: 1 cell */
+    size_t i = 0;
+    const unsigned char *p = (const unsigned char *)s;
+    while (i < n && p[i]) {
+        if (p[i] < 0x80) { /* ASCII: 1 cell */
             w += 1;
-            p += 1;
-        } else if ((*p & 0xE0) == 0xC0) { /* 2-byte (e.g. "·"): 1 cell */
+            i += 1;
+        } else if ((p[i] & 0xE0) == 0xC0) { /* 2-byte (e.g. "·"): 1 cell */
             w += 1;
-            p += 2;
-        } else if ((*p & 0xF0) == 0xE0) { /* 3-byte */
-            w += (*p == 0xE2) ? 1 : 2;     /* 0xE2: box drawing / arrows */
-            p += 3;
+            i += 2;
+        } else if ((p[i] & 0xF0) == 0xE0) { /* 3-byte */
+            w += (p[i] == 0xE2) ? 1 : 2;     /* 0xE2: box drawing / arrows */
+            i += 3;
         } else { /* 4-byte: 2 cells */
             w += 2;
-            p += 4;
+            i += 4;
         }
     }
     return w;
@@ -698,6 +711,12 @@ static void cli_build_role_header(char *out, size_t cap, const char *name, const
 void cli_render_role_line(cli_role_t role, cli_actor_t actor, const char *tag,
                           const char *content)
 {
+    /* One-shot server mode (-p): execution detail (trace / status / sub-agent
+     * reports) is suppressed so the output carries only the final result and
+     * real errors (Claude Code -p keeps execution chrome out of the reply). */
+    if (g_cli_print_mode &&
+        (role == CLI_ROLE_TRACE || role == CLI_ROLE_STATUS || role == CLI_ROLE_SUB_AGENT))
+        return;
     const char *g = cli_gutter(2);
     const char *col = cli_render_role_color(role);
     const char *name = cli_render_actor_name(actor);
@@ -755,6 +774,10 @@ void cli_render_stream_fold_trailer(size_t more_lines)
 
 void cli_render_user_message(const char *content)
 {
+    /* One-shot server mode (-p): no user-input echo; the reply is the only
+     * output (Claude Code -p / Codex exec convention). */
+    if (g_cli_print_mode)
+        return;
     const char *g = cli_gutter(2);
     const char *col = cli_render_role_color(CLI_ROLE_USER);
     const char *bg = cli_c(CLR_BG_GRAY);
@@ -788,6 +811,9 @@ void cli_render_user_message(const char *content)
 
 void cli_render_sub_agent_line(cli_role_t role, const char *tag, const char *content)
 {
+    /* One-shot server mode (-p): suppress sub-agent reports; keep real errors. */
+    if (g_cli_print_mode && role != CLI_ROLE_ERROR)
+        return;
     char hdr[CLI_ROLE_HDR_W + 1];
     const char *t = (tag && tag[0]) ? tag : "exec";
 
@@ -824,8 +850,117 @@ void cli_render_sub_agent(const char *tag, const char *content)
     cli_render_sub_agent_line(CLI_ROLE_SUB_AGENT, tag, content);
 }
 
+/* ---- tool invocation / result (Claude Code tool-use cards) ---- */
+
+/* Trim args to a single displayable line (collapse newlines to spaces,
+ * cap the length) so a tool card never wraps the viewport. */
+static void cli_tool_args_preview(const char *args, char *out, size_t cap)
+{
+    if (!out || cap == 0)
+        return;
+    size_t o = 0;
+    for (const char *p = args ? args : ""; *p && o + 2 < cap; p++) {
+        if (*p == '\n' || *p == '\r' || *p == '\t')
+            out[o++] = ' ';
+        else if ((unsigned char)*p >= 0x20)
+            out[o++] = *p;
+    }
+    if (o > 0 && out[o - 1] == ' ')
+        o--;
+    out[o] = '\0';
+}
+
+void cli_render_tool_use(const char *name, const char *args)
+{
+    /* One-shot server mode (-p): tool chrome stays out of the reply. */
+    if (g_cli_print_mode)
+        return;
+    if (!name)
+        return;
+    char preview[384];
+    cli_tool_args_preview(args, preview, sizeof(preview));
+
+    const char *g = cli_gutter(2);
+    cli_out(g);
+    cli_out(cli_c(CLR_MAGENTA));
+    cli_out(CLI_ICON_TOOL);
+    cli_out(" ");
+    cli_out(cli_c(CLR_RESET));
+    cli_out(cli_c(CLR_CYAN));
+    cli_out(name);
+    cli_out(cli_c(CLR_RESET));
+    cli_out(cli_c(CLR_DIM));
+    cli_out(" ");
+    cli_out(preview);
+    cli_out(cli_c(CLR_RESET));
+    cli_outc('\n');
+}
+
+void cli_render_tool_result(const char *name, const char *text, int ok)
+{
+    /* One-shot server mode (-p): tool chrome stays out of the reply. */
+    if (g_cli_print_mode)
+        return;
+    if (!name)
+        return;
+    char hdr[CLI_ROLE_HDR_W + 1];
+    const char *t = (strcmp(name, "web_fetch") == 0) ? "fetch" : "search";
+    size_t tag_budget = CLI_ROLE_HDR_W > 12 ? (CLI_ROLE_HDR_W - 12) : 0;
+    size_t tag_show = strlen(t);
+    if (tag_show > tag_budget)
+        tag_show = tag_budget;
+    snprintf(hdr, sizeof(hdr), "[Sub %.*s Agent]", (int)tag_show, t);
+
+    /* Fold the result to its first line (Claude Code folds tool output;
+     * the full text is already carried back to the model as context). */
+    char summary[320];
+    const char *src = (text && text[0]) ? text : (ok ? "(empty)" : "(no error detail)");
+    size_t o = 0;
+    for (const char *p = src; *p && o + 2 < sizeof(summary); p++) {
+        if (*p == '\n') {
+            summary[o++] = ' ';
+            if (p[1] == '\0' || p[1] == '\n')
+                break;
+        } else if ((unsigned char)*p >= 0x20) {
+            summary[o++] = *p;
+        }
+    }
+    if (o <= sizeof(summary) - 3) {
+        /* "…" 多字节字符：显式 UTF-8 字节序列（避免 multichar 常量）。 */
+        summary[o++] = (char)0xE2;
+        summary[o++] = (char)0x80;
+        summary[o++] = (char)0xA6;
+    }
+    summary[o] = '\0';
+
+    const char *g = cli_gutter(2);
+    const char *col = ok ? cli_render_role_color(CLI_ROLE_SUB_AGENT) : cli_c(CLR_RED);
+    cli_out(g);
+    cli_out(col);
+    cli_out(hdr);
+    cli_out(cli_c(CLR_RESET));
+    cli_pad_role_header(hdr);
+    cli_out(ok ? cli_c(CLR_GREEN) : cli_c(CLR_RED));
+    cli_out(ok ? CLI_ICON_CHECK : CLI_ICON_CROSS);
+    cli_out(" ");
+    cli_out(cli_c(CLR_RESET));
+    cli_out(cli_c(CLR_CYAN));
+    cli_out(name);
+    cli_out(cli_c(CLR_RESET));
+    cli_out(cli_c(CLR_DIM));
+    cli_out(" — ");
+    cli_out(cli_c(CLR_RESET));
+    cli_out(cli_c(ok ? CLR_DIM : CLR_RED));
+    cli_out(summary);
+    cli_out(cli_c(CLR_RESET));
+    cli_outc('\n');
+}
+
 void cli_render_turn_separator(uint64_t elapsed_ms, const char *metrics)
 {
+    /* One-shot server mode (-p): the result is the only output, no turn chrome. */
+    if (g_cli_print_mode)
+        return;
     uint64_t secs = elapsed_ms / 1000;
     char label[128];
     if (secs < 1)
@@ -857,8 +992,9 @@ void cli_render_turn_separator(uint64_t elapsed_ms, const char *metrics)
 void cli_render_footer_hint(void)
 {
     /* TTY only: keep piped / logged output free of UI chrome. The full-screen
-     * TUI already carries this hint in its pinned header, so skip it there. */
-    if (!cli_term_is_tty() || cli_tui_active(cli_tui_get_default()))
+     * TUI already carries this hint in its pinned header, so skip it there.
+     * One-shot server mode (-p) never shows it either. */
+    if (g_cli_print_mode || !cli_term_is_tty() || cli_tui_active(cli_tui_get_default()))
         return;
     const char *g = cli_gutter(2);
     cli_out(g);
@@ -885,6 +1021,9 @@ void cli_render_footer_hint(void)
 
 void cli_render_progress_bar(double progress, size_t width, const char *label)
 {
+    /* One-shot server mode (-p): no progress chrome, only the final result. */
+    if (g_cli_print_mode)
+        return;
     if (width < 4)
         width = 4;
     if (progress < 0.0)
@@ -918,6 +1057,9 @@ void cli_render_progress_bar(double progress, size_t width, const char *label)
 void cli_render_task_line(const char *tag, const char *id, const char *state,
                           double progress)
 {
+    /* One-shot server mode (-p): no task board chrome, only the final result. */
+    if (g_cli_print_mode)
+        return;
     if (progress < 0.0)
         progress = 0.0;
     if (progress > 1.0)
@@ -1015,6 +1157,10 @@ static void cli_spinner_erase(void)
 
 int cli_spinner_start(const char *title)
 {
+    /* One-shot server mode (-p): no status lines at all; the final result is
+     * the only output (Claude Code -p / Codex exec convention). */
+    if (g_cli_print_mode)
+        return 0;
     AIRY_MEMSET(&g_spinner, 0, sizeof(g_spinner));
     if (!title || !title[0])
         return 0;

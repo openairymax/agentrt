@@ -20,10 +20,25 @@
 #include "daemon_rpc_client.h"
 #include "airy_memory.h"
 #include "cli_render.h"
+#include "logger.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <process.h>
+#include <sys/stat.h>
+#else
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
 
 #define CLI_RPC_TIMEOUT_MS 10000
 
@@ -73,6 +88,37 @@ static const char *cli_rt_dir(void)
     return "/tmp/agentrt";
 }
 
+/* Resolve a daemon namespace against the known table. Accepts both the
+ * canonical name ("tool") and the process-name form ("tool_d", the daemon
+ * binary suffix) so /rpc tool_d.list_tools and /rpc tool.list_tools both
+ * work. Returns 0 on match (out holds the canonical name), non-zero when
+ * the namespace is unknown. */
+static int cli_ns_resolve(const char *in, char *out, size_t out_cap)
+{
+    for (size_t i = 0; i < CLI_DAEMONS_COUNT; i++) {
+        if (strcmp(in, CLI_DAEMONS[i].ns) == 0) {
+            AIRY_STRNCPY_TERM(out, CLI_DAEMONS[i].ns, out_cap);
+            return 0;
+        }
+    }
+    size_t in_len = strlen(in);
+    if (in_len > 2 && strcmp(in + in_len - 2, "_d") == 0) {
+        char trimmed[64];
+        size_t tlen = in_len - 2;
+        if (tlen >= sizeof(trimmed))
+            tlen = sizeof(trimmed) - 1;
+        __builtin_memcpy(trimmed, in, tlen);
+        trimmed[tlen] = '\0';
+        for (size_t i = 0; i < CLI_DAEMONS_COUNT; i++) {
+            if (strcmp(trimmed, CLI_DAEMONS[i].ns) == 0) {
+                AIRY_STRNCPY_TERM(out, CLI_DAEMONS[i].ns, out_cap);
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
 static const char *cli_ns_sock(const char *ns)
 {
     static char buf[512];
@@ -88,6 +134,14 @@ static void cli_rpc_print(const char *ns, const char *method, const char *params
         char line[160];
         snprintf(line, sizeof(line), "%s.%s call failed (err=%d)", ns, method, rc);
         cli_render_sub_agent_line(CLI_ROLE_ERROR, ns, line);
+        AIRY_FREE(result);
+        return;
+    }
+    /* One-shot server mode: a command's RPC response IS the result, so print
+     * it raw (JSON) instead of routing it through the conversation renderer
+     * that -p suppresses. */
+    if (g_cli_print_mode) {
+        cli_outf("%s\n", result);
         AIRY_FREE(result);
         return;
     }
@@ -120,6 +174,14 @@ int cmd_rpc(const char *arg, void *ctx)
     __builtin_memcpy(ns, arg, ns_len);
     ns[ns_len] = '\0';
 
+    /* Namespace tolerance: accept "tool_d" and "tool" alike. */
+    char ns_resolved[64];
+    if (cli_ns_resolve(ns, ns_resolved, sizeof(ns_resolved)) != 0) {
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "rpc",
+                             "未知 daemon 命名空间，/daemons 查看在线列表");
+        return 0;
+    }
+
     const char *rest = dot + 1;
     char method[128];
     size_t mlen = 0;
@@ -134,7 +196,7 @@ int cmd_rpc(const char *arg, void *ctx)
     if (rest[mlen] == ' ')
         params = rest + mlen + 1;
 
-    cli_rpc_print(ns, method, params);
+    cli_rpc_print(ns_resolved, method, params);
     return 0;
 }
 
@@ -143,24 +205,495 @@ int cmd_daemons(const char *arg, void *ctx)
     (void)arg;
     (void)ctx;
     int online = 0;
-    cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "daemon",
-                         "health check");
+    if (!g_cli_print_mode)
+        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "daemon",
+                             "health check");
     for (size_t i = 0; i < CLI_DAEMONS_COUNT; i++) {
         char *result = NULL;
         int rc = daemon_rpc_call(cli_ns_sock(CLI_DAEMONS[i].ns), CLI_DAEMONS[i].health_method, NULL,
                                  &result, 6000);
         if (rc == 0 && result) {
-            cli_render_task_line(NULL, CLI_DAEMONS[i].ns, "online", 1.0);
+            if (g_cli_print_mode)
+                cli_outf("%s online\n", CLI_DAEMONS[i].ns);
+            else
+                cli_render_task_line(NULL, CLI_DAEMONS[i].ns, "online", 1.0);
             online++;
         } else {
-            cli_render_task_line(NULL, CLI_DAEMONS[i].ns, "offline", 0.0);
+            if (g_cli_print_mode)
+                cli_outf("%s offline\n", CLI_DAEMONS[i].ns);
+            else
+                cli_render_task_line(NULL, CLI_DAEMONS[i].ns, "offline", 0.0);
         }
         AIRY_FREE(result);
     }
     {
         char line[64];
         snprintf(line, sizeof(line), "online %d/%zu", online, CLI_DAEMONS_COUNT);
-        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "daemon", line);
+        if (g_cli_print_mode)
+            cli_outf("%s\n", line);
+        else
+            cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "daemon", line);
+    }
+    return 0;
+}
+
+/* ==================== daemon 生命周期管理（/daemon start|stop|restart|status） ====================
+ *
+ * 服务器工业场景：CLI 需能一键管理 agentrt 的全部 daemon，无需手动逐个
+ * 拉起进程。daemon 二进制约定在 $AIRY_HOME/bin/<ns>_d（Windows 为
+ * <ns>_d.exe），日志写入 $AIRY_HOME/logs/<ns>_d.log；停止优先走 daemon
+ * 注册的优雅 "shutdown" RPC，避免直接杀进程丢失状态。 */
+
+/* AIRY_HOME 根目录（$AIRY_HOME，缺省 $HOME/.airymaxrt）。 */
+static const char *cli_rt_base(void)
+{
+    static char buf[512];
+    const char *home = getenv("AIRY_HOME");
+    if (home && home[0]) {
+        snprintf(buf, sizeof(buf), "%s", home);
+        return buf;
+    }
+    const char *uhome = getenv("HOME");
+    if (uhome && uhome[0]) {
+        snprintf(buf, sizeof(buf), "%s/.airymaxrt", uhome);
+        return buf;
+    }
+#ifdef _WIN32
+    const char *pdata = getenv("PROGRAMDATA");
+    if (pdata && pdata[0])
+        snprintf(buf, sizeof(buf), "%s/airymaxrt", pdata);
+    else
+        snprintf(buf, sizeof(buf), "%s/airymaxrt", "C:\\ProgramData");
+#else
+    snprintf(buf, sizeof(buf), "/tmp/agentrt");
+#endif
+    return buf;
+}
+
+/* daemon 二进制完整路径（返回 1=存在，0=不存在）。 */
+static int cli_daemon_bin(const char *ns, char *buf, size_t cap)
+{
+#ifdef _WIN32
+    snprintf(buf, cap, "%s\\bin\\%s_d.exe", cli_rt_base(), ns);
+#else
+    snprintf(buf, cap, "%s/bin/%s_d", cli_rt_base(), ns);
+#endif
+    struct stat st;
+#ifdef _WIN32
+    return (stat(buf, &st) == 0 && (st.st_mode & _S_IFREG)) ? 1 : 0;
+#else
+    return (stat(buf, &st) == 0 && S_ISREG(st.st_mode)) ? 1 : 0;
+#endif
+}
+
+/* daemon 是否在线（health_check RPC 成功）。 */
+static int cli_daemon_online(const char *ns)
+{
+    char *result = NULL;
+    int rc = daemon_rpc_call(cli_ns_sock(ns), "health_check", NULL, &result, 2000);
+    AIRY_FREE(result);
+    return (rc == 0) ? 1 : 0;
+}
+
+/* 启动一个 daemon（detach 守护化，日志落盘）；返回 0=成功，非零=失败。 */
+static int cli_daemon_start(const char *ns)
+{
+    char bin[512];
+    if (!cli_daemon_bin(ns, bin, sizeof(bin))) {
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, ns,
+                             "二进制不存在（$AIRY_HOME/bin 下未找到），先安装/构建");
+        return -1;
+    }
+    if (cli_daemon_online(ns)) {
+        cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, "already online");
+        return 0;
+    }
+
+    char logf[640];
+#ifdef _WIN32
+    snprintf(logf, sizeof(logf), "%s\\logs\\%s_d.log", cli_rt_base(), ns);
+#else
+    snprintf(logf, sizeof(logf), "%s/logs/%s_d.log", cli_rt_base(), ns);
+#endif
+
+#ifdef _WIN32
+    {
+        STARTUPINFOA si;
+        PROCESS_INFORMATION pi;
+        __builtin_memset(&si, 0, sizeof(si));
+        __builtin_memset(&pi, 0, sizeof(pi));
+        si.cb = sizeof(si);
+        /* 日志重定向：先打开追加句柄，作为子进程 stdout/stderr。 */
+        SECURITY_ATTRIBUTES sa;
+        __builtin_memset(&sa, 0, sizeof(sa));
+        sa.nLength = sizeof(sa);
+        sa.bInheritHandle = TRUE;
+        HANDLE log_h = CreateFileA(logf, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                   &sa, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (log_h != INVALID_HANDLE_VALUE) {
+            si.dwFlags = STARTF_USESTDHANDLES;
+            si.hStdOutput = log_h;
+            si.hStdError = log_h;
+            si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+        }
+        char cmd[560];
+        snprintf(cmd, sizeof(cmd), "\"%s\"", bin);
+        if (!CreateProcessA(NULL, cmd, NULL, NULL, TRUE, DETACHED_PROCESS | CREATE_NO_WINDOW,
+                            NULL, NULL, &si, &pi)) {
+            if (log_h != INVALID_HANDLE_VALUE)
+                CloseHandle(log_h);
+            return -1;
+        }
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+        if (log_h != INVALID_HANDLE_VALUE)
+            CloseHandle(log_h);
+    }
+#else
+    {
+        pid_t pid = fork();
+        if (pid < 0)
+            return -1;
+        if (pid == 0) {
+            /* 子进程：脱离会话、重定向日志、exec daemon。 */
+            setsid();
+            int fd = open(logf, O_WRONLY | O_CREAT | O_APPEND, 0644);
+            if (fd >= 0) {
+                dup2(fd, STDOUT_FILENO);
+                dup2(fd, STDERR_FILENO);
+                close(fd);
+            }
+            execl(bin, bin, (char *)NULL);
+            _exit(127);
+        }
+        /* 父进程：等一个短间隔，让健康检查能看到新进程。 */
+    }
+#endif
+    return 0;
+}
+
+/* 等待 daemon 离线（轮询 health_check），超时返回 0。 */
+static int cli_daemon_wait_offline(const char *ns, int timeout_ms)
+{
+    int waited = 0;
+    while (cli_daemon_online(ns)) {
+#ifdef _WIN32
+        Sleep(200);
+#else
+        usleep(200 * 1000);
+#endif
+        waited += 200;
+        if (waited >= timeout_ms)
+            return 0;
+    }
+    return 1;
+}
+
+/* 等待 daemon 上线，超时返回 0。 */
+static int cli_daemon_wait_online(const char *ns, int timeout_ms)
+{
+    int waited = 0;
+    while (!cli_daemon_online(ns)) {
+#ifdef _WIN32
+        Sleep(200);
+#else
+        usleep(200 * 1000);
+#endif
+        waited += 200;
+        if (waited >= timeout_ms)
+            return 0;
+    }
+    return 1;
+}
+
+/* 停止一个 daemon：优先优雅 shutdown RPC，等待离线。 */
+static int cli_daemon_stop(const char *ns)
+{
+    if (!cli_daemon_online(ns)) {
+        cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, "already offline");
+        return 0;
+    }
+    char *result = NULL;
+    daemon_rpc_call(cli_ns_sock(ns), "shutdown", "{}", &result, 3000);
+    AIRY_FREE(result);
+    if (!cli_daemon_wait_offline(ns, 5000))
+        return -1;
+    return 0;
+}
+
+/* ==================== 生命周期层 reconcile：agent 自愈重启（阶段 2） ====================
+ *
+ * 平台本质 = 声明式自愈（reconcile），三层的第三层（生命周期/资源层）：
+ *   - 认知层 reconcile：蓝图 desired → GRAD 收敛 → 执行 → 复核 DRIFT → 回灌（roadmap_sched）
+ *   - 执行层 reconcile：任务失败自动重调度（work_hall redispatch，P23）
+ *   - 生命周期层 reconcile（本模块）：期望在线（desired）的 daemon 实际离线
+ *     （current）→ 自动拉起（restart），带重启上限 + 退避，防重启风暴。
+ *
+ * desired 集合：AIRY_SELF_HEAL_AGENTS（逗号分隔 ns；缺省全部 16 daemon）。
+ * 启用：AIRY_SELF_HEAL=1（或设置了 AGENTS 列表即视为启用）。
+ * 限流：AIRY_SELF_HEAL_MAX_RESTARTS（每 daemon 最大重启数，缺省 3）、
+ *       AIRY_SELF_HEAL_BACKOFF_MS（同 daemon 两次重启最小间隔，缺省 10000）、
+ *       AIRY_SELF_HEAL_POLL_MS（全量探测节拍，缺省 5000）。
+ * 驱动：main.c 主循环每轮调用 cli_daemon_lifecycle_reconcile_once()（与
+ *       work_hall redispatch_once 并列），失败自愈与任务重调度共享同一控制器节奏。 */
+
+#define CLI_SELF_HEAL_MAX_AGENTS CLI_DAEMONS_COUNT
+
+typedef struct {
+    char ns[32];
+    int restarts;
+    uint64_t last_restart_ms;
+} cli_selfheal_agent_t;
+
+typedef struct {
+    int enabled;
+    int max_restarts;
+    uint64_t backoff_ms;
+    uint64_t poll_interval_ms;
+    uint64_t last_scan_ms;
+    size_t agent_count;
+    cli_selfheal_agent_t agents[CLI_SELF_HEAL_MAX_AGENTS];
+} cli_selfheal_t;
+
+static cli_selfheal_t g_selfheal;
+
+void cli_daemon_lifecycle_init(const char *agents_csv)
+{
+    if (g_selfheal.enabled)
+        return;
+    g_selfheal.max_restarts = 3;
+    g_selfheal.backoff_ms = 10000;
+    g_selfheal.poll_interval_ms = 5000;
+
+    const char *e_max = getenv("AIRY_SELF_HEAL_MAX_RESTARTS");
+    if (e_max && e_max[0]) {
+        long v = strtol(e_max, NULL, 10);
+        if (v >= 0)
+            g_selfheal.max_restarts = (int)v;
+    }
+    const char *e_bk = getenv("AIRY_SELF_HEAL_BACKOFF_MS");
+    if (e_bk && e_bk[0]) {
+        long long v = strtoll(e_bk, NULL, 10);
+        if (v >= 0)
+            g_selfheal.backoff_ms = (uint64_t)v;
+    }
+    const char *e_poll = getenv("AIRY_SELF_HEAL_POLL_MS");
+    if (e_poll && e_poll[0]) {
+        long long v = strtoll(e_poll, NULL, 10);
+        if (v >= 100)
+            g_selfheal.poll_interval_ms = (uint64_t)v;
+    }
+
+    /* desired 集合：显式列表（逗号分隔）或缺省全部 daemon */
+    if (agents_csv && agents_csv[0]) {
+        char csv[512];
+        AIRY_STRNCPY_TERM(csv, agents_csv, sizeof(csv));
+        char *tok = csv;
+        while (tok && *tok && g_selfheal.agent_count < CLI_SELF_HEAL_MAX_AGENTS) {
+            char *comma = strchr(tok, ',');
+            if (comma)
+                *comma = '\0';
+            /* 去掉首尾空白 */
+            char *p = tok;
+            while (*p == ' ' || *p == '\t')
+                p++;
+            size_t n = strlen(p);
+            while (n > 0 && (p[n - 1] == ' ' || p[n - 1] == '\t'))
+                p[--n] = '\0';
+            if (p[0]) {
+                /* 校验 ns 属于已知 daemon 表 */
+                int known = 0;
+                for (size_t i = 0; i < CLI_DAEMONS_COUNT; i++) {
+                    if (strcmp(CLI_DAEMONS[i].ns, p) == 0) {
+                        known = 1;
+                        break;
+                    }
+                }
+                if (known) {
+                    /* AIRY_STRNCPY_TERM 对 dst 二次求值：先取 index 再写，
+                     * 避免 agent_count 双递增产生空 ns 条目 */
+                    size_t idx = g_selfheal.agent_count++;
+                    AIRY_STRNCPY_TERM(g_selfheal.agents[idx].ns, p,
+                                      sizeof(g_selfheal.agents[0].ns));
+                }
+            }
+            tok = comma ? comma + 1 : NULL;
+        }
+    } else {
+        for (size_t i = 0; i < CLI_DAEMONS_COUNT; i++) {
+            size_t idx = g_selfheal.agent_count++;
+            AIRY_STRNCPY_TERM(g_selfheal.agents[idx].ns, CLI_DAEMONS[i].ns,
+                              sizeof(g_selfheal.agents[0].ns));
+        }
+    }
+
+    if (g_selfheal.agent_count == 0) {
+        AIRY_LOG_INFO("cli_lifecycle: no valid agents, self-heal disabled");
+        return;
+    }
+    g_selfheal.enabled = 1;
+    AIRY_LOG_INFO("cli_lifecycle: agent self-heal enabled (agents=%zu, max_restarts=%d, "
+                  "backoff_ms=%llu, poll_ms=%llu)",
+                  g_selfheal.agent_count, g_selfheal.max_restarts,
+                  (unsigned long long)g_selfheal.backoff_ms,
+                  (unsigned long long)g_selfheal.poll_interval_ms);
+}
+
+/* 声明式自愈一轮：探测 desired 集合，离线且未超限/退避 → 自动重启。
+ * 返回本次重启的 daemon 数（0 = 无动作/未启用/节流中）。 */
+int cli_daemon_lifecycle_reconcile_once(void)
+{
+    if (!g_selfheal.enabled || g_selfheal.agent_count == 0)
+        return 0;
+
+    uint64_t now = cli_now_ms();
+    if (g_selfheal.last_scan_ms != 0 &&
+        now - g_selfheal.last_scan_ms < g_selfheal.poll_interval_ms)
+        return 0; /* 探测节流 */
+    g_selfheal.last_scan_ms = now;
+
+    int restarted = 0;
+    for (size_t i = 0; i < g_selfheal.agent_count; i++) {
+        cli_selfheal_agent_t *a = &g_selfheal.agents[i];
+        if (cli_daemon_online(a->ns))
+            continue; /* current == desired：健康 */
+
+        /* 离线 → 尝试收敛到 desired：限流 + 退避 + 二进制存在性 */
+        if (g_selfheal.max_restarts >= 0 && a->restarts >= g_selfheal.max_restarts)
+            continue;
+        if (g_selfheal.backoff_ms > 0 && now - a->last_restart_ms < g_selfheal.backoff_ms)
+            continue;
+        char bin[512];
+        if (!cli_daemon_bin(a->ns, bin, sizeof(bin))) {
+            /* 二进制缺失：无法自愈（不计数、不打日志刷屏） */
+            continue;
+        }
+        if (cli_daemon_start(a->ns) != 0) {
+            cli_render_sub_agent_line(CLI_ROLE_ERROR, a->ns,
+                                      "self-heal restart failed");
+            continue;
+        }
+        a->restarts++;
+        a->last_restart_ms = now;
+        restarted++;
+        char line[128];
+        snprintf(line, sizeof(line), "offline → auto-restarted (%d/%d)",
+                 a->restarts, g_selfheal.max_restarts);
+        cli_render_sub_agent_line(CLI_ROLE_ERROR, a->ns, line);
+    }
+    return restarted;
+}
+
+int cmd_daemon(const char *arg, void *ctx)
+{
+    (void)ctx;
+    char action[16] = "status";
+    const char *ns_list[CLI_DAEMONS_COUNT];
+    size_t ns_count = 0;
+
+    /* 解析 "start|stop|restart|status [ns...]"。 */
+    const char *p = arg;
+    while (p && *p == ' ')
+        p++;
+    if (p && *p) {
+        size_t alen = 0;
+        while (p[alen] && p[alen] != ' ')
+            alen++;
+        if (alen >= sizeof(action))
+            alen = sizeof(action) - 1;
+        __builtin_memcpy(action, p, alen);
+        action[alen] = '\0';
+        p += alen;
+        while (p && *p == ' ')
+            p++;
+        /* 其余 token 为命名空间列表（容错 ns_d 后缀）。 */
+        while (p && *p && ns_count < CLI_DAEMONS_COUNT) {
+            const char *tok = p;
+            size_t tlen = 0;
+            while (tok[tlen] && tok[tlen] != ' ')
+                tlen++;
+            char tokbuf[64];
+            size_t tc = tlen < sizeof(tokbuf) - 1 ? tlen : sizeof(tokbuf) - 1;
+            __builtin_memcpy(tokbuf, tok, tc);
+            tokbuf[tc] = '\0';
+            char resolved[64];
+            if (cli_ns_resolve(tokbuf, resolved, sizeof(resolved)) == 0)
+                ns_list[ns_count++] = AIRY_STRDUP(resolved);
+            else
+                cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, tokbuf,
+                                     "未知 daemon 命名空间，已忽略");
+            p = tok + tlen;
+            while (*p == ' ')
+                p++;
+        }
+    }
+    /* 未指定 ns：默认全部。 */
+    if (ns_count == 0) {
+        for (size_t i = 0; i < CLI_DAEMONS_COUNT; i++)
+            ns_list[i] = CLI_DAEMONS[i].ns;
+        ns_count = CLI_DAEMONS_COUNT;
+    }
+
+    if (strcmp(action, "status") == 0) {
+        for (size_t i = 0; i < ns_count; i++) {
+            int up = cli_daemon_online(ns_list[i]);
+            if (g_cli_print_mode)
+                cli_outf("%s %s\n", ns_list[i], up ? "online" : "offline");
+            else
+                cli_render_task_line(NULL, ns_list[i], up ? "online" : "offline", up ? 1.0 : 0.0);
+        }
+    } else if (strcmp(action, "start") == 0) {
+        for (size_t i = 0; i < ns_count; i++) {
+            if (cli_daemon_start(ns_list[i]) == 0) {
+                const char *st = cli_daemon_wait_online(ns_list[i], 8000) ? "started" : "starting";
+                if (g_cli_print_mode)
+                    cli_outf("%s %s\n", ns_list[i], st);
+                else
+                    cli_render_sub_agent_line(CLI_ROLE_TRACE, ns_list[i], st);
+            }
+        }
+    } else if (strcmp(action, "stop") == 0) {
+        for (size_t i = 0; i < ns_count; i++) {
+            if (cli_daemon_stop(ns_list[i]) == 0) {
+                if (g_cli_print_mode)
+                    cli_outf("%s stopped\n", ns_list[i]);
+                else
+                    cli_render_sub_agent_line(CLI_ROLE_TRACE, ns_list[i], "stopped");
+            } else {
+                if (g_cli_print_mode)
+                    cli_outf("%s stop failed (timeout)\n", ns_list[i]);
+                else
+                    cli_render_sub_agent_line(CLI_ROLE_ERROR, ns_list[i], "stop failed (timeout)");
+            }
+        }
+    } else if (strcmp(action, "restart") == 0) {
+        for (size_t i = 0; i < ns_count; i++) {
+            cli_daemon_stop(ns_list[i]);
+            if (cli_daemon_start(ns_list[i]) == 0) {
+                const char *st = cli_daemon_wait_online(ns_list[i], 8000) ? "restarted"
+                                                                          : "restarting";
+                if (g_cli_print_mode)
+                    cli_outf("%s %s\n", ns_list[i], st);
+                else
+                    cli_render_sub_agent_line(CLI_ROLE_TRACE, ns_list[i], st);
+            }
+        }
+    } else {
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "usage",
+                             "/daemon start|stop|restart|status [ns...]（默认全部）");
+    }
+
+    /* 释放用户输入解析出的 strdup 命名空间名（静态表条目不释放）。 */
+    for (size_t i = 0; i < ns_count; i++) {
+        int is_static = 0;
+        for (size_t j = 0; j < CLI_DAEMONS_COUNT; j++) {
+            if (ns_list[i] == CLI_DAEMONS[j].ns) {
+                is_static = 1;
+                break;
+            }
+        }
+        if (!is_static)
+            AIRY_FREE((void *)ns_list[i]);
     }
     return 0;
 }
