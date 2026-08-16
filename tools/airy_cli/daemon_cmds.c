@@ -122,8 +122,33 @@ static int cli_ns_resolve(const char *in, char *out, size_t out_cap)
 static const char *cli_ns_sock(const char *ns)
 {
     static char buf[512];
+#ifdef _WIN32
+    /* Windows daemon IPC 走 TCP 回环（daemon_main.h parse_args 强制），
+     * socket_path 约定 "host:port"。端口与各 daemon DEFAULT_TCP_PORT /
+     * *_DEFAULT_PORT 对齐（含 info=8088/observe=8091 的已调优端口、
+     * hook=8093/channel=8094）。 */
+    static const struct { const char *ns; const char *ep; } WIN_NS_TCP[] = {
+        {"llm", "127.0.0.1:8080"},     {"tool", "127.0.0.1:8081"},
+        {"market", "127.0.0.1:8082"},   {"sched", "127.0.0.1:8083"},
+        {"notify", "127.0.0.1:8084"},   {"mem", "127.0.0.1:8085"},
+        {"agent", "127.0.0.1:8086"},    {"a2a", "127.0.0.1:8087"},
+        {"info", "127.0.0.1:8088"},     {"cupolas", "127.0.0.1:8089"},
+        {"think", "127.0.0.1:8090"},    {"observe", "127.0.0.1:8091"},
+        {"plugin", "127.0.0.1:8092"},   {"hook", "127.0.0.1:8093"},
+        {"channel", "127.0.0.1:8094"},  {"monit", "127.0.0.1:9090"},
+    };
+    for (size_t i = 0; i < sizeof(WIN_NS_TCP) / sizeof(WIN_NS_TCP[0]); i++) {
+        if (strcmp(ns, WIN_NS_TCP[i].ns) == 0) {
+            snprintf(buf, sizeof(buf), "%s", WIN_NS_TCP[i].ep);
+            return buf;
+        }
+    }
+    snprintf(buf, sizeof(buf), "%s\\%s.sock", cli_rt_dir(), ns);
+    return buf;
+#else
     snprintf(buf, sizeof(buf), "%s/%s.sock", cli_rt_dir(), ns);
     return buf;
+#endif
 }
 
 static void cli_rpc_print(const char *ns, const char *method, const char *params_json)
