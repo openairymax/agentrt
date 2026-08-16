@@ -69,7 +69,7 @@ static const cli_daemon_desc_t CLI_DAEMONS[] = {
 
 #define CLI_DAEMONS_COUNT (sizeof(CLI_DAEMONS) / sizeof(CLI_DAEMONS[0]))
 
-static const char *cli_rt_dir(void)
+const char *cli_rt_dir(void)
 {
     static char buf[512];
     const char *rdir = getenv("AIRY_RUNTIME_DIR");

@@ -40,6 +40,10 @@ int cmd_perm(const char *arg, void *ctx);
 int cmd_sanitize(const char *arg, void *ctx);
 int cmd_security(const char *arg, void *ctx);
 
+/* 运行时目录解析（AIRY_RUNTIME_DIR → AIRY_HOME/run → ~/.airymaxrt/run）。
+ * cli_chat.c 工具回路用它拼 tool.sock。 */
+const char *cli_rt_dir(void);
+
 /* 阶段 2 生命周期层 reconcile：agent 自愈重启（声明式自愈第三层）。
  * init 在 main 启动时调用（desired 集合 + 限流配置）；reconcile_once 由
  * 主循环每轮驱动（与 work_hall redispatch_once 并列）。 */

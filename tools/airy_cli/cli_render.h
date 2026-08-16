@@ -75,6 +75,19 @@ void cli_outn(const char *s, size_t n);
 void cli_outc(char c);
 void cli_outf(const char *fmt, ...);
 
+/**
+ * @brief One-shot server mode (-p) progress channel: "[tag] message" to stderr.
+ *
+ * stdout stays reserved for the final answer (Claude Code -p convention), so
+ * scripts can parse the reply while operators watch the pipeline progress on
+ * stderr. No-op in interactive mode, where the role chrome already shows
+ * progress.
+ *
+ * @param tag  short phase tag (e.g. "plan", "submit", "status")
+ * @param fmt  printf-style message
+ */
+void cli_trace(const char *tag, const char *fmt, ...);
+
 /* Shortcuts mirroring the historical fputs/fputc(stdout) call sites. */
 #define cli_puts(s) cli_out(s)
 #define cli_putc(c) cli_outc(c)
@@ -106,6 +119,12 @@ void cli_outf(const char *fmt, ...);
 #define CLI_ICON_ERR "\u25A0"           /* ■ error        */
 #define CLI_ICON_BRANCH "\u2514"        /* └ detail indent */
 #define CLI_ICON_TOOL "\u26CF"          /* ⛏ tool invocation */
+
+/* 非 TTY 状态行辅助（2026-08-16）：状态图标 + 紧凑进度条，供 -p 模式下
+ * [progress]/[status]/[result] 等 cli_trace 行使用，让管道/CI 输出同样
+ * 一眼可读（Linux 工程哲学：最小但完整的结构化信号）。 */
+const char *cli_icon_for_state(const char *state);
+void cli_compact_bar(char *out, size_t cap, double progress, size_t cells);
 
 typedef enum {
     CLI_ROLE_USER = 0,        /* [For Thee]     cyan     */

@@ -35,6 +35,10 @@
 #include "daemon_rpc_client.h"
 #include "daemon_cmds.h"
 #include "cli_internal.h"
+/* 阶段 4（item 4）: 认知阶段并行子 agent 审查（事实/风险） */
+#include "cli_review.h"
+/* 阶段 4（改进6，P3）: 执行复核管线接线（门禁 -> t2 语义复核 -> t1-f 终裁） */
+#include "cli_exec_review.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -351,6 +355,13 @@ int main(int argc, char *argv[])
     wh_cfg.progress_cb = cli_progress_cb;
     wh_cfg.roadmap_sched = rsched;
     wh_cfg.output_validator = cli_validator;
+    /* 改进6（P3）: 执行复核管线——wait 返回前对聚合产物跑门禁 -> t2 语义
+     * 复核 -> t1-f 终裁，verdict 写 hall_store verify 事件并回灌 L2（PASS
+     * 可缓存 / DRIFT 不缓存 / REJECT 失效）。t2/t1-f 委托走 llm_d；
+     * llm_d 不可用时降级为纯确定性门禁。 */
+    wh_cfg.reviewer = cli_exec_review_create();
+    if (wh_cfg.reviewer)
+        AIRY_LOG_INFO("airy_cli: execution review pipeline attached (gate -> t2 -> t1-f)");
     /* Decision C (2026-08-09): task file model - full-visibility storage ($AIRY_HOME/data/agentrt/hall).
       * Progress/result/issue events go to the hall store for replay and experience mining. */
     airy_hall_store_t *hall_store = airy_hall_store_create(NULL);
@@ -444,6 +455,8 @@ int main(int argc, char *argv[])
     err = airy_work_hall_create(&wh_cfg, loop, &hall);
     if (err != AIRY_EOK || !hall) {
         AIRY_LOG_ERROR("airy_cli: work hall create failed (err=%d)", (int)err);
+        if (wh_cfg.reviewer)
+            airy_execution_review_destroy(wh_cfg.reviewer);
         if (rsched)
             airy_roadmap_sched_destroy(rsched);
         airy_loop_destroy(loop);
@@ -604,6 +617,11 @@ int main(int argc, char *argv[])
                         cJSON_free(js);
                     }
                     cJSON_Delete(jroot);
+                } else if (next_buf[0] && g_cli_print_mode) {
+                    /* One-shot server mode (-p): L1 hit = the answer for this
+                     * turn; emit the next-step with provenance on stderr. */
+                    cli_trace("blueprint", "L1 state machine hit (zero token)");
+                    cli_outf("%s\n", next_buf);
                 } else if (next_buf[0]) {
                     char line[1024];
                     snprintf(line, sizeof(line), "L1 blueprint state machine: advance to step "
@@ -619,6 +637,7 @@ int main(int argc, char *argv[])
                              rs_out ? rs_out : "{}");
                     cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "blueprint",
                                          line);
+                    cli_trace("blueprint", "%s", line);
                 }
                 /* 阶段 4：蓝图 L1 状态机命中 → 决策链事件（preflight，cognition） */
                 if (g_cli_hall_store) {
@@ -665,6 +684,14 @@ int main(int argc, char *argv[])
                                  "\"result\":\"%s\"}\n",
                                  sugg);
 #endif /* AIRY_HAS_CJSON */
+                    } else if (g_cli_print_mode) {
+                        /* One-shot server mode (-p): the cached suggestion is the
+                         * result — emit it, with the replay provenance on stderr.
+                         * 走 markdown 渲染：缓存内容同样可能含 [code] 标签，
+                         * 直出会裸露（L2 重放绕过流式归一化）。 */
+                        cli_trace("blueprint",
+                                  "L2 semantic cache hit (low token): replaying last result");
+                        cli_render_markdown(sugg, 0);
                     } else {
                         cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "blueprint",
                                              "L2 semantic cache hit (low token): replaying last result");
@@ -698,6 +725,7 @@ int main(int argc, char *argv[])
         }
 
         int is_task = cli_classify_input(input);
+        cli_trace("intent", "%s", is_task ? "task" : "chat");
         if (is_task == 0) {
             cli_chat_reply(input);
             cli_render_turn_separator(cli_now_ms() - turn_start, NULL);
@@ -725,6 +753,7 @@ int main(int argc, char *argv[])
             err = airy_cognition_process(cog, input, input_len, &plan);
             if (err != AIRY_EOK || !plan) {
                 cli_spinner_stop(0, "planning failed");
+                cli_trace("plan", "failed err=%d", (int)err);
                 char line[128];
                 snprintf(line, sizeof(line), "Planning failed: err=%d", (int)err);
                 cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_THINK, "cognition", line);
@@ -742,6 +771,7 @@ int main(int argc, char *argv[])
                      plan->task_plan_id ? plan->task_plan_id : "?", plan->task_plan_node_count,
                      plan->task_plan_entry_count);
             cli_render_sub_agent_line(CLI_ROLE_TRACE, "cognition", line);
+            cli_trace("plan", "%s", line);
         }
         /* 阶段 4：计划生成 → 决策链 COMMAND 事件（preflight，cognition；plan_id
          * 供提交事件关联，exec 链与 preflight 链由此可追溯） */
@@ -751,6 +781,28 @@ int main(int argc, char *argv[])
                      plan->task_plan_id, plan->task_plan_node_count, plan->task_plan_entry_count);
             airy_hall_store_write(g_cli_hall_store, "default", "preflight", NULL,
                                   AIRY_HALL_CAT_COMMAND, "cognition", ev, NULL, 0);
+        }
+
+        /* 阶段 4（item 4）：认知阶段并行子 agent 审查——计划生成后派出
+         * fact（完整性/目标覆盖）与 risk（风险/边界/依赖）两个审查子 agent
+         * 同步并行审查，汇总意见写 preflight verify 事件（决策链可见）。
+         * agent_d 不可用或 AIRY_COGNITION_REVIEW=0 时静默跳过，不阻塞执行。 */
+        {
+            char *review_report = NULL;
+            const char *agent_sock_env = getenv("AIRY_AGENT_SOCK");
+            if (cli_cognition_review(agent_sock_env, input, plan, &review_report) > 0 &&
+                review_report) {
+                cli_trace("review",
+                          "parallel cognition review (fact+risk) merged");
+                cli_render_sub_agent_line(CLI_ROLE_TRACE, "cognition",
+                                          "Parallel sub-agent review completed");
+                if (g_cli_hall_store) {
+                    airy_hall_store_write(g_cli_hall_store, "default", "preflight", NULL,
+                                          AIRY_HALL_CAT_VERIFY, "cognition", review_report, NULL,
+                                          0);
+                }
+                AIRY_FREE(review_report);
+            }
         }
 
         taskflow_workflow_t *wf = NULL;
@@ -763,10 +815,20 @@ int main(int argc, char *argv[])
             continue;
         }
         {
-            char line[256];
-            snprintf(line, sizeof(line), "Workflow adapted: id=%s nodes=%zu edges=%zu", wf->id,
-                     wf->node_count, wf->edge_count);
+            char line[384];
+            char hdrs[256] = "";
+            size_t ho = 0;
+            for (size_t ni = 0; ni < wf->node_count && ho < sizeof(hdrs) - 2; ni++) {
+                ho += (size_t)snprintf(hdrs + ho, sizeof(hdrs) - ho, "%s%s",
+                                       ni > 0 ? "," : "",
+                                       wf->nodes[ni].task_handler_name
+                                           ? wf->nodes[ni].task_handler_name
+                                           : "?");
+            }
+            snprintf(line, sizeof(line), "Workflow adapted: id=%s nodes=%zu edges=%zu [%s]", wf->id,
+                     wf->node_count, wf->edge_count, hdrs);
             cli_render_sub_agent_line(CLI_ROLE_TRACE, "DAG", line);
+            cli_trace("dag", "%s", line);
         }
 
         cli_print_plan_list(wf);
@@ -777,6 +839,12 @@ int main(int argc, char *argv[])
         char *exec_id = NULL;
         const char *sched_sock = getenv("AIRY_SCHED_SOCK");
         int sched_remote = (sched_sock && sched_sock[0]) ? 1 : 0;
+        /* 改进6（P3）: 绑定执行蓝图（BORROW）——执行复核在 wait 返回前读取
+         * entry 节点的 I/O 契约（node_id/node_goal/output_signatures/
+         * invariant_guard）判定产物。plan 生命周期覆盖 submit~wait，
+         * 本轮结束后由调用方统一释放。 */
+        if (!sched_remote)
+            airy_work_hall_set_blueprint(hall, plan);
         if (sched_remote) {
             err = cli_dag_submit_remote(sched_sock, wf, input, wh_cfg.main_workspace_dir, &exec_id);
             if (err != AIRY_EOK || !exec_id) {
@@ -791,6 +859,7 @@ int main(int argc, char *argv[])
                 char line[256];
                 snprintf(line, sizeof(line), "Submitted: dag=%s", exec_id);
                 cli_render_sub_agent_line(CLI_ROLE_TRACE, "sched_d", line);
+                cli_trace("submit", "%s %s", CLI_ICON_DIAMOND, line);
                 cli_chain_record_submit(exec_id, plan, wf);
             }
         }
@@ -800,6 +869,8 @@ int main(int argc, char *argv[])
                 char line[128];
                 snprintf(line, sizeof(line), "Submit failed: err=%d", (int)err);
                 cli_render_sub_agent_line(CLI_ROLE_ERROR, "hall", line);
+                /* 改进6（P3）: 提交失败即解绑蓝图（BORROW 指针随 plan 释放失效） */
+                airy_work_hall_set_blueprint(hall, NULL);
                 airy_workflow_free(wf);
                 airy_task_plan_free(plan);
                 continue;
@@ -808,6 +879,7 @@ int main(int argc, char *argv[])
                 char line[256];
                 snprintf(line, sizeof(line), "Submitted: exec=%s", exec_id);
                 cli_render_sub_agent_line(CLI_ROLE_TRACE, "hall", line);
+                cli_trace("submit", "%s %s", CLI_ICON_DIAMOND, line);
                 cli_chain_record_submit(exec_id, plan, wf);
             }
         }
@@ -915,6 +987,11 @@ int main(int argc, char *argv[])
                 cli_spinner_resume();
                 snprintf(last_state, sizeof(last_state), "%s", cur_state);
                 last_progress = cur_progress;
+                char sbar[16];
+                cli_compact_bar(sbar, sizeof(sbar), cur_progress, 8);
+                cli_trace("status", "%s %s state=%s %s %3.0f%%",
+                          cli_icon_for_state(cur_state), sched_remote ? "sched_d" : "hall",
+                          cur_state, sbar, cur_progress * 100.0);
             }
             if (done) {
                 cli_spinner_stop(!run_failed, NULL);
@@ -952,13 +1029,20 @@ int main(int argc, char *argv[])
         uint32_t vf_before = 0, vf_after = 0;
         airy_work_hall_verify_stats(hall, NULL, &vf_before, NULL);
         char *result = NULL;
+        cli_trace("wait", "%s exec=%s awaiting completion (polls=%d)", CLI_ICON_DIAMOND, exec_id,
+                  board_polls);
         if (sched_remote) {
             /* Remote: poll dag_status to the final state (replaces airy_work_hall_wait),
               * aggregating node outputs/errors for display at the final state */
             err = cli_dag_wait_remote(sched_sock, exec_id, &result);
         } else {
             err = airy_work_hall_wait(hall, exec_id, 0, &result);
+            /* 改进6（P3）: 本轮执行复核（wait 内门禁/t2/t1-f）已结束，
+             * 解绑蓝图——BORROW 指针随本轮 plan 释放失效，避免跨轮悬垂。 */
+            airy_work_hall_set_blueprint(hall, NULL);
         }
+        cli_trace("wait", "%s done err=%d has_result=%d", CLI_ICON_DONE, (int)err,
+                  result ? 1 : 0);
         if (spin_running) {
             if (g_cli_cancel)
                 cli_spinner_stop(0, "aborted");
@@ -1008,6 +1092,7 @@ int main(int argc, char *argv[])
         if (g_cli_cancel) {
             cli_render_sub_agent_line(CLI_ROLE_ERROR, "cancel",
                                       "Task aborted (stopped after the current node).");
+            cli_trace("result", "%s canceled", CLI_ICON_CROSS);
         } else if (err == AIRY_EOK && result) {
             if (g_cli_json_mode) {
 #ifdef AIRY_HAS_CJSON
@@ -1032,6 +1117,8 @@ int main(int argc, char *argv[])
             } else {
                 cli_print_result(result);
             }
+            cli_trace("result", "%s success=%d", task_succeeded ? CLI_ICON_CHECK : CLI_ICON_CROSS,
+                      task_succeeded ? 1 : 0);
         } else {
             if (g_cli_json_mode) {
 #ifdef AIRY_HAS_CJSON
@@ -1105,6 +1192,9 @@ int main(int argc, char *argv[])
 
     if (g_chat_adapter)
         llm_svc_adapter_destroy(g_chat_adapter);
+    /* 改进6（P3）: 释放执行复核器（t2/t1-f LLM 委托随 reviewer 销毁） */
+    if (wh_cfg.reviewer)
+        airy_execution_review_destroy(wh_cfg.reviewer);
     airy_work_hall_destroy(hall);
     if (cli_validator)
         airy_artifact_validator_destroy(cli_validator);
