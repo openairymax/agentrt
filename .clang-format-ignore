@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+#
+# 豁免 clang-format 的文件（格式受生成器控制，全仓格式化时跳过）：
+# - codegen 产物（SSoT 生成，格式由生成器保持；clang-format 重排会触发
+#   drift 检查失败，见 atoms/syscall/CMakeLists.txt airy_syscall_codegen_check）
+# - 第三方头（保持上游格式，避免无意义 diff）
+atoms/syscall/include/syscall_ids.h
+atoms/syscall/include/syscall_table_gen.h
+commons/include/third_party/nghttp2/nghttp2.h
+commons/include/third_party/nghttp2/nghttp2ver.h
