@@ -46,7 +46,6 @@ if(TARGET airy_llm_service AND TARGET airy_tool_service)
             airy_llm_service
             airy_tool_service
             airy_cognition
-            airy_execution
             airy_core
             airy_memory
             airy_atoms
@@ -61,7 +60,6 @@ if(TARGET airy_llm_service AND TARGET airy_tool_service)
             airy_llm_service
             airy_tool_service
             airy_cognition
-            airy_execution
             airy_core
             airy_memory
             airy_atoms
@@ -79,7 +77,6 @@ else()
         airy_coreloopthree
         airy_atoms
         airy_cognition
-        airy_execution
         airy_core
         airy_memory
         airy_taskflow

@@ -288,7 +288,7 @@ int main(int argc, char *argv[])
     }
 
     airy_cognition_engine_t *cog = NULL;
-    airy_loop_get_engines(loop, &cog, NULL, NULL);
+    airy_loop_get_engines(loop, &cog, NULL);
     if (cog) {
         airy_cognition_set_gccp_interact(cog, cli_gccp_interact, NULL);
         AIRY_LOG_INFO("airy_cli: GCCP interaction callback attached");
