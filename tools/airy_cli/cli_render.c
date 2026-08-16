@@ -404,9 +404,11 @@ static void cli_table_flush(cli_table_row_t *table, size_t *table_rows, const ch
     }
     size_t *widths = (size_t *)AIRY_CALLOC(cols ? cols : 1, sizeof(size_t));
     if (widths) {
+        /* Column width in display columns (CJK chars occupy 2 columns), not
+         * bytes: strlen-based padding misaligns every mixed ASCII/CJK table. */
         for (size_t t = 0; t < rows; t++) {
             for (size_t c = 0; c < table[t].cell_count; c++) {
-                size_t cl = strlen(table[t].cells[c]);
+                size_t cl = cli_disp_width(table[t].cells[c]);
                 if (cl > widths[c])
                     widths[c] = cl;
             }
@@ -425,7 +427,7 @@ static void cli_table_flush(cli_table_row_t *table, size_t *table_rows, const ch
                 cli_out(cell);
                 if (t == 0)
                     cli_out(cli_c(CLR_RESET));
-                size_t pad = widths[c] - strlen(cell);
+                size_t pad = widths[c] - cli_disp_width(cell);
                 for (size_t q = 0; q < pad + 1; q++)
                     cli_outc(' ');
             }
