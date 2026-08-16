@@ -1,0 +1,82 @@
+# SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+#
+# agentrt 用户态 C/C++ 编码格式（OS-IFACE-008：4 空格 + 1TBS + 100 列）
+# 与 agentrt-linux 内核态（Tab 8 + K&R + 80 列）风格独立，命名同源。
+# 依据: docs/AirymaxRT/50-engineering-standards（01-coding-standards.md Part II,
+#       coding_conventions.md Part IV 命名规范）
+#
+# 适用 clang-format >= 14。使用:
+#   clang-format -i <file>          格式化单文件
+#   find . -name '*.c' -o -name '*.h' | xargs clang-format -i   全仓
+#
+# 约束: SortIncludes 必须为 false（OS-BAN-008 禁止自动排序 include，
+#       include 顺序承载语义分组）。
+---
+BasedOnStyle: LLVM
+Language: Cpp
+
+# ---- 缩进：4 空格（用户态，禁止 Tab） ----
+UseTab: Never
+IndentWidth: 4
+TabWidth: 4
+ContinuationIndentWidth: 4
+
+# ---- 行宽：100 列硬上限（用户态 OS-IFACE-008） ----
+ColumnLimit: 100
+
+# ---- 大括号：1TBS（函数左大括号另起一行，控制语句同行） ----
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  AfterControlStatement: false
+  AfterStruct: false
+  AfterClass: false
+  AfterEnum: false
+  AfterUnion: false
+  AfterNamespace: false
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+AllowShortBlocksOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+
+# ---- 空格规则（OS-STD-FMT-005/006：关键字后加空格，函数名后不加） ----
+SpaceAfterCStyleCast: false
+SpaceBeforeParens: ControlStatements
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+PointerAlignment: Right
+
+# ---- 对齐与换行 ----
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignOperands: true
+AlignTrailingComments: false
+# 宏续行 \ 靠左（不产生 100+ 列的尾部对齐空格；对齐 OS-STD-FMT 行宽约束）
+AlignEscapedNewlines: Left
+AllowAllParametersOfDeclarationOnNextLine: false
+BinPackArguments: true
+BinPackParameters: true
+BreakBeforeBinaryOperators: None
+BreakBeforeTernaryOperators: false
+AlwaysBreakBeforeMultilineStrings: false
+PenaltyBreakBeforeFirstCallParameter: 100
+PenaltyExcessCharacter: 100
+PenaltyReturnTypeOnItsOwnLine: 200
+
+# ---- include 顺序：禁止自动排序（OS-BAN-008） ----
+SortIncludes: false
+
+# ---- 其他 ----
+MaxEmptyLinesToKeep: 2
+NamespaceIndentation: None
+DerivePointerAlignment: false
+ReflowComments: false
