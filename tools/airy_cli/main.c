@@ -229,6 +229,14 @@ int main(int argc, char *argv[])
     cli_term_init();
     cli_term_title("AgentRT · airy_cli");
 
+    /* 运行时根解析 SSoT：airy_paths_init() 在 commons/platform 统一解析
+     * AIRY_HOME（显式 env → install.env 固化安装根 → $HOME/.airymaxrt），
+     * 并 setenv 兼容变量（AIRY_HOME/AIRY_RUNTIME_DIR 等）供 cli_rt_dir 等
+     * getenv 消费者读取。直接运行 airy_cli（无 AIRY_HOME 环境变量）时，
+     * 此前解析到 $HOME/.airymaxrt 导致 llm.sock 连接失败；本调用使独立
+     * 调用与 airymaxrt 启动器的解析结果一致（2026-08-16）。 */
+    (void)airy_paths_init();
+
     /* Keep the CLI chat UI clean: raise the global log level to ERROR to silence
       * GCCP/ThinkDual INFO/WARN noise (the logging constructor already ran
       * log_init with defaults; adjust the level at runtime, no re-init). */
@@ -531,24 +539,25 @@ int main(int argc, char *argv[])
         (void)cli_daemon_lifecycle_reconcile_once();
         size_t input_len = 0;
         if (g_cli_print_mode) {
-            /* One-shot server mode: source the prompt from -p (or stdin when
-             * omitted), run exactly one turn, then exit. No prompt echo. */
-            if (print_consumed)
-                break;
-            print_consumed = 1;
+            /* One-shot server mode (-p)：prompt 参数模式单轮；stdin 流模式
+             * 逐行执行直到 EOF（非 TTY 会话/管道连续对话，每行一轮）。
+             * 无 prompt 回显。 */
             if (print_prompt && print_prompt[0]) {
+                if (print_consumed)
+                    break;
+                print_consumed = 1;
                 AIRY_STRNCPY_TERM(input, print_prompt, sizeof(input));
                 input_len = strlen(input);
             } else {
                 if (!fgets(input, sizeof(input), stdin))
-                    break;
+                    break; /* EOF：stdin 流结束 */
                 input_len = strlen(input);
                 while (input_len > 0 &&
                        (input[input_len - 1] == '\n' || input[input_len - 1] == '\r'))
                     input[--input_len] = '\0';
+                if (input_len == 0)
+                    continue; /* 空行跳过；EOF 由 fgets 返回 NULL 终止循环 */
             }
-            if (input_len == 0)
-                break;
             /* One-shot server mode still honors slash commands: /daemon etc.
              * are dispatchable, so scripting `-p "/daemon status"` works the
              * same as typing it in the interactive session. */
