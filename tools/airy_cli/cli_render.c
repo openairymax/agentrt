@@ -101,6 +101,41 @@ void cli_outf(const char *fmt, ...)
     AIRY_FREE(big);
 }
 
+void cli_trace(const char *tag, const char *fmt, ...)
+{
+    /* One-shot server mode (-p) progress channel: a "[tag] message" line on
+     * stderr so stdout carries only the final answer (Claude Code -p
+     * convention). No-op in interactive mode, where the normal role chrome
+     * already shows progress. */
+    if (!g_cli_print_mode)
+        return;
+    if (!tag || !fmt)
+        return;
+    va_list ap;
+    va_start(ap, fmt);
+    char stack_buf[1024];
+    int need = vsnprintf(stack_buf, sizeof(stack_buf), fmt, ap);
+    va_end(ap);
+    if (need < 0)
+        return;
+    fputs("[", stderr);
+    fputs(tag, stderr);
+    fputs("] ", stderr);
+    if ((size_t)need < sizeof(stack_buf)) {
+        fwrite(stack_buf, 1, (size_t)need, stderr);
+    } else {
+        char *big = (char *)AIRY_MALLOC((size_t)need + 1);
+        if (big) {
+            va_start(ap, fmt);
+            vsnprintf(big, (size_t)need + 1, fmt, ap);
+            va_end(ap);
+            fwrite(big, 1, (size_t)need, stderr);
+            AIRY_FREE(big);
+        }
+    }
+    fputc('\n', stderr);
+}
+
 /* Runtime color gate (shared): every ANSI sequence flows through cli_c() so
  * NO_COLOR / piped output produces clean monochrome text (server-grade).
  * Defined here, declared in cli_render.h, used across all CLI translation
@@ -432,17 +467,27 @@ void cli_render_markdown(const char *text, size_t indent)
         if (llen > 0 && line[llen - 1] == '\r')
             line[--llen] = '\0';
 
-        /* fenced code block toggle */
-        if (strncmp(line, "```", 3) == 0) {
+        /* fenced code block toggle: ``` 或 LLM 常用替代分隔符 [code]/[/code]
+         * （2026-08-16：部分模型以 [code] 包裹代码，若不识别则代码行以
+         * 普通文本直出，可读性差；统一按代码围栏渲染） */
+        if (strncmp(line, "```", 3) == 0 || strncmp(line, "[code]", 6) == 0 ||
+            strncmp(line, "[/code]", 7) == 0) {
             if (in_table) {
                 cli_table_flush(table, &table_rows, g);
                 in_table = 0;
             }
             in_code = !in_code;
             cli_out(g);
-            cli_out(cli_c(CLR_DIM));
-            cli_out(in_code ? "[code]" : "[/code]");
-            cli_out(cli_c(CLR_RESET));
+            /* One-shot server mode (-p)：输出标准 markdown 围栏 ``` 而非
+             * [code] 字样，保证 stdout 可被下游 markdown 渲染器直接消费；
+             * 交互模式保留 [code] 视觉围栏（灰底代码块上下文更醒目）。 */
+            if (g_cli_print_mode) {
+                cli_out("```");
+            } else {
+                cli_out(cli_c(CLR_DIM));
+                cli_out(in_code ? "[code]" : "[/code]");
+                cli_out(cli_c(CLR_RESET));
+            }
             cli_outc('\n');
             AIRY_FREE(line);
             continue;
@@ -872,13 +917,31 @@ static void cli_tool_args_preview(const char *args, char *out, size_t cap)
 
 void cli_render_tool_use(const char *name, const char *args)
 {
-    /* One-shot server mode (-p): tool chrome stays out of the reply. */
-    if (g_cli_print_mode)
-        return;
     if (!name)
         return;
     char preview[384];
     cli_tool_args_preview(args, preview, sizeof(preview));
+
+    if (g_cli_print_mode) {
+        /* One-shot server mode (-p): tool progress goes to stderr so stdout
+         * stays a pure, pipeable reply (Claude Code -p convention). The
+         * same ⛏ icon renders the live chain in the terminal. */
+        fputs(cli_c(CLR_MAGENTA), stderr);
+        fputs(CLI_ICON_TOOL, stderr);
+        fputs(" ", stderr);
+        fputs(cli_c(CLR_RESET), stderr);
+        fputs(cli_c(CLR_CYAN), stderr);
+        fputs(name, stderr);
+        fputs(cli_c(CLR_RESET), stderr);
+        if (preview[0]) {
+            fputs(cli_c(CLR_DIM), stderr);
+            fputs(" ", stderr);
+            fputs(preview, stderr);
+            fputs(cli_c(CLR_RESET), stderr);
+        }
+        fputc('\n', stderr);
+        return;
+    }
 
     const char *g = cli_gutter(2);
     cli_out(g);
@@ -898,11 +961,28 @@ void cli_render_tool_use(const char *name, const char *args)
 
 void cli_render_tool_result(const char *name, const char *text, int ok)
 {
-    /* One-shot server mode (-p): tool chrome stays out of the reply. */
-    if (g_cli_print_mode)
-        return;
     if (!name)
         return;
+
+    if (g_cli_print_mode) {
+        /* One-shot server mode (-p): one ✓/✗ status line per tool on stderr;
+         * the folded detail stays out of stdout (pipeable reply). 失败时附
+         * 错误摘要，让无 TTY 场景也能诊断工具失败原因（2026-08-16）。 */
+        fputs(cli_c(ok ? CLR_GREEN : CLR_RED), stderr);
+        fputs(ok ? CLI_ICON_CHECK : CLI_ICON_CROSS, stderr);
+        fputs(cli_c(CLR_RESET), stderr);
+        fputs(" ", stderr);
+        fputs(cli_c(CLR_CYAN), stderr);
+        fputs(name, stderr);
+        fputs(cli_c(CLR_RESET), stderr);
+        if (!ok && text && text[0]) {
+            fputs(" — ", stderr);
+            fputs(text, stderr);
+        }
+        fputc('\n', stderr);
+        return;
+    }
+
     char hdr[CLI_ROLE_HDR_W + 1];
     const char *t = (strcmp(name, "web_fetch") == 0) ? "fetch" : "search";
     size_t tag_budget = CLI_ROLE_HDR_W > 12 ? (CLI_ROLE_HDR_W - 12) : 0;
@@ -1106,6 +1186,48 @@ void cli_render_task_line(const char *tag, const char *id, const char *state,
     cli_outf("%s[%s]%s %s%3.0f%%%s\n", cli_c(bar_bright ? CLR_GREEN : CLR_DIM), bar,
            cli_c(CLR_RESET), cli_c(bar_bright ? CLR_GREEN : CLR_DIM), progress * 100.0,
            cli_c(CLR_RESET));
+}
+
+/* ---- 非 TTY 状态行辅助（-p 模式的 cli_trace 行） ---- */
+
+const char *cli_icon_for_state(const char *state)
+{
+    if (!state)
+        return CLI_ICON_BULLET;
+    if (strcmp(state, "completed") == 0 || strcmp(state, "success") == 0 ||
+        strcmp(state, "done") == 0)
+        return CLI_ICON_CHECK;
+    if (strcmp(state, "failed") == 0 || strcmp(state, "canceled") == 0 ||
+        strcmp(state, "error") == 0)
+        return CLI_ICON_CROSS;
+    if (strcmp(state, "running") == 0 || strcmp(state, "active") == 0 ||
+        strcmp(state, "executing") == 0)
+        return CLI_ICON_DIAMOND;
+    if (strcmp(state, "pending") == 0 || strcmp(state, "queued") == 0 ||
+        strcmp(state, "ready") == 0)
+        return CLI_ICON_TODO;
+    return CLI_ICON_BULLET;
+}
+
+void cli_compact_bar(char *out, size_t cap, double progress, size_t cells)
+{
+    if (!out || cap == 0)
+        return;
+    if (progress < 0.0)
+        progress = 0.0;
+    if (progress > 1.0)
+        progress = 1.0;
+    size_t filled = (size_t)(progress * (double)cells);
+    if (filled > cells)
+        filled = cells;
+    size_t o = 0;
+    if (o < cap - 1)
+        out[o++] = '[';
+    for (size_t i = 0; i < cells && o < cap - 1; i++)
+        out[o++] = (i < filled) ? '#' : '-';
+    if (o < cap - 1)
+        out[o++] = ']';
+    out[o] = '\0';
 }
 
 /* ---- one-line status indicator (spinner) ---- */

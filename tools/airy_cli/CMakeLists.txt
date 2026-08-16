@@ -25,6 +25,12 @@ add_executable(airy_cli
     cli_tui.c
     # 阶段 4: TUI 面板数据源（任务看板 / 事件流）
     cli_panel.c
+    # 阶段 4（item 4）: 认知阶段并行子 agent 审查（事实/风险）
+    cli_review.h
+    cli_review.c
+    # 改进6（P3）: 执行复核管线 t2/t1-f LLM 语义委托（门禁 -> t2 -> t1-f）
+    cli_exec_review.h
+    cli_exec_review.c
 )
 
 # 链接模式：coreloopthree 与 llm/tool service 存在交叉引用（静态库 + 全局

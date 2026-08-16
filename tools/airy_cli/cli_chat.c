@@ -272,6 +272,10 @@ void cli_history_clear(void)
 #define CLI_SYSTEM_PROMPT                                                       \
     "你是 AgentRT，一个智能体操作系统与超级智能体助手。请用中文简洁、友好地"    \
     "回答用户的问题；需要执行具体工程任务时，请引导用户描述为任务指令。\n"      \
+    "你具备本地文件工具：fs_read（读文件）、fs_write（写/覆盖文件）、fs_list"  \
+    "（列目录）、fs_glob（通配符找文件）、fs_grep（正则搜文件内容）、fs_edit"  \
+    "（精确字符串替换编辑）。用户要求查看、修改本地文件时，先 fs_read/fs_list" \
+    " 确认现状再操作；fs_edit 需精确匹配原文，改完可 fs_read 复核。\n"          \
     "你具备两个联网工具：web_search（搜索引擎，参数 query/max_results）与 "    \
     "web_fetch（抓取网页正文，参数 url）。当问题涉及实时信息、最新新闻、时效"   \
     "性数据，或你知识截止日期（2025-05）之后发生的事件，必须调用 web_search "  \
@@ -279,10 +283,12 @@ void cli_history_clear(void)
     "工具结果返回后，基于结果组织回答并标注信息时效。"
 
 #define CLI_CLASSIFY_PROMPT                                                    \
-    "判断用户输入属于【任务指令】还是【普通对话】。任务指令：包含可执行动作"   \
-    "（实现、开发、构建、创建、编写、修复、重构、部署、测试等），要求执行具体" \
-    "工程任务；普通对话：寒暄、提问、解释、闲聊，只需回答无需执行。"           \
-    "只输出 JSON：{\"type\":\"task\"} 或 {\"type\":\"chat\"}"
+    "判断用户输入属于【任务指令】还是【普通对话】。任务指令：要求执行具体工程" \
+    "任务（实现、开发、构建、创建、编写、修复、重构、部署等），需要改动代码、" \
+    "文件或系统；普通对话：寒暄、提问、解释、闲聊、搜索/查询/了解实时信息（如" \
+    "新闻、天气、资料、概念解释）、读取/查看/编辑单个本地文件（读文件、列目录、" \
+    "改文件内容等日常操作），只需回答或联网检索或调用文件工具即可完成，无需"   \
+    "进入任务调度管线。只输出 JSON：{\"type\":\"task\"} 或 {\"type\":\"chat\"}"
 
 /* ============================================================================
  * 聊天工具回路（Claude Code / Codex tool-use 范式，2026-08-15）
@@ -296,7 +302,7 @@ void cli_history_clear(void)
  * 安全护栏：工具轮上限 CLI_CHAT_TOOL_MAX_ROUNDS（防模型无限工具循环）；
  * 工具结果按折叠摘要渲染到屏幕（全量文本仍回填模型上下文）。
  * ============================================================================ */
-#define CLI_CHAT_TOOL_MAX_ROUNDS 4
+#define CLI_CHAT_TOOL_MAX_ROUNDS 8
 #define CLI_CHAT_TOOL_RESULT_CAP 12000 /* 单工具结果回填模型的最大字节数 */
 
 #ifdef AIRY_HAS_CJSON
@@ -323,10 +329,56 @@ int web_search_tool(const char *params_json, tool_result_t *res);
 #endif
 int web_fetch_tool(const char *params_json, tool_result_t *res);
 
-/* OpenAI function-calling schema（聊天工具回路）：web_search + web_fetch。
- * 与 tool_d builtin_net.c 的实现一一对应；工具行为 SSoT 在 tool_d。 */
+/* OpenAI function-calling schema（聊天工具回路）。工具行为 SSoT 在 tool_d
+ * （builtin.c 真实实现）；本 schema 与 gateway_tools_schema.h 保持同构
+ * （2026-08-16 对齐）。本地文件读写 + 联网检索构成超级智能体的日常能力：
+ * fs_read/fs_write/fs_list/fs_glob/fs_grep/fs_edit/fs_delete + web_search/web_fetch。
+ * shell_run / git_* 不入聊天回路（高危，留给任务管线审批链）。 */
 static const char *CLI_CHAT_TOOLS_JSON =
     "["
+    "{\"type\":\"function\",\"function\":{"
+    "\"name\":\"fs_read\","
+    "\"description\":\"Read a file's content from the local filesystem\","
+    "\"parameters\":{\"type\":\"object\",\"properties\":{"
+    "\"path\":{\"type\":\"string\"}},\"required\":[\"path\"]}}},"
+    "{\"type\":\"function\",\"function\":{"
+    "\"name\":\"fs_write\","
+    "\"description\":\"Write content to a local file (creates or overwrites)\","
+    "\"parameters\":{\"type\":\"object\",\"properties\":{"
+    "\"path\":{\"type\":\"string\"},\"content\":{\"type\":\"string\"}},"
+    "\"required\":[\"path\",\"content\"]}}},"
+    "{\"type\":\"function\",\"function\":{"
+    "\"name\":\"fs_list\","
+    "\"description\":\"List entries of a local directory (JSON array)\","
+    "\"parameters\":{\"type\":\"object\",\"properties\":{"
+    "\"path\":{\"type\":\"string\"}},\"required\":[]}}},"
+    "{\"type\":\"function\",\"function\":{"
+    "\"name\":\"fs_glob\","
+    "\"description\":\"List files matching a glob pattern (supports * ? and **)\","
+    "\"parameters\":{\"type\":\"object\",\"properties\":{"
+    "\"pattern\":{\"type\":\"string\"},\"base\":{\"type\":\"string\"}},"
+    "\"required\":[\"pattern\"]}}},"
+    "{\"type\":\"function\",\"function\":{"
+    "\"name\":\"fs_grep\","
+    "\"description\":\"Search file contents with a regular expression (relpath:line:text)\","
+    "\"parameters\":{\"type\":\"object\",\"properties\":{"
+    "\"pattern\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},"
+    "\"glob\":{\"type\":\"string\"},\"max_results\":{\"type\":\"integer\"}},"
+    "\"required\":[\"pattern\"]}}},"
+    "{\"type\":\"function\",\"function\":{"
+    "\"name\":\"fs_edit\","
+    "\"description\":\"Replace an exact string in a file (search-and-replace edit)\","
+    "\"parameters\":{\"type\":\"object\",\"properties\":{"
+    "\"path\":{\"type\":\"string\"},\"old\":{\"type\":\"string\"},"
+    "\"new\":{\"type\":\"string\"},\"count\":{\"type\":\"integer\"}},"
+    "\"required\":[\"path\",\"old\",\"new\"]}}},"
+    "{\"type\":\"function\",\"function\":{"
+    "\"name\":\"fs_delete\","
+    "\"description\":\"Delete a local file, or a directory (recursive=1 for "
+    "non-empty trees; destructive)\","
+    "\"parameters\":{\"type\":\"object\",\"properties\":{"
+    "\"path\":{\"type\":\"string\"},\"recursive\":{\"type\":\"boolean\"}},"
+    "\"required\":[\"path\"]}}},"
     "{\"type\":\"function\",\"function\":{"
     "\"name\":\"web_search\","
     "\"description\":\"Search the web for up-to-date information relevant to "
@@ -410,7 +462,80 @@ static void cli_msgbuf_push(cli_chat_msgbuf_t *b, const char *role, const char *
     m->reasoning_content = cli_msgbuf_own(b, reasoning_content);
 }
 
-/* 执行一个工具调用，返回回填模型的 result JSON（OWNER，AIRY_FREE）。 */
+/* 工具执行主体：CLI 聊天回路的默认身份（ACL permission_rules.yaml 的
+ * coding_v1 标准工作集）。tool_d 的 execute RPC 按该主体做 fail-closed
+ * 权限判定，未显式 allow 的工具一律拒绝。 */
+#define CLI_TOOL_AGENT "coding_v1"
+#define CLI_TOOL_RPC_TIMEOUT_MS 30000
+
+/* 相对路径绝对化：tool_d 在 daemon 启动目录解析相对路径，与 CLI 的 cwd
+ * 不一致（2026-08-16 实测：模型传 "test_edit.txt" 被 tool_d 按自己的 cwd
+ * 解析失败）。CLI 是用户会话的语义边界——用户说"当前目录"就是 CLI 的
+ * cwd，故将 fs 工具的路径参数基于 CLI cwd 转为绝对路径（并规范化
+ * "." / ".." 段）。 */
+static void cli_tool_absolutize_path(cJSON *args, const char *key)
+{
+    cJSON *v = cJSON_GetObjectItem(args, key);
+    if (!v || !cJSON_IsString(v) || !v->valuestring || !v->valuestring[0])
+        return;
+    const char *p = v->valuestring;
+    if (p[0] == '/')
+        return;
+#if !defined(_WIN32)
+    char cwd[4096];
+    if (!getcwd(cwd, sizeof(cwd)))
+        return;
+    size_t cl = strlen(cwd);
+    size_t pl = strlen(p);
+    if (cl + pl + 2 > sizeof(cwd))
+        return;
+    char out[4096];
+    snprintf(out, sizeof(out), "%s/%s", cwd, p);
+    /* 逐段规范化：空段与 "." 跳过；".." 回退上一段（cwd 为绝对路径）；*/
+    /* 其余段原样保留。dst 指向当前写入位置，回退即移回上一 '/'。 */
+    char *dst = out;
+    const char *src = out;
+    for (;;) {
+        const char *seg = src;
+        const char *slash = strchr(seg, '/');
+        size_t seg_len = slash ? (size_t)(slash - seg) : strlen(seg);
+        if (seg_len == 0 || (seg_len == 1 && seg[0] == '.')) {
+            src = slash ? slash + 1 : seg + seg_len;
+            if (!slash)
+                break;
+            continue;
+        }
+        if (seg_len == 2 && seg[0] == '.' && seg[1] == '.') {
+            if (dst > out + 1) {
+                dst -= 1;
+                while (dst > out && dst[-1] != '/')
+                    dst -= 1;
+            }
+            src = slash ? slash + 1 : seg + seg_len;
+            if (!slash)
+                break;
+            continue;
+        }
+        dst[0] = '/';
+        __builtin_memcpy(dst + 1, seg, seg_len);
+        dst += 1 + seg_len;
+        src = slash ? slash + 1 : seg + seg_len;
+        if (!slash)
+            break;
+    }
+    *dst = '\0';
+    if (out[0] == '\0')
+        snprintf(out, sizeof(out), "%s/", cwd);
+    cJSON_SetValuestring(v, out);
+#else
+    (void)p; /* Windows 平台：保持原样（daemon 与 CLI 同盘时语义一致） */
+#endif
+}
+
+/* 执行一个工具调用，返回回填模型的 result JSON（OWNER，AIRY_FREE）。
+ * 统一走 tool_d daemon RPC（tool.sock execute，带 ACL fail-closed），与
+ * gateway agent.run 同一路径；不直连 builtin 库（那会绕过权限边界）。
+ * tool_d 离线或 RPC 失败时返回可诊断的错误 JSON。 */
 static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int *out_ok)
 {
     if (!tool_id || !args_json) {
@@ -419,39 +544,100 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
         return AIRY_STRDUP("{\"ok\":false,\"error\":\"missing tool arguments\"}");
     }
 
-    tool_result_t *res = (tool_result_t *)AIRY_CALLOC(1, sizeof(tool_result_t));
-    if (!res) {
+    char sock[512];
+    snprintf(sock, sizeof(sock), "%s/tool.sock", cli_rt_dir());
+
+    cJSON *params = cJSON_CreateObject();
+    if (!params) {
+        if (out_ok)
+            *out_ok = 0;
+        return AIRY_STRDUP("{\"ok\":false,\"error\":\"out of memory\"}");
+    }
+    cJSON_AddStringToObject(params, "tool_id", tool_id);
+    cJSON *pargs = cJSON_Parse(args_json);
+    if (!pargs) {
+        cJSON_Delete(params);
+        if (out_ok)
+            *out_ok = 0;
+        return AIRY_STRDUP("{\"ok\":false,\"error\":\"invalid tool arguments\"}");
+    }
+    /* 相对路径绝对化（基于 CLI cwd；tool_d 按自身 cwd 解析）：
+     * fs 工具的 path 参数与 fs_glob 的 base 参数。 */
+    if (strcmp(tool_id, "fs_read") == 0 || strcmp(tool_id, "fs_write") == 0 ||
+        strcmp(tool_id, "fs_list") == 0 || strcmp(tool_id, "fs_edit") == 0 ||
+        strcmp(tool_id, "fs_grep") == 0 || strcmp(tool_id, "fs_delete") == 0) {
+        cli_tool_absolutize_path(pargs, "path");
+    } else if (strcmp(tool_id, "fs_glob") == 0) {
+        cli_tool_absolutize_path(pargs, "base");
+        if (!cJSON_GetObjectItem(pargs, "base")) {
+            char cwd[4096];
+#if !defined(_WIN32)
+            if (getcwd(cwd, sizeof(cwd)))
+                cJSON_AddStringToObject(pargs, "base", cwd);
+#else
+            (void)cwd;
+#endif
+        }
+    }
+    cJSON_AddItemToObject(params, "params", pargs);
+    cJSON_AddStringToObject(params, "agent_id", CLI_TOOL_AGENT);
+    char *params_json = cJSON_PrintUnformatted(params);
+    cJSON_Delete(params);
+    if (!params_json) {
         if (out_ok)
             *out_ok = 0;
         return AIRY_STRDUP("{\"ok\":false,\"error\":\"out of memory\"}");
     }
 
-    int rc = -1;
-    if (strcmp(tool_id, "web_search") == 0)
-        rc = web_search_tool(args_json, res);
-    else if (strcmp(tool_id, "web_fetch") == 0)
-        rc = web_fetch_tool(args_json, res);
-
-    int ok = (rc == 0 && res->success);
-    cJSON *root = cJSON_CreateObject();
-    if (!root) {
-        tool_result_free(res);
+    char *result_json = NULL;
+    int rpc_ret = daemon_rpc_call(sock, "execute", params_json, &result_json,
+                                  CLI_TOOL_RPC_TIMEOUT_MS);
+    AIRY_FREE(params_json);
+    if (rpc_ret != 0 || !result_json) {
+        cli_trace("chat", "%s tool rpc fail tool=%s ret=%d sock=%s", CLI_ICON_CROSS, tool_id,
+                  rpc_ret, sock);
+        AIRY_FREE(result_json);
         if (out_ok)
             *out_ok = 0;
-        return NULL;
+        return AIRY_STRDUP("{\"ok\":false,\"error\":\"tool_d unreachable\"}");
     }
-    cJSON_AddBoolToObject(root, "ok", ok ? 1 : 0);
-    if (ok && res->output) {
-        cJSON_AddStringToObject(root, "output", res->output);
-    } else {
-        cJSON_AddStringToObject(root, "error", res->error ? res->error : "tool failed");
+
+    /* daemon_rpc_call 已解包 JSON-RPC 的 result 字段：result_json 即
+     * {"success":..,"output":"..","error":"..","exit_code":..}（2026-08-16
+     * 实测：误以为带外层 "result" 导致解析失败，工具全部报 ✗）。 */
+    cJSON *root = cJSON_Parse(result_json);
+    AIRY_FREE(result_json);
+    int ok = 0;
+    char *out_json = NULL;
+    if (root) {
+        cJSON *succ = cJSON_GetObjectItem(root, "success");
+        /* tool_d 返回 "success":1（数字），cJSON_IsTrue 只认 true 字面量；
+         * 数字与布尔都按非 0 判定（2026-08-16 实测误判 ok=0）。 */
+        ok = (succ && (cJSON_IsTrue(succ) || (cJSON_IsNumber(succ) && succ->valueint != 0))) ? 1
+                                                                                            : 0;
+        cJSON *out = cJSON_GetObjectItem(root, "output");
+        cJSON *err = cJSON_GetObjectItem(root, "error");
+        cJSON *r = cJSON_CreateObject();
+        cJSON_AddBoolToObject(r, "ok", ok);
+        if (ok && out && cJSON_IsString(out) && out->valuestring) {
+            cJSON_AddStringToObject(r, "output", out->valuestring);
+        } else {
+            cJSON_AddStringToObject(r, "error",
+                                    (err && cJSON_IsString(err) && err->valuestring)
+                                        ? err->valuestring
+                                        : "tool failed");
+        }
+        out_json = cJSON_PrintUnformatted(r);
+        cJSON_Delete(r);
+        cJSON_Delete(root);
     }
-    char *json = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    tool_result_free(res);
+    if (!out_json)
+        out_json = AIRY_STRDUP("{\"ok\":false,\"error\":\"tool response parse failed\"}");
+    cli_trace("chat", "%s tool exec tool=%s ok=%d resp=%.120s", ok ? CLI_ICON_CHECK : CLI_ICON_CROSS,
+              tool_id, ok, out_json);
     if (out_ok)
         *out_ok = ok;
-    return json;
+    return out_json;
 }
 
 /* 解析一轮 LLM 返回的 tool_calls，渲染 + 执行 + 回填消息缓冲。
@@ -476,6 +662,9 @@ static int cli_chat_tool_round(cli_chat_msgbuf_t *b, const llm_response_t *resp)
     /* assistant 消息：保留原 content 与 reasoning_content，附 tool_calls
      * （OpenAI 要求续轮必需 tool_calls；DeepSeek thinking 要求回传
      * reasoning_content，否则 tool 续轮 HTTP 400） */
+    cli_trace("chat", "tool-round reasoning=%s tools=%zu",
+              resp->choices[0].reasoning_content ? "yes" : "no",
+              strlen(resp->choices[0].tool_calls_json));
     cli_msgbuf_push(b, "assistant", resp->choices[0].content, NULL,
                     resp->choices[0].tool_calls_json,
                     resp->choices[0].reasoning_content);
@@ -509,12 +698,19 @@ static int cli_chat_tool_round(cli_chat_msgbuf_t *b, const llm_response_t *resp)
             detail = (ok && out && cJSON_IsString(out)) ? out->valuestring
                      : (err && cJSON_IsString(err)) ? err->valuestring
                                                     : NULL;
-            cJSON_Delete(rroot);
         }
 #else
         detail = ok ? NULL : result_json;
 #endif
+        /* UAF 修复（2026-08-16，ASan heap-use-after-free）：detail 指向
+         * cJSON 树内字符串（out->valuestring），必须在渲染消费完之后再
+         * 释放树；此前 cJSON_Delete(rroot) 先于 cli_render_tool_result
+         * 执行，工具回路偶发崩溃。 */
         cli_render_tool_result(name, detail, ok);
+#ifdef AIRY_HAS_CJSON
+        if (rroot)
+            cJSON_Delete(rroot);
+#endif
 
         /* role="tool" 消息回填：携带匹配的 tool_call_id；超长结果在 UTF-8
          * 字符边界截断，防止上下文无界膨胀（web_fetch 页面可能很大）。 */
@@ -540,13 +736,24 @@ static int cli_chat_tool_round(cli_chat_msgbuf_t *b, const llm_response_t *resp)
 
 /**
   * @brief Ask the LLM to classify input as task or chat (returns 1=task 0=chat -1=failure)
+  *
+  * Reasoning-model note: the classifier must not be starved of output tokens.
+  * With a tiny max_tokens a thinking model (e.g. DeepSeek) spends the whole
+  * budget on reasoning_content and emits an empty content, which parses as a
+  * failure here and degrades intent routing (2026-08-16: "北京今天天气怎么样"
+  * misrouted to the task pipeline this way). 64 tokens leaves room for the
+  * JSON verdict after the chain of thought.
   */
 static int cli_llm_classify(const char *input)
 {
     if (!g_chat_adapter || !input)
         return -1;
 
+    /* llm_message_t carries optional fields (reasoning_content/tool_call_id/
+     * tool_calls_json) that build_llm_request_json dereferences; zero the
+     * array so unset fields are never garbage pointers (2026-08-16). */
     llm_message_t msgs[2];
+    __builtin_memset(&msgs, 0, sizeof(msgs));
     msgs[0].role = "system";
     msgs[0].content = CLI_CLASSIFY_PROMPT;
     msgs[1].role = "user";
@@ -558,7 +765,7 @@ static int cli_llm_classify(const char *input)
     cfg.messages = msgs;
     cfg.message_count = 2;
     cfg.temperature = 0.0f;
-    cfg.max_tokens = 16;
+    cfg.max_tokens = 64;
 
     llm_response_t *resp = NULL;
     int ret = llm_svc_adapter_complete(g_chat_adapter, &cfg, &resp);
@@ -570,17 +777,26 @@ static int cli_llm_classify(const char *input)
     }
 
     const char *content = resp->choices[0].content;
-    int is_task = (strstr(content, "\"task\"") != NULL);
+    /* The classifier prompt mandates {"type":"task"} / {"type":"chat"}; the
+     * JSON verdict key with optional spacing still carries the literal
+     * "task" token, so a plain substring match is sufficient and robust.
+     * Only the emitted content counts: the chain-of-thought may mention
+     * "task" while concluding "chat" (thinking models), so never consult
+     * reasoning_content — an empty content degrades to the chat default. */
+    int is_task = (content[0] != '\0' && strstr(content, "\"task\"") != NULL);
     llm_response_free(resp);
     return is_task ? 1 : 0;
 }
 
 /**
   * @brief Intent routing: fast heuristic check + LLM confirmation
- *
+  *
   * Clear task words -> task set; clear chat words -> chat set; ambiguous -> LLM;
-  * falls back to the task set when the LLM is unavailable.
- */
+  * fails SAFE to the chat set (the super-agent default): a misrouted "task"
+  * sent into the task pipeline can stall/act, whereas a chat reply is always
+  * harmless and lets the user rephrase. The explicit task_marks fast path
+  * still catches unambiguous task commands without any LLM round trip.
+  */
 int cli_classify_input(const char *input)
 {
     static const char *const task_marks[] = {
@@ -588,7 +804,7 @@ int cli_classify_input(const char *input)
         "实现", "开发", "构建", "创建", "编写", "修复", "重构",
         "部署", "设计", "添加", "支持", "优化", "迁移", "集成",
         "写一个", "写一", "做一个", "实现一个", "帮我实现", "开发一个",
-        "生成", "运行", "测试", "检查", "分析", "调研", "搜索",
+        "生成", "运行", "测试", "检查",
         "启动", "停止", "安装", "配置", "删除", "更新", "下载",
         /* 英文命令式（Claude Code/Codex 约定：命令式动词即任务） */
         "create ", "create a", "create an", "write ", "write a", "write an",
@@ -596,7 +812,7 @@ int cli_classify_input(const char *input)
         "fix ", "fix a", "refactor ", "add ", "add a", "add an",
         "support ", "optimize ", "migrate ", "integrate ", "update ",
         "remove ", "delete ", "run ", "run a", "install ", "configure ",
-        "test ", "search ", "research ", "analyze ", "generate ", "generate a",
+        "test ", "generate ", "generate a",
         "deploy ", "start ", "stop ", "download ", "rename ", "move ",
         "make a", "make an", "make ", "change ", "modify ", "convert ",
     };
@@ -605,6 +821,14 @@ int cli_classify_input(const char *input)
         "讲讲", "聊聊", "帮助", "请问", "你好呀", "hello", "hi",
         "thanks", "thank you", "bye", "who are you", "what is", "what are",
         "why ", "explain ", "tell me", "help me", "how do i", "how to",
+        /* 联网检索/信息查询 → 聊天工具回路（web_search/web_fetch），非工程任务 */
+        "搜索", "查询", "搜索一下", "查一下", "了解",
+        "search ", "look up", "what's ", "what is ",
+        /* 本地文件读/查/编辑 → 聊天工具回路（fs_read/fs_list/fs_edit 等）：
+         * 查看、读取、修改单个文件属于超级智能体的日常操作，非工程任务
+         * （2026-08-16：此前被误路由到任务管线导致提交失败） */
+        "读取", "读一下", "读文件", "查看", "看看", "打开", "内容是什么",
+        "修改一下", "改一下", "编辑一下", "写入", "文件",
     };
 
     for (size_t i = 0; i < sizeof(task_marks) / sizeof(task_marks[0]); i++) {
@@ -617,7 +841,7 @@ int cli_classify_input(const char *input)
     }
 
     int cls = cli_llm_classify(input);
-    return cls >= 0 ? cls : 1;
+    return cls >= 0 ? cls : 0;
 }
 
 /**
@@ -633,11 +857,103 @@ int cli_classify_input(const char *input)
   * as role="tool" messages, and repeats until the model answers without
   * tools. Rendering follows the Claude Code tool-use convention: tool cards
   * (⛏ name + folded result) during the loop, then the final reply rendered
-  * as markdown. Requests are non-streaming because llm_d's streaming path
-  * does not (yet) surface tool_calls (protocol limitation); the typewriter
-  * dynamism lives in the task/progress path (spinner, progress bars, task
-  * lines, tool cards).
+  * as markdown. -p 模式整轮走 complete_stream（增量文本实时直出 stdout）；
+  * tool_calls 由 provider 以控制帧暴露，流式结束后的响应与非流式同构，
+  * 工具轮逻辑完全复用（2026-08-16）。交互模式仍非流式（spinner + markdown
+  * 完整渲染），避免流式下 markdown 标记裸露。
   */
+
+/* -p 模式流式渲染回调：把增量文本直写 stdout（stdout 保持纯净可管道；
+ * 工具/进度 chrome 走 stderr，见 cli_trace）。交互模式仍走 spinner +
+ * markdown 完整渲染，避免流式下 markdown 标记裸露。
+ *
+ * 流式归一化：部分模型用 [code]/[/code] 包裹代码而非 markdown 围栏
+ * ``` ```。交互模式由 cli_render_markdown 统一识别；-p 流式直出时必须
+ * 在此归一化（[code] → ```），否则管道输出裸露标签。跨 chunk 边界
+ * （token 被 provider 截断成多个增量）用静态 carry 缓冲拼接。 */
+static char s_code_carry[8];
+static size_t s_code_carry_len = 0;
+
+static void cli_stream_norm_emit(const char *s, size_t n)
+{
+    for (size_t i = 0; i < n; i++)
+        cli_outc(s[i]);
+    fflush(stdout);
+}
+
+static void cli_stream_norm_flush_carry(void)
+{
+    if (s_code_carry_len) {
+        cli_stream_norm_emit(s_code_carry, s_code_carry_len);
+        s_code_carry_len = 0;
+    }
+}
+
+/* s[0..n) 是否是 [code] 或 [/code] 的严格前缀（不含完整标签本身）？ */
+static int cli_code_prefix(const char *s, size_t n)
+{
+    static const char *const tags[] = {"[code]", "[/code]"};
+    if (n == 0 || n >= 7)
+        return 0;
+    for (size_t t = 0; t < sizeof(tags) / sizeof(tags[0]); t++) {
+        if (n < strlen(tags[t]) && strncmp(s, tags[t], n) == 0)
+            return 1;
+    }
+    return 0;
+}
+
+static void cli_chat_stream_cb(const char *chunk, void *user_data)
+{
+    (void)user_data;
+    if (!chunk)
+        return;
+    size_t n = strlen(chunk);
+    if (n == 0)
+        return;
+
+    /* 跨 chunk：上一片末尾的标签前缀先与本次开头拼接判断。 */
+    if (s_code_carry_len) {
+        size_t take = 7 - s_code_carry_len;
+        if (take > n)
+            take = n;
+        AIRY_MEMCPY(s_code_carry + s_code_carry_len, chunk, take);
+        s_code_carry_len += take;
+        chunk += take;
+        n -= take;
+        if (strncmp(s_code_carry, "[code]", 6) == 0 ||
+            strncmp(s_code_carry, "[/code]", 7) == 0) {
+            cli_stream_norm_emit("```", 3);
+            s_code_carry_len = 0;
+        } else {
+            cli_stream_norm_flush_carry();
+        }
+        if (n == 0)
+            return;
+    }
+
+    size_t i = 0;
+    while (i < n) {
+        if (n - i >= 6 && strncmp(chunk + i, "[code]", 6) == 0) {
+            cli_stream_norm_emit("```", 3);
+            i += 6;
+            continue;
+        }
+        if (n - i >= 7 && strncmp(chunk + i, "[/code]", 7) == 0) {
+            cli_stream_norm_emit("```", 3);
+            i += 7;
+            continue;
+        }
+        /* chunk 末尾的标签前缀（被 token 截断）→ 缓存，不提前输出。 */
+        if (i + 6 >= n && cli_code_prefix(chunk + i, n - i)) {
+            AIRY_MEMCPY(s_code_carry, chunk + i, n - i);
+            s_code_carry_len = n - i;
+            return;
+        }
+        cli_outc(chunk[i]);
+        i++;
+    }
+    fflush(stdout);
+}
 
 void cli_chat_reply(const char *input)
 {
@@ -648,6 +964,8 @@ void cli_chat_reply(const char *input)
     }
 
     const char *t1f_model = getenv("AIRY_MODEL_T1F");
+    cli_trace("chat", "%s start model=%s", CLI_ICON_DIAMOND,
+              (t1f_model && t1f_model[0]) ? t1f_model : "default");
 
     /* Decision B (2026-08-09): config reminder - t1-f (B model) activates first.
       * If unset, hint the three config points and order without blocking (provider default).
@@ -683,12 +1001,14 @@ void cli_chat_reply(const char *input)
         cli_spinner_start(think_title);
     }
 
-    /* 工具回路：非流式 complete（llm_d 流式路径暂不返回 tool_calls）。
+    /* 工具回路：-p 模式走 complete_stream（增量文本实时直出，tool_calls
+     * 经控制帧暴露）；交互模式仍走非流式 complete（spinner + markdown）。
      * 模型返回 tool_calls → 渲染卡片 + 执行 + 回填 → 续轮；
      * 不再调用工具 → final_resp 即最终回复。护栏：轮次上限。 */
     llm_response_t *final_resp = NULL;
     int tool_rounds = 0;
     int force_summary = 0; /* 工具轮次用尽：撤下工具定义，强制基于已有结果总结 */
+    int stream_mode = g_cli_print_mode && !g_cli_json_mode;
     for (;;) {
         llm_request_config_t cfg;
         __builtin_memset(&cfg, 0, sizeof(cfg));
@@ -698,9 +1018,19 @@ void cli_chat_reply(const char *input)
         cfg.temperature = 0.7f;
         cfg.max_tokens = 2048;
         cfg.tools_json = force_summary ? NULL : CLI_CHAT_TOOLS_JSON;
+        cfg.stream = stream_mode ? 1 : 0;
 
         llm_response_t *resp = NULL;
-        int ret = llm_svc_adapter_complete(g_chat_adapter, &cfg, &resp);
+        int ret;
+        if (stream_mode) {
+            ret = llm_svc_adapter_complete_stream(g_chat_adapter, &cfg, cli_chat_stream_cb, NULL,
+                                                  &resp);
+            /* 流式收尾：flush 可能残留的 [code] 前缀 carry（流提前结束时
+             * 最后一片未触达标签判定的字节）。 */
+            cli_stream_norm_flush_carry();
+        } else {
+            ret = llm_svc_adapter_complete(g_chat_adapter, &cfg, &resp);
+        }
         if (ret != 0 || !resp || resp->choice_count == 0) {
             if (resp)
                 llm_response_free(resp);
@@ -740,6 +1070,8 @@ void cli_chat_reply(const char *input)
         cli_spinner_stop(1, NULL);
 #else
     /* 无 cJSON 平台：固定消息数组 + 单轮非流式（不带工具），保持纯对话。 */
+    int stream_mode = 0;
+    int tool_rounds = 0;
     size_t msg_n = g_history_count + 2;
     llm_message_t *msgs = (llm_message_t *)AIRY_MALLOC(msg_n * sizeof(llm_message_t));
     if (!msgs) {
@@ -826,13 +1158,17 @@ void cli_chat_reply(const char *input)
         cli_outf("}\n");
 #endif /* AIRY_HAS_CJSON */
     } else if (g_cli_print_mode) {
-        cli_outf("%s\n", final_content);
+        /* 流式模式：final_content 已随块实时直出，不再重复打印。 */
+        if (!stream_mode)
+            cli_outf("%s\n", final_content);
     } else {
         cli_render_super_agent(final_content);
     }
 
     cli_history_add("user", input);
     cli_history_add("assistant", final_content);
+    cli_trace("chat", "%s done rounds=%d bytes=%zu", CLI_ICON_CHECK, tool_rounds,
+              strlen(final_content));
 
     llm_response_free(final_resp);
 #ifdef AIRY_HAS_CJSON

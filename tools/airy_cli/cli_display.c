@@ -49,6 +49,13 @@ void cli_print_result(const char *result)
         cJSON *output = cJSON_GetObjectItem(root, "output");
         cJSON *agent = cJSON_GetObjectItem(root, "agent_id");
         if (output && cJSON_IsString(output)) {
+            /* One-shot server mode (-p)：stdout 保持纯净可管道，跳过角色行
+             * 前缀，直接渲染结果内容（markdown 归一化，[code] 归一为 ```）。 */
+            if (g_cli_print_mode) {
+                cli_render_markdown(output->valuestring, 0);
+                cJSON_Delete(root);
+                return;
+            }
             if (agent && cJSON_IsString(agent)) {
                 char line[160];
                 snprintf(line, sizeof(line), "Execution finished by %s.", agent->valuestring);
@@ -64,6 +71,11 @@ void cli_print_result(const char *result)
         cJSON_Delete(root);
     }
 #endif /* AIRY_HAS_CJSON */
+
+    if (g_cli_print_mode) {
+        cli_outf("%s\n", result ? result : "");
+        return;
+    }
 
     char truncated[640];
     snprintf(truncated, sizeof(truncated), "%.600s%s", result,
@@ -211,6 +223,45 @@ void cli_progress_cb(const char *execution_id, const char *node_id, taskflow_sta
                             double progress, void *user_data)
 {
     (void)user_data;
+
+    /* One-shot server mode (-p): node-level progress on the stderr channel
+     * (stdout carries only the final answer), throttled to state changes or
+     * >=5% progress deltas per node so long-running tasks stay observable
+     * without line spam. */
+    if (g_cli_print_mode) {
+        static char s_exec[64];
+        static char s_node[128];
+        static int s_state = -1;
+        static double s_prog = -1.0;
+        if (!node_id) {
+            if (state == TASKFLOW_STATE_COMPLETED)
+                cli_trace("progress", "%s execution completed: %s", CLI_ICON_CHECK,
+                          execution_id ? execution_id : "?");
+            else if (state == TASKFLOW_STATE_FAILED)
+                cli_trace("progress", "%s execution failed: %s", CLI_ICON_CROSS,
+                          execution_id ? execution_id : "?");
+            return;
+        }
+        int changed = (strcmp(s_exec, execution_id ? execution_id : "") != 0 ||
+                       strcmp(s_node, node_id) != 0 || (int)state != s_state ||
+                       progress - s_prog >= 0.05 || s_prog - progress >= 0.05);
+        if (!changed)
+            return;
+        static const char *const st[] = {"pending",  "ready",  "running", "waiting",
+                                         "completed", "failed", "canceled", "skipped",
+                                         "retrying"};
+        const char *ss = (state >= 0 && (int)state < 9) ? st[state] : "?";
+        snprintf(s_exec, sizeof(s_exec), "%s", execution_id ? execution_id : "");
+        snprintf(s_node, sizeof(s_node), "%s", node_id);
+        s_state = (int)state;
+        s_prog = progress;
+        char sbar[16];
+        cli_compact_bar(sbar, sizeof(sbar), progress, 8);
+        cli_trace("progress", "%s %s %s %s %3.0f%%", cli_icon_for_state(ss), node_id, ss, sbar,
+                  progress * 100.0);
+        return;
+    }
+
     if (!node_id) {
         if (state == TASKFLOW_STATE_COMPLETED)
             cli_render_sub_agent(execution_id, "Execution completed.");
