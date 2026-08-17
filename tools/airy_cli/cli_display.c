@@ -121,16 +121,15 @@ static int cli_plan_ready(const taskflow_workflow_t *wf, size_t idx,
 /**
  * @brief Print the execution plan as an ordered task list.
  *
- * Renders nodes in dependency (topological) order, each line carrying a
- * sequence number, a state glyph, the handler and the incoming deps:
+ * Renders nodes in dependency (topological) order with clear visual hierarchy:
  *
- *     [Sub plan Agent] Execution plan (3 nodes, topo order):
- *         ◇ 1. n1  agent_analyze   analyze requirements
- *         ◇ 2. n2  agent_codegen   generate code   <- dep: n1
+ *     ◇ 执行计划 (3 nodes, 2 deps)
+ *       □ 1. analyze requirements        [agent_analyze]
+ *       □ 2. generate code               [agent_codegen]    ← n1
+ *       □ 3. verify output               [agent_verify]     ← n2
  */
 void cli_print_plan_list(const taskflow_workflow_t *wf)
 {
-    /* One-shot server mode (-p): no plan list, only the final result. */
     if (g_cli_print_mode)
         return;
     if (!wf || wf->node_count == 0) {
@@ -140,9 +139,12 @@ void cli_print_plan_list(const taskflow_workflow_t *wf)
     }
 
     const size_t n = wf->node_count;
-    char line[256];
-    snprintf(line, sizeof(line), "Execution plan (%zu nodes, topo order):", n);
-    cli_render_sub_agent_line(CLI_ROLE_TRACE, "plan", line);
+    const char *g = cli_gutter_pad(2);
+
+    cli_outf("%s%s%s %s执行计划%s %s(%zu nodes, %zu deps)%s\n",
+             g, cli_c(CLR_CYAN), CLI_ICON_DIAMOND,
+             cli_c(CLR_RESET), cli_c(CLR_DIM),
+             n, wf->edge_count, cli_c(CLR_RESET));
 
     size_t *order = (size_t *)AIRY_MALLOC(n * sizeof(size_t));
     unsigned char *ordered = (unsigned char *)AIRY_CALLOC(n, 1);
@@ -164,7 +166,7 @@ void cli_print_plan_list(const taskflow_workflow_t *wf)
             }
         }
         if (pick == (size_t)-1)
-            break; /* cycle or unconstrained remainder: stop ordering */
+            break;
         order[placed++] = pick;
         ordered[pick] = 1;
     }
@@ -175,38 +177,40 @@ void cli_print_plan_list(const taskflow_workflow_t *wf)
         }
     }
 
+    const char *ig = cli_gutter_pad(4);
     for (size_t r = 0; r < n; r++) {
         const taskflow_node_t *nd = &wf->nodes[order[r]];
-        const char *g = cli_gutter_pad(4);
-        /* Whole plan is background trace: node id keeps a cyan accent for
-         * quick scanning, the rest renders dim so the plan cannot compete
-         * with the reply (Claude Code keeps execution detail subtle). */
-        cli_outf("%s%s%2zu.%s %s◇%s %s%s%s %s%s%s %s%s%s",
-               g, cli_c(CLR_DIM), r + 1, cli_c(CLR_RESET), cli_c(CLR_DIM),
-               cli_c(CLR_RESET), cli_c(CLR_CYAN), nd->id, cli_c(CLR_RESET),
-               cli_c(CLR_DIM), nd->task_handler_name ? nd->task_handler_name : "?",
-               cli_c(CLR_RESET), cli_c(CLR_DIM), nd->name[0] ? nd->name : "",
-               cli_c(CLR_RESET));
+        const char *handler = nd->task_handler_name ? nd->task_handler_name : "?";
+        const char *goal = nd->name[0] ? nd->name : "";
 
-        /* incoming deps, best effort */
+        cli_outf("%s%s%s%s %zu. %s%s%s  %s[%s]%s",
+                 ig, cli_c(CLR_DIM), CLI_ICON_TODO, cli_c(CLR_RESET),
+                 r + 1,
+                 cli_c(CLR_RESET), goal, cli_c(CLR_DIM),
+                 handler, cli_c(CLR_RESET));
+
         char deps[128];
-        size_t dlen = (size_t)snprintf(deps, sizeof(deps), "  %s<- dep:%s ", cli_c(CLR_DIM),
-                                       cli_c(CLR_RESET));
-        int first = 1;
+        size_t dlen = 0;
+        int has_dep = 0;
         for (size_t e = 0; e < wf->edge_count; e++) {
             const taskflow_edge_t *ed = &wf->edges[e];
             if (strcmp(ed->target_node_id, nd->id) != 0)
                 continue;
             if (strcmp(ed->source_node_id, nd->id) == 0)
                 continue;
-            if (!first && dlen < sizeof(deps) - 2)
+            if (has_dep && dlen < sizeof(deps) - 2)
                 dlen += (size_t)snprintf(deps + dlen, sizeof(deps) - dlen, ", ");
-            first = 0;
+            if (!has_dep) {
+                dlen = (size_t)snprintf(deps, sizeof(deps), "  %s←%s ",
+                                        cli_c(CLR_DIM), cli_c(CLR_RESET));
+                has_dep = 1;
+            }
             if (dlen < sizeof(deps) - 2)
-                dlen += (size_t)snprintf(deps + dlen, sizeof(deps) - dlen, "%s",
-                                         ed->source_node_id);
+                dlen += (size_t)snprintf(deps + dlen, sizeof(deps) - dlen, "%s%s%s",
+                                         cli_c(CLR_CYAN), ed->source_node_id,
+                                         cli_c(CLR_DIM));
         }
-        cli_outf("%s\n", first ? "" : deps);
+        cli_outf("%s\n", has_dep ? deps : "");
     }
 
     AIRY_FREE(order);

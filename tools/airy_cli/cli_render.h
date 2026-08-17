@@ -46,6 +46,76 @@ extern "C" {
 extern int g_cli_print_mode;
 extern int g_cli_json_mode;
 
+/* ---- reply folding (2026-08-17) ----
+ *
+ * 对话不再暴露工具参数与结果内容，只展示"过程"（动作名）；长回复在
+ * 完成后折叠为前几行 + 折叠尾，避免占屏（Linux 工程哲学：最小输出，
+ * 全量保留在日志/历史中）。 */
+
+/* 一次回复渲染/流式输出的物理行数计量器：供 TTY 折叠（ANSI 上移擦除
+ * 重绘）与流式空回复判定使用。统计"逻辑行数 + 物理行数（含软换行）"，
+ * 通过 cli_out*() 输出挂钩自动累积，ANSI 转义序列不计入宽度。 */
+typedef struct cli_line_meter_s {
+    int active;       /* begin 后为 1，end 清 0 */
+    int done;         /* phys 已结算（残行已 flush） */
+    size_t lines;     /* 逻辑行数（'\n' 计数） */
+    size_t phys_lines;/* 物理行数（软换行感知，TTY 擦除量） */
+    size_t col;       /* 当前行已用列宽 */
+    size_t cols;      /* 终端宽度（0 = 未知，不计算软换行） */
+    char *row;        /* 当前行字节缓冲（UTF-8 宽度结算用） */
+    size_t row_len;
+    size_t row_cap;
+    int in_esc;       /* 处于 ANSI 转义序列中（不计入输出） */
+} cli_line_meter_t;
+
+/**
+ * @brief 开始计量：挂接后续 cli_out*() 输出到 meter，并探测终端宽度。
+ * @param m   meter（调用方持有，begin 前应清零）
+ */
+void cli_render_meter_begin(cli_line_meter_t *m);
+
+/**
+ * @brief 结束计量：解除挂接（后续输出不再计入）。
+ */
+void cli_render_meter_end(cli_line_meter_t *m);
+
+/**
+ * @brief 结算并返回已输出的物理行数（幂等，可多次调用）。
+ *
+ * 残留的末行（无 '\n' 结尾）一并计入，供 TTY 擦除重绘精确计算
+ * 需要上移的行数。
+ */
+size_t cli_render_meter_phys(cli_line_meter_t *m);
+
+/* 长回复折叠阈值与保留行数（交互 TTY / TUI 共用） */
+#define CLI_REPLY_FOLD_MAX 8   /* 逻辑行数超过则折叠 */
+#define CLI_REPLY_FOLD_KEEP 3  /* 折叠后保留的前几行 */
+
+/* 空回复占位（2026-08-17）：模型未产生文本回复（thinking 模型可能
+ * 只输出 reasoning_content，或 provider 异常）时渲染明确提示，避免
+ * 对话中出现"空返回"却无任何说明。 */
+#define CLI_REPLY_EMPTY_HINT "（未产生回复：模型可能仅生成了思考内容，请重试）"
+
+/**
+ * @brief 渲染 super-agent 回复，完成后若行数超阈值则折叠（TTY 专用）。
+ *
+ * 渲染期间计量物理行；超阈值时用 ANSI 上移擦除已输出行，重绘为
+ * 前 CLI_REPLY_FOLD_KEEP 行（markdown 渲染）+ 折叠尾。非 TTY / -p /
+ * TUI 调用方应自行分支（-p 需完整输出；TUI 走折叠区机制）。
+ *
+ * @param content 最终回复（markdown）
+ */
+void cli_render_super_agent_folded(const char *content);
+
+/**
+ * @brief 渲染回复的前 CLI_REPLY_FOLD_KEEP 行 + 折叠尾（无测量/擦除）。
+ *
+ * 供流式完成后的重绘路径使用（调用方已擦除流式预览）：短回复场景
+ * 由调用方走 cli_render_super_agent 全量 markdown；此处只用于超阈值
+ * 的长回复折叠形态。
+ */
+void cli_render_super_agent_truncated(const char *content);
+
 /* Opaque TUI engine handle (full definition in cli_tui.h). */
 struct cli_tui_s;
 
@@ -409,6 +479,21 @@ void cli_spinner_stop(int ok, const char *detail);
  * and a separate completion line would duplicate the output.
  */
 void cli_spinner_cancel(void);
+
+/**
+ * @brief Render a phase indicator line for task execution stages.
+ *
+ * Displays a dim separator with a cyan diamond and the phase label:
+ *
+ *   ◇ 认知规划 ─────────────────────────────
+ *
+ * Provides clear visual hierarchy during multi-phase task execution so the
+ * user can track progression at a glance (Claude Code phase convention).
+ * No-op in -p server mode (stdout stays clean for piping).
+ *
+ * @param label short phase name (e.g. "认知规划", "执行提交", "结果汇总")
+ */
+void cli_render_phase(const char *label);
 
 #ifdef __cplusplus
 }

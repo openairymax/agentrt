@@ -120,6 +120,11 @@ struct cli_tui_s {
     size_t cur_len;
     size_t cur_cap;
 
+    /* 最新回复折叠区（2026-08-17）：live-tail 只显示前 CLI_REPLY_FOLD_KEEP
+     * 行 + 折叠尾，浏览（↑）时展开全量。start = 回复渲染前 hist.count。 */
+    int fold_active;
+    size_t fold_start;
+
     size_t viewport_rows; /* rows usable by the middle viewport */
     size_t scroll_off;    /* history lines scrolled back (0 = live tail) */
 
@@ -602,6 +607,36 @@ void cli_tui_emit_flush(cli_tui_t *t)
     }
 }
 
+size_t cli_tui_hist_count(cli_tui_t *t)
+{
+    return t ? t->hist.count : 0;
+}
+
+void cli_tui_fold_last(cli_tui_t *t, size_t start)
+{
+    if (!t)
+        return;
+    if (start > t->hist.count)
+        start = t->hist.count;
+    if (t->hist.count <= start) {
+        t->fold_active = 0;
+    } else {
+        t->fold_active = 1;
+        t->fold_start = start;
+    }
+    t->dirty = 1;
+}
+
+void cli_tui_fold_clear(cli_tui_t *t)
+{
+    if (!t)
+        return;
+    if (t->fold_active) {
+        t->fold_active = 0;
+        t->dirty = 1;
+    }
+}
+
 void cli_tui_pin_header(cli_tui_t *t)
 {
     if (!t)
@@ -730,10 +765,29 @@ static void tui_render_viewport(cli_tui_t *t)
     size_t total = t->hist.count;
     int have_partial = t->cur && t->cur_len > 0;
 
+    /* 折叠区（仅 live-tail，2026-08-17）：把最新回复折叠为前
+     * CLI_REPLY_FOLD_KEEP 行 + 折叠尾，避免长回复占满视口；
+     * 浏览（scroll_off > 0）显示全量。 */
+    size_t fold_more = 0;
+    int fold_view = 0;
+    if (t->fold_active && t->scroll_off == 0 && t->fold_start >= t->hist.pinned &&
+        t->fold_start < t->hist.count) {
+        size_t span = t->hist.count - t->fold_start;
+        if (span > CLI_REPLY_FOLD_MAX) {
+            fold_more = span - CLI_REPLY_FOLD_KEEP;
+            fold_view = 1;
+        }
+    }
+
     /* Viewport window over the content (history minus header), plus the
      * in-progress partial line (streamed text not yet committed). */
     size_t content = (total > t->hist.pinned ? total - t->hist.pinned : 0) +
                      (have_partial ? 1 : 0);
+    if (fold_view) {
+        /* 折叠视口内容 = 折叠区外行 + keep 行 + 折叠尾 + 残行 */
+        content = (t->fold_start - t->hist.pinned) + CLI_REPLY_FOLD_KEEP + 1 +
+                  (have_partial ? 1 : 0);
+    }
     size_t live = content > rows ? rows : content;
     size_t start = 0;
     if (t->scroll_off > 0) {
@@ -753,15 +807,32 @@ static void tui_render_viewport(cli_tui_t *t)
         tui_write_literal(";1H");
         tui_clear_line();
         size_t rel = start + r;
-        if (rel < content) {
-            if (rel < content - (have_partial ? 1 : 0)) {
-                size_t idx = t->hist.pinned + rel;
-                if (idx < t->hist.count)
-                    fputs(t->hist.lines[idx], stdout);
-            } else if (have_partial) {
-                fputs(t->cur, stdout);
+        if (rel >= content)
+            continue;
+        if (have_partial && rel == content - 1) {
+            fputs(t->cur, stdout);
+            continue;
+        }
+        size_t idx = t->hist.pinned + rel;
+        if (fold_view && idx >= t->fold_start) {
+            size_t in_fold = idx - t->fold_start;
+            if (in_fold >= CLI_REPLY_FOLD_KEEP) {
+                if (in_fold == CLI_REPLY_FOLD_KEEP) {
+                    /* 折叠尾（保留行之后的一行） */
+                    char fb[128];
+                    int fn = snprintf(fb, sizeof(fb), "  %s … %zu more lines · ↑ 浏览展开",
+                                      CLI_ICON_BRANCH, fold_more);
+                    if (fn > 0) {
+                        fputs(cli_c(CLR_DIM), stdout);
+                        fputs(fb, stdout);
+                        fputs(cli_c(CLR_RESET), stdout);
+                    }
+                }
+                continue; /* 折叠区其余行留空（避免占屏） */
             }
         }
+        if (idx < t->hist.count)
+            fputs(t->hist.lines[idx], stdout);
     }
 }
 
@@ -1797,7 +1868,13 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
         }
         switch (key) {
         case TUI_KEY_UP:
-            if (t->input_len > 0 || t->cmd_hist.count > 0) {
+            if (t->fold_active && t->scroll_off == 0 && t->input_len == 0) {
+                /* 折叠区激活（2026-08-17）：空输入行时 ↑ 优先滚动视口，
+                 * 展开最新回复的全量文本（折叠尾提示"↑ 浏览展开"）。
+                 * 一旦开始输入，↑ 回到 readline 命令历史浏览惯例。 */
+                t->scroll_off++;
+                cli_tui_redraw(t);
+            } else if (t->input_len > 0 || t->cmd_hist.count > 0) {
                 /* With typed text: browse the submitted-command history
                  * (readline Up convention). Preserve the in-progress draft
                  * so Down returns to it. */

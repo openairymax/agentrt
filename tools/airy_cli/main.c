@@ -265,6 +265,30 @@ int main(int argc, char *argv[])
         if (cli_tui_active(tui))
             cli_render_set_tui(tui);
     }
+
+    /* 交互全屏 TUI：把进程 stderr 重定向到日志文件（$AIRY_HOME/logs/
+     * airy_cli.log）。daemon RPC 层在 llm_d 离线等故障时会向 stderr 打印
+     * ERROR（如 C-L02 / rpc_connect_unix），直接泄漏会破坏全屏界面；
+     * 落盘保留完整诊断。-p 管道模式不重定向（stderr 承载 trace 诊断，
+     * 供脚本消费，见 cli_trace）。Windows 无全屏 TUI（active 恒 false），
+     * 且 dup2/fileno 为 POSIX 接口，整体跳过。 */
+#ifndef _WIN32
+    if (tui && cli_tui_active(tui)) {
+        const char *home = getenv("AIRY_HOME");
+        char logpath[512];
+        if (home && home[0]) {
+            snprintf(logpath, sizeof(logpath), "%s/logs/airy_cli.log", home);
+        } else {
+            snprintf(logpath, sizeof(logpath), "airy_cli.log");
+        }
+        FILE *lf = fopen(logpath, "a");
+        if (lf) {
+            fflush(stderr);
+            dup2(fileno(lf), STDERR_FILENO);
+            fclose(lf);
+        }
+    }
+#endif
     g_session_start_ms = cli_now_ms();
 
     /* Dual-thinking three-model injection (GRAD separation of powers; user-chosen models):
@@ -742,6 +766,8 @@ int main(int argc, char *argv[])
         }
 
         g_cli_cancel = 0;
+
+        cli_render_phase("认知规划");
         airy_task_plan_t *plan = NULL;
         const char *think_sock = getenv("AIRY_THINK_SOCK");
         if (think_sock && think_sock[0]) {
@@ -774,14 +800,9 @@ int main(int argc, char *argv[])
           * so later "continue/next" hits L1 (zero-token progress). Failure only degrades. */
         if (rsched)
             airy_roadmap_sched_absorb(rsched, plan, NULL, NULL);
-        {
-            char line[256];
-            snprintf(line, sizeof(line), "Plan generated: plan_id=%s nodes=%zu entry=%zu",
-                     plan->task_plan_id ? plan->task_plan_id : "?", plan->task_plan_node_count,
-                     plan->task_plan_entry_count);
-            cli_render_sub_agent_line(CLI_ROLE_TRACE, "cognition", line);
-            cli_trace("plan", "%s", line);
-        }
+        cli_trace("plan", "plan_id=%s nodes=%zu entry=%zu",
+                  plan->task_plan_id ? plan->task_plan_id : "?",
+                  plan->task_plan_node_count, plan->task_plan_entry_count);
         /* 阶段 4：计划生成 → 决策链 COMMAND 事件（preflight，cognition；plan_id
          * 供提交事件关联，exec 链与 preflight 链由此可追溯） */
         if (g_cli_hall_store && plan && plan->task_plan_id) {
@@ -824,7 +845,6 @@ int main(int argc, char *argv[])
             continue;
         }
         {
-            char line[384];
             char hdrs[256] = "";
             size_t ho = 0;
             for (size_t ni = 0; ni < wf->node_count && ho < sizeof(hdrs) - 2; ni++) {
@@ -834,17 +854,17 @@ int main(int argc, char *argv[])
                                            ? wf->nodes[ni].task_handler_name
                                            : "?");
             }
-            snprintf(line, sizeof(line), "Workflow adapted: id=%s nodes=%zu edges=%zu [%s]", wf->id,
-                     wf->node_count, wf->edge_count, hdrs);
-            cli_render_sub_agent_line(CLI_ROLE_TRACE, "DAG", line);
-            cli_trace("dag", "%s", line);
+            cli_trace("dag", "id=%s nodes=%zu edges=%zu [%s]", wf->id,
+                      wf->node_count, wf->edge_count, hdrs);
         }
 
+        cli_render_phase("执行计划");
         cli_print_plan_list(wf);
 
         /* 4.3 Submit execution (with AIRY_SCHED_SOCK set, use remote sched_d blueprint DAG;
           * otherwise submit to the embedded work hall. input is the raw task text for agents;
           * if omitted, the first node handler gets empty input and produces boilerplate) */
+        cli_render_phase("执行提交");
         char *exec_id = NULL;
         const char *sched_sock = getenv("AIRY_SCHED_SOCK");
         int sched_remote = (sched_sock && sched_sock[0]) ? 1 : 0;
@@ -865,10 +885,7 @@ int main(int argc, char *argv[])
                 exec_id = NULL;
                 sched_remote = 0;
             } else {
-                char line[256];
-                snprintf(line, sizeof(line), "Submitted: dag=%s", exec_id);
-                cli_render_sub_agent_line(CLI_ROLE_TRACE, "sched_d", line);
-                cli_trace("submit", "%s %s", CLI_ICON_DIAMOND, line);
+                cli_trace("submit", "%s dag=%s", CLI_ICON_DIAMOND, exec_id);
                 cli_chain_record_submit(exec_id, plan, wf);
             }
         }
@@ -884,13 +901,8 @@ int main(int argc, char *argv[])
                 airy_task_plan_free(plan);
                 continue;
             }
-            {
-                char line[256];
-                snprintf(line, sizeof(line), "Submitted: exec=%s", exec_id);
-                cli_render_sub_agent_line(CLI_ROLE_TRACE, "hall", line);
-                cli_trace("submit", "%s %s", CLI_ICON_DIAMOND, line);
-                cli_chain_record_submit(exec_id, plan, wf);
-            }
+            cli_trace("submit", "%s exec=%s", CLI_ICON_DIAMOND, exec_id);
+            cli_chain_record_submit(exec_id, plan, wf);
         }
 
         /* 4.4 Board polling
@@ -1103,6 +1115,7 @@ int main(int argc, char *argv[])
                                       "Task aborted (stopped after the current node).");
             cli_trace("result", "%s canceled", CLI_ICON_CROSS);
         } else if (err == AIRY_EOK && result) {
+            cli_render_phase("结果汇总");
             if (g_cli_json_mode) {
 #ifdef AIRY_HAS_CJSON
                 cJSON *jroot = cJSON_CreateObject();
@@ -1172,12 +1185,21 @@ int main(int argc, char *argv[])
             __builtin_memset(&rmeta, 0, sizeof(rmeta));
             rmeta.node_id = input;
             rmeta.output_json = result;
-            if (task_succeeded) {
-                rmeta.result = AIRY_RS_RESULT_SUCCESS;
-                rmeta.verify = AIRY_RS_VERIFY_PASS;
-            } else {
-                rmeta.result = AIRY_RS_RESULT_NORMAL_FAIL;
-                rmeta.verify = AIRY_RS_VERIFY_FAIL;
+            /* 复核 verdict 感知（2026-08-17 缓存污染修复）：DRIFT/REJECT
+             * 的执行即使 status=completed 也不得缓存为 PASS——复核否决的
+             * 产物入 L2 会作为"已验证成功"的记忆污染后续相似任务。
+             * work_hall 已在 wait 返回前把 verdict 记录到 board entry。 */
+            {
+                const char *rv = hall ? airy_work_hall_entry_verdict(hall, exec_id) : "";
+                int review_rejected =
+                    (strcmp(rv, "DRIFT") == 0 || strcmp(rv, "REJECT") == 0);
+                if (task_succeeded && !review_rejected) {
+                    rmeta.result = AIRY_RS_RESULT_SUCCESS;
+                    rmeta.verify = AIRY_RS_VERIFY_PASS;
+                } else {
+                    rmeta.result = AIRY_RS_RESULT_NORMAL_FAIL;
+                    rmeta.verify = AIRY_RS_VERIFY_FAIL;
+                }
             }
             airy_roadmap_sched_absorb(rsched, NULL, exec_id, &rmeta);
         }

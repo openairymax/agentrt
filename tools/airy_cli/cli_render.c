@@ -58,10 +58,111 @@ void cli_out(const char *s)
     cli_outn(s, strlen(s));
 }
 
+/* ---- reply folding meter (2026-08-17) ----
+ *
+ * 计量器挂接在 cli_out*() 输出路径上：begin 之后所有渲染输出（含
+ * markdown 拆行）逐字节喂入 meter，得到精确的逻辑/物理行数，供 TTY
+ * 折叠擦除重绘与流式空回复判定。ANSI 转义序列（颜色等）被跳过，不
+ * 计入宽度。 */
+
+static cli_line_meter_t *g_active_meter;
+
+static void cli_meter_feed(cli_line_meter_t *m, const char *s, size_t n)
+{
+    if (!m)
+        return;
+    for (size_t i = 0; i < n; i++) {
+        unsigned char c = (unsigned char)s[i];
+        if (c == 0x1B) { /* ANSI escape: skip until a letter terminator */
+            m->in_esc = 1;
+            continue;
+        }
+        if (m->in_esc) {
+            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))
+                m->in_esc = 0;
+            continue;
+        }
+        if (c == '\n') {
+            /* settle the current row: soft-wrap = floor(width / cols) extra */
+            if (m->cols > 0 && m->row_len > 0) {
+                size_t w = cli_disp_width(m->row);
+                if (w > m->cols)
+                    m->phys_lines += (w - 1) / m->cols;
+            }
+            m->phys_lines += 1;
+            m->lines += 1;
+            m->row_len = 0;
+            continue;
+        }
+        if (c == '\r') {
+            m->row_len = 0;
+            continue;
+        }
+        if (c < 0x20)
+            continue; /* other control chars never appear in rendered text */
+        /* accumulate the row; width settled on '\n' / phys() */
+        if (m->row_len + 1 >= m->row_cap) {
+            size_t new_cap = m->row_cap ? m->row_cap * 2 : 256;
+            char *grown = (char *)AIRY_REALLOC(m->row, new_cap);
+            if (!grown)
+                continue;
+            m->row = grown;
+            m->row_cap = new_cap;
+        }
+        m->row[m->row_len++] = (char)c;
+        m->row[m->row_len] = '\0';
+    }
+}
+
+void cli_render_meter_begin(cli_line_meter_t *m)
+{
+    if (!m)
+        return;
+    AIRY_MEMSET(m, 0, sizeof(*m));
+    int rows = 0, cols = 0;
+    cli_term_size(&rows, &cols);
+    m->cols = cols > 0 ? (size_t)cols : 0;
+    m->active = 1;
+    g_active_meter = m;
+}
+
+void cli_render_meter_end(cli_line_meter_t *m)
+{
+    if (!m)
+        return;
+    if (g_active_meter == m)
+        g_active_meter = NULL;
+    m->active = 0;
+    AIRY_FREE(m->row);
+    m->row = NULL;
+    m->row_len = 0;
+    m->row_cap = 0;
+}
+
+size_t cli_render_meter_phys(cli_line_meter_t *m)
+{
+    if (!m)
+        return 0;
+    if (!m->done) {
+        /* settle the trailing partial row (no '\n' at end) */
+        if (m->cols > 0 && m->row_len > 0) {
+            size_t w = cli_disp_width(m->row);
+            if (w > m->cols)
+                m->phys_lines += (w - 1) / m->cols;
+        }
+        if (m->row_len > 0)
+            m->phys_lines += 1;
+        m->done = 1;
+    }
+    return m->phys_lines;
+}
+
 void cli_outn(const char *s, size_t n)
 {
     if (!s || n == 0)
         return;
+    if (g_active_meter)
+        cli_meter_feed(g_active_meter, s, n);
     if (g_cli_tui && cli_tui_active(g_cli_tui))
         cli_tui_emit(g_cli_tui, s, n);
     else
@@ -70,6 +171,8 @@ void cli_outn(const char *s, size_t n)
 
 void cli_outc(char c)
 {
+    if (g_active_meter)
+        cli_meter_feed(g_active_meter, &c, 1);
     if (g_cli_tui && cli_tui_active(g_cli_tui))
         cli_tui_emit(g_cli_tui, &c, 1);
     else
@@ -804,6 +907,78 @@ void cli_render_super_agent_begin(void)
     cli_pad_role_header(hdr);
 }
 
+/* 截取文本前 max_lines 行（按 '\n' 分割；保留行内内容），供折叠重绘。 */
+static size_t cli_take_first_lines(const char *text, size_t max_lines, char *out,
+                                   size_t cap)
+{
+    if (!out || cap == 0)
+        return 0;
+    size_t o = 0, lines = 0;
+    const char *p = text ? text : "";
+    while (*p && lines < max_lines && o + 1 < cap) {
+        if (*p == '\n') {
+            lines++;
+            if (o + 1 < cap)
+                out[o++] = '\n';
+            p++;
+            continue;
+        }
+        out[o++] = *p++;
+    }
+    if (o == 0)
+        out[o++] = '\0';
+    else
+        out[o] = '\0';
+    return o;
+}
+
+void cli_render_super_agent_truncated(const char *content)
+{
+    const char *src = content ? content : "";
+    char keep_buf[8192];
+    cli_take_first_lines(src, CLI_REPLY_FOLD_KEEP, keep_buf, sizeof(keep_buf));
+    cli_render_super_agent(keep_buf);
+
+    /* 折叠尾行数 = 原文逻辑行数 - KEEP（渲染形态与原文行数可能有细微
+     * 差异，尾数近似即可——只影响折叠提示文案）。 */
+    size_t total_lines = 0;
+    for (const char *p = src; *p; p++) {
+        if (*p == '\n')
+            total_lines++;
+    }
+    total_lines++; /* 末行 */
+    if (total_lines > CLI_REPLY_FOLD_KEEP)
+        cli_render_stream_fold_trailer(total_lines - CLI_REPLY_FOLD_KEEP);
+}
+
+void cli_render_super_agent_folded(const char *content)
+{
+    /* 折叠依赖 ANSI 上移擦除：仅交互 TTY 可用；-p（管道）与 TUI 由
+     * 调用方自行分支（-p 完整输出、TUI 折叠区）。 */
+    if (!cli_term_is_tty())
+        return;
+
+    cli_line_meter_t m;
+    AIRY_MEMSET(&m, 0, sizeof(m));
+    cli_render_meter_begin(&m);
+    cli_render_super_agent(content ? content : "");
+    size_t lines = m.lines;
+    size_t phys = cli_render_meter_phys(&m);
+    cli_render_meter_end(&m);
+
+    if (lines <= CLI_REPLY_FOLD_MAX)
+        return; /* 短回复：已完整渲染，无需折叠 */
+
+    /* 长回复：上移擦除已渲染的物理行，重绘为前 KEEP 行 + 折叠尾。
+     * 全量文本保留在日志/消息历史中（full text in logs 约定）。 */
+    char erase[32];
+    int en = snprintf(erase, sizeof(erase), "\033[%zuA\033[J", phys);
+    if (en > 0)
+        fwrite(erase, 1, (size_t)en, stdout);
+
+    cli_render_super_agent_truncated(content ? content : "");
+}
+
 void cli_render_stream_fold_trailer(size_t more_lines)
 {
     if (more_lines == 0)
@@ -897,51 +1072,56 @@ void cli_render_sub_agent(const char *tag, const char *content)
     cli_render_sub_agent_line(CLI_ROLE_SUB_AGENT, tag, content);
 }
 
-/* ---- tool invocation / result (Claude Code tool-use cards) ---- */
+/* ---- tool invocation / result (process-only, Claude Code tool-use) ---- */
 
-/* Trim args to a single displayable line (collapse newlines to spaces,
- * cap the length) so a tool card never wraps the viewport. */
-static void cli_tool_args_preview(const char *args, char *out, size_t cap)
+/* 动作短语映射：对话只展示"正在做什么"（过程），不暴露工具参数与
+ * 返回内容（代码/URL/文件内容等操作细节保留在日志与模型上下文里）。 */
+static const char *cli_tool_action(const char *name)
 {
-    if (!out || cap == 0)
-        return;
-    size_t o = 0;
-    for (const char *p = args ? args : ""; *p && o + 2 < cap; p++) {
-        if (*p == '\n' || *p == '\r' || *p == '\t')
-            out[o++] = ' ';
-        else if ((unsigned char)*p >= 0x20)
-            out[o++] = *p;
+    static const struct {
+        const char *tool;
+        const char *action;
+    } map[] = {
+        {"web_search", "搜索网络"},
+        {"web_fetch", "抓取网页"},
+        {"fs_read", "读取文件"},
+        {"fs_write", "写入文件"},
+        {"fs_list", "列出目录"},
+        {"fs_ls", "列出目录"},
+        {"fs_info", "查看文件信息"},
+        {"fs_mkdir", "创建目录"},
+        {"fs_rm", "删除文件"},
+        {"agent.spawn", "派生智能体"},
+        {"agent.invoke", "调用智能体"},
+        {"think.depth", "深度思考"},
+        {"memory.get", "读取记忆"},
+        {"memory.put", "写入记忆"},
+    };
+    for (size_t i = 0; i < sizeof(map) / sizeof(map[0]); i++) {
+        if (strcmp(name, map[i].tool) == 0)
+            return map[i].action;
     }
-    if (o > 0 && out[o - 1] == ' ')
-        o--;
-    out[o] = '\0';
+    return name; /* 未知工具保留原名（过程性名词，非参数） */
 }
 
 void cli_render_tool_use(const char *name, const char *args)
 {
+    (void)args; /* 参数不进对话：只展示过程（2026-08-17） */
     if (!name)
         return;
-    char preview[384];
-    cli_tool_args_preview(args, preview, sizeof(preview));
+    const char *action = cli_tool_action(name);
 
     if (g_cli_print_mode) {
         /* One-shot server mode (-p): tool progress goes to stderr so stdout
-         * stays a pure, pipeable reply (Claude Code -p convention). The
-         * same ⛏ icon renders the live chain in the terminal. */
+         * stays a pure, pipeable reply. */
         fputs(cli_c(CLR_MAGENTA), stderr);
         fputs(CLI_ICON_TOOL, stderr);
         fputs(" ", stderr);
         fputs(cli_c(CLR_RESET), stderr);
         fputs(cli_c(CLR_CYAN), stderr);
-        fputs(name, stderr);
+        fputs(action, stderr);
         fputs(cli_c(CLR_RESET), stderr);
-        if (preview[0]) {
-            fputs(cli_c(CLR_DIM), stderr);
-            fputs(" ", stderr);
-            fputs(preview, stderr);
-            fputs(cli_c(CLR_RESET), stderr);
-        }
-        fputc('\n', stderr);
+        fputs("…\n", stderr);
         return;
     }
 
@@ -952,11 +1132,10 @@ void cli_render_tool_use(const char *name, const char *args)
     cli_out(" ");
     cli_out(cli_c(CLR_RESET));
     cli_out(cli_c(CLR_CYAN));
-    cli_out(name);
+    cli_out(action);
     cli_out(cli_c(CLR_RESET));
     cli_out(cli_c(CLR_DIM));
-    cli_out(" ");
-    cli_out(preview);
+    cli_out("…");
     cli_out(cli_c(CLR_RESET));
     cli_outc('\n');
 }
@@ -965,76 +1144,62 @@ void cli_render_tool_result(const char *name, const char *text, int ok)
 {
     if (!name)
         return;
+    const char *action = cli_tool_action(name);
+
+    /* 首行错误摘要（失败时附于结果行末尾） */
+    char err[128];
+    err[0] = '\0';
+    if (!ok && text && text[0]) {
+        size_t o = 0;
+        for (const char *p = text; *p && o + 1 < sizeof(err); p++) {
+            if (*p == '\n' || *p == '\r')
+                break;
+            err[o++] = *p;
+        }
+        err[o] = '\0';
+    }
 
     if (g_cli_print_mode) {
-        /* One-shot server mode (-p): one ✓/✗ status line per tool on stderr;
-         * the folded detail stays out of stdout (pipeable reply). 失败时附
-         * 错误摘要，让无 TTY 场景也能诊断工具失败原因（2026-08-16）。 */
+        /* -p: stderr 一行 ✓/✗ + 动作 + 可选错误 */
         fputs(cli_c(ok ? CLR_GREEN : CLR_RED), stderr);
         fputs(ok ? CLI_ICON_CHECK : CLI_ICON_CROSS, stderr);
         fputs(cli_c(CLR_RESET), stderr);
         fputs(" ", stderr);
         fputs(cli_c(CLR_CYAN), stderr);
-        fputs(name, stderr);
+        fputs(action, stderr);
         fputs(cli_c(CLR_RESET), stderr);
-        if (!ok && text && text[0]) {
+        if (err[0]) {
             fputs(" — ", stderr);
-            fputs(text, stderr);
+            fputs(err, stderr);
         }
         fputc('\n', stderr);
         return;
     }
 
-    char hdr[CLI_ROLE_HDR_W + 1];
-    const char *t = (strcmp(name, "web_fetch") == 0) ? "fetch" : "search";
-    size_t tag_budget = CLI_ROLE_HDR_W > 12 ? (CLI_ROLE_HDR_W - 12) : 0;
-    size_t tag_show = strlen(t);
-    if (tag_show > tag_budget)
-        tag_show = tag_budget;
-    snprintf(hdr, sizeof(hdr), "[Sub %.*s Agent]", (int)tag_show, t);
-
-    /* Fold the result to its first line (Claude Code folds tool output;
-     * the full text is already carried back to the model as context). */
-    char summary[320];
-    const char *src = (text && text[0]) ? text : (ok ? "(empty)" : "(no error detail)");
-    size_t o = 0;
-    for (const char *p = src; *p && o + 2 < sizeof(summary); p++) {
-        if (*p == '\n') {
-            summary[o++] = ' ';
-            if (p[1] == '\0' || p[1] == '\n')
-                break;
-        } else if ((unsigned char)*p >= 0x20) {
-            summary[o++] = *p;
-        }
-    }
-    if (o <= sizeof(summary) - 3) {
-        /* "…" 多字节字符：显式 UTF-8 字节序列（避免 multichar 常量）。 */
-        summary[o++] = (char)0xE2;
-        summary[o++] = (char)0x80;
-        summary[o++] = (char)0xA6;
-    }
-    summary[o] = '\0';
-
+    /* 交互 TTY：与工具调用卡片对齐的简洁结果行
+     *   ✓ 搜索完成
+     *   ✗ 抓取 — 连接超时
+     * 不暴露内部角色名（[Sub xxx Agent]）或工具参数。 */
     const char *g = cli_gutter(2);
-    const char *col = ok ? cli_render_role_color(CLI_ROLE_SUB_AGENT) : cli_c(CLR_RED);
     cli_out(g);
-    cli_out(col);
-    cli_out(hdr);
-    cli_out(cli_c(CLR_RESET));
-    cli_pad_role_header(hdr);
     cli_out(ok ? cli_c(CLR_GREEN) : cli_c(CLR_RED));
     cli_out(ok ? CLI_ICON_CHECK : CLI_ICON_CROSS);
     cli_out(" ");
-    cli_out(cli_c(CLR_RESET));
     cli_out(cli_c(CLR_CYAN));
-    cli_out(name);
+    cli_out(action);
     cli_out(cli_c(CLR_RESET));
-    cli_out(cli_c(CLR_DIM));
-    cli_out(" — ");
-    cli_out(cli_c(CLR_RESET));
-    cli_out(cli_c(ok ? CLR_DIM : CLR_RED));
-    cli_out(summary);
-    cli_out(cli_c(CLR_RESET));
+    if (err[0]) {
+        cli_out(cli_c(CLR_DIM));
+        cli_out(" — ");
+        cli_out(cli_c(CLR_RESET));
+        cli_out(cli_c(CLR_RED));
+        cli_out(err);
+        cli_out(cli_c(CLR_RESET));
+    } else {
+        cli_out(ok ? cli_c(CLR_DIM) : cli_c(CLR_RESET));
+        cli_out(ok ? " 完成" : "");
+        cli_out(cli_c(CLR_RESET));
+    }
     cli_outc('\n');
 }
 
@@ -1046,27 +1211,45 @@ void cli_render_turn_separator(uint64_t elapsed_ms, const char *metrics)
     uint64_t secs = elapsed_ms / 1000;
     char label[128];
     if (secs < 1)
-        snprintf(label, sizeof(label), "Worked");
+        snprintf(label, sizeof(label), "完成");
     else if (secs < 60)
-        snprintf(label, sizeof(label), "Worked for %llus", (unsigned long long)secs);
+        snprintf(label, sizeof(label), "耗时 %llus", (unsigned long long)secs);
     else
-        snprintf(label, sizeof(label), "Worked for %llum %02llus", (unsigned long long)(secs / 60),
-                 (unsigned long long)(secs % 60));
+        snprintf(label, sizeof(label), "耗时 %llum %02llus",
+                 (unsigned long long)(secs / 60), (unsigned long long)(secs % 60));
+
+    int rows = 0, cols = 0;
+    cli_term_size(&rows, &cols);
+    size_t label_len = strlen(label);
+    size_t metrics_len = (metrics && metrics[0]) ? strlen(metrics) + 3 : 0; /* " · " + metrics */
+    size_t center = label_len + metrics_len + 2; /* 2 spaces padding */
+    size_t ccols = (size_t)(cols > 0 ? cols : 80);
+    size_t dash_total = ccols > center + 6 ? ccols - center - 6 : 10;
+    size_t dash_left = dash_total / 2;
+    size_t dash_right = dash_total - dash_left;
+    if (dash_left > 40)
+        dash_left = 40;
+    if (dash_right > 40)
+        dash_right = 40;
 
     const char *g = cli_gutter(2);
     cli_out(g);
     cli_out(cli_c(CLR_DIM));
-    cli_out("──────────────── ");
+    for (size_t i = 0; i < dash_left; i++)
+        cli_out("─");
+    cli_out(" ");
     cli_out(cli_c(CLR_RESET));
     cli_out(label);
     if (metrics && metrics[0]) {
         cli_out(cli_c(CLR_DIM));
         cli_out(" · ");
-        cli_out(metrics);
         cli_out(cli_c(CLR_RESET));
+        cli_out(metrics);
     }
     cli_out(cli_c(CLR_DIM));
-    cli_out(" ─────────────────");
+    cli_out(" ");
+    for (size_t i = 0; i < dash_right; i++)
+        cli_out("─");
     cli_out(cli_c(CLR_RESET));
     cli_outc('\n');
 }
@@ -1386,4 +1569,27 @@ void cli_spinner_cancel(void)
         return;
     cli_spinner_erase();
     AIRY_MEMSET(&g_spinner, 0, sizeof(g_spinner));
+}
+
+/* ---- 阶段指示器（task execution phase headers） ---- */
+
+void cli_render_phase(const char *label)
+{
+    if (!label || !label[0] || g_cli_print_mode)
+        return;
+    const char *g = cli_gutter(2);
+    cli_outf("\n%s%s%s %s%s%s %s",
+             g, cli_c(CLR_CYAN), CLI_ICON_DIAMOND,
+             cli_c(CLR_CYAN), label, cli_c(CLR_RESET),
+             cli_c(CLR_DIM));
+    int rows = 0, cols = 0;
+    cli_term_size(&rows, &cols);
+    size_t used = 4 + 2 + strlen(label);
+    size_t ccols = (size_t)(cols > 0 ? cols : 80);
+    size_t dash = ccols > used + 4 ? ccols - used - 4 : 20;
+    if (dash > 50)
+        dash = 50;
+    for (size_t i = 0; i < dash; i++)
+        cli_out("─");
+    cli_outf("%s\n", cli_c(CLR_RESET));
 }

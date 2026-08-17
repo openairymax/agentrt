@@ -680,7 +680,9 @@ static int cli_chat_tool_round(cli_chat_msgbuf_t *b, const llm_response_t *resp)
         if (!name)
             name = "unknown";
 
-        /* 工具调用卡片：⛏ web_search(...)（Claude Code tool-use 范式） */
+        /* 工具调用过程卡片：⚙ 动作名…（参数/返回内容不暴露在对话中；
+         * 操作细节经 cli_trace 留档供 -p 管道与日志诊断）。 */
+        cli_trace("chat", "tool call %s args=%.160s", name, args ? args : "{}");
         cli_render_tool_use(name, args);
 
         int ok = 0;
@@ -874,6 +876,12 @@ int cli_classify_input(const char *input)
 static char s_code_carry[8];
 static size_t s_code_carry_len = 0;
 
+/* 交互 TTY 流式折叠状态（2026-08-17）：流式预览直出后记录其逻辑/
+ * 物理行数，完成后擦除预览并按需折叠重绘。仅最终轮有意义（工具轮
+ * 的预览保留为过程展示，不擦除）。 */
+static size_t g_chat_fold_lines = 0;
+static size_t g_chat_fold_phys = 0;
+
 static void cli_stream_norm_emit(const char *s, size_t n)
 {
     for (size_t i = 0; i < n; i++)
@@ -969,17 +977,16 @@ void cli_chat_reply(const char *input)
 
     /* Decision B (2026-08-09): config reminder - t1-f (B model) activates first.
       * If unset, hint the three config points and order without blocking (provider default).
-      * The hint prints once per session only: repeating it on every turn floods the
-      * conversation with the same advisory line (Claude Code keeps such setup hints
-      * out of the chat column entirely). */
+      * The hint prints once per session only. 2026-08-17: 改为 cli_trace 输出
+      * （日志/stderr），不再渲染进对话列——配置提示是内部运维信息，出现在
+      * 会话正文会污染对话（用户要求对话只展示过程，不暴露内部细节）。 */
     static int s_t1f_hint_shown = 0;
-    if (!g_cli_print_mode && !s_t1f_hint_shown && (!t1f_model || !t1f_model[0])) {
+    if (!s_t1f_hint_shown && (!t1f_model || !t1f_model[0])) {
         s_t1f_hint_shown = 1;
-        cli_render_role_line(
-            CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "config",
-            "t1-f (B model) not configured; set AIRY_MODEL_T1F (local Ollama/vLLM or "
-            "cloud API), then AIRY_MODEL_T2 (A) and AIRY_MODEL_T1P (C) as needed. "
-            "Chat will use the llm_d default model for now.");
+        cli_trace("config",
+                  "t1-f (B model) not configured; set AIRY_MODEL_T1F (local Ollama/vLLM or "
+                  "cloud API), then AIRY_MODEL_T2 (A) and AIRY_MODEL_T1P (C) as needed. "
+                  "Chat will use the llm_d default model for now.");
     }
 
 #ifdef AIRY_HAS_CJSON
@@ -992,8 +999,15 @@ void cli_chat_reply(const char *input)
         cli_msgbuf_push(&buf, g_history_roles[hi], g_history_contents[hi], NULL, NULL, NULL);
     cli_msgbuf_push(&buf, "user", input, NULL, NULL, NULL);
 
-    /* 交互模式的"思考中"状态行（spinner；-p/--json 抑制 chrome）。 */
-    int spinner_on = !g_cli_print_mode && !g_cli_json_mode;
+    /* 交互 TTY 与 -p 走流式（打字机预览，完成后折叠/重绘最终形态）；
+     * TUI 与 --json 保持非流式（markdown 完整渲染进历史 / 结构化输出）。
+     * 交互流式不再使用 spinner——打字机即进度指示。 */
+    cli_tui_t *tui = cli_tui_get_default();
+    int tui_active = tui && cli_tui_active(tui);
+    int stream_mode = !g_cli_json_mode && !tui_active;
+
+    /* 交互模式的"思考中"状态行（spinner；流式/-p/--json 抑制 chrome）。 */
+    int spinner_on = !g_cli_print_mode && !g_cli_json_mode && !stream_mode;
     if (spinner_on) {
         char think_title[128];
         snprintf(think_title, sizeof(think_title), "Thinking (%s)",
@@ -1001,14 +1015,13 @@ void cli_chat_reply(const char *input)
         cli_spinner_start(think_title);
     }
 
-    /* 工具回路：-p 模式走 complete_stream（增量文本实时直出，tool_calls
-     * 经控制帧暴露）；交互模式仍走非流式 complete（spinner + markdown）。
-     * 模型返回 tool_calls → 渲染卡片 + 执行 + 回填 → 续轮；
+    /* 工具回路：流式模式走 complete_stream（增量文本实时直出，tool_calls
+     * 经控制帧暴露）；TUI/--json 走非流式 complete（markdown / 结构化）。
+     * 模型返回 tool_calls → 渲染过程卡片 + 执行 + 回填 → 续轮；
      * 不再调用工具 → final_resp 即最终回复。护栏：轮次上限。 */
     llm_response_t *final_resp = NULL;
     int tool_rounds = 0;
     int force_summary = 0; /* 工具轮次用尽：撤下工具定义，强制基于已有结果总结 */
-    int stream_mode = g_cli_print_mode && !g_cli_json_mode;
     for (;;) {
         llm_request_config_t cfg;
         __builtin_memset(&cfg, 0, sizeof(cfg));
@@ -1023,11 +1036,23 @@ void cli_chat_reply(const char *input)
         llm_response_t *resp = NULL;
         int ret;
         if (stream_mode) {
-            ret = llm_svc_adapter_complete_stream(g_chat_adapter, &cfg, cli_chat_stream_cb, NULL,
-                                                  &resp);
+            /* 交互 TTY 流式：计量本轮直出预览的行数，完成后擦除重绘
+             * 最终形态（短回复 markdown 精修 / 长回复折叠）。-p 流式
+             * 直出供管道消费，不计量不重绘。 */
+            cli_line_meter_t meter;
+            int folding = !g_cli_print_mode;
+            if (folding)
+                cli_render_meter_begin(&meter);
+            ret = llm_svc_adapter_complete_stream(g_chat_adapter, &cfg,
+                                                  cli_chat_stream_cb, NULL, &resp);
             /* 流式收尾：flush 可能残留的 [code] 前缀 carry（流提前结束时
              * 最后一片未触达标签判定的字节）。 */
             cli_stream_norm_flush_carry();
+            if (folding) {
+                g_chat_fold_lines = meter.lines;
+                g_chat_fold_phys = cli_render_meter_phys(&meter);
+                cli_render_meter_end(&meter);
+            }
         } else {
             ret = llm_svc_adapter_complete(g_chat_adapter, &cfg, &resp);
         }
@@ -1132,8 +1157,9 @@ void cli_chat_reply(const char *input)
 
     /* 最终回复渲染：
      *   --json  结构化 JSON（Codex exec 约定）
-     *   -p      纯文本（Claude Code -p / Codex exec 约定）
-     *   交互    markdown 完整渲染（角色行 [Super Agent]） */
+     *   -p      纯文本（Claude Code -p / Codex exec 约定；流式已直出）
+     *   交互    TTY 流式：擦除预览后 markdown 精修 / 长回复折叠；
+     *           TUI/非流式：markdown 渲染 + 折叠区（浏览展开） */
     if (g_cli_json_mode) {
 #ifdef AIRY_HAS_CJSON
         cJSON *root = cJSON_CreateObject();
@@ -1158,11 +1184,49 @@ void cli_chat_reply(const char *input)
         cli_outf("}\n");
 #endif /* AIRY_HAS_CJSON */
     } else if (g_cli_print_mode) {
-        /* 流式模式：final_content 已随块实时直出，不再重复打印。 */
+        /* 流式模式：final_content 已随块实时直出，不再重复打印。
+         * 空返回诊断（2026-08-17）：流式未输出任何字节且模型无文本
+         * 回复（thinking 模型可能只产生 reasoning_content）→ stderr
+         * 明确告警，stdout 保持空串可解析（脚本不被打断）。 */
         if (!stream_mode)
             cli_outf("%s\n", final_content);
+        else if (final_content[0] == '\0' && g_chat_fold_phys == 0)
+            fprintf(stderr,
+                    "[chat] warning: empty reply (model returned no text; "
+                    "reasoning-only or provider error)\n");
     } else {
-        cli_render_super_agent(final_content);
+        cli_tui_t *r_tui = cli_tui_get_default();
+        int r_tui_active = r_tui && cli_tui_active(r_tui);
+        if (stream_mode) {
+            /* 交互 TTY 流式：擦除打字机预览，重绘最终形态。 */
+            if (g_chat_fold_phys > 0 && cli_term_is_tty()) {
+                char erase[32];
+                int en = snprintf(erase, sizeof(erase), "\033[%zuA\033[J",
+                                  g_chat_fold_phys);
+                if (en > 0)
+                    fwrite(erase, 1, (size_t)en, stdout);
+            }
+            if (final_content[0] != '\0') {
+                if (g_chat_fold_lines > CLI_REPLY_FOLD_MAX)
+                    cli_render_super_agent_truncated(final_content);
+                else
+                    cli_render_super_agent(final_content);
+            } else {
+                cli_render_super_agent(CLI_REPLY_EMPTY_HINT);
+            }
+        } else {
+            /* TUI / 非流式交互：markdown 渲染进历史，标记折叠区。 */
+            if (final_content[0] != '\0') {
+                size_t start_hist = r_tui_active ? cli_tui_hist_count(r_tui) : 0;
+                if (r_tui_active)
+                    cli_tui_fold_clear(r_tui); /* 上一轮折叠先清除 */
+                cli_render_super_agent(final_content);
+                if (r_tui_active)
+                    cli_tui_fold_last(r_tui, start_hist);
+            } else {
+                cli_render_super_agent(CLI_REPLY_EMPTY_HINT);
+            }
+        }
     }
 
     cli_history_add("user", input);

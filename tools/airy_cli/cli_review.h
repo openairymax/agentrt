@@ -5,12 +5,15 @@
  * @file cli_review.h
  * @brief Cognition-stage parallel sub-agent review (item 4, 2026-08-16).
  *
- * After the cognition pipeline produces a task plan, two reviewer sub-agents
+ * After the cognition pipeline produces a task plan, reviewer sub-agents
  * (agent_d spawn+invoke, run on parallel threads) independently audit the
- * plan — fact/coverage check and risk/boundary check — and the verdicts are
- * merged into a single review report. The caller records it into the hall
- * event flow (preflight verify) so the cognition decision is fully visible
- * on the decision chain, without blocking execution.
+ * plan — fact/coverage check and risk/boundary check, extended with
+ * boundary/coverage checks on hardware-rich hosts — and the verdicts are
+ * merged into a single review report. The reviewer count is probed from the
+ * host hardware (cpu/memory) to avoid oversubscription on constrained
+ * devices. The caller records it into the hall event flow (preflight
+ * verify) so the cognition decision is fully visible on the decision chain,
+ * without blocking execution.
  *
  * Degradation contract: agent_d unreachable, AIRY_COGNITION_REVIEW=0, or an
  * empty plan yields a silent skip (return 0) — the main task pipeline is
