@@ -102,7 +102,10 @@ static int cli_exec_t2_review(const airy_review_input_t *in, const char *fact_ba
 
     llm_request_config_t cfg;
     __builtin_memset(&cfg, 0, sizeof(cfg));
-    cfg.model = getenv("AIRY_MODEL_T1F");
+    /* t2 语义复核属 A 角色（生成器/复核），按 GRAD 三模型命名取
+     * AIRY_MODEL_T2（2026-08-17 审计修复：此前误用 T1F，仅配 T2 时
+     * 复核会回落 provider 默认，角色分离失效）；t1-f 终裁仍取 T1F。 */
+    cfg.model = getenv("AIRY_MODEL_T2");
     cfg.messages = msgs;
     cfg.message_count = 2;
     cfg.temperature = 0.0f;

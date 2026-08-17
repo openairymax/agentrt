@@ -5,10 +5,12 @@
  * @file cli_review.c
  * @brief Cognition-stage parallel sub-agent review (item 4).
  *
- * Two reviewer sub-agents (fact/coverage + risk/boundary) run concurrently on
- * separate threads; each spawns through agent_d and invokes once with the
- * task text + plan summary, returning a short JSON verdict. The main thread
- * joins both and merges the outputs into one report JSON.
+ * Reviewer sub-agents (fact/risk + optional boundary/coverage on rich hosts)
+ * run concurrently on separate threads; each spawns through agent_d and
+ * invokes once with the task text + plan summary, returning a short JSON
+ * verdict. The number of reviewers is probed from the host hardware
+ * (cli_review_parallelism: 4 on rich, 2 mid-range, 1 constrained). The main
+ * thread joins all and merges the outputs into one report JSON.
  *
  * Design notes:
  *  - Parallelism via airy_thread_create (cross-platform), never nested: the
@@ -41,12 +43,47 @@
 
 #include "platform.h"
 
-#define CLI_REVIEW_TOPIC_COUNT 2
+/* Review topics are probed from the host (hardware-aware parallelism), so
+ * the worker array is sized dynamically; these bounds keep memory bounded
+ * even on many-core servers. */
+#define CLI_REVIEW_MAX_TOPICS 4
+#define CLI_REVIEW_DEFAULT_TOPICS 2
 #define CLI_REVIEW_HEALTH_TIMEOUT_MS 3000
 #define CLI_REVIEW_SPAWN_TIMEOUT_MS 90000
 #define CLI_REVIEW_INVOKE_TIMEOUT_MS 180000
 #define CLI_REVIEW_PROMPT_MAX 4096
 #define CLI_REVIEW_SPEC_MAX 256
+
+/* Topic table: each reviewer sub-agent audits one aspect of the plan.
+ * Hardware-rich hosts enable all four; constrained hosts fall back to the
+ * first ones only (order matters: fact/risk are the mandatory core). */
+typedef struct {
+    const char *name;
+    const char *brief;
+} cli_review_topic_t;
+
+static const cli_review_topic_t cli_review_topics[CLI_REVIEW_MAX_TOPICS] = {
+    {"fact", "审查计划的完整性与目标覆盖度"},
+    {"risk", "审查计划的风险、边界与依赖正确性"},
+    {"boundary", "审查计划的边界条件与资源约束"},
+    {"coverage", "审查计划的验收标准与结果可验证性"},
+};
+
+/* Decide how many reviewer sub-agents to dispatch based on the host CPU and
+ * memory. 4 on rich hosts, 2 on mid-range hosts, 1 (serial) on constrained
+ * hosts; a probe failure degrades to the previous default of 2. */
+static int cli_review_parallelism(void)
+{
+    airy_sysinfo_t si;
+    if (airy_get_sysinfo(&si) != 0)
+        return CLI_REVIEW_DEFAULT_TOPICS;
+    const uint64_t gb = 1024ULL * 1024 * 1024;
+    if (si.cpu_count >= 8 && si.memory_total >= 8 * gb)
+        return 4;
+    if (si.cpu_count >= 4 || si.memory_total >= 4 * gb)
+        return 2;
+    return 1;
+}
 
 typedef struct {
     const char *sock;
@@ -115,12 +152,16 @@ static char *cli_review_plan_summary(const airy_task_plan_t *plan)
 /* Build the reviewer sub-agent input prompt (OWNER, caller AIRY_FREE). */
 static char *cli_review_build_prompt(const char *topic, const char *task, const char *plan_json)
 {
+    const char *brief = "";
+    for (size_t i = 0; i < CLI_REVIEW_MAX_TOPICS; i++) {
+        if (strcmp(topic, cli_review_topics[i].name) == 0) {
+            brief = cli_review_topics[i].brief;
+            break;
+        }
+    }
     char *prompt = (char *)AIRY_MALLOC(CLI_REVIEW_PROMPT_MAX + 1);
     if (!prompt)
         return NULL;
-    const char *brief = (strcmp(topic, "fact") == 0) ?
-                            "审查计划的完整性与目标覆盖度" :
-                            "审查计划的风险、边界与依赖正确性";
     snprintf(prompt, CLI_REVIEW_PROMPT_MAX,
              "你是 AgentRT 认知阶段的%s审查子 agent。%s。\n"
              "任务：%s\n计划：%s\n"
@@ -232,23 +273,32 @@ int cli_cognition_review(const char *agent_sock, const char *task, const airy_ta
     char *plan_json = cli_review_plan_summary(plan);
     if (!plan_json)
         return 0;
-    cli_trace("review", "parallel cognition review (fact+risk) started, plan=%s nodes=%zu",
-              plan->task_plan_id ? plan->task_plan_id : "?", plan->task_plan_node_count);
 
-    static const char *topics[CLI_REVIEW_TOPIC_COUNT] = {"fact", "risk"};
-    cli_review_job_t jobs[CLI_REVIEW_TOPIC_COUNT];
-    airy_thread_t threads[CLI_REVIEW_TOPIC_COUNT];
-    AIRY_MEMSET(jobs, 0, sizeof(jobs));
-    for (int i = 0; i < CLI_REVIEW_TOPIC_COUNT; i++) {
+    const int n = cli_review_parallelism();
+    if (n <= 0 || n > CLI_REVIEW_MAX_TOPICS)
+        return 0;
+
+    cli_review_job_t *jobs = (cli_review_job_t *)AIRY_CALLOC((size_t)n, sizeof(cli_review_job_t));
+    airy_thread_t *threads = (airy_thread_t *)AIRY_CALLOC((size_t)n, sizeof(airy_thread_t));
+    if (!jobs || !threads) {
+        AIRY_FREE(jobs);
+        AIRY_FREE(threads);
+        AIRY_FREE(plan_json);
+        return 0;
+    }
+    cli_trace("review", "parallel cognition review (%d sub-agents) started, plan=%s nodes=%zu",
+              n, plan->task_plan_id ? plan->task_plan_id : "?", plan->task_plan_node_count);
+
+    for (int i = 0; i < n; i++) {
         threads[i] = AIRY_INVALID_THREAD;
         jobs[i].sock = sock;
-        jobs[i].topic = topics[i];
-        jobs[i].prompt = cli_review_build_prompt(topics[i], task, plan_json);
+        jobs[i].topic = cli_review_topics[i].name;
+        jobs[i].prompt = cli_review_build_prompt(cli_review_topics[i].name, task, plan_json);
         if (jobs[i].prompt)
             airy_platform_thread_create(&threads[i], cli_review_worker, &jobs[i]);
     }
 
-    for (int i = 0; i < CLI_REVIEW_TOPIC_COUNT; i++) {
+    for (int i = 0; i < n; i++) {
         if (threads[i] != AIRY_INVALID_THREAD)
             airy_platform_thread_join(threads[i], NULL);
         AIRY_FREE(jobs[i].prompt);
@@ -256,26 +306,34 @@ int cli_cognition_review(const char *agent_sock, const char *task, const airy_ta
     AIRY_FREE(plan_json);
 
     int produced = 0;
-    for (int i = 0; i < CLI_REVIEW_TOPIC_COUNT; i++) {
+    for (int i = 0; i < n; i++) {
         if (jobs[i].output)
             produced++;
     }
-    if (produced == 0)
+    if (produced == 0) {
+        AIRY_FREE(jobs);
+        AIRY_FREE(threads);
         return 0;
+    }
 
     cJSON *rep = cJSON_CreateObject();
-    if (!rep)
+    if (!rep) {
+        for (int i = 0; i < n; i++)
+            AIRY_FREE(jobs[i].output);
+        AIRY_FREE(jobs);
+        AIRY_FREE(threads);
         return 0;
+    }
     cJSON_AddStringToObject(rep, "reviewer", "cognition-sub-agents");
     cJSON *items = cJSON_CreateArray();
     if (items) {
-        for (int i = 0; i < CLI_REVIEW_TOPIC_COUNT; i++) {
+        for (int i = 0; i < n; i++) {
             if (!jobs[i].output)
                 continue;
             cJSON *it = cJSON_CreateObject();
             if (!it)
                 continue;
-            cJSON_AddStringToObject(it, "topic", topics[i]);
+            cJSON_AddStringToObject(it, "topic", cli_review_topics[i].name);
             cJSON_AddStringToObject(it, "output", jobs[i].output);
             cJSON_AddItemToArray(items, it);
         }
@@ -284,8 +342,10 @@ int cli_cognition_review(const char *agent_sock, const char *task, const airy_ta
     char *report = cJSON_PrintUnformatted(rep);
     cJSON_Delete(rep);
 
-    for (int i = 0; i < CLI_REVIEW_TOPIC_COUNT; i++)
+    for (int i = 0; i < n; i++)
         AIRY_FREE(jobs[i].output);
+    AIRY_FREE(jobs);
+    AIRY_FREE(threads);
 
     if (!report)
         return 0;
