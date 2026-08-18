@@ -36,13 +36,14 @@ static const char *cli_panel_state_icon(const char *state)
         return CLI_ICON_BULLET;
     if (strcmp(state, "completed") == 0)
         return CLI_ICON_CHECK;
-    if (strcmp(state, "running") == 0 || strcmp(state, "pending") == 0 ||
-        strcmp(state, "scheduled") == 0)
+    if (strcmp(state, "running") == 0 || strcmp(state, "pending") == 0)
         return CLI_ICON_DIAMOND;
+    if (strcmp(state, "scheduled") == 0)
+        return CLI_ICON_CLOCK;
     if (strcmp(state, "failed") == 0)
         return CLI_ICON_CROSS;
     if (strcmp(state, "canceled") == 0)
-        return CLI_ICON_ERR;
+        return CLI_ICON_CANCEL;
     return CLI_ICON_BULLET;
 }
 

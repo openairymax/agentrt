@@ -1325,6 +1325,10 @@ int main(int argc, char *argv[])
             __builtin_memset(&rmeta, 0, sizeof(rmeta));
             rmeta.node_id = input;
             rmeta.output_json = result;
+            /* 2.7.2：用户整轮输入写入用户意图键空间（is_user_intent），
+             * 使重复/相似任务在 process 查询时可命中 L2（此前错误写入
+             * 节点 ID 键空间，process 查询过滤后命中率恒为 0）。 */
+            rmeta.is_user_intent = true;
             /* 复核 verdict 感知（2026-08-17 缓存污染修复）：DRIFT/REJECT
              * 的执行即使 status=completed 也不得缓存为 PASS——复核否决的
              * 产物入 L2 会作为"已验证成功"的记忆污染后续相似任务。

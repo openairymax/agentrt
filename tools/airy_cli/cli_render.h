@@ -197,6 +197,8 @@ void cli_trace(const char *tag, const char *fmt, ...);
 #define CLI_ICON_DONE "\u2714"          /* ✔ completed    */
 #define CLI_ICON_WARN "\u26A0"          /* ⚠ warning      */
 #define CLI_ICON_INFO "\u24D8"          /* ⓘ info         */
+#define CLI_ICON_CLOCK "\u25F7"         /* ◷ scheduled    */
+#define CLI_ICON_CANCEL "\u2298"        /* ⊘ canceled     */
 #define CLI_ICON_ERR "\u25A0"           /* ■ error        */
 #define CLI_ICON_BRANCH "\u2514"        /* └ detail indent */
 #define CLI_ICON_TOOL "\u26CF"          /* ⛏ tool invocation */
