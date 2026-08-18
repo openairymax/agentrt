@@ -78,8 +78,11 @@ void cli_print_result(const char *result)
     }
 
     char truncated[640];
-    snprintf(truncated, sizeof(truncated), "%.600s%s", result,
-             strlen(result) > 600 ? "..." : "");
+    /* Back off to a UTF-8 boundary so a long result never shows half a
+     * multi-byte character (stray continuation byte garbles the preview). */
+    size_t keep = cli_utf8_safe_len(result, 600);
+    snprintf(truncated, sizeof(truncated), "%.*s%s", (int)keep, result,
+             strlen(result) > keep ? "..." : "");
     cli_render_role_line(CLI_ROLE_SUPER_AGENT, CLI_ACTOR_SUPER_AGENT, "result", truncated);
 }
 
@@ -288,45 +291,52 @@ void cli_board_line(const char *tag, const char *id, const char *state, double p
     cli_render_task_line(tag, id, state, progress);
 }
 
-/* ---- welcome screen: brand box, role legend, model panel ---- */
+/* ---- welcome hero: brand, capabilities, role legend (Claude-style) ----
+ *
+ * The startup header follows the Claude Code / Terminal aesthetic instead of
+ * a boxed installer banner: left-aligned on the shared gutter, one quiet
+ * accent color for identity, dim muted text for everything else, generous
+ * whitespace. Four pinned lines carry identity + capabilities + the role
+ * color legend; the model configuration sits to the right on wide TTYs and
+ * stacks below on narrow ones. Color gating uses the shared cli_c() from
+ * cli_render.c (NO_COLOR / piped output renders monochrome too).
+ */
 
-/* Color gating uses the shared cli_c() from cli_render.c (NO_COLOR / piped
- * output renders the banner monochrome too, server-grade clean logs). */
+#define CLI_HERO_SEP_W 54
 
-/* Box frame row: <left> + <fill> x inner + <right>, whole line in cyan.
- * Used for the top/bottom edges (┌─┐ / └─┘) and the ═ separator rows. */
-static void cli_box_line(const char *g, size_t inner, const char *left,
-                         const char *fill, const char *right)
+/* Brand line: ◆ Airymax Agent RT  v0.1.2 — identity only, no chrome. */
+static void cli_hero_brand(const char *g)
 {
-    cli_outf("%s%s%s", g, cli_c(CLR_CYAN), left);
-    for (size_t i = 0; i < inner; i++)
-        cli_out(fill);
-    cli_outf("%s%s\n", right, cli_c(CLR_RESET));
-}
-
-/* Centered content row: │ <text> │ with CJK-aware padding so the right
- * border lines up even when the row mixes ASCII and CJK text. */
-static void cli_box_row(const char *g, size_t inner, const char *text,
-                        const char *color)
-{
-    size_t w = cli_disp_width(text);
-    size_t l = w < inner ? (inner - w) / 2 : 0;
-    size_t r = w < inner ? inner - w - l : 0;
-
-    cli_outf("%s%s│%s", g, cli_c(CLR_CYAN), cli_c(CLR_RESET));
-    for (size_t i = 0; i < l; i++)
-        cli_outc(' ');
-    cli_out(cli_c(color));
-    cli_out(text);
+    cli_out(g);
+    cli_out(cli_c(CLR_CYAN));
+    cli_out("◆");
     cli_out(cli_c(CLR_RESET));
-    for (size_t i = 0; i < r; i++)
-        cli_outc(' ');
-    cli_outf("%s│%s\n", cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_out(" ");
+    cli_out(cli_c(CLR_BOLD));
+    cli_out(cli_c(CLR_CYAN));
+    cli_out("Airymax Agent RT");
+    cli_out(cli_c(CLR_RESET));
+    cli_out("  ");
+    cli_out(cli_c(CLR_DIM));
+    cli_out("v");
+    cli_out(AIRY_CLI_VERSION);
+    cli_out(cli_c(CLR_RESET));
+    cli_outc('\n');
 }
 
-/* Four-role conversation legend rendered under the brand box.  Each bracket
- * keeps its role color so the scheme [For Thee] / [Super Agent] /
- * [Dual Think] / [Sub Agent] is visible at a glance on startup. */
+/* One quiet capabilities line: what the runtime does at a glance. */
+static void cli_hero_capabilities(const char *g)
+{
+    cli_out(g);
+    cli_out(cli_c(CLR_DIM));
+    cli_out("对话 · 任务 · 蓝图调度 · 双思考 · GCCP · 工具执行");
+    cli_out(cli_c(CLR_RESET));
+    cli_outc('\n');
+}
+
+/* Four-role conversation legend. Each bracket keeps its role color so the
+ * scheme [For Thee] / [Super Agent] / [Dual Think] / [Sub Agent] is visible
+ * at a glance on startup and stays consistent with every conversation line. */
 static void cli_banner_legend(const char *g)
 {
     static const struct {
@@ -342,19 +352,35 @@ static void cli_banner_legend(const char *g)
 
     cli_out(g);
     for (size_t i = 0; i < sizeof(roles) / sizeof(roles[0]); i++) {
-        if (i > 0) {
-            cli_out(cli_c(CLR_DIM));
-            cli_out(" · ");
-            cli_out(cli_c(CLR_RESET));
-        }
+        if (i > 0)
+            cli_out("   ");
         cli_out("[");
         cli_out(cli_c(roles[i].color));
         cli_out(roles[i].name);
-        cli_out(cli_c(CLR_DIM));
-        cli_out("]");
         cli_out(cli_c(CLR_RESET));
+        cli_out("]");
         cli_outf(" %s", roles[i].label);
     }
+    cli_out(cli_c(CLR_RESET));
+    cli_outc('\n');
+}
+
+/* Thin dim separator closing the hero block. Width adapts to the terminal
+ * (each ─ is two cells), so a narrow TTY never wraps the line. */
+static void cli_hero_separator(const char *g)
+{
+    size_t n = CLI_HERO_SEP_W;
+    int rows = 0, cols = 0;
+    cli_term_size(&rows, &cols);
+    if (cols > 4) {
+        size_t room = ((size_t)cols - 4) / 2;
+        if (room > 0 && room < n)
+            n = room;
+    }
+    cli_out(g);
+    cli_out(cli_c(CLR_DIM));
+    for (size_t i = 0; i < n; i++)
+        cli_out("─");
     cli_out(cli_c(CLR_RESET));
     cli_outc('\n');
 }
@@ -362,59 +388,52 @@ static void cli_banner_legend(const char *g)
 void cli_print_banner(void)
 {
     const char *g = cli_gutter_pad(2);
-    const size_t inner = 53; /* same content width as the installer banner */
-
-    cli_outf("\n");
-    cli_box_line(g, inner, "┌", "─", "┐");
-    cli_box_row(g, inner, "Airymax Agent RT   极境智能体运行平台工程", CLR_BOLD CLR_CYAN);
-    cli_box_row(g, inner, "AI Agent Runtime Platform Engineering  ·  v" AIRY_CLI_VERSION,
-                CLR_DIM);
-    cli_box_line(g, inner, "│", "═", "│");
-    cli_box_row(g, inner, "对话 · 任务 · 蓝图调度 · 双思考 · GCCP · 工具执行", CLR_YELLOW);
-    cli_box_line(g, inner, "│", "═", "│");
-    cli_box_row(g, inner, " \"Agents, To the open air. To OpenAirymax. To hope.\"", CLR_DIM);
-    cli_box_line(g, inner, "└", "─", "┘");
-
+    cli_hero_brand(g);
+    cli_hero_capabilities(g);
     cli_banner_legend(g);
-
-    cli_outf("%s%sAirymax Agent RT v%s%s %s·%s 输入 %s/help%s 查看命令 · %squit%s/%sexit%s 退出%s\n",
-           g, cli_c(CLR_GREEN), AIRY_CLI_VERSION, cli_c(CLR_RESET), cli_c(CLR_DIM),
-           cli_c(CLR_DIM), cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_YELLOW),
-           cli_c(CLR_RESET), cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_RESET));
+    cli_hero_separator(g);
 }
 
-/* ---- combined system header: banner left, model config right, pinned ----
+/* ---- combined system header: hero left, model config right, pinned ----
  *
- * The startup block (brand box + four-role legend + one-line hint) doubles as
- * a pinned header: on a wide TTY the model configuration renders to the right
- * of the brand box on the same rows, and the ANSI scroll region locks all of
- * it in place so conversation output scrolls below it instead of pushing the
- * header off screen (Terminal feedback: "system header must stay fixed").
+ * The startup hero (CLI_HDR_LINES = 4 lines) doubles as a fixed header: on a
+ * wide TTY the model configuration renders to the right of the brand /
+ * capability rows on the same lines, and the ANSI scroll region locks the
+ * whole block in place so conversation output scrolls below it instead of
+ * pushing the header off screen (Terminal feedback: "system header must stay
+ * fixed"). All pinning happens here, so the plain-TTY entry point only needs
+ * to call cli_print_system_header().
  *
- * Widths: brand box spans cols 1..57 (2 gutter + 55 frame), the model column
- * starts at col 60. Requires >= 118 columns; narrower terminals / non-TTY
- * fall back to the stacked layout (banner above, model config below).
+ * Widths: the role legend is the widest hero row (~col 80), the model column
+ * starts at col 88. Requires >= 126 columns; narrower terminals / non-TTY
+ * fall back to the stacked layout (hero above, model config below).
  */
 
-#define CLI_HDR_MODEL_COL 60
-#define CLI_HDR_MIN_COLS 118
+#define CLI_HDR_MODEL_COL 88
+#define CLI_HDR_MIN_COLS 126
+
+/* Model panel column widths: "A · t2" pads to 9, CJK role labels pad to 9,
+ * so ASCII keys and CJK roles share the same left edge with a visible gap
+ * before the arrow. */
+#define CLI_MODEL_KEY_W 9
+#define CLI_MODEL_ROLE_W 9
 
 /* One model row rendered at an absolute column (no leading gutter). */
-static void cli_model_row_at(int col, const char *key, const char *role,
+static void cli_model_row_at(const char *key, const char *role,
                              const char *model, const char *note)
 {
     size_t kw = cli_disp_width(key);
     size_t rw = cli_disp_width(role);
 
     cli_outf("%s%s%s", cli_c(CLR_CYAN), key, cli_c(CLR_RESET));
-    for (size_t i = kw; i < 10; i++)
+    for (size_t i = kw; i < CLI_MODEL_KEY_W; i++)
         cli_outc(' ');
     cli_out(cli_c(CLR_DIM));
     cli_out(role);
     cli_out(cli_c(CLR_RESET));
-    for (size_t i = rw; i < 10; i++)
+    for (size_t i = rw; i < CLI_MODEL_ROLE_W; i++)
         cli_outc(' ');
-    cli_outf("%s→%s %s%s%s", cli_c(CLR_DIM), cli_c(CLR_RESET), cli_c(CLR_YELLOW), model,
+    cli_outf("%s →%s %s%s%s", cli_c(CLR_DIM), cli_c(CLR_RESET), cli_c(CLR_YELLOW), model,
            cli_c(CLR_RESET));
     if (note && note[0])
         cli_outf("  %s%s%s", cli_c(CLR_DIM), note, cli_c(CLR_RESET));
@@ -422,7 +441,7 @@ static void cli_model_row_at(int col, const char *key, const char *role,
 
 void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
 {
-    /* One-shot server mode (-p): no startup banner/panel, output is the
+    /* One-shot server mode (-p): no startup hero/panel, output is the
      * single-turn result only (Claude Code -p / Codex exec convention). */
     if (g_cli_print_mode)
         return;
@@ -431,45 +450,26 @@ void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
     const char *b = (t1f && t1f[0]) ? t1f : "默认";
     const char *c = (t1p && t1p[0]) ? t1p : "默认";
 
-    /* Full-screen TUI page: render a compact pinned header so the
-     * conversation viewport keeps most of the screen. Structure: brand line
-     * (name only) -> three-model panel -> separator -> hint. */
+    /* Full-screen TUI page: same hero as the CLI so switching between the
+     * two never breaks the visual language, plus one compact model line.
+     * The TUI pins its own header boundary (history-based) after this. */
     if (cli_tui_active(cli_tui_get_default())) {
         const char *g = cli_gutter_pad(2);
 
-        /* Brand line: the platform name alone (Terminal feedback), bold
-         * cyan, version kept off the brand line. */
-        cli_out(g);
-        cli_out(cli_c(CLR_BOLD));
-        cli_out(cli_c(CLR_CYAN));
-        cli_out("Airymax Agent RT   极境智能体运行平台工程");
-        cli_out(cli_c(CLR_RESET));
-        cli_outc('\n');
-
-        /* Model panel: three parallel roles, each clearly framed with its
-         * key, role label and resolved model. */
-        cli_out(g);
-        cli_outf("%sA%s %s· t2%s  %s生成器%s  →  %s%s%s      "
-                 "%sB%s %s· t1-f%s  %s仲裁/日常%s  →  %s%s%s      "
-                 "%sC%s %s· t1-p%s  %s校验%s  →  %s%s%s\n",
+        cli_hero_brand(g);
+        cli_hero_capabilities(g);
+        cli_banner_legend(g);
+        cli_outf("%s%s模型%s  %sA·t2%s %s→%s %s%s%s   "
+                 "%sB·t1-f%s %s→%s %s%s%s   "
+                 "%sC·t1-p%s %s→%s %s%s%s\n",
+                 g, cli_c(CLR_GREEN), cli_c(CLR_RESET),
                  cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_RESET),
-                 cli_c(CLR_DIM), cli_c(CLR_RESET),
                  cli_c(CLR_YELLOW), a, cli_c(CLR_RESET),
                  cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_RESET),
-                 cli_c(CLR_DIM), cli_c(CLR_RESET),
                  cli_c(CLR_YELLOW), b, cli_c(CLR_RESET),
                  cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_RESET),
-                 cli_c(CLR_DIM), cli_c(CLR_RESET),
                  cli_c(CLR_YELLOW), c, cli_c(CLR_RESET));
-
-        /* Separator, then a hint line (version tucked into its tail so the
-         * brand line stays clean). */
-        cli_outf("%s%s%s\n", g, cli_c(CLR_DIM),
-                 "──────────────────────────────────────────────────────────────");
-        cli_outf("%s%s?%s  %s输入 /help 查看命令 · quit 退出%s      %sv%s%s\n",
-                 g, cli_c(CLR_YELLOW), cli_c(CLR_RESET),
-                 cli_c(CLR_DIM), cli_c(CLR_RESET),
-                 cli_c(CLR_DIM), AIRY_CLI_VERSION, cli_c(CLR_RESET));
+        cli_hero_separator(g);
         return;
     }
 
@@ -477,33 +477,29 @@ void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
     cli_term_size(&rows, &cols);
 
     if (!cli_term_is_tty() || cols < CLI_HDR_MIN_COLS) {
-        /* Narrow / non-TTY: stacked layout (full compatibility). */
+        /* Narrow / non-TTY: stacked layout, nothing pinned (full scroll).
+         * The footer hint follows later (main loop). */
         cli_print_banner();
         cli_print_model_config(t2, t1f, t1p);
         return;
     }
 
-    /* Wide TTY: brand box (11 lines) left, model config right on the same
-     * header rows. The header is then pinned so scrolling stays below it. */
-    cli_print_banner(); /* cursor lands at line 12 (header is 11 lines tall) */
+    /* Wide TTY: 4-line hero left, model config right on the same header
+     * rows, then pin so scrolling stays below the header. */
+    cli_print_banner(); /* cursor lands at line 5 (hero is 4 lines tall) */
 
-    cli_term_cursor_to(2, CLI_HDR_MODEL_COL);
+    cli_term_cursor_to(1, CLI_HDR_MODEL_COL);
     cli_outf("%s模型配置%s  %sA 生成 · B 仲裁/日常 · C 校验%s\n", cli_c(CLR_GREEN),
            cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_RESET));
+    cli_term_cursor_to(2, CLI_HDR_MODEL_COL);
+    cli_model_row_at("A · t2", "生成器", a, NULL);
     cli_term_cursor_to(3, CLI_HDR_MODEL_COL);
-    cli_model_row_at(CLI_HDR_MODEL_COL, "A · t2", "生成器", a, NULL);
+    cli_model_row_at("B · t1-f", "仲裁/日常", b, "(最先激活)");
     cli_term_cursor_to(4, CLI_HDR_MODEL_COL);
-    cli_model_row_at(CLI_HDR_MODEL_COL, "B · t1-f", "仲裁/日常", b, "(最先激活)");
-    cli_term_cursor_to(5, CLI_HDR_MODEL_COL);
-    cli_model_row_at(CLI_HDR_MODEL_COL, "C · t1-p", "校验", c, NULL);
-    cli_term_cursor_to(6, CLI_HDR_MODEL_COL);
-    cli_outf("%s%s%s%s", cli_c(CLR_DIM), "env: ", cli_c(CLR_YELLOW),
-           "AIRY_MODEL_T2 · T1F · T1P");
-    cli_outf("%s%s", cli_c(CLR_RESET), cli_c(CLR_DIM));
-    cli_outf("  云端 API 或本地 Ollama/vLLM%s\n", cli_c(CLR_RESET));
+    cli_model_row_at("C · t1-p", "校验", c, NULL);
 
-    /* Back to the first scrollable line, then pin the 11-line header. */
-    cli_term_header_pin(11);
+    /* Back to the first scrollable line, then pin the 4-line hero. */
+    cli_term_header_pin(CLI_HDR_LINES);
     fflush(stdout);
 }
 
@@ -517,14 +513,14 @@ static void cli_model_row(const char *g, const char *key, const char *role,
     size_t rw = cli_disp_width(role);
 
     cli_outf("%s%s%s%s", g, cli_c(CLR_CYAN), key, cli_c(CLR_RESET));
-    for (size_t i = kw; i < 10; i++)
+    for (size_t i = kw; i < CLI_MODEL_KEY_W; i++)
         cli_outc(' ');
     cli_out(cli_c(CLR_DIM));
     cli_out(role);
     cli_out(cli_c(CLR_RESET));
-    for (size_t i = rw; i < 10; i++)
+    for (size_t i = rw; i < CLI_MODEL_ROLE_W; i++)
         cli_outc(' ');
-    cli_outf("%s→%s %s%s%s", cli_c(CLR_DIM), cli_c(CLR_RESET), cli_c(CLR_YELLOW), model,
+    cli_outf("%s →%s %s%s%s", cli_c(CLR_DIM), cli_c(CLR_RESET), cli_c(CLR_YELLOW), model,
            cli_c(CLR_RESET));
     if (note && note[0])
         cli_outf("  %s%s%s", cli_c(CLR_DIM), note, cli_c(CLR_RESET));

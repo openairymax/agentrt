@@ -47,6 +47,10 @@ extern "C" {
 
 #define AIRY_CLI_VERSION "0.1.2"
 
+/* Pinned startup header height (brand + capabilities + legend + separator).
+ * Shared by cli_display.c (which renders it) and main.c (which pins it). */
+#define CLI_HDR_LINES 4
+
 /* Max chat history messages: 30 by default (~15 rounds); AIRY_CHAT_HISTORY_ROUNDS
   * overrides it in rounds (messages = rounds*2). Capped at 60, aligned with
   * the 64-message cap in build_llm_request_json. When full, the oldest round
