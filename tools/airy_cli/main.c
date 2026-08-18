@@ -53,6 +53,7 @@
 #else
 #include <unistd.h>
 #include <signal.h>
+#include <poll.h>
 #endif
 
 #ifdef AIRY_HAS_CJSON
@@ -76,6 +77,87 @@ static void cli_sigint_handler(int sig)
 }
 #endif
 
+/* ---- 2.3.7 任务集中途打断/插入对话 ----
+ * 任务执行（4.5 wait 段）原为阻塞式，用户在任务完成前无法输入。
+ * 将 wait 放入后台线程推进引擎，主线程轮询 stdin：
+ *   - 中断指令（quit/exit/abort/stop/cancel/打断/停止）→ g_cli_cancel=1
+ *   - 其他输入 → 作为插入对话处理（cli_chat_reply），任务继续后台执行
+ * 线程完成（done=1）或取消时退出轮询，回到结果汇总。 */
+typedef struct {
+    airy_work_hall_t *hall;       /* 本地 wait 用（BORROW） */
+    const char *sched_sock;       /* 远程 wait 用（BORROW） */
+    const char *exec_id;          /* BORROW */
+    int sched_remote;
+    airy_err_t err;
+    char *result;                 /* OWNER，线程完成后调用方释放 */
+    volatile int done;
+} cli_task_wait_ctx_t;
+
+static void *cli_task_wait_worker(void *arg)
+{
+    cli_task_wait_ctx_t *c = (cli_task_wait_ctx_t *)arg;
+    if (!c)
+        return NULL;
+    if (c->sched_remote) {
+        c->err = cli_dag_wait_remote(c->sched_sock, c->exec_id, &c->result);
+    } else {
+        c->err = airy_work_hall_wait(c->hall, c->exec_id, 0, &c->result);
+        /* 改进6（P3）: 本轮执行复核（wait 内门禁/t2/t1-f）已结束，
+         * 解绑蓝图——BORROW 指针随本轮 plan 释放失效，避免跨轮悬垂。 */
+        airy_work_hall_set_blueprint(c->hall, NULL);
+    }
+    c->done = 1;
+    return NULL;
+}
+
+/* 任务执行期间轮询 stdin（交互行模式，非 -p/--json/TUI）：
+ *   - 无输入返回 0
+ *   - 中断指令 → g_cli_cancel=1，返回 -1（打断任务）
+ *   - 其他文本 → 渲染用户消息 + 插入对话回复，返回 1（任务继续）
+ * 仅在 TTY 行模式启用；-p 管道流、--json、TUI 面板模式保持原语义。 */
+static int cli_task_poll_input(void)
+{
+    if (g_cli_print_mode || g_cli_json_mode)
+        return 0;
+    cli_tui_t *tui = cli_tui_get_default();
+    if (tui && cli_tui_active(tui))
+        return 0;
+#ifndef _WIN32
+    struct pollfd pfd;
+    pfd.fd = STDIN_FILENO;
+    pfd.events = POLLIN;
+    pfd.revents = 0;
+    int r = poll(&pfd, 1, 0);
+    if (r <= 0 || !(pfd.revents & POLLIN))
+        return 0;
+    char line[4096];
+    if (!fgets(line, sizeof(line), stdin))
+        return 0;
+    size_t n = strlen(line);
+    while (n > 0 && (line[n - 1] == '\n' || line[n - 1] == '\r'))
+        line[--n] = '\0';
+    if (n == 0)
+        return 0;
+    /* 中断指令：不进入对话，直接打断任务（与 SIGINT 同语义） */
+    if (strcmp(line, "quit") == 0 || strcmp(line, "exit") == 0 ||
+        strcmp(line, "abort") == 0 || strcmp(line, "stop") == 0 ||
+        strcmp(line, "cancel") == 0 || strcmp(line, "打断") == 0 ||
+        strcmp(line, "停止") == 0 || strcmp(line, "取消") == 0) {
+        g_cli_cancel = 1;
+        return -1;
+    }
+    /* 插入对话：渲染用户消息 + 对话回复；任务在后台继续执行 */
+    cli_spinner_pause();
+    cli_render_user_message(line);
+    cli_chat_reply(line);
+    cli_spinner_resume();
+    return 1;
+#else
+    (void)0;
+    return 0;
+#endif
+}
+
 llm_svc_adapter_t *g_chat_adapter = NULL;
 /* 阶段 4（2026-08-15）：决策链事件流句柄（hall_store 创建后赋值）。 */
 airy_hall_store_t *g_cli_hall_store = NULL;
@@ -89,6 +171,7 @@ const cli_command_t CLI_COMMANDS[] = {
     {"/status", "查看执行大厅状态", 0, cmd_status},
     {"/chain", "决策链可视化：/chain [task_id]（默认列出最近任务）", 0, cmd_chain},
     {"/quit", "退出 agentrt", 0, cmd_quit},
+    {"/tui", "切换到图形 TUI（agentrt-tui）", 0, cmd_tui},
     {"/daemons", "查看全部 daemon 在线状态", 0, cmd_daemons},
     {"/daemon", "管理 daemon：/daemon start|stop|restart|status [ns...]（默认全部）", 0, cmd_daemon},
     {"/rpc", "直接调用 daemon 方法：/rpc <ns>.<method> [json]（ns 或 ns_d 均可）", 1, cmd_rpc},
@@ -255,25 +338,25 @@ int main(int argc, char *argv[])
     }
 #endif
 
-    /* Full-screen TUI page on interactive terminals (Claude Code style):
-     * pinned header + scrollable history + bottom input line. Piped/logged
-     * output keeps the line-oriented renderer (cli_tui stays inactive).
-     * One-shot server mode (-p) never enters the TUI. */
+    /* 交互界面（2.3.7）：默认行渲染流式模式（打字机 + 思考链折叠 +
+     * markdown 精修）；全屏 TUI 页面按 F8 切换进入（Claude Code style：
+     * pinned header + scrollable history + bottom input line）。Piped/
+     * logged output keeps the line-oriented renderer. One-shot server
+     * mode (-p) never enters the TUI. */
     cli_tui_t *tui = NULL;
     if (!g_cli_print_mode) {
         cli_tui_create(&tui);
-        if (cli_tui_active(tui))
-            cli_render_set_tui(tui);
     }
 
-    /* 交互全屏 TUI：把进程 stderr 重定向到日志文件（$AIRY_HOME/logs/
-     * airy_cli.log）。daemon RPC 层在 llm_d 离线等故障时会向 stderr 打印
-     * ERROR（如 C-L02 / rpc_connect_unix），直接泄漏会破坏全屏界面；
-     * 落盘保留完整诊断。-p 管道模式不重定向（stderr 承载 trace 诊断，
-     * 供脚本消费，见 cli_trace）。Windows 无全屏 TUI（active 恒 false），
-     * 且 dup2/fileno 为 POSIX 接口，整体跳过。 */
+    /* 交互模式（行渲染流式 + 全屏 TUI）：把进程 stderr 重定向到日志文件
+     * （$AIRY_HOME/logs/airy_cli.log）。daemon RPC 层在 llm_d 离线等故障
+     * 时会向 stderr 打印 ERROR（如 C-L02 / rpc_connect_unix），直接泄漏
+     * 会污染对话/破坏全屏界面（2.3.11：不把内部实现暴露进对话）；落盘
+     * 保留完整诊断。-p 管道模式不重定向（stderr 承载 trace 诊断，供脚本
+     * 消费，见 cli_trace）。Windows 无全屏 TUI 且 dup2/fileno 为 POSIX
+     * 接口，整体跳过。 */
 #ifndef _WIN32
-    if (tui && cli_tui_active(tui)) {
+    if (!g_cli_print_mode) {
         const char *home = getenv("AIRY_HOME");
         char logpath[512];
         if (home && home[0]) {
@@ -513,7 +596,8 @@ int main(int argc, char *argv[])
 
     char input[8192];
     int quit_flag = 0;
-    cli_cmd_ctx_t cmd_ctx = {.hall = hall, .quit = &quit_flag};
+    int switch_tui_flag = 0;
+    cli_cmd_ctx_t cmd_ctx = {.hall = hall, .quit = &quit_flag, .switch_tui = &switch_tui_flag};
     int print_consumed = 0;
 
     /* 阶段 2 生命周期层 reconcile：agent 自愈重启（AIRY_SELF_HEAL=1 或
@@ -596,8 +680,29 @@ int main(int argc, char *argv[])
                 cli_outf("\n%sairy>%s ", cli_c(CLR_CYAN), cli_c(CLR_RESET));
                 fflush(stdout);
             }
-            if (!cli_tui_readline(tui, input, sizeof(input), &input_len))
-                break;
+            int rl = cli_tui_readline(tui, input, sizeof(input), &input_len);
+            if (rl == 0)
+                break; /* EOF / abort */
+            if (rl == 2) {
+                /* 2.3.7：行渲染模式 F8 → 进入全屏页面。重放行模式对话
+                 * 历史使页面不空，pinned header 转交给 TUI。 */
+                cli_tui_enter(tui);
+                if (cli_tui_active(tui)) {
+                    cli_render_set_tui(tui);
+                    cli_term_header_unpin();
+                    cli_tui_pin_header(tui);
+                    cli_tui_replay_history(tui);
+                    cli_tui_redraw(tui);
+                }
+                continue;
+            }
+            if (rl == 3) {
+                /* 2.3.7：全屏 F8 → 退出回行渲染流式模式。 */
+                cli_tui_leave(tui);
+                cli_render_set_tui(NULL);
+                cli_term_header_pin(11);
+                continue;
+            }
             if (input_len == 0)
                 continue;
             if (strcmp(input, "quit") == 0 || strcmp(input, "exit") == 0)
@@ -640,7 +745,7 @@ int main(int argc, char *argv[])
                 }
                 if (g_cli_json_mode) {
                     cJSON *jroot = cJSON_CreateObject();
-                    cJSON_AddStringToObject(jroot, "role", "super_think");
+                    cJSON_AddStringToObject(jroot, "role", "dual_think");
                     cJSON_AddStringToObject(jroot, "type", "l1_hit");
                     cJSON_AddBoolToObject(jroot, "success", 1);
                     cJSON_AddStringToObject(jroot, "next_step", next_buf);
@@ -660,7 +765,7 @@ int main(int argc, char *argv[])
                     snprintf(line, sizeof(line), "L1 blueprint state machine: advance to step "
                                                  "%s%s%s (zero token)",
                              cli_c(CLR_CYAN), next_buf, cli_c(CLR_RESET));
-                    cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "blueprint",
+                    cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
                                          line);
                 } else
 #endif /* AIRY_HAS_CJSON */
@@ -668,7 +773,7 @@ int main(int argc, char *argv[])
                     char line[1024];
                     snprintf(line, sizeof(line), "L1 state machine hit (zero token): %s",
                              rs_out ? rs_out : "{}");
-                    cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "blueprint",
+                    cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
                                          line);
                     cli_trace("blueprint", "%s", line);
                 }
@@ -726,7 +831,7 @@ int main(int argc, char *argv[])
                                   "L2 semantic cache hit (low token): replaying last result");
                         cli_render_markdown(sugg, 0);
                     } else {
-                        cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "blueprint",
+                        cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
                                              "L2 semantic cache hit (low token): replaying last result");
                         cli_render_super_agent(sugg);
                     }
@@ -737,7 +842,7 @@ int main(int argc, char *argv[])
                     char line[1024];
                     snprintf(line, sizeof(line), "L2 semantic cache hit (low token): %s",
                              rs_out ? rs_out : "{}");
-                    cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK, "blueprint",
+                    cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
                                          line);
                 }
                 /* 阶段 4：蓝图 L2 语义缓存命中 → 决策链事件（preflight，cognition） */
@@ -775,8 +880,8 @@ int main(int argc, char *argv[])
             err = cli_think_process_remote(think_sock, input, input_len, &plan);
             if (err != AIRY_EOK || !plan) {
                 cli_spinner_stop(0, "remote thinking failed");
-                cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_THINK, "think_d",
-                                     "Remote thinking failed, falling back to the embedded engine.");
+                cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_DUAL_SLOW_THINK, "深度思考",
+                                     "远程思考引擎不可用，已回退内置引擎。");
                 plan = NULL;
             } else {
                 cli_spinner_stop(1, NULL);
@@ -790,8 +895,8 @@ int main(int argc, char *argv[])
                 cli_spinner_stop(0, "planning failed");
                 cli_trace("plan", "failed err=%d", (int)err);
                 char line[128];
-                snprintf(line, sizeof(line), "Planning failed: err=%d", (int)err);
-                cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_THINK, "cognition", line);
+                snprintf(line, sizeof(line), "规划失败：%s", cli_err_desc((int)err));
+                cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_DUAL_SLOW_THINK, "认知规划", line);
                 continue;
             }
             cli_spinner_stop(1, NULL);
@@ -839,7 +944,7 @@ int main(int argc, char *argv[])
         err = airy_plan_to_workflow(plan, &wf);
         if (err != AIRY_EOK || !wf) {
             char line[128];
-            snprintf(line, sizeof(line), "Workflow adaption failed: err=%d", (int)err);
+            snprintf(line, sizeof(line), "工作流适配失败：%s", cli_err_desc((int)err));
             cli_render_sub_agent_line(CLI_ROLE_ERROR, "DAG", line);
             airy_task_plan_free(plan);
             continue;
@@ -878,8 +983,8 @@ int main(int argc, char *argv[])
             err = cli_dag_submit_remote(sched_sock, wf, input, wh_cfg.main_workspace_dir, &exec_id);
             if (err != AIRY_EOK || !exec_id) {
                 char line[128];
-                snprintf(line, sizeof(line), "Remote DAG submit failed (err=%d), falling back.",
-                         (int)err);
+                snprintf(line, sizeof(line), "远程提交失败（%s），已回退本地执行。",
+                         cli_err_desc((int)err));
                 cli_render_sub_agent_line(CLI_ROLE_ERROR, "sched_d", line);
                 AIRY_FREE(exec_id);
                 exec_id = NULL;
@@ -893,7 +998,7 @@ int main(int argc, char *argv[])
             err = airy_work_hall_submit(hall, wf, input, &exec_id);
             if (err != AIRY_EOK || !exec_id) {
                 char line[128];
-                snprintf(line, sizeof(line), "Submit failed: err=%d", (int)err);
+                snprintf(line, sizeof(line), "任务提交失败：%s", cli_err_desc((int)err));
                 cli_render_sub_agent_line(CLI_ROLE_ERROR, "hall", line);
                 /* 改进6（P3）: 提交失败即解绑蓝图（BORROW 指针随 plan 释放失效） */
                 airy_work_hall_set_blueprint(hall, NULL);
@@ -932,6 +1037,17 @@ int main(int argc, char *argv[])
         char last_state[16] = "";
         double last_progress = -1.0;
         for (;;) {
+            /* 2.3.7：轮询节拍期间检测用户输入（插入对话/中断）。
+             * 有输入先处理（不阻塞任务轮询），再继续本轮的 200ms 节拍。 */
+            int input_rc = cli_task_poll_input();
+            if (input_rc < 0) {
+                /* 用户请求打断：等同 SIGINT，统一走取消路径 */
+                cli_spinner_stop(0, "aborted");
+                spin_running = 0;
+                cli_render_sub_agent_line(CLI_ROLE_ERROR, "cancel",
+                                          "Abort requested, stopping the task ...");
+                break;
+            }
 #ifdef _WIN32
             Sleep(200);
 #else
@@ -1040,7 +1156,7 @@ int main(int argc, char *argv[])
              * trace line, no internal jargon. */
             if (board_polls > 0 && stale_polls >= 10) {
                 cli_spinner_pause();
-                cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUPER_THINK,
+                cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_THINK,
                                      sched_remote ? "sched_d" : "hall",
                                      "still running, waiting for completion ...");
                 cli_spinner_resume();
@@ -1052,14 +1168,38 @@ int main(int argc, char *argv[])
         char *result = NULL;
         cli_trace("wait", "%s exec=%s awaiting completion (polls=%d)", CLI_ICON_DIAMOND, exec_id,
                   board_polls);
-        if (sched_remote) {
-            /* Remote: poll dag_status to the final state (replaces airy_work_hall_wait),
-              * aggregating node outputs/errors for display at the final state */
+        /* 2.3.7：wait 放后台线程推进引擎，主线程轮询 stdin（插入对话/中断）。
+         * 线程创建失败时退化回阻塞 wait（原语义，功能不受影响）。 */
+        cli_task_wait_ctx_t wctx;
+        __builtin_memset(&wctx, 0, sizeof(wctx));
+        wctx.hall = hall;
+        wctx.sched_sock = sched_remote ? sched_sock : NULL;
+        wctx.exec_id = exec_id;
+        wctx.sched_remote = sched_remote;
+        airy_thread_t wthr = AIRY_INVALID_THREAD;
+        int wait_threaded =
+            (airy_platform_thread_create(&wthr, cli_task_wait_worker, &wctx) == 0);
+        if (wait_threaded) {
+            /* 任务在后台推进；主线程轮询输入直到完成/取消 */
+            while (!wctx.done && !g_cli_cancel) {
+                int input_rc = cli_task_poll_input();
+                if (input_rc < 0)
+                    break; /* 用户打断：g_cli_cancel 已置位 */
+#ifdef _WIN32
+                Sleep(200);
+#else
+                usleep(200 * 1000);
+#endif
+                cli_spinner_tick();
+            }
+            airy_platform_thread_join(wthr, NULL);
+            err = wctx.err;
+            result = wctx.result;
+        } else if (sched_remote) {
+            /* 线程创建失败：回退阻塞 wait（远程） */
             err = cli_dag_wait_remote(sched_sock, exec_id, &result);
         } else {
             err = airy_work_hall_wait(hall, exec_id, 0, &result);
-            /* 改进6（P3）: 本轮执行复核（wait 内门禁/t2/t1-f）已结束，
-             * 解绑蓝图——BORROW 指针随本轮 plan 释放失效，避免跨轮悬垂。 */
             airy_work_hall_set_blueprint(hall, NULL);
         }
         cli_trace("wait", "%s done err=%d has_result=%d", CLI_ICON_DONE, (int)err,
@@ -1163,8 +1303,8 @@ int main(int argc, char *argv[])
 #endif /* AIRY_HAS_CJSON */
             } else {
                 char line[128];
-                snprintf(line, sizeof(line), "No result (err=%d)", (int)err);
-                cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "result", line);
+                snprintf(line, sizeof(line), "任务执行无结果：%s", cli_err_desc((int)err));
+                cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "执行结果", line);
             }
         }
         /* Decision G: validation gate annotation - mark FAIL clearly when artifacts
@@ -1172,7 +1312,7 @@ int main(int argc, char *argv[])
         if (!g_cli_cancel) {
             airy_work_hall_verify_stats(hall, NULL, &vf_after, NULL);
             if (vf_after > vf_before)
-                cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_THINK, "validate",
+                cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_DUAL_FAST_THINK, "校验",
                                      "Artifact validation failed - replan or retry the task.");
         }
         /* L2 semantic cache write-back: register the executed blueprint under the
@@ -1247,6 +1387,36 @@ int main(int argc, char *argv[])
     cli_render_set_tui(NULL);
     cli_tui_destroy(tui);
     cli_term_header_unpin();
+
+    /* 2026-08-17：/tui 切换——TUI 页面已销毁（终端恢复），用 agentrt-tui
+     * 替换当前进程（exec 语义），同一终端由图形前端接管，无进程嵌套。
+     * 仅交互模式（非 -p）且请求过切换时执行。 */
+    if (!g_cli_print_mode && switch_tui_flag) {
+        const char *home = getenv("AIRY_HOME");
+        char tui_bin[AIRY_PATH_MAX];
+        if (home && home[0])
+            snprintf(tui_bin, sizeof(tui_bin), "%s/bin/agentrt-tui", home);
+        else
+            snprintf(tui_bin, sizeof(tui_bin), "agentrt-tui");
+#ifndef _WIN32
+        extern char **environ;
+        char gw_url[128] = "";
+        const char *gw = getenv("AIRY_GATEWAY_URL");
+        if (gw && gw[0])
+            snprintf(gw_url, sizeof(gw_url), "%s", gw);
+        else
+            snprintf(gw_url, sizeof(gw_url), "http://127.0.0.1:8080");
+        char *const argv[] = {(char *)tui_bin, "--gateway-url", gw_url, NULL};
+        execve(tui_bin, argv, environ);
+        /* exec 失败（二进制缺失等）：提示后正常退出，不崩溃。 */
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "tui",
+                             "agentrt-tui 不可用，无法切换。");
+        return 0;
+#else
+        (void)0;
+#endif
+    }
+
     if (!g_cli_print_mode)
         cli_render_role_line(CLI_ROLE_SUPER_AGENT, CLI_ACTOR_SUPER_AGENT, NULL,
                              "AgentRT has exited. Thank you for using it.");

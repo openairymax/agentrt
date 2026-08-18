@@ -66,13 +66,8 @@ option(AIRY_BUILD_ALL "Build all AgentRT components" ON)
 # 默认启用而非显式开关。外部源缺失时 atoms/memoryrovol/CMakeLists.txt
 # 自动降级为 builtin provider，不会破坏构建。
 option(AIRY_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" ON)
-# 兼容别名：允许使用 AIRY_WITH_MEMORYROVOL（旧名）
-if(DEFINED AIRY_WITH_MEMORYROVOL AND NOT DEFINED AIRY_WITH_MEMORYROVOL)
-    set(AIRY_WITH_MEMORYROVOL ${AIRY_WITH_MEMORYROVOL})
-endif()
 option(AIRY_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe functions)" ON)
 set(AIRY_MEMORY_BACKEND "builtin" CACHE STRING "Memory backend (builtin|memoryrovol)")
-set(AIRY_DOCKER_BUILD OFF CACHE BOOL "Docker build mode")
 
 # CTest必须在顶级启用（在任何add_subdirectory之前）
 # R-09-SEC: Strict compliance mode and tests are now independent.
@@ -105,7 +100,6 @@ airy_print_info("Build tests:      ${BUILD_TESTS}")
 airy_print_info("Compliance strict:${AIRY_COMPLIANCE_STRICT}")
 airy_print_info("Memory backend:   ${AIRY_MEMORY_BACKEND}")
 airy_print_info("MemoryRovol Pro:  ${AIRY_WITH_MEMORYROVOL}")
-airy_print_info("Docker build:     ${AIRY_DOCKER_BUILD}")
 airy_print_info("Sanitizers:       ${ENABLE_SANITIZERS}")
 
 # 关键路径验证：确认核心目录存在
@@ -166,7 +160,7 @@ else()
     endif()
 
     if(AIRY_COMPLIANCE_STRICT)
-        add_compile_definitions(AIRY_COMPLIANCE_STRICT AIRY_COMPLIANCE_STRICT)
+        add_compile_definitions(AIRY_COMPLIANCE_STRICT)
         add_compile_options("-include" "${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/compliance/include/banned_functions.h")
 
         # 注意：内存子系统实现层的 AIRY_COMPLIANCE_IMPL 豁免由各子目录的

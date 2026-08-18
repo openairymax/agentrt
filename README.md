@@ -167,7 +167,6 @@ cd /tmp/agentrt-build && ctest --output-on-failure
 | `ENABLE_SANITIZERS` | ON | Enable ASan + LSan + UBSan |
 | `ENABLE_COVERAGE` | OFF | Enable code coverage reporting |
 | `WARNINGS_AS_ERRORS` | OFF | Treat compiler warnings as errors |
-| `AIRY_DOCKER_BUILD` | OFF | Docker build mode |
 
 ## Branch Strategy
 

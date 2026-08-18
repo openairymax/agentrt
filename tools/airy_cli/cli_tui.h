@@ -89,16 +89,46 @@ void cli_tui_mode_prev(cli_tui_t *t);
 #define CLI_TUI_PANEL_POLL_MS 200
 
 /**
- * @brief Create and activate the full-screen TUI (if stdout is a TTY).
+ * @brief Create the TUI engine handle (does NOT enter the full-screen page).
  *
- * Enters the alternate screen, switches stdin to raw mode, clears the screen
- * and primes the line history. On non-TTY / unsupported platforms returns a
- * handle with active == 0 so every later call degrades to plain stdout.
+ * 2.3.7 (2026-08-17): the interactive session defaults to the line-oriented
+ * streaming renderer (typewriter + folded thought chain); the full-screen
+ * page is entered explicitly with cli_tui_enter() (F8) so the CLI keeps its
+ * streaming interaction until the user asks for the full-screen view.
+ * Non-TTY / unsupported platforms degrade to plain stdout everywhere.
  *
  * @param out_tui output engine handle (may return a handle with active==0)
  * @return 0 on success (handle valid), non-zero on allocation failure
  */
 int cli_tui_create(cli_tui_t **out_tui);
+
+/**
+ * @brief Enter the full-screen page (alt screen + raw mode + redraw).
+ *
+ * Safe no-op when already active or when stdout is not a TTY / the terminal
+ * is too small. Routes the renderer into the TUI (cli_render_set_tui) so
+ * subsequent output lands in the page history. The conversation history
+ * accumulated while in line mode is replayed via cli_tui_replay_history()
+ * by the caller so the page is not empty on switch-in.
+ *
+ * @return 0 on success, non-zero when the page could not be entered
+ */
+int cli_tui_enter(cli_tui_t *tui);
+
+/**
+ * @brief Leave the full-screen page (restore alt screen + raw mode).
+ *
+ * Safe no-op when inactive. Routes the renderer back to plain stdout.
+ *
+ * @return 0 on success, non-zero on failure
+ */
+int cli_tui_leave(cli_tui_t *tui);
+
+/**
+ * @brief Replay the line-mode conversation history (g_history) into the
+ * TUI history so a switch-in shows prior turns. No-op when inactive.
+ */
+void cli_tui_replay_history(cli_tui_t *tui);
 
 /**
  * @brief Destroy the TUI and restore the terminal (alt screen, raw mode).
@@ -196,7 +226,11 @@ void cli_tui_pin_header(cli_tui_t *tui);
  * @param buf       output buffer
  * @param cap       buffer capacity (must be >= 2)
  * @param out_len   number of chars read (excluding '\0')
- * @return 1 on success, 0 on EOF / abort
+ * @return 1 on success, 0 on EOF / abort,
+ *         2 = line mode F8 → request to enter the full-screen page
+ *            (*out_len = 0),
+ *         3 = full-screen F8 → request to leave back to line mode
+ *            (*out_len = 0)
  */
 int cli_tui_readline(cli_tui_t *tui, char *buf, size_t cap, size_t *out_len);
 

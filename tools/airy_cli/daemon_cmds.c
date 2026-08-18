@@ -157,7 +157,7 @@ static void cli_rpc_print(const char *ns, const char *method, const char *params
     int rc = daemon_rpc_call(cli_ns_sock(ns), method, params_json, &result, CLI_RPC_TIMEOUT_MS);
     if (rc != 0 || !result) {
         char line[160];
-        snprintf(line, sizeof(line), "%s.%s call failed (err=%d)", ns, method, rc);
+        snprintf(line, sizeof(line), "%s.%s 调用失败：%s", ns, method, cli_err_desc(rc));
         cli_render_sub_agent_line(CLI_ROLE_ERROR, ns, line);
         AIRY_FREE(result);
         return;
@@ -188,7 +188,7 @@ int cmd_rpc(const char *arg, void *ctx)
 
     const char *dot = strchr(arg, '.');
     if (!dot) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "usage",
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "用法",
                               "需要 <ns>.<method> 形式");
         return 0;
     }
@@ -202,7 +202,7 @@ int cmd_rpc(const char *arg, void *ctx)
     /* Namespace tolerance: accept "tool_d" and "tool" alike. */
     char ns_resolved[64];
     if (cli_ns_resolve(ns, ns_resolved, sizeof(ns_resolved)) != 0) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "rpc",
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "RPC",
                              "未知 daemon 命名空间，/daemons 查看在线列表");
         return 0;
     }

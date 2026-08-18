@@ -342,8 +342,13 @@ static void tui_history_path(char *buf, size_t cap)
     }
     if (data && data[0])
         snprintf(buf, cap, "%s/%s", data, TUI_HISTORY_REL_PATH);
-    else
-        snprintf(buf, cap, ".%s", TUI_HISTORY_REL_PATH);
+    else {
+        const char *home = airy_home_dir();
+        if (home && home[0])
+            snprintf(buf, cap, "%s/data/%s", home, TUI_HISTORY_REL_PATH);
+        else
+            snprintf(buf, cap, "/tmp/agentrt/cli/history");
+    }
 }
 
 #ifndef _WIN32
@@ -1055,6 +1060,7 @@ enum {
     TUI_KEY_ALT_RIGHT,   /* ESC [ 1 ; 3 C / ESC [ 3 C：词右移 */
     TUI_KEY_ALT_B,       /* ESC b：词左移 */
     TUI_KEY_ALT_F,       /* ESC f：词右移 */
+    TUI_KEY_F8,          /* ESC [ 1 9 ~：全屏 ↔ 行渲染 切换（2.3.7） */
     TUI_KEY_PASTE_START, /* ESC [ 200 ~：bracketed paste 开始 */
     TUI_KEY_UNKNOWN,
 };
@@ -1122,10 +1128,17 @@ static int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
                 if (tui_wait_byte(t, &b, 50, eof) && b == '~')
                     return TUI_KEY_PGDN;
                 return TUI_KEY_UNKNOWN;
-            case '1': /* ESC [ 1 ; 5 D/C = Ctrl+Left/Right; ESC [ 1 ; 3 D/C = Alt+Left/Right */
+            case '1': /* ESC[19~ = F8；ESC[1;5D 等 = Ctrl/Alt+Left/Right */
             {
                 char semi, mod, dir;
-                if (!tui_wait_byte(t, &semi, 50, eof) || semi != ';')
+                if (!tui_wait_byte(t, &semi, 50, eof))
+                    return TUI_KEY_UNKNOWN;
+                if (semi == '9') { /* F8: ESC [ 1 9 ~ */
+                    if (!tui_wait_byte(t, &dir, 50, eof) || dir != '~')
+                        return TUI_KEY_UNKNOWN;
+                    return TUI_KEY_F8;
+                }
+                if (semi != ';')
                     return TUI_KEY_UNKNOWN;
                 if (!tui_wait_byte(t, &mod, 50, eof))
                     return TUI_KEY_UNKNOWN;
@@ -1546,12 +1559,18 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
         *out_len = 0;
 
     if (!t || !t->active) {
-        /* Non-TUI: classic fgets semantics. */
+        /* Non-TUI: classic fgets semantics. 2.3.7：F8 转义序列
+         * (ESC[19~) 出现在行输入中 → 请求进入全屏页面（返回 2）。 */
         if (!fgets(buf, (int)cap, stdin))
             return 0;
         size_t n = strlen(buf);
         while (n > 0 && (buf[n - 1] == '\n' || buf[n - 1] == '\r'))
             buf[--n] = '\0';
+        if (strstr(buf, "\x1b[19~")) {
+            if (out_len)
+                *out_len = 0;
+            return 2;
+        }
         if (out_len)
             *out_len = n;
         return 1;
@@ -1592,6 +1611,13 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
                 cli_tui_redraw(t);
             }
             continue;
+        }
+        /* 2.3.7：全屏 F8 → 请求退出回行渲染流式模式（返回 3）。放在
+         * 模式/搜索处理之前：任何视图下 F8 都能切换，语义单一。 */
+        if (key == TUI_KEY_F8) {
+            if (out_len)
+                *out_len = 0;
+            return 3;
         }
 
         /* ---- 阶段 4：视图模式（tab）切换 ---- */
@@ -2041,21 +2067,28 @@ int cli_tui_create(cli_tui_t **out_tui)
         g_default_tui = t;
     /* Recall past submitted commands (Up / Ctrl+R) from the previous session. */
     tui_cmd_hist_load(t);
-    if (!cli_term_is_tty()) {
-        /* Non-TTY: keep the handle but stay inactive (stream-safe). */
+    /* 2.3.7 (2026-08-17)：交互默认行渲染流式模式，不自动进入全屏页面；
+     * 全屏由 cli_tui_enter() 显式进入（F8 切换）。 */
+    return 0;
+}
+
+int cli_tui_enter(cli_tui_t *t)
+{
+    if (!t || t->active)
         return 0;
-    }
+    if (!cli_term_is_tty())
+        return -1;
 
     t->active = 1;
     tui_get_size(t);
     if (t->rows <= 6 || t->cols <= 10) {
         t->active = 0;
-        return 0;
+        return -1;
     }
 
 #ifdef _WIN32
     t->active = 0; /* POSIX-only full-screen mode */
-    return 0;
+    return -1;
 #else
     /* Enter alternate screen + bracketed paste + raw mode. */
     fputs("\033[?1049h\033[?2004h\033[2J\033[H", stdout);
@@ -2084,19 +2117,52 @@ int cli_tui_create(cli_tui_t **out_tui)
 #endif
 }
 
+int cli_tui_leave(cli_tui_t *t)
+{
+    if (!t || !t->active)
+        return 0;
+#ifndef _WIN32
+    if (t->termios_saved)
+        tcsetattr(STDIN_FILENO, TCSANOW, &t->saved_termios);
+    signal(SIGWINCH, SIG_DFL);
+#endif
+    fputs("\033[?2004l\033[?1049l", stdout);
+    fflush(stdout);
+    t->active = 0;
+    t->termios_saved = 0;
+    return 0;
+}
+
+void cli_tui_replay_history(cli_tui_t *t)
+{
+    if (!t || !t->active)
+        return;
+    for (size_t i = 0; i < g_history_count; i++) {
+        const char *role = g_history_roles[i];
+        const char *content = g_history_contents[i];
+        if (!role || !content)
+            continue;
+        const char *tag = (strcmp(role, "user") == 0) ? "[For Thee]" : "[Super Agent]";
+        size_t cap = 64 + strlen(tag) + strlen(content);
+        char *line = (char *)AIRY_MALLOC(cap);
+        if (!line)
+            continue;
+        int n = snprintf(line, cap, "  %s  %s", tag, content);
+        if (n < 0) {
+            AIRY_FREE(line);
+            continue;
+        }
+        tui_commit_line(t, line);
+    }
+    t->dirty = 1;
+}
+
 void cli_tui_destroy(cli_tui_t *t)
 {
     if (!t)
         return;
-    if (t->active) {
-#ifndef _WIN32
-        if (t->termios_saved)
-            tcsetattr(STDIN_FILENO, TCSANOW, &t->saved_termios);
-        signal(SIGWINCH, SIG_DFL);
-#endif
-        fputs("\033[?2004l\033[?1049l", stdout);
-        fflush(stdout);
-    }
+    if (t->active)
+        cli_tui_leave(t);
     tui_history_reset(&t->hist);
     tui_cmd_hist_reset(t);
     AIRY_FREE(t->cur);

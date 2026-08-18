@@ -54,8 +54,8 @@ int cmd_status(const char *arg, void *ctx)
     (void)arg;
     cli_cmd_ctx_t *c = (cli_cmd_ctx_t *)ctx;
     if (!c || !c->hall) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "status",
-                             "Hall unavailable");
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "状态",
+                             "任务大厅不可用");
         return 0;
     }
 
@@ -64,8 +64,8 @@ int cmd_status(const char *arg, void *ctx)
     airy_err_t err = airy_work_hall_list(c->hall, &entries, &count);
     if (err != AIRY_SUCCESS) {
         char line[128];
-        snprintf(line, sizeof(line), "Hall query failed (err=%d)", (int)err);
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "status", line);
+        snprintf(line, sizeof(line), "任务大厅查询失败：%s", cli_err_desc((int)err));
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "状态", line);
         return 0;
     }
 
@@ -324,7 +324,7 @@ int cmd_chain(const char *arg, void *ctx)
 {
     (void)ctx;
     if (!g_cli_hall_store) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "chain",
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "事件流",
                              "事件流不可用（hall store 未创建）");
         return 0;
     }
@@ -337,8 +337,8 @@ int cmd_chain(const char *arg, void *ctx)
     airy_err_t err = airy_hall_store_list_tasks(g_cli_hall_store, "default", &tasks, &n);
     if (err != AIRY_SUCCESS) {
         char line[128];
-        snprintf(line, sizeof(line), "任务枚举失败 (err=%d)", (int)err);
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "chain", line);
+        snprintf(line, sizeof(line), "任务枚举失败：%s", cli_err_desc((int)err));
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "事件流", line);
         return 0;
     }
     if (n == 0) {
@@ -375,5 +375,21 @@ int cmd_quit(const char *arg, void *ctx)
     cli_cmd_ctx_t *c = (cli_cmd_ctx_t *)ctx;
     if (c && c->quit)
         *c->quit = 1;
+    return 0;
+}
+
+/* 2026-08-17：/tui 切换到图形 TUI（agentrt-tui）。
+ * 定位同 $AIRY_HOME/bin 下的 agentrt-tui（由 airymaxrt 启动器保证两个
+ * 前端二进制同装），仅当 CLI 运行于全屏 TUI 页面时切换才有意义——该
+ * 页面激活说明终端已就绪，exec 后由 agentrt-tui 接管同一终端。切换请求
+ * 只置标志，真正的 exec 发生在主循环清理之后（main.c），保证无进程嵌套。 */
+int cmd_tui(const char *arg, void *ctx)
+{
+    (void)arg;
+    cli_cmd_ctx_t *c = (cli_cmd_ctx_t *)ctx;
+    if (c && c->quit)
+        *c->quit = 1;
+    if (c && c->switch_tui)
+        *c->switch_tui = 1;
     return 0;
 }

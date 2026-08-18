@@ -10,7 +10,9 @@
  *
  *   - [For Thee]     the human operator (cyan)
  *   - [Super Agent]  agentrt itself, replies and decisions (green)
- *   - [Super Think]  system-level thinking / dual-thinking traces (yellow)
+ *   - [Dual Think]   dual-thinking system traces (yellow); chain variants
+ *                    [Dual Slow Think] (t2) / [Dual Fast Think] (t1-f) /
+ *                    [Dual Prof Think] (t1-p) tag the active thinking track
  *   - [Sub xxx Agent] sub-agents and executors running nodes (magenta)
  *
  * Design follows the Claude Code / Codex CLI conventions:
@@ -87,8 +89,9 @@ void cli_render_meter_end(cli_line_meter_t *m);
  */
 size_t cli_render_meter_phys(cli_line_meter_t *m);
 
-/* 长回复折叠阈值与保留行数（交互 TTY / TUI 共用） */
-#define CLI_REPLY_FOLD_MAX 8   /* 逻辑行数超过则折叠 */
+/* 长回复折叠阈值与保留行数（交互 TTY / TUI 共用）
+ * 端侧小屏幕适配：阈值从 8 降至 6，确保有限屏幕下长回复不占满全屏。 */
+#define CLI_REPLY_FOLD_MAX 6   /* 逻辑行数超过则折叠 */
 #define CLI_REPLY_FOLD_KEEP 3  /* 折叠后保留的前几行 */
 
 /* 空回复占位（2026-08-17）：模型未产生文本回复（thinking 模型可能
@@ -143,7 +146,11 @@ void cli_render_set_tui(struct cli_tui_s *tui);
 void cli_out(const char *s);
 void cli_outn(const char *s, size_t n);
 void cli_outc(char c);
+#if defined(__GNUC__)
+void cli_outf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+#else
 void cli_outf(const char *fmt, ...);
+#endif
 
 /**
  * @brief One-shot server mode (-p) progress channel: "[tag] message" to stderr.
@@ -156,7 +163,11 @@ void cli_outf(const char *fmt, ...);
  * @param tag  short phase tag (e.g. "plan", "submit", "status")
  * @param fmt  printf-style message
  */
+#if defined(__GNUC__)
+void cli_trace(const char *tag, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+#else
 void cli_trace(const char *tag, const char *fmt, ...);
+#endif
 
 /* Shortcuts mirroring the historical fputs/fputc(stdout) call sites. */
 #define cli_puts(s) cli_out(s)
@@ -196,21 +207,36 @@ void cli_trace(const char *tag, const char *fmt, ...);
 const char *cli_icon_for_state(const char *state);
 void cli_compact_bar(char *out, size_t cap, double progress, size_t cells);
 
+/* 用户可读的错误描述（2026-08-17）：内部错误码（AIRY_ERR_* 负值）对用户
+ * 无意义，统一映射为可理解的中文描述；未识别码返回通用描述。返回值指向
+ * 静态字符串，调用方直接用于打印即可。 */
+const char *cli_err_desc(int err);
+
+/* 任务状态中文化（2026-08-17）：内部状态机字符串（completed/running/...）
+ * 对用户无意义，统一映射为简短中文；未识别状态返回原文。返回值指向静态
+ * 字符串，直接用于进度行展示即可。 */
+const char *cli_state_cn(const char *state);
+
 typedef enum {
     CLI_ROLE_USER = 0,        /* [For Thee]     cyan     */
     CLI_ROLE_SUPER_AGENT,     /* [Super Agent]  green    */
-    CLI_ROLE_SUPER_THINK,     /* [Super Think]  yellow   */
+    CLI_ROLE_DUAL_THINK,      /* [Dual Think]   yellow   */
     CLI_ROLE_SUB_AGENT,       /* [Sub xxx Agent] magenta  */
     CLI_ROLE_STATUS,          /* status / info  dim      */
     CLI_ROLE_TRACE,           /* internal trace  dim-gray */
     CLI_ROLE_ERROR,           /* error / warn   red      */
 } cli_role_t;
 
-/* Conversation actor label used inside the bracket header. */
+/* Conversation actor label used inside the bracket header.
+ * Dual-thinking chain（2026-08-17）：t2=慢思考、t1-f=快思考、t1-p=专业
+ * 思考，展示时按实时思考链区分，通用场景回落 CLI_ACTOR_DUAL_THINK。 */
 typedef enum {
     CLI_ACTOR_USER = 0,
     CLI_ACTOR_SUPER_AGENT,
-    CLI_ACTOR_SUPER_THINK,
+    CLI_ACTOR_DUAL_THINK,
+    CLI_ACTOR_DUAL_SLOW_THINK,  /* t2     [Dual Slow Think] */
+    CLI_ACTOR_DUAL_FAST_THINK,  /* t1-f   [Dual Fast Think] */
+    CLI_ACTOR_DUAL_PROF_THINK,  /* t1-p   [Dual Prof Think] */
     CLI_ACTOR_SUB_AGENT,
 } cli_actor_t;
 

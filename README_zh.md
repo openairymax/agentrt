@@ -167,7 +167,6 @@ cd /tmp/agentrt-build && ctest --output-on-failure
 | `ENABLE_SANITIZERS`      | ON        | 启用 ASan + LSan + UBSan             |
 | `ENABLE_COVERAGE`        | OFF       | 启用代码覆盖率报告                          |
 | `WARNINGS_AS_ERRORS`     | OFF       | 将编译器警告视为错误                         |
-| `AIRY_DOCKER_BUILD`      | OFF       | Docker 构建模式                        |
 
 ## 分支策略
 

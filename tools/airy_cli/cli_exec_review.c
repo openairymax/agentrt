@@ -104,8 +104,16 @@ static int cli_exec_t2_review(const airy_review_input_t *in, const char *fact_ba
     __builtin_memset(&cfg, 0, sizeof(cfg));
     /* t2 语义复核属 A 角色（生成器/复核），按 GRAD 三模型命名取
      * AIRY_MODEL_T2（2026-08-17 审计修复：此前误用 T1F，仅配 T2 时
-     * 复核会回落 provider 默认，角色分离失效）；t1-f 终裁仍取 T1F。 */
-    cfg.model = getenv("AIRY_MODEL_T2");
+     * 复核会回落 provider 默认，角色分离失效）；t1-f 终裁仍取 T1F。
+     * 2026-08-17 审计修复：T2 未配置时显式返回 -1 走机制层降级
+     * （gate-only），而非静默回落 provider 默认——否则与主生成同模型
+     * 自审自签，双思考独立性失效且 n_degraded 不递增。 */
+    const char *t2m = getenv("AIRY_MODEL_T2");
+    if (!t2m || !t2m[0]) {
+        cli_trace("review", "exec t2: AIRY_MODEL_T2 not set, degrade to gate-only");
+        return -1;
+    }
+    cfg.model = t2m;
     cfg.messages = msgs;
     cfg.message_count = 2;
     cfg.temperature = 0.0f;
@@ -158,7 +166,15 @@ static int cli_exec_t1f_adjudicate(const airy_review_input_t *in, int drift,
 
     llm_request_config_t cfg;
     __builtin_memset(&cfg, 0, sizeof(cfg));
-    cfg.model = getenv("AIRY_MODEL_T1F");
+    /* 2026-08-17 审计修复：T1F 未配置时显式返回 -1，由机制层走既定降级
+     * （adopt t2 verdict）——而非静默回落 provider 默认，否则终裁与
+     * 主生成同模型自我终裁（自审自签），双思考独立性失效。 */
+    const char *t1fm = getenv("AIRY_MODEL_T1F");
+    if (!t1fm || !t1fm[0]) {
+        cli_trace("review", "exec t1-f: AIRY_MODEL_T1F not set, adopt t2 verdict");
+        return -1;
+    }
+    cfg.model = t1fm;
     cfg.messages = msgs;
     cfg.message_count = 2;
     cfg.temperature = 0.0f;

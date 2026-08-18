@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -65,8 +66,8 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
         return empty_json;
     }
 
-    cli_render_role_line(CLI_ROLE_SUPER_THINK, CLI_ACTOR_SUPER_THINK, "gccp",
-                         "Intent confirmation: I will ask one question at a time (Enter to skip):");
+    cli_render_role_line(CLI_ROLE_DUAL_THINK, CLI_ACTOR_DUAL_FAST_THINK, "意图确认",
+                         "我将逐问确认意图（Enter 跳过当前问题）：");
     /* The planning spinner may be animating; pause it so the questions
      * render on clean lines, then resume after the answers. */
     cli_spinner_pause();
@@ -115,8 +116,11 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
 
         char line[1024];
         size_t line_len = 0;
-        if (!cli_tui_readline(cli_tui_get_default(), line, sizeof(line), &line_len))
+        int rl = cli_tui_readline(cli_tui_get_default(), line, sizeof(line), &line_len);
+        if (rl == 0)
             break;
+        if (rl != 1)
+            continue; /* F8 切换请求：重试当前问题（切换在主循环处理） */
         int answered = (line_len > 0);
         if (answered)
             cJSON_AddStringToObject(answers, q->id, line);
@@ -201,8 +205,11 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
         fflush(stdout);
         char line[1024];
         size_t line_len = 0;
-        if (!cli_tui_readline(cli_tui_get_default(), line, sizeof(line), &line_len))
+        int rl = cli_tui_readline(cli_tui_get_default(), line, sizeof(line), &line_len);
+        if (rl == 0)
             break;
+        if (rl != 1)
+            continue; /* F8 切换请求：重试当前问题（切换在主循环处理） */
         if (i > 0)
             *p++ = ',';
         n = snprintf(p, cap - (size_t)(p - json), "\"%s\":\"%s\"", q->id, line);
@@ -280,7 +287,30 @@ void cli_history_clear(void)
     "web_fetch（抓取网页正文，参数 url）。当问题涉及实时信息、最新新闻、时效"   \
     "性数据，或你知识截止日期（2025-05）之后发生的事件，必须调用 web_search "  \
     "获取最新结果，必要时再用 web_fetch 深入抓取；不要凭过时知识硬答。"        \
-    "工具结果返回后，基于结果组织回答并标注信息时效。"
+    "工具结果返回后，基于结果组织回答并标注信息时效。\n"                        \
+    "系统上下文已注入宿主机当前时间。用户问现在几点/今天几号/星期几等时间类"    \
+    "问题时，直接依据注入的时间作答，不要为查询时间调用任何工具。"
+
+/* 2.3.4 宿主机时间注入（2026-08-17 补强）：system prompt 声明"已注入宿主机
+ * 当前时间"，但此前从未真正注入——LLM 只能靠知识截止日期猜测，问"今天几号"
+ * 会答错。现在每次会话真实注入本地时间（含时区偏移）。静态缓冲够用（每个
+ * 会话一条 system 消息，msgbuf 已 STRDUP 复制，生命周期安全）。 */
+static const char *cli_system_prompt_now(void)
+{
+    static char s_sys[1536];
+    time_t now = time(NULL);
+    struct tm tmv;
+#ifdef _WIN32
+    localtime_s(&tmv, &now);
+#else
+    localtime_r(&now, &tmv);
+#endif
+    char ts[96];
+    strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z", &tmv);
+    snprintf(s_sys, sizeof(s_sys),
+             "当前宿主机时间：%s（本地时区）。\n%s", ts, CLI_SYSTEM_PROMPT);
+    return s_sys;
+}
 
 #define CLI_CLASSIFY_PROMPT                                                    \
     "判断用户输入属于【任务指令】还是【普通对话】。任务指令：要求执行具体工程" \
@@ -634,7 +664,7 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
     if (!out_json)
         out_json = AIRY_STRDUP("{\"ok\":false,\"error\":\"tool response parse failed\"}");
     cli_trace("chat", "%s tool exec tool=%s ok=%d resp=%.120s", ok ? CLI_ICON_CHECK : CLI_ICON_CROSS,
-              tool_id, ok, out_json);
+              tool_id, ok, out_json ? out_json : "");
     if (out_ok)
         *out_ok = ok;
     return out_json;
@@ -876,6 +906,10 @@ int cli_classify_input(const char *input)
 static char s_code_carry[8];
 static size_t s_code_carry_len = 0;
 
+/* 交互 TTY 流式：首片到达时擦除 "Connecting..." 提示行（stderr 上的
+ * 光标行），避免残留。仅在交互 TTY 流式模式下有意义（-p 不打印提示）。 */
+static int s_stream_first_chunk = 0;
+
 /* 交互 TTY 流式折叠状态（2026-08-17）：流式预览直出后记录其逻辑/
  * 物理行数，完成后擦除预览并按需折叠重绘。仅最终轮有意义（工具轮
  * 的预览保留为过程展示，不擦除）。 */
@@ -918,6 +952,13 @@ static void cli_chat_stream_cb(const char *chunk, void *user_data)
     size_t n = strlen(chunk);
     if (n == 0)
         return;
+
+    /* 首片到达：擦除 "Connecting..." 提示行 */
+    if (s_stream_first_chunk) {
+        s_stream_first_chunk = 0;
+        fprintf(stderr, "\r\033[K");
+        fflush(stderr);
+    }
 
     /* 跨 chunk：上一片末尾的标签前缀先与本次开头拼接判断。 */
     if (s_code_carry_len) {
@@ -963,11 +1004,20 @@ static void cli_chat_stream_cb(const char *chunk, void *user_data)
     fflush(stdout);
 }
 
+/* 2.3.14 (2026-08-17)：对话思考链来自 t1-f（context arbiter）模型，
+ * 实时思考标签为 [Dual Fast Think]；未配置 AIRY_MODEL_T1F（走 llm_d
+ * 默认模型）时回落通用 [Dual Think]。 */
+static cli_actor_t cli_chat_think_actor(void)
+{
+    const char *t1f = getenv("AIRY_MODEL_T1F");
+    return (t1f && t1f[0]) ? CLI_ACTOR_DUAL_FAST_THINK : CLI_ACTOR_DUAL_THINK;
+}
+
 void cli_chat_reply(const char *input)
 {
     if (!g_chat_adapter) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "chat",
-                             "Chat unavailable (llm_d not connected).");
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "对话",
+                             "对话服务不可用（模型服务未连接）。");
         return;
     }
 
@@ -994,23 +1044,27 @@ void cli_chat_reply(const char *input)
      * （assistant tool_calls + role="tool" 结果），所有内容副本由缓冲统一管理。 */
     cli_chat_msgbuf_t buf;
     AIRY_MEMSET(&buf, 0, sizeof(buf));
-    cli_msgbuf_push(&buf, "system", CLI_SYSTEM_PROMPT, NULL, NULL, NULL);
+    cli_msgbuf_push(&buf, "system", cli_system_prompt_now(), NULL, NULL, NULL);
     for (size_t hi = 0; hi < g_history_count; hi++)
         cli_msgbuf_push(&buf, g_history_roles[hi], g_history_contents[hi], NULL, NULL, NULL);
     cli_msgbuf_push(&buf, "user", input, NULL, NULL, NULL);
 
-    /* 交互 TTY 与 -p 走流式（打字机预览，完成后折叠/重绘最终形态）；
-     * TUI 与 --json 保持非流式（markdown 完整渲染进历史 / 结构化输出）。
+    /* 交互 TTY 走流式（打字机预览，完成后折叠/重绘最终形态）；
+     * TUI、--json 与 -p 保持非流式（markdown 完整渲染进历史 / 结构化
+     * 输出 / 纯 stdout 最终答案）。-p 非流式还避免工具轮之间模型的
+     * 过程叙述混入 stdout——脚本模式只消费最终回答（2026-08-17）。
      * 交互流式不再使用 spinner——打字机即进度指示。 */
     cli_tui_t *tui = cli_tui_get_default();
     int tui_active = tui && cli_tui_active(tui);
-    int stream_mode = !g_cli_json_mode && !tui_active;
+    int stream_mode = !g_cli_json_mode && !g_cli_print_mode && !tui_active;
 
     /* 交互模式的"思考中"状态行（spinner；流式/-p/--json 抑制 chrome）。 */
     int spinner_on = !g_cli_print_mode && !g_cli_json_mode && !stream_mode;
     if (spinner_on) {
         char think_title[128];
-        snprintf(think_title, sizeof(think_title), "Thinking (%s)",
+        /* 2.3.14：思考角色细分——t1-f 思考中显示 [Dual Fast Think] */
+        snprintf(think_title, sizeof(think_title), "%s (%s)",
+                 cli_render_actor_name(cli_chat_think_actor()),
                  t1f_model ? t1f_model : "default");
         cli_spinner_start(think_title);
     }
@@ -1043,11 +1097,25 @@ void cli_chat_reply(const char *input)
             int folding = !g_cli_print_mode;
             if (folding)
                 cli_render_meter_begin(&meter);
+            /* 连接反馈：流式前在 stderr 显示连接状态，首片到达时擦除。
+             * 避免连接阶段（RPC 握手 + 模型推理首 token）用户无任何反馈。 */
+            s_stream_first_chunk = !g_cli_print_mode;
+            if (s_stream_first_chunk) {
+                fprintf(stderr, "    %s●%s Connecting…\r",
+                        cli_c(CLR_DIM), cli_c(CLR_RESET));
+                fflush(stderr);
+            }
             ret = llm_svc_adapter_complete_stream(g_chat_adapter, &cfg,
                                                   cli_chat_stream_cb, NULL, &resp);
             /* 流式收尾：flush 可能残留的 [code] 前缀 carry（流提前结束时
              * 最后一片未触达标签判定的字节）。 */
             cli_stream_norm_flush_carry();
+            /* 流结束但无首片到达（连接失败/空响应）：擦除 Connecting 行 */
+            if (s_stream_first_chunk) {
+                s_stream_first_chunk = 0;
+                fprintf(stderr, "\r\033[K");
+                fflush(stderr);
+            }
             if (folding) {
                 g_chat_fold_lines = meter.lines;
                 g_chat_fold_phys = cli_render_meter_phys(&meter);
@@ -1061,9 +1129,13 @@ void cli_chat_reply(const char *input)
                 llm_response_free(resp);
             if (spinner_on)
                 cli_spinner_stop(0, "reply failed");
-            char line[128];
-            snprintf(line, sizeof(line), "Reply failed (err=%d).", ret);
-            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "chat", line);
+            /* 人类可读的错误描述（数字码对用户无意义） */
+            const char *err_desc = cli_err_desc((int)ret);
+            if (ret == 0 && (!resp || resp->choice_count == 0))
+                err_desc = "模型未返回文本（可能仅生成了思考内容）";
+            char line[256];
+            snprintf(line, sizeof(line), "回复失败：%s", err_desc);
+            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "对话", line);
             cli_msgbuf_free(&buf);
             return;
         }
@@ -1098,15 +1170,15 @@ void cli_chat_reply(const char *input)
     int stream_mode = 0;
     int tool_rounds = 0;
     size_t msg_n = g_history_count + 2;
-    llm_message_t *msgs = (llm_message_t *)AIRY_MALLOC(msg_n * sizeof(llm_message_t));
+    llm_message_t *msgs = (llm_message_t *)AIRY_CALLOC(msg_n, sizeof(llm_message_t));
     if (!msgs) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "chat",
-                             "Out of memory, cannot reply.");
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "对话",
+                             "内存不足，无法生成回复。");
         return;
     }
     size_t mi = 0;
     msgs[mi].role = "system";
-    msgs[mi].content = CLI_SYSTEM_PROMPT;
+    msgs[mi].content = cli_system_prompt_now();
     mi++;
     for (size_t hi = 0; hi < g_history_count; hi++) {
         msgs[mi].role = g_history_roles[hi];
@@ -1120,7 +1192,9 @@ void cli_chat_reply(const char *input)
     int spinner_on = !g_cli_print_mode && !g_cli_json_mode;
     if (spinner_on) {
         char think_title[128];
-        snprintf(think_title, sizeof(think_title), "Thinking (%s)",
+        /* 2.3.14：思考角色细分——t1-f 思考中显示 [Dual Fast Think] */
+        snprintf(think_title, sizeof(think_title), "%s (%s)",
+                 cli_render_actor_name(cli_chat_think_actor()),
                  t1f_model ? t1f_model : "default");
         cli_spinner_start(think_title);
     }
@@ -1141,8 +1215,8 @@ void cli_chat_reply(const char *input)
         if (spinner_on)
             cli_spinner_stop(0, "reply failed");
         char line[128];
-        snprintf(line, sizeof(line), "Reply failed (err=%d).", ret);
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "chat", line);
+        snprintf(line, sizeof(line), "回复失败：%s", cli_err_desc(ret));
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "对话", line);
         AIRY_FREE(msgs);
         return;
     }
@@ -1206,6 +1280,17 @@ void cli_chat_reply(const char *input)
                 if (en > 0)
                     fwrite(erase, 1, (size_t)en, stdout);
             }
+            /* 2.3.5/2.3.14：thinking 模型的思考过程以 [Dual Think] 折叠
+             * 呈现（前几行 + 折叠尾），避免碎片刷屏，又让用户看到模型
+             * 确实在思考；浏览/日志可看全量。 */
+            if (final_resp->choices && final_resp->choice_count > 0 &&
+                final_resp->choices[0].reasoning_content &&
+                final_resp->choices[0].reasoning_content[0]) {
+                cli_render_role_line(CLI_ROLE_DUAL_THINK, cli_chat_think_actor(),
+                                     "思考", NULL);
+                cli_render_collapsed(final_resp->choices[0].reasoning_content,
+                                     4, CLI_REPLY_FOLD_KEEP, 1);
+            }
             if (final_content[0] != '\0') {
                 if (g_chat_fold_lines > CLI_REPLY_FOLD_MAX)
                     cli_render_super_agent_truncated(final_content);
@@ -1215,7 +1300,16 @@ void cli_chat_reply(const char *input)
                 cli_render_super_agent(CLI_REPLY_EMPTY_HINT);
             }
         } else {
-            /* TUI / 非流式交互：markdown 渲染进历史，标记折叠区。 */
+            /* TUI / 非流式交互：思考链折叠展示（进历史）+ markdown 渲染
+             * 进历史，标记折叠区（浏览展开）。 */
+            if (final_resp->choices && final_resp->choice_count > 0 &&
+                final_resp->choices[0].reasoning_content &&
+                final_resp->choices[0].reasoning_content[0]) {
+                cli_render_role_line(CLI_ROLE_DUAL_THINK, cli_chat_think_actor(),
+                                     "思考", NULL);
+                cli_render_collapsed(final_resp->choices[0].reasoning_content,
+                                     4, CLI_REPLY_FOLD_KEEP, 1);
+            }
             if (final_content[0] != '\0') {
                 size_t start_hist = r_tui_active ? cli_tui_hist_count(r_tui) : 0;
                 if (r_tui_active)
