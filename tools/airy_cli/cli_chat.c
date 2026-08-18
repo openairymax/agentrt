@@ -663,8 +663,8 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
     }
     if (!out_json)
         out_json = AIRY_STRDUP("{\"ok\":false,\"error\":\"tool response parse failed\"}");
-    cli_trace("chat", "%s tool exec tool=%s ok=%d resp=%.120s", ok ? CLI_ICON_CHECK : CLI_ICON_CROSS,
-              tool_id, ok, out_json ? out_json : "");
+    cli_trace("chat", "%s tool exec tool=%s ok=%d resp=%.*s", ok ? CLI_ICON_CHECK : CLI_ICON_CROSS,
+              tool_id, ok, (int)cli_utf8_safe_len(out_json, 120), out_json ? out_json : "");
     if (out_ok)
         *out_ok = ok;
     return out_json;
@@ -712,7 +712,7 @@ static int cli_chat_tool_round(cli_chat_msgbuf_t *b, const llm_response_t *resp)
 
         /* 工具调用过程卡片：⚙ 动作名…（参数/返回内容不暴露在对话中；
          * 操作细节经 cli_trace 留档供 -p 管道与日志诊断）。 */
-        cli_trace("chat", "tool call %s args=%.160s", name, args ? args : "{}");
+        cli_trace("chat", "tool call %s args=%.*s", name, (int)cli_utf8_safe_len(args, 160), args ? args : "{}");
         cli_render_tool_use(name, args);
 
         int ok = 0;

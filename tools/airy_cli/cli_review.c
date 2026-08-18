@@ -240,7 +240,7 @@ static void *cli_review_worker(void *arg)
     if (rc == 0 && resp)
         job->output = cli_review_rpc_field(resp, "output");
     if (job->output && job->output[0])
-        cli_trace("review", "sub-agent[%s] verdict: %.180s", job->topic, job->output);
+        cli_trace("review", "sub-agent[%s] verdict: %.*s", job->topic, (int)cli_utf8_safe_len(job->output, 180), job->output);
     AIRY_FREE(resp);
     return NULL;
 }
