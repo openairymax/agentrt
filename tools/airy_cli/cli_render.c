@@ -204,6 +204,36 @@ void cli_outf(const char *fmt, ...)
     AIRY_FREE(big);
 }
 
+/* 用户可读的错误描述：内部 AIRY_ERR_* 错误码（负值）对用户无意义，
+ * 统一映射为可理解的中文描述；未识别码返回通用描述。 */
+const char *cli_err_desc(int err)
+{
+    switch (err) {
+    case AIRY_ERR_TIMEOUT:
+        return "请求超时，请检查网络或服务状态";
+    case AIRY_ERR_NOT_FOUND:
+        return "目标不存在或未找到";
+    case AIRY_ERR_GENERIC_FAIL:
+        return "操作失败，请稍后重试";
+    case AIRY_ERR_IO:
+        return "读写错误，请检查文件或磁盘";
+    case AIRY_ERR_PERMISSION_DENIED:
+        return "权限不足，无法执行该操作";
+    case AIRY_ERR_INVALID_PARAM:
+        return "参数无效，请检查输入";
+    case AIRY_ERR_NOT_SUPPORTED:
+        return "暂不支持该操作";
+    case AIRY_ERR_OUT_OF_MEMORY:
+        return "内存不足";
+    case AIRY_ERR_CANCELED:
+        return "操作已取消";
+    case AIRY_ERR_WOULD_BLOCK:
+        return "资源暂时不可用，请稍后重试";
+    default:
+        return "发生错误";
+    }
+}
+
 void cli_trace(const char *tag, const char *fmt, ...)
 {
     /* One-shot server mode (-p) progress channel: a "[tag] message" line on
@@ -305,7 +335,7 @@ const char *cli_render_role_color(cli_role_t role)
         return CLR_CYAN;
     case CLI_ROLE_SUPER_AGENT:
         return CLR_GREEN;
-    case CLI_ROLE_SUPER_THINK:
+    case CLI_ROLE_DUAL_THINK:
         return CLR_YELLOW;
     case CLI_ROLE_SUB_AGENT:
         return CLR_MAGENTA;
@@ -327,8 +357,14 @@ const char *cli_render_actor_name(cli_actor_t actor)
         return "For Thee";
     case CLI_ACTOR_SUPER_AGENT:
         return "Super Agent";
-    case CLI_ACTOR_SUPER_THINK:
-        return "Super Think";
+    case CLI_ACTOR_DUAL_THINK:
+        return "Dual Think";
+    case CLI_ACTOR_DUAL_SLOW_THINK:
+        return "Dual Slow Think";
+    case CLI_ACTOR_DUAL_FAST_THINK:
+        return "Dual Fast Think";
+    case CLI_ACTOR_DUAL_PROF_THINK:
+        return "Dual Prof Think";
     case CLI_ACTOR_SUB_AGENT:
         return "Sub Agent";
     default:
@@ -391,6 +427,34 @@ static void cli_emit_inline(const char *text)
                 cli_out(cli_c(CLR_RESET));
                 p = e + 1;
                 continue;
+            }
+        }
+        /* Markdown link: [text](url) — cyan + underline for the label;
+         * URL hidden in interactive mode (kept in -p for pipe consumers). */
+        if (p[0] == '[') {
+            const char *close_bracket = strchr(p + 1, ']');
+            if (close_bracket && close_bracket[1] == '(') {
+                const char *close_paren = strchr(close_bracket + 2, ')');
+                if (close_paren) {
+                    size_t label_len = (size_t)(close_bracket - (p + 1));
+                    if (label_len > 0) {
+                        cli_out(cli_c(CLR_CYAN));
+                        cli_out(cli_c(CLR_UNDERLINE));
+                        cli_outn(p + 1, label_len);
+                        cli_out(cli_c(CLR_RESET));
+                        if (g_cli_print_mode) {
+                            /* -p: expose URL for pipe consumers */
+                            size_t url_len = (size_t)(close_paren - (close_bracket + 2));
+                            cli_out(cli_c(CLR_DIM));
+                            cli_out(" (");
+                            cli_outn(close_bracket + 2, url_len);
+                            cli_out(")");
+                            cli_out(cli_c(CLR_RESET));
+                        }
+                        p = close_paren + 1;
+                        continue;
+                    }
+                }
             }
         }
         cli_outc(*p);
@@ -983,8 +1047,9 @@ void cli_render_stream_fold_trailer(size_t more_lines)
 {
     if (more_lines == 0)
         return;
-    char trailer[96];
-    snprintf(trailer, sizeof(trailer), "└ … %zu more lines (full text in logs)",
+    /* 折叠尾：中文提示 + 省略号图标，视觉轻盈不抢眼 */
+    char trailer[128];
+    snprintf(trailer, sizeof(trailer), "└ … 省略 %zu 行（完整内容见日志）",
              more_lines);
     const char *g = cli_gutter(2 + CLI_ROLE_HDR_W);
     cli_out(g);
@@ -1301,14 +1366,13 @@ void cli_render_progress_bar(double progress, size_t width, const char *label)
         filled = width;
 
     const char *g = cli_gutter(4);
+    cli_out(g);
     if (label && label[0]) {
-        cli_out(g);
         cli_out(cli_c(CLR_DIM));
+        cli_out(CLI_ICON_BRANCH " "); /* └ 节点层级分支符号 */
         cli_out(label);
         cli_out(cli_c(CLR_RESET));
         cli_out(": ");
-    } else {
-        cli_out(g);
     }
 
     cli_out("[");
@@ -1367,7 +1431,7 @@ void cli_render_task_line(const char *tag, const char *id, const char *state,
         cli_outf("%s%s[%s]%s ", g, cli_c(CLR_DIM), tag, cli_c(CLR_RESET));
     cli_outf("%s%s %s%s%s ", st_col, st_icon, cli_c(CLR_RESET), cli_c(CLR_DIM),
            id ? id : "?");
-    cli_outf("%s%s%s ", st_col, st, cli_c(CLR_RESET));
+    cli_outf("%s%s%s ", st_col, cli_state_cn(st), cli_c(CLR_RESET));
     cli_outf("%s[%s]%s %s%3.0f%%%s\n", cli_c(bar_bright ? CLR_GREEN : CLR_DIM), bar,
            cli_c(CLR_RESET), cli_c(bar_bright ? CLR_GREEN : CLR_DIM), progress * 100.0,
            cli_c(CLR_RESET));
@@ -1392,6 +1456,39 @@ const char *cli_icon_for_state(const char *state)
         strcmp(state, "ready") == 0)
         return CLI_ICON_TODO;
     return CLI_ICON_BULLET;
+}
+
+const char *cli_state_cn(const char *state)
+{
+    if (!state)
+        return "未知";
+    if (strcmp(state, "completed") == 0 || strcmp(state, "success") == 0 ||
+        strcmp(state, "done") == 0)
+        return "完成";
+    if (strcmp(state, "failed") == 0)
+        return "失败";
+    if (strcmp(state, "canceled") == 0)
+        return "已取消";
+    if (strcmp(state, "error") == 0)
+        return "出错";
+    if (strcmp(state, "running") == 0 || strcmp(state, "active") == 0 ||
+        strcmp(state, "executing") == 0)
+        return "执行中";
+    if (strcmp(state, "queued") == 0)
+        return "排队中";
+    if (strcmp(state, "ready") == 0)
+        return "就绪";
+    if (strcmp(state, "waiting") == 0)
+        return "等待中";
+    if (strcmp(state, "skipped") == 0)
+        return "已跳过";
+    if (strcmp(state, "retrying") == 0)
+        return "重试中";
+    if (strcmp(state, "online") == 0)
+        return "在线";
+    if (strcmp(state, "offline") == 0)
+        return "离线";
+    return state;
 }
 
 void cli_compact_bar(char *out, size_t cap, double progress, size_t cells)

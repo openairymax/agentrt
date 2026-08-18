@@ -63,6 +63,9 @@ typedef struct {
 typedef struct {
     airy_work_hall_t *hall;
     int *quit;
+    /* 2026-08-17：/tui 切换请求——退出 CLI 主循环后 exec agentrt-tui
+     * （进程替换，无嵌套进程；仅 CLI 全屏 TUI 页面被激活时可用）。 */
+    int *switch_tui;
 } cli_cmd_ctx_t;
 
 typedef enum { CLI_DAG_POLL_ACTIVE = 0, CLI_DAG_POLL_DONE, CLI_DAG_POLL_ERROR } cli_dag_poll_rc_t;
@@ -127,6 +130,7 @@ int cmd_clear(const char *arg, void *ctx);
 int cmd_status(const char *arg, void *ctx);
 int cmd_chain(const char *arg, void *ctx);
 int cmd_quit(const char *arg, void *ctx);
+int cmd_tui(const char *arg, void *ctx);
 
 /* 决策链事件解析 helpers（cli_cmds.c 实现；/chain 命令与 cli_panel.c 事件流面板共用） */
 uint64_t cli_chain_extract_gseq(const char *json);

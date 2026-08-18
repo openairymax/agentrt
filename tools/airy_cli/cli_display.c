@@ -143,7 +143,7 @@ void cli_print_plan_list(const taskflow_workflow_t *wf)
 
     cli_outf("%s%s%s %s执行计划%s %s(%zu nodes, %zu deps)%s\n",
              g, cli_c(CLR_CYAN), CLI_ICON_DIAMOND,
-             cli_c(CLR_RESET), cli_c(CLR_DIM),
+             cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_DIM),
              n, wf->edge_count, cli_c(CLR_RESET));
 
     size_t *order = (size_t *)AIRY_MALLOC(n * sizeof(size_t));
@@ -183,11 +183,11 @@ void cli_print_plan_list(const taskflow_workflow_t *wf)
         const char *handler = nd->task_handler_name ? nd->task_handler_name : "?";
         const char *goal = nd->name[0] ? nd->name : "";
 
-        cli_outf("%s%s%s%s %zu. %s%s%s  %s[%s]%s",
+        cli_outf("%s%s%s%s %zu. %s%s%s  %s%s[%s]%s",
                  ig, cli_c(CLR_DIM), CLI_ICON_TODO, cli_c(CLR_RESET),
                  r + 1,
                  cli_c(CLR_RESET), goal, cli_c(CLR_DIM),
-                 handler, cli_c(CLR_RESET));
+                 cli_c(CLR_DIM), handler, cli_c(CLR_DIM), cli_c(CLR_RESET));
 
         char deps[128];
         size_t dlen = 0;
@@ -239,10 +239,10 @@ void cli_progress_cb(const char *execution_id, const char *node_id, taskflow_sta
         static double s_prog = -1.0;
         if (!node_id) {
             if (state == TASKFLOW_STATE_COMPLETED)
-                cli_trace("progress", "%s execution completed: %s", CLI_ICON_CHECK,
+                cli_trace("progress", "%s 执行完成: %s", CLI_ICON_CHECK,
                           execution_id ? execution_id : "?");
             else if (state == TASKFLOW_STATE_FAILED)
-                cli_trace("progress", "%s execution failed: %s", CLI_ICON_CROSS,
+                cli_trace("progress", "%s 执行失败: %s", CLI_ICON_CROSS,
                           execution_id ? execution_id : "?");
             return;
         }
@@ -261,19 +261,26 @@ void cli_progress_cb(const char *execution_id, const char *node_id, taskflow_sta
         s_prog = progress;
         char sbar[16];
         cli_compact_bar(sbar, sizeof(sbar), progress, 8);
-        cli_trace("progress", "%s %s %s %s %3.0f%%", cli_icon_for_state(ss), node_id, ss, sbar,
-                  progress * 100.0);
+        cli_trace("progress", "%s %s %s %s %3.0f%%", cli_icon_for_state(ss), node_id,
+                  cli_state_cn(ss), sbar, progress * 100.0);
         return;
     }
 
     if (!node_id) {
         if (state == TASKFLOW_STATE_COMPLETED)
-            cli_render_sub_agent(execution_id, "Execution completed.");
+            cli_render_sub_agent(execution_id, "任务执行完成");
         else if (state == TASKFLOW_STATE_FAILED)
-            cli_render_sub_agent_line(CLI_ROLE_ERROR, execution_id, "Execution failed.");
+            cli_render_sub_agent_line(CLI_ROLE_ERROR, execution_id, "任务执行失败");
         return;
     }
-    cli_render_progress_bar(progress, 20, node_id);
+    /* 节点级进度：分支符号 + 二级缩进，与任务级行形成清晰层级。 */
+    static const char *const st[] = {"pending",  "ready",  "running", "waiting",
+                                     "completed", "failed", "canceled", "skipped",
+                                     "retrying"};
+    const char *ss = (state >= 0 && (int)state < 9) ? st[state] : "?";
+    char buf[96];
+    snprintf(buf, sizeof(buf), "%s %s", cli_state_cn(ss), node_id);
+    cli_render_progress_bar(progress, 20, buf);
 }
 
 void cli_board_line(const char *tag, const char *id, const char *state, double progress)
@@ -319,7 +326,7 @@ static void cli_box_row(const char *g, size_t inner, const char *text,
 
 /* Four-role conversation legend rendered under the brand box.  Each bracket
  * keeps its role color so the scheme [For Thee] / [Super Agent] /
- * [Super Think] / [Sub Agent] is visible at a glance on startup. */
+ * [Dual Think] / [Sub Agent] is visible at a glance on startup. */
 static void cli_banner_legend(const char *g)
 {
     static const struct {
@@ -329,7 +336,7 @@ static void cli_banner_legend(const char *g)
     } roles[] = {
         {CLR_CYAN, "For Thee", "你"},
         {CLR_GREEN, "Super Agent", "agentrt"},
-        {CLR_YELLOW, "Super Think", "思考"},
+        {CLR_YELLOW, "Dual Think", "思考"},
         {CLR_MAGENTA, "Sub Agent", "执行体"},
     };
 
