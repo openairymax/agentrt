@@ -79,6 +79,9 @@
 - cli_tui.c 不完整类型（面板访问器移到 struct 定义后）、`tui_read_byte` 未用删除、cli_panel.c 数组字段恒真判断与缺参格式串
 - memoryrovol 数据曾写入 CWD 相对路径 `./data/memoryrovol`（源码区污染）→ AIRY_HOME 收敛
 - Ctrl+S 被终端流控（`IXON`）吞掉无法触发正向搜索 → 完整 raw 模式清流控
+- **蓝图调度 L2 用户意图键空间命中率恒 0（2.7.2 审计）**：CLI 整轮路径将用户输入写入 `is_node_key=1`（节点 ID 键空间），而 `process` 查询过滤该空间，仅靠 `lookup_node` 精确 strcmp 兜底——重复/相似任务输入无法命中 L2 低 token 路径。修复：`airy_rs_absorb_meta_t` 增加 `is_user_intent`，CLI 整轮路径写用户意图键空间（`is_node_key=0`），重复输入经 `process` 精确命中 L2；语义相似命中（`exact=0`）仍保守降级 L3（避免参数化任务复用旧参数输出答错）。新增 `test_user_intent_l2_hit` 闭环用例
+- **TUI MemoryRovol 全功能此前从未真正链接（2.6）**：空 `src/lib.rs` 触发 cargo 隐式 lib 目标，build.rs 的 `rustc-link-lib` 只传给 lib 编译；空 lib 未被 bin 引用 → 链接时被剔除 → native-libs 元数据不传播，bin 内 memory.rs FFI 引用 `airy_mr_*` 无法解析（此前构建实为 JsonlMemory 降级）。修复：删除空 lib.rs，build.rs link-lib 直接作用于 bin 目标；构建产物 `nm` 确认 `airy_mr_stats/add_memory/retrieve` 符号已定义
+- **TUI `TaskControl::Aborted` 状态恢复**：此前删变体时未全局检查引用（ui.rs/chat.rs 3 处编译失败），且 `abort_task` 复位 Running 导致中止后状态徽章误显"运行中"。恢复 `Aborted` 变体，中止后保持中止态（新交互发起时自动复位 Running）
 
 ### Removed
 

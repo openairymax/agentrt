@@ -1411,9 +1411,10 @@ void cli_render_task_line(const char *tag, const char *id, const char *state,
         st_col = cli_c(CLR_GREEN);
         st_icon = CLI_ICON_CHECK;
         bar_bright = 1;
-    } else if (strcmp(st, "failed") == 0 || strcmp(st, "canceled") == 0) {
+    } else if (strcmp(st, "failed") == 0) {
         st_col = cli_c(CLR_RED);
         st_icon = CLI_ICON_CROSS;
+        bar_bright = 0;
     } else if (strcmp(st, "running") == 0 || strcmp(st, "active") == 0 ||
                strcmp(st, "queued") == 0) {
         /* In-flight board lines are background trace (dim): the running state
@@ -1424,6 +1425,12 @@ void cli_render_task_line(const char *tag, const char *id, const char *state,
     } else if (strcmp(st, "pending") == 0) {
         st_col = cli_c(CLR_DIM);
         st_icon = CLI_ICON_TODO;
+    } else if (strcmp(st, "scheduled") == 0) {
+        st_col = cli_c(CLR_CYAN);
+        st_icon = CLI_ICON_CLOCK;
+    } else if (strcmp(st, "canceled") == 0) {
+        st_col = cli_c(CLR_DIM);
+        st_icon = CLI_ICON_CANCEL;
     }
 
     const char *g = cli_gutter(2);
@@ -1446,8 +1453,7 @@ const char *cli_icon_for_state(const char *state)
     if (strcmp(state, "completed") == 0 || strcmp(state, "success") == 0 ||
         strcmp(state, "done") == 0)
         return CLI_ICON_CHECK;
-    if (strcmp(state, "failed") == 0 || strcmp(state, "canceled") == 0 ||
-        strcmp(state, "error") == 0)
+    if (strcmp(state, "failed") == 0 || strcmp(state, "error") == 0)
         return CLI_ICON_CROSS;
     if (strcmp(state, "running") == 0 || strcmp(state, "active") == 0 ||
         strcmp(state, "executing") == 0)
@@ -1455,6 +1461,10 @@ const char *cli_icon_for_state(const char *state)
     if (strcmp(state, "pending") == 0 || strcmp(state, "queued") == 0 ||
         strcmp(state, "ready") == 0)
         return CLI_ICON_TODO;
+    if (strcmp(state, "scheduled") == 0)
+        return CLI_ICON_CLOCK;
+    if (strcmp(state, "canceled") == 0)
+        return CLI_ICON_CANCEL;
     return CLI_ICON_BULLET;
 }
 
@@ -1476,6 +1486,10 @@ const char *cli_state_cn(const char *state)
         return "执行中";
     if (strcmp(state, "queued") == 0)
         return "排队中";
+    if (strcmp(state, "pending") == 0)
+        return "待处理";
+    if (strcmp(state, "scheduled") == 0)
+        return "已调度";
     if (strcmp(state, "ready") == 0)
         return "就绪";
     if (strcmp(state, "waiting") == 0)
