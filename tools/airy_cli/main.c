@@ -390,10 +390,11 @@ int main(int argc, char *argv[])
         /* One-shot server mode: no banner, no pinned header, no footer hint. */
         (void)0;
     } else if (cli_tui_active(tui)) {
+        /* Full-screen TUI pins its own header boundary after the hero. */
         cli_tui_pin_header(tui);
-    } else {
-        cli_term_header_pin(11);
     }
+    /* Plain TTY: cli_print_system_header already pinned the 4-line hero
+     * (wide TTY) or rendered a fully-scrollable stacked layout (narrow). */
 
     airy_core_loop_t *loop = NULL;
     airy_err_t err = airy_loop_create(NULL, &loop);
