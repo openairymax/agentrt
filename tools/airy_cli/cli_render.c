@@ -326,6 +326,22 @@ size_t cli_disp_width_of(const char *s, size_t n)
     return w;
 }
 
+/* Back off a byte-wise truncation point to the nearest UTF-8 sequence
+ * boundary so a multi-byte character is never cut in half (which would
+ * print a stray continuation byte and garble CJK tags/headers).
+ * Returns a safe byte count <= max_bytes. */
+size_t cli_utf8_safe_len(const char *s, size_t max_bytes)
+{
+    size_t len = strlen(s);
+    if (max_bytes >= len)
+        return len;
+    size_t n = max_bytes;
+    /* Walk back while byte n is a continuation byte of a multi-byte char */
+    while (n > 0 && ((unsigned char)s[n] & 0xC0) == 0x80)
+        n--;
+    return n;
+}
+
 const char *cli_render_role_color(cli_role_t role)
 {
     if (!cli_color_enabled())
@@ -898,7 +914,7 @@ void cli_render_collapsed(const char *text, size_t indent, size_t max_lines, int
 
 static void cli_pad_role_header(const char *hdr)
 {
-    size_t w = strlen(hdr);
+    size_t w = cli_disp_width(hdr);
     for (size_t i = w; i < CLI_ROLE_HDR_W; i++)
         cli_outc(' ');
 }
@@ -906,7 +922,9 @@ static void cli_pad_role_header(const char *hdr)
 /* Build a fixed-width role header, always keeping the closing "]" intact.
  * When the tag makes the header exceed CLI_ROLE_HDR_W, the tag is truncated
  * (not the bracket), so the gutter stays aligned and never renders a dangling
- * header like "[Sub Agent:tool.list_too". */
+ * header like "[Sub Agent:tool.list_too".  Truncation is UTF-8 safe: the cut
+ * falls back to the nearest character boundary so a CJK tag (对话/思考/状态)
+ * never renders as a broken half-width glyph (乱码). */
 static void cli_build_role_header(char *out, size_t cap, const char *name, const char *tag)
 {
     if (!tag || !tag[0]) {
@@ -918,7 +936,7 @@ static void cli_build_role_header(char *out, size_t cap, const char *name, const
         CLI_ROLE_HDR_W > (name_len + 3) ? (CLI_ROLE_HDR_W - name_len - 3) : 0;
     size_t tag_show = strlen(tag);
     if (tag_show > tag_budget)
-        tag_show = tag_budget;
+        tag_show = cli_utf8_safe_len(tag, tag_budget);
     snprintf(out, cap, "[%s:%.*s]", name, (int)tag_show, tag);
 }
 
@@ -971,7 +989,9 @@ void cli_render_super_agent_begin(void)
     cli_pad_role_header(hdr);
 }
 
-/* 截取文本前 max_lines 行（按 '\n' 分割；保留行内内容），供折叠重绘。 */
+/* 截取文本前 max_lines 行（按 '\n' 分割；保留行内内容），供折叠重绘。
+ * UTF-8 安全：末字节落在多字节序列中间时回退到字符边界，避免切断
+ * 中文 → 折叠展示出现乱码。 */
 static size_t cli_take_first_lines(const char *text, size_t max_lines, char *out,
                                    size_t cap)
 {
@@ -989,6 +1009,8 @@ static size_t cli_take_first_lines(const char *text, size_t max_lines, char *out
         }
         out[o++] = *p++;
     }
+    if (o > 0)
+        o = cli_utf8_safe_len(out, o);
     if (o == 0)
         out[o++] = '\0';
     else
@@ -1343,6 +1365,9 @@ void cli_render_footer_hint(void)
     cli_out(cli_c(CLR_RESET));
     cli_out(cli_c(CLR_DIM));
     cli_out(" 退出");
+    cli_out(cli_c(CLR_RESET));
+    cli_out(cli_c(CLR_DIM));
+    cli_out("    \"Agents, To the open air.\"");
     cli_out(cli_c(CLR_RESET));
     cli_outc('\n');
 }

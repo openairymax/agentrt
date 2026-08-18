@@ -275,6 +275,15 @@ size_t cli_disp_width(const char *s);
 size_t cli_disp_width_of(const char *s, size_t n);
 
 /**
+ * @brief Largest byte count <= max_bytes that ends on a UTF-8 boundary.
+ *
+ * Truncating with snprintf precision can cut a multi-byte char in half and
+ * print a stray continuation byte. Call this before any byte-wise
+ * truncation of user/agent text (tags, headers, previews).
+ */
+size_t cli_utf8_safe_len(const char *s, size_t max_bytes);
+
+/**
  * @brief Render a long text collapsed to at most `max_lines` lines.
  *
  * Progressive disclosure (Claude Code / Codex convention): only the first
