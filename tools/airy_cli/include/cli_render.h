@@ -336,15 +336,6 @@ void cli_render_super_agent(const char *content);
 void cli_render_super_agent_begin(void);
 
 /**
- * @brief Print a dim fold trailer after a streamed reply was truncated:
- * "└ … N more lines (full text in logs)". Mirrors cli_render_collapsed's
- * trailer so streaming and collapsed rendering share one visual language.
- *
- * @param more_lines number of hidden lines (>= 1)
- */
-void cli_render_stream_fold_trailer(size_t more_lines);
-
-/**
  * @brief Print the user's own message: "[For Thee] › text".
  *
  * Uses the CLI_ICON_USER prefix and cyan accent so the human side of the
