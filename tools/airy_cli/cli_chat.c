@@ -988,7 +988,10 @@ static void cli_chat_reasoning_clear(void)
 {
     if (s_reasoning_progress) {
         s_reasoning_progress = 0;
-        fputs("\r\033[K", stdout);
+        /* 2K erases the whole line (not just cursor-to-end): a partially
+         * rendered progress row must not leak "… 字 · 0.6s" onto the first
+         * streaming-reply line (reported debris). */
+        fputs("\r\033[2K", stdout);
         fflush(stdout);
     }
 }
@@ -1006,7 +1009,7 @@ static void cli_chat_stream_cb(const char *chunk, void *user_data)
     if (s_stream_first_chunk) {
         s_stream_first_chunk = 0;
         s_reasoning_progress = 0; /* 进度行已被首片擦除，避免收尾重复擦除 */
-        fputs("\r\033[K", stdout);
+        fputs("\r\033[2K", stdout);
         fflush(stdout);
     }
 
@@ -1187,7 +1190,7 @@ void cli_chat_reply(const char *input)
             /* 流结束但无首片到达（连接失败/空响应）：擦除 Connecting 行 */
             if (s_stream_first_chunk) {
                 s_stream_first_chunk = 0;
-                fputs("\r\033[K", stdout);
+                fputs("\r\033[2K", stdout);
                 fflush(stdout);
             }
             if (folding) {

@@ -1315,15 +1315,14 @@ void cli_render_turn_separator(uint64_t elapsed_ms, const char *metrics)
     cli_term_size(&rows, &cols);
     size_t label_len = strlen(label);
     size_t metrics_len = (metrics && metrics[0]) ? strlen(metrics) + 3 : 0; /* " · " + metrics */
-    size_t center = label_len + metrics_len + 2; /* 2 spaces padding */
-    size_t ccols = (size_t)(cols > 0 ? cols : 80);
-    size_t dash_total = ccols > center + 6 ? ccols - center - 6 : 10;
-    size_t dash_left = dash_total / 2;
-    size_t dash_right = dash_total - dash_left;
-    if (dash_left > 40)
-        dash_left = 40;
-    if (dash_right > 40)
-        dash_right = 40;
+    /* Short, fixed dashes: a full-width separator ("─" all the way across
+     * the terminal) visually collides with the pinned hero frame and reads
+     * as the dialogue "covering" the header on narrow screens. A compact
+     * 12-dash segment keeps the turn boundary visible without dominating
+     * the viewport (minimal-output engineering philosophy). */
+    size_t dash_left = 12;
+    size_t dash_right = 12;
+    (void)cols;
 
     const char *g = cli_gutter(2);
     cli_out(g);
