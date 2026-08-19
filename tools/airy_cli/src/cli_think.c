@@ -300,12 +300,7 @@ static void cli_think_cfg_path(char *path, size_t cap)
         snprintf(path, cap, "%s", cfg);
         return;
     }
-    const char *home = getenv("AIRY_HOME");
-    if (home && home[0])
-        snprintf(path, cap, "%s/config/model.yaml", home);
-    else
-        snprintf(path, cap, "%s/.airymaxrt/config/model.yaml",
-                 getenv("HOME") ? getenv("HOME") : ".");
+    snprintf(path, cap, "%s/model.yaml", airy_config_dir());
 }
 
 /* 双思考三模型配置统一读取，CLI 侧真相源对齐 think_d。

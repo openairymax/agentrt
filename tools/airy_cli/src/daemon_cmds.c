@@ -16,11 +16,11 @@
  */
 
 #include "daemon_cmds.h"
-
 #include "daemon_rpc_client.h"
 #include "airy_memory.h"
 #include "cli_render.h"
 #include "logger.h"
+#include "platform.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,21 +71,7 @@ static const cli_daemon_desc_t CLI_DAEMONS[] = {
 
 const char *cli_rt_dir(void)
 {
-    static char buf[512];
-    const char *rdir = getenv("AIRY_RUNTIME_DIR");
-    if (rdir && rdir[0])
-        return rdir;
-    const char *home = getenv("AIRY_HOME");
-    if (home && home[0]) {
-        snprintf(buf, sizeof(buf), "%s/run", home);
-        return buf;
-    }
-    const char *uhome = getenv("HOME");
-    if (uhome && uhome[0]) {
-        snprintf(buf, sizeof(buf), "%s/.airymaxrt/run", uhome);
-        return buf;
-    }
-    return "/tmp/agentrt";
+    return airy_runtime_dir();
 }
 
 /* Resolve a daemon namespace against the known table. Accepts both the
@@ -272,27 +258,7 @@ int cmd_daemons(const char *arg, void *ctx)
 /* AIRY_HOME 根目录（$AIRY_HOME，缺省 $HOME/.airymaxrt）。 */
 static const char *cli_rt_base(void)
 {
-    static char buf[512];
-    const char *home = getenv("AIRY_HOME");
-    if (home && home[0]) {
-        snprintf(buf, sizeof(buf), "%s", home);
-        return buf;
-    }
-    const char *uhome = getenv("HOME");
-    if (uhome && uhome[0]) {
-        snprintf(buf, sizeof(buf), "%s/.airymaxrt", uhome);
-        return buf;
-    }
-#ifdef _WIN32
-    const char *pdata = getenv("PROGRAMDATA");
-    if (pdata && pdata[0])
-        snprintf(buf, sizeof(buf), "%s/airymaxrt", pdata);
-    else
-        snprintf(buf, sizeof(buf), "%s/airymaxrt", "C:\\ProgramData");
-#else
-    snprintf(buf, sizeof(buf), "/tmp/agentrt");
-#endif
-    return buf;
+    return airy_home_dir();
 }
 
 /* daemon 二进制完整路径（返回 1=存在，0=不存在）。 */
