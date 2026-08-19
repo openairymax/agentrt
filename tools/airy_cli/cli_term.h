@@ -63,8 +63,11 @@ void cli_term_size(int *out_rows, int *out_cols);
  * the header lines above it stay pinned. No-op when stdout is not a TTY.
  *
  * @param header_lines number of pinned header lines (>= 1)
+ * @param footer_lines lines reserved below the scroll region (>= 0); a
+ *        positive value keeps a fixed bottom strip (e.g. the input line in
+ *        the three-zone layout) that the dialogue never scrolls over.
  */
-void cli_term_header_pin(int header_lines);
+void cli_term_header_pin(int header_lines, int footer_lines);
 
 /**
  * @brief Release the pinned header: restore full-screen scrolling.
@@ -81,6 +84,38 @@ void cli_term_header_unpin(void);
  * @param col 1-based column
  */
 void cli_term_cursor_to(int row, int col);
+
+/* ---- fixed bottom input strip (three-zone layout helpers) ----
+ *
+ * cli_term_header_pin() 保留的 footer 行构成输入区：对话滚动区在其上方，
+ * 底部输入行固定可见。以下助手仅当「TTY + 底部条已保留」时生效，否则
+ * no-op / 返回 0，piped / logged 输出保持传统换行提示符布局。
+ */
+
+/**
+ * @brief True when a fixed bottom input strip is in effect.
+ */
+int cli_term_input_active(void);
+
+/**
+ * @brief Move the cursor to the fixed input line and clear it.
+ *
+ * Caller prints the prompt right after; returns 1 when the strip is active,
+ * 0 otherwise (caller then falls back to the legacy prompt print).
+ */
+int cli_term_input_begin(void);
+
+/**
+ * @brief Wipe the echoed input after Enter and hop back into the scroll
+ * region (its last line), so dialogue output never covers the input strip.
+ */
+void cli_term_input_submit(void);
+
+/**
+ * @brief Move the cursor back into the scroll region (its last line) after
+ * printing something on the fixed input row (e.g. a dim prompt placeholder).
+ */
+void cli_term_input_hop(void);
 
 #ifdef __cplusplus
 }

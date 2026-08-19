@@ -683,16 +683,23 @@ int main(int argc, char *argv[])
             }
         } else {
             if (!cli_tui_active(tui)) {
-                /* Line-oriented mode: print the prompt ourselves. The extra
-                 * blank line keeps the dialogue visually separated from the
-                 * pinned hero frame above (reported overlap on narrow
-                 * terminals). */
-                cli_outf("\n\n%sairy>%s ", cli_c(CLR_CYAN), cli_c(CLR_RESET));
+                /* 三区布局（TTY）：提示符画在固定底部输入行；非 TTY /
+                 * 无底部条时保持传统换行提示符（额外空行避免与上方
+                 * hero 框视觉重叠，兼容窄终端）。 */
+                if (!cli_term_input_begin()) {
+                    cli_outf("\n\n%sairy>%s ", cli_c(CLR_CYAN), cli_c(CLR_RESET));
+                } else {
+                    cli_outf("%sairy>%s ", cli_c(CLR_CYAN), cli_c(CLR_RESET));
+                }
                 fflush(stdout);
             }
             int rl = cli_tui_readline(tui, input, sizeof(input), &input_len);
-            if (rl == 0)
-                break; /* EOF / abort */
+            if (rl == 0) {
+                /* EOF / abort：先清输入行并把光标送回滚动区，退出横幅
+                 * 渲染在对话区而不是输入行上。 */
+                cli_term_input_submit();
+                break;
+            }
             if (rl == 2) {
                 /* 2.3.7：行渲染模式 F8 → 进入全屏页面。重放行模式对话
                  * 历史使页面不空，pinned header 转交给 TUI。 */
@@ -712,9 +719,20 @@ int main(int argc, char *argv[])
                 cli_render_set_tui(NULL);
                 /* Re-pin the same 6-line hero block; the count must match
                  * CLI_HDR_LINES or the scroll region drifts and dialogue
-                 * output overlaps the header. */
-                cli_term_header_pin(CLI_HDR_LINES);
+                 * output overlaps the header. The bottom row stays reserved
+                 * as the fixed input zone (three-zone layout). */
+                cli_term_header_pin(CLI_HDR_LINES, 1);
                 continue;
+            }
+            /* 三区布局：清掉输入行回显并把光标送回滚动区末行，之后无论
+             * 是对话输出、slash 命令还是退出横幅，都不会盖住底部输入条。
+             * 本轮对话进行期间在输入区保留一个 dim 占位提示符，使三区
+             * （英雄区/对话区/输入区）边界始终可见。 */
+            cli_term_input_submit();
+            if (input_len > 0 && cli_term_input_active()) {
+                cli_term_input_begin();
+                cli_outf("%sairy>%s", cli_c(CLR_DIM), cli_c(CLR_RESET));
+                cli_term_input_hop();
             }
             if (input_len == 0)
                 continue;
@@ -1403,12 +1421,12 @@ int main(int argc, char *argv[])
         cli_panel_board_destroy(board_ud);
     cli_render_set_tui(NULL);
     cli_tui_destroy(tui);
-    cli_term_header_unpin();
 
     /* 2026-08-17：/tui 切换——TUI 页面已销毁（终端恢复），用 agentrt-tui
      * 替换当前进程（exec 语义），同一终端由图形前端接管，无进程嵌套。
-     * 仅交互模式（非 -p）且请求过切换时执行。 */
+     * 仅交互模式（非 -p）且请求过切换时执行。切换前先解 pin（全屏滚动）。 */
     if (!g_cli_print_mode && switch_tui_flag) {
+        cli_term_header_unpin();
         const char *home = getenv("AIRY_HOME");
         char tui_bin[AIRY_PATH_MAX];
         if (home && home[0])
@@ -1435,12 +1453,20 @@ int main(int argc, char *argv[])
     }
 
     if (!g_cli_print_mode) {
-        /* New line first: the exit banner would otherwise render right on
-         * the "airy> " prompt line ("airy> [Super Agent] AgentRT has
-         * exited…"). */
-        cli_outc('\n');
+        /* 退出横幅先于 unpin 渲染：此时滚动区（含底部输入条）仍激活，
+         * 光标已由 submit 送到滚动区末行，横幅画在对话末尾，不会覆盖
+         * hero 或输入行。之后再解 pin 交给 shell 接管全屏滚动——
+         * 部分终端在 \033[r（重置滚动区）时会同时把光标送回 (1,1)，
+         * 若先 unpin 再输出，横幅会画在屏幕顶部破坏 hero。
+         * 非 TTY（管道/日志）无底部输入条：先换行再画，避免横幅直接
+         * 跟在 "airy> " 提示符后。 */
+        if (cli_term_input_active())
+            cli_term_input_submit();
+        else
+            cli_outc('\n');
         cli_render_role_line(CLI_ROLE_SUPER_AGENT, CLI_ACTOR_SUPER_AGENT, NULL,
                              "AgentRT has exited. Thank you for using it.");
     }
+    cli_term_header_unpin();
     return 0;
 }

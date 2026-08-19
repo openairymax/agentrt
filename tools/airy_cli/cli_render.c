@@ -1313,8 +1313,6 @@ void cli_render_turn_separator(uint64_t elapsed_ms, const char *metrics)
 
     int rows = 0, cols = 0;
     cli_term_size(&rows, &cols);
-    size_t label_len = strlen(label);
-    size_t metrics_len = (metrics && metrics[0]) ? strlen(metrics) + 3 : 0; /* " · " + metrics */
     /* Short, fixed dashes: a full-width separator ("─" all the way across
      * the terminal) visually collides with the pinned hero frame and reads
      * as the dialogue "covering" the header on narrow screens. A compact
@@ -1322,6 +1320,7 @@ void cli_render_turn_separator(uint64_t elapsed_ms, const char *metrics)
      * the viewport (minimal-output engineering philosophy). */
     size_t dash_left = 12;
     size_t dash_right = 12;
+    (void)rows;
     (void)cols;
 
     const char *g = cli_gutter(2);
