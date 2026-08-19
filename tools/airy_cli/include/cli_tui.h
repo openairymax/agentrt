@@ -164,6 +164,17 @@ int cli_tui_leave(cli_tui_t *tui);
 void cli_tui_replay_history(cli_tui_t *tui);
 
 /**
+ * @brief Reset the in-memory page history (clears header pin + viewport
+ * content) without leaving the full-screen page.
+ *
+ * Used before re-entering the full-screen page: the caller re-renders the
+ * hero, re-pins the header and replays the conversation, so switching
+ * full-screen ↔ line-mode repeatedly never accumulates duplicated lines.
+ * No-op when inactive.
+ */
+void cli_tui_reset_history(cli_tui_t *tui);
+
+/**
  * @brief Destroy the TUI and restore the terminal (alt screen, raw mode).
  *
  * Safe to call on any handle (including inactive ones).

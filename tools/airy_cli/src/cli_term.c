@@ -208,6 +208,17 @@ int cli_term_input_begin(void)
         return 0;
     int rows = 0, cols = 0;
     cli_term_size(&rows, &cols);
+    /* 三区布局（2026-08-19）：footer >= 2 时，倒数第二行画一条 dim
+     * 分隔线，末行留给输入。对话滚动区止于 rows-footer，分隔线与
+     * 输入行固定不动，hero / 对话 / 输入三区边界始终清晰。 */
+    if (g_footer_lines >= 2 && cols > 0) {
+        cli_term_cursor_to(rows - 1, 1);
+        printf("\033[2K");
+        printf("\033[2m");
+        for (int c = 0; c < cols; c++)
+            fputs("─", stdout); /* UTF-8 整字符（fputc 只写首字节会乱码） */
+        printf("\033[0m");
+    }
     /* 定位到末行并整行擦除，随后由调用方打印提示符。 */
     cli_term_cursor_to(rows, 1);
     printf("\033[2K");

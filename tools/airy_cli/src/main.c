@@ -703,12 +703,18 @@ int main(int argc, char *argv[])
                 break;
             }
             if (rl == 2) {
-                /* 2.3.7：行渲染模式 F8 → 进入全屏页面。重放行模式对话
-                 * 历史使页面不空，pinned header 转交给 TUI。 */
+                /* 2.3.7：行渲染模式 F8 / 空输入 ↑ → 进入全屏页面。
+                 * 先重置页面历史（避免反复 F8 切换时 hero 重复累积），
+                 * 再切渲染目标进 TUI，重放 hero（此时 cli_out 走 TUI
+                 * emit），pin 头部，最后重放行模式对话历史。 */
                 cli_tui_enter(tui);
                 if (cli_tui_active(tui)) {
+                    cli_tui_reset_history(tui);
                     cli_render_set_tui(tui);
                     cli_term_header_unpin();
+                    cli_print_system_header(m_s2[0] ? m_s2 : NULL,
+                                            m_verify[0] ? m_verify : NULL,
+                                            m_expert[0] ? m_expert : NULL);
                     cli_tui_pin_header(tui);
                     cli_tui_replay_history(tui);
                     cli_tui_redraw(tui);
@@ -723,7 +729,7 @@ int main(int argc, char *argv[])
                  * CLI_HDR_LINES or the scroll region drifts and dialogue
                  * output overlaps the header. The bottom row stays reserved
                  * as the fixed input zone (three-zone layout). */
-                cli_term_header_pin(CLI_HDR_LINES, 1);
+                cli_term_header_pin(CLI_HDR_LINES, 2);
                 continue;
             }
             /* 三区布局：清掉输入行回显并把光标送回滚动区末行，之后无论

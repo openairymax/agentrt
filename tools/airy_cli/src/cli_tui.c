@@ -981,6 +981,20 @@ static void tui_render_input(cli_tui_t *t)
         fputs("  Ctrl+P/O 切换", stdout);
         fputs(cli_c(CLR_RESET), stdout);
         fflush(stdout);
+    } else {
+        /* 对话视图（2026-08-19）：输入行上方画一条 dim 分隔线，与
+         * 行渲染三区布局一致——对话滚动区与输入区边界清晰不重叠。 */
+        size_t brow = row > 1 ? row - 1 : 1;
+        tui_write_literal("\033[");
+        snprintf(num, sizeof(num), "%zu", brow);
+        tui_write_literal(num);
+        tui_write_literal(";1H");
+        tui_clear_line();
+        fputs(cli_c(CLR_DIM), stdout);
+        for (int c = 0; c < t->cols; c++)
+            fputs("─", stdout); /* UTF-8 整字符（fputc 只写首字节会乱码） */
+        fputs(cli_c(CLR_RESET), stdout);
+        fflush(stdout);
     }
 
     if (t->search_active) {
@@ -1629,6 +1643,252 @@ static int tui_input_tab_complete(cli_tui_t *t)
     return 1;
 }
 
+/* ---- 行渲染模式（非全屏）readline（2026-08-19）----
+ *
+ * 默认交互是行渲染流式（三区布局：hero / 对话 / 输入）。全屏 TUI 用
+ * alt screen + 自身历史翻动；行渲染模式不切屏，但输入区同样需要
+ * 字节级按键解析——否则方向键/PgUp 的转义序列会被 fgets 原样吞进
+ * 输入行（用户反馈"方向键乱码"），↑ 也无法翻动会话历史。
+ *
+ * 实现：读取期间临时切 raw mode（结束恢复），逐键解析；输入行在
+ * 屏幕末行原位重绘（与 cli_term_input_begin 的输入条同一位置）。
+ * 空输入时 ↑/PgUp 请求进入全屏 TUI 翻历史（返回 2，等价 F8）。
+ */
+
+static void tui_line_redraw(cli_tui_t *t)
+{
+    char num[16];
+    tui_write_literal("\033[");
+    snprintf(num, sizeof(num), "%d", t->rows > 0 ? t->rows : 1);
+    tui_write_literal(num);
+    tui_write_literal(";1H");
+    tui_clear_line();
+    fputs(cli_c(CLR_CYAN), stdout);
+    fputs(TUI_INPUT_PREFIX, stdout);
+    fputs(cli_c(CLR_RESET), stdout);
+    if (t->input_len > 0)
+        fwrite(t->input, 1, t->input_len, stdout);
+    /* 光标落在编辑位置（UTF-8 显示宽度对齐，CJK 不漂移）。 */
+    size_t col = (size_t)strlen(TUI_INPUT_PREFIX) +
+                 cli_disp_width_of(t->input, t->input_len);
+    tui_write_literal("\033[");
+    snprintf(num, sizeof(num), "%d", t->rows > 0 ? t->rows : 1);
+    tui_write_literal(num);
+    tui_write_literal(";");
+    snprintf(num, sizeof(num), "%zu", col > 0 ? col : 1);
+    tui_write_literal(num);
+    tui_write_literal("H");
+    fflush(stdout);
+}
+
+static int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
+                                  size_t *out_len)
+{
+#ifdef _WIN32
+    (void)t;
+    (void)buf;
+    (void)cap;
+    (void)out_len;
+    return 0;
+#else
+    if (!t)
+        return 0;
+    t->input_len = 0;
+    t->input_col = 0;
+    if (t->input)
+        t->input[0] = '\0';
+    t->tab_active = 0;
+    t->tab_count = 0;
+    t->tab_sel = 0;
+    t->scroll_off = 0;
+    t->search_active = 0;
+    t->search_query_len = 0;
+    t->search_match = -1;
+    t->cmd_hist_idx = t->cmd_hist.count;
+    tui_get_size(t);
+
+    struct termios saved;
+    int saved_ok = 0;
+    if (tcgetattr(STDIN_FILENO, &saved) == 0) {
+        struct termios raw = saved;
+        raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+        raw.c_oflag &= ~OPOST;
+        raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+        raw.c_cflag &= ~(CSIZE | PARENB);
+        raw.c_cflag |= CS8;
+        raw.c_cc[VMIN] = 1;
+        raw.c_cc[VTIME] = 0;
+        if (tcsetattr(STDIN_FILENO, TCSANOW, &raw) == 0)
+            saved_ok = 1;
+    }
+    tui_line_redraw(t);
+
+    int rc = 1;
+    for (;;) {
+        int eof = 0;
+        int key = tui_read_key(t, -1, &eof);
+        if (eof || key == 0) {
+            rc = 0;
+            break;
+        }
+        if (key == TUI_KEY_F8) {
+            /* 行渲染 → 全屏 TUI（与 main.c 的 rl==2 分支一致）。 */
+            if (out_len)
+                *out_len = 0;
+            rc = 2;
+            break;
+        }
+        if (key == '\n' || key == '\r') {
+            size_t n = t->input_len;
+            if (n >= cap)
+                n = cap - 1;
+            if (n > 0)
+                AIRY_MEMCPY(buf, t->input, n);
+            buf[n] = '\0';
+            if (out_len)
+                *out_len = n;
+            tui_cmd_hist_push(t, buf);
+            tui_cmd_hist_save(t);
+            t->input_len = 0;
+            t->input_col = 0;
+            break;
+        }
+        if (key == TUI_KEY_UP && t->input_len == 0) {
+            /* 空输入 ↑：翻动会话历史 → 进入全屏 TUI（return 2）。 */
+            if (out_len)
+                *out_len = 0;
+            rc = 2;
+            break;
+        }
+        if (key == TUI_KEY_DOWN && t->input_len == 0)
+            continue; /* 已在尾部，忽略 */
+        if (key == 0x03) { /* Ctrl+C：非空清行，空行退出 */
+            if (t->input_len > 0) {
+                t->input_len = 0;
+                t->input_col = 0;
+                if (t->input)
+                    t->input[0] = '\0';
+                tui_line_redraw(t);
+            } else {
+                rc = 0;
+                break;
+            }
+            continue;
+        }
+        if (key == 0x04) { /* Ctrl+D：非空删光标处字符；空行 EOF */
+            if (t->input_len > 0) {
+                tui_input_delete_fwd(t);
+                tui_line_redraw(t);
+                continue;
+            }
+            rc = 0;
+            break;
+        }
+        if (key == 0x7f || key == 0x08) {
+            tui_input_backspace(t);
+            tui_line_redraw(t);
+            continue;
+        }
+        if (key == 0x01) { /* Ctrl+A */
+            t->input_col = 0;
+            tui_line_redraw(t);
+            continue;
+        }
+        if (key == 0x05) { /* Ctrl+E */
+            t->input_col = t->input_len;
+            tui_line_redraw(t);
+            continue;
+        }
+        if (key == 0x15) { /* Ctrl+U */
+            if (t->input_col > 0) {
+                tui_input_kill_save(t, t->input, t->input_col);
+                AIRY_MEMMOVE(t->input, t->input + t->input_col,
+                             t->input_len - t->input_col + 1);
+                t->input_len -= t->input_col;
+                t->input_col = 0;
+            }
+            tui_line_redraw(t);
+            continue;
+        }
+        if (key == 0x0b) { /* Ctrl+K */
+            if (t->input_col < t->input_len) {
+                tui_input_kill_save(t, t->input + t->input_col,
+                                    t->input_len - t->input_col);
+                t->input[t->input_col] = '\0';
+                t->input_len = t->input_col;
+            }
+            tui_line_redraw(t);
+            continue;
+        }
+        if (key == TUI_KEY_LEFT) {
+            if (t->input_col > 0) {
+                size_t n = t->input_col;
+                while (n > 1 && ((unsigned char)t->input[n - 1] & 0xC0) == 0x80)
+                    n--;
+                if (n > 0)
+                    n--;
+                t->input_col = n;
+                tui_line_redraw(t);
+            }
+            continue;
+        }
+        if (key == TUI_KEY_RIGHT) {
+            if (t->input_col < t->input_len) {
+                size_t n = t->input_col + 1;
+                while (n < t->input_len &&
+                       ((unsigned char)t->input[n] & 0xC0) == 0x80)
+                    n++;
+                t->input_col = n;
+                tui_line_redraw(t);
+            }
+            continue;
+        }
+        if (key == TUI_KEY_UP || key == TUI_KEY_DOWN) {
+            /* 非空输入：浏览已提交命令历史（readline Up/Down）。 */
+            if (key == TUI_KEY_UP && t->cmd_hist_idx > 0) {
+                tui_cmd_hist_save_draft(t);
+                t->cmd_hist_idx--;
+                tui_cmd_hist_apply(t, t->cmd_hist_idx);
+            } else if (key == TUI_KEY_DOWN &&
+                       t->cmd_hist_idx < t->cmd_hist.count) {
+                t->cmd_hist_idx++;
+                if (t->cmd_hist_idx >= t->cmd_hist.count) {
+                    if (t->cmd_hist_edit && t->cmd_hist_edit_len > 0) {
+                        t->input_len = t->cmd_hist_edit_len;
+                        AIRY_MEMCPY(t->input, t->cmd_hist_edit, t->cmd_hist_edit_len);
+                        t->input[t->input_len] = '\0';
+                        t->input_col = t->input_len;
+                    } else {
+                        t->input_len = 0;
+                        t->input_col = 0;
+                        if (t->input)
+                            t->input[0] = '\0';
+                    }
+                } else {
+                    tui_cmd_hist_apply(t, t->cmd_hist_idx);
+                }
+            }
+            tui_line_redraw(t);
+            continue;
+        }
+        if (key == '\t') {
+            if (tui_input_tab_complete(t))
+                tui_line_redraw(t);
+            continue;
+        }
+        if (key >= 0x20 && key <= 0xFF) {
+            tui_input_append(t, (char)key);
+            tui_line_redraw(t);
+            continue;
+        }
+    }
+
+    if (saved_ok)
+        tcsetattr(STDIN_FILENO, TCSANOW, &saved);
+    return rc;
+#endif
+}
+
 int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
 {
     if (!buf || cap < 2)
@@ -1637,8 +1897,13 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
         *out_len = 0;
 
     if (!t || !t->active) {
-        /* Non-TUI: classic fgets semantics. 2.3.7：F8 转义序列
-         * (ESC[19~) 出现在行输入中 → 请求进入全屏页面（返回 2）。 */
+        /* Non-TUI. 2.3.7：F8 转义序列 (ESC[19~) 出现在行输入中 →
+         * 请求进入全屏页面（返回 2）。交互 TTY 走字节级 readline
+         * （方向键/PgUp 翻历史、无乱码）；管道/日志走 fgets。 */
+#ifndef _WIN32
+        if (cli_term_is_tty())
+            return tui_readline_line_mode(t, buf, cap, out_len);
+#endif
         if (!fgets(buf, (int)cap, stdin))
             return 0;
         size_t n = strlen(buf);
@@ -2340,6 +2605,18 @@ void cli_tui_replay_history(cli_tui_t *t)
         }
         tui_commit_line(t, line);
     }
+    t->dirty = 1;
+}
+
+void cli_tui_reset_history(cli_tui_t *t)
+{
+    if (!t || !t->active)
+        return;
+    tui_history_reset(&t->hist);
+    t->cur_len = 0;
+    if (t->cur)
+        t->cur[0] = '\0';
+    t->scroll_off = 0;
     t->dirty = 1;
 }
 
