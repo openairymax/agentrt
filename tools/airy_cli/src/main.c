@@ -357,13 +357,8 @@ int main(int argc, char *argv[])
      * 接口，整体跳过。 */
 #ifndef _WIN32
     if (!g_cli_print_mode) {
-        const char *home = getenv("AIRY_HOME");
         char logpath[512];
-        if (home && home[0]) {
-            snprintf(logpath, sizeof(logpath), "%s/logs/airy_cli.log", home);
-        } else {
-            snprintf(logpath, sizeof(logpath), "airy_cli.log");
-        }
+        snprintf(logpath, sizeof(logpath), "%s/airy_cli.log", airy_log_dir());
         FILE *lf = fopen(logpath, "a");
         if (lf) {
             fflush(stderr);
@@ -1458,12 +1453,8 @@ int main(int argc, char *argv[])
      * 仅交互模式（非 -p）且请求过切换时执行。切换前先解 pin（全屏滚动）。 */
     if (!g_cli_print_mode && switch_tui_flag) {
         cli_term_header_unpin();
-        const char *home = getenv("AIRY_HOME");
         char tui_bin[AIRY_PATH_MAX];
-        if (home && home[0])
-            snprintf(tui_bin, sizeof(tui_bin), "%s/bin/agentrt-tui", home);
-        else
-            snprintf(tui_bin, sizeof(tui_bin), "agentrt-tui");
+        snprintf(tui_bin, sizeof(tui_bin), "%s/agentrt-tui", airy_bin_dir());
 #ifndef _WIN32
         extern char **environ;
         char gw_url[128] = "";

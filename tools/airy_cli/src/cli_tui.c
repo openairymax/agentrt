@@ -367,20 +367,7 @@ static void tui_cmd_hist_reset(cli_tui_t *t)
 
 static void tui_history_path(char *buf, size_t cap)
 {
-    const char *data = airy_data_dir();
-    if (!data || !data[0]) {
-        const char *home = getenv("AIRY_HOME");
-        data = (home && home[0]) ? home : NULL;
-    }
-    if (data && data[0])
-        snprintf(buf, cap, "%s/%s", data, TUI_HISTORY_REL_PATH);
-    else {
-        const char *home = airy_home_dir();
-        if (home && home[0])
-            snprintf(buf, cap, "%s/data/%s", home, TUI_HISTORY_REL_PATH);
-        else
-            snprintf(buf, cap, "/tmp/agentrt/cli/history");
-    }
+    snprintf(buf, cap, "%s/%s", airy_data_dir(), TUI_HISTORY_REL_PATH);
 }
 
 #ifndef _WIN32

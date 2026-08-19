@@ -92,8 +92,8 @@ typedef struct {
     char *output;       /* OWNER (filled by worker) */
 } cli_review_job_t;
 
-/* Resolve agent_d socket: AIRY_AGENT_SOCK -> $AIRY_HOME/run/agent.sock ->
- * agent.sock (same origin as the daemon commands). */
+/* Resolve agent_d socket: AIRY_AGENT_SOCK -> $AIRY_HOME/run/agent.sock
+ * (same origin as the daemon commands). */
 static const char *cli_review_agent_sock(const char *sock)
 {
     if (sock && sock[0])
@@ -104,17 +104,7 @@ static const char *cli_review_agent_sock(const char *sock)
         snprintf(buf, sizeof(buf), "%s", env);
         return buf;
     }
-    const char *home = getenv("AIRY_HOME");
-    if (home && home[0]) {
-        snprintf(buf, sizeof(buf), "%s/run/agent.sock", home);
-        return buf;
-    }
-    const char *uhome = getenv("HOME");
-    if (uhome && uhome[0]) {
-        snprintf(buf, sizeof(buf), "%s/.airymaxrt/run/agent.sock", uhome);
-        return buf;
-    }
-    snprintf(buf, sizeof(buf), "%s", "agent.sock");
+    snprintf(buf, sizeof(buf), "%s", airy_runtime_dir_socket("agent.sock"));
     return buf;
 }
 
