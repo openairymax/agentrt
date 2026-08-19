@@ -122,6 +122,10 @@ cli_dag_board_t *cli_dag_node_board_create(void);
 void cli_dag_node_board_destroy(cli_dag_board_t *board);
 int cli_dag_node_board_tick(cli_dag_board_t *board, const char *sched_sock,
                             const char *dag_id);
+/* Remote DAG per-node state snapshot: reports (node_id, state) via cb without
+ * printing (feeds the live plan board). Returns 1 on terminal state. */
+int cli_dag_board_snapshot(const char *sched_sock, const char *dag_id,
+                           void (*cb)(const char *node_id, const char *state));
 
 void cli_print_system_header(const char *t2, const char *t1f, const char *t1p);
 void cli_print_result(const char *result);
@@ -129,6 +133,22 @@ void cli_print_plan_list(const taskflow_workflow_t *wf);
 void cli_progress_cb(const char *execution_id, const char *node_id, taskflow_state_t state,
                      double progress, void *user_data);
 void cli_board_line(const char *tag, const char *id, const char *state, double progress);
+
+/* Live plan board (structured task progress + icon choreography, 2026-08-19):
+ * prints the plan once (□ 待处理) and re-renders the block in place as node
+ * states change (□ → ◐ 执行中 → ✓/✗ 完成/失败), footer 汇总进度。非 TTY /
+ * TUI 激活时退化为静态计划 + 追加看板行（原语义）。
+ *   begin    —— 打印计划块（header + 节点行 + footer），TTY 下开启原位重绘
+ *   set_node —— 运行时节点状态写入（progress 回调线程 → 轮询线程读取）
+ *   refresh  —— 轮询循环调用：有变化则原位重绘，返回 1；退化为 0（调用方
+ *               回退 cli_board_line）
+ *   done     —— 结束看板会话（插入对话等场景主动退场） */
+void cli_live_board_begin(const taskflow_workflow_t *wf);
+void cli_live_board_set_node(const char *node_id, const char *state);
+int cli_live_board_refresh(const char *agg_state, double agg_progress);
+int cli_live_board_active(void);
+void cli_live_board_extra(void);
+void cli_live_board_done(void);
 int cmd_help(const char *arg, void *ctx);
 
 /* Dual-thinking three-model config, unified with think_d's model.yaml.
