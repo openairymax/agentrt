@@ -8,29 +8,24 @@ if(NOT TARGET airy_coreloopthree)
     message(FATAL_ERROR "airy_cli requires airy_coreloopthree target")
 endif()
 
+# 源/头分离布局（2026-08-19）：include/ 公共头，src/ 实现
 add_executable(airy_cli
-    main.c
-    daemon_cmds.c
-    cli_internal.h
-    cli_chat.c
-    cli_think.c
-    cli_dag.c
-    cli_display.c
-    cli_cmds.c
-    cli_render.h
-    cli_render.c
-    cli_term.h
-    cli_term.c
-    cli_tui.h
-    cli_tui.c
+    src/main.c
+    src/daemon_cmds.c
+    src/cli_chat.c
+    src/cli_think.c
+    src/cli_dag.c
+    src/cli_display.c
+    src/cli_cmds.c
+    src/cli_render.c
+    src/cli_term.c
+    src/cli_tui.c
     # 阶段 4: TUI 面板数据源（任务看板 / 事件流）
-    cli_panel.c
+    src/cli_panel.c
     # 阶段 4（item 4）: 认知阶段并行子 agent 审查（事实/风险）
-    cli_review.h
-    cli_review.c
+    src/cli_review.c
     # 改进6（P3）: 执行复核管线 t2/t1-f LLM 语义委托（门禁 -> t2 -> t1-f）
-    cli_exec_review.h
-    cli_exec_review.c
+    src/cli_exec_review.c
 )
 
 # 链接模式：coreloopthree 与 llm/tool service 存在交叉引用（静态库 + 全局
@@ -98,8 +93,9 @@ if(AIRY_HAS_CJSON)
     endif()
 endif()
 
-# include 路径（与 coreloopthree 同源）
+# include 路径（本工具 include/ + coreloopthree 同源）
 target_include_directories(airy_cli PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/coreloopthree/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/taskflow/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../commons/include
