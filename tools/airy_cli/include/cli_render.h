@@ -89,37 +89,10 @@ void cli_render_meter_end(cli_line_meter_t *m);
  */
 size_t cli_render_meter_phys(cli_line_meter_t *m);
 
-/* 长回复折叠阈值与保留行数（交互 TTY / TUI 共用）
- * 结果优先：回复在 10 逻辑行内完整展示（用户反馈 6 行阈值把正常
- * 回复"截断"了）；超过才折叠为前 KEEP 行 + 折叠尾。思考链折叠
- * 单独用更紧凑的 CLI_REPLY_FOLD_KEEP（见 cli_chat.c）。 */
-#define CLI_REPLY_FOLD_MAX 10  /* 逻辑行数超过则折叠 */
-#define CLI_REPLY_FOLD_KEEP 4  /* 折叠后保留的前几行 */
-
 /* 空回复占位（2026-08-17）：模型未产生文本回复（thinking 模型可能
  * 只输出 reasoning_content，或 provider 异常）时渲染明确提示，避免
  * 对话中出现"空返回"却无任何说明。 */
 #define CLI_REPLY_EMPTY_HINT "（未产生回复：模型可能仅生成了思考内容，请重试）"
-
-/**
- * @brief 渲染 super-agent 回复，完成后若行数超阈值则折叠（TTY 专用）。
- *
- * 渲染期间计量物理行；超阈值时用 ANSI 上移擦除已输出行，重绘为
- * 前 CLI_REPLY_FOLD_KEEP 行（markdown 渲染）+ 折叠尾。非 TTY / -p /
- * TUI 调用方应自行分支（-p 需完整输出；TUI 走折叠区机制）。
- *
- * @param content 最终回复（markdown）
- */
-void cli_render_super_agent_folded(const char *content);
-
-/**
- * @brief 渲染回复的前 CLI_REPLY_FOLD_KEEP 行 + 折叠尾（无测量/擦除）。
- *
- * 供流式完成后的重绘路径使用（调用方已擦除流式预览）：短回复场景
- * 由调用方走 cli_render_super_agent 全量 markdown；此处只用于超阈值
- * 的长回复折叠形态。
- */
-void cli_render_super_agent_truncated(const char *content);
 
 /* Opaque TUI engine handle (full definition in cli_tui.h). */
 struct cli_tui_s;

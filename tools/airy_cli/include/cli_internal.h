@@ -47,6 +47,10 @@ extern "C" {
 
 #define AIRY_CLI_VERSION "0.1.2"
 
+/* 思考链折叠保留行数（2026-08-19：仅折叠思考链，结果完整展示）。
+ * 思考链渲染为前 N 行 + 折叠尾，避免碎片刷屏；结果不折叠。 */
+#define CLI_REPLY_FOLD_KEEP 4
+
 /* Pinned startup header height (blue frame: top edge + brand/capabilities/
  * legend/models rows + bottom edge). Shared by cli_display.c (which renders
  * it) and main.c (which pins it). 2026-08-19: the hero became a blue box so

@@ -205,29 +205,9 @@ void cli_tui_emit(cli_tui_t *tui, const char *data, size_t len);
 void cli_tui_emit_flush(cli_tui_t *tui);
 
 /**
- * @brief Current committed history length (for fold-span bookkeeping).
+ * @brief Current committed history length (for viewport bookkeeping).
  */
 size_t cli_tui_hist_count(cli_tui_t *tui);
-
-/**
- * @brief Mark [start, hist.count) as the latest reply fold span.
- *
- * Live-tail rendering shows only the first CLI_REPLY_FOLD_KEEP lines of the
- * span plus a dim fold trailer, so a long reply never floods the viewport;
- * browsing (scroll_off > 0) reveals the full history. A reply whose span is
- * at most CLI_REPLY_FOLD_MAX lines renders unfolded — no visual cost for
- * short replies. Call after the reply rendered, with `start` captured via
- * cli_tui_hist_count() before rendering.
- *
- * @param tui    engine handle
- * @param start  first history index of the reply
- */
-void cli_tui_fold_last(cli_tui_t *tui, size_t start);
-
-/**
- * @brief Clear any active fold span (next reply starts fresh).
- */
-void cli_tui_fold_clear(cli_tui_t *tui);
 
 /**
  * @brief Mark the current history length as the pinned header boundary.

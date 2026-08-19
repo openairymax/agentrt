@@ -910,10 +910,9 @@ static size_t s_code_carry_len = 0;
  * 光标行），避免残留。仅在交互 TTY 流式模式下有意义（-p 不打印提示）。 */
 static int s_stream_first_chunk = 0;
 
-/* 交互 TTY 流式折叠状态（2026-08-17）：流式预览直出后记录其逻辑/
- * 物理行数，完成后擦除预览并按需折叠重绘。仅最终轮有意义（工具轮
- * 的预览保留为过程展示，不擦除）。 */
-static size_t g_chat_fold_lines = 0;
+/* 交互 TTY 流式状态（2026-08-17）：流式预览直出后记录其物理行数，
+ * 完成后擦除预览并完整重绘最终形态（结果不折叠，仅思考链折叠）。
+ * 仅最终轮有意义（工具轮的预览保留为过程展示，不擦除）。 */
 static size_t g_chat_fold_phys = 0;
 /* 预览末尾是否无换行（光标停在最后一行行尾）：擦除时上移行数须少 1，
  * 否则会把预览起点上方那行（消息行）一并覆盖。 */
@@ -1194,7 +1193,6 @@ void cli_chat_reply(const char *input)
                 fflush(stdout);
             }
             if (folding) {
-                g_chat_fold_lines = meter.lines;
                 g_chat_fold_phys = cli_render_meter_phys(&meter);
                 g_chat_fold_tail_no_nl = (meter.row_len > 0) ? 1 : 0;
                 cli_render_meter_end(&meter);
@@ -1348,7 +1346,7 @@ void cli_chat_reply(const char *input)
                     "reasoning-only or provider error)\n");
     } else {
         cli_tui_t *r_tui = cli_tui_get_default();
-        int r_tui_active = r_tui && cli_tui_active(r_tui);
+        (void)r_tui;
         if (stream_mode) {
             /* 交互 TTY 流式：擦除打字机预览，重绘最终形态。
              * 上移行数：末尾无换行（光标在最后一行行尾）时 = phys-1，
@@ -1378,16 +1376,15 @@ void cli_chat_reply(const char *input)
                                      4, CLI_REPLY_FOLD_KEEP, 1);
             }
             if (final_content[0] != '\0') {
-                if (g_chat_fold_lines > CLI_REPLY_FOLD_MAX)
-                    cli_render_super_agent_truncated(final_content);
-                else
-                    cli_render_super_agent(final_content);
+                /* 结果完整渲染，不折叠（2026-08-19：仅折叠思考链，
+                 * 结果必须完整展示；长结果靠终端滚动/TUI 视口浏览）。 */
+                cli_render_super_agent(final_content);
             } else {
                 cli_render_super_agent(CLI_REPLY_EMPTY_HINT);
             }
         } else {
-            /* TUI / 非流式交互：思考链折叠展示（进历史）+ markdown 渲染
-             * 进历史，标记折叠区（浏览展开）。 */
+            /* TUI / 非流式交互：思考链折叠展示（进历史）；结果完整渲染
+             * 进历史（用户要求结果不折叠，长结果经视口滚动浏览）。 */
             if (final_resp->choices && final_resp->choice_count > 0 &&
                 final_resp->choices[0].reasoning_content &&
                 final_resp->choices[0].reasoning_content[0]) {
@@ -1397,12 +1394,7 @@ void cli_chat_reply(const char *input)
                                      4, CLI_REPLY_FOLD_KEEP, 1);
             }
             if (final_content[0] != '\0') {
-                size_t start_hist = r_tui_active ? cli_tui_hist_count(r_tui) : 0;
-                if (r_tui_active)
-                    cli_tui_fold_clear(r_tui); /* 上一轮折叠先清除 */
                 cli_render_super_agent(final_content);
-                if (r_tui_active)
-                    cli_tui_fold_last(r_tui, start_hist);
             } else {
                 cli_render_super_agent(CLI_REPLY_EMPTY_HINT);
             }
