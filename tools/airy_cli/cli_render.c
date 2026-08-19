@@ -1342,37 +1342,6 @@ void cli_render_turn_separator(uint64_t elapsed_ms, const char *metrics)
     cli_outc('\n');
 }
 
-void cli_render_footer_hint(void)
-{
-    /* TTY only: keep piped / logged output free of UI chrome. The full-screen
-     * TUI already carries this hint in its pinned header, so skip it there.
-     * One-shot server mode (-p) never shows it either. */
-    if (g_cli_print_mode || !cli_term_is_tty() || cli_tui_active(cli_tui_get_default()))
-        return;
-    const char *g = cli_gutter(2);
-    cli_out(g);
-    cli_out(cli_c(CLR_DIM));
-    cli_out("? ");
-    cli_out(cli_c(CLR_YELLOW));
-    cli_out("/help");
-    cli_out(cli_c(CLR_RESET));
-    cli_out(cli_c(CLR_DIM));
-    cli_out(" 查看命令 · ");
-    cli_out(cli_c(CLR_YELLOW));
-    cli_out("quit");
-    cli_out(cli_c(CLR_RESET));
-    cli_out(cli_c(CLR_DIM));
-    cli_out("/exit");
-    cli_out(cli_c(CLR_RESET));
-    cli_out(cli_c(CLR_DIM));
-    cli_out(" 退出");
-    cli_out(cli_c(CLR_RESET));
-    cli_out(cli_c(CLR_DIM));
-    cli_out("    \"Agents, To the open air.\"");
-    cli_out(cli_c(CLR_RESET));
-    cli_outc('\n');
-}
-
 /* ---- progress bar ---- */
 
 void cli_render_progress_bar(double progress, size_t width, const char *label)

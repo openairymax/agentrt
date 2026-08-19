@@ -432,9 +432,8 @@ int main(int argc, char *argv[])
         /* Decision B (2026-08-09): three model config points - t2=A (generator, cloud-first),
           * t1-f=B (arbiter/daily chat, first to activate, local-first), t1-p=C (verifier);
           * each may use cloud APIs or local endpoints (Ollama/vLLM); the user decides.
-          * The model panel was already rendered side-by-side in the pinned
+          * The model panel was already rendered inside the blue-framed
           * system header above (cli_print_system_header); only inject. */
-        cli_render_footer_hint();
 
         airy_cognition_set_grad_enabled(cog, 1);
     }

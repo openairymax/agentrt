@@ -300,15 +300,6 @@ size_t cli_utf8_safe_len(const char *s, size_t max_bytes);
 void cli_render_collapsed(const char *text, size_t indent, size_t max_lines, int weak);
 
 /**
- * @brief Print a dim footer hint line (TTY only).
- *
- * A one-line reminder after each finished turn ("? 快捷键 · /help 命令"),
- * matching the Codex footer convention; no-op when stdout is not a TTY so
- * piped / logged output stays clean.
- */
-void cli_render_footer_hint(void);
-
-/**
  * @brief Return a left gutter of `indent` spaces (shared static buffer).
  */
 const char *cli_gutter_pad(size_t indent);

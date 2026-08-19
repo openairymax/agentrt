@@ -335,7 +335,8 @@ static void cli_hero_line_end(size_t used, size_t w)
     cli_outc('\n');
 }
 
-/* Top edge with the brand in the title area: ┌─ ◆ Airymax Agent RT  v0.1.2 ─┐ */
+/* Top edge with the brand in the title area: ┌─ ◆ Airymax - Agent Runtime
+ * Platform Engineering ──────────────────────────┐ */
 static void cli_hero_brand(const char *g)
 {
     size_t w = cli_hero_frame_w();
@@ -345,14 +346,9 @@ static void cli_hero_brand(const char *g)
     cli_out("┌─ ");
     cli_out(cli_c(CLR_BOLD));
     cli_out(cli_c(CLR_CYAN));
-    cli_out("◆ Airymax Agent RT");
+    cli_out("◆ Airymax - Agent Runtime Platform Engineering");
     cli_out(cli_c(CLR_RESET));
-    used += cli_disp_width("◆ Airymax Agent RT");
-    cli_out(cli_c(CLR_DIM));
-    cli_out("  v");
-    cli_out(AIRY_CLI_VERSION);
-    cli_out(cli_c(CLR_RESET));
-    used += 3 + cli_disp_width(AIRY_CLI_VERSION);
+    used += cli_disp_width("◆ Airymax - Agent Runtime Platform Engineering");
     cli_out(cli_c(CLR_BLUE));
     while (used + 1 < w) {
         cli_out("─");
@@ -377,10 +373,13 @@ static void cli_hero_frame_bottom(const char *g)
     cli_outc('\n');
 }
 
-/* One quiet capabilities row inside the frame. */
+/* One quiet capabilities row inside the frame, carrying the version and
+ * what the runtime does at a glance: 版本 v0.1.2：对话 · 任务 · … */
 static void cli_hero_capabilities(const char *g)
 {
-    static const char text[] = "  对话 · 任务 · 蓝图调度 · 双思考 · GCCP · 工具执行";
+    char text[160];
+    snprintf(text, sizeof(text), "  版本 v%s：对话 · 任务 · 蓝图调度 · 双思考 · GCCP · 工具执行",
+             AIRY_CLI_VERSION);
     size_t w = cli_hero_frame_w();
     size_t used = 2 + cli_disp_width(text); /* "│ " + content */
     cli_out(g);
@@ -498,13 +497,58 @@ static void cli_model_line(const char *g, const char *t2, const char *t1f,
     cli_hero_line_end(used, w);
 }
 
+/* In-frame footer row: command hints + the project motto. Lives inside the
+ * frame so the whole system header reads as one pinned block above the
+ * dialogue. */
+static void cli_hero_footer(const char *g)
+{
+    size_t w = cli_hero_frame_w();
+    size_t used = 2; /* "│ " */
+    cli_out(g);
+    cli_out(cli_c(CLR_BLUE));
+    cli_out("│");
+    cli_out(cli_c(CLR_RESET));
+    cli_out(" ");
+    used += 1;
+
+    cli_out(cli_c(CLR_DIM));
+    cli_out("? ");
+    cli_out(cli_c(CLR_RESET));
+    used += 2;
+    cli_out(cli_c(CLR_YELLOW));
+    cli_out("/help");
+    cli_out(cli_c(CLR_RESET));
+    used += 5;
+    cli_out(cli_c(CLR_DIM));
+    cli_out(" 查看命令 · ");
+    cli_out(cli_c(CLR_RESET));
+    used += cli_disp_width(" 查看命令 · ");
+    cli_out(cli_c(CLR_YELLOW));
+    cli_out("quit");
+    cli_out(cli_c(CLR_RESET));
+    used += 4;
+    cli_out(cli_c(CLR_DIM));
+    cli_out("/exit");
+    cli_out(cli_c(CLR_RESET));
+    used += 5;
+    cli_out(cli_c(CLR_DIM));
+    cli_out(" 退出");
+    cli_out(cli_c(CLR_RESET));
+    used += 1 + cli_disp_width("退出");
+    cli_out(cli_c(CLR_DIM));
+    cli_out("   \"Agents, To the open air.\"");
+    cli_out(cli_c(CLR_RESET));
+    used += 3 + cli_disp_width("\"Agents, To the open air.\"");
+    cli_hero_line_end(used, w);
+}
+
 /* ---- unified blue-framed system header ----
  *
- * Brand + capabilities + role legend + one model-config row, enclosed in
- * a blue frame (6 pinned lines including the two edges). The whole block
- * is pinned so conversation output scrolls below it (Terminal feedback:
- * "system header must stay fixed"); the frame marks the boundary between
- * the system header and the dialogue.
+ * Title edge + version/capabilities + role legend + model config + footer
+ * hints, all enclosed in a blue frame (6 pinned lines including the two
+ * edges). The whole block is pinned so conversation output scrolls below
+ * it (Terminal feedback: "system header must stay fixed"); the frame marks
+ * the boundary between the system header and the dialogue.
  */
 void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
 {
@@ -518,6 +562,7 @@ void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
     cli_hero_capabilities(g);
     cli_banner_legend(g);
     cli_model_line(g, t2, t1f, t1p);
+    cli_hero_footer(g);
     cli_hero_frame_bottom(g);
 
     /* Full-screen TUI page pins its own header boundary (history-based)
