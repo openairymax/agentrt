@@ -1217,11 +1217,44 @@ void cli_chat_reply(const char *input)
         }
         int has_tools =
             resp->choices[0].tool_calls_json && resp->choices[0].tool_calls_json[0];
-        if (has_tools && !force_summary && tool_rounds < CLI_CHAT_TOOL_MAX_ROUNDS &&
-            cli_chat_tool_round(&buf, resp) == 0) {
-            tool_rounds++;
-            llm_response_free(resp);
-            continue;
+        if (has_tools && !force_summary && tool_rounds < CLI_CHAT_TOOL_MAX_ROUNDS) {
+            /* 层级修复（2026-08-20）：工具轮中间叙述（"第一次搜索不太
+             * 直接…"）流式直出后与工具卡片拼接在同一行，层级混乱。
+             * 先擦除本轮流式直出的中间叙述预览，折叠为一行弱化摘要，
+             * 工具卡片从新行独立渲染——过程叙述 / 工具卡片 / 最终
+             * 结果三层清晰分隔（2.3.12 层级编排）。 */
+            if (stream_mode && g_chat_fold_phys > 0 && cli_term_is_tty()) {
+                fflush(stdout);
+                size_t up = g_chat_fold_phys;
+                if (g_chat_fold_tail_no_nl && up > 0)
+                    up -= 1;
+                /* CUU 参数 0 在 ANSI 中等于默认值 1（上移 1 行）！
+                 * up=0 时必须避免 `\033[0A`（会误删上一行内容），
+                 * 改用回车 + 清当前行。 */
+                char erase[32];
+                int en;
+                if (up > 0)
+                    en = snprintf(erase, sizeof(erase), "\033[%zuA\r\033[J", up);
+                else
+                    en = snprintf(erase, sizeof(erase), "\r\033[2K");
+                if (en > 0)
+                    fwrite(erase, 1, (size_t)en, stdout);
+                fflush(stdout);
+                g_chat_fold_phys = 0;
+                g_chat_fold_tail_no_nl = 0;
+                /* 中间叙述折叠为一行弱化摘要（保留首行 + 折叠尾） */
+                const char *mid = resp->choices[0].content;
+                if (mid && mid[0]) {
+                    cli_render_role_line(CLI_ROLE_TRACE, cli_chat_think_actor(),
+                                         "分析", NULL);
+                    cli_render_collapsed(mid, 2, 1, 1);
+                }
+            }
+            if (cli_chat_tool_round(&buf, resp) == 0) {
+                tool_rounds++;
+                llm_response_free(resp);
+                continue;
+            }
         }
         /* 工具轮次用尽但模型仍想调用工具：不再放行工具，追加一条
          * 总结提示并进入最终轮，保证用户拿到基于已获取信息的完整回答
@@ -1358,8 +1391,14 @@ void cli_chat_reply(const char *input)
                 size_t up = g_chat_fold_phys;
                 if (g_chat_fold_tail_no_nl && up > 0)
                     up -= 1;
+                /* CUU 参数 0 = 默认值 1（ANSI），up=0 时避免 `\033[0A`
+                 * 误删上一行，改用回车 + 清当前行。 */
                 char erase[32];
-                int en = snprintf(erase, sizeof(erase), "\033[%zuA\r\033[J", up);
+                int en;
+                if (up > 0)
+                    en = snprintf(erase, sizeof(erase), "\033[%zuA\r\033[J", up);
+                else
+                    en = snprintf(erase, sizeof(erase), "\r\033[2K");
                 if (en > 0)
                     fwrite(erase, 1, (size_t)en, stdout);
                 fflush(stdout);
