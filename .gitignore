@@ -27,6 +27,15 @@
 !SECURITY.md
 !SUPPORT.md
 !tests/
+!tests/CMakeLists.txt
+!tests/test_banned_functions.c
+!tests/test_smoke.c
+!tests/test_string_utils.c
+!tests/test_utils.c
+!tests/e2e/
+!tests/e2e/**
+!LICENSES/
+!LICENSES/**
 # ---------------------------------------------------------------------------
 # 管理仓必要工具（CMake/README/CHANGELOG 正式引用，须入库）：
 # - tools/codegen: syscall.xml SSoT codegen 生成器（CMake 构建与 CI 防漂移校验依赖）
