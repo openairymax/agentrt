@@ -41,7 +41,7 @@ int cmd_clear(const char *arg, void *ctx)
 #else
     cli_outf("\033[2J\033[H");
 #endif
-    /* Re-render the pinned 5-line system header so the clear keeps the
+    /* Re-render the pinned blue-framed system header so the clear keeps the
      * fixed-header layout consistent (models unified with model.yaml). */
     char t2[128], t1f[128], t1p[128];
     cli_think_cfg_load(t2, sizeof(t2), t1f, sizeof(t1f), t1p, sizeof(t1p));
