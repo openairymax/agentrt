@@ -1135,13 +1135,59 @@ void cli_render_tool_use(const char *name, const char *args)
     cli_outc('\n');
 }
 
+/* 工具失败错误的人类可读摘要（2026-08-19）：原始 error 串含 curl 退出码等
+ * 内部细节（"Web fetch failed (curl exit 28): curl: (28) Connection timed
+ * out..."），直出到对话区破坏可读性（2.3.14：不暴露内部实现）。映射为
+ * 简洁原因，失败明细仍经 cli_trace 留档。 */
+static void cli_tool_error_summary(const char *raw, char *out, size_t cap)
+{
+    if (!out || cap == 0)
+        return;
+    out[0] = '\0';
+    if (!raw || !raw[0])
+        return;
+    const char *p = raw;
+    /* 跳过 "Web fetch failed (curl exit NN): " 前缀 */
+    if (strncmp(p, "Web fetch failed", 16) == 0) {
+        const char *close = strchr(p, ')');
+        if (close && close[1] == ':')
+            p = close + 2;
+        while (*p == ' ')
+            p++;
+    }
+    if (strstr(p, "timed out") || strstr(p, "Timeout") || strstr(p, "timeout")) {
+        snprintf(out, cap, "连接超时");
+        return;
+    }
+    if (strstr(p, "refused") || strstr(p, "Failed to connect") || strstr(p, "couldn't connect")) {
+        snprintf(out, cap, "连接被拒绝");
+        return;
+    }
+    if (strstr(p, "Could not resolve") || strstr(p, "getaddrinfo") || strstr(p, "resolve host")) {
+        snprintf(out, cap, "无法解析域名");
+        return;
+    }
+    if (strstr(p, "404") || strstr(p, "Not Found")) {
+        snprintf(out, cap, "页面不存在 (404)");
+        return;
+    }
+    /* 兜底：取第一行非空内容，截断到 cap */
+    size_t o = 0;
+    for (; *p && o + 1 < cap; p++) {
+        if (*p == '\n' || *p == '\r')
+            break;
+        out[o++] = *p;
+    }
+    out[o] = '\0';
+}
+
 void cli_render_tool_result(const char *name, const char *text, int ok)
 {
     if (!name)
         return;
     const char *action = cli_tool_action(name);
 
-    /* 首行错误摘要（失败时附于结果行末尾） */
+    /* 首行错误摘要（失败时附于结果行末尾；内部细节已化简） */
     char err[128];
     err[0] = '\0';
     if (!ok && text && text[0]) {
@@ -1152,6 +1198,11 @@ void cli_render_tool_result(const char *name, const char *text, int ok)
             err[o++] = *p;
         }
         err[o] = '\0';
+        char plain[128];
+        cli_tool_error_summary(err, plain, sizeof(plain));
+        if (plain[0]) {
+            AIRY_STRNCPY_TERM(err, plain, sizeof(err));
+        }
     }
 
     if (g_cli_print_mode) {
