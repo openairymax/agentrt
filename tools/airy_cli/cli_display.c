@@ -296,10 +296,10 @@ void cli_board_line(const char *tag, const char *id, const char *state, double p
  * The startup header follows the Claude Code / Terminal aesthetic instead of
  * a boxed installer banner: left-aligned on the shared gutter, one quiet
  * accent color for identity, dim muted text for everything else, generous
- * whitespace. Four pinned lines carry identity + capabilities + the role
- * color legend; the model configuration sits to the right on wide TTYs and
- * stacks below on narrow ones. Color gating uses the shared cli_c() from
- * cli_render.c (NO_COLOR / piped output renders monochrome too).
+ * whitespace. Five pinned lines carry identity + capabilities + the role
+ * color legend + one model-config row; the separator closes the block.
+ * Color gating uses the shared cli_c() from cli_render.c (NO_COLOR / piped
+ * output renders monochrome too).
  */
 
 #define CLI_HERO_SEP_W 54
@@ -385,60 +385,35 @@ static void cli_hero_separator(const char *g)
     cli_outc('\n');
 }
 
-void cli_print_banner(void)
+/* One compact model-config row: the three GRAD roles (A·t2 generator,
+ * B·t1-f arbiter, C·t1-p verifier) on a single line. Empty env/yaml
+ * values fall back to the provider default ("默认"). This is row 4 of the
+ * pinned 5-line header; the separator closes the block on row 5. */
+static void cli_model_line(const char *g, const char *t2, const char *t1f,
+                           const char *t1p)
 {
-    const char *g = cli_gutter_pad(2);
-    cli_hero_brand(g);
-    cli_hero_capabilities(g);
-    cli_banner_legend(g);
-    cli_hero_separator(g);
+    const char *a = (t2 && t2[0]) ? t2 : "默认";
+    const char *b = (t1f && t1f[0]) ? t1f : "默认";
+    const char *c = (t1p && t1p[0]) ? t1p : "默认";
+    cli_outf("%s%sA·t2%s → %s%s%s   %sB·t1-f%s → %s%s%s   %sC·t1-p%s → %s%s%s\n",
+             g, cli_c(CLR_CYAN), cli_c(CLR_RESET),
+             cli_c(CLR_YELLOW), a, cli_c(CLR_RESET),
+             cli_c(CLR_CYAN), cli_c(CLR_RESET),
+             cli_c(CLR_YELLOW), b, cli_c(CLR_RESET),
+             cli_c(CLR_CYAN), cli_c(CLR_RESET),
+             cli_c(CLR_YELLOW), c, cli_c(CLR_RESET));
 }
 
-/* ---- combined system header: hero left, model config right, pinned ----
+/* ---- unified 5-line system header ----
  *
- * The startup hero (CLI_HDR_LINES = 4 lines) doubles as a fixed header: on a
- * wide TTY the model configuration renders to the right of the brand /
- * capability rows on the same lines, and the ANSI scroll region locks the
- * whole block in place so conversation output scrolls below it instead of
- * pushing the header off screen (Terminal feedback: "system header must stay
- * fixed"). All pinning happens here, so the plain-TTY entry point only needs
- * to call cli_print_system_header().
- *
- * Widths: the role legend is the widest hero row (~col 80), the model column
- * starts at col 88. Requires >= 126 columns; narrower terminals / non-TTY
- * fall back to the stacked layout (hero above, model config below).
+ * Brand + capabilities + role legend + one model-config row + separator.
+ * The old wide-TTY layout rendered the model panel at an absolute column
+ * to the right of the hero; the separator (54 full-width dashes ≈ col 110)
+ * overlapped the panel starting at col 88. Everything now flows left in
+ * five fixed rows, so no overlap exists at any terminal width. The whole
+ * block is pinned so conversation output scrolls below it (Terminal
+ * feedback: "system header must stay fixed").
  */
-
-#define CLI_HDR_MODEL_COL 88
-#define CLI_HDR_MIN_COLS 126
-
-/* Model panel column widths: "A · t2" pads to 9, CJK role labels pad to 9,
- * so ASCII keys and CJK roles share the same left edge with a visible gap
- * before the arrow. */
-#define CLI_MODEL_KEY_W 9
-#define CLI_MODEL_ROLE_W 9
-
-/* One model row rendered at an absolute column (no leading gutter). */
-static void cli_model_row_at(const char *key, const char *role,
-                             const char *model, const char *note)
-{
-    size_t kw = cli_disp_width(key);
-    size_t rw = cli_disp_width(role);
-
-    cli_outf("%s%s%s", cli_c(CLR_CYAN), key, cli_c(CLR_RESET));
-    for (size_t i = kw; i < CLI_MODEL_KEY_W; i++)
-        cli_outc(' ');
-    cli_out(cli_c(CLR_DIM));
-    cli_out(role);
-    cli_out(cli_c(CLR_RESET));
-    for (size_t i = rw; i < CLI_MODEL_ROLE_W; i++)
-        cli_outc(' ');
-    cli_outf("%s →%s %s%s%s", cli_c(CLR_DIM), cli_c(CLR_RESET), cli_c(CLR_YELLOW), model,
-           cli_c(CLR_RESET));
-    if (note && note[0])
-        cli_outf("  %s%s%s", cli_c(CLR_DIM), note, cli_c(CLR_RESET));
-}
-
 void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
 {
     /* One-shot server mode (-p): no startup hero/panel, output is the
@@ -446,107 +421,20 @@ void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
     if (g_cli_print_mode)
         return;
 
-    const char *a = (t2 && t2[0]) ? t2 : "默认";
-    const char *b = (t1f && t1f[0]) ? t1f : "默认";
-    const char *c = (t1p && t1p[0]) ? t1p : "默认";
+    const char *g = cli_gutter_pad(2);
+    cli_hero_brand(g);
+    cli_hero_capabilities(g);
+    cli_banner_legend(g);
+    cli_model_line(g, t2, t1f, t1p);
+    cli_hero_separator(g);
 
-    /* Full-screen TUI page: same hero as the CLI so switching between the
-     * two never breaks the visual language, plus one compact model line.
-     * The TUI pins its own header boundary (history-based) after this. */
-    if (cli_tui_active(cli_tui_get_default())) {
-        const char *g = cli_gutter_pad(2);
-
-        cli_hero_brand(g);
-        cli_hero_capabilities(g);
-        cli_banner_legend(g);
-        cli_outf("%s%s模型%s  %sA·t2%s %s→%s %s%s%s   "
-                 "%sB·t1-f%s %s→%s %s%s%s   "
-                 "%sC·t1-p%s %s→%s %s%s%s\n",
-                 g, cli_c(CLR_GREEN), cli_c(CLR_RESET),
-                 cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_RESET),
-                 cli_c(CLR_YELLOW), a, cli_c(CLR_RESET),
-                 cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_RESET),
-                 cli_c(CLR_YELLOW), b, cli_c(CLR_RESET),
-                 cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_RESET),
-                 cli_c(CLR_YELLOW), c, cli_c(CLR_RESET));
-        cli_hero_separator(g);
+    /* Full-screen TUI page pins its own header boundary (history-based)
+     * after this; non-TTY output just scrolls. Only interactive plain
+     * TTYs pin the 5-line block. */
+    if (!cli_term_is_tty() || cli_tui_active(cli_tui_get_default()))
         return;
-    }
-
-    int rows = 0, cols = 0;
-    cli_term_size(&rows, &cols);
-
-    if (!cli_term_is_tty() || cols < CLI_HDR_MIN_COLS) {
-        /* Narrow / non-TTY: stacked layout, nothing pinned (full scroll).
-         * The footer hint follows later (main loop). */
-        cli_print_banner();
-        cli_print_model_config(t2, t1f, t1p);
-        return;
-    }
-
-    /* Wide TTY: 4-line hero left, model config right on the same header
-     * rows, then pin so scrolling stays below the header. */
-    cli_print_banner(); /* cursor lands at line 5 (hero is 4 lines tall) */
-
-    cli_term_cursor_to(1, CLI_HDR_MODEL_COL);
-    cli_outf("%s模型配置%s  %sA 生成 · B 仲裁/日常 · C 校验%s\n", cli_c(CLR_GREEN),
-           cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_RESET));
-    cli_term_cursor_to(2, CLI_HDR_MODEL_COL);
-    cli_model_row_at("A · t2", "生成器", a, NULL);
-    cli_term_cursor_to(3, CLI_HDR_MODEL_COL);
-    cli_model_row_at("B · t1-f", "仲裁/日常", b, "(最先激活)");
-    cli_term_cursor_to(4, CLI_HDR_MODEL_COL);
-    cli_model_row_at("C · t1-p", "校验", c, NULL);
-
-    /* Back to the first scrollable line, then pin the 4-line hero. */
     cli_term_header_pin(CLI_HDR_LINES);
     fflush(stdout);
 }
 
-/* One model row of the startup panel: "A · t2   生成器    → <model>".
- * Columns are padded against cli_disp_width so ASCII keys and CJK role
- * labels share the same left edge. */
-static void cli_model_row(const char *g, const char *key, const char *role,
-                          const char *model, const char *note)
-{
-    size_t kw = cli_disp_width(key);
-    size_t rw = cli_disp_width(role);
 
-    cli_outf("%s%s%s%s", g, cli_c(CLR_CYAN), key, cli_c(CLR_RESET));
-    for (size_t i = kw; i < CLI_MODEL_KEY_W; i++)
-        cli_outc(' ');
-    cli_out(cli_c(CLR_DIM));
-    cli_out(role);
-    cli_out(cli_c(CLR_RESET));
-    for (size_t i = rw; i < CLI_MODEL_ROLE_W; i++)
-        cli_outc(' ');
-    cli_outf("%s →%s %s%s%s", cli_c(CLR_DIM), cli_c(CLR_RESET), cli_c(CLR_YELLOW), model,
-           cli_c(CLR_RESET));
-    if (note && note[0])
-        cli_outf("  %s%s%s", cli_c(CLR_DIM), note, cli_c(CLR_RESET));
-    cli_outc('\n');
-}
-
-/* Three-model startup panel (GRAD separation of powers):
- *   A · t2    生成器     → <model>
- *   B · t1-f  仲裁/日常  → <model>   (最先激活)
- *   C · t1-p  校验       → <model>
- * Unset env vars fall back to the provider default ("默认"). */
-void cli_print_model_config(const char *t2, const char *t1f, const char *t1p)
-{
-    const char *g = cli_gutter_pad(2);
-    const char *a = (t2 && t2[0]) ? t2 : "默认";
-    const char *b = (t1f && t1f[0]) ? t1f : "默认";
-    const char *c = (t1p && t1p[0]) ? t1p : "默认";
-
-    cli_outf("\n");
-    cli_outf("%s%s模型配置%s  %sA 生成 · B 仲裁/日常 · C 校验%s\n", g, cli_c(CLR_GREEN),
-           cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_RESET));
-    cli_model_row(g, "A · t2", "生成器", a, NULL);
-    cli_model_row(g, "B · t1-f", "仲裁/日常", b, "(最先激活)");
-    cli_model_row(g, "C · t1-p", "校验", c, NULL);
-    cli_outf("%s%senv 覆盖: %sAIRY_MODEL_T2%s · %sAIRY_MODEL_T1F%s · %sAIRY_MODEL_T1P%s"
-           "  云端 API 或本地 Ollama/vLLM%s\n",
-           g, cli_c(CLR_DIM), cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_YELLOW),
-           cli_c(CLR_RESET), cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_RESET));
-}

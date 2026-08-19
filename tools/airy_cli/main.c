@@ -378,14 +378,18 @@ int main(int argc, char *argv[])
       *   AIRY_MODEL_T2    -> model A (generator)
       *   AIRY_MODEL_T1F   -> model B (context arbiter)
       *   AIRY_MODEL_T1P   -> model C (logic verifier)
-      * Unset variables use the provider default model (backward compatible).
-      * Read early so the combined header (banner + model panel) can render
-      * them side by side in one pinned startup block. */
-    const char *m_s2 = getenv("AIRY_MODEL_T2");
-    const char *m_verify = getenv("AIRY_MODEL_T1F");
-    const char *m_expert = getenv("AIRY_MODEL_T1P");
+      * Config is unified with think_d's model.yaml (env > think section >
+      * llm.model default; see cli_think_cfg_load), so the header shows the
+      * models that actually take effect. Unset values use the provider
+      * default model (backward compatible). Read early so the combined
+      * 5-line header can render them in one pinned startup block. */
+    char m_s2[128], m_verify[128], m_expert[128];
+    cli_think_cfg_load(m_s2, sizeof(m_s2), m_verify, sizeof(m_verify),
+                       m_expert, sizeof(m_expert));
 
-    cli_print_system_header(m_s2, m_verify, m_expert);
+    cli_print_system_header(m_s2[0] ? m_s2 : NULL,
+                            m_verify[0] ? m_verify : NULL,
+                            m_expert[0] ? m_expert : NULL);
     if (g_cli_print_mode) {
         /* One-shot server mode: no banner, no pinned header, no footer hint. */
         (void)0;
@@ -413,13 +417,16 @@ int main(int argc, char *argv[])
           *   AIRY_MODEL_T2    -> model A (generator)
           *   AIRY_MODEL_T1F   -> model B (context arbiter)
           *   AIRY_MODEL_T1P   -> model C (logic verifier)
-          * Unset variables use the provider default model (backward compatible).
+          * Unset values use the provider default model (backward compatible).
           * Values were read above for the combined system header. */
-        airy_cognition_set_tc3_models(cog, m_s2, m_verify, m_expert);
-        if (m_s2 || m_verify || m_expert) {
+        airy_cognition_set_tc3_models(cog, m_s2[0] ? m_s2 : NULL,
+                                      m_verify[0] ? m_verify : NULL,
+                                      m_expert[0] ? m_expert : NULL);
+        if (m_s2[0] || m_verify[0] || m_expert[0]) {
             AIRY_LOG_INFO("airy_cli: TC3 models injected (s2=%s verify=%s expert=%s)",
-                          m_s2 ? m_s2 : "(default)", m_verify ? m_verify : "(default)",
-                          m_expert ? m_expert : "(default)");
+                          m_s2[0] ? m_s2 : "(default)",
+                          m_verify[0] ? m_verify : "(default)",
+                          m_expert[0] ? m_expert : "(default)");
         }
 
         /* Decision B (2026-08-09): three model config points - t2=A (generator, cloud-first),
@@ -630,7 +637,7 @@ int main(int argc, char *argv[])
          * 右侧 dim 显示。每轮开头刷新，覆盖 L1/L2/chat/plan 全部分支。 */
         if (cli_tui_active(tui)) {
             char st[96];
-            const char *mdl = getenv("AIRY_MODEL_T1F");
+            const char *mdl = m_verify[0] ? m_verify : "default";
             uint64_t sess_sec = (cli_now_ms() - g_session_start_ms) / 1000;
             snprintf(st, sizeof(st), "\u25c7 %zu msgs \u00b7 %02llu:%02llu \u00b7 %s",
                      g_history_count / 2, (unsigned long long)(sess_sec / 60),

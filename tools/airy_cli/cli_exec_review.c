@@ -110,8 +110,17 @@ static int cli_exec_t2_review(const airy_review_input_t *in, const char *fact_ba
      * 自审自签，双思考独立性失效且 n_degraded 不递增。 */
     const char *t2m = getenv("AIRY_MODEL_T2");
     if (!t2m || !t2m[0]) {
-        cli_trace("review", "exec t2: AIRY_MODEL_T2 not set, degrade to gate-only");
-        return -1;
+        /* 2026-08-19：模型配置统一自 cli_think_cfg_*（env > model.yaml
+         * think 段 > llm.model 默认）。复核须显式配置（explicit，不
+         * 回填默认）——llm.model 默认与主生成同模型，采用即自审自签。 */
+        char t2x[128], t1fx[128], t1px[128];
+        if (cli_think_cfg_explicit(t2x, sizeof(t2x), t1fx, sizeof(t1fx),
+                                   t1px, sizeof(t1px)) && t2x[0]) {
+            t2m = t2x;
+        } else {
+            cli_trace("review", "exec t2: AIRY_MODEL_T2 not set, degrade to gate-only");
+            return -1;
+        }
     }
     cfg.model = t2m;
     cfg.messages = msgs;
@@ -171,8 +180,15 @@ static int cli_exec_t1f_adjudicate(const airy_review_input_t *in, int drift,
      * 主生成同模型自我终裁（自审自签），双思考独立性失效。 */
     const char *t1fm = getenv("AIRY_MODEL_T1F");
     if (!t1fm || !t1fm[0]) {
-        cli_trace("review", "exec t1-f: AIRY_MODEL_T1F not set, adopt t2 verdict");
-        return -1;
+        /* 同 t2：终裁须显式配置（explicit），不回填 llm.model 默认 */
+        char t2x[128], t1fx[128], t1px[128];
+        if (cli_think_cfg_explicit(t2x, sizeof(t2x), t1fx, sizeof(t1fx),
+                                   t1px, sizeof(t1px)) && t1fx[0]) {
+            t1fm = t1fx;
+        } else {
+            cli_trace("review", "exec t1-f: AIRY_MODEL_T1F not set, adopt t2 verdict");
+            return -1;
+        }
     }
     cfg.model = t1fm;
     cfg.messages = msgs;

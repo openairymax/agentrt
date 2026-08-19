@@ -41,11 +41,12 @@ int cmd_clear(const char *arg, void *ctx)
 #else
     cli_outf("\033[2J\033[H");
 #endif
-    /* Re-render the pinned system header (banner + model panel) so the clear
-     * keeps the fixed-header layout consistent (narrow terminals get the
-     * stacked banner + model config instead). */
-    cli_print_system_header(getenv("AIRY_MODEL_T2"), getenv("AIRY_MODEL_T1F"),
-                            getenv("AIRY_MODEL_T1P"));
+    /* Re-render the pinned 5-line system header so the clear keeps the
+     * fixed-header layout consistent (models unified with model.yaml). */
+    char t2[128], t1f[128], t1p[128];
+    cli_think_cfg_load(t2, sizeof(t2), t1f, sizeof(t1f), t1p, sizeof(t1p));
+    cli_print_system_header(t2[0] ? t2 : NULL, t1f[0] ? t1f : NULL,
+                            t1p[0] ? t1p : NULL);
     return 0;
 }
 

@@ -47,9 +47,12 @@ extern "C" {
 
 #define AIRY_CLI_VERSION "0.1.2"
 
-/* Pinned startup header height (brand + capabilities + legend + separator).
- * Shared by cli_display.c (which renders it) and main.c (which pins it). */
-#define CLI_HDR_LINES 4
+/* Pinned startup header height (brand + capabilities + legend + models +
+ * separator). Shared by cli_display.c (which renders it) and main.c (which
+ * pins it). 2026-08-19: unified 5-line header (model config merged into a
+ * single row) — the old 4-line hero + right-side model column overlapped
+ * the separator on wide TTYs. */
+#define CLI_HDR_LINES 5
 
 /* Max chat history messages: 30 by default (~15 rounds); AIRY_CHAT_HISTORY_ROUNDS
   * overrides it in rounds (messages = rounds*2). Capped at 60, aligned with
@@ -121,8 +124,6 @@ void cli_dag_node_board_destroy(cli_dag_board_t *board);
 int cli_dag_node_board_tick(cli_dag_board_t *board, const char *sched_sock,
                             const char *dag_id);
 
-void cli_print_banner(void);
-void cli_print_model_config(const char *t2, const char *t1f, const char *t1p);
 void cli_print_system_header(const char *t2, const char *t1f, const char *t1p);
 void cli_print_result(const char *result);
 void cli_print_plan_list(const taskflow_workflow_t *wf);
@@ -130,6 +131,19 @@ void cli_progress_cb(const char *execution_id, const char *node_id, taskflow_sta
                      double progress, void *user_data);
 void cli_board_line(const char *tag, const char *id, const char *state, double progress);
 int cmd_help(const char *arg, void *ctx);
+
+/* Dual-thinking three-model config, unified with think_d's model.yaml.
+ * Priority: env AIRY_MODEL_T2/T1F/T1P > model.yaml think section >
+ * model.yaml llm.model default. Outputs are NUL-terminated; an empty
+ * string means "unset" (callers render "默认" or pass NULL). */
+void cli_think_cfg_load(char *t2, size_t t2c, char *t1f, size_t t1fc,
+                        char *t1p, size_t t1pc);
+/* Env + model.yaml think section only (no llm.model backfill). Returns 1
+ * when at least one role is explicitly configured. Used by exec review to
+ * keep the no-self-review guarantee (a backfilled default equals the main
+ * generator model). */
+int cli_think_cfg_explicit(char *t2, size_t t2c, char *t1f, size_t t1fc,
+                           char *t1p, size_t t1pc);
 int cmd_clear(const char *arg, void *ctx);
 int cmd_status(const char *arg, void *ctx);
 int cmd_chain(const char *arg, void *ctx);
