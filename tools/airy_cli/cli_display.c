@@ -669,10 +669,11 @@ void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
 
     /* Full-screen TUI page pins its own header boundary (history-based)
      * after this; non-TTY output just scrolls. Only interactive plain
-     * TTYs pin the 6-line block. */
+     * TTYs pin the 6-line block; the bottom row is reserved as the fixed
+     * input zone (three-zone layout: hero / dialogue / input). */
     if (!cli_term_is_tty() || cli_tui_active(cli_tui_get_default()))
         return;
-    cli_term_header_pin(CLI_HDR_LINES);
+    cli_term_header_pin(CLI_HDR_LINES, 1);
     fflush(stdout);
 }
 

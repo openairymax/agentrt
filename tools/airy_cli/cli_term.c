@@ -27,6 +27,10 @@
 static int g_color_level = -1; /* -1 = not probed yet */
 static int g_tty = -1;
 
+/* Fixed bottom strip rows reserved below the scroll region (three-zone
+ * layout: hero / dialogue / input). Updated by cli_term_header_pin. */
+static int g_footer_lines = 0;
+
 static void cli_term_probe(void)
 {
     int level = CLI_TERM_COLOR_BASIC;
@@ -146,28 +150,98 @@ void cli_term_cursor_to(int row, int col)
     printf("\033[%d;%dH", row, col);
 }
 
-void cli_term_header_pin(int header_lines)
+void cli_term_header_pin(int header_lines, int footer_lines)
 {
+    g_footer_lines = (footer_lines > 0) ? footer_lines : 0;
     if (!cli_term_is_tty() || header_lines < 1)
         return;
     int rows = 0, cols = 0;
     cli_term_size(&rows, &cols);
-    if (rows <= header_lines + 1) {
-        /* Terminal too short for a pinned header: keep full-screen scroll. */
+    if (rows - g_footer_lines <= header_lines) {
+        /* Terminal too short for a pinned header plus a fixed footer strip:
+         * keep full-screen scroll (three-zone layout degrades gracefully). */
+        g_footer_lines = 0;
         return;
     }
-    /* Scroll region = header+1 .. rows; then home the cursor to the first
-     * scrollable line so subsequent output stays below the pinned header. */
-    printf("\033[%d;%dr", header_lines + 1, rows);
+    /* Scroll region = header+1 .. rows-footer_lines; then home the cursor to
+     * the first scrollable line so subsequent output stays below the pinned
+     * hero. The bottom footer_lines rows stay fixed (input zone). */
+    printf("\033[%d;%dr", header_lines + 1, rows - g_footer_lines);
     cli_term_cursor_to(header_lines + 1, 1);
     fflush(stdout);
 }
 
 void cli_term_header_unpin(void)
 {
+    g_footer_lines = 0;
     if (!cli_term_is_tty())
         return;
     fputs("\033[r", stdout);
+    /* 部分终端（tmux 等）在重置滚动区（DECSTBM 空参）时会把光标送回
+     * 屏幕左上角；显式回到最后一行，保证后续输出（如退出横幅）继续
+     * 画在对话结束处，而不是覆盖屏幕顶部的 hero 区。 */
+    int rows = 0, cols = 0;
+    cli_term_size(&rows, &cols);
+    if (rows > 0)
+        printf("\033[%d;1H", rows);
+    fflush(stdout);
+}
+
+/* ---- fixed bottom input strip (three-zone layout helpers) ----
+ *
+ * 输入区：pin 时保留的底部行。这些助手只在「TTY + 已保留底部条」时生效，
+ * 否则返回 0 / no-op，piped / logged 输出保持传统换行提示符布局。
+ */
+
+int cli_term_input_active(void)
+{
+    if (!cli_term_is_tty() || g_footer_lines <= 0)
+        return 0;
+    int rows = 0, cols = 0;
+    cli_term_size(&rows, &cols);
+    return (rows > g_footer_lines) ? 1 : 0;
+}
+
+int cli_term_input_begin(void)
+{
+    if (!cli_term_input_active())
+        return 0;
+    int rows = 0, cols = 0;
+    cli_term_size(&rows, &cols);
+    /* 定位到末行并整行擦除，随后由调用方打印提示符。 */
+    cli_term_cursor_to(rows, 1);
+    printf("\033[2K");
+    fflush(stdout);
+    return 1;
+}
+
+void cli_term_input_submit(void)
+{
+    if (!cli_term_input_active())
+        return;
+    int rows = 0, cols = 0;
+    cli_term_size(&rows, &cols);
+    if (rows < 1)
+        return;
+    /* 擦除用户输入回显，光标回到滚动区末行，对话输出从那里继续流动，
+     * 永不覆盖底部输入条。 */
+    cli_term_cursor_to(rows, 1);
+    printf("\033[2K");
+    cli_term_cursor_to(rows - g_footer_lines, 1);
+    fflush(stdout);
+}
+
+void cli_term_input_hop(void)
+{
+    if (!cli_term_input_active())
+        return;
+    int rows = 0, cols = 0;
+    cli_term_size(&rows, &cols);
+    if (rows < 1)
+        return;
+    /* 在底部输入条上打印内容（如占位提示符）后，把光标送回滚动区末行，
+     * 后续流式输出从对话区继续，不会写进输入条。 */
+    cli_term_cursor_to(rows - g_footer_lines, 1);
     fflush(stdout);
 }
 
