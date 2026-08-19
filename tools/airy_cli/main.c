@@ -707,7 +707,10 @@ int main(int argc, char *argv[])
                 /* 2.3.7：全屏 F8 → 退出回行渲染流式模式。 */
                 cli_tui_leave(tui);
                 cli_render_set_tui(NULL);
-                cli_term_header_pin(11);
+                /* Re-pin the same 6-line hero block; the count must match
+                 * CLI_HDR_LINES or the scroll region drifts and dialogue
+                 * output overlaps the header. */
+                cli_term_header_pin(CLI_HDR_LINES);
                 continue;
             }
             if (input_len == 0)

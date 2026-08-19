@@ -295,10 +295,11 @@ void cli_board_line(const char *tag, const char *id, const char *state, double p
  *
  * The startup header is a blue box with the brand on the top edge:
  *
- *   ┌─ ◆ Airymax Agent RT  v0.1.2 ──────────────────────┐
- *   │  对话 · 任务 · 蓝图调度 · 双思考 · GCCP · 工具执行   │
- *   │  [For Thee] 你  [Super Agent] agentrt  …          │
- *   │  A·t2 → deepseek-v4-flash  B·t1-f → …  C·t1-p → … │
+ *   ┌─ ◆ Airymax - Agent Runtime Platform Engineering ─┐
+ *   │  版本 v0.1.2：对话 · 任务 · 蓝图调度 · 双思考 · … │
+ *   │  [For Thee] 你  [Super Agent] agentrt  …         │
+ *   │  A·t2 → …  B·t1-f → …  C·t1-p → …               │
+ *   │  ? /help 查看命令 · quit/exit 退出  "Agents…"     │
  *   └───────────────────────────────────────────────────┘
  *
  * The frame is blue (CLR_BLUE); inner rows keep their own role colors so
@@ -307,6 +308,12 @@ void cli_board_line(const char *tag, const char *id, const char *state, double p
  * it — a clear visual boundary between the system header and the dialogue.
  * Color gating uses the shared cli_c() (NO_COLOR / piped output renders
  * monochrome too, keeping the box geometry).
+ *
+ * Every content row is width-budgeted (cli_hero_content_max): segments
+ * that would overflow the frame are dropped or clipped (UTF-8 safe, "…"),
+ * so on narrow terminals the box stays intact instead of wrapping — a
+ * wrapped row would shift the pinned line count and let the dialogue
+ * overlap the header.
  */
 
 /* Frame width: adapts to the terminal, clamped for readability. */
@@ -319,6 +326,52 @@ static size_t cli_hero_frame_w(void)
         w = 74;
     if (w > 110)
         w = 110;
+    return w;
+}
+
+/* Content budget inside the frame: each row is
+ *   gutter + "│ " + content + padding + "│"
+ * so content may use at most w-3 cells (one padding cell remains). */
+static size_t cli_hero_content_max(size_t w)
+{
+    return (w > 3) ? w - 3 : 0;
+}
+
+/* Width-aware, UTF-8-safe truncation of `s` into buf (cap bytes) so it
+ * fits max_w cells; appends "…" (1 cell) when text was cut. Returns the
+ * display width of what was emitted. */
+static size_t cli_hero_clip(const char *s, size_t max_w, char *buf, size_t cap)
+{
+    size_t len = strlen(s);
+    size_t n = 0, w = 0;
+    while (n < len) {
+        unsigned char c = (unsigned char)s[n];
+        size_t cbytes = (c < 0x80) ? 1
+                      : ((c & 0xE0) == 0xC0) ? 2
+                      : ((c & 0xF0) == 0xE0) ? 3
+                      : ((c & 0xF8) == 0xF0) ? 4 : 1;
+        if (n + cbytes >= cap)
+            break; /* keep room for the terminator */
+        /* width of the current character only (not the rest of the
+         * string): pass cbytes, otherwise the whole remaining tail is
+         * counted and every row gets clipped to its first glyph */
+        size_t cw = cli_disp_width_of(s + n, cbytes);
+        if (w + cw > max_w)
+            break;
+        AIRY_MEMCPY(buf + n, s + n, cbytes);
+        n += cbytes;
+        w += cw;
+    }
+    if (n < len && w + 1 <= max_w && n + 3 < cap) {
+        /* cut: append "…" (U+2026, 3 bytes, 1 cell) */
+        buf[n] = '\xE2';
+        buf[n + 1] = '\x80';
+        buf[n + 2] = '\xA6';
+        buf[n + 3] = '\0';
+        w += 1;
+    } else {
+        buf[n] = '\0';
+    }
     return w;
 }
 
@@ -346,9 +399,16 @@ static void cli_hero_brand(const char *g)
     cli_out("┌─ ");
     cli_out(cli_c(CLR_BOLD));
     cli_out(cli_c(CLR_CYAN));
-    cli_out("◆ Airymax - Agent Runtime Platform Engineering");
+    char buf[96];
+    /* leave one cell for a "─" filler before "┐" */
+    size_t tmax = cli_hero_content_max(w);
+    if (tmax > 1)
+        tmax -= 1;
+    size_t tw = cli_hero_clip("◆ Airymax - Agent Runtime Platform Engineering",
+                              tmax, buf, sizeof(buf));
+    cli_out(buf);
     cli_out(cli_c(CLR_RESET));
-    used += cli_disp_width("◆ Airymax - Agent Runtime Platform Engineering");
+    used += tw;
     cli_out(cli_c(CLR_BLUE));
     while (used + 1 < w) {
         cli_out("─");
@@ -381,21 +441,25 @@ static void cli_hero_capabilities(const char *g)
     snprintf(text, sizeof(text), "  版本 v%s：对话 · 任务 · 蓝图调度 · 双思考 · GCCP · 工具执行",
              AIRY_CLI_VERSION);
     size_t w = cli_hero_frame_w();
-    size_t used = 2 + cli_disp_width(text); /* "│ " + content */
+    size_t budget = cli_hero_content_max(w);
+    char out[160];
+    size_t tw = cli_hero_clip(text, budget, out, sizeof(out));
+    size_t used = 2 + tw; /* "│ " + content */
     cli_out(g);
     cli_out(cli_c(CLR_BLUE));
     cli_out("│");
     cli_out(cli_c(CLR_RESET));
     cli_out(" ");
     cli_out(cli_c(CLR_DIM));
-    cli_out(text);
+    cli_out(out);
     cli_out(cli_c(CLR_RESET));
     cli_hero_line_end(used, w);
 }
 
 /* Four-role conversation legend. Each bracket keeps its role color so the
  * scheme [For Thee] / [Super Agent] / [Dual Think] / [Sub Agent] is visible
- * at a glance on startup and stays consistent with every conversation line. */
+ * at a glance on startup and stays consistent with every conversation line.
+ * On narrow terminals later roles are dropped before the frame wraps. */
 static void cli_banner_legend(const char *g)
 {
     static const struct {
@@ -410,14 +474,20 @@ static void cli_banner_legend(const char *g)
     };
 
     size_t w = cli_hero_frame_w();
+    size_t budget = cli_hero_content_max(w);
     size_t used = 2; /* "│ " */
     cli_out(g);
     cli_out(cli_c(CLR_BLUE));
     cli_out("│");
     cli_out(cli_c(CLR_RESET));
     cli_out(" ");
-    used += 1;
     for (size_t i = 0; i < sizeof(roles) / sizeof(roles[0]); i++) {
+        size_t seg = 2 + cli_disp_width(roles[i].name) +
+                     1 + cli_disp_width(roles[i].label);
+        if (i > 0)
+            seg += 3;
+        if (used + seg > budget)
+            break; /* narrow terminal: drop the remaining roles */
         if (i > 0) {
             cli_out("   ");
             used += 3;
@@ -435,20 +505,59 @@ static void cli_banner_legend(const char *g)
     cli_hero_line_end(used, w);
 }
 
-/* Truncate an over-long model name (UTF-8 safe) so the row never overflows
- * the frame; short names are returned as-is. */
-static const char *cli_hero_model_short(const char *m, char *buf, size_t cap)
+/* Emit one "key → model" segment for the model row. The model name is
+ * clipped to the remaining budget (UTF-8 safe) so a narrow terminal keeps
+ * the frame intact. Returns 0 when not even the key + arrow fit (stop the
+ * row). */
+static int cli_hero_model_seg(const char *key, const char *model,
+                              size_t *used, size_t budget, int lead_sep)
 {
-    size_t len = strlen(m);
-    if (len + 1 <= cap)
-        return m;
-    size_t safe = cli_utf8_safe_len(m, cap - 1);
-    if (safe > 0) {
-        AIRY_MEMCPY(buf, m, safe);
-        buf[safe] = '\0';
-        return buf;
+    size_t sep = lead_sep ? 3 : 0;
+    size_t key_w = cli_disp_width(key);
+    size_t model_w = cli_disp_width(model);
+    if (*used + sep + key_w + 3 + model_w <= budget) {
+        if (lead_sep) {
+            cli_out("   ");
+            *used += 3;
+        }
+        cli_out(cli_c(CLR_CYAN));
+        cli_out(key);
+        cli_out(cli_c(CLR_RESET));
+        *used += key_w;
+        cli_out(cli_c(CLR_DIM));
+        cli_out(" → ");
+        cli_out(cli_c(CLR_RESET));
+        *used += 3;
+        cli_out(cli_c(CLR_YELLOW));
+        cli_out(model);
+        cli_out(cli_c(CLR_RESET));
+        *used += model_w;
+        return 1;
     }
-    return m;
+    size_t left = (*used + sep + key_w + 3 <= budget)
+                      ? budget - *used - sep - key_w - 3
+                      : 0;
+    if (left < 2)
+        return 0;
+    char buf[64];
+    size_t mw = cli_hero_clip(model, left, buf, sizeof(buf));
+    if (lead_sep) {
+        cli_out("   ");
+        *used += 3;
+    }
+    cli_out(cli_c(CLR_CYAN));
+    cli_out(key);
+    cli_out(cli_c(CLR_RESET));
+    *used += key_w;
+    cli_out(cli_c(CLR_DIM));
+    cli_out(" → ");
+    cli_out(cli_c(CLR_RESET));
+    *used += 3;
+    cli_out(cli_c(CLR_YELLOW));
+    cli_out(buf);
+    cli_out(cli_c(CLR_RESET));
+    *used += mw;
+    return 1;
 }
 
 /* One compact model-config row: the three GRAD roles (A·t2 generator,
@@ -460,39 +569,21 @@ static void cli_model_line(const char *g, const char *t2, const char *t1f,
     const char *a = (t2 && t2[0]) ? t2 : "默认";
     const char *b = (t1f && t1f[0]) ? t1f : "默认";
     const char *c = (t1p && t1p[0]) ? t1p : "默认";
-    char ab[24], bb[24], cb[24];
-    a = cli_hero_model_short(a, ab, sizeof(ab));
-    b = cli_hero_model_short(b, bb, sizeof(bb));
-    c = cli_hero_model_short(c, cb, sizeof(cb));
 
     size_t w = cli_hero_frame_w();
+    size_t budget = cli_hero_content_max(w);
     size_t used = 2; /* "│ " */
     cli_out(g);
     cli_out(cli_c(CLR_BLUE));
     cli_out("│");
     cli_out(cli_c(CLR_RESET));
     cli_out(" ");
-    used += 1;
 
     static const char *const keys[] = {"A·t2", "B·t1-f", "C·t1-p"};
     const char *models[] = {a, b, c};
     for (size_t i = 0; i < 3; i++) {
-        if (i > 0) {
-            cli_out("   ");
-            used += 3;
-        }
-        cli_out(cli_c(CLR_CYAN));
-        cli_out(keys[i]);
-        cli_out(cli_c(CLR_RESET));
-        used += cli_disp_width(keys[i]);
-        cli_out(cli_c(CLR_DIM));
-        cli_out(" → ");
-        cli_out(cli_c(CLR_RESET));
-        used += 3;
-        cli_out(cli_c(CLR_YELLOW));
-        cli_out(models[i]);
-        cli_out(cli_c(CLR_RESET));
-        used += cli_disp_width(models[i]);
+        if (!cli_hero_model_seg(keys[i], models[i], &used, budget, i > 0))
+            break;
     }
     cli_hero_line_end(used, w);
 }
@@ -503,13 +594,13 @@ static void cli_model_line(const char *g, const char *t2, const char *t1f,
 static void cli_hero_footer(const char *g)
 {
     size_t w = cli_hero_frame_w();
+    size_t budget = cli_hero_content_max(w);
     size_t used = 2; /* "│ " */
     cli_out(g);
     cli_out(cli_c(CLR_BLUE));
     cli_out("│");
     cli_out(cli_c(CLR_RESET));
     cli_out(" ");
-    used += 1;
 
     cli_out(cli_c(CLR_DIM));
     cli_out("? ");
@@ -535,10 +626,18 @@ static void cli_hero_footer(const char *g)
     cli_out(" 退出");
     cli_out(cli_c(CLR_RESET));
     used += 1 + cli_disp_width("退出");
-    cli_out(cli_c(CLR_DIM));
-    cli_out("   \"Agents, To the open air.\"");
-    cli_out(cli_c(CLR_RESET));
-    used += 3 + cli_disp_width("\"Agents, To the open air.\"");
+
+    /* The motto is clipped to whatever room remains (narrow terminals). */
+    size_t left = budget - used;
+    if (left >= 2) {
+        char buf[64];
+        static const char *motto = "  \"Agents, To the open air.\"";
+        size_t mw = cli_hero_clip(motto, left, buf, sizeof(buf));
+        cli_out(cli_c(CLR_DIM));
+        cli_out(buf);
+        cli_out(cli_c(CLR_RESET));
+        used += mw;
+    }
     cli_hero_line_end(used, w);
 }
 
