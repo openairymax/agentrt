@@ -134,7 +134,21 @@ struct cli_tui_s {
         void *ud;
         cli_tui_panel_count_fn count;
         cli_tui_panel_line_fn line;
+        cli_tui_panel_action_fn action;
     } panel[CLI_TUI_MODE_MAX];
+
+    /* ---- 阶段 4：面板可操作状态（2026-08-19）----
+     *   sel          任务看板选中行索引（↑/↓ 移动，Enter 详情）
+     *   detail_active 任务详情视图激活（BOARD，Esc/Enter 返回列表）
+     *   detail        DETAIL action 回填的详情文本（\n 分隔行）
+     *   follow        事件流实时跟随（尾部刷新；浏览时关闭）
+     *   note          操作结果提示（标题栏展示，如取消反馈/过滤名） */
+    size_t sel;
+    int detail_active;
+    char detail[4096];
+    size_t detail_len;
+    int follow;
+    char note[160];
 
     /* ---- input line state ---- */
     char *input;     /* input line being edited */
@@ -195,6 +209,15 @@ void cli_tui_set_panel(cli_tui_t *t, cli_tui_mode_t mode, void *ud,
     t->dirty = 1;
 }
 
+void cli_tui_set_panel_action(cli_tui_t *t, cli_tui_mode_t mode,
+                              cli_tui_panel_action_fn fn)
+{
+    if (!t || mode < 0 || mode >= CLI_TUI_MODE_MAX)
+        return;
+    t->panel[mode].action = fn;
+    t->dirty = 1;
+}
+
 cli_tui_mode_t cli_tui_mode(const cli_tui_t *t)
 {
     return t ? t->mode : CLI_TUI_MODE_CHAT;
@@ -218,17 +241,31 @@ void cli_tui_mode_next(cli_tui_t *t)
 {
     if (!t)
         return;
-    t->mode = (cli_tui_mode_t)(((int)t->mode + 1) % CLI_TUI_MODE_MAX);
-    t->scroll_off = 0;
-    t->dirty = 1;
+    cli_tui_mode_set(t, (cli_tui_mode_t)(((int)t->mode + 1) % CLI_TUI_MODE_MAX));
 }
 
 void cli_tui_mode_prev(cli_tui_t *t)
 {
     if (!t)
         return;
-    t->mode = (cli_tui_mode_t)((((int)t->mode + CLI_TUI_MODE_MAX - 1)) % CLI_TUI_MODE_MAX);
+    cli_tui_mode_set(t,
+                     (cli_tui_mode_t)(((int)t->mode + CLI_TUI_MODE_MAX - 1) %
+                                      CLI_TUI_MODE_MAX));
+}
+
+void cli_tui_mode_set(cli_tui_t *t, cli_tui_mode_t m)
+{
+    if (!t || m < 0 || m >= CLI_TUI_MODE_MAX || m == t->mode)
+        return;
+    t->mode = m;
     t->scroll_off = 0;
+    /* 进入任务看板：重置选择与详情（事件流保持跟随/过滤状态） */
+    if (m == CLI_TUI_MODE_BOARD) {
+        t->sel = 0;
+        t->detail_active = 0;
+        t->detail_len = 0;
+    }
+    t->note[0] = '\0';
     t->dirty = 1;
 }
 
@@ -702,6 +739,18 @@ static void tui_clear_line(void)
     tui_write_literal("\033[2K");
 }
 
+/* 看板选中行反显（reverse video）；不改变字节长度，供 fputs 直接输出 */
+static void tui_render_select(char *buf, size_t cap)
+{
+    char tmp[512];
+    size_t n = strlen(buf);
+    if (n + 1 >= sizeof(tmp))
+        n = sizeof(tmp) - 1;
+    AIRY_MEMCPY(tmp, buf, n);
+    tmp[n] = '\0';
+    snprintf(buf, cap, "\033[7m%s\033[27m", tmp);
+}
+
 static void tui_render_header(cli_tui_t *t)
 {
     for (size_t i = 0; i < t->hist.pinned && i < t->hist.count; i++) {
@@ -729,15 +778,105 @@ static void tui_render_viewport(cli_tui_t *t)
         const cli_tui_panel_count_fn count = t->panel[t->mode].count;
         const cli_tui_panel_line_fn line = t->panel[t->mode].line;
         const void *ud = t->panel[t->mode].ud;
+
+        /* ---- 任务详情视图（BOARD，Enter 进入，Esc/Enter 返回）---- */
+        if (t->detail_active) {
+            size_t dl = t->detail_len;
+            size_t dstart = 0;
+            char buf[512];
+            for (size_t r = 0; r < rows; r++) {
+                tui_write_literal("\033[");
+                char num[16];
+                snprintf(num, sizeof(num), "%zu", start_row + r);
+                tui_write_literal(num);
+                tui_write_literal(";1H");
+                tui_clear_line();
+                if (r == 0) {
+                    snprintf(buf, sizeof(buf), "%s%s%s  %s%s%s",
+                             cli_c(CLR_BOLD), cli_c(CLR_CYAN),
+                             "任务详情", cli_c(CLR_DIM),
+                             "· Esc 返回列表", cli_c(CLR_RESET));
+                } else {
+                    size_t ln = 0;
+                    while (dstart + ln < dl && t->detail[dstart + ln] != '\n')
+                        ln++;
+                    size_t keep = (ln < sizeof(buf) - 1) ? ln : sizeof(buf) - 1;
+                    AIRY_MEMCPY(buf, t->detail + dstart, keep);
+                    buf[keep] = '\0';
+                    dstart += ln;
+                    if (dstart < dl)
+                        dstart++; /* 跳过换行 */
+                }
+                fputs(buf, stdout);
+            }
+            return;
+        }
+
         size_t total = (count && ud) ? count((void *)ud) : 0;
         size_t lines = total + 1; /* 标题行 + 内容行 */
 
-        /* 滚动窗口：默认显示头部（看板最新在前 / 事件流从起点回放） */
+        /* 滚动/跟随窗口：
+         *   - 任务看板：选择游标驱动（sel 始终可见，↑/↓ 移动）
+         *   - 事件流：跟随模式（t->follow）固定尾部实时刷新，否则
+         *     按 scroll_off 回放浏览 */
         size_t live = lines > rows ? rows : lines;
         size_t max_off = lines > rows ? lines - rows : 0;
+        if (t->mode == CLI_TUI_MODE_BOARD) {
+            if (total == 0)
+                t->sel = 0;
+            else if (t->sel >= total)
+                t->sel = total - 1;
+            /* 选中行保持在窗口内（默认窗口头部，越界时整体移动） */
+            t->scroll_off = 0;
+            size_t start = 0;
+            if (max_off && t->sel + 1 >= live)
+                start = t->sel + 1 - live + 1;
+            if (start > max_off)
+                start = max_off;
+            for (size_t r = 0; r < rows; r++) {
+                tui_write_literal("\033[");
+                char num[16];
+                snprintf(num, sizeof(num), "%zu", start_row + r);
+                tui_write_literal(num);
+                tui_write_literal(";1H");
+                tui_clear_line();
+                size_t rel = start + r;
+                if (rel < lines) {
+                    char buf[512];
+                    if (rel == 0) {
+                        snprintf(buf, sizeof(buf), "%s%s%s  %s%zu 条%s  %s%s%s",
+                                 cli_c(CLR_BOLD), cli_c(CLR_CYAN),
+                                 tui_mode_name(t->mode), cli_c(CLR_DIM), total,
+                                 cli_c(CLR_RESET), cli_c(CLR_DIM),
+                                 "· ↑↓ 选择 Enter 详情 x 取消",
+                                 cli_c(CLR_RESET));
+                        if (t->note[0]) {
+                            snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf),
+                                     "  %s", t->note);
+                        }
+                    } else if (line && ud) {
+                        if (!line((void *)ud, rel - 1, buf, sizeof(buf)))
+                            buf[0] = '\0';
+                        /* 选中行反显（标记是看板行索引 rel-1） */
+                        if (rel - 1 == t->sel)
+                            tui_render_select(buf, sizeof(buf));
+                    } else {
+                        buf[0] = '\0';
+                    }
+                    fputs(buf, stdout);
+                }
+            }
+            return;
+        }
+
+        /* ---- 事件流：跟随尾部 / 回放浏览 ---- */
+        if (t->follow)
+            t->scroll_off = 0;
         if (t->scroll_off > max_off)
             t->scroll_off = max_off;
-        size_t start = t->scroll_off > 0 ? lines - t->scroll_off - live : 0;
+        size_t start = t->follow
+                           ? (lines > rows ? lines - rows : 0)
+                           : (t->scroll_off > 0 ? lines - t->scroll_off - live : 0);
 
         for (size_t r = 0; r < rows; r++) {
             tui_write_literal("\033[");
@@ -751,10 +890,15 @@ static void tui_render_viewport(cli_tui_t *t)
                 char buf[512];
                 if (rel == 0) {
                     snprintf(buf, sizeof(buf), "%s%s%s  %s%zu 条%s  %s%s%s",
-                             cli_c(CLR_BOLD), cli_c(CLR_CYAN), tui_mode_name(t->mode),
-                             cli_c(CLR_DIM), total, cli_c(CLR_RESET),
-                             cli_c(CLR_DIM), "· Ctrl+P/O 切换 · ↑↓ 滚动",
+                             cli_c(CLR_BOLD), cli_c(CLR_CYAN),
+                             tui_mode_name(t->mode), cli_c(CLR_DIM), total,
+                             cli_c(CLR_RESET), cli_c(CLR_DIM),
+                             t->follow ? "· 跟随中(f 关)" : "· 回放浏览(f 跟随)",
                              cli_c(CLR_RESET));
+                    if (t->note[0]) {
+                        snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf),
+                                 "  %s", t->note);
+                    }
                 } else if (line && ud) {
                     if (!line((void *)ud, rel - 1, buf, sizeof(buf)))
                         buf[0] = '\0';
@@ -1061,6 +1205,8 @@ enum {
     TUI_KEY_ALT_B,       /* ESC b：词左移 */
     TUI_KEY_ALT_F,       /* ESC f：词右移 */
     TUI_KEY_F8,          /* ESC [ 1 9 ~：全屏 ↔ 行渲染 切换（2.3.7） */
+    TUI_KEY_F6,          /* ESC [ 1 7 ~：直达任务看板（2026-08-19） */
+    TUI_KEY_F7,          /* ESC [ 1 8 ~：直达事件流 */
     TUI_KEY_PASTE_START, /* ESC [ 200 ~：bracketed paste 开始 */
     TUI_KEY_UNKNOWN,
 };
@@ -1137,6 +1283,16 @@ static int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
                     if (!tui_wait_byte(t, &dir, 50, eof) || dir != '~')
                         return TUI_KEY_UNKNOWN;
                     return TUI_KEY_F8;
+                }
+                if (semi == '7') { /* F6: ESC [ 1 7 ~ */
+                    if (!tui_wait_byte(t, &dir, 50, eof) || dir != '~')
+                        return TUI_KEY_UNKNOWN;
+                    return TUI_KEY_F6;
+                }
+                if (semi == '8') { /* F7: ESC [ 1 8 ~ */
+                    if (!tui_wait_byte(t, &dir, 50, eof) || dir != '~')
+                        return TUI_KEY_UNKNOWN;
+                    return TUI_KEY_F7;
                 }
                 if (semi != ';')
                     return TUI_KEY_UNKNOWN;
@@ -1593,17 +1749,18 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
 
     for (;;) {
         int eof = 0;
-        /* 看板模式 200ms 轮询节拍（实时刷新）；其余模式无限等待（原语义） */
-        int timeout = (t->mode == CLI_TUI_MODE_BOARD) ? CLI_TUI_PANEL_POLL_MS : -1;
+        /* 面板模式（任务看板/事件流）200ms 轮询节拍（实时刷新）；
+         * 其余模式无限等待（原语义）。 */
+        int timeout = (t->mode != CLI_TUI_MODE_CHAT) ? CLI_TUI_PANEL_POLL_MS : -1;
         int key = tui_read_key(t, timeout, &eof);
         if (eof)
             return 0;
         if (key == 0)
             return 0; /* EOF */
         if (key == -1) {
-            /* 轮询超时：任务看板实时刷新（count 回调重建缓存 → 重绘）。
+            /* 轮询超时：面板实时刷新（count 回调重建缓存 → 重绘）。
              * SIGWINCH 到达：刷新几何尺寸并全量重绘。 */
-            if (t->mode == CLI_TUI_MODE_BOARD)
+            if (t->mode != CLI_TUI_MODE_CHAT)
                 cli_tui_redraw(t);
             else if (g_tui_resize_pending) {
                 g_tui_resize_pending = 0;
@@ -1633,57 +1790,170 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
             fflush(stdout);
             continue;
         }
+        /* 2026-08-19：F6 直达任务看板 / F7 直达事件流 */
+        if (key == TUI_KEY_F6) {
+            cli_tui_mode_set(t, CLI_TUI_MODE_BOARD);
+            cli_tui_redraw(t);
+            fflush(stdout);
+            continue;
+        }
+        if (key == TUI_KEY_F7) {
+            cli_tui_mode_set(t, CLI_TUI_MODE_EVENTS);
+            cli_tui_redraw(t);
+            fflush(stdout);
+            continue;
+        }
 
-        /* ---- 面板模式（任务看板/事件流）：滚动回放 + Enter 返回对话 ---- */
+        /* ---- 面板模式（任务看板/事件流）：可操作浏览 ---- */
         if (t->mode != CLI_TUI_MODE_CHAT) {
-            if (key == '\n' || key == '\r') {
-                t->mode = CLI_TUI_MODE_CHAT;
-                cli_tui_redraw(t);
-                fflush(stdout);
-                continue;
-            }
-            switch (key) {
-            case TUI_KEY_UP:
-                t->scroll_off++;
-                cli_tui_redraw(t);
-                break;
-            case TUI_KEY_DOWN:
-                if (t->scroll_off > 0)
-                    t->scroll_off--;
-                cli_tui_redraw(t);
-                break;
-            case TUI_KEY_PGUP:
-                t->scroll_off += tui_middle_rows(t) - 1;
-                cli_tui_redraw(t);
-                break;
-            case TUI_KEY_PGDN:
-                t->scroll_off = (t->scroll_off > tui_middle_rows(t) - 1)
-                                    ? t->scroll_off - (tui_middle_rows(t) - 1)
-                                    : 0;
-                cli_tui_redraw(t);
-                break;
-            case TUI_KEY_HOME:
-                t->scroll_off = SIZE_MAX; /* 渲染时 clamp 到面板末尾 */
-                cli_tui_redraw(t);
-                break;
-            case TUI_KEY_END:
-                t->scroll_off = 0;
-                cli_tui_redraw(t);
-                break;
-            default:
-                /* 其他键：返回对话模式，并把该击键送入输入框（"打字即
-                 * 退出浏览"的 Claude Code 风格）。若按键被吞掉，快速连
-                 * 击的命令（如 quit）会缺首字符。 */
-                t->mode = CLI_TUI_MODE_CHAT;
-                if (key >= 0x20 && key <= 0xFF) {
-                    tui_input_append(t, (char)key);
-                    tui_render_input(t);
-                } else {
+            const cli_tui_panel_action_fn act = t->panel[t->mode].action;
+            const void *ud = t->panel[t->mode].ud;
+            size_t rows_page = tui_middle_rows(t) > 1 ? tui_middle_rows(t) - 1 : 1;
+
+            /* 详情视图：Esc/Enter 返回列表 */
+            if (t->detail_active) {
+                if (key == 0x1b || key == '\n' || key == '\r') {
+                    t->detail_active = 0;
+                    t->detail_len = 0;
                     cli_tui_redraw(t);
                 }
                 fflush(stdout);
-                break;
+                continue;
             }
+
+            if (t->mode == CLI_TUI_MODE_BOARD) {
+                /* 看板计数：按键时重新拉取（同时刷新 entries 缓存） */
+                size_t total = (t->panel[t->mode].count && ud)
+                                   ? t->panel[t->mode].count((void *)ud)
+                                   : 0;
+
+                if (key == TUI_KEY_UP || key == TUI_KEY_DOWN ||
+                    key == TUI_KEY_PGUP || key == TUI_KEY_PGDN ||
+                    key == TUI_KEY_HOME || key == TUI_KEY_END) {
+                    if (key == TUI_KEY_UP && t->sel > 0)
+                        t->sel--;
+                    else if (key == TUI_KEY_DOWN && total > 0 && t->sel + 1 < total)
+                        t->sel++;
+                    else if (key == TUI_KEY_PGUP)
+                        t->sel = (t->sel > rows_page) ? t->sel - rows_page : 0;
+                    else if (key == TUI_KEY_PGDN && total > 0)
+                        t->sel = (t->sel + rows_page < total - 1) ? t->sel + rows_page
+                                                                  : total - 1;
+                    else if (key == TUI_KEY_HOME)
+                        t->sel = 0;
+                    else if (key == TUI_KEY_END && total > 0)
+                        t->sel = total - 1;
+                    cli_tui_redraw(t);
+                    continue;
+                }
+                if (key == '\n' || key == '\r') {
+                    /* Enter：查看选中任务详情（DETAIL action 回填 detail）；
+                     * 空看板时 Enter 回对话。 */
+                    t->detail_len = 0;
+                    if (act && ud && total > 0 && t->sel < total) {
+                        t->detail[0] = '\0';
+                        if (act((void *)ud, CLI_TUI_ACT_DETAIL, t->sel, t->detail,
+                                sizeof(t->detail)))
+                            t->detail_len = strlen(t->detail);
+                        if (t->detail_len)
+                            t->detail_active = 1;
+                    } else if (total == 0) {
+                        t->mode = CLI_TUI_MODE_CHAT;
+                    }
+                    cli_tui_redraw(t);
+                    fflush(stdout);
+                    continue;
+                }
+                if (key == 'x' || key == 'X') {
+                    /* x：请求取消选中任务（结果提示进标题栏） */
+                    if (act && ud && total > 0 && t->sel < total)
+                        act((void *)ud, CLI_TUI_ACT_CANCEL, t->sel, t->note,
+                            sizeof(t->note));
+                    cli_tui_redraw(t);
+                    fflush(stdout);
+                    continue;
+                }
+                if (key == 0x1b) { /* Esc：返回对话 */
+                    t->mode = CLI_TUI_MODE_CHAT;
+                    cli_tui_redraw(t);
+                    fflush(stdout);
+                    continue;
+                }
+            } else {
+                /* 事件流：f 跟随 / c 过滤 / 方向键回放 */
+                if (key == 'f' || key == 'F') {
+                    t->follow = !t->follow;
+                    t->scroll_off = 0;
+                    cli_tui_redraw(t);
+                    fflush(stdout);
+                    continue;
+                }
+                if (key == 'c' || key == 'C') {
+                    if (act && ud)
+                        act((void *)ud, CLI_TUI_ACT_CYCLE_FILTER, 0, t->note,
+                            sizeof(t->note));
+                    t->scroll_off = 0;
+                    cli_tui_redraw(t);
+                    fflush(stdout);
+                    continue;
+                }
+                if (key == TUI_KEY_UP) {
+                    t->follow = 0;
+                    t->scroll_off++;
+                    cli_tui_redraw(t);
+                    continue;
+                }
+                if (key == TUI_KEY_DOWN) {
+                    if (t->scroll_off > 0)
+                        t->scroll_off--;
+                    cli_tui_redraw(t);
+                    continue;
+                }
+                if (key == TUI_KEY_PGUP) {
+                    t->follow = 0;
+                    t->scroll_off += rows_page;
+                    cli_tui_redraw(t);
+                    continue;
+                }
+                if (key == TUI_KEY_PGDN) {
+                    t->follow = 0;
+                    t->scroll_off = (t->scroll_off > rows_page)
+                                        ? t->scroll_off - rows_page
+                                        : 0;
+                    cli_tui_redraw(t);
+                    continue;
+                }
+                if (key == TUI_KEY_HOME) {
+                    t->follow = 0;
+                    t->scroll_off = SIZE_MAX; /* 渲染时 clamp 到面板末尾 */
+                    cli_tui_redraw(t);
+                    continue;
+                }
+                if (key == TUI_KEY_END) {
+                    t->scroll_off = 0;
+                    t->follow = 1; /* 回到尾部 = 恢复跟随 */
+                    cli_tui_redraw(t);
+                    continue;
+                }
+                if (key == 0x1b || key == '\n' || key == '\r') {
+                    t->mode = CLI_TUI_MODE_CHAT;
+                    cli_tui_redraw(t);
+                    fflush(stdout);
+                    continue;
+                }
+            }
+
+            /* 其他键：返回对话模式，并把该击键送入输入框（"打字即
+             * 退出浏览"的 Claude Code 风格）。若按键被吞掉，快速连
+             * 击的命令（如 quit）会缺首字符。 */
+            t->mode = CLI_TUI_MODE_CHAT;
+            if (key >= 0x20 && key <= 0xFF) {
+                tui_input_append(t, (char)key);
+                tui_render_input(t);
+            } else {
+                cli_tui_redraw(t);
+            }
+            fflush(stdout);
             continue;
         }
 

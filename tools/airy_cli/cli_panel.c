@@ -131,6 +131,51 @@ int cli_panel_board_line(void *ud, size_t idx, char *out, size_t cap)
     return 1;
 }
 
+/* 任务看板可操作动作（2026-08-19）：DETAIL 查看选中任务详情 /
+ * CANCEL 请求取消选中任务。动作期间重新拉取列表解析 sel（事件处理时
+ * 引擎刚重绘过，entries 缓存有效，但拉取最新状态更稳）。 */
+int cli_panel_board_action(void *ud, int action, size_t sel, char *out, size_t cap)
+{
+    cli_board_panel_t *p = (cli_board_panel_t *)ud;
+    if (!p || !p->hall || !out || cap == 0)
+        return 0;
+    out[0] = '\0';
+
+    airy_work_hall_entry_t **entries = NULL;
+    size_t n = 0;
+    if (airy_work_hall_list(p->hall, &entries, &n) != AIRY_SUCCESS)
+        return 0;
+    int ok = 0;
+
+    if (sel < n) {
+        airy_work_hall_entry_t *e = entries[sel];
+        if (action == CLI_TUI_ACT_DETAIL) {
+            size_t o = 0;
+            o += snprintf(out + o, cap - o, "◆ 执行 ID  %s\n", e->execution_id);
+            o += snprintf(out + o, cap - o, "  工作流    %s\n",
+                          e->workflow_name[0] ? e->workflow_name : e->workflow_id);
+            o += snprintf(out + o, cap - o, "  状态      %s %.0f%%\n", e->state,
+                          e->progress * 100.0);
+            o += snprintf(out + o, cap - o, "  复核      %s\n",
+                          e->review_verdict[0] ? e->review_verdict : "-");
+            o += snprintf(out + o, cap - o, "  输入      %.*s\n",
+                          (int)(e->input_json ? strlen(e->input_json) : 0),
+                          e->input_json ? e->input_json : "");
+            ok = 1;
+        } else if (action == CLI_TUI_ACT_CANCEL) {
+            airy_err_t err = airy_work_hall_cancel(p->hall, e->execution_id);
+            if (err == AIRY_SUCCESS)
+                snprintf(out, cap, "已请求取消 %s", e->execution_id);
+            else
+                snprintf(out, cap, "取消失败 %s（%s）", e->execution_id,
+                         cli_err_desc((int)err));
+            ok = 1;
+        }
+    }
+    airy_work_hall_list_free(entries, n);
+    return ok;
+}
+
 /* ================================================================
  * 事件流面板（hall_store 全局 gseq 因果序回放）
  * ================================================================ */
@@ -139,6 +184,7 @@ int cli_panel_board_line(void *ud, size_t idx, char *out, size_t cap)
 
 typedef struct {
     airy_hall_store_t *hs;
+    int filter_cat; /* 类别过滤（-1 = 全部；CYCLE_FILTER 循环切换） */
     struct {
         uint64_t gseq;
         int cat;
@@ -156,6 +202,7 @@ void cli_panel_events_create(airy_hall_store_t *hs, void **out_ud)
     if (!p)
         return;
     p->hs = hs;
+    p->filter_cat = -1; /* 默认全部类别 */
     *out_ud = p;
 }
 
@@ -176,9 +223,12 @@ size_t cli_panel_events_count(void *ud)
     if (airy_hall_store_list_tasks(p->hs, "default", &tasks, &nt) != AIRY_SUCCESS || nt == 0)
         return 0;
 
-    /* 跨任务 + 跨类别合并收集（最新 512 条，超出取新弃旧） */
+    /* 跨任务 + 跨类别合并收集（最新 512 条，超出取新弃旧；启用类别
+     * 过滤时只收集 filter_cat 匹配的事件） */
     for (size_t ti = 0; ti < nt && p->nev < CLI_PANEL_EV_MAX; ti++) {
         for (int cat = 0; cat < AIRY_HALL_CAT_MAX && p->nev < CLI_PANEL_EV_MAX; cat++) {
+            if (p->filter_cat >= 0 && cat != p->filter_cat)
+                continue;
             char **jsons = NULL;
             size_t cnt = 0;
             if (airy_hall_store_replay(p->hs, "default", tasks[ti],
@@ -228,5 +278,24 @@ int cli_panel_events_line(void *ud, size_t idx, char *out, size_t cap)
              cli_c(CLR_DIM), p->evs[idx].task, cli_c(CLR_RESET),
              cli_c(CLR_BOLD), p->evs[idx].label, cli_c(CLR_RESET),
              cli_c(CLR_DIM), p->evs[idx].content, cli_c(CLR_RESET));
+    return 1;
+}
+
+/* 事件流可操作动作（2026-08-19）：CYCLE_FILTER 循环切换类别过滤
+ * （全部 → cat0 → cat1 → ... → 全部），out 返回当前过滤名。 */
+int cli_panel_events_action(void *ud, int action, size_t sel, char *out, size_t cap)
+{
+    cli_events_panel_t *p = (cli_events_panel_t *)ud;
+    (void)sel;
+    if (!p || !out || cap == 0 || action != CLI_TUI_ACT_CYCLE_FILTER)
+        return 0;
+    p->filter_cat++;
+    if (p->filter_cat >= AIRY_HALL_CAT_MAX)
+        p->filter_cat = -1;
+    if (p->filter_cat < 0)
+        snprintf(out, cap, "过滤：全部类别");
+    else
+        snprintf(out, cap, "过滤：%s",
+                 airy_hall_category_name((airy_hall_category_t)p->filter_cat));
     return 1;
 }
