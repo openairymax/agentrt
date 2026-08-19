@@ -90,9 +90,11 @@ void cli_render_meter_end(cli_line_meter_t *m);
 size_t cli_render_meter_phys(cli_line_meter_t *m);
 
 /* 长回复折叠阈值与保留行数（交互 TTY / TUI 共用）
- * 端侧小屏幕适配：阈值从 8 降至 6，确保有限屏幕下长回复不占满全屏。 */
-#define CLI_REPLY_FOLD_MAX 6   /* 逻辑行数超过则折叠 */
-#define CLI_REPLY_FOLD_KEEP 3  /* 折叠后保留的前几行 */
+ * 结果优先：回复在 10 逻辑行内完整展示（用户反馈 6 行阈值把正常
+ * 回复"截断"了）；超过才折叠为前 KEEP 行 + 折叠尾。思考链折叠
+ * 单独用更紧凑的 CLI_REPLY_FOLD_KEEP（见 cli_chat.c）。 */
+#define CLI_REPLY_FOLD_MAX 10  /* 逻辑行数超过则折叠 */
+#define CLI_REPLY_FOLD_KEEP 4  /* 折叠后保留的前几行 */
 
 /* 空回复占位（2026-08-17）：模型未产生文本回复（thinking 模型可能
  * 只输出 reasoning_content，或 provider 异常）时渲染明确提示，避免
