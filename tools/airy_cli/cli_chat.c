@@ -1055,11 +1055,25 @@ static void cli_chat_stream_cb(const char *chunk, void *user_data)
 }
 
 /* 2.3.14 (2026-08-17)：对话思考链来自 t1-f（context arbiter）模型，
- * 实时思考标签为 [Dual Fast Think]；未配置 AIRY_MODEL_T1F（走 llm_d
- * 默认模型）时回落通用 [Dual Think]。 */
+ * 实时思考标签为 [Dual Fast Think]；未配置（走 llm_d 默认模型）时
+ * 回落通用 [Dual Think]。2026-08-19：t1-f 配置统一来自
+ * cli_think_cfg_load（env > model.yaml think 段 > llm.model 默认），
+ * 与 think_d 实际生效模型一致；静态缓存避免每帧进度行重复读文件。 */
+static const char *cli_chat_t1f_cached(void)
+{
+    static char s_t1f[128];
+    static int s_loaded = 0;
+    if (!s_loaded) {
+        s_loaded = 1;
+        char t2[128], t1p[128];
+        cli_think_cfg_load(t2, sizeof(t2), s_t1f, sizeof(s_t1f), t1p, sizeof(t1p));
+    }
+    return s_t1f;
+}
+
 static cli_actor_t cli_chat_think_actor(void)
 {
-    const char *t1f = getenv("AIRY_MODEL_T1F");
+    const char *t1f = cli_chat_t1f_cached();
     return (t1f && t1f[0]) ? CLI_ACTOR_DUAL_FAST_THINK : CLI_ACTOR_DUAL_THINK;
 }
 
@@ -1071,7 +1085,7 @@ void cli_chat_reply(const char *input)
         return;
     }
 
-    const char *t1f_model = getenv("AIRY_MODEL_T1F");
+    const char *t1f_model = cli_chat_t1f_cached();
     cli_trace("chat", "%s start model=%s", CLI_ICON_DIAMOND,
               (t1f_model && t1f_model[0]) ? t1f_model : "default");
 
@@ -1079,7 +1093,8 @@ void cli_chat_reply(const char *input)
       * If unset, hint the three config points and order without blocking (provider default).
       * The hint prints once per session only. 2026-08-17: 改为 cli_trace 输出
       * （日志/stderr），不再渲染进对话列——配置提示是内部运维信息，出现在
-      * 会话正文会污染对话（用户要求对话只展示过程，不暴露内部细节）。 */
+      * 会话正文会污染对话（用户要求对话只展示过程，不暴露内部细节）。
+      * 2026-08-19: model.yaml 的 llm.model 默认可满足 t1-f，此时不再提示。 */
     static int s_t1f_hint_shown = 0;
     if (!s_t1f_hint_shown && (!t1f_model || !t1f_model[0])) {
         s_t1f_hint_shown = 1;

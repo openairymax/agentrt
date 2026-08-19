@@ -213,3 +213,185 @@ airy_err_t cli_think_process_remote(const char *think_sock, const char *input,
     cJSON_Delete(outer);
     return (airy_err_t)perr;
 }
+
+/* ==================== 双思考三模型配置统一读取 ==================== */
+
+/* 从 model.yaml 提取标量字段（BAN 合规：手写解析，禁 sscanf）。
+ *
+ * 结构约定（ecosystem/manager/model/model.yaml）：
+ *   llm:
+ *     model: "deepseek-v4-flash"
+ *   think:
+ *     think2_slow_model: ""
+ *     think1_fast_model: ""
+ *     think1_prof_model: ""
+ * 无缩进段标题（"name:"）切换当前段；目标段内缩进的 "key: \"value\""
+ * 行命中即返回。返回 0 找到（含空串），-1 未找到/文件不可读。 */
+static int cli_think_cfg_yaml_get(const char *path, const char *section,
+                                  const char *key, char *out, size_t cap)
+{
+    if (!path || !section || !key || !out || cap == 0)
+        return -1;
+    out[0] = '\0';
+
+    FILE *f = fopen(path, "r");
+    if (!f)
+        return -1;
+
+    char line[512];
+    char cur[32] = "";
+    int found = 0;
+    while (fgets(line, sizeof(line), f)) {
+        size_t len = strlen(line);
+        while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r'))
+            line[--len] = '\0';
+
+        const char *p = line;
+        while (*p == ' ' || *p == '\t')
+            p++;
+        const char *kstart = p;
+        while (*p && *p != ':' && *p != ' ' && *p != '\t')
+            p++;
+        if (*p != ':' || p == kstart)
+            continue;
+
+        const char *after = p + 1;
+        while (*after == ' ' || *after == '\t')
+            after++;
+        size_t kl = (size_t)(p - kstart);
+
+        if (*after == '\0') {
+            /* 段标题行：key:（后无其他非空白） */
+            if (kl < sizeof(cur)) {
+                AIRY_MEMCPY(cur, kstart, kl);
+                cur[kl] = '\0';
+            }
+            continue;
+        }
+        if (strcmp(cur, section) != 0)
+            continue;
+        if (strlen(key) != kl || strncmp(kstart, key, kl) != 0)
+            continue;
+
+        if (*after == '"') {
+            /* 引号包裹值：截到闭引号 */
+            const char *v = after + 1;
+            size_t vl = 0;
+            while (v[vl] && v[vl] != '"' && vl + 1 < cap)
+                vl++;
+            AIRY_MEMCPY(out, v, vl);
+            out[vl] = '\0';
+        } else {
+            /* 无引号标量（timeout_ms 等）：仅确认键存在，值为空 */
+            out[0] = '\0';
+        }
+        found = 1;
+        break;
+    }
+    fclose(f);
+    return found ? 0 : -1;
+}
+
+/* 定位 model.yaml：AIRY_MODEL_CONFIG > $AIRY_HOME/config/model.yaml */
+static void cli_think_cfg_path(char *path, size_t cap)
+{
+    const char *cfg = getenv("AIRY_MODEL_CONFIG");
+    if (cfg && cfg[0]) {
+        snprintf(path, cap, "%s", cfg);
+        return;
+    }
+    const char *home = getenv("AIRY_HOME");
+    if (home && home[0])
+        snprintf(path, cap, "%s/config/model.yaml", home);
+    else
+        snprintf(path, cap, "%s/.airymaxrt/config/model.yaml",
+                 getenv("HOME") ? getenv("HOME") : ".");
+}
+
+/* 双思考三模型配置统一读取，CLI 侧真相源对齐 think_d。
+ *
+ * 优先级：env AIRY_MODEL_T2/T1F/T1P > $AIRY_MODEL_CONFIG（或
+ * $AIRY_HOME/config/model.yaml）think 段 > 该文件 llm.model 默认
+ * （model.yaml 语义：think 段留空 = 使用默认模型）。
+ *
+ * 2026-08-19：CLI 此前只读 env，与 think_d 配置脱节——think 段留空
+ * 时 CLI 显示"默认"而 think_d 实际用 llm.model；现统一为真实生效
+ * 模型。调用方对空串按原语义处理（显示"默认"/传 NULL 走 provider
+ * default）。 */
+void cli_think_cfg_load(char *t2, size_t t2c, char *t1f, size_t t1fc,
+                        char *t1p, size_t t1pc)
+{
+    if (!t2 || !t1f || !t1p || t2c == 0 || t1fc == 0 || t1pc == 0)
+        return;
+    t2[0] = t1f[0] = t1p[0] = '\0';
+
+    const char *e2 = getenv("AIRY_MODEL_T2");
+    const char *e1f = getenv("AIRY_MODEL_T1F");
+    const char *e1p = getenv("AIRY_MODEL_T1P");
+    if (e2 && e2[0])
+        snprintf(t2, t2c, "%s", e2);
+    if (e1f && e1f[0])
+        snprintf(t1f, t1fc, "%s", e1f);
+    if (e1p && e1p[0])
+        snprintf(t1p, t1pc, "%s", e1p);
+    if (t2[0] && t1f[0] && t1p[0])
+        return;
+
+    char path[AIRY_PATH_MAX];
+    cli_think_cfg_path(path, sizeof(path));
+
+    if (t2[0] == '\0')
+        cli_think_cfg_yaml_get(path, "think", "think2_slow_model", t2, t2c);
+    if (t1f[0] == '\0')
+        cli_think_cfg_yaml_get(path, "think", "think1_fast_model", t1f, t1fc);
+    if (t1p[0] == '\0')
+        cli_think_cfg_yaml_get(path, "think", "think1_prof_model", t1p, t1pc);
+
+    /* think 段留空 = llm.model 默认 */
+    if (t2[0] && t1f[0] && t1p[0])
+        return;
+    char def_model[128] = "";
+    cli_think_cfg_yaml_get(path, "llm", "model", def_model, sizeof(def_model));
+    if (def_model[0]) {
+        if (t2[0] == '\0')
+            snprintf(t2, t2c, "%s", def_model);
+        if (t1f[0] == '\0')
+            snprintf(t1f, t1fc, "%s", def_model);
+        if (t1p[0] == '\0')
+            snprintf(t1p, t1pc, "%s", def_model);
+    }
+}
+
+/* 仅显式配置：env AIRY_MODEL_T2/T1F/T1P + model.yaml think 段，不回填
+ * llm.model 默认。执行复核等场景须区分"用户显式指定"与"默认回填"——
+ * 默认回填意味着与主生成同模型，复核会自审自签，必须降级而非采用。
+ * 返回是否至少一个字段显式配置（输出为对应模型名，未配置为空串）。 */
+int cli_think_cfg_explicit(char *t2, size_t t2c, char *t1f, size_t t1fc,
+                           char *t1p, size_t t1pc)
+{
+    if (!t2 || !t1f || !t1p || t2c == 0 || t1fc == 0 || t1pc == 0)
+        return 0;
+    t2[0] = t1f[0] = t1p[0] = '\0';
+
+    const char *e2 = getenv("AIRY_MODEL_T2");
+    const char *e1f = getenv("AIRY_MODEL_T1F");
+    const char *e1p = getenv("AIRY_MODEL_T1P");
+    if (e2 && e2[0])
+        snprintf(t2, t2c, "%s", e2);
+    if (e1f && e1f[0])
+        snprintf(t1f, t1fc, "%s", e1f);
+    if (e1p && e1p[0])
+        snprintf(t1p, t1pc, "%s", e1p);
+    if (t2[0] && t1f[0] && t1p[0])
+        return 1;
+
+    char path[AIRY_PATH_MAX];
+    cli_think_cfg_path(path, sizeof(path));
+    if (t2[0] == '\0')
+        cli_think_cfg_yaml_get(path, "think", "think2_slow_model", t2, t2c);
+    if (t1f[0] == '\0')
+        cli_think_cfg_yaml_get(path, "think", "think1_fast_model", t1f, t1fc);
+    if (t1p[0] == '\0')
+        cli_think_cfg_yaml_get(path, "think", "think1_prof_model", t1p, t1pc);
+    return (t2[0] || t1f[0] || t1p[0]) ? 1 : 0;
+}
