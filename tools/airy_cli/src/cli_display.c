@@ -945,11 +945,17 @@ void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
 
     /* Full-screen TUI page pins its own header boundary (history-based)
      * after this; non-TTY output just scrolls. Only interactive plain
-     * TTYs pin the 6-line block; the bottom row is reserved as the fixed
-     * input zone (three-zone layout: hero / dialogue / input). */
-    if (!cli_term_is_tty() || cli_tui_active(cli_tui_get_default()))
+     * TTYs pin the 6-line block; the bottom two rows are reserved as the
+     * fixed input zone (three-zone layout: hero / dialogue / input with a
+     * dim separator line between dialogue and input).
+     *
+     * 注意：TUI active 时 hero 仍要打印——它会被重定向进 TUI 历史
+     * （cli_render_set_tui 已切换渲染目标），供全屏页面 pin 头部；
+     * 此处只跳过行渲染模式的 scroll-region pin。 */
+    if (!cli_term_is_tty())
         return;
-    cli_term_header_pin(CLI_HDR_LINES, 1);
+    if (!cli_tui_active(cli_tui_get_default()))
+        cli_term_header_pin(CLI_HDR_LINES, 2);
     fflush(stdout);
 }
 
