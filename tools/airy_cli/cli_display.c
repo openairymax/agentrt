@@ -438,7 +438,10 @@ static void cli_hero_frame_bottom(const char *g)
 static void cli_hero_capabilities(const char *g)
 {
     char text[160];
-    snprintf(text, sizeof(text), "  版本 v%s：对话 · 任务 · 蓝图调度 · 双思考 · GCCP · 工具执行",
+    /* 1 leading space matches the other hero rows ("│ [For Thee]",
+     * "│ A·t2", "│ ? /help") so all content is left-aligned inside
+     * the frame. */
+    snprintf(text, sizeof(text), " 版本 v%s：对话 · 任务 · 蓝图调度 · 双思考 · GCCP · 工具执行",
              AIRY_CLI_VERSION);
     size_t w = cli_hero_frame_w();
     size_t budget = cli_hero_content_max(w);
