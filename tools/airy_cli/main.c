@@ -683,8 +683,11 @@ int main(int argc, char *argv[])
             }
         } else {
             if (!cli_tui_active(tui)) {
-                /* Line-oriented mode: print the prompt ourselves. */
-                cli_outf("\n%sairy>%s ", cli_c(CLR_CYAN), cli_c(CLR_RESET));
+                /* Line-oriented mode: print the prompt ourselves. The extra
+                 * blank line keeps the dialogue visually separated from the
+                 * pinned hero frame above (reported overlap on narrow
+                 * terminals). */
+                cli_outf("\n\n%sairy>%s ", cli_c(CLR_CYAN), cli_c(CLR_RESET));
                 fflush(stdout);
             }
             int rl = cli_tui_readline(tui, input, sizeof(input), &input_len);
@@ -1431,8 +1434,13 @@ int main(int argc, char *argv[])
 #endif
     }
 
-    if (!g_cli_print_mode)
+    if (!g_cli_print_mode) {
+        /* New line first: the exit banner would otherwise render right on
+         * the "airy> " prompt line ("airy> [Super Agent] AgentRT has
+         * exited…"). */
+        cli_outc('\n');
         cli_render_role_line(CLI_ROLE_SUPER_AGENT, CLI_ACTOR_SUPER_AGENT, NULL,
                              "AgentRT has exited. Thank you for using it.");
+    }
     return 0;
 }

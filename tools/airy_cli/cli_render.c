@@ -1296,6 +1296,11 @@ void cli_render_turn_separator(uint64_t elapsed_ms, const char *metrics)
     /* One-shot server mode (-p): the result is the only output, no turn chrome. */
     if (g_cli_print_mode)
         return;
+    /* Start on a fresh line: the previous turn's content (or a folded
+     * reply tail) may not end with '\n', and writing the separator right
+     * after it would leave "…─" debris on the prompt line (reported
+     * overlap). This also adds breathing room between turns. */
+    cli_outc('\n');
     uint64_t secs = elapsed_ms / 1000;
     char label[128];
     if (secs < 1)
