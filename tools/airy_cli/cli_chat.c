@@ -915,6 +915,9 @@ static int s_stream_first_chunk = 0;
  * 的预览保留为过程展示，不擦除）。 */
 static size_t g_chat_fold_lines = 0;
 static size_t g_chat_fold_phys = 0;
+/* 预览末尾是否无换行（光标停在最后一行行尾）：擦除时上移行数须少 1，
+ * 否则会把预览起点上方那行（消息行）一并覆盖。 */
+static int g_chat_fold_tail_no_nl = 0;
 
 static void cli_stream_norm_emit(const char *s, size_t n)
 {
@@ -944,6 +947,52 @@ static int cli_code_prefix(const char *s, size_t n)
     return 0;
 }
 
+/* 2.3.5/2.3.6：thinking 模型（DeepSeek/Kimi 等）先产思考链再产正文，
+ * 思考阶段可长达数十秒。原始推理碎片逐块上屏无阅读价值（用户反馈
+ * "太长看不懂"），因此思考期间只显示轻量进度行
+ * （[Dual Fast Think] 思考中… N 字 · 耗时，\r 原地刷新），首个
+ * content 分片到达即擦除；完整思考链在回复完成后折叠展示。
+ * 通道说明：交互模式 stderr 被重定向到日志，实时 UI 反馈（Connecting /
+ * 思考进度）与流式正文**同流直写 stdout**（同一 fd 光标同步，\r 覆盖
+ * 不留痕）；-p / --json / TUI 下这些反馈被各自前置条件禁用。 */
+static cli_actor_t cli_chat_think_actor(void);
+static int s_reasoning_progress = 0;      /* 进度行当前可见 */
+static int s_reasoning_chars = 0;         /* 思考字数累计 */
+static uint64_t s_reasoning_start_ms = 0; /* 思考阶段开始时刻 */
+
+static void cli_chat_reasoning_cb(const char *delta, void *user_data)
+{
+    (void)user_data;
+    /* 仅交互 TTY 流式显示进度；-p / --json / TUI 走各自无进度路径。 */
+    if (!delta || g_cli_print_mode || g_cli_json_mode)
+        return;
+    /* 正文已开始（首片到达）：思考阶段结束，不再刷新进度行——上游
+     * reasoning 增量与 content 首片可能交错到达（DeepSeek 流式分块），
+     * 否则进度行 \r 覆盖会压到正文首行（2026-08-19 实测竞态）。 */
+    if (!s_stream_first_chunk)
+        return;
+    if (!s_reasoning_start_ms)
+        s_reasoning_start_ms = cli_now_ms();
+    s_reasoning_chars += (int)strlen(delta);
+    s_reasoning_progress = 1;
+    uint64_t ms = cli_now_ms() - s_reasoning_start_ms;
+    /* 角色名与全站一致：[Dual Slow/Fast/Prof Think]（2.3.14） */
+    fprintf(stdout, "\r    %s[%s]%s 思考中… %d 字 · %lu.%lus   ",
+            cli_c(CLR_YELLOW), cli_render_actor_name(cli_chat_think_actor()),
+            cli_c(CLR_RESET), s_reasoning_chars, (unsigned long)(ms / 1000),
+            (unsigned long)(ms % 1000) / 100);
+    fflush(stdout);
+}
+
+static void cli_chat_reasoning_clear(void)
+{
+    if (s_reasoning_progress) {
+        s_reasoning_progress = 0;
+        fputs("\r\033[K", stdout);
+        fflush(stdout);
+    }
+}
+
 static void cli_chat_stream_cb(const char *chunk, void *user_data)
 {
     (void)user_data;
@@ -953,11 +1002,12 @@ static void cli_chat_stream_cb(const char *chunk, void *user_data)
     if (n == 0)
         return;
 
-    /* 首片到达：擦除 "Connecting..." 提示行 */
+    /* 首片到达：擦除 "Connecting..." / 思考进度提示行（同位置） */
     if (s_stream_first_chunk) {
         s_stream_first_chunk = 0;
-        fprintf(stderr, "\r\033[K");
-        fflush(stderr);
+        s_reasoning_progress = 0; /* 进度行已被首片擦除，避免收尾重复擦除 */
+        fputs("\r\033[K", stdout);
+        fflush(stdout);
     }
 
     /* 跨 chunk：上一片末尾的标签前缀先与本次开头拼接判断。 */
@@ -1097,28 +1147,38 @@ void cli_chat_reply(const char *input)
             int folding = !g_cli_print_mode;
             if (folding)
                 cli_render_meter_begin(&meter);
-            /* 连接反馈：流式前在 stderr 显示连接状态，首片到达时擦除。
-             * 避免连接阶段（RPC 握手 + 模型推理首 token）用户无任何反馈。 */
+            /* 连接反馈：流式前显示连接状态（与正文同流 stdout），首片
+             * 到达时擦除。避免连接阶段（RPC 握手 + 模型推理首 token）
+             * 用户无任何反馈。 */
             s_stream_first_chunk = !g_cli_print_mode;
             if (s_stream_first_chunk) {
-                fprintf(stderr, "    %s●%s Connecting…\r",
+                fprintf(stdout, "    %s●%s Connecting…\r",
                         cli_c(CLR_DIM), cli_c(CLR_RESET));
-                fflush(stderr);
+                fflush(stdout);
             }
+            /* 思考阶段进度：每轮重置计数，reasoning 增量经回调实时上屏 */
+            s_reasoning_start_ms = 0;
+            s_reasoning_chars = 0;
+            s_reasoning_progress = 0;
             ret = llm_svc_adapter_complete_stream(g_chat_adapter, &cfg,
-                                                  cli_chat_stream_cb, NULL, &resp);
+                                                  cli_chat_stream_cb, NULL,
+                                                  cli_chat_reasoning_cb, NULL,
+                                                  &resp);
+            /* 思考进度行残留清理（reasoning-only 或异常中断场景） */
+            cli_chat_reasoning_clear();
             /* 流式收尾：flush 可能残留的 [code] 前缀 carry（流提前结束时
              * 最后一片未触达标签判定的字节）。 */
             cli_stream_norm_flush_carry();
             /* 流结束但无首片到达（连接失败/空响应）：擦除 Connecting 行 */
             if (s_stream_first_chunk) {
                 s_stream_first_chunk = 0;
-                fprintf(stderr, "\r\033[K");
-                fflush(stderr);
+                fputs("\r\033[K", stdout);
+                fflush(stdout);
             }
             if (folding) {
                 g_chat_fold_lines = meter.lines;
                 g_chat_fold_phys = cli_render_meter_phys(&meter);
+                g_chat_fold_tail_no_nl = (meter.row_len > 0) ? 1 : 0;
                 cli_render_meter_end(&meter);
             }
         } else {
@@ -1272,13 +1332,21 @@ void cli_chat_reply(const char *input)
         cli_tui_t *r_tui = cli_tui_get_default();
         int r_tui_active = r_tui && cli_tui_active(r_tui);
         if (stream_mode) {
-            /* 交互 TTY 流式：擦除打字机预览，重绘最终形态。 */
+            /* 交互 TTY 流式：擦除打字机预览，重绘最终形态。
+             * 上移行数：末尾无换行（光标在最后一行行尾）时 = phys-1，
+             * 否则 = phys；\r 回行首再 \033[J 清屏（CUU 只移行不移列，
+             * 直接清会残留列尾内容）。擦除前强制 flush：预览/进度行
+             * 全部落盘后再移动光标，避免 stdio 缓冲重排造成擦除错位。 */
             if (g_chat_fold_phys > 0 && cli_term_is_tty()) {
+                fflush(stdout);
+                size_t up = g_chat_fold_phys;
+                if (g_chat_fold_tail_no_nl && up > 0)
+                    up -= 1;
                 char erase[32];
-                int en = snprintf(erase, sizeof(erase), "\033[%zuA\033[J",
-                                  g_chat_fold_phys);
+                int en = snprintf(erase, sizeof(erase), "\033[%zuA\r\033[J", up);
                 if (en > 0)
                     fwrite(erase, 1, (size_t)en, stdout);
+                fflush(stdout);
             }
             /* 2.3.5/2.3.14：thinking 模型的思考过程以 [Dual Think] 折叠
              * 呈现（前几行 + 折叠尾），避免碎片刷屏，又让用户看到模型

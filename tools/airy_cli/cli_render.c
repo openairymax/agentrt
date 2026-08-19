@@ -1056,9 +1056,10 @@ void cli_render_super_agent_folded(const char *content)
         return; /* 短回复：已完整渲染，无需折叠 */
 
     /* 长回复：上移擦除已渲染的物理行，重绘为前 KEEP 行 + 折叠尾。
+     * \r 先回行首再 \033[J（CUU 只移行不移列，直接清会残留列尾内容）。
      * 全量文本保留在日志/消息历史中（full text in logs 约定）。 */
     char erase[32];
-    int en = snprintf(erase, sizeof(erase), "\033[%zuA\033[J", phys);
+    int en = snprintf(erase, sizeof(erase), "\033[%zuA\r\033[J", phys);
     if (en > 0)
         fwrite(erase, 1, (size_t)en, stdout);
 
