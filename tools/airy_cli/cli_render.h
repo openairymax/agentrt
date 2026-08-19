@@ -204,6 +204,7 @@ void cli_trace(const char *tag, const char *fmt, ...);
 #define CLI_ICON_ERR "\u25A0"           /* ■ error        */
 #define CLI_ICON_BRANCH "\u2514"        /* └ detail indent */
 #define CLI_ICON_TOOL "\u26CF"          /* ⛏ tool invocation */
+#define CLI_ICON_HALF "\u25D0"          /* ◐ in-progress (live plan board) */
 
 /* 非 TTY 状态行辅助（2026-08-16）：状态图标 + 紧凑进度条，供 -p 模式下
  * [progress]/[status]/[result] 等 cli_trace 行使用，让管道/CI 输出同样

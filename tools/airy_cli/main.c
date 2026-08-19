@@ -994,13 +994,10 @@ int main(int argc, char *argv[])
                       wf->node_count, wf->edge_count, hdrs);
         }
 
-        cli_render_phase("执行计划");
-        cli_print_plan_list(wf);
-
-        /* 4.3 Submit execution (with AIRY_SCHED_SOCK set, use remote sched_d blueprint DAG;
-          * otherwise submit to the embedded work hall. input is the raw task text for agents;
-          * if omitted, the first node handler gets empty input and produces boilerplate) */
-        cli_render_phase("执行提交");
+        /* 4.3 执行计划：直播看板（结构 + 图标编排）。看板块打印后，下方
+         * 紧跟 spinner 开始运行，期间不再输出新行，保证原位重绘的相对
+         * 几何稳定；提交过程静默（cli_trace 记录），不再单独打阶段头。 */
+        cli_live_board_begin(wf);
         char *exec_id = NULL;
         const char *sched_sock = getenv("AIRY_SCHED_SOCK");
         int sched_remote = (sched_sock && sched_sock[0]) ? 1 : 0;
@@ -1071,6 +1068,11 @@ int main(int argc, char *argv[])
             /* 2.3.7：轮询节拍期间检测用户输入（插入对话/中断）。
              * 有输入先处理（不阻塞任务轮询），再继续本轮的 200ms 节拍。 */
             int input_rc = cli_task_poll_input();
+            if (input_rc == 1) {
+                /* 插入对话：回复渲染在看板块下方，原位重绘的相对几何失效，
+                 * 看板退化为追加行模式（后续状态变化走 cli_board_line）。 */
+                cli_live_board_done();
+            }
             if (input_rc < 0) {
                 /* 用户请求打断：等同 SIGINT，统一走取消路径 */
                 cli_spinner_stop(0, "aborted");
@@ -1109,17 +1111,25 @@ int main(int argc, char *argv[])
                     break;
                 }
                 if (node_board) {
+                    /* TTY 直播看板激活：远程节点状态只喂快照，由看板统一
+                     * 原位重绘；退化模式（非 TTY）仍用追加式节点行。 */
                     cli_spinner_pause();
-                    int nb_terminal = cli_dag_node_board_tick(node_board, sched_sock, exec_id);
+                    if (cli_live_board_active())
+                        cli_dag_board_snapshot(sched_sock, exec_id, cli_live_board_set_node);
+                    else {
+                        int nb_terminal =
+                            cli_dag_node_board_tick(node_board, sched_sock, exec_id);
+                        if (nb_terminal)
+                            cli_dag_node_board_destroy(node_board), node_board = NULL;
+                    }
                     cli_spinner_resume();
-                    if (nb_terminal)
-                        cli_dag_node_board_destroy(node_board), node_board = NULL;
                 }
                 if (prc == CLI_DAG_POLL_DONE) {
                     run_failed = (strcmp(cur_state, "failed") == 0 ||
                                   strcmp(cur_state, "canceled") == 0);
                     cli_spinner_pause();
-                    cli_board_line("sched_d", exec_id, cur_state, cur_progress);
+                    if (!cli_live_board_refresh(cur_state, cur_progress))
+                        cli_board_line("sched_d", exec_id, cur_state, cur_progress);
                     cli_spinner_stop(!run_failed, NULL);
                     spin_running = 0;
                     done = 1;
@@ -1150,8 +1160,9 @@ int main(int argc, char *argv[])
                 (cur_progress - last_progress) >= 0.01 || (cur_progress - last_progress) <= -0.01;
             if (state_changed || prog_changed) {
                 cli_spinner_pause();
-                cli_board_line(sched_remote ? "sched_d" : "hall", exec_id, cur_state,
-                               cur_progress);
+                if (!cli_live_board_refresh(cur_state, cur_progress))
+                    cli_board_line(sched_remote ? "sched_d" : "hall", exec_id, cur_state,
+                                   cur_progress);
                 cli_spinner_resume();
                 snprintf(last_state, sizeof(last_state), "%s", cur_state);
                 last_progress = cur_progress;
@@ -1187,6 +1198,7 @@ int main(int argc, char *argv[])
              * trace line, no internal jargon. */
             if (board_polls > 0 && stale_polls >= 10) {
                 cli_spinner_pause();
+                cli_live_board_extra(); /* 回退行打在块与 spinner 之间 */
                 cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_THINK,
                                      sched_remote ? "sched_d" : "hall",
                                      "still running, waiting for completion ...");
@@ -1235,6 +1247,18 @@ int main(int argc, char *argv[])
         }
         cli_trace("wait", "%s done err=%d has_result=%d", CLI_ICON_DONE, (int)err,
                   result ? 1 : 0);
+        /* 阻塞 wait 结束后（轮询早退的 stale 路径）补一次最终原位重绘：
+         * 节点图标翻到终态、footer 汇总完成度。仅当 spinner 仍在运行
+         * （几何仍以看板块为参照）时执行；轮询内已完成终态刷新的路径
+         * （spin_running=0）跳过，避免二次重绘破坏布局。 */
+        if (spin_running && cli_live_board_active() && !g_cli_cancel) {
+            if (sched_remote)
+                cli_dag_board_snapshot(sched_sock, exec_id, cli_live_board_set_node);
+            cli_spinner_pause();
+            cli_live_board_refresh((err == AIRY_EOK && result) ? "completed" : "failed",
+                                   1.0);
+            cli_spinner_resume();
+        }
         if (spin_running) {
             if (g_cli_cancel)
                 cli_spinner_stop(0, "aborted");

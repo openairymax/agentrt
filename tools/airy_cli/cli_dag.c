@@ -472,3 +472,59 @@ int cli_dag_node_board_tick(cli_dag_board_t *b, const char *sched_sock, const ch
     cJSON_Delete(root);
     return terminal ? 1 : 0;
 }
+
+/* Remote DAG per-node state snapshot (live plan board feeder): parses
+ * dag_status and reports every node's (id, state) through cb without
+ * printing anything — the live plan board renders the block itself.
+ * Returns 1 once a terminal state is observed, 0 otherwise. */
+int cli_dag_board_snapshot(const char *sched_sock, const char *dag_id,
+                           void (*cb)(const char *node_id, const char *state))
+{
+    if (!sched_sock || !dag_id || !cb)
+        return 0;
+
+    cJSON *params = cJSON_CreateObject();
+    if (!params)
+        return 0;
+    cJSON_AddStringToObject(params, "dag_id", dag_id);
+    char *params_json = cJSON_PrintUnformatted(params);
+    cJSON_Delete(params);
+    if (!params_json)
+        return 0;
+
+    char *rpc_result = NULL;
+    int rc = daemon_rpc_call(sched_sock, "dag_status", params_json, &rpc_result, 10000);
+    AIRY_FREE(params_json);
+    if (rc != AIRY_SUCCESS || !rpc_result) {
+        AIRY_FREE(rpc_result);
+        return 0;
+    }
+
+    cJSON *root = cJSON_Parse(rpc_result);
+    AIRY_FREE(rpc_result);
+    if (!root)
+        return 0;
+
+    cJSON *st = cJSON_GetObjectItem(root, "status");
+    const char *status = (cJSON_IsString(st) && st->valuestring) ? st->valuestring : "unknown";
+    int terminal = (strcmp(status, "completed") == 0 || strcmp(status, "failed") == 0 ||
+                    strcmp(status, "canceled") == 0);
+
+    cJSON *nodes = cJSON_GetObjectItem(root, "nodes");
+    int nsz = (nodes && cJSON_IsArray(nodes)) ? cJSON_GetArraySize(nodes) : 0;
+    for (int i = 0; i < nsz; i++) {
+        cJSON *nj = cJSON_GetArrayItem(nodes, i);
+        if (!nj)
+            continue;
+        cJSON *nid = cJSON_GetObjectItem(nj, "id");
+        cJSON *nst = cJSON_GetObjectItem(nj, "status");
+        if (cJSON_IsString(nid) && nid->valuestring) {
+            const char *st_s = (cJSON_IsString(nst) && nst->valuestring) ? nst->valuestring
+                                                                         : "pending";
+            cb(nid->valuestring, st_s);
+        }
+    }
+
+    cJSON_Delete(root);
+    return terminal ? 1 : 0;
+}
