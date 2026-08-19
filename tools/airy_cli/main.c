@@ -617,18 +617,25 @@ int main(int argc, char *argv[])
     }
 
     /* 阶段 4：TUI 面板数据源绑定（任务看板 = work_hall 实时；事件流 =
-     * hall_store gseq 因果序）。面板 ud 生命周期与本函数共存，退出前销毁。 */
+     * hall_store gseq 因果序）。面板 ud 生命周期与本函数共存，退出前销毁。
+     * 2026-08-19：绑定可操作动作（详情/取消/过滤），面板从只读升级为可操作。
+     * 绑定不依赖 TUI 激活时刻（F8 之后随时可进入面板模式），ud 持有
+     * 会话级 hall/hall_store 指针，成本可忽略。 */
     void *board_ud = NULL;
     void *events_ud = NULL;
-    if (tui && cli_tui_active(tui)) {
+    if (tui) {
         cli_panel_board_create(hall, &board_ud);
         cli_panel_events_create(hall_store, &events_ud);
-        if (board_ud)
+        if (board_ud) {
             cli_tui_set_panel(tui, CLI_TUI_MODE_BOARD, board_ud, cli_panel_board_count,
                               cli_panel_board_line);
-        if (events_ud)
+            cli_tui_set_panel_action(tui, CLI_TUI_MODE_BOARD, cli_panel_board_action);
+        }
+        if (events_ud) {
             cli_tui_set_panel(tui, CLI_TUI_MODE_EVENTS, events_ud, cli_panel_events_count,
                               cli_panel_events_line);
+            cli_tui_set_panel_action(tui, CLI_TUI_MODE_EVENTS, cli_panel_events_action);
+        }
     }
 
     for (;;) {

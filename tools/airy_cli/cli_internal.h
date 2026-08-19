@@ -184,6 +184,9 @@ size_t cli_panel_board_count(void *ud);
 int cli_panel_board_line(void *ud, size_t idx, char *out, size_t cap);
 size_t cli_panel_events_count(void *ud);
 int cli_panel_events_line(void *ud, size_t idx, char *out, size_t cap);
+/* 面板可操作动作（2026-08-19）：TUI 引擎按键触发，动作在 CLI 层执行 */
+int cli_panel_board_action(void *ud, int action, size_t sel, char *out, size_t cap);
+int cli_panel_events_action(void *ud, int action, size_t sel, char *out, size_t cap);
 
 #ifdef __cplusplus
 }

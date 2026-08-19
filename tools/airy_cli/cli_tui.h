@@ -43,10 +43,15 @@ typedef struct cli_tui_s cli_tui_t;
  *
  * 多视图切换（底部 tab 栏）：对话（默认）/ 任务看板 / 事件流。
  * 看板与事件流是"数据面板"：内容由 main.c 注册的回调生成（面板数据
- * 源），TUI 引擎只负责布局与滚动，不感知 work_hall/hall_store，保持
- * 渲染层与机制层解耦。
- * 按键：Ctrl+P 下一个 tab，Ctrl+O 上一个 tab；看板模式 200ms 轮询
- * 重绘（实时刷新）；面板内 Up/Down/PageUp/PageDown 滚动回放。
+ * 源），TUI 引擎只负责布局、选择与滚动，不感知 work_hall/hall_store，
+ * 保持渲染层与机制层解耦。可操作动作（详情/取消/过滤）经面板 action
+ * 回调路由回 CLI 层执行（引擎不持有机制状态）。
+ * 按键：Ctrl+P 下一个 tab，Ctrl+O 上一个 tab，F6 直达任务看板，
+ * F7 直达事件流；面板模式 200ms 轮询重绘（实时刷新）。
+ *   - 任务看板：↑/↓ 移动选择，Enter 查看任务详情（Esc 返回列表），
+ *     x 请求取消选中任务，PageUp/PageDown/Home/End 按页/首尾跳选。
+ *   - 事件流：f 切换实时跟随（尾部刷新），c 循环类别过滤，其余
+ *     方向键回放浏览。
  * ================================================================ */
 
 typedef enum {
@@ -62,6 +67,17 @@ typedef enum {
 typedef size_t (*cli_tui_panel_count_fn)(void *ud);
 typedef int (*cli_tui_panel_line_fn)(void *ud, size_t idx, char *out, size_t cap);
 
+/* 面板可操作动作（mode=BOARD/EVENTS 时由 TUI 引擎转发给 action 回调）：
+ *   BOARD:   DETAIL  查看选中任务详情（TUI 以 t->detail 展示，Esc 返回）
+ *            CANCEL  请求取消选中任务（out 返回结果提示）
+ *   EVENTS:  CYCLE_FILTER 循环类别过滤（out 返回当前过滤名） */
+#define CLI_TUI_ACT_DETAIL        1
+#define CLI_TUI_ACT_CANCEL        2
+#define CLI_TUI_ACT_CYCLE_FILTER  3
+
+typedef int (*cli_tui_panel_action_fn)(void *ud, int action, size_t sel,
+                                       char *out, size_t cap);
+
 /**
  * @brief 绑定一个视图模式的面板数据源（BOARD/EVENTS）。
  *
@@ -73,6 +89,16 @@ void cli_tui_set_panel(cli_tui_t *t, cli_tui_mode_t mode, void *ud,
                        cli_tui_panel_count_fn count, cli_tui_panel_line_fn line);
 
 /**
+ * @brief 绑定面板的可操作动作回调（BOARD/EVENTS；NULL 清除）。
+ *
+ * 动作由 TUI 引擎按键触发，回调在 CLI 层执行（查询/取消等），结果
+ * 文本写回 out 供 TUI 在标题栏展示；DETAIL 动作额外把详情写入
+ * t->detail（引擎持有缓冲），TUI 切换为详情视图。
+ */
+void cli_tui_set_panel_action(cli_tui_t *t, cli_tui_mode_t mode,
+                              cli_tui_panel_action_fn fn);
+
+/**
  * @brief 当前视图模式。
  */
 cli_tui_mode_t cli_tui_mode(const cli_tui_t *t);
@@ -82,6 +108,13 @@ cli_tui_mode_t cli_tui_mode(const cli_tui_t *t);
  */
 void cli_tui_mode_next(cli_tui_t *t);
 void cli_tui_mode_prev(cli_tui_t *t);
+
+/**
+ * @brief 直接切换到指定视图模式（F6 → BOARD / F7 → EVENTS）。
+ *
+ * 目标模式为 BOARD 时重置选择与详情视图；EVENTS 保持跟随/过滤状态。
+ */
+void cli_tui_mode_set(cli_tui_t *t, cli_tui_mode_t m);
 
 /**
  * @brief 面板模式轮询间隔（毫秒）：看板实时刷新节拍（0 = 不轮询）。
