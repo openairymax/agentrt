@@ -382,7 +382,7 @@ int main(int argc, char *argv[])
       * llm.model default; see cli_think_cfg_load), so the header shows the
       * models that actually take effect. Unset values use the provider
       * default model (backward compatible). Read early so the combined
-      * 5-line header can render them in one pinned startup block. */
+      * blue-framed header can render them in one pinned startup block. */
     char m_s2[128], m_verify[128], m_expert[128];
     cli_think_cfg_load(m_s2, sizeof(m_s2), m_verify, sizeof(m_verify),
                        m_expert, sizeof(m_expert));
@@ -397,8 +397,8 @@ int main(int argc, char *argv[])
         /* Full-screen TUI pins its own header boundary after the hero. */
         cli_tui_pin_header(tui);
     }
-    /* Plain TTY: cli_print_system_header already pinned the 4-line hero
-     * (wide TTY) or rendered a fully-scrollable stacked layout (narrow). */
+    /* Plain TTY: cli_print_system_header already pinned the blue-framed
+     * header, keeping the system block fixed above the dialogue. */
 
     airy_core_loop_t *loop = NULL;
     airy_err_t err = airy_loop_create(NULL, &loop);

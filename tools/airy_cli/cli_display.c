@@ -291,47 +291,107 @@ void cli_board_line(const char *tag, const char *id, const char *state, double p
     cli_render_task_line(tag, id, state, progress);
 }
 
-/* ---- welcome hero: brand, capabilities, role legend (Claude-style) ----
+/* ---- hero: blue-framed welcome panel (Claude-style, pinned) ----
  *
- * The startup header follows the Claude Code / Terminal aesthetic instead of
- * a boxed installer banner: left-aligned on the shared gutter, one quiet
- * accent color for identity, dim muted text for everything else, generous
- * whitespace. Five pinned lines carry identity + capabilities + the role
- * color legend + one model-config row; the separator closes the block.
- * Color gating uses the shared cli_c() from cli_render.c (NO_COLOR / piped
- * output renders monochrome too).
+ * The startup header is a blue box with the brand on the top edge:
+ *
+ *   ┌─ ◆ Airymax Agent RT  v0.1.2 ──────────────────────┐
+ *   │  对话 · 任务 · 蓝图调度 · 双思考 · GCCP · 工具执行   │
+ *   │  [For Thee] 你  [Super Agent] agentrt  …          │
+ *   │  A·t2 → deepseek-v4-flash  B·t1-f → …  C·t1-p → … │
+ *   └───────────────────────────────────────────────────┘
+ *
+ * The frame is blue (CLR_BLUE); inner rows keep their own role colors so
+ * the [For Thee]/[Super Agent]/[Dual Think]/[Sub Agent] scheme stays
+ * visible. The whole block is pinned so conversation output scrolls below
+ * it — a clear visual boundary between the system header and the dialogue.
+ * Color gating uses the shared cli_c() (NO_COLOR / piped output renders
+ * monochrome too, keeping the box geometry).
  */
 
-#define CLI_HERO_SEP_W 54
-
-/* Brand line: ◆ Airymax Agent RT  v0.1.2 — identity only, no chrome. */
-static void cli_hero_brand(const char *g)
+/* Frame width: adapts to the terminal, clamped for readability. */
+static size_t cli_hero_frame_w(void)
 {
-    cli_out(g);
-    cli_out(cli_c(CLR_CYAN));
-    cli_out("◆");
-    cli_out(cli_c(CLR_RESET));
-    cli_out(" ");
-    cli_out(cli_c(CLR_BOLD));
-    cli_out(cli_c(CLR_CYAN));
-    cli_out("Airymax Agent RT");
-    cli_out(cli_c(CLR_RESET));
-    cli_out("  ");
-    cli_out(cli_c(CLR_DIM));
-    cli_out("v");
-    cli_out(AIRY_CLI_VERSION);
+    int rows = 0, cols = 0;
+    cli_term_size(&rows, &cols);
+    size_t w = (cols > 4) ? (size_t)cols - 4 : 74;
+    if (w < 74)
+        w = 74;
+    if (w > 110)
+        w = 110;
+    return w;
+}
+
+/* Close a framed content row: pad spaces to the frame width then "│". */
+static void cli_hero_line_end(size_t used, size_t w)
+{
+    cli_out(cli_c(CLR_BLUE));
+    while (used + 1 < w) {
+        cli_out(" ");
+        used++;
+    }
+    cli_out("│");
     cli_out(cli_c(CLR_RESET));
     cli_outc('\n');
 }
 
-/* One quiet capabilities line: what the runtime does at a glance. */
-static void cli_hero_capabilities(const char *g)
+/* Top edge with the brand in the title area: ┌─ ◆ Airymax Agent RT  v0.1.2 ─┐ */
+static void cli_hero_brand(const char *g)
 {
+    size_t w = cli_hero_frame_w();
+    size_t used = 3; /* "┌─ " */
     cli_out(g);
+    cli_out(cli_c(CLR_BLUE));
+    cli_out("┌─ ");
+    cli_out(cli_c(CLR_BOLD));
+    cli_out(cli_c(CLR_CYAN));
+    cli_out("◆ Airymax Agent RT");
+    cli_out(cli_c(CLR_RESET));
+    used += cli_disp_width("◆ Airymax Agent RT");
     cli_out(cli_c(CLR_DIM));
-    cli_out("对话 · 任务 · 蓝图调度 · 双思考 · GCCP · 工具执行");
+    cli_out("  v");
+    cli_out(AIRY_CLI_VERSION);
+    cli_out(cli_c(CLR_RESET));
+    used += 3 + cli_disp_width(AIRY_CLI_VERSION);
+    cli_out(cli_c(CLR_BLUE));
+    while (used + 1 < w) {
+        cli_out("─");
+        used++;
+    }
+    cli_out("┐");
     cli_out(cli_c(CLR_RESET));
     cli_outc('\n');
+}
+
+/* Bottom edge: └─────┘ */
+static void cli_hero_frame_bottom(const char *g)
+{
+    size_t w = cli_hero_frame_w();
+    cli_out(g);
+    cli_out(cli_c(CLR_BLUE));
+    cli_out("└");
+    for (size_t i = 1; i + 1 < w; i++)
+        cli_out("─");
+    cli_out("┘");
+    cli_out(cli_c(CLR_RESET));
+    cli_outc('\n');
+}
+
+/* One quiet capabilities row inside the frame. */
+static void cli_hero_capabilities(const char *g)
+{
+    static const char text[] = "  对话 · 任务 · 蓝图调度 · 双思考 · GCCP · 工具执行";
+    size_t w = cli_hero_frame_w();
+    size_t used = 2 + cli_disp_width(text); /* "│ " + content */
+    cli_out(g);
+    cli_out(cli_c(CLR_BLUE));
+    cli_out("│");
+    cli_out(cli_c(CLR_RESET));
+    cli_out(" ");
+    cli_out(cli_c(CLR_DIM));
+    cli_out(text);
+    cli_out(cli_c(CLR_RESET));
+    cli_hero_line_end(used, w);
 }
 
 /* Four-role conversation legend. Each bracket keeps its role color so the
@@ -350,69 +410,101 @@ static void cli_banner_legend(const char *g)
         {CLR_MAGENTA, "Sub Agent", "执行体"},
     };
 
+    size_t w = cli_hero_frame_w();
+    size_t used = 2; /* "│ " */
     cli_out(g);
+    cli_out(cli_c(CLR_BLUE));
+    cli_out("│");
+    cli_out(cli_c(CLR_RESET));
+    cli_out(" ");
+    used += 1;
     for (size_t i = 0; i < sizeof(roles) / sizeof(roles[0]); i++) {
-        if (i > 0)
+        if (i > 0) {
             cli_out("   ");
+            used += 3;
+        }
         cli_out("[");
         cli_out(cli_c(roles[i].color));
         cli_out(roles[i].name);
         cli_out(cli_c(CLR_RESET));
         cli_out("]");
+        used += 2 + cli_disp_width(roles[i].name);
         cli_outf(" %s", roles[i].label);
+        used += 1 + cli_disp_width(roles[i].label);
     }
     cli_out(cli_c(CLR_RESET));
-    cli_outc('\n');
+    cli_hero_line_end(used, w);
 }
 
-/* Thin dim separator closing the hero block. Width adapts to the terminal
- * (each ─ is two cells), so a narrow TTY never wraps the line. */
-static void cli_hero_separator(const char *g)
+/* Truncate an over-long model name (UTF-8 safe) so the row never overflows
+ * the frame; short names are returned as-is. */
+static const char *cli_hero_model_short(const char *m, char *buf, size_t cap)
 {
-    size_t n = CLI_HERO_SEP_W;
-    int rows = 0, cols = 0;
-    cli_term_size(&rows, &cols);
-    if (cols > 4) {
-        size_t room = ((size_t)cols - 4) / 2;
-        if (room > 0 && room < n)
-            n = room;
+    size_t len = strlen(m);
+    if (len + 1 <= cap)
+        return m;
+    size_t safe = cli_utf8_safe_len(m, cap - 1);
+    if (safe > 0) {
+        AIRY_MEMCPY(buf, m, safe);
+        buf[safe] = '\0';
+        return buf;
     }
-    cli_out(g);
-    cli_out(cli_c(CLR_DIM));
-    for (size_t i = 0; i < n; i++)
-        cli_out("─");
-    cli_out(cli_c(CLR_RESET));
-    cli_outc('\n');
+    return m;
 }
 
 /* One compact model-config row: the three GRAD roles (A·t2 generator,
- * B·t1-f arbiter, C·t1-p verifier) on a single line. Empty env/yaml
- * values fall back to the provider default ("默认"). This is row 4 of the
- * pinned 5-line header; the separator closes the block on row 5. */
+ * B·t1-f arbiter, C·t1-p verifier). Empty env/yaml values fall back to
+ * the provider default ("默认"). */
 static void cli_model_line(const char *g, const char *t2, const char *t1f,
                            const char *t1p)
 {
     const char *a = (t2 && t2[0]) ? t2 : "默认";
     const char *b = (t1f && t1f[0]) ? t1f : "默认";
     const char *c = (t1p && t1p[0]) ? t1p : "默认";
-    cli_outf("%s%sA·t2%s → %s%s%s   %sB·t1-f%s → %s%s%s   %sC·t1-p%s → %s%s%s\n",
-             g, cli_c(CLR_CYAN), cli_c(CLR_RESET),
-             cli_c(CLR_YELLOW), a, cli_c(CLR_RESET),
-             cli_c(CLR_CYAN), cli_c(CLR_RESET),
-             cli_c(CLR_YELLOW), b, cli_c(CLR_RESET),
-             cli_c(CLR_CYAN), cli_c(CLR_RESET),
-             cli_c(CLR_YELLOW), c, cli_c(CLR_RESET));
+    char ab[24], bb[24], cb[24];
+    a = cli_hero_model_short(a, ab, sizeof(ab));
+    b = cli_hero_model_short(b, bb, sizeof(bb));
+    c = cli_hero_model_short(c, cb, sizeof(cb));
+
+    size_t w = cli_hero_frame_w();
+    size_t used = 2; /* "│ " */
+    cli_out(g);
+    cli_out(cli_c(CLR_BLUE));
+    cli_out("│");
+    cli_out(cli_c(CLR_RESET));
+    cli_out(" ");
+    used += 1;
+
+    static const char *const keys[] = {"A·t2", "B·t1-f", "C·t1-p"};
+    const char *models[] = {a, b, c};
+    for (size_t i = 0; i < 3; i++) {
+        if (i > 0) {
+            cli_out("   ");
+            used += 3;
+        }
+        cli_out(cli_c(CLR_CYAN));
+        cli_out(keys[i]);
+        cli_out(cli_c(CLR_RESET));
+        used += cli_disp_width(keys[i]);
+        cli_out(cli_c(CLR_DIM));
+        cli_out(" → ");
+        cli_out(cli_c(CLR_RESET));
+        used += 3;
+        cli_out(cli_c(CLR_YELLOW));
+        cli_out(models[i]);
+        cli_out(cli_c(CLR_RESET));
+        used += cli_disp_width(models[i]);
+    }
+    cli_hero_line_end(used, w);
 }
 
-/* ---- unified 5-line system header ----
+/* ---- unified blue-framed system header ----
  *
- * Brand + capabilities + role legend + one model-config row + separator.
- * The old wide-TTY layout rendered the model panel at an absolute column
- * to the right of the hero; the separator (54 full-width dashes ≈ col 110)
- * overlapped the panel starting at col 88. Everything now flows left in
- * five fixed rows, so no overlap exists at any terminal width. The whole
- * block is pinned so conversation output scrolls below it (Terminal
- * feedback: "system header must stay fixed").
+ * Brand + capabilities + role legend + one model-config row, enclosed in
+ * a blue frame (6 pinned lines including the two edges). The whole block
+ * is pinned so conversation output scrolls below it (Terminal feedback:
+ * "system header must stay fixed"); the frame marks the boundary between
+ * the system header and the dialogue.
  */
 void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
 {
@@ -426,15 +518,16 @@ void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
     cli_hero_capabilities(g);
     cli_banner_legend(g);
     cli_model_line(g, t2, t1f, t1p);
-    cli_hero_separator(g);
+    cli_hero_frame_bottom(g);
 
     /* Full-screen TUI page pins its own header boundary (history-based)
      * after this; non-TTY output just scrolls. Only interactive plain
-     * TTYs pin the 5-line block. */
+     * TTYs pin the 6-line block. */
     if (!cli_term_is_tty() || cli_tui_active(cli_tui_get_default()))
         return;
     cli_term_header_pin(CLI_HDR_LINES);
     fflush(stdout);
 }
+
 
 

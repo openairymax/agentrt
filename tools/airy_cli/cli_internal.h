@@ -47,12 +47,11 @@ extern "C" {
 
 #define AIRY_CLI_VERSION "0.1.2"
 
-/* Pinned startup header height (brand + capabilities + legend + models +
- * separator). Shared by cli_display.c (which renders it) and main.c (which
- * pins it). 2026-08-19: unified 5-line header (model config merged into a
- * single row) — the old 4-line hero + right-side model column overlapped
- * the separator on wide TTYs. */
-#define CLI_HDR_LINES 5
+/* Pinned startup header height (blue frame: top edge + brand/capabilities/
+ * legend/models rows + bottom edge). Shared by cli_display.c (which renders
+ * it) and main.c (which pins it). 2026-08-19: the hero became a blue box so
+ * the header reads as a distinct block above the dialogue. */
+#define CLI_HDR_LINES 6
 
 /* Max chat history messages: 30 by default (~15 rounds); AIRY_CHAT_HISTORY_ROUNDS
   * overrides it in rounds (messages = rounds*2). Capped at 60, aligned with
