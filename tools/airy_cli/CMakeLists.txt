@@ -13,6 +13,7 @@ add_executable(airy_cli
     src/main.c
     src/daemon_cmds.c
     src/cli_chat.c
+    src/cli_classify.c
     src/cli_think.c
     src/cli_dag.c
     src/cli_display.c
@@ -93,30 +94,43 @@ if(AIRY_HAS_CJSON)
     endif()
 endif()
 
-# include 路径（本工具 include/ + coreloopthree 同源）
-target_include_directories(airy_cli PRIVATE
+# include 路径（本工具 include/ + coreloopthree 同源；相对路径自本目录
+# tools/airy_cli 起算，源码树为 agentrt/tools/airy_cli → ../../）
+set(CLI_INC_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/coreloopthree/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/taskflow/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/string/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/logging/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/sync/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/ipc/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/sd/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/platform/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../daemons/llm_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../daemons/tool_d/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../daemons/common/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../cupolas/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/memory
-    ${CMAKE_CURRENT_SOURCE_DIR}/../atoms/memory/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/coreloopthree/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/taskflow/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/string/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/logging/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/error/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/sync/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/ipc/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/sd/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/platform/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/llm_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/tool_d/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/common/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../cupolas/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/memory
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/memory/src
 )
+target_include_directories(airy_cli PRIVATE ${CLI_INC_DIRS})
 
 if(WIN32)
     target_link_libraries(airy_cli PRIVATE ws2_32)
 endif()
 
 install(TARGETS airy_cli RUNTIME DESTINATION bin)
+
+# 2.5.x 意图分辨启发式单测（纯函数，独立于 LLM/daemon）
+if(BUILD_TESTS)
+    add_executable(test_cli_classify tests/test_cli_classify.c src/cli_classify.c)
+    target_include_directories(test_cli_classify PRIVATE ${CLI_INC_DIRS})
+    target_compile_definitions(test_cli_classify PRIVATE AIRY_HAS_CJSON=1)
+    # 借 coreloopthree 的 interface include（types.h 等传递依赖）——
+    # cli_classify.c 无外部符号引用，静态库按需抽取，无重链接负担。
+    target_link_libraries(test_cli_classify PRIVATE airy_coreloopthree)
+    add_test(NAME cli_classify_heuristic COMMAND test_cli_classify)
+endif()

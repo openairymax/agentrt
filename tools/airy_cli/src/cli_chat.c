@@ -830,49 +830,15 @@ static int cli_llm_classify(const char *input)
   * sent into the task pipeline can stall/act, whereas a chat reply is always
   * harmless and lets the user rephrase. The explicit task_marks fast path
   * still catches unambiguous task commands without any LLM round trip.
+  *
+  * 启发式词表与优先级（consult > task > chat）见 cli_classify_heuristic
+  * （2.5.x 意图分辨，独立纯函数可单测）。
   */
 int cli_classify_input(const char *input)
 {
-    static const char *const task_marks[] = {
-        /* 中文命令式 */
-        "实现", "开发", "构建", "创建", "编写", "修复", "重构",
-        "部署", "设计", "添加", "支持", "优化", "迁移", "集成",
-        "写一个", "写一", "做一个", "实现一个", "帮我实现", "开发一个",
-        "生成", "运行", "测试", "检查",
-        "启动", "停止", "安装", "配置", "删除", "更新", "下载",
-        /* 英文命令式（Claude Code/Codex 约定：命令式动词即任务） */
-        "create ", "create a", "create an", "write ", "write a", "write an",
-        "implement ", "implement a", "implement an", "build ", "build a",
-        "fix ", "fix a", "refactor ", "add ", "add a", "add an",
-        "support ", "optimize ", "migrate ", "integrate ", "update ",
-        "remove ", "delete ", "run ", "run a", "install ", "configure ",
-        "test ", "generate ", "generate a",
-        "deploy ", "start ", "stop ", "download ", "rename ", "move ",
-        "make a", "make an", "make ", "change ", "modify ", "convert ",
-    };
-    static const char *const chat_marks[] = {
-        "你好", "谢谢", "再见", "你是谁", "介绍一下", "解释", "为什么",
-        "讲讲", "聊聊", "帮助", "请问", "你好呀", "hello", "hi",
-        "thanks", "thank you", "bye", "who are you", "what is", "what are",
-        "why ", "explain ", "tell me", "help me", "how do i", "how to",
-        /* 联网检索/信息查询 → 聊天工具回路（web_search/web_fetch），非工程任务 */
-        "搜索", "查询", "搜索一下", "查一下", "了解",
-        "search ", "look up", "what's ", "what is ",
-        /* 本地文件读/查/编辑 → 聊天工具回路（fs_read/fs_list/fs_edit 等）：
-         * 查看、读取、修改单个文件属于超级智能体的日常操作，非工程任务
-         * （2026-08-16：此前被误路由到任务管线导致提交失败） */
-        "读取", "读一下", "读文件", "查看", "看看", "打开", "内容是什么",
-        "修改一下", "改一下", "编辑一下", "写入", "文件",
-    };
-
-    for (size_t i = 0; i < sizeof(task_marks) / sizeof(task_marks[0]); i++) {
-        if (strstr(input, task_marks[i]))
-            return 1;
-    }
-    for (size_t i = 0; i < sizeof(chat_marks) / sizeof(chat_marks[0]); i++) {
-        if (strstr(input, chat_marks[i]))
-            return 0;
-    }
+    int h = cli_classify_heuristic(input);
+    if (h >= 0)
+        return h;
 
     int cls = cli_llm_classify(input);
     return cls >= 0 ? cls : 0;
