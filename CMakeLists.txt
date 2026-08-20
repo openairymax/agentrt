@@ -249,6 +249,11 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
         add_compile_options(-O3 -flto -ffat-lto-objects)
         add_compile_definitions(NDEBUG)
         add_link_options(-flto -ffat-lto-objects)
+        # 发行制品体积控制：链接期 strip 符号表与残留 debug 段。
+        # Sanitizer 构建保留符号（ASan 符号化依赖），仅纯 Release 剥离。
+        if(NOT ENABLE_SANITIZERS)
+            add_link_options(-s)
+        endif()
     endif()
 endif()
 
