@@ -130,11 +130,26 @@ void cli_term_size(int *out_rows, int *out_cols)
     }
 #else
     struct winsize ws;
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0) {
-        if (out_rows && ws.ws_row > 0)
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_row > 0 && ws.ws_col > 0) {
+        if (out_rows)
             *out_rows = ws.ws_row;
-        if (out_cols && ws.ws_col > 0)
+        if (out_cols)
             *out_cols = ws.ws_col;
+        return;
+    }
+    /* PTY winsize 未设置（script/CI/非交互终端常为 0）时回退：
+     * ① 环境变量 COLUMNS（多数 shell 导出）② 默认 80。否则折行计量
+     * 依赖 cols=0 而失效，长行预览擦除不足导致最终形态与残留重叠
+     * （2026-08-20 PTY 复现：fold_phys=1 而真实折行 22 行）。 */
+    if (out_cols) {
+        const char *env_cols = getenv("COLUMNS");
+        int c = env_cols ? atoi(env_cols) : 0;
+        *out_cols = (c > 0) ? c : 80;
+    }
+    if (out_rows) {
+        const char *env_rows = getenv("LINES");
+        int r = env_rows ? atoi(env_rows) : 0;
+        *out_rows = (r > 0) ? r : 24;
     }
 #endif
 }
