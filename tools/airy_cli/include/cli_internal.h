@@ -180,6 +180,9 @@ int cmd_tui(const char *arg, void *ctx);
 uint64_t cli_chain_extract_gseq(const char *json);
 void cli_chain_extract_content(const char *json, char *out, size_t cap);
 int cli_chain_str_field(const char *json, const char *key, char *out, size_t cap);
+/* 提取 "seq":<digits>（事件文件序号，header 首现；供跨进程事件流按
+ * (ts_utc, seq) 排序——gseq 为进程内单调，跨进程会撞号） */
+uint32_t cli_chain_extract_seq(const char *json);
 void cli_chain_label(int cat, const char *content, char *out, size_t cap);
 
 /* 阶段 4 面板数据源（cli_panel.c 实现；main.c 绑定到 TUI） */
