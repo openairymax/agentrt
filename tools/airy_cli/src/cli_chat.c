@@ -66,7 +66,9 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
         return empty_json;
     }
 
-    cli_render_role_line(CLI_ROLE_DUAL_THINK, CLI_ACTOR_DUAL_FAST_THINK, "意图确认",
+    /* GCCP 意图确认是对用户需求的结构化约束验证（目标/起点/瓶颈/受众），
+     * 属 t1-p 验证者（PROF）职责，而非 t1-f 仲裁者的对话生成链。 */
+    cli_render_role_line(CLI_ROLE_DUAL_THINK, CLI_ACTOR_DUAL_PROF_THINK, "意图确认",
                          "我将逐问确认意图（Enter 跳过当前问题）：");
     /* The planning spinner may be animating; pause it so the questions
      * render on clean lines, then resume after the answers. */
