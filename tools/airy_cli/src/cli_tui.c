@@ -1303,6 +1303,40 @@ static void tui_input_append(cli_tui_t *t, char c)
     t->input_col++;
 }
 
+/* 判断 input 末尾的 UTF-8 序列是否完整：ASCII 单字节恒完整；多字节序列
+ * 需前导字节 + 足量续字节（2/3/4 字节）才完整。readline 逐字节读入时，
+ * 中文的每个字节都会走到这里——序列不完整时暂缓重绘，攒齐后才刷新，
+ * 避免输入过程渲染出 � 中间乱码帧（2026-08-20 复现：中文逐字节回显）。 */
+static int tui_input_utf8_complete(const char *s, size_t len)
+{
+    if (len == 0)
+        return 1;
+    unsigned char last = (unsigned char)s[len - 1];
+    if (last < 0x80)
+        return 1; /* ASCII：单字节，恒完整 */
+
+    /* 从末尾回退到最后一个前导字节（0xC0-0xF7），统计续字节数。 */
+    size_t i = len;
+    size_t cont = 0;
+    while (i > 1 && ((unsigned char)s[i - 1] & 0xC0) == 0x80) {
+        i--;
+        cont++;
+    }
+    if (i == 0)
+        return 0; /* 只有续字节，无前导 → 不完整 */
+    unsigned char lead = (unsigned char)s[i - 1];
+    size_t need;
+    if ((lead & 0xE0) == 0xC0)
+        need = 1; /* 2 字节 */
+    else if ((lead & 0xF0) == 0xE0)
+        need = 2; /* 3 字节 */
+    else if ((lead & 0xF8) == 0xF0)
+        need = 3; /* 4 字节 */
+    else
+        return 1; /* 非法前导（0x80-0xBF 等），按完整处理避免卡住 */
+    return (cont >= need) ? 1 : 0;
+}
+
 static void tui_input_backspace(cli_tui_t *t)
 {
     t->tab_active = 0; /* 编辑输入即离开补全模式 */
@@ -1654,10 +1688,18 @@ static int tui_input_tab_complete(cli_tui_t *t)
 static void tui_line_redraw(cli_tui_t *t)
 {
     char num[16];
-    tui_write_literal("\033[");
-    snprintf(num, sizeof(num), "%d", t->rows > 0 ? t->rows : 1);
-    tui_write_literal(num);
-    tui_write_literal(";1H");
+    if (cli_term_input_active()) {
+        /* 三区布局：提示符画在固定底部输入条（绝对定位，避免与对话
+         * 滚动区重叠）。 */
+        tui_write_literal("\033[");
+        snprintf(num, sizeof(num), "%d", t->rows > 0 ? t->rows : 1);
+        tui_write_literal(num);
+        tui_write_literal(";1H");
+    } else {
+        /* 无底部输入条（窄终端/降级布局）：在当前行重绘，不做绝对定位，
+         * 避免覆盖 hero 或对话内容。 */
+        tui_write_literal("\r\033[2K");
+    }
     tui_clear_line();
     fputs(cli_c(CLR_CYAN), stdout);
     fputs(TUI_INPUT_PREFIX, stdout);
@@ -1667,13 +1709,15 @@ static void tui_line_redraw(cli_tui_t *t)
     /* 光标落在编辑位置（UTF-8 显示宽度对齐，CJK 不漂移）。 */
     size_t col = (size_t)strlen(TUI_INPUT_PREFIX) +
                  cli_disp_width_of(t->input, t->input_len);
-    tui_write_literal("\033[");
-    snprintf(num, sizeof(num), "%d", t->rows > 0 ? t->rows : 1);
-    tui_write_literal(num);
-    tui_write_literal(";");
-    snprintf(num, sizeof(num), "%zu", col > 0 ? col : 1);
-    tui_write_literal(num);
-    tui_write_literal("H");
+    if (cli_term_input_active()) {
+        tui_write_literal("\033[");
+        snprintf(num, sizeof(num), "%d", t->rows > 0 ? t->rows : 1);
+        tui_write_literal(num);
+        tui_write_literal(";");
+        snprintf(num, sizeof(num), "%zu", col > 0 ? col : 1);
+        tui_write_literal(num);
+        tui_write_literal("H");
+    }
     fflush(stdout);
 }
 
@@ -1874,7 +1918,10 @@ static int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
         }
         if (key >= 0x20 && key <= 0xFF) {
             tui_input_append(t, (char)key);
-            tui_line_redraw(t);
+            /* UTF-8 完整序列到达才重绘：中文输入攒齐 2/3/4 字节后一次
+             * 刷新，避免逐字节渲染的 � 中间乱码帧（输入过程保持干净）。 */
+            if (tui_input_utf8_complete(t->input, t->input_len))
+                tui_line_redraw(t);
             continue;
         }
     }

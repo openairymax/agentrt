@@ -769,13 +769,14 @@ int main(int argc, char *argv[])
             }
         } else {
             if (!cli_tui_active(tui)) {
-                /* 三区布局（TTY）：提示符画在固定底部输入行；非 TTY /
-                 * 无底部条时保持传统换行提示符（额外空行避免与上方
-                 * hero 框视觉重叠，兼容窄终端）。 */
+                /* 三区布局（TTY）：提示符由 readline（tui_line_redraw /
+                 * TUI_INPUT_PREFIX）在固定底部输入行绘制，此处不再打印，
+                 * 避免双重提示符回显（2026-08-20 根因：双 airy> 叠加）；
+                 * 非 TTY（管道/日志）无底部条时保持传统换行提示符。 */
                 if (!cli_term_input_begin()) {
-                    cli_outf("\n\n%sairy>%s ", cli_c(CLR_CYAN), cli_c(CLR_RESET));
-                } else {
-                    cli_outf("%sairy>%s ", cli_c(CLR_CYAN), cli_c(CLR_RESET));
+                    if (!cli_term_is_tty())
+                        cli_outf("\n\n%sairy>%s ", cli_c(CLR_CYAN),
+                                 cli_c(CLR_RESET));
                 }
                 fflush(stdout);
             }

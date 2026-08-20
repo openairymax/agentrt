@@ -410,9 +410,29 @@ static int cli_emph_is_letter(char c)
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
+/* 跨行粗体状态：行内 ** 在当前行未闭合时置位，后续行以粗体持续输出，
+ * 直到闭合 ** 出现（2026-08-20：模型常产出跨行粗体，如
+ * "**滤网构成…。最后结合噪音和能耗**"，行内渲染不配对会裸显 **）。 */
+static int s_inline_bold_open = 0;
+
 static void cli_emit_inline(const char *text)
 {
     const char *p = text;
+
+    /* 跨行粗体继续：整行以粗体输出，直到本行出现闭合 **。 */
+    if (s_inline_bold_open) {
+        const char *close = strstr(text, "**");
+        if (close) {
+            cli_outn(text, (size_t)(close - text));
+            cli_out(cli_c(CLR_RESET));
+            s_inline_bold_open = 0;
+            p = close + 2;
+        } else {
+            cli_out(text);
+            return;
+        }
+    }
+
     while (*p) {
         if (p[0] == '*' && p[1] == '*') {
             const char *e = strstr(p + 2, "**");
@@ -422,6 +442,13 @@ static void cli_emit_inline(const char *text)
                 cli_out(cli_c(CLR_RESET));
                 p = e + 2;
                 continue;
+            }
+            if (cli_emph_has_letter(p + 2, strlen(p + 2))) {
+                /* 行内无闭合 **：按跨行粗体开始，输出到行尾后置位。 */
+                cli_out(cli_c(CLR_BOLD));
+                cli_outn(p + 2, strlen(p + 2));
+                s_inline_bold_open = 1;
+                return;
             }
         }
         if (p[0] == '*' && cli_emph_is_letter(p[1])) {
@@ -635,6 +662,7 @@ void cli_render_markdown(const char *text, size_t indent)
     int in_table = 0;
     cli_table_row_t table[CLI_TABLE_MAX_COLS];
     size_t table_rows = 0;
+    s_inline_bold_open = 0; /* 每段渲染独立，跨行粗体状态不跨段残留 */
 
     while (p && *p) {
         const char *nl = strchr(p, '\n');
