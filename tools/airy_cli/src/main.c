@@ -1371,11 +1371,13 @@ int main(int argc, char *argv[])
             }
         }
         /* Decision G: validation gate annotation - mark FAIL clearly when artifacts
-          * fail validation, so the user can replan/retry (sched_d owns node-level retries). */
+          * fail validation, so the user can replan/retry (sched_d owns node-level retries).
+          * t1-p (PROF) is the logic verifier in the GRAD separation of powers, so an
+          * artifact-validation failure carries the PROF label, not the fast-think actor. */
         if (!g_cli_cancel) {
             airy_work_hall_verify_stats(hall, NULL, &vf_after, NULL);
             if (vf_after > vf_before)
-                cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_DUAL_FAST_THINK, "校验",
+                cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_DUAL_PROF_THINK, "校验",
                                      "Artifact validation failed - replan or retry the task.");
         }
         /* L2 semantic cache write-back: register the executed blueprint under the
