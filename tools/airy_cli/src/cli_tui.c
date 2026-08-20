@@ -655,20 +655,16 @@ void cli_tui_pin_header(cli_tui_t *t)
 
 static void tui_get_size(cli_tui_t *t)
 {
-#ifdef _WIN32
-    (void)t;
-    t->rows = 24;
-    t->cols = 80;
-#else
-    struct winsize ws;
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_row > 0 && ws.ws_col > 0) {
-        t->rows = (int)ws.ws_row;
-        t->cols = (int)ws.ws_col;
-    } else {
-        t->rows = 24;
-        t->cols = 80;
-    }
-#endif
+    if (!t)
+        return;
+    /* 复用 cli_term_size 的完整回退链（ioctl → COLUMNS/LINES → 默认 24/80）。
+     * 此前 winsize=0（script/CI/非交互终端）时回退固定 24×80，与
+     * cli_term_header_pin 的 rows 计算（COLUMNS/LINES 回退）不同步——
+     * 输入行画进滚动区（row 24），破坏三区布局（2026-08-20 PTY 复现）。 */
+    int rows = 0, cols = 0;
+    cli_term_size(&rows, &cols);
+    t->rows = (rows > 0) ? rows : 24;
+    t->cols = (cols > 0) ? cols : 80;
 }
 
 static void tui_write_literal(const char *s)
