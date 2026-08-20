@@ -6,12 +6,15 @@
  * @brief 简单对话意图分辨（task vs chat）启发式（纯字符串，无 LLM/全局依赖）。
  *
  * 两级路由的启发式第一级（2.5.x 意图分辨）：
- *   1. 强对话咨询词（consult_marks）——讲解/解释/咨询类输入即使含命令式
- *      动词（如"介绍一下如何构建项目"）也判 chat：用户要的是方法说明而非
- *      执行工程任务。先前置检查，避免被 task_marks 抢先短路；
- *   2. 明确任务词（task_marks）——命令式动词命中即 task（零 LLM 开销）；
- *   3. 明确对话词（chat_marks）——寒暄/检索/文件读改命中即 chat；
- *   4. 两表均未命中返回 -1，由调用方走 LLM 分类（cli_llm_classify）。
+ *   1. 强任务引导词（task_lead_marks）——"帮我实现/开发一个"等命令式
+ *      工程动词前缀，即使后文含咨询词（"帮我实现一个如何构建的功能"）
+ *      也判 task（2.3.4：此前 consult 词表优先，这类输入被误路由到对话）；
+ *   2. 强对话咨询词（consult_marks）——讲解/解释/咨询类输入，即使含
+ *      命令式动词（如"介绍一下如何构建项目"）也判 chat：用户要的是方法
+ *      说明而非执行工程任务；
+ *   3. 明确任务词（task_marks）——命令式动词命中即 task（零 LLM 开销）；
+ *   4. 明确对话词（chat_marks）——寒暄/检索/文件读改命中即 chat；
+ *   5. 两表均未命中返回 -1，由调用方走 LLM 分类（cli_llm_classify）。
  *
  * fail-safe 语义：调用方在 LLM 失败时归 0（chat）——chat 误路由无害，
  * task 误路由会阻塞/执行（与 cli_classify_input 的决策一致）。
@@ -28,6 +31,39 @@ int cli_classify_heuristic(const char *input)
 {
     if (!input || input[0] == '\0')
         return -1;
+
+    /* 强任务引导词：工程命令式前缀。与 consult 词冲突时（如"帮我实现一个
+     * 如何排序的功能"）判 task——用户要的是执行，不是方法说明。置于
+     * consult_marks 之前，避免被咨询词抢先短路。
+     * 例外：输入以 consult 引导开头（"如何构建一个项目"/"介绍一下如何
+     * 构建"）时是方法咨询而非命令执行——裸"构建一个"在咨询语境下是
+     * 描述对象，不是命令。 */
+    static const char *const task_lead_marks[] = {
+        "帮我实现", "帮我开发", "帮我构建", "帮我创建", "帮我部署",
+        "帮我修复", "帮我重构", "帮我做", "帮我写", "帮我设计",
+        "实现一个", "开发一个", "构建一个", "创建一个", "部署一个",
+        "修复一个", "重构一个", "做一个", "写一个", "设计一个",
+        "please implement ", "please create ", "please build ",
+        "please fix ", "please write ",
+    };
+    static const char *const consult_prefixes[] = {
+        "如何", "怎么", "怎样", "介绍一下", "解释", "为什么", "什么是",
+        "what is", "what are", "why ", "how to", "how do", "explain ",
+    };
+    for (size_t i = 0; i < sizeof(task_lead_marks) / sizeof(task_lead_marks[0]); i++) {
+        if (strstr(input, task_lead_marks[i])) {
+            int consult_lead = 0;
+            for (size_t j = 0;
+                 j < sizeof(consult_prefixes) / sizeof(consult_prefixes[0]); j++) {
+                size_t plen = strlen(consult_prefixes[j]);
+                if (strncmp(input, consult_prefixes[j], plen) == 0) {
+                    consult_lead = 1;
+                    break;
+                }
+            }
+            return consult_lead ? 0 : 1;
+        }
+    }
 
     /* 强对话咨询词：讲解/解释/咨询类输入，即使含命令式动词也判 chat */
     static const char *const consult_marks[] = {
