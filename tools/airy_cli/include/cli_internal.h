@@ -106,6 +106,9 @@ size_t cli_commands_count(void);
 
 char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data);
 void cli_history_clear(void);
+/* 2.5.x 意图分辨：纯字符串启发式（consult > task > chat 三级优先），
+ * 返回 1=task / 0=chat / -1=未命中（调用方交 LLM 兜底） */
+int cli_classify_heuristic(const char *input);
 int cli_classify_input(const char *input);
 void cli_chat_reply(const char *input);
 
