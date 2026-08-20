@@ -110,6 +110,73 @@ static void *cli_task_wait_worker(void *arg)
     return NULL;
 }
 
+/* 2.3.14 GRAD 决策链可见性：cognition feedback → [Dual Think] 阶段行。
+ * 事件（grad_coordinator progress_cb）：grad_s2_done / grad_verify_start /
+ * grad_verify_done / grad_arbiter_start / grad_arbiter_done / grad_done。
+ * -p/--json 与 TUI 面板模式不渲染（脚本结构化输出 / TUI 自绘决策链）。 */
+static void cli_grad_feedback_cb(int level, const char *module, const char *event,
+                                 const char *data, size_t data_len, void *user_data)
+{
+    (void)level;
+    (void)module;
+    (void)user_data;
+    if (!event || strncmp(event, "grad_", 5) != 0)
+        return;
+    if (g_cli_print_mode || g_cli_json_mode)
+        return;
+    cli_tui_t *tui = cli_tui_get_default();
+    if (tui && cli_tui_active(tui))
+        return;
+
+    cli_actor_t actor = CLI_ACTOR_DUAL_THINK;
+    const char *tag = "GRAD";
+    if (strcmp(event, "grad_s2_done") == 0) {
+        actor = CLI_ACTOR_DUAL_SLOW_THINK;
+        tag = "S2 骨架";
+    } else if (strcmp(event, "grad_verify_start") == 0) {
+        actor = CLI_ACTOR_DUAL_PROF_THINK;
+        tag = "四向验证";
+    } else if (strcmp(event, "grad_verify_done") == 0) {
+        actor = CLI_ACTOR_DUAL_PROF_THINK;
+        tag = "验证结果";
+    } else if (strcmp(event, "grad_arbiter_start") == 0) {
+        actor = CLI_ACTOR_DUAL_FAST_THINK;
+        tag = "上下文仲裁";
+    } else if (strcmp(event, "grad_arbiter_done") == 0) {
+        actor = CLI_ACTOR_DUAL_FAST_THINK;
+        tag = "仲裁结论";
+    } else if (strcmp(event, "grad_done") == 0) {
+        actor = CLI_ACTOR_DUAL_THINK;
+        tag = "GRAD 收敛";
+    } else {
+        return; /* 非 GRAD 决策链事件，不渲染 */
+    }
+
+    char line[512];
+    if (data && data_len > 0) {
+        int n = snprintf(line, sizeof(line), "%s", data);
+        if (n < 0 || (size_t)n >= sizeof(line))
+            line[sizeof(line) - 1] = '\0';
+    } else {
+        line[0] = '\0';
+    }
+    cli_spinner_pause();
+    cli_render_role_line(CLI_ROLE_DUAL_THINK, actor, tag, line);
+    cli_spinner_resume();
+
+    /* 阶段 4：GRAD 决策链 → 事件流单一真相源（/chain 与 TUI 决策链面板可见）。
+     * 事件体复用 progress 的 JSON data（追加 event 字段）。 */
+    if (g_cli_hall_store) {
+        char ev[768];
+        if (line[0])
+            snprintf(ev, sizeof(ev), "{\"event\":\"%s\",\"data\":%s}", event, line);
+        else
+            snprintf(ev, sizeof(ev), "{\"event\":\"%s\"}", event);
+        airy_hall_store_write(g_cli_hall_store, "default", "grad", NULL, AIRY_HALL_CAT_CHAIN,
+                              "cognition", ev, NULL, 0);
+    }
+}
+
 /* 任务执行期间轮询 stdin（交互行模式，非 -p/--json/TUI）：
  *   - 无输入返回 0
  *   - 中断指令 → g_cli_cancel=1，返回 -1（打断任务）
@@ -442,6 +509,10 @@ int main(int argc, char *argv[])
           * system header above (cli_print_system_header); only inject. */
 
         airy_cognition_set_grad_enabled(cog, 1);
+        /* 2.3.14 GRAD 决策链可见性：注册 feedback 回调，任务规划期
+         * GRAD 阶段进度实时渲染为 [Dual Slow/Prof/Fast Think] 行。 */
+        airy_cognition_set_feedback(cog, cli_grad_feedback_cb, NULL);
+        AIRY_LOG_INFO("airy_cli: GRAD decision-chain feedback attached");
     }
 
     /* 3. Blueprint scheduling (Roadmap Sched): result feedback hook (synergy point 1).
