@@ -186,7 +186,9 @@ typedef struct {
     airy_hall_store_t *hs;
     int filter_cat; /* 类别过滤（-1 = 全部；CYCLE_FILTER 循环切换） */
     struct {
-        uint64_t gseq;
+        uint64_t gseq; /* 进程内单调序（仅展示用） */
+        char ts[24];   /* ts_utc（跨进程稳定序，固定宽度可字典序比较） */
+        uint32_t seq;  /* 事件文件序号 */
         int cat;
         char task[48];
         char label[128];
@@ -218,6 +220,11 @@ size_t cli_panel_events_count(void *ud)
         return 0;
     p->nev = 0;
 
+    /* 2.8c：实时可见——事件流由多进程写入（gateway/sched/tool/runtime），
+     * 本进程索引是 create() 时的会话快照；刷新面板前 rescan 一次，让
+     * 跨进程事件可见、gseq 续接到磁盘最大号（失败仅降级为快照）。 */
+    (void)airy_hall_store_rescan(p->hs);
+
     char **tasks = NULL;
     size_t nt = 0;
     if (airy_hall_store_list_tasks(p->hs, "default", &tasks, &nt) != AIRY_SUCCESS || nt == 0)
@@ -239,6 +246,9 @@ size_t cli_panel_events_count(void *ud)
                 char content[192];
                 cli_chain_extract_content(jsons[i], content, sizeof(content));
                 p->evs[p->nev].gseq = cli_chain_extract_gseq(jsons[i]);
+                p->evs[p->nev].seq = cli_chain_extract_seq(jsons[i]);
+                (void)cli_chain_str_field(jsons[i], "ts_utc", p->evs[p->nev].ts,
+                                          sizeof(p->evs[p->nev].ts));
                 p->evs[p->nev].cat = cat;
                 AIRY_STRNCPY_TERM(p->evs[p->nev].task, tasks[ti],
                                   sizeof(p->evs[p->nev].task));
@@ -253,10 +263,13 @@ size_t cli_panel_events_count(void *ud)
     }
     airy_hall_store_free_strings(tasks, nt);
 
-    /* 按 gseq 升序（全局因果序，事件流回放顺序） */
+    /* 跨进程稳定全局序 (ts_utc, seq)：gseq 是进程内单调，跨进程会撞号，
+     * 不能作为全局排序键（2.8c）。ts_utc 定宽字典序即时间序。 */
     for (size_t i = 1; i < p->nev; i++) {
         size_t j = i;
-        while (j > 0 && p->evs[j - 1].gseq > p->evs[j].gseq) {
+        while (j > 0 && (strcmp(p->evs[j - 1].ts, p->evs[j].ts) > 0 ||
+                         (strcmp(p->evs[j - 1].ts, p->evs[j].ts) == 0 &&
+                          p->evs[j - 1].seq > p->evs[j].seq))) {
             __typeof__(p->evs[0]) tmp = p->evs[j - 1];
             p->evs[j - 1] = p->evs[j];
             p->evs[j] = tmp;

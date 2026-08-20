@@ -947,14 +947,15 @@ int main(int argc, char *argv[])
         cli_trace("plan", "plan_id=%s nodes=%zu entry=%zu",
                   plan->task_plan_id ? plan->task_plan_id : "?",
                   plan->task_plan_node_count, plan->task_plan_entry_count);
-        /* 阶段 4：计划生成 → 决策链 COMMAND 事件（preflight，cognition；plan_id
-         * 供提交事件关联，exec 链与 preflight 链由此可追溯） */
+        /* 阶段 4：计划生成 → 决策链 BLUEPRINT 事件（preflight，cognition；
+         * 计划即蓝图，plan_id 供提交事件关联，exec 链与 preflight 链由此
+         * 可追溯。BLUEPRINT 类目由此获得生产写入点） */
         if (g_cli_hall_store && plan && plan->task_plan_id) {
             char ev[256];
             snprintf(ev, sizeof(ev), "{\"plan_id\":\"%s\",\"nodes\":%zu,\"entry\":%zu}",
                      plan->task_plan_id, plan->task_plan_node_count, plan->task_plan_entry_count);
             airy_hall_store_write(g_cli_hall_store, "default", "preflight", NULL,
-                                  AIRY_HALL_CAT_COMMAND, "cognition", ev, NULL, 0);
+                                  AIRY_HALL_CAT_BLUEPRINT, "cognition", ev, NULL, 0);
         }
 
         /* 阶段 4（item 4）：认知阶段并行子 agent 审查——计划生成后派出

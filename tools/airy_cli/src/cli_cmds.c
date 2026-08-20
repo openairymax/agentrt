@@ -125,6 +125,22 @@ uint64_t cli_chain_extract_gseq(const char *json)
     return v;
 }
 
+/* 提取 "seq":<digits>（事件文件序号；header 首现。跨进程事件流的稳定
+ * 全局序为 (ts_utc, seq)——gseq 进程内单调，跨进程会撞号不可用作排序） */
+uint32_t cli_chain_extract_seq(const char *json)
+{
+    const char *p = strstr(json, "\"seq\":");
+    if (!p)
+        return 0;
+    p += 6;
+    uint32_t v = 0;
+    while (*p >= '0' && *p <= '9') {
+        v = v * 10 + (uint32_t)(*p - '0');
+        p++;
+    }
+    return v;
+}
+
 /* 提取 "content":{...}（去掉事件信封，返回 content 对象自身） */
 void cli_chain_extract_content(const char *json, char *out, size_t cap)
 {
