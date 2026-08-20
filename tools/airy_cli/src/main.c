@@ -358,12 +358,23 @@ int main(int argc, char *argv[])
 #ifndef _WIN32
     if (!g_cli_print_mode) {
         char logpath[512];
-        snprintf(logpath, sizeof(logpath), "%s/airy_cli.log", airy_log_dir());
-        FILE *lf = fopen(logpath, "a");
-        if (lf) {
-            fflush(stderr);
-            dup2(fileno(lf), STDERR_FILENO);
-            fclose(lf);
+        const char *logdir = airy_log_dir();
+        /* 2.3.4：重定向前确保日志目录存在——此前 fopen 失败（首次运行/
+         * AIRY_HOME 被清/权限变更）会静默跳过重定向，ERROR 级日志（如
+         * llm_d 离线的 rpc_connect_unix）直打终端混入对话。失败时明确
+         * 告警，不再静默降级。 */
+        if (airy_mkdir_p(logdir) != 0) {
+            fprintf(stderr, "[airy_cli] 无法创建日志目录: %s（stderr 将直连终端）\n", logdir);
+        } else {
+            snprintf(logpath, sizeof(logpath), "%s/airy_cli.log", logdir);
+            FILE *lf = fopen(logpath, "a");
+            if (lf) {
+                fflush(stderr);
+                dup2(fileno(lf), STDERR_FILENO);
+                fclose(lf);
+            } else {
+                fprintf(stderr, "[airy_cli] 无法打开日志文件: %s（stderr 将直连终端）\n", logpath);
+            }
         }
     }
 #endif

@@ -75,6 +75,18 @@ static void test_chat_fast_path(void)
     CHECK_CHAT("what's the weather in Shanghai");
 }
 
+static void test_task_lead_priority(void)
+{
+    /* 强任务引导词 + 咨询词并存 → task（2.3.4：此前 consult 词表优先，
+     * "帮我实现一个如何…"被误路由到对话；命令式前缀说明用户要执行） */
+    CHECK_TASK("帮我实现一个如何排序的功能");
+    CHECK_TASK("帮我做一个能自动备份的脚本");
+    CHECK_TASK("帮我写一个解析 JSON 的函数");
+    CHECK_TASK("实现一个如何计算费用的模块");
+    /* 无强引导的纯咨询仍判 chat（"写一篇"不命中强引导"写一个"） */
+    CHECK_CHAT("写一篇关于如何优化的文章");
+}
+
 static void test_unknown_goes_llm(void)
 {
     /* 未命中任何词表 → -1（交 LLM 兜底） */
@@ -91,6 +103,7 @@ int main(void)
     test_consult_priority();
     test_task_fast_path();
     test_chat_fast_path();
+    test_task_lead_priority();
     test_unknown_goes_llm();
 
     printf("\n%d/%d passed\n", tests_passed, tests_run);
