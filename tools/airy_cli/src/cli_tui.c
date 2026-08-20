@@ -2179,7 +2179,10 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
             t->mode = CLI_TUI_MODE_CHAT;
             if (key >= 0x20 && key <= 0xFF) {
                 tui_input_append(t, (char)key);
-                tui_render_input(t);
+                /* UTF-8 完整序列才重绘（与行模式 readline 一致），
+                 * 避免中文逐字节渲染的 � 中间乱码帧 */
+                if (tui_input_utf8_complete(t->input, t->input_len))
+                    tui_render_input(t);
             } else {
                 cli_tui_redraw(t);
             }
@@ -2538,7 +2541,9 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
              * above; anything else is literal text. */
             if (key >= 0x20 && key <= 0xFF) {
                 tui_input_append(t, (char)key);
-                tui_render_input(t);
+                /* UTF-8 完整序列才重绘（与行模式 readline 一致） */
+                if (tui_input_utf8_complete(t->input, t->input_len))
+                    tui_render_input(t);
                 fflush(stdout);
             }
             break;
