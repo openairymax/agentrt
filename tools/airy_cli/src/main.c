@@ -983,6 +983,36 @@ int main(int argc, char *argv[])
                     cli_render_turn_separator(cli_now_ms() - turn_start, NULL);
                 continue;
             }
+            /* L3 全量规划（miss 或语义提示）：消费 rs_out 的 semantic_hint，
+             * 有相似历史任务建议时轻量提示（不改变路由，仅信息增量）。
+             * 命中率审计（2026-08-20）：此前 L2 语义命中被完全丢弃。 */
+            if (rs_out && rs_out[0]) {
+                char *hint = NULL;
+                cJSON *r = cJSON_Parse(rs_out);
+                if (r) {
+                    const char *reason = NULL;
+                    cJSON *rz = cJSON_GetObjectItem(r, "reason");
+                    if (cJSON_IsString(rz))
+                        reason = rz->valuestring;
+                    if (reason && strcmp(reason, "semantic_hint") == 0) {
+                        cJSON *s = cJSON_GetObjectItem(r, "suggestion");
+                        if (cJSON_IsString(s) && s->valuestring)
+                            hint = AIRY_STRDUP(s->valuestring);
+                    }
+                    cJSON_Delete(r);
+                }
+                if (hint) {
+                    cli_trace("blueprint", "L2 semantic hint for similar task");
+                    if (!g_cli_print_mode && !g_cli_json_mode) {
+                        char line[512];
+                        snprintf(line, sizeof(line), "检测到相似历史任务，可参考：%s",
+                                 hint);
+                        cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK,
+                                             "blueprint", line);
+                    }
+                    AIRY_FREE(hint);
+                }
+            }
             AIRY_FREE(rs_out);
         }
 
