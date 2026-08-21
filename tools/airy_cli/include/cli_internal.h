@@ -63,9 +63,18 @@ extern "C" {
   * (user+assistant) is dropped, keeping FIFO. */
 #define CLI_HISTORY_MAX_MSGS 60
 
+/* 命令类别：/help 按组展示，避免 26 个命令平铺淹没关键入口。 */
+typedef enum {
+    CLI_CAT_SESSION = 0, /* 会话控制：/help /clear /quit /tui /sanitize */
+    CLI_CAT_SYSTEM,      /* 系统状态：status/chain/daemon/rpc/stats 等 */
+    CLI_CAT_RESOURCE,    /* 资源查询：agents/tools/hooks/models/mem 等 */
+    CLI_CAT_SECURITY,    /* 安全与权限：vault/perm/security/notify */
+} cli_cmd_category_t;
+
 typedef struct {
     const char *name;
     const char *desc;
+    cli_cmd_category_t category;
     int needs_args;
     int (*fn)(const char *arg, void *ctx);
 } cli_command_t;
