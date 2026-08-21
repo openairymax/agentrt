@@ -4,7 +4,7 @@
 
 ## 📋 目录
 
-- [v0.1.2](#v012---2026-08-15) ⭐ 最新 — SSoT 收敛 / 平台本质补齐 / 品牌化 ID / CLI·TUI
+- [v0.1.2](#v012---2026-08-21) ⭐ 最新 — SSoT 收敛 / 平台本质补齐 / 品牌化 ID / CLI·TUI / orchestrator
 - [v0.1.1 框架化改造](#v011-框架化改造---2026-08-02) — GCCP / 工作大厅 / 双思考 / CLI
 - [v0.1.1](#v011---2026-07-12) — 奠基版本（Foundation Release）
 - [v0.1.0](#v010---2026-05-29) — 首个正式发行版
@@ -21,7 +21,7 @@
 
 ---
 
-## [v0.1.2] - 2026-08-15
+## [v0.1.2] - 2026-08-21
 
 ### 🎯 发布主题：SSoT 收敛 + 平台本质补齐 + 品牌化 ID + CLI/TUI 优化
 
@@ -99,6 +99,82 @@
 - 决策链探针验证：preflight 4 事件（GCCP→L1→L2→计划）+ exec-1 4 事件（提交→进度→复核→结果）gseq 严格递增
 - 聊天工具回路探针 2/2：web_search（Bing 搜索）+ web_fetch（kernel.org 抓取）真实执行
 - CPR 端到端：CLI 任务在无 LLM 环境下降级执行不阻塞（exit=0），memoryrovol 数据正确落于 `$AIRY_HOME/data/memoryrovol/`
+
+### 2026-08-21 追加：orchestrator 恢复 + 全量端到端集成
+
+在 0.1.2 基线之上完成 orchestrator 流程编排器恢复启用与全量端到端集成，统一双管线（engine_process 为单次认知权威，orchestrator 负责多任务/阶段编排）。
+
+#### Added
+
+- **orchestrator 流程编排器恢复并启用**（atoms `coreloopthree/src/orchestrator.c` + `include/orchestrator.h`）：7 阶段管线（分解→规划→生成→批判→验证→审计→对齐），子任务分发/聚合、编排策略（串行/并行/条件/循环）、超时熔断、思考链路追踪
+  - 宿主为 think_d：新增 `think.orchestrate` RPC（网关 GW_THINK_METHODS 白名单放行）+ `airy_orch_ops_t` ops 表注入（`are_ops_set_orch`，atoms 侧无需链接 daemons 即可调度）
+  - LLM 调用路径重构：废弃的 ipc_service_bus（llm_d 不监听 bus，请求必然失败）改为 `daemon_rpc_call` 直连 llm.sock + cJSON 解析 `choices[0].message.content`；超时 30s→120s（生成阶段多轮查重）
+  - 批判阶段经 `airy_mc_evaluate_step` 评分门禁：`critique_acceptance_threshold`（默认 0.7）+ `critique_max_rounds`（默认 3），未达阈值自动纠错循环（S1 批判→t2 修正→复评），ESCALATE 立即熔断；`confidence_calibrator` 校准 + `airy_mc_detect_patterns` 错误模式检测
+- **TUI 多会话 tab + 甘特视图 + hall.watch 事件流**（sdk/tui）：SessionTab 多会话（Ctrl+T 新建 / Alt+1..9 切换，标题自动派生）、甘特进度条与节点状态条、`GET /api/v1/hall/watch` SSE 长连接推送消费（`hall_watch_events` + `sse_frame_end`）
+- **E2E 回归补强**（tests/e2e）：新增 `llm.complete` 空/缺 messages fail-closed 断言 2 条 + `think.orchestrate` 缺/空 input 断言 2 条（网关白名单 + think_d 接线闭环验证）
+
+#### Changed
+
+- **llm_d 空消息 fail-closed**（daemons/llm_d `parse_params`）：messages 缺失或空数组立即返回 -32602 参数错误，不再把 0 消息请求下发给 provider（旧行为在有无 API key 环境下结果漂移）
+- **bootstrap gateway_d 单实例锁**（devtools `agentrt-bootstrap.sh`）：TCP daemon 改按端口占用判定已运行（gateway 不建 Unix socket，旧 socket 检查每次 bootstrap 都重复启动一个 bind 失败的半死实例，累积多个残留 gateway_d）
+- **task_desc.h 同名冲突**：commons 128B A-TD 任务描述符改名 `airy_task_desc_hdr`（与 sched.h 64B 调度描述符同 magic 'AGTS'，消除头文件同名遮蔽）
+
+#### Fixed
+
+- llm_d 空 messages 请求曾下发给 provider（错误路径断言依赖外部 API key 环境，测试不可复现）
+- gateway_d 多实例残留（曾出现 5 个半死进程）：bootstrap 幂等锁根因修复
+- orchestrator LLM 调用走废弃 bus 路径（llm_d 不监听）导致必然失败
+
+#### Tested
+
+- C 侧全量 ctest **171/171** 通过（ASan/LSan）
+- E2E 端到端回归 **153/153** 全过（17 daemon 全 RPC 方法，PASS/FAIL/SKIP 汇总）
+- orchestrator 真实管线：think.orchestrate 经网关执行，decomposition/planning/generation 全真实 LLM 完成（生成 63s、3 轮验证），critique 门禁 3 轮评分 0.667 未达 0.7 阈值按 REJECTED 停止（自动纠错机制行为正确）
+- llm_d fail-closed 行为一致：空/缺 messages → -32602（有无 API key 环境相同）
+- bootstrap 幂等：17 daemon 二次启动全部 skip，gateway 按端口判定不再产生新实例
+
+### 2026-08-21 追加（第二批）：第 86 条平台支持 + channel_d 自举修复 + CLI/TUI 转换闭环
+
+#### Added
+
+- **第 86 条：ARM/RISC-V 可运行、三端可用**（平台矩阵落地产物）
+  - `agentrt-0.1.2-arm64.tar.gz` 离线安装包（aarch64 容器全量构建：C daemon 群 + airy_cli + Rust TUI，含 MemoryRovol OSS 库，TUI 独立链接 L1+L2）
+  - RISC-V CI 构建 job（release.yml `build-riscv64`：docker + qemu + ubuntu:24.04 容器内构建）；Linux/macOS/Windows 构建矩阵补装 nghttp2（HTTP/2 全平台真实启用）
+  - docs `02-build-guide.md` 平台支持矩阵 + CLI/TUI 转换说明
+- **TUI 制品体积控制**（sdk/tui `Cargo.toml`）：`[profile.release] strip = true`，agentrt-tui 由 ~11MB 降至 ~8.4MB（x86_64）/ ~7.6MB（arm64）
+
+#### Changed
+
+- **airymaxrt cli 子命令闭环**（sdk/tui `scripts/airymaxrt`）：`cli` 不再直接 exec（跳过 daemon 群启动会报"目标不存在"），改为置 `AIRYRT_FORCE_CLI` 标记走统一默认流程——先确保守护进程群就绪，再进 CLI 前端（带参数透传 airy_cli / 无参 TTY 交互），退出后无参数重跑即回 TUI
+- **gateway/CMakeLists nghttp2 豁免去条件化**：http2_gateway*.c 始终参与编译（无库时空 TU），其 `#include <nghttp2/nghttp2.h>` 先于 `#ifdef AIRY_HAS_HTTP2` 守卫，AIRY_COMPLIANCE_IMPL 豁免改为无条件——缺 libnghttp2 平台不再因 poisoned "malloc" 编译失败
+
+#### Fixed
+
+- **channel_d socket_dir 自举**（daemons/channel_d `channel_service.c`）：默认通道端点目录 `/var/tmp/agentrt/channels` 在新系统上不存在，`create_socket_channel()` bind() 因 ENOENT 失败（channel.* 全量返回 -32603）；channel_service_create 幂等逐级 mkdir 自管运行目录（x86_64 曾因历史残留目录偶然通过，arm64 干净环境必现）
+- **arm64 TUI 链接失败根因**：误链 PRO 全功能 `libagentrt_memoryrovol.a`（依赖 agentrt 运行时符号 memory_alloc/airy_mtx_* 无法独立链接）；按 build.rs 设计改用 OSS 模式构建的 `libagentrt_memoryrovol_oss.a`（L1+L2，无运行时符号）→ 链接成功
+
+#### Tested
+
+- **arm64 全量 E2E 153/153 通过**（aarch64 容器安装冒烟：doctor + 16 daemon 群拉起 + gateway 就绪 + CLI 前端 + LLM 无 key fail-closed + 退出清理无残留）
+- **x86_64 干净环境（rm /var/tmp/agentrt）E2E 153/153 通过**——channel_d 自举修复双架构验证
+- 双包（x86_64 / arm64）安装流程冒烟：架构校验 → daemon 部署 → 启动 → 健康检查全绿
+
+### 2026-08-21 追加（第三批）：2.11 代码质量清理（冗余/废弃代码移除）
+
+#### Removed
+
+- **废除的文本级批判循环模块整体移除**（atoms/coreloopthree，GRAD 已取代）：`triple_coordinator.{c,h}`（887+160 行）、`tc3_llm_callbacks.{c,h}`（893+169 行）——旧 TC3 t2/t1-f/t1-p 文本级批判循环自 engine_process.c 明确废除后全树零引用、未参与任何构建目标
+- **孤儿源文件 `error_utils.c`（224 行）**：从未被任何 CMakeLists 编译、函数（airy_err_string/airy_err_to_json/airy_err_context_*）全树零调用；其声明头 `error_utils.h` 仍被 engine.c/engine_process.c 包含，保留
+- **孤儿测试 `test_triple_coordinator.c`（779 行）**：仅针对已废除模块、未接入 ctest
+
+#### Changed
+
+- `stream_critic.h` 过时注释同步：Phase2 由 "triple_coordinator's existing loop" 改为 "GRAD critique loop（grad_coordinator/grad_llm_callbacks）"
+
+#### Tested
+
+- 清理后增量构建 x86_64 Debug/Release 双配置零错误；ctest 171/171 全绿
+- 保留决策：`bench_atomic_logging.c`（独立性能基准工具）、`workbench_container.c`（SSoT S-7 文档化保留供未来原生容器运行时参考）、各孤立测试文件（未构建、无制品影响、保留测试资产）
 
 ---
 
