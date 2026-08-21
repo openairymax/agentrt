@@ -3,7 +3,9 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 cmake_minimum_required(VERSION 3.20)
-project(AgentRT VERSION 0.1.2 LANGUAGES C CXX)
+# 纯 C 项目（全仓无 .cpp/.cc 源文件）；仅声明 C 可避免 CXX 编译器
+# 缺失时（如 aarch64 交叉工具链仅装了 gcc 未装 g++）configure 失败。
+project(AgentRT VERSION 0.1.2 LANGUAGES C)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR
@@ -367,6 +369,17 @@ find_package(libmicrohttpd QUIET)
 if(NOT libmicrohttpd_FOUND AND PkgConfig_FOUND)
     pkg_check_modules(MICROHTTPD QUIET libmicrohttpd)
 endif()
+# 交叉编译（sysroot 无 gnutls.pc 等传递依赖）时 pkg-config 校验失败，
+# 回退 find_library 直查（同 SQLite3 既有模式）。
+if(NOT libmicrohttpd_FOUND AND NOT MICROHTTPD_FOUND)
+    find_path(_MICROHTTPD_INCLUDE_DIR microhttpd.h)
+    find_library(_MICROHTTPD_LIBRARY microhttpd)
+    if(_MICROHTTPD_INCLUDE_DIR AND _MICROHTTPD_LIBRARY)
+        set(MICROHTTPD_INCLUDE_DIRS ${_MICROHTTPD_INCLUDE_DIR})
+        set(MICROHTTPD_LIBRARIES ${_MICROHTTPD_LIBRARY})
+        set(MICROHTTPD_FOUND TRUE)
+    endif()
+endif()
 if(libmicrohttpd_FOUND OR MICROHTTPD_FOUND)
     set(AIRY_HAS_MICROHTTPD TRUE CACHE BOOL "libmicrohttpd available")
     airy_print_ok("libmicrohttpd found")
@@ -379,6 +392,17 @@ endif()
 find_package(libwebsockets QUIET)
 if(NOT libwebsockets_FOUND AND PkgConfig_FOUND)
     pkg_check_modules(LIBWEBSOCKETS QUIET libwebsockets)
+endif()
+# 交叉编译：libwebsockets.pc 的 Requires.private（libcap 等）缺失时
+# pkg-config 校验失败，回退 find_library 直查。
+if(NOT libwebsockets_FOUND AND NOT LIBWEBSOCKETS_FOUND)
+    find_path(_LWS_INCLUDE_DIR libwebsockets.h)
+    find_library(_LWS_LIBRARY websockets)
+    if(_LWS_INCLUDE_DIR AND _LWS_LIBRARY)
+        set(LIBWEBSOCKETS_INCLUDE_DIRS ${_LWS_INCLUDE_DIR})
+        set(LIBWEBSOCKETS_LIBRARIES ${_LWS_LIBRARY})
+        set(LIBWEBSOCKETS_FOUND TRUE)
+    endif()
 endif()
 if(libwebsockets_FOUND OR LIBWEBSOCKETS_FOUND)
     set(AIRY_HAS_LIBWEBSOCKETS TRUE CACHE BOOL "libwebsockets available")
