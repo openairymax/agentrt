@@ -428,11 +428,13 @@ int main(int argc, char *argv[])
      * （$AIRY_HOME/logs/airy_cli.log）。daemon RPC 层在 llm_d 离线等故障
      * 时会向 stderr 打印 ERROR（如 C-L02 / rpc_connect_unix），直接泄漏
      * 会污染对话/破坏全屏界面（2.3.11：不把内部实现暴露进对话）；落盘
-     * 保留完整诊断。-p 管道模式不重定向（stderr 承载 trace 诊断，供脚本
-     * 消费，见 cli_trace）。Windows 无全屏 TUI 且 dup2/fileno 为 POSIX
-     * 接口，整体跳过。 */
+     * 保留完整诊断。-p 模式同样在终端（stderr 为 TTY）下重定向——人类使
+     * 用时 trace 行（[intent]/[chat]，cli_trace）与 ERROR 日志会与答案
+     * 视觉混叠，落盘既保诊断又不污染输出；仅当 stderr 被管道/脚本消费
+     * （非 TTY）时保留直连，供脚本读取 trace 进度（cli_trace 约定）。
+     * Windows 无全屏 TUI 且 dup2/fileno 为 POSIX 接口，整体跳过。 */
 #ifndef _WIN32
-    if (!g_cli_print_mode) {
+    if (!g_cli_print_mode || isatty(STDERR_FILENO)) {
         char logpath[512];
         const char *logdir = airy_log_dir();
         /* 2.3.4：重定向前确保日志目录存在——此前 fopen 失败（首次运行/
