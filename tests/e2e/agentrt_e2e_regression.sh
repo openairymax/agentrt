@@ -144,6 +144,8 @@ log "[think_d]"
 rpc think.get_stats '{}' "think.get_stats"
 rpc_match think.health_check '{}' '"healthy":true' "think.health_check"
 rpc_err think.process '{"prompt":""}' -32602 "think.process(空 prompt, 错误路径)"
+rpc_err think.orchestrate '{}' -32602 "think.orchestrate(缺 input, fail-closed)"
+rpc_err think.orchestrate '{"input":""}' -32602 "think.orchestrate(空 input, fail-closed)"
 
 # ── monit_d ────────────────────────────────────────────────────────────────
 log "[monit_d]"
@@ -210,7 +212,8 @@ rpc_match llm.count_tokens '{"text":"hello world"}' '"tokens"' "llm.count_tokens
 rpc llm.health_check '{}' "llm.health_check"
 rpc llm.get_stats '{}' "llm.get_stats"
 rpc_err llm.count_tokens '{}' -32602 "llm.count_tokens(缺参, 错误路径)"
-[ "$SKIP_EXTERNAL" = 0 ] && rpc_err llm.complete '{"messages":[]}' -32603 "llm.complete(缺消息, provider 不可达)"
+rpc_err llm.complete '{"messages":[]}' -32602 "llm.complete(空消息数组, fail-closed)"
+rpc_err llm.complete '{"model":"default"}' -32602 "llm.complete(缺 messages, fail-closed)"
 
 # ── cupolas_d ──────────────────────────────────────────────────────────────
 log "[cupolas_d]"
