@@ -339,13 +339,12 @@ static void cli_print_usage(void)
     cli_outf("交互模式：直接运行 airy_cli 进入对话；输入 /help 查看命令。\n");
 }
 
-int main(int argc, char *argv[])
+/* 命令行解析（2026-08-21 自 main 抽离降圈复杂度）：支持选项与
+ * -p 模式 prompt 任意顺序（`-p --json "prompt"`、`--json -p "prompt"`、
+ * `-p "prompt" --json` 均合法），首个非选项 token 作为 prompt（含空格的
+ * prompt 须用引号包裹）。返回 0=继续启动；1=已输出帮助或错误并退出。 */
+static int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
 {
-    /* Server one-shot mode (-p/--print): run a single prompt then exit.
-     * 参数解析允许 -p/--print 之后的选项（如 --json）与 prompt 任意顺序：
-     * `-p --json "prompt"`、`--json -p "prompt"`、`-p "prompt" --json` 均合法，
-     * 首个非选项 token 作为 prompt（含空格的 prompt 须用引号包裹）。 */
-    const char *print_prompt = NULL;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--print") == 0) {
             g_cli_print_mode = 1;
@@ -353,15 +352,15 @@ int main(int argc, char *argv[])
             g_cli_json_mode = 1;
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             cli_print_usage();
-            return 0;
+            return 1;
         } else if (argv[i][0] == '-') {
             cli_outf("airy_cli: 未知选项 %s%s%s\n", cli_c(CLR_YELLOW), argv[i],
                    cli_c(CLR_RESET));
             cli_print_usage();
             return 1;
-        } else if (g_cli_print_mode && !print_prompt) {
+        } else if (g_cli_print_mode && !*out_print_prompt) {
             /* -p 模式下首个非选项 token 作为 prompt。 */
-            print_prompt = argv[i];
+            *out_print_prompt = argv[i];
         } else if (g_cli_print_mode) {
             cli_outf("airy_cli: 多出的参数 %s%s%s（-p 只接受一个 prompt）\n",
                    cli_c(CLR_YELLOW), argv[i], cli_c(CLR_RESET));
@@ -375,7 +374,15 @@ int main(int argc, char *argv[])
             return 1;
         }
     }
+    return 0;
+}
 
+int main(int argc, char *argv[])
+{
+    /* Server one-shot mode (-p/--print): run a single prompt then exit. */
+    const char *print_prompt = NULL;
+    if (cli_parse_args(argc, argv, &print_prompt) != 0)
+        return 1;
     /* Terminal capability probe (TTY / color level / NO_COLOR) before any
      * output so every render call degrades consistently on servers and logs. */
     cli_term_init();
