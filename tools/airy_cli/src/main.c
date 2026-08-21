@@ -235,34 +235,34 @@ airy_hall_store_t *g_cli_hall_store = NULL;
 static uint64_t g_session_start_ms;
 
 const cli_command_t CLI_COMMANDS[] = {
-    {"/help", "显示所有命令", 0, cmd_help},
-    {"/clear", "清屏并清空对话上下文", 0, cmd_clear},
-    {"/status", "查看执行大厅状态", 0, cmd_status},
-    {"/chain", "决策链可视化：/chain [task_id]（默认列出最近任务）", 0, cmd_chain},
-    {"/quit", "退出 agentrt", 0, cmd_quit},
-    {"/tui", "切换到图形 TUI（agentrt-tui）", 0, cmd_tui},
-    {"/daemons", "查看全部 daemon 在线状态", 0, cmd_daemons},
-    {"/daemon", "管理 daemon：/daemon start|stop|restart|status [ns...]（默认全部）", 0, cmd_daemon},
-    {"/rpc", "直接调用 daemon 方法：/rpc <ns>.<method> [json]（ns 或 ns_d 均可）", 1, cmd_rpc},
-    {"/stats", "查看 daemon 统计：/stats [ns]", 0, cmd_stats},
-    {"/agents", "列出已注册智能体", 0, cmd_agents},
-    {"/tools", "列出可用工具", 0, cmd_tools},
-    {"/hooks", "列出事件钩子", 0, cmd_hooks},
-    {"/plugins", "列出插件", 0, cmd_plugins},
-    {"/channels", "列出消息通道", 0, cmd_channels},
-    {"/market", "搜索市场（/market skill 搜技能）", 0, cmd_market},
-    {"/models", "列出 LLM 模型", 0, cmd_models},
-    {"/mem", "记忆检索：/mem [query]", 1, cmd_mem},
-    {"/a2a", "发现 A2A 智能体", 0, cmd_a2a},
-    {"/metrics", "查询观测指标", 0, cmd_metrics},
-    {"/alerts", "查看监控告警", 0, cmd_alerts},
-    {"/tasks", "调度状态与检查点", 0, cmd_tasks},
-    {"/info", "系统信息", 0, cmd_info},
-    {"/notify", "发布通知：/notify <channel> <msg>", 1, cmd_notify},
-    {"/vault", "凭据保险库：/vault list", 1, cmd_vault},
-    {"/perm", "权限裁决：/perm <agent> <action> <resource>", 1, cmd_perm},
-    {"/sanitize", "输入净化：/sanitize <input>", 1, cmd_sanitize},
-    {"/security", "安全状态（网络规则统计）", 0, cmd_security},
+    {"/help", "显示所有命令", CLI_CAT_SESSION, 0, cmd_help},
+    {"/clear", "清屏并清空对话上下文", CLI_CAT_SESSION, 0, cmd_clear},
+    {"/status", "查看执行大厅状态", CLI_CAT_SYSTEM, 0, cmd_status},
+    {"/chain", "决策链可视化：/chain [task_id]（默认列出最近任务）", CLI_CAT_SYSTEM, 0, cmd_chain},
+    {"/quit", "退出 agentrt", CLI_CAT_SESSION, 0, cmd_quit},
+    {"/tui", "切换到图形 TUI（agentrt-tui）", CLI_CAT_SESSION, 0, cmd_tui},
+    {"/daemons", "查看全部 daemon 在线状态", CLI_CAT_SYSTEM, 0, cmd_daemons},
+    {"/daemon", "管理 daemon：/daemon start|stop|restart|status [ns...]（默认全部）", CLI_CAT_SYSTEM, 0, cmd_daemon},
+    {"/rpc", "直接调用 daemon 方法：/rpc <ns>.<method> [json]（ns 或 ns_d 均可）", CLI_CAT_SYSTEM, 1, cmd_rpc},
+    {"/stats", "查看 daemon 统计：/stats [ns]", CLI_CAT_SYSTEM, 0, cmd_stats},
+    {"/agents", "列出已注册智能体", CLI_CAT_RESOURCE, 0, cmd_agents},
+    {"/tools", "列出可用工具", CLI_CAT_RESOURCE, 0, cmd_tools},
+    {"/hooks", "列出事件钩子", CLI_CAT_RESOURCE, 0, cmd_hooks},
+    {"/plugins", "列出插件", CLI_CAT_RESOURCE, 0, cmd_plugins},
+    {"/channels", "列出消息通道", CLI_CAT_RESOURCE, 0, cmd_channels},
+    {"/market", "搜索市场（/market skill 搜技能）", CLI_CAT_RESOURCE, 0, cmd_market},
+    {"/models", "列出 LLM 模型", CLI_CAT_RESOURCE, 0, cmd_models},
+    {"/mem", "记忆检索：/mem [query]", CLI_CAT_RESOURCE, 1, cmd_mem},
+    {"/a2a", "发现 A2A 智能体", CLI_CAT_RESOURCE, 0, cmd_a2a},
+    {"/metrics", "查询观测指标", CLI_CAT_SYSTEM, 0, cmd_metrics},
+    {"/alerts", "查看监控告警", CLI_CAT_SYSTEM, 0, cmd_alerts},
+    {"/tasks", "调度状态与检查点", CLI_CAT_SYSTEM, 0, cmd_tasks},
+    {"/info", "系统信息", CLI_CAT_SYSTEM, 0, cmd_info},
+    {"/notify", "发布通知：/notify <channel> <msg>", CLI_CAT_SECURITY, 1, cmd_notify},
+    {"/vault", "凭据保险库：/vault list", CLI_CAT_SECURITY, 1, cmd_vault},
+    {"/perm", "权限裁决：/perm <agent> <action> <resource>", CLI_CAT_SECURITY, 1, cmd_perm},
+    {"/sanitize", "输入净化：/sanitize <input>", CLI_CAT_SESSION, 1, cmd_sanitize},
+    {"/security", "安全状态（网络规则统计）", CLI_CAT_SECURITY, 0, cmd_security},
 };
 
 #define CLI_COMMANDS_COUNT (sizeof(CLI_COMMANDS) / sizeof(CLI_COMMANDS[0]))
@@ -1205,11 +1205,7 @@ int main(int argc, char *argv[])
                                           "Abort requested, stopping the task ...");
                 break;
             }
-#ifdef _WIN32
-            Sleep(200);
-#else
-            usleep(200 * 1000);
-#endif
+            airy_sleep_ms(200);
             cli_spinner_tick();
 
             if (g_cli_cancel) {
@@ -1352,11 +1348,7 @@ int main(int argc, char *argv[])
                 int input_rc = cli_task_poll_input();
                 if (input_rc < 0)
                     break; /* 用户打断：g_cli_cancel 已置位 */
-#ifdef _WIN32
-                Sleep(200);
-#else
-                usleep(200 * 1000);
-#endif
+                airy_sleep_ms(200);
                 cli_spinner_tick();
             }
             airy_platform_thread_join(wthr, NULL);
