@@ -325,11 +325,7 @@ airy_err_t cli_dag_wait_remote(const char *sched_sock, const char *dag_id, char 
         }
         if (prc == CLI_DAG_POLL_ERROR)
             return AIRY_ERR_GENERIC_FAIL;
-#ifdef _WIN32
-        Sleep(200);
-#else
-        usleep(200 * 1000);
-#endif
+        airy_sleep_ms(200);
     }
     return AIRY_ERR_TIMEOUT;
 }

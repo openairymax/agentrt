@@ -305,11 +305,8 @@ static const char *cli_system_prompt_now(void)
     static char s_sys[1536];
     time_t now = time(NULL);
     struct tm tmv;
-#ifdef _WIN32
-    localtime_s(&tmv, &now);
-#else
-    localtime_r(&now, &tmv);
-#endif
+    if (airy_localtime_r(&now, &tmv) != 0)
+        return CLI_SYSTEM_PROMPT; /* 时间转换失败时回退无时间戳提示 */
     char ts[96];
     strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S %z", &tmv);
     snprintf(s_sys, sizeof(s_sys),

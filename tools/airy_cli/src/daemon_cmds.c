@@ -370,11 +370,7 @@ static int cli_daemon_wait_offline(const char *ns, int timeout_ms)
 {
     int waited = 0;
     while (cli_daemon_online(ns)) {
-#ifdef _WIN32
-        Sleep(200);
-#else
-        usleep(200 * 1000);
-#endif
+        airy_sleep_ms(200);
         waited += 200;
         if (waited >= timeout_ms)
             return 0;
@@ -387,11 +383,7 @@ static int cli_daemon_wait_online(const char *ns, int timeout_ms)
 {
     int waited = 0;
     while (!cli_daemon_online(ns)) {
-#ifdef _WIN32
-        Sleep(200);
-#else
-        usleep(200 * 1000);
-#endif
+        airy_sleep_ms(200);
         waited += 200;
         if (waited >= timeout_ms)
             return 0;
