@@ -100,6 +100,24 @@
 - 聊天工具回路探针 2/2：web_search（Bing 搜索）+ web_fetch（kernel.org 抓取）真实执行
 - CPR 端到端：CLI 任务在无 LLM 环境下降级执行不阻塞（exit=0），memoryrovol 数据正确落于 `$AIRY_HOME/data/memoryrovol/`
 
+### 2026-08-22 追加：CLI 意图/渲染修复 + L2 缓存命中率
+
+#### Fixed
+
+- **意图分类误路由（CLI `cli_classify.c`）**：`task_marks` 全串 `strstr` 把"请帮我分析一下…在树莓派上**运行**容器化数据库…比较…"的"运行"（场景描述）判为命令，纯咨询问题被误送任务管线（GCCP 四问 + 执行计划）。修复：新增分析/评估/比较类咨询词层（分析/比较/对比/评估/总结/讲解/探讨/研讨/剖析/评测/评价/解析/区别/差异/优缺点/利弊/优劣），未含产物变更强动词（实现/修复/开发/构建/创建/部署/重构/迁移/安装/配置/删除/更新/下载/编写/生成/集成/改造）时判 chat；场景描述动词（运行/测试/检查/启动/停止）仅无描述性语境（"上运行"/"性能测试"/"安全检查"）时计 task。回归测试 44/44 + CLI 端到端实测
+- **markdown 中文粗体渲染（CLI `cli_render.c`）**：`cli_emph_has_letter` 仅认 ASCII 字母，`**容器不是虚拟机**` 等中文粗体配对失败、闭合 `**` 泄漏到终端。修复：UTF-8 多字节序列视为字母；`6*7=42` 数学式仍保持字面
+- **L2 语义缓存命中率（atoms `rs_semantic_cache.c`/`roadmap_sched.c`）**：
+  - 默认 θ 700→550 permille（语义命中仅作 L3 参考提示、安全；700 时 OSS bigram 路径与短中文意图近邻几乎无法过阈）
+  - 向量 top-K 均低于 θ 时回退 bigram 全扫描（此前仅空结果集回退）
+  - TTL 过期条目同步从向量索引移除（此前仅内存置 invalid，索引残留过期 embedding）
+  - 删除死字段 `alpha`/`target_fp_permille`，"动态阈值"注释更正为可配置静态阈值
+
+#### Tested
+
+- `test_cli_classify` 44/44（含分析/产物动词拆分、命令 vs 场景动词回归）
+- CLI 端到端：分析/比较类问题直接对话回答（思考链折叠 + markdown 完整渲染，0 泄漏 `**`）；联网搜索（web_search×2 + web_fetch kernel.org）返回实时内核版本并正确使用注入的宿主机时间；文件写/读/删（fs_write/fs_read/fs_delete + fs_glob 复核）磁盘实证
+- Roadmap Sched 测试套件（BUILD_TESTS=ON，x86_64 focal）全 PASS（含 L2 向量命中/持久化/降级/用户意图命中）
+
 ### 2026-08-21 追加：orchestrator 恢复 + 全量端到端集成
 
 在 0.1.2 基线之上完成 orchestrator 流程编排器恢复启用与全量端到端集成，统一双管线（engine_process 为单次认知权威，orchestrator 负责多任务/阶段编排）。
