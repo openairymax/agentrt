@@ -20,11 +20,26 @@ int cmd_help(const char *arg, void *ctx)
 {
     (void)arg;
     (void)ctx;
-    cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, NULL, "可用命令");
+    /* 分组顺序与 CLI_CAT_* 枚举一致（会话/系统/资源/安全） */
+    static const struct {
+        cli_cmd_category_t cat;
+        const char        *title;
+    } groups[] = {
+        {CLI_CAT_SESSION, "会话"},
+        {CLI_CAT_SYSTEM, "系统"},
+        {CLI_CAT_RESOURCE, "资源"},
+        {CLI_CAT_SECURITY, "安全"},
+    };
+    cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, NULL, "可用命令（按类别）");
     size_t ncmds = cli_commands_count();
-    for (size_t i = 0; i < ncmds; i++) {
-        cli_outf("    %s%-8s%s  %s\n", cli_c(CLR_CYAN), CLI_COMMANDS[i].name, cli_c(CLR_RESET),
-               CLI_COMMANDS[i].desc);
+    for (size_t g = 0; g < sizeof(groups) / sizeof(groups[0]); g++) {
+        cli_outf("  %s── %s ──%s\n", cli_c(CLR_YELLOW), groups[g].title, cli_c(CLR_RESET));
+        for (size_t i = 0; i < ncmds; i++) {
+            if (CLI_COMMANDS[i].category != groups[g].cat)
+                continue;
+            cli_outf("    %s%-8s%s  %s\n", cli_c(CLR_CYAN), CLI_COMMANDS[i].name,
+                     cli_c(CLR_RESET), CLI_COMMANDS[i].desc);
+        }
     }
     cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, NULL,
                          "普通输入直接对话或下达任务指令。");
