@@ -122,6 +122,14 @@ void cli_tui_mode_set(cli_tui_t *t, cli_tui_mode_t m);
 #define CLI_TUI_PANEL_POLL_MS 200
 
 /**
+ * @brief 对话模式轮询间隔（毫秒）：P1 重绘节流的兜底消费节拍。
+ *
+ * emit 侧按 TUI_REDRAW_MIN_MS（16ms）合并相邻重绘；输出暂停且未 flush
+ * 时，readline 以本间隔唤醒消费 redraw_pending，保证末帧不丢失。
+ */
+#define CLI_TUI_CHAT_POLL_MS 100
+
+/**
  * @brief Create the TUI engine handle (does NOT enter the full-screen page).
  *
  * 2.3.7 (2026-08-17): the interactive session defaults to the line-oriented

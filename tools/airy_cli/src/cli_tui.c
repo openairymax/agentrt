@@ -49,7 +49,9 @@
 #endif
 
 #ifdef _WIN32
-/* TUI is POSIX-only: everything degrades to line-oriented stdout. */
+/* Windows：全屏 alt-screen 模式仍为 POSIX-only，退化为行渲染；行渲染
+ * readline 的逐键输入由 tui_wait_byte 的 ReadConsoleInputW 翻译层支持
+ * （见 input 段），方向键/功能键/UTF-8 输入与 POSIX 行为一致。 */
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #else
@@ -95,6 +97,10 @@ cli_tui_t *cli_tui_get_default(void)
 #define TUI_SEARCH_QUERY_MAX 256
 #define TUI_INPUT_PREFIX "airy> " /* input prompt, width tracked in bytes */
 
+/* P1 重绘节流窗口（毫秒）：两个相邻重绘的最小间隔（约 60fps 上限）。
+ * 流式输出按此合并，视觉依然平滑。 */
+#define TUI_REDRAW_MIN_MS 16
+
 typedef struct {
     char **lines;    /* committed history lines (no trailing '\n') */
     size_t count;    /* number of committed lines */
@@ -122,6 +128,29 @@ struct cli_tui_s {
 
     size_t viewport_rows; /* rows usable by the middle viewport */
     size_t scroll_off;    /* history lines scrolled back (0 = live tail) */
+
+    /* 增量渲染状态（P1 重绘优化）：上次渲染的 viewport 窗口顶部 rel 索引。
+     * cli_tui_emit 追加历史尾部时，若窗口未移动则只重绘最后可见行 +
+     * 输入行，替代每次 chunk 全量重绘（实测流式输出每次全屏重绘产生
+     * 1.5MB+ 字节流，弱终端卡顿闪烁）。 */
+    size_t vp_start_rendered;
+    int vp_start_valid;
+
+    /* 上次渲染时的内容行数：滚动增量仅当旧窗口已填满（content >= rows）
+     * 时安全——窗口未满时滚动会把未渲染的空洞滚上来，中间行缺失。 */
+    size_t vp_content_rendered;
+
+    /* P1 滚动区（DECSTBM）状态：窗口顶部前移时用终端滚动代替全量重绘
+     * （滚动区 = viewport 区域，header/输入行固定在外）。 */
+    size_t scr_top;
+    size_t scr_bottom;
+    int scr_set;
+
+    /* P1 重绘节流：emit 侧按时间窗口合并相邻重绘（TUI_REDRAW_MIN_MS），
+     * 避免逐字节/逐帧输出时每次触发一次重绘（实测一次会话累计产生
+     * 1.5MB+ 字节流，弱终端卡顿闪烁）。 */
+    long long redraw_last_ms; /* 上次实际执行重绘的时间戳 */
+    int redraw_pending;       /* 节流窗口内被合并、待执行的重绘 */
 
     /* ---- 阶段 4：视图模式（tab）+ 面板数据源 ---- */
     cli_tui_mode_t mode;
@@ -286,6 +315,10 @@ static void tui_grow_history(tui_history_t *h)
         h->cap = new_cap;
     }
 }
+
+/* P1 增量重绘（emit 场景）前向声明：定义在 emit 之后（尾部渲染段） */
+static void tui_redraw_tail(cli_tui_t *t);
+static void tui_schedule_redraw(cli_tui_t *t);
 
 static void tui_commit_line(cli_tui_t *t, char *line)
 {
@@ -572,6 +605,16 @@ static void tui_append_byte(cli_tui_t *t, char c)
     t->cur[t->cur_len] = '\0';
 }
 
+/* 内容行数：历史（去 header）+ 未提交的 partial 行。增量/全量渲染
+ * 共用同一几何口径（与 tui_render_viewport 聊天分支一致）。 */
+static size_t tui_content_lines(cli_tui_t *t)
+{
+    size_t total = t->hist.count;
+    int have_partial = t->cur && t->cur_len > 0;
+    return (total > t->hist.pinned ? total - t->hist.pinned : 0) +
+           (have_partial ? 1 : 0);
+}
+
 void cli_tui_emit(cli_tui_t *t, const char *data, size_t len)
 {
     if (!t || !data) {
@@ -586,6 +629,7 @@ void cli_tui_emit(cli_tui_t *t, const char *data, size_t len)
         return;
     }
 
+    size_t c0 = tui_content_lines(t);
     for (size_t i = 0; i < len; i++) {
         char c = data[i];
         if (c == '\r') {
@@ -612,10 +656,22 @@ void cli_tui_emit(cli_tui_t *t, const char *data, size_t len)
         }
         tui_append_byte(t, c);
     }
-    /* Redraw immediately so streamed chunks appear live (typewriter effect).
-     * Each cli_outn() call is one render tick — chunk-granular, cheap enough. */
-    t->dirty = 1;
-    cli_tui_redraw(t);
+    /* P1 重绘优化：不再每 chunk 全量重绘。
+     *   - chat 跟随模式：增量重绘 viewport 尾部（窗口未移动时仅重绘
+     *     最后可见行 + 输入行，字节量从 ~1.2KB/次降至 ~100B/次）；
+     *   - 本次 emit 批量新增 >1 行（如 /daemons 整段输出）：全量逐行
+     *     重绘——增量只画末行会导致中间新行不显示；
+     *   - 面板模式（200ms 轮询兜底）/ 回放浏览（scroll_off>0，内容不在
+     *     可视区）：只标记 dirty，由轮询或下次按键触发重绘。 */
+    if (t->mode != CLI_TUI_MODE_CHAT || t->scroll_off > 0) {
+        t->dirty = 1;
+        return;
+    }
+    if (tui_content_lines(t) - c0 > 1) {
+        cli_tui_redraw(t);
+        return;
+    }
+    tui_schedule_redraw(t);
 }
 
 void cli_tui_emit_flush(cli_tui_t *t)
@@ -627,8 +683,15 @@ void cli_tui_emit_flush(cli_tui_t *t)
         t->cur = NULL;
         t->cur_len = 0;
         t->cur_cap = 0;
-        t->dirty = 1;
     }
+    /* P1：flush 提交了部分行 → 立即增量重绘（跳过节流窗口，保证输出
+     * 结束时末帧不丢；窗口移动时 tui_redraw_tail 内部回退全量）。 */
+    if (t->mode != CLI_TUI_MODE_CHAT || t->scroll_off > 0) {
+        t->dirty = 1;
+        return;
+    }
+    t->redraw_pending = 0;
+    tui_redraw_tail(t);
 }
 
 size_t cli_tui_hist_count(cli_tui_t *t)
@@ -683,6 +746,30 @@ static size_t tui_middle_rows(cli_tui_t *t)
     if (avail <= header + input_rows)
         return 0;
     return avail - header - input_rows;
+}
+
+/* P1：把 viewport 区域设为终端滚动区（DECSTBM），几何变化时才重设。
+ * 窗口前移时终端滚动比逐行全量重绘省一个数量级的字节。 */
+static void tui_scroll_region_set(cli_tui_t *t)
+{
+    size_t rows = tui_middle_rows(t);
+    if (rows == 0)
+        return;
+    size_t top = t->hist.pinned + 1;
+    size_t bottom = t->hist.pinned + rows; /* viewport 最后一行 */
+    if (t->scr_set && t->scr_top == top && t->scr_bottom == bottom)
+        return;
+    tui_write_literal("\033[");
+    char num[24];
+    snprintf(num, sizeof(num), "%zu", top);
+    tui_write_literal(num);
+    tui_write_literal(";");
+    snprintf(num, sizeof(num), "%zu", bottom);
+    tui_write_literal(num);
+    tui_write_literal("r");
+    t->scr_top = top;
+    t->scr_bottom = bottom;
+    t->scr_set = 1;
 }
 
 /* ---- full redraw ---- */
@@ -882,6 +969,12 @@ static void tui_render_viewport(cli_tui_t *t)
     } else {
         start = content > rows ? content - rows : 0;
     }
+    /* 全量渲染完成 → 记录窗口顶部，供 cli_tui_emit 增量重绘检测；
+     * 同步 viewport 滚动区，供窗口前移时终端滚动增量。 */
+    t->vp_start_rendered = start;
+    t->vp_start_valid = 1;
+    t->vp_content_rendered = content;
+    tui_scroll_region_set(t);
 
     for (size_t r = 0; r < rows; r++) {
         tui_write_literal("\033[");
@@ -1066,6 +1159,125 @@ static void tui_render_input(cli_tui_t *t)
     fflush(stdout);
 }
 
+/* P1 增量重绘（emit 场景）：chat 跟随模式下仅重绘 viewport 尾部变化行
+ * （最后可见内容行 + 输入行），替代每次 chunk 全量重绘。窗口移动（内容
+ * 溢出导致 start 前移）或首次进入时回退全量。 */
+static void tui_redraw_tail(cli_tui_t *t)
+{
+    size_t rows = tui_middle_rows(t);
+    if (rows == 0) {
+        cli_tui_redraw(t);
+        return;
+    }
+    size_t content = tui_content_lines(t);
+    int have_partial = t->cur && t->cur_len > 0;
+    if (content == 0) {
+        cli_tui_redraw(t);
+        return;
+    }
+    size_t live = content > rows ? rows : content;
+    size_t start = content > rows ? content - rows : 0;
+
+    /* 窗口前移（尾部溢出）：滚动区增量——终端滚动 k 行 + 重绘新进
+     * 视口的 k 行，避免全量逐行重绘。仅当旧窗口已填满（上次渲染时
+     * 内容行数 >= 视口行数）时安全；首次进入或窗口未满（中间行从未
+     * 渲染，滚动会带出空洞）时回退全量。 */
+    if (start != t->vp_start_rendered) {
+        size_t k = start > t->vp_start_rendered
+                       ? start - t->vp_start_rendered
+                       : 0;
+        if (!t->vp_start_valid || k == 0 || k > rows || !t->scr_set ||
+            t->vp_content_rendered < rows) {
+            cli_tui_redraw(t);
+            return;
+        }
+        /* 光标到滚动区底部，k 次换行触发终端上滚；滚动后底部 k 行空。 */
+        char num[16];
+        tui_write_literal("\033[");
+        snprintf(num, sizeof(num), "%zu", t->scr_bottom);
+        tui_write_literal(num);
+        tui_write_literal(";1H");
+        for (size_t i = 0; i < k; i++)
+            tui_write_literal("\n");
+        /* 重绘新进入视口的 k 行（滚动后的空行区） */
+        for (size_t r = rows - k; r < rows; r++) {
+            size_t rel = start + r;
+            if (rel >= content)
+                break;
+            tui_write_literal("\033[");
+            snprintf(num, sizeof(num), "%zu", t->hist.pinned + 1 + r);
+            tui_write_literal(num);
+            tui_write_literal(";1H");
+            tui_clear_line();
+            if (have_partial && rel == content - 1) {
+                fputs(t->cur, stdout);
+            } else {
+                size_t idx = t->hist.pinned + rel;
+                if (idx < t->hist.count)
+                    fputs(t->hist.lines[idx], stdout);
+            }
+        }
+        t->vp_start_rendered = start;
+        t->vp_content_rendered = content;
+        tui_render_input(t);
+        t->dirty = 0;
+        fflush(stdout);
+        return;
+    }
+    /* 窗口未移动：只重绘最后可见内容行（含未提交的部分行）与输入行。
+     * 字节量从每次全屏 ~1.2KB 降至 ~100B。超宽行触发终端自动换行时，
+     * 画出内容后清掉其占用的 wrap 溢出行，避免 partial 变短/commit 后
+     * 上一帧的溢出内容残留（显示宽度用 cli_disp_width_of，CJK 双宽正确）。 */
+    size_t cols = t->cols > 0 ? (size_t)t->cols : 80;
+    size_t row = t->hist.pinned + live; /* start_row + live - 1 */
+    tui_write_literal("\033[");
+    char num[16];
+    snprintf(num, sizeof(num), "%zu", row);
+    tui_write_literal(num);
+    tui_write_literal(";1H");
+    tui_clear_line();
+    size_t disp = 0;
+    if (have_partial) {
+        fputs(t->cur, stdout);
+        disp = cli_disp_width_of(t->cur, t->cur_len);
+    } else {
+        size_t idx = t->hist.pinned + start + live - 1;
+        if (idx < t->hist.count) {
+            fputs(t->hist.lines[idx], stdout);
+            disp = cli_disp_width_of(t->hist.lines[idx],
+                                     strlen(t->hist.lines[idx]));
+        }
+    }
+    /* 清 wrap 溢出区（占用物理行数 - 1）；不越过输入行（输入行由
+     * tui_render_input 覆盖）。 */
+    size_t phys = disp > 0 ? (disp + cols - 1) / cols : 1;
+    for (size_t i = 1; i < phys && row + i < (size_t)t->rows; i++) {
+        tui_write_literal("\033[");
+        snprintf(num, sizeof(num), "%zu", row + i);
+        tui_write_literal(num);
+        tui_write_literal(";1H");
+        tui_clear_line();
+    }
+    tui_render_input(t);
+    t->dirty = 0;
+    fflush(stdout);
+}
+
+/* P1 重绘节流入口（emit 侧）：距上次重绘 >= TUI_REDRAW_MIN_MS 才实际
+ * 重绘，否则仅挂起 redraw_pending（由下一次 emit / flush / readline 轮询
+ * 消费）。逐字节流式输出因此合并为 ~60fps 的整帧刷新。 */
+static void tui_schedule_redraw(cli_tui_t *t)
+{
+    long long now = cli_now_ms();
+    if (now - t->redraw_last_ms >= TUI_REDRAW_MIN_MS) {
+        t->redraw_last_ms = now;
+        t->redraw_pending = 0;
+        tui_redraw_tail(t);
+    } else {
+        t->redraw_pending = 1;
+    }
+}
+
 void cli_tui_redraw(cli_tui_t *t)
 {
     if (!t || !t->active)
@@ -1079,6 +1291,121 @@ void cli_tui_redraw(cli_tui_t *t)
 
 /* ---- input ---- */
 
+/* ---- Windows 输入：控制台键事件 → 伪 VT 字节流 ----
+ *
+ * tui_read_key 解析 ESC 序列，但 Windows 控制台不产生 raw 字节流。
+ * 这里把 ReadConsoleInputW 的 KEY_EVENT 翻译为字节：普通字符按 UTF-8
+ * （含代理对），方向/功能/修饰键翻译为 xterm VT 序列，使 POSIX 的
+ * 按键解析代码在 Windows 上零改动复用（Windows 10+ ConPTY 与现代
+ * 终端行为一致，老控制台经 cli_term_init 降级为行渲染）。
+ */
+#ifdef _WIN32
+
+static char g_win_key_buf[16];    /* 翻译后的字节序列缓存 */
+static size_t g_win_key_len = 0;
+static size_t g_win_key_off = 0;
+static WCHAR g_win_high_surrogate = 0; /* UTF-16 高代理暂存（跨事件） */
+
+static void tui_win_flush_buf(const char *s, size_t n)
+{
+    if (n > sizeof(g_win_key_buf))
+        n = sizeof(g_win_key_buf);
+    memcpy(g_win_key_buf, s, n);
+    g_win_key_len = n;
+    g_win_key_off = 0;
+}
+
+/* UTF-16 单字符 → UTF-8（含代理对组合）。无内容时不动缓存。 */
+static void tui_win_enqueue_wchar(WCHAR wc)
+{
+    char buf[4];
+    size_t n;
+    if (wc < 0x80) {
+        buf[0] = (char)wc;
+        n = 1;
+    } else if (wc < 0x800) {
+        buf[0] = (char)(0xC0 | (wc >> 6));
+        buf[1] = (char)(0x80 | (wc & 0x3F));
+        n = 2;
+    } else if (wc < 0xD800 || wc > 0xDFFF) {
+        /* BMP 非代理（中文等 3 字节字符） */
+        buf[0] = (char)(0xE0 | (wc >> 12));
+        buf[1] = (char)(0x80 | ((wc >> 6) & 0x3F));
+        buf[2] = (char)(0x80 | (wc & 0x3F));
+        n = 3;
+    } else if (wc >= 0xDC00) {
+        /* 低代理：与暂存的高代理组合成 4 字节（无高代理则丢弃） */
+        if (g_win_high_surrogate == 0)
+            return;
+        unsigned long cp = 0x10000 +
+                (((unsigned long)(g_win_high_surrogate - 0xD800)) << 10) +
+                (wc - 0xDC00);
+        g_win_high_surrogate = 0;
+        buf[0] = (char)(0xF0 | (cp >> 18));
+        buf[1] = (char)(0x80 | ((cp >> 12) & 0x3F));
+        buf[2] = (char)(0x80 | ((cp >> 6) & 0x3F));
+        buf[3] = (char)(0x80 | (cp & 0x3F));
+        n = 4;
+    } else {
+        /* 高代理：暂存，等待随后的低代理事件 */
+        g_win_high_surrogate = wc;
+        return;
+    }
+    tui_win_flush_buf(buf, n);
+}
+
+static void tui_win_enqueue_key(WORD vk, WCHAR wc, DWORD ctl)
+{
+    const int ctrl = (ctl & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)) != 0;
+    const int alt = (ctl & (LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED)) != 0;
+    const char *seq = NULL;
+
+    switch (vk) {
+    case VK_UP:     seq = "\x1b[A";      break;
+    case VK_DOWN:   seq = "\x1b[B";      break;
+    case VK_RIGHT:  seq = ctrl ? "\x1b[1;5C" : alt ? "\x1b[1;3C" : "\x1b[C"; break;
+    case VK_LEFT:   seq = ctrl ? "\x1b[1;5D" : alt ? "\x1b[1;3D" : "\x1b[D"; break;
+    case VK_HOME:   seq = "\x1b[H";      break;
+    case VK_END:    seq = "\x1b[F";      break;
+    case VK_PRIOR:  seq = "\x1b[5~";     break;
+    case VK_NEXT:   seq = "\x1b[6~";     break;
+    case VK_DELETE: seq = "\x1b[3~";     break;
+    case VK_F6:     seq = "\x1b[17~";    break;
+    case VK_F7:     seq = "\x1b[18~";    break;
+    case VK_F8:     seq = "\x1b[19~";    break;
+    case VK_TAB:    seq = "\t";          break;
+    case VK_RETURN: seq = "\r";          break;
+    case VK_BACK:   seq = "\x7f";        break; /* termios DEL，与 POSIX 一致 */
+    case VK_ESCAPE: seq = "\x1b";        break;
+    default:
+        break;
+    }
+    if (seq) {
+        tui_win_flush_buf(seq, strlen(seq));
+        return;
+    }
+    if (alt && (vk == 'B' || vk == 'F')) {
+        /* Alt+B / Alt+F：词左/右移（xterm 的 ESC b / ESC f） */
+        const char *ab = (vk == 'B') ? "\x1bb" : "\x1bf";
+        tui_win_flush_buf(ab, 2);
+        return;
+    }
+    if (ctrl && vk >= 'A' && vk <= 'Z') {
+        /* Ctrl+letter → 控制字节 0x01-0x1A（Ctrl+C=0x03 等）。Windows
+         * 的 uChar 对 Ctrl 组合常为 0，按虚拟键码自行合成。 */
+        char b = (char)((vk - 'A') + 1);
+        tui_win_flush_buf(&b, 1);
+        return;
+    }
+    if (wc) {
+        tui_win_enqueue_wchar(wc);
+        return;
+    }
+    /* 无字符可翻译（Shift 等纯修饰键）：缓存保持空，调用方重试。 */
+}
+
+#endif /* _WIN32 */
+
 /* 阶段 4：带超时的按键等待。timeout_ms < 0 无限等待（原阻塞语义）。
  * 返回 1 有数据（*out 有效）；0 = 超时（*eof=0）或 EOF（*eof=1）。
  * 看板模式用它做 200ms 轮询节拍实现"实时刷新"。 */
@@ -1086,10 +1413,62 @@ static int tui_wait_byte(cli_tui_t *t, char *out, int timeout_ms, int *eof)
 {
 #ifdef _WIN32
     (void)t;
-    (void)timeout_ms;
-    (void)eof;
-    (void)out;
-    return 0; /* TUI 为 POSIX-only，Windows 不读键 */
+    /* 优先消耗上一个键事件翻译出的字节序列。 */
+    if (g_win_key_off < g_win_key_len) {
+        *out = g_win_key_buf[g_win_key_off++];
+        *eof = 0;
+        return 1;
+    }
+    g_win_key_len = g_win_key_off = 0;
+
+    HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
+    if (hin == INVALID_HANDLE_VALUE || hin == NULL) {
+        *eof = 1;
+        return 0;
+    }
+    DWORD ms = (timeout_ms < 0) ? INFINITE : (DWORD)timeout_ms;
+    if (WaitForSingleObject(hin, ms) != WAIT_OBJECT_0) {
+        *eof = 0;
+        return 0;
+    }
+    if (GetFileType(hin) != FILE_TYPE_CHAR) {
+        /* 重定向的管道/文件：逐字节读（与 POSIX read 语义一致）。 */
+        char c;
+        DWORD n = 0;
+        if (ReadFile(hin, &c, 1, &n, NULL) && n == 1) {
+            *out = c;
+            *eof = 0;
+            return 1;
+        }
+        *eof = 1;
+        return 0;
+    }
+    /* 控制台：ReadConsoleInputW 取 KEY_EVENT，跳过鼠标/窗口尺寸等
+     * 非键事件后翻译为字节。 */
+    for (;;) {
+        INPUT_RECORD rec;
+        DWORD n = 0;
+        if (!ReadConsoleInputW(hin, &rec, 1, &n) || n == 0) {
+            /* 缓冲已空：非键事件只占单个记录，通常 KEY_EVENT 紧随；
+             * 再等待一轮，避免 resize/鼠标事件被误判为 EOF。 */
+            if (WaitForSingleObject(hin, ms) != WAIT_OBJECT_0) {
+                *eof = 0;
+                return 0;
+            }
+            continue;
+        }
+        if (rec.EventType == KEY_EVENT &&
+            rec.Event.KeyEvent.bKeyDown) {
+            tui_win_enqueue_key(rec.Event.KeyEvent.wVirtualKeyCode,
+                                rec.Event.KeyEvent.uChar.UnicodeChar,
+                                rec.Event.KeyEvent.dwControlKeyState);
+            if (g_win_key_len > 0) {
+                *out = g_win_key_buf[g_win_key_off++];
+                *eof = 0;
+                return 1;
+            }
+        }
+    }
 #else
     struct pollfd pfd;
     pfd.fd = STDIN_FILENO;
@@ -1146,14 +1525,17 @@ enum {
 /* ---- bracketed paste (ESC [ 200 ~ ... ESC [ 201 ~) ---- */
 
 /* 读取 bracketed-paste 结束序列的剩余字节（ESC 已被调用方消费，
- * 这里只读 "[201~" 5 字节）。返回 1 = 完整结束序列；0 = 不匹配。 */
-static int tui_paste_read_end(void)
+ * 这里只读 "[201~" 5 字节）。返回 1 = 完整结束序列；0 = 不匹配。
+ * 经 tui_wait_byte 读取，Windows 键翻译层与原样字节流均适用。 */
+static int tui_paste_read_end(cli_tui_t *t)
 {
     char want[] = {'[', '2', '0', '1', '~'};
     char got[sizeof(want)];
     for (size_t i = 0; i < sizeof(want); i++) {
-        ssize_t n = read(STDIN_FILENO, &got[i], 1);
-        if (n != 1 || got[i] != want[i])
+        int eof = 0;
+        if (!tui_wait_byte(t, &got[i], 50, &eof))
+            return 0;
+        if (got[i] != want[i])
             return 0;
     }
     return 1;
@@ -1724,13 +2106,6 @@ static void tui_line_redraw(cli_tui_t *t)
 static int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
                                   size_t *out_len)
 {
-#ifdef _WIN32
-    (void)t;
-    (void)buf;
-    (void)cap;
-    (void)out_len;
-    return 0;
-#else
     if (!t)
         return 0;
     t->input_len = 0;
@@ -1747,6 +2122,7 @@ static int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
     t->cmd_hist_idx = t->cmd_hist.count;
     tui_get_size(t);
 
+#ifndef _WIN32
     struct termios saved;
     int saved_ok = 0;
     if (tcgetattr(STDIN_FILENO, &saved) == 0) {
@@ -1761,6 +2137,7 @@ static int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
         if (tcsetattr(STDIN_FILENO, TCSANOW, &raw) == 0)
             saved_ok = 1;
     }
+#endif
     tui_line_redraw(t);
 
     int rc = 1;
@@ -1926,10 +2303,11 @@ static int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
         }
     }
 
+#ifndef _WIN32
     if (saved_ok)
         tcsetattr(STDIN_FILENO, TCSANOW, &saved);
-    return rc;
 #endif
+    return rc;
 }
 
 int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
@@ -1942,11 +2320,11 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
     if (!t || !t->active) {
         /* Non-TUI. 2.3.7：F8 转义序列 (ESC[19~) 出现在行输入中 →
          * 请求进入全屏页面（返回 2）。交互 TTY 走字节级 readline
-         * （方向键/PgUp 翻历史、无乱码）；管道/日志走 fgets。 */
-#ifndef _WIN32
+         * （方向键/PgUp 翻历史、无乱码）；管道/日志走 fgets。
+         * Windows：行渲染 readline 由 tui_wait_byte 的键翻译层支持，
+         * 与 POSIX 同路径（无 _WIN32 降级）。 */
         if (cli_term_is_tty())
             return tui_readline_line_mode(t, buf, cap, out_len);
-#endif
         if (!fgets(buf, (int)cap, stdin))
             return 0;
         size_t n = strlen(buf);
@@ -1980,8 +2358,10 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
     for (;;) {
         int eof = 0;
         /* 面板模式（任务看板/事件流）200ms 轮询节拍（实时刷新）；
-         * 其余模式无限等待（原语义）。 */
-        int timeout = (t->mode != CLI_TUI_MODE_CHAT) ? CLI_TUI_PANEL_POLL_MS : -1;
+         * 对话模式按 100ms 轮询：P1 节流兜底——输出暂停且未 flush 时
+         * 消费 redraw_pending，保证末帧不丢。 */
+        int timeout = (t->mode != CLI_TUI_MODE_CHAT) ? CLI_TUI_PANEL_POLL_MS
+                                                     : CLI_TUI_CHAT_POLL_MS;
         int key = tui_read_key(t, timeout, &eof);
         if (eof)
             return 0;
@@ -1989,13 +2369,21 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
             return 0; /* EOF */
         if (key == -1) {
             /* 轮询超时：面板实时刷新（count 回调重建缓存 → 重绘）。
-             * SIGWINCH 到达：刷新几何尺寸并全量重绘。 */
-            if (t->mode != CLI_TUI_MODE_CHAT)
+             * SIGWINCH 到达：刷新几何尺寸并全量重绘。对话模式下消费
+             * 节流挂起的增量重绘。 */
+            if (t->mode != CLI_TUI_MODE_CHAT) {
                 cli_tui_redraw(t);
+            }
+#ifndef _WIN32
             else if (g_tui_resize_pending) {
                 g_tui_resize_pending = 0;
                 tui_get_size(t);
                 cli_tui_redraw(t);
+            }
+#endif
+            else if (t->redraw_pending) {
+                t->redraw_pending = 0;
+                tui_redraw_tail(t);
             }
             continue;
         }
@@ -2497,7 +2885,7 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
                     continue; /* resize tick / EINTR: keep pasting */
                 }
                 if (pb == 0x1b) {
-                    if (tui_paste_read_end()) {
+                    if (tui_paste_read_end(t)) {
                         t->paste_active = 0;
                         break;
                     }
@@ -2579,6 +2967,7 @@ int cli_tui_enter(cli_tui_t *t)
         return -1;
 
     t->active = 1;
+    t->scr_set = 0; /* 滚动区在首次全量渲染时建立 */
     tui_get_size(t);
     if (t->rows <= 6 || t->cols <= 10) {
         t->active = 0;
@@ -2625,10 +3014,12 @@ int cli_tui_leave(cli_tui_t *t)
         tcsetattr(STDIN_FILENO, TCSANOW, &t->saved_termios);
     signal(SIGWINCH, SIG_DFL);
 #endif
-    fputs("\033[?2004l\033[?1049l", stdout);
+    /* 恢复全屏滚动区（\x1b[r），随后退出 alt screen。 */
+    fputs("\033[r\033[?2004l\033[?1049l", stdout);
     fflush(stdout);
     t->active = 0;
     t->termios_saved = 0;
+    t->scr_set = 0;
     return 0;
 }
 

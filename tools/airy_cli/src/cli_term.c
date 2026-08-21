@@ -58,9 +58,53 @@ static void cli_term_probe(void)
 #endif
 }
 
+#ifdef _WIN32
+/* 兜底定义：Windows 10+ 的 VT 模式宏在旧 SDK / 老 mingw-w64 的
+ * wincon.h 中可能缺失（_WIN32_WINNT 低于 0x0A00）。用官方数值，
+ * #ifndef 保护避免与已定义冲突。 */
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#endif
+#ifndef ENABLE_VIRTUAL_TERMINAL_INPUT
+#define ENABLE_VIRTUAL_TERMINAL_INPUT 0x0200
+#endif
+#endif
+
 void cli_term_init(void)
 {
     cli_term_probe();
+
+#ifdef _WIN32
+    /* Windows 10+ 现代控制台：启用 VT 序列（ANSI 转义输出）与 VT 输入
+     * 序列（方向键/功能键以 ESC [ x 形式到达），并把代码页切到 UTF-8，
+     * 使中文提示符/输入不依赖系统 ANSI 代码页。旧控制台（Win7/8）
+     * SetConsoleMode 失败即静默降级——TUI 退化为行渲染，行为同 POSIX
+     * 非 TTY 路径。 */
+    HANDLE hout = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hout != INVALID_HANDLE_VALUE) {
+        DWORD mode = 0;
+        if (GetConsoleMode(hout, &mode)) {
+            mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_PROCESSED_OUTPUT;
+            SetConsoleMode(hout, mode);
+        }
+    }
+    HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
+    if (hin != INVALID_HANDLE_VALUE) {
+        DWORD mode = 0;
+        if (GetConsoleMode(hin, &mode)) {
+            /* raw 输入（与 POSIX termios raw mode 对齐）：禁回显/行缓冲，
+             * 禁 PROCESSED_INPUT（否则 Ctrl+C 变成进程中断，readline 收
+             * 不到 0x03 取消键），禁 QUICK_EDIT（误点会进入选择模式卡死
+             * 逐键输入）。 */
+            mode |= ENABLE_VIRTUAL_TERMINAL_INPUT | ENABLE_EXTENDED_FLAGS;
+            mode &= ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT |
+                      ENABLE_PROCESSED_INPUT | ENABLE_QUICK_EDIT_MODE);
+            SetConsoleMode(hin, mode);
+        }
+    }
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+#endif
 }
 
 int cli_term_color_level(void)
