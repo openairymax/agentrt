@@ -232,6 +232,16 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
 
 #endif /* AIRY_HAS_CJSON */
 
+/* 聊天场景的错误描述：llm_d 是聊天回复的唯一 RPC 目标，NOT_FOUND 即
+ * llm.sock 不存在（llm_d 未启动），与通用"目标不存在"相比给出可执行
+ * 提示；其余错误沿用通用映射（cli_err_desc）。 */
+static const char *cli_chat_err_desc(int err)
+{
+    if (err == AIRY_ERR_NOT_FOUND)
+        return "LLM 服务未运行，请先启动 airymaxrt（llm_d 守护进程）";
+    return cli_err_desc(err);
+}
+
 char *g_history_roles[CLI_HISTORY_MAX_MSGS];
 char *g_history_contents[CLI_HISTORY_MAX_MSGS];
 size_t g_history_count = 0;
@@ -1174,7 +1184,7 @@ void cli_chat_reply(const char *input)
             if (spinner_on)
                 cli_spinner_stop(0, "reply failed");
             /* 人类可读的错误描述（数字码对用户无意义） */
-            const char *err_desc = cli_err_desc((int)ret);
+            const char *err_desc = cli_chat_err_desc((int)ret);
             if (ret == 0 && (!resp || resp->choice_count == 0))
                 err_desc = "模型未返回文本（可能仅生成了思考内容）";
             char line[256];
@@ -1292,7 +1302,7 @@ void cli_chat_reply(const char *input)
         if (spinner_on)
             cli_spinner_stop(0, "reply failed");
         char line[128];
-        snprintf(line, sizeof(line), "回复失败：%s", cli_err_desc(ret));
+        snprintf(line, sizeof(line), "回复失败：%s", cli_chat_err_desc(ret));
         cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "对话", line);
         AIRY_FREE(msgs);
         return;
