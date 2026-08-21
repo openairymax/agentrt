@@ -391,15 +391,17 @@ const char *cli_render_actor_name(cli_actor_t actor)
 /* ---- inline markdown: **bold**, *emph*, `code` ---- */
 
 /* Emphasis markers only bind when the enclosed text contains at least one
- * ASCII letter, the opener is immediately followed by a letter and the
- * closer is immediately preceded by a letter.  This keeps math like
- * "6*7=42" / "cross-check with 7*6" intact (CommonMark would otherwise
- * pair the stray asterisks as emphasis) while *real* emphasis like *step*
- * still renders bold. */
+ * letter, the opener is immediately followed by a letter and the closer is
+ * immediately preceded by a letter. A letter is an ASCII alpha or any UTF-8
+ * multibyte sequence (CJK: "**容器不是虚拟机**" must bind, 2026-08-22).
+ * This keeps math like "6*7=42" / "cross-check with 7*6" intact (CommonMark
+ * would otherwise pair the stray asterisks as emphasis) while *real*
+ * emphasis like *step* still renders bold. */
 static int cli_emph_has_letter(const char *s, size_t len)
 {
     for (size_t i = 0; i < len; i++) {
-        if ((s[i] >= 'a' && s[i] <= 'z') || (s[i] >= 'A' && s[i] <= 'Z'))
+        unsigned char u = (unsigned char)s[i];
+        if (u >= 0x80 || (u >= 'a' && u <= 'z') || (u >= 'A' && u <= 'Z'))
             return 1;
     }
     return 0;
@@ -407,7 +409,10 @@ static int cli_emph_has_letter(const char *s, size_t len)
 
 static int cli_emph_is_letter(char c)
 {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    unsigned char u = (unsigned char)c;
+    if (u >= 0x80) /* UTF-8 lead/continuation byte: CJK or other non-ASCII */
+        return 1;
+    return (u >= 'a' && u <= 'z') || (u >= 'A' && u <= 'Z');
 }
 
 /* 跨行粗体状态：行内 ** 在当前行未闭合时置位，后续行以粗体持续输出，
