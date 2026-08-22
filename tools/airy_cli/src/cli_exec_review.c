@@ -108,12 +108,16 @@ static int cli_exec_t2_review(const airy_review_input_t *in, const char *fact_ba
      * 2026-08-17 审计修复：T2 未配置时显式返回 -1 走机制层降级
      * （gate-only），而非静默回落 provider 默认——否则与主生成同模型
      * 自审自签，双思考独立性失效且 n_degraded 不递增。 */
+    /* t2x/t1fx/t1px 必须为函数作用域：若在 if 块内声明，t2m 指向的
+     * 栈数组随块结束失效，后台线程（cli_task_wait_worker）中
+     * llm_svc_adapter_complete 读取 cfg.model 触发 ASan
+     * stack-use-after-scope（2026-08-22 冒烟实测复现）。 */
+    char t2x[128], t1fx[128], t1px[128];
     const char *t2m = getenv("AIRY_MODEL_T2");
     if (!t2m || !t2m[0]) {
         /* 2026-08-19：模型配置统一自 cli_think_cfg_*（env > model.yaml
          * think 段 > llm.model 默认）。复核须显式配置（explicit，不
          * 回填默认）——llm.model 默认与主生成同模型，采用即自审自签。 */
-        char t2x[128], t1fx[128], t1px[128];
         if (cli_think_cfg_explicit(t2x, sizeof(t2x), t1fx, sizeof(t1fx),
                                    t1px, sizeof(t1px)) && t2x[0]) {
             t2m = t2x;
@@ -178,10 +182,12 @@ static int cli_exec_t1f_adjudicate(const airy_review_input_t *in, int drift,
     /* 2026-08-17 审计修复：T1F 未配置时显式返回 -1，由机制层走既定降级
      * （adopt t2 verdict）——而非静默回落 provider 默认，否则终裁与
      * 主生成同模型自我终裁（自审自签），双思考独立性失效。 */
+    /* 同 t2：t1fx 必须函数作用域，避免栈数组随 if 块失效（ASan
+     * stack-use-after-scope，2026-08-22 冒烟实测复现）。 */
+    char t2x[128], t1fx[128], t1px[128];
     const char *t1fm = getenv("AIRY_MODEL_T1F");
     if (!t1fm || !t1fm[0]) {
         /* 同 t2：终裁须显式配置（explicit），不回填 llm.model 默认 */
-        char t2x[128], t1fx[128], t1px[128];
         if (cli_think_cfg_explicit(t2x, sizeof(t2x), t1fx, sizeof(t1fx),
                                    t1px, sizeof(t1px)) && t1fx[0]) {
             t1fm = t1fx;
