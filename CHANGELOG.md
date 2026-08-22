@@ -118,6 +118,25 @@
 - CLI 端到端：分析/比较类问题直接对话回答（思考链折叠 + markdown 完整渲染，0 泄漏 `**`）；联网搜索（web_search×2 + web_fetch kernel.org）返回实时内核版本并正确使用注入的宿主机时间；文件写/读/删（fs_write/fs_read/fs_delete + fs_glob 复核）磁盘实证
 - Roadmap Sched 测试套件（BUILD_TESTS=ON，x86_64 focal）全 PASS（含 L2 向量命中/持久化/降级/用户意图命中）
 
+### 2026-08-22 追加（第三轮）：任务集插入对话 + 执行链路缺陷根因修复 + GCCP 交互
+
+#### Fixed
+
+- **执行复核栈变量 use-after-scope（CLI `cli_exec_review.c`）**：`cli_exec_t2_review`/`cli_exec_t1f_adjudicate` 的 `t2x/t1fx/t1px` 声明在 env 检查 if 块内、模型指针逃逸出块，后台 wait 线程（`cli_task_wait_worker`）异步读 `cfg.model` 触发 ASan stack-use-after-scope，任务 100% 完成时崩溃。修复：缓冲提升到函数作用域（ASan 冒烟实测复现后修复）
+- **LLM 分解空内容崩溃（atoms `engine_phase0.c`）**：LLM 偶发返回空 content 时 `decomp_output_len=0` 仍调 `airy_tc_step_complete` 触发 NULL/invalid params 告警。修复：空串视为分解失败走 heuristic fallback + 调用处加 `len>0` 守卫
+- **GCCP 中断指令被当答案（CLI `cli_chat.c`）**：意图确认阶段输入 quit/exit/stop 等被写入 Q 字段作为答案。修复：中断指令视为放弃意图确认（返回 NULL），引擎走默认约束继续，任务不中断
+
+#### Added
+
+- **任务集模式中途插入对话（CLI `main.c`）**：任务执行 wait 段放后台线程推进引擎，主线程 poll stdin——非中断输入经 `cli_chat_reply` 插入对话（任务继续后台执行），中断指令（quit/exit/abort/stop/cancel/打断/停止/取消）置取消标志；`-p`/`--json`/TUI 面板模式保持原语义
+- **GCCP 问题标签与行为一致（CLI `cli_chat.c`）**：「（必答）」→「（建议回答）」——空行跳过即收敛（可跳过），"必答"标签与实际交互语义矛盾
+
+#### Tested
+
+- PTY 端到端：任务 Running 后插入"总结当前进度"对话 → 273s 收到完整 `[Super Agent]` 回复，任务继续执行至终态
+- PTY 端到端：GCCP Q1 标签显示「建议回答」；输入 quit 显示"已放弃意图确认，任务按默认约束继续执行"，任务随后正常提交执行
+- 缺陷修复经重编部署（md5 校验一致）+ e2e 回归；cognition 21/21 + e2e 7/7
+
 ### 2026-08-21 追加：orchestrator 恢复 + 全量端到端集成
 
 在 0.1.2 基线之上完成 orchestrator 流程编排器恢复启用与全量端到端集成，统一双管线（engine_process 为单次认知权威，orchestrator 负责多任务/阶段编排）。
