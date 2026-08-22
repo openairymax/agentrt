@@ -55,7 +55,7 @@ endif()
 
 # 引入统一构建打印系统（彩色 + 时间戳 + 级别）
 # v4.1: cmake 模块归位至 agentrt 管理仓 cmake/（v0.1.2 决策：构建系统属
-# IRON-9 [IND] 完全独立层，agentrt 与 agentrt-linux 各自独立，不再共享
+# IRON-9 [IND] 完全独立层，agentrt 与 agent-linux 各自独立，不再共享
 # 伞仓直属模块；独立 clone agentrt 仓即可完整构建）
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/airy_print.cmake)
 

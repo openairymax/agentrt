@@ -17,9 +17,9 @@
 #   --check 与仓库现有产物 diff，不一致返回非零退出码（构建/CI 防漂移）
 #
 # 仅使用 Python 标准库（xml.etree.ElementTree），无第三方依赖。
-# 生成器结构借鉴 agentrt-linux/tools/codegen/syscall_gen.py（parse_xml /
+# 生成器结构借鉴 agent-linux/tools/codegen/syscall_gen.py（parse_xml /
 # render_* / check_mode 三段式），但与本项目的 syscall.xml 完全独立——
-# agentrt-linux 内核侧 SSoT（编号 548+）与本用户态 syscall（编号 1-23）
+# agent-linux 内核侧 SSoT（编号 548+）与本用户态 syscall（编号 1-23）
 # 互不相干，勿混用。
 #
 # Generator version: 1.0.0

@@ -3,9 +3,9 @@
 > **模块路径**: `agentrt/cmake/` | **版本**: v1.1.0 | **归属**: agentrt 管理仓直属
 >
 > v1.1.0（v0.1.2 决策）：cmake/ 自伞仓直属迁移至 agentrt 管理仓。构建系统属
-> IRON-9 四层共享模型 [IND] 完全独立层——agentrt（用户态）与 agentrt-linux
+> IRON-9 四层共享模型 [IND] 完全独立层——agentrt（用户态）与 agent-linux
 > （内核态）构建系统各自独立，不共享；独立 clone agentrt 仓即可完整构建。
-> 迁移前伞仓 cmake/ 声称"agentrt-linux 亦消费"，与实际不符（agentrt-linux
+> 迁移前伞仓 cmake/ 声称"agent-linux 亦消费"，与实际不符（agent-linux
 > 各 CMakeLists 均未 include 伞仓模块），迁移后文档与实现一致。
 
 ## 概述
@@ -215,7 +215,7 @@ airy_print_ok("my_target built successfully")
 | **agentrt** 管理仓 | 根 CMakeLists.txt `include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/airy_print.cmake)` 等 |
 | **agentrt** 7 个叶子仓（atoms 等） | 经 `CMAKE_SOURCE_DIR`（= agentrt 根）相对引用 `cmake/` 模块 |
 
-> 注意：agentrt-linux（内核态）不消费本模块——构建系统属 IRON-9 [IND] 完全独立层，agentrt-linux 有独立的 Kbuild / CMake 体系（见 agentrt-linux 管理仓）。
+> 注意：agent-linux（内核态）不消费本模块——构建系统属 IRON-9 [IND] 完全独立层，agent-linux 有独立的 Kbuild / CMake 体系（见 agent-linux 管理仓）。
 
 ## 设计原则
 

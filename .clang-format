@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 #
 # agentrt 用户态 C/C++ 编码格式（OS-IFACE-008：4 空格 + 1TBS + 100 列）
-# 与 agentrt-linux 内核态（Tab 8 + K&R + 80 列）风格独立，命名同源。
+# 与 agent-linux 内核态（Tab 8 + K&R + 80 列）风格独立，命名同源。
 # 依据: docs/AirymaxRT/50-engineering-standards（01-coding-standards.md Part II,
 #       coding_conventions.md Part IV 命名规范）
 #
