@@ -21,6 +21,54 @@
 
 ---
 
+## [Unreleased]
+
+### 发布主题：真实计费闭环 + 记忆状态机 + CLI/TUI 体验与二进制分发
+
+### Added
+
+- **token 真实计费闭环**（2.1.1.5/2.1.1.6，llm_d + CoreLoopThree）
+  - OpenAI 兼容流式端点显式声明 `stream_options.include_usage`，流式响应真实回传 usage
+  - 流式 usage 控制帧（RS 0x1E `U` JSON RS）由 llm_d 在流结束统一发送，`llm_svc_adapter` 解析
+  - 非流式顶层 usage 对象解析 + 响应序列化含 usage；`cost_tracker` 真实累计 token 与 cost
+  - GRAD 思考 token 持久化：`grad_llm_call` 累计三角色 token，engine_process feedback JSON 与决策链 trace（`chain.jsonl` token_usage 事件）双路保留思考 token
+- **记忆上下文状态机**（2.2.2.4，coreloopthree cognition）
+  - `cognition_provider_recall`：LLM 调用前按当前输入从记忆存储召回相关记忆并注入 system 上下文——上下文窗口作索引参考，具体记忆从存储补上；相关性阈值过滤低分噪声，防记忆污染
+  - Phase 2 生成路径接入召回；无命中/不可用时优雅降级为基础提示词
+  - memoryrovol bridge 新增 write→retrieve→get_raw 往返契约测试
+- **内置拼音输入法**（2.2.3，commons `utils/ime/`）：全拼前缀查询 + 候选频次排序，纯 C 运行期零依赖，词典带 CRC32 校验、端序无关；`airy_ime.dat` 随安装分发至 `share/agentrt/ime`
+- **TUI**：水晶蓝主题 + 英雄区（品牌/状态/计费/项目上下文/快捷键），F8 切换后清屏消除界面重叠，F2 宿主环境面板（架构/OS/CPU/内存/GPU），reqwest 切纯 rustls（消除 libssl 运行时依赖，交叉编译一致）
+- **TUI 输入光标**：黑白两态交替闪烁（1s 周期 ≈ Word 光标节奏），替代原呼吸灯
+- **TUI 记忆链展示**：`├─/└─` 树形连接符 + 角色标签 + 时间戳/内容截断，记忆链清晰可见（2.2.1.8）
+- **commons io 文件 CRUD 闭环**（2.2.4）：新增 `airy_io_remove_file` 单文件删除（不存在幂等成功），`test_io.c` 覆盖 create→read→update→delete 往返 + 目录递归 + 错误路径，coding 场景文件增删改查全链路可用
+- **RAG 知识库一等抽象**（2.1.2.3，mem_d + llm_d + gateway_d）
+  - mem_d 新增 `kb.*` 方法族：`kb_ingest`（UTF-8 安全分块）/`kb_search`（TF-IDF + embedding 混合检索）/`kb_delete`（交换删除 + 哈希索引维护）/`kb_list`；gateway 白名单 `mem.*` 全量放行
+  - 知识库删除修正为"逐条交换删除"：`mem_remove_record_at` 尾部交换保持数组紧凑，修复删除后 record_count 收缩导致的残留记录游离/泄漏
+  - `mem_jsonl_path_resolve` 递归创建完整父目录，修复 `$data/agentrt/memory` 子目录缺失时持久化静默失败
+  - llm_d 新增 `embeddings` 方法（provider 查找 → `$api_base/embeddings` 转发）；gateway 新增 `gw_biz_llm_embeddings` + `set_embed_fn` 接线
+- **gateway HTTP 路径感知路由**（修复 `/v1/embeddings` 无法分发缺口）
+  - HTTP 传输层构造 `gateway_http_request_t`（携带 method/path + NUL 终止 body 拷贝），`gateway_protocol_entry` 以 path 参与 `gw_proto_detect` 与路由
+  - 修复 MHD upload_data 非 NUL 终止导致的潜在越界；embeddings 请求体（无 `messages` 字段）不再被误判为 JSON-RPC 返回 -32600
+  - 回归测试：test_protocol_router 新增场景 E（path 感知检测）与 F（HTTP 请求上下文 magic）
+- **测试有效性系统性修复**：Release 构建全局 `-DNDEBUG` 使全部 `assert()` 失效（173 个测试"假通过"）→ 根 CMakeLists 对 `^(test_|integ_|check_)` 目标统一 `-UNDEBUG` 恢复断言，全部测试转为真实验证
+  - 断言生效后暴露并修复：`builtin_index_add` 长度边界遍历（for_each_token 改长度界定，修复 memory write 非 NUL 终止 content 越界读）、`heapstore_get_root` 惰性兜底（trace/ipc 未 init 时落到空串 "/"）
+
+### Changed
+
+- `.airymaxrt` 运行时目录自清理：`paths_cleanup_stale_tmp()` 启动时清理 7 天以上陈旧 tmp 目录（上限 256）
+- 安装器 PATH 引导：`print_path_guidance()` 检测启动器目录不在 PATH 时输出临时/持久/完整路径三选一引导
+- 二进制包（airymax-binary v0.1.2）：x86_64 与 arm64（focal/glibc 2.31 兼容）双架构重建，含 IME 词典；arm64 在 aarch64 容器内原生构建保证 glibc 兼容
+- 工程研究："一切皆插件"机制科研论证（M1-M8 机制本质 + 纯 C 等价性 + Airymax 语义命名：回卷机制/依赖宣言/服务索引/认知事件总线/能力契约环/能力编成单/会话能力套件/自成长）写入内部文档 `closed-docs/agentrt/07-subsystem-specs/13-module-boundaries.md` 第 4 节，论证结论纳入开发计划（P0-P3 + 远期 P4）
+
+### Fixed
+
+- 流式请求 usage 统计为 0（缺 include_usage + 流式帧未解析）→ 真实计费
+- F8 TUI→CLI 切换后界面重叠、英雄区错乱（alt screen 退出未清屏）→ 恢复后清屏重建
+- 思考时大模型输出的 token 未保留 → GRAD 决策链 + feedback 持久化
+- arm64 二进制 glibc 兼容性（noble sysroot 产物要求 GLIBC_2.39）→ 改回 focal 容器原生构建（glibc 2.31）
+
+---
+
 ## [v0.1.2] - 2026-08-21
 
 ### 🎯 发布主题：SSoT 收敛 + 平台本质补齐 + 品牌化 ID + CLI/TUI 优化
@@ -165,6 +213,28 @@
 
 - Linux x86_64 全量重建通过（LTO）；`nm libairy_common.a` 重复符号消除（airy_version_string/airy_build_info 2→1）
 - commons 单测 13/13 通过；CLI 冒烟 `SMOKE_RC=0`，部署 md5 一致
+
+### 2026-08-22 追加（第六轮）：记忆跨进程失忆根因修复 + CLI/TUI 交互一致性 + main 圈复杂度拆分 + monitor 后台常驻
+
+#### Fixed
+
+- **记忆"重启即失忆"系统性根因（atoms `memoryrovol/src/memoryrovol.c`）**：L2 HNSW 特征索引为纯内存结构且无磁盘持久化，`airy_mr_init` 不重建——进程重启后索引为空，跨进程查询必然 0 命中（对话记忆"记不住"）。修复：`airy_mr_init` 末尾从 L1 raw 卷（`.dat` + metadata.db 已持久化）遍历重建内存 HNSW 索引，重建计数入日志。跨进程冒烟验证：写"我叫小明"→ 新进程查询"我叫什么名字"命中"你叫小明"；172/172 全量回归通过
+
+#### Changed
+
+- **CLI/TUI 交互一致性（`tools/airy_cli`）**：`?`/`？`（含尾随空格）单独输入进帮助（此前被当对话发 LLM）；纯空白输入三处静默过滤（主循环/`-p` stdin 流/任务轮询）；全屏 TUI 终端窗口缩得过小（<7 行或 <11 列）自动退出回行渲染流式模式（2.2.2 环境突变自适应）
+- **`cmd_daemons` 健康检查补 gateway（`tools/airy_cli/src/daemon_cmds.c`）**：gateway 是 HTTP 网关（无 Unix socket，不进 CLI_DAEMONS 表），改 TCP 连接探测其就绪端口补报，`online x/17` 统计完整（POSIX socket + Windows winsock 双分支）
+- **`main` 圈复杂度拆分（`tools/airy_cli/src/main.c`）**：初始化装配 `cli_setup_core_engines`（loop + 记忆注入 + cognition 接线）→ 运行时上下文 `cli_runtime_ctx_t` + `cli_setup_runtime`/`cli_teardown_runtime`（rsched/validator/reviewer/hall_store/governance/hall/面板对称装配与释放，main 不再逐组件释放）→ 蓝图三层快速路由 `cli_blueprint_fastpath`（L1 零 token 命中 / L2 语义缓存命中 / MISS_L3 落回五阶段管线）。main 决策点 193→139，构建 + 冒烟 + 172/172 回归通过，无诊断错误
+
+#### Added
+
+- **硬件监控后台常驻（sdk/tui `airymaxrt monitor --daemon/--stop`）**：此前 monitor 仅前台（Ctrl+C 退出），端侧/服务器部署后无人保持终端即失去"硬件变化自动恢复功能"。新增 `--daemon`（nohup 递归真实脚本路径 + PID 记录 `$RUNTIME_DIR/airymaxrt-monitor.pid`，插入显卡等外设增强自动补齐被裁剪 daemon）与 `--stop`（按 PID 文件停止）。隔离生命周期验证：启动→PID 记录→停止→进程确认终止
+
+#### Tested
+
+- 端侧/服务器资源分级：1.5GiB 模拟（fake awk/nproc）`assess_hardware` 判定 minimal（端侧可运行），12GB 实机判定 full（服务器/PC）
+- ARM64 交叉语法检查 7 文件全通过（commons 平台层 4 + airy_cli main/daemon_cmds/cli_tui 3）
+- airy_cli 冒烟：`?` 帮助、空白输入静默跳过、`/help`、`quit` 退出正常；roadmap/memoryrovol/memory 相关单测 8/8 通过；`-D__APPLE__` 模拟语法检查 sync_semaphore 通过（macOS 分支未回归）
 
 ### 2026-08-21 追加：orchestrator 恢复 + 全量端到端集成
 
