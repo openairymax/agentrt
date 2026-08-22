@@ -160,6 +160,7 @@ void cli_trace(const char *tag, const char *fmt, ...);
 #define CLR_BLUE "\033[34m"
 #define CLR_BG_GRAY "\033[48;5;236m"
 #define CLR_BG_BLUE "\033[48;5;24m"
+#define CLR_REVERSE "\033[7m"   /* 反显：2.2.1.5 输入光标黑白交替闪烁 */
 #define CLR_RESET "\033[0m"
 
 /* Small icon set shared across the CLI (Claude Code / Codex style). */
