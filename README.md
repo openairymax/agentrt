@@ -18,7 +18,7 @@
 
 This repository is a **management repo** (git superproject). It aggregates **7 leaf repositories** as git submodules and inherits the **complete git history** of the original AgentRT monorepo. The repository URL retains its historical name `git@atomgit.com:openairymax/agentrt.git` to preserve commit continuity. AgentRT exposes the OS-level mechanisms required to run agent teams at scale: micro-core primitives, cognitive loops, memory stratification, security domes, IPC protocols, gateway services, and long-running daemon processes.
 
-AgentRT is **one of five management repositories** under the `airymaxhub` umbrella (the other four being `sdk`, `ecosystem`, `products`, and `agentrt-linux`). The Airymax workspace is partitioned into 38 repositories in total: 1 umbrella repo + 5 management repos + 29 leaf repos + 3 top-level repos. Each leaf repo is independently buildable and version-controlled, while the management repo pins them together via git submodules to produce a coherent, reproducible runtime platform.
+AgentRT is a **management repo** (git superproject) under the user-space engineering super-repo `agent-runtim` (sibling super-repos under the `airymaxhub` umbrella: kernel-space `agent-linux` plus top-level `docs`, `closed-docs`, `devtools`, `closed-dev-build`). The Airymax workspace is partitioned into 38 repositories in total: 1 umbrella repo + 2 engineering super-repos + 4 top-level repos + the management/leaf repos underneath. Each leaf repo is independently buildable and version-controlled, while the management repo pins them together via git submodules to produce a coherent, reproducible runtime platform.
 
 ### 0.1.2 Capabilities (SSoT Convergence + Platform Essence)
 
