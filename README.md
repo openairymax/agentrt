@@ -61,26 +61,28 @@ Product loop: **natural-language big-task instruction → GCCP intent confirmati
 
 ```
 airymaxhub/                     ← Umbrella repo (git superproject root)
-├── agentrt/                    ← THIS REPO (management repo)
-│   ├── atoms/                  ← submodule: micro-core primitives (A-class)
-│   ├── commons/                ← submodule: shared foundation utilities (A-class)
-│   ├── cupolas/                ← submodule: safety dome (B-class)
-│   ├── heapstore/              ← submodule: heap-backed storage (A-class)
-│   ├── protocols/              ← submodule: AgentsIPC & A2A/A2T protocol stack
-│   ├── gateway/                ← submodule: HTTP/WS/Stdio → JSON-RPC 2.0 gateway
-│   ├── daemons/                ← submodule: 12 runtime daemons
-│   ├── contracts/              ← contract headers (symlink → atoms/contracts)
-│   ├── cmake/                  ← build-system modules (moved from umbrella since v0.1.2, IRON-9 [IND])
-│   ├── scripts/                ← official installer install.sh/install.ps1 (moved from umbrella since v0.1.2)
-│   ├── CMakeLists.txt          ← top-level CMake entry point
-│   └── Doxyfile                ← API documentation configuration
-├── sdk/                        ← SDK management repo
-├── ecosystem/                  ← Ecosystem management repo
-├── products/                   ← Products management repo
-├── agentrt-linux/              ← AgentRT-Linux management repo
+├── agent-runtim/               ← user-space engineering super-repo (v0.1.3)
+│   ├── agentrt/                ← THIS REPO (management repo)
+│   │   ├── atoms/              ← submodule: micro-core primitives (A-class)
+│   │   ├── commons/            ← submodule: shared foundation utilities (A-class)
+│   │   ├── cupolas/            ← submodule: safety dome (B-class)
+│   │   ├── heapstore/          ← submodule: heap-backed storage (A-class)
+│   │   ├── protocols/          ← submodule: AgentsIPC & A2A/A2T protocol stack
+│   │   ├── gateway/            ← submodule: HTTP/WS/Stdio → JSON-RPC 2.0 gateway
+│   │   ├── daemons/            ← submodule: 12 runtime daemons
+│   │   ├── contracts/          ← contract headers (symlink → atoms/contracts)
+│   │   ├── cmake/              ← build-system modules (moved from umbrella since v0.1.2, IRON-9 [IND])
+│   │   ├── scripts/            ← official installer install.sh/install.ps1 (moved from umbrella since v0.1.2)
+│   │   ├── CMakeLists.txt      ← top-level CMake entry point
+│   │   └── Doxyfile            ← API documentation configuration
+│   ├── sdk/                    ← SDK management repo
+│   ├── ecosystem/              ← Ecosystem management repo
+│   └── products/               ← Products management repo
+├── agent-linux/                ← kernel-space engineering super-repo (formerly agentrt-linux, renamed v0.1.3)
 ├── devtools/                   ← Development tools
 ├── docs/                       ← Open documentation
-└── docs-closed/                ← Internal documentation
+├── closed-docs/                ← Internal documentation
+└── closed-dev-build/           ← Internal build/deploy
 ```
 
 ## Leaf Repositories
