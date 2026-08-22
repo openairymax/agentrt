@@ -154,6 +154,18 @@
 - commons 跨平台：Linux x86_64 全构建通过；`-D__APPLE__` 模拟语法检查 PASS（含 `rand_r`/`sem_timedwait` 移除）；commons 单测 13/13 通过
 - CLI 冒烟 `SMOKE_RC=0`（16 daemon 群 + gateway 就绪 + 对话正常），部署 md5 一致
 
+### 2026-08-22 追加（第五轮）：compat 层 SSoT 收敛 + 原子操作位宽修复
+
+#### Fixed
+
+- **compat2.c 平行重复定义（commons `utils/compat`）**：compat2.c 与 compat.c 平行存在，近全部函数重复定义（assert handler、mem*_s、strncpy_safe、debug_break、version/build_info、gethostname/sysconf），且 `airy_strlcpy`/`airy_strlcat` 与 platform.c 重复——静态库按需拉取侥幸掩盖 multiple definition，Windows DLL/特定链接配置下必然链接冲突。compat2.c 的 `sysconf` 用私有 `AIRY_SC_*` 枚举（与 compat.h 标准 `_SC_*` 语义分裂）、`build_info` 硬编码 "0.1.1"/"gcc"/"linux"。**SSoT 收敛**：删除 compat2.c（净删 238 行），权威源收敛为 compat.c（Windows gethostname/sysconf/nanosleep/AIRY_STRDUP/localtime_r/strtok_r，宏注入构建信息）+ platform.c（airy_strlcpy/airy_strlcat）
+- **sync.c 原子操作 Windows 位宽（commons `utils/sync/src/sync.c`）**：Windows 分支硬编码 `_Interlocked*64` 系列，32 位 Windows（uintptr_t 为 32 位）按 8 字节读写越界且语义错误（POSIX `__sync_*` 本就按 uintptr_t 自适应）。修复：按 `_WIN64` 选择 Interlocked 32/64 位变体
+
+#### Tested
+
+- Linux x86_64 全量重建通过（LTO）；`nm libairy_common.a` 重复符号消除（airy_version_string/airy_build_info 2→1）
+- commons 单测 13/13 通过；CLI 冒烟 `SMOKE_RC=0`，部署 md5 一致
+
 ### 2026-08-21 追加：orchestrator 恢复 + 全量端到端集成
 
 在 0.1.2 基线之上完成 orchestrator 流程编排器恢复启用与全量端到端集成，统一双管线（engine_process 为单次认知权威，orchestrator 负责多任务/阶段编排）。
