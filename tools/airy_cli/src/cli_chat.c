@@ -106,7 +106,7 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
         }
 
         cli_outf("  %sQ%zu%s [%s]%s %s\n", cli_c(CLR_CYAN), round + 1, cli_c(CLR_RESET), q->id,
-                 q->required ? "（必答）" : "", q->question);
+                 q->required ? "（建议回答）" : "", q->question);
         if (q->hint[0])
             cli_outf("      %s提示：%s%s\n", cli_c(CLR_GREEN), q->hint, cli_c(CLR_RESET));
         if (!cli_tui_active(cli_tui_get_default())) {
@@ -124,10 +124,23 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
         if (rl != 1)
             continue; /* F8 切换请求：重试当前问题（切换在主循环处理） */
         int answered = (line_len > 0);
-        if (answered)
+        if (answered) {
+            /* 中断指令：放弃意图确认（视为意愿不足），任务按默认约束
+             * 继续；避免把 quit/stop 等当答案写入 Q 字段。 */
+            if (strcmp(line, "quit") == 0 || strcmp(line, "exit") == 0 ||
+                strcmp(line, "abort") == 0 || strcmp(line, "stop") == 0 ||
+                strcmp(line, "cancel") == 0 || strcmp(line, "打断") == 0 ||
+                strcmp(line, "停止") == 0 || strcmp(line, "取消") == 0) {
+                cJSON_Delete(answers);
+                cli_spinner_resume();
+                cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_THINK, "意图确认",
+                                     "已放弃意图确认，任务按默认约束继续执行。");
+                return NULL;
+            }
             cJSON_AddStringToObject(answers, q->id, line);
-        else
+        } else {
             break; /* 用户跳过：收敛，不再追问（不纠缠） */
+        }
 
         /* 让 LLM 对已答内容思考，决定收敛或生成下一个追问。无 LLM 时
          * airy_gccp_step 降级为"继续下一题"，交互仍逐问推进。 */
@@ -199,7 +212,7 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
     p += n;
     for (size_t i = 0; i < probe->question_count; i++) {
         const airy_gccp_question_t *q = &probe->questions[i];
-        cli_outf("  Q%zu [%s]%s %s\n", i + 1, q->id, q->required ? "（必答）" : "", q->question);
+        cli_outf("  Q%zu [%s]%s %s\n", i + 1, q->id, q->required ? "（建议回答）" : "", q->question);
         if (q->hint[0])
             cli_outf("      提示：%s\n", q->hint);
         if (!cli_tui_active(cli_tui_get_default()))
@@ -212,6 +225,17 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
             break;
         if (rl != 1)
             continue; /* F8 切换请求：重试当前问题（切换在主循环处理） */
+        /* 中断指令：放弃意图确认（同 cJSON 分支，避免 quit/stop 当答案） */
+        if (strcmp(line, "quit") == 0 || strcmp(line, "exit") == 0 ||
+            strcmp(line, "abort") == 0 || strcmp(line, "stop") == 0 ||
+            strcmp(line, "cancel") == 0 || strcmp(line, "打断") == 0 ||
+            strcmp(line, "停止") == 0 || strcmp(line, "取消") == 0) {
+            AIRY_FREE(json);
+            cli_spinner_resume();
+            cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_THINK, "意图确认",
+                                 "已放弃意图确认，任务按默认约束继续执行。");
+            return NULL;
+        }
         if (i > 0)
             *p++ = ',';
         n = snprintf(p, cap - (size_t)(p - json), "\"%s\":\"%s\"", q->id, line);
