@@ -70,13 +70,14 @@ airymaxhub/                     ← 伞仓（git superproject 根）
 │   ├── gateway/                ← submodule：HTTP/WS/Stdio → JSON-RPC 2.0 网关
 │   ├── daemons/                ← submodule：12 个运行时守护进程
 │   ├── contracts/              ← 契约头文件（符号链接 → atoms/contracts）
+│   ├── cmake/                  ← 构建系统模块（v0.1.2 起自伞仓迁入，IRON-9 [IND] 独立层）
+│   ├── scripts/                ← 官方安装器 install.sh/install.ps1（v0.1.2 起自伞仓迁入）
 │   ├── CMakeLists.txt          ← 顶层 CMake 入口
 │   └── Doxyfile                ← API 文档配置
 ├── sdk/                        ← SDK 管理仓
 ├── ecosystem/                  ← 生态管理仓
 ├── products/                   ← 产品管理仓
 ├── agentrt-linux/              ← AgentRT-Linux 管理仓
-├── cmake/                      ← 共享 CMake 模块（5 通用 + 4 AgentRT 专用）
 ├── devtools/                   ← 开发工具
 ├── docs/                       ← 开放文档
 └── other/                      ← 其他文档

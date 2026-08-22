@@ -54,8 +54,10 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # 引入统一构建打印系统（彩色 + 时间戳 + 级别）
-# v4.0: cmake 模块统一归位至伞仓直属 cmake/（消除 agentrt/cmake 与伞仓 cmake 命名冲突）
-include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/airy_print.cmake)
+# v4.1: cmake 模块归位至 agentrt 管理仓 cmake/（v0.1.2 决策：构建系统属
+# IRON-9 [IND] 完全独立层，agentrt 与 agentrt-linux 各自独立，不再共享
+# 伞仓直属模块；独立 clone agentrt 仓即可完整构建）
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/airy_print.cmake)
 
 # 项目范围选项
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" OFF)
@@ -689,12 +691,12 @@ if(AIRY_BUILD_ALL)
     endif()
 
     if(MSVC)
-        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/windows_preinclude.h")
-            airy_print_ok("[MSVC] Force-include file found: ../cmake/windows_preinclude.h")
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows_preinclude.h")
+            airy_print_ok("[MSVC] Force-include file found: cmake/windows_preinclude.h")
         else()
-            airy_print_warn("[MSVC] Force-include file NOT FOUND: ../cmake/windows_preinclude.h")
+            airy_print_warn("[MSVC] Force-include file NOT FOUND: cmake/windows_preinclude.h")
         endif()
-        add_compile_options(/FI"${CMAKE_CURRENT_SOURCE_DIR}/../cmake/windows_preinclude.h")
+        add_compile_options(/FI"${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows_preinclude.h")
     endif()
 
     # 模块选项设置
@@ -847,11 +849,35 @@ include(CPack)
 # 这里我们通过 configure_file 生成一个 ctest 包装脚本
 if(BUILD_TESTS AND ENABLE_SANITIZERS AND NOT MSVC)
     configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/ctest_wrapper.sh.in"
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ctest_wrapper.sh.in"
         "${CMAKE_BINARY_DIR}/run_tests.sh"
         @ONLY
     )
     airy_print_info("Test wrapper script: ${CMAKE_BINARY_DIR}/run_tests.sh")
+endif()
+
+# 系统性修复（v6）：Release 构建全局 -DNDEBUG 会把 assert() 编译为 no-op，
+# 导致全部单元测试的断言失效——测试"通过"只是未崩溃的假象。
+# 对所有测试目标强制 -UNDEBUG，恢复断言有效性（生产 target 不受影响）。
+if(BUILD_TESTS)
+    function(airy_undef_ndebug_for_tests _dir)
+        get_property(_tgts DIRECTORY "${_dir}" PROPERTY BUILDSYSTEM_TARGETS)
+        foreach(_tgt IN LISTS _tgts)
+            # 跳过 alias/imported target（以 :: 结尾），仅处理可编译目标
+            if(_tgt MATCHES "::" )
+                continue()
+            endif()
+            if(_tgt MATCHES "^(test_|integ_|check_)")
+                target_compile_options("${_tgt}" PRIVATE -UNDEBUG)
+            endif()
+        endforeach()
+        get_property(_subs DIRECTORY "${_dir}" PROPERTY SUBDIRECTORIES)
+        foreach(_sub IN LISTS _subs)
+            airy_undef_ndebug_for_tests("${_sub}")
+        endforeach()
+    endfunction()
+    airy_undef_ndebug_for_tests("${CMAKE_CURRENT_SOURCE_DIR}")
+    airy_print_info("Test targets: assert() re-enabled via -UNDEBUG (NDEBUG no-op fix)")
 endif()
 
 # 自定义目标：清理构建
