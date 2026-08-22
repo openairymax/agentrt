@@ -377,6 +377,123 @@ static int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
     return 0;
 }
 
+/* 任务回合结果汇总（2026-08-22 自 main 任务段抽离降圈复杂度）：
+ * 解析执行结果 JSON 判定真实成败（status/success/error 字段，防失败
+ * 结果被误判成功写缓存），按 g_cli_json_mode / 行渲染分派输出，并在
+ * 产物校验统计上升时给出 PROF 校验失败提示。仅读执行状态，不触碰
+ * 管线。 */
+static int cli_task_result_render(const char *result, airy_err_t err, const char *exec_id,
+                                  int canceled, airy_work_hall_t *hall, uint32_t vf_before)
+{
+    /* 任务实际成败：远程 DAG 终态可能是 failed/canceled，此时
+     * cli_dag_wait_remote 仍返回 EOK + 结果 JSON，必须解析 status
+     * 而非仅看 err，否则失败结果会被误 absorb 为 SUCCESS 写入 L2
+     * 语义缓存（缓存中毒、错误记忆累积）。嵌入式路径的 result 也是
+     * JSON（含 success 字段），同样必须解析——agent 执行失败（如
+     * tool loop / 工具被拒）返回 {"success":false,...} 时 err 仍为
+     * EOK，若只看 err 会把失败当成功缓存（P0-1 L2 中毒根因）。 */
+    int task_succeeded = (err == AIRY_EOK && result) ? 1 : 0;
+    if (task_succeeded && result) {
+#ifdef AIRY_HAS_CJSON
+        cJSON *rstat = cJSON_Parse(result);
+        if (rstat) {
+            cJSON *st = cJSON_GetObjectItem(rstat, "status");
+            if (cJSON_IsString(st) && st->valuestring) {
+                if (strcmp(st->valuestring, "completed") != 0)
+                    task_succeeded = 0;
+            } else {
+                /* 嵌入式路径：result 可能是 agent 输出 JSON，含
+                 * success 字段；无 status 时按 success 判定 */
+                cJSON *ok = cJSON_GetObjectItem(rstat, "success");
+                if (cJSON_IsBool(ok) && !cJSON_IsTrue(ok))
+                    task_succeeded = 0;
+                else if (cJSON_IsString(ok) && strcmp(ok->valuestring, "true") != 0)
+                    task_succeeded = 0;
+                cJSON *errj = cJSON_GetObjectItem(rstat, "error");
+                if (errj && cJSON_IsString(errj) && errj->valuestring &&
+                    errj->valuestring[0])
+                    task_succeeded = 0;
+            }
+            cJSON_Delete(rstat);
+        }
+#else
+        if (strstr(result, "\"failed\"") || strstr(result, "\"canceled\"") ||
+            strstr(result, "\"success\":false") || strstr(result, "\"error\":"))
+            task_succeeded = 0;
+#endif /* AIRY_HAS_CJSON */
+    }
+    if (canceled) {
+        cli_render_sub_agent_line(CLI_ROLE_ERROR, "cancel",
+                                  "Task aborted (stopped after the current node).");
+        cli_trace("result", "%s canceled", CLI_ICON_CROSS);
+    } else if (err == AIRY_EOK && result) {
+        cli_render_phase("结果汇总");
+        if (g_cli_json_mode) {
+#ifdef AIRY_HAS_CJSON
+            cJSON *jroot = cJSON_CreateObject();
+            cJSON_AddStringToObject(jroot, "role", "super_agent");
+            cJSON_AddStringToObject(jroot, "type", "task");
+            cJSON_AddBoolToObject(jroot, "success", task_succeeded);
+            cJSON_AddStringToObject(jroot, "dag_id", exec_id ? exec_id : "");
+            cJSON_AddStringToObject(jroot, "result", result);
+            char *js = cJSON_PrintUnformatted(jroot);
+            if (js) {
+                cli_outf("%s\n", js);
+                cJSON_free(js);
+            }
+            cJSON_Delete(jroot);
+#else
+            cli_outf("{\"role\":\"super_agent\",\"type\":\"task\",\"success\":%s,"
+                     "\"dag_id\":\"%s\",\"result\":\"%s\"}\n",
+                     task_succeeded ? "true" : "false",
+                     exec_id ? exec_id : "", result);
+#endif /* AIRY_HAS_CJSON */
+        } else {
+            cli_print_result(result);
+        }
+        cli_trace("result", "%s success=%d", task_succeeded ? CLI_ICON_CHECK : CLI_ICON_CROSS,
+                  task_succeeded ? 1 : 0);
+    } else {
+        if (g_cli_json_mode) {
+#ifdef AIRY_HAS_CJSON
+            cJSON *jroot = cJSON_CreateObject();
+            cJSON_AddStringToObject(jroot, "role", "super_agent");
+            cJSON_AddStringToObject(jroot, "type", "task");
+            cJSON_AddBoolToObject(jroot, "success", 0);
+            cJSON_AddStringToObject(jroot, "dag_id", exec_id ? exec_id : "");
+            cJSON_AddNumberToObject(jroot, "code", (double)(int)err);
+            char *js = cJSON_PrintUnformatted(jroot);
+            if (js) {
+                cli_outf("%s\n", js);
+                cJSON_free(js);
+            }
+            cJSON_Delete(jroot);
+#else
+            cli_outf("{\"role\":\"super_agent\",\"type\":\"task\",\"success\":false,"
+                     "\"dag_id\":\"%s\",\"code\":%d}\n",
+                     exec_id ? exec_id : "", (int)err);
+#endif /* AIRY_HAS_CJSON */
+        } else {
+            char line[128];
+            snprintf(line, sizeof(line), "任务执行无结果：%s", cli_err_desc((int)err));
+            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "执行结果", line);
+        }
+    }
+    /* Decision G: validation gate annotation - mark FAIL clearly when artifacts
+      * fail validation, so the user can replan/retry (sched_d owns node-level retries).
+      * t1-p (PROF) is the logic verifier in the GRAD separation of powers, so an
+      * artifact-validation failure carries the PROF label, not the fast-think actor. */
+    if (!canceled) {
+        uint32_t vf_after = 0;
+        airy_work_hall_verify_stats(hall, NULL, &vf_after, NULL);
+        if (vf_after > vf_before)
+            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_DUAL_PROF_THINK, "校验",
+                                 "Artifact validation failed - replan or retry the task.");
+    }
+    /* 返回真实成败，供调用方决定 L2 语义缓存 absorb 的成败指纹 */
+    return task_succeeded;
+}
+
 int main(int argc, char *argv[])
 {
     /* Server one-shot mode (-p/--print): run a single prompt then exit. */
@@ -1335,7 +1452,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        uint32_t vf_before = 0, vf_after = 0;
+        uint32_t vf_before = 0;
         airy_work_hall_verify_stats(hall, NULL, &vf_before, NULL);
         char *result = NULL;
         cli_trace("wait", "%s exec=%s awaiting completion (polls=%d)", CLI_ICON_DIAMOND, exec_id,
@@ -1393,110 +1510,11 @@ int main(int argc, char *argv[])
                 cli_spinner_stop(0, "no result");
             spin_running = 0;
         }
-        /* 任务实际成败：远程 DAG 终态可能是 failed/canceled，此时
-         * cli_dag_wait_remote 仍返回 EOK + 结果 JSON，必须解析 status
-         * 而非仅看 err，否则失败结果会被误 absorb 为 SUCCESS 写入 L2
-         * 语义缓存（缓存中毒、错误记忆累积）。嵌入式路径的 result 也是
-         * JSON（含 success 字段），同样必须解析——agent 执行失败（如
-         * tool loop / 工具被拒）返回 {"success":false,...} 时 err 仍为
-         * EOK，若只看 err 会把失败当成功缓存（P0-1 L2 中毒根因）。 */
-        int task_succeeded = (err == AIRY_EOK && result) ? 1 : 0;
-        if (task_succeeded && result) {
-#ifdef AIRY_HAS_CJSON
-            cJSON *rstat = cJSON_Parse(result);
-            if (rstat) {
-                cJSON *st = cJSON_GetObjectItem(rstat, "status");
-                if (cJSON_IsString(st) && st->valuestring) {
-                    if (strcmp(st->valuestring, "completed") != 0)
-                        task_succeeded = 0;
-                } else {
-                    /* 嵌入式路径：result 可能是 agent 输出 JSON，含
-                     * success 字段；无 status 时按 success 判定 */
-                    cJSON *ok = cJSON_GetObjectItem(rstat, "success");
-                    if (cJSON_IsBool(ok) && !cJSON_IsTrue(ok))
-                        task_succeeded = 0;
-                    else if (cJSON_IsString(ok) && strcmp(ok->valuestring, "true") != 0)
-                        task_succeeded = 0;
-                    cJSON *errj = cJSON_GetObjectItem(rstat, "error");
-                    if (errj && cJSON_IsString(errj) && errj->valuestring &&
-                        errj->valuestring[0])
-                        task_succeeded = 0;
-                }
-                cJSON_Delete(rstat);
-            }
-#else
-            if (strstr(result, "\"failed\"") || strstr(result, "\"canceled\"") ||
-                strstr(result, "\"success\":false") || strstr(result, "\"error\":"))
-                task_succeeded = 0;
-#endif /* AIRY_HAS_CJSON */
-        }
-        if (g_cli_cancel) {
-            cli_render_sub_agent_line(CLI_ROLE_ERROR, "cancel",
-                                      "Task aborted (stopped after the current node).");
-            cli_trace("result", "%s canceled", CLI_ICON_CROSS);
-        } else if (err == AIRY_EOK && result) {
-            cli_render_phase("结果汇总");
-            if (g_cli_json_mode) {
-#ifdef AIRY_HAS_CJSON
-                cJSON *jroot = cJSON_CreateObject();
-                cJSON_AddStringToObject(jroot, "role", "super_agent");
-                cJSON_AddStringToObject(jroot, "type", "task");
-                cJSON_AddBoolToObject(jroot, "success", task_succeeded);
-                cJSON_AddStringToObject(jroot, "dag_id", exec_id ? exec_id : "");
-                cJSON_AddStringToObject(jroot, "result", result);
-                char *js = cJSON_PrintUnformatted(jroot);
-                if (js) {
-                    cli_outf("%s\n", js);
-                    cJSON_free(js);
-                }
-                cJSON_Delete(jroot);
-#else
-                cli_outf("{\"role\":\"super_agent\",\"type\":\"task\",\"success\":%s,"
-                         "\"dag_id\":\"%s\",\"result\":\"%s\"}\n",
-                         task_succeeded ? "true" : "false",
-                         exec_id ? exec_id : "", result);
-#endif /* AIRY_HAS_CJSON */
-            } else {
-                cli_print_result(result);
-            }
-            cli_trace("result", "%s success=%d", task_succeeded ? CLI_ICON_CHECK : CLI_ICON_CROSS,
-                      task_succeeded ? 1 : 0);
-        } else {
-            if (g_cli_json_mode) {
-#ifdef AIRY_HAS_CJSON
-                cJSON *jroot = cJSON_CreateObject();
-                cJSON_AddStringToObject(jroot, "role", "super_agent");
-                cJSON_AddStringToObject(jroot, "type", "task");
-                cJSON_AddBoolToObject(jroot, "success", 0);
-                cJSON_AddStringToObject(jroot, "dag_id", exec_id ? exec_id : "");
-                cJSON_AddNumberToObject(jroot, "code", (double)(int)err);
-                char *js = cJSON_PrintUnformatted(jroot);
-                if (js) {
-                    cli_outf("%s\n", js);
-                    cJSON_free(js);
-                }
-                cJSON_Delete(jroot);
-#else
-                cli_outf("{\"role\":\"super_agent\",\"type\":\"task\",\"success\":false,"
-                         "\"dag_id\":\"%s\",\"code\":%d}\n",
-                         exec_id ? exec_id : "", (int)err);
-#endif /* AIRY_HAS_CJSON */
-            } else {
-                char line[128];
-                snprintf(line, sizeof(line), "任务执行无结果：%s", cli_err_desc((int)err));
-                cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "执行结果", line);
-            }
-        }
-        /* Decision G: validation gate annotation - mark FAIL clearly when artifacts
-          * fail validation, so the user can replan/retry (sched_d owns node-level retries).
-          * t1-p (PROF) is the logic verifier in the GRAD separation of powers, so an
-          * artifact-validation failure carries the PROF label, not the fast-think actor. */
-        if (!g_cli_cancel) {
-            airy_work_hall_verify_stats(hall, NULL, &vf_after, NULL);
-            if (vf_after > vf_before)
-                cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_DUAL_PROF_THINK, "校验",
-                                     "Artifact validation failed - replan or retry the task.");
-        }
+        /* 结果汇总（2026-08-22 抽离函数）：成败 JSON 判定 + 渲染 +
+         * 产物校验失败提示（详见 cli_task_result_render）；返回真实成败
+         * 供下方 L2 语义缓存 absorb 决定 SUCCESS / NORMAL_FAIL 指纹。 */
+        int task_succeeded =
+            cli_task_result_render(result, err, exec_id, g_cli_cancel, hall, vf_before);
         /* L2 semantic cache write-back: register the executed blueprint under the
           * user's original intent, so a repeated or similar task hits L2 (low token)
           * instead of a full L3 replan. Absorb requires PASS + SUCCESS to admit;
