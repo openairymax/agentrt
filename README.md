@@ -70,13 +70,14 @@ airymaxhub/                     ← Umbrella repo (git superproject root)
 │   ├── gateway/                ← submodule: HTTP/WS/Stdio → JSON-RPC 2.0 gateway
 │   ├── daemons/                ← submodule: 12 runtime daemons
 │   ├── contracts/              ← contract headers (symlink → atoms/contracts)
+│   ├── cmake/                  ← build-system modules (moved from umbrella since v0.1.2, IRON-9 [IND])
+│   ├── scripts/                ← official installer install.sh/install.ps1 (moved from umbrella since v0.1.2)
 │   ├── CMakeLists.txt          ← top-level CMake entry point
 │   └── Doxyfile                ← API documentation configuration
 ├── sdk/                        ← SDK management repo
 ├── ecosystem/                  ← Ecosystem management repo
 ├── products/                   ← Products management repo
 ├── agentrt-linux/              ← AgentRT-Linux management repo
-├── cmake/                      ← Shared CMake modules (5 general + 4 AgentRT-specific)
 ├── devtools/                   ← Development tools
 ├── docs/                       ← Open documentation
 └── docs-closed/                ← Internal documentation
