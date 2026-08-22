@@ -1,7 +1,7 @@
 # AgentRT 极境智能体运行底座平台工程 (AirymaxRT)
 
 > 面向 AI 智能体团队的奠基级运行时平台工程 — 定位类比 Kubernetes 之于微服务：为 Agent 团队提供标准化编排、调度、通信、记忆与安全的完整平台范式。
-> [airymaxhub](https://atomgit.com/openairymax/airymaxhub) 伞仓下的管理仓之一，以 git submodule 形式聚合 7 个叶子仓。
+> [airymaxhub](https://atomgit.com/openairymax/airymaxhub) 伞仓下用户态工程大管理仓 `agent-runtim` 内的管理仓，以 git submodule 形式聚合 7 个叶子仓。
 
 **语言:** [English](README.md) | 简体中文
 
