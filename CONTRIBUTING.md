@@ -42,8 +42,7 @@ AgentRT 项目采用分层架构，关键目录如下：
 
 ```bash
 # 1. 克隆仓库
-# 注：git 远端名沿用历史名称 agentos.git 以保持提交连续性（见 README §概述）
-git clone https://atomgit.com/openairymax/agentos.git agentrt
+git clone https://atomgit.com/openairymax/agentrt.git
 cd agentrt
 
 # 2. 安装系统依赖 (Ubuntu)

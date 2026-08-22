@@ -18,7 +18,7 @@
 
 本仓库是**管理仓**（git superproject），以 git submodule 形式聚合 **7 个叶子仓**，并继承原 AgentRT 单体仓库的**全部 git 历史**，以保持提交连续性。
 
-AgentRT 是 `airymaxhub` 伞仓下**五个管理仓之一**（其余四个为 `sdk`、`ecosystem`、`products`、`agentrt-linux`）。Airymax 工作区共拆分为 38 个仓库：1 个伞仓 + 5 个管理仓 + 29 个叶子仓 + 3 个顶层仓。每个叶子仓可独立构建与版本控制，管理仓通过 git submodule 将它们钉合在一起，产出连贯、可复现的运行时平台。
+AgentRT 是 `airymaxhub` 伞仓下用户态工程大管理仓 `agent-runtim` 中的**管理仓**（伞仓同级另有内核态 `agent-linux`，以及顶层仓 `docs`、`closed-docs`、`devtools`、`closed-dev-build`）。Airymax 工作区共拆分为 38 个仓库：1 个伞仓 + 2 个工程大管理仓 + 4 个顶层仓 + 其下的管理仓与叶子仓。每个叶子仓可独立构建与版本控制，管理仓通过 git submodule 将它们钉合在一起，产出连贯、可复现的运行时平台。
 
 ### 0.1.2 能力（SSoT 收敛 + 平台本质补齐）
 
