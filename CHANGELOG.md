@@ -137,6 +137,23 @@
 - PTY 端到端：GCCP Q1 标签显示「建议回答」；输入 quit 显示"已放弃意图确认，任务按默认约束继续执行"，任务随后正常提交执行
 - 缺陷修复经重编部署（md5 校验一致）+ e2e 回归；cognition 21/21 + e2e 7/7
 
+### 2026-08-22 追加（第四轮）：daemon 生命周期修复 + commons 跨平台编译缺口 + CLI 结果渲染拆分
+
+#### Fixed
+
+- **daemon 会话退出残留僵尸（sdk/tui `airymaxrt`）**：全部 daemon（`_launch_daemon`/`_ensure_daemon`/llm_d/gateway_d）以裸后台 `&` 拉起，终端会话异常退出（SSH 断连/终端关闭）时进程组 SIGHUP 连带杀死 daemon，父脚本先行死亡留下 defunct 僵尸（实测两代 llm_d/agent_d/gateway_d 全残留），下次启动 `_sock_alive` 复用判定失效。修复：五处拉起统一加 `nohup`（`$!` 语义不变，cleanup 按 PID TERM 回收仍有效）——EXIT trap 执行路径由 cleanup 干净回收；EXIT trap 不执行路径（SIGKILL）daemon 忽略 SIGHUP 存活续服务、reparent 后零僵尸。PTY 实测 SIGKILL 后 5 个核心 daemon 全存活、零新增 defunct
+- **macOS 编译级缺口（commons `platform/platform.c` + `utils/sync/src/sync_platform.c`）**：POSIX 随机数分支使用 `rand_r()`（macOS 不提供）、`platform_semaphore_timedwait` 使用 `sem_timedwait()`（macOS 亦无），两者使 macOS 构建失败——"POSIX 分支"实为 Linux-only。修复：随机数统一走 `airy_random_bytes()`（`/dev/urandom`，随机质量优于 rand_r+时间种子，urandom 不可用时回退线程局部 xorshift）；信号量超时在 macOS 用 `sem_trywait` 轮询 + 2ms 短眠近似，返回语义与 Linux 分支一致
+
+#### Changed
+
+- **CLI 结果渲染拆分（`tools/airy_cli/src/main.c`）**：任务段混含结果渲染、L2 语义缓存吸收判定与退出码推导，圈复杂度过高。抽为 `cli_task_result_render()`，返回任务是否成功供吸收判定成败指纹使用；main 仅保留调用与退出码映射（No functional change）
+
+#### Tested
+
+- daemon 生命周期双路径 PTY 验证：SIGHUP 场景 cleanup 干净回收；SIGKILL 场景 5 个核心 daemon 全存活、零新增 defunct；后续会话探测复用（"复用 12 个 + 新拉 4 个"）
+- commons 跨平台：Linux x86_64 全构建通过；`-D__APPLE__` 模拟语法检查 PASS（含 `rand_r`/`sem_timedwait` 移除）；commons 单测 13/13 通过
+- CLI 冒烟 `SMOKE_RC=0`（16 daemon 群 + gateway 就绪 + 对话正常），部署 md5 一致
+
 ### 2026-08-21 追加：orchestrator 恢复 + 全量端到端集成
 
 在 0.1.2 基线之上完成 orchestrator 流程编排器恢复启用与全量端到端集成，统一双管线（engine_process 为单次认知权威，orchestrator 负责多任务/阶段编排）。
