@@ -13,6 +13,8 @@
 
 #include "cli_internal.h"
 
+#include "memory.h" /* 对话记忆引擎 API（2.2.4 对话路径读写） */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,6 +33,73 @@
 #endif
 
 #ifdef AIRY_HAS_CJSON
+
+/* 对话记忆引擎（2.2.4）：main.c 注入，见 cli_internal.h */
+airy_memory_engine_t *g_cli_memory_engine = NULL;
+
+/* 检索相关历史记忆，拼成 system 追加段（最多 3 条、每条截断 200 字符） */
+static void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t out_size)
+{
+    out_buf[0] = '\0';
+    if (!g_cli_memory_engine || !input || !input[0] || out_size < 16)
+        return;
+
+    airy_memory_query_t q;
+    __builtin_memset(&q, 0, sizeof(q));
+    q.memory_query_text = (char *)input;
+    q.memory_query_text_len = strlen(input);
+    q.memory_query_limit = 3;
+    q.memory_query_include_raw = 1;
+
+    airy_memory_result_ext_t *res = NULL;
+    if (airy_memory_query(g_cli_memory_engine, &q, &res) != AIRY_EOK || !res)
+        return;
+
+    size_t off = 0;
+    off += snprintf(out_buf + off, out_size - off, "\n\n[相关历史记忆]");
+    for (size_t i = 0; i < res->memory_result_count; i++) {
+        airy_memory_result_item_t *it =
+            (res->memory_result_items && i < res->memory_result_count)
+                ? res->memory_result_items[i]
+                : NULL;
+        if (!it || !it->memory_result_item_record)
+            continue;
+        airy_memory_record_t *r = it->memory_result_item_record;
+        if (!r->memory_record_data || r->memory_record_data_len == 0)
+            continue;
+        size_t n = r->memory_record_data_len < 200 ? r->memory_record_data_len : 200;
+        off += snprintf(out_buf + off, out_size - off, "\n- %.*s", (int)n,
+                        (const char *)r->memory_record_data);
+        if (off >= out_size - 1)
+            break;
+    }
+    airy_memory_result_free(res);
+}
+
+/* 一轮对话完成后写入记忆：用户输入 + 回复（截断防噪声，只记事实） */
+static void cli_chat_mem_record(const char *input, const char *reply)
+{
+    if (!g_cli_memory_engine || !input || !input[0] || !reply || !reply[0])
+        return;
+
+    char content[1400];
+    int n = snprintf(content, sizeof(content), "用户: %s\nAgentRT: %s", input, reply);
+    if (n <= 0)
+        return;
+    if (n > 1200)
+        n = 1200;
+
+    airy_memory_record_t rec;
+    __builtin_memset(&rec, 0, sizeof(rec));
+    rec.memory_record_type = AIRY_MEMTYPE_TEXT;
+    rec.memory_record_data = content;
+    rec.memory_record_data_len = (size_t)n;
+    rec.memory_record_importance = 0.6f;
+
+    char *rid = NULL;
+    (void)airy_memory_write(g_cli_memory_engine, &rec, &rid);
+    AIRY_FREE(rid);
+}
 
 /* LLM 上一步生成的追问（跨循环轮次保留；每次提问前清零，未生成则自然退出） */
 static char g_last_step_q[512];
@@ -1113,7 +1182,13 @@ void cli_chat_reply(const char *input)
      * （assistant tool_calls + role="tool" 结果），所有内容副本由缓冲统一管理。 */
     cli_chat_msgbuf_t buf;
     AIRY_MEMSET(&buf, 0, sizeof(buf));
+    /* 2.2.4 对话记忆读取：相关历史记忆注入 system 上下文（此前对话
+     * 路径零记忆，用户"记不住/想不准"的直接根因） */
+    char mem_sys[768];
+    cli_chat_mem_inject_system(input, mem_sys, sizeof(mem_sys));
     cli_msgbuf_push(&buf, "system", cli_system_prompt_now(), NULL, NULL, NULL);
+    if (mem_sys[0])
+        cli_msgbuf_push(&buf, "system", mem_sys, NULL, NULL, NULL);
     for (size_t hi = 0; hi < g_history_count; hi++)
         cli_msgbuf_push(&buf, g_history_roles[hi], g_history_contents[hi], NULL, NULL, NULL);
     cli_msgbuf_push(&buf, "user", input, NULL, NULL, NULL);
@@ -1276,6 +1351,12 @@ void cli_chat_reply(const char *input)
 
     if (spinner_on)
         cli_spinner_stop(1, NULL);
+
+    /* 2.2.4 对话记忆写入：一轮对话完成且有回复时落盘（用户输入+回复，
+     * 供下轮/下次会话检索注入；只记对话事实，不记内部思考链） */
+    if (final_resp && final_resp->choice_count > 0 && final_resp->choices[0].content) {
+        cli_chat_mem_record(input, final_resp->choices[0].content);
+    }
 #else
     /* 无 cJSON 平台：固定消息数组 + 单轮非流式（不带工具），保持纯对话。 */
     int stream_mode = 0;

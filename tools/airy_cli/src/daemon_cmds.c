@@ -29,11 +29,16 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <process.h>
 #include <sys/stat.h>
 #else
+#include <arpa/inet.h>
 #include <fcntl.h>
+#include <netinet/in.h>
 #include <signal.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -237,9 +242,55 @@ int cmd_daemons(const char *arg, void *ctx)
         }
         AIRY_FREE(result);
     }
+    /* gateway 是 HTTP 网关（无 Unix socket，CLI_DAEMONS 表不含）——
+     * 以 TCP 连接探测其就绪端口（AIRY_GATEWAY_URL 或默认 8080）补报。 */
+    {
+        const char *gw = getenv("AIRY_GATEWAY_URL");
+        int gw_port = 8080;
+        if (gw && *gw) {
+            const char *colon = strrchr(gw, ':');
+            if (colon && colon[1])
+                gw_port = atoi(colon + 1);
+        }
+        int gw_ok = 0;
+#ifdef _WIN32
+        /* Windows：SOCKET 连接探测（与 daemon_rpc TCP 一致） */
+        WSADATA wsa;
+        if (WSAStartup(MAKEWORD(2, 2), &wsa) == 0) {
+            SOCKET s = socket(AF_INET, SOCK_STREAM, 0);
+            if (s != INVALID_SOCKET) {
+                struct sockaddr_in sa;
+                sa.sin_family = AF_INET;
+                sa.sin_port = htons((unsigned short)gw_port);
+                sa.sin_addr.s_addr = inet_addr("127.0.0.1");
+                gw_ok = (connect(s, (struct sockaddr *)&sa, sizeof(sa)) == 0);
+                closesocket(s);
+            }
+            WSACleanup();
+        }
+#else
+        int s = socket(AF_INET, SOCK_STREAM, 0);
+        if (s >= 0) {
+            struct sockaddr_in sa;
+            sa.sin_family = AF_INET;
+            sa.sin_port = htons((unsigned short)gw_port);
+            sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+            if (connect(s, (struct sockaddr *)&sa, sizeof(sa)) == 0) {
+                gw_ok = 1;
+            }
+            close(s);
+        }
+#endif
+        if (g_cli_print_mode)
+            cli_outf("gateway %s\n", gw_ok ? "online" : "offline");
+        else
+            cli_render_task_line(NULL, "gateway", gw_ok ? "online" : "offline", gw_ok ? 1.0 : 0.0);
+        if (gw_ok)
+            online++;
+    }
     {
         char line[64];
-        snprintf(line, sizeof(line), "online %d/%zu", online, CLI_DAEMONS_COUNT);
+        snprintf(line, sizeof(line), "online %d/%zu", online, CLI_DAEMONS_COUNT + 1);
         if (g_cli_print_mode)
             cli_outf("%s\n", line);
         else

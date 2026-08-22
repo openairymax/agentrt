@@ -109,6 +109,7 @@ set(CLI_INC_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/ipc/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/sd/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/platform/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/ime/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/llm_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/tool_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/common/include

@@ -276,6 +276,26 @@ int cli_tui_readline(cli_tui_t *tui, char *buf, size_t cap, size_t *out_len);
 void cli_tui_set_status(cli_tui_t *tui, const char *status);
 
 /**
+ * @brief Snapshot the three-model names for hero re-rendering (2.2.1.3).
+ *
+ * main 启动时填充（与 cli_print_system_header 同一组模型名）。终端
+ * resize / F8 退出全屏时，cli_tui_rebuild_three_zone 用它重建 hero，
+ * 不依赖 main 的局部变量。传 NULL/"" 表示该模型未设置。
+ */
+void cli_tui_set_header_models(cli_tui_t *tui, const char *t2, const char *t1f,
+                               const char *t1p);
+
+/**
+ * @brief Rebuild the line-mode three-zone layout (hero / dialogue / input).
+ *
+ * 2.2.1.2/2.2.1.3：退出全屏（alt screen 残留主屏画面）或终端 resize
+ * 后，滚动区与 hero 可能错位导致重叠。此函数：解 pin → 清屏 → 用
+ * 模型名快照重绘 hero（内部重 pin + 保留输入条）→ 按角色重放对话
+ * 历史 → 光标落回滚动区末行。仅 TTY 且非全屏时生效，否则 no-op。
+ */
+void cli_tui_rebuild_three_zone(cli_tui_t *tui);
+
+/**
  * @brief Redraw the full screen immediately (e.g. before a long blocking
  * call that emits progress without reading input).
  */

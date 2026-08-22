@@ -33,6 +33,7 @@
 #include "cli_term.h"
 #include "cli_internal.h" /* CLI_COMMANDS (Tab 补全 SSoT) */
 #include "airy_dirent.h"  /* 跨平台 opendir/readdir/closedir（文件补全） */
+#include "airy_ime.h"     /* 内置拼音输入法词典（commons，2.2.3） */
 #include "airy_memory.h"
 #include "platform.h"
 
@@ -213,6 +214,29 @@ struct cli_tui_s {
     char tab_cand_strs[TUI_TAB_CAND_MAX][TUI_TAB_NAME_MAX]; /* 文件候选（tab_kind==1） */
 
     char status[96];         /* 会话状态（输入行右侧 dim 指示：模型/消息/耗时） */
+
+    /* ---- 内置拼音输入法（airy_ime，2.2.3：无 IME 设备中文输入）----
+     * F4 切换中/英；拼音模式字母进 ime_buf，数字 1-9/空格上屏候选，
+     * 退格删拼音，Enter 提交拼音原文。词典加载失败时 ime==NULL 功能
+     * 整体禁用，不影响既有英文输入。 */
+    airy_ime_t *ime;         /* 词典句柄（加载失败=NULL） */
+    int ime_active;          /* 拼音模式 */
+    char ime_buf[48];        /* 拼音缓冲（[a-z]，ü 以 v 表示） */
+    size_t ime_buf_len;
+    airy_ime_cand_t ime_cands[9]; /* 候选（数字键 1-9 选择） */
+    int ime_cand_count;
+
+    /* 2.2.1.5 输入光标：黑白反显交替闪烁，半周期 ≈ Word 默认（500ms）。
+     * caret_visible=1 时光标处字符反显（白底黑字/黑底白字按终端配色），
+     * 0 时正常显示。由输入循环的轮询节拍翻转并局部重绘输入行。 */
+    uint64_t caret_tick;     /* 上次翻转时间戳（cli_now_ms） */
+    int caret_visible;
+
+    /* 2.2.1.3：三区重建所需的 hero 模型名快照（main 启动时填充；
+     * 终端 resize / F8 退出重建时用于重绘 hero，不依赖 main 局部量）。 */
+    char hdr_t2[128];
+    char hdr_t1f[128];
+    char hdr_t1p[128];
 
 #ifndef _WIN32
     struct termios saved_termios;
@@ -996,6 +1020,11 @@ static void tui_render_viewport(cli_tui_t *t)
     }
 }
 
+/* 拼音候选条（定义在输入法辅助段，此处前置声明供 tui_render_input 用）。 */
+static int tui_ime_draw_cands(cli_tui_t *t, int input_row);
+/* 反显光标打印（定义在光标辅助段，前置声明供输入行渲染用）。 */
+static size_t tui_caret_print(cli_tui_t *t);
+
 static void tui_render_input(cli_tui_t *t)
 {
     size_t row = (size_t)t->rows;
@@ -1006,8 +1035,9 @@ static void tui_render_input(cli_tui_t *t)
     tui_write_literal(";1H");
     tui_clear_line();
 
-    /* 多候选 Tab 补全：在输入行上方显示候选列表（当前候选高亮）。 */
-    if (t->tab_active && t->tab_count > 1) {
+    /* 多候选 Tab 补全：在输入行上方显示候选列表（当前候选高亮）。
+     * 2.2.3 拼音候选条优先：IME 拼音态时占用该行，回落原绘制路径。 */
+    if (!tui_ime_draw_cands(t, (int)row) && t->tab_active && t->tab_count > 1) {
         size_t brow = row > 1 ? row - 1 : 1;
         tui_write_literal("\033[");
         snprintf(num, sizeof(num), "%zu", brow);
@@ -1119,17 +1149,24 @@ static void tui_render_input(cli_tui_t *t)
         return;
     }
 
+    /* 2.2.3 IME 状态标记：[中]/[英]（词典可用时显示，dim） */
+    const char *ime_tag = t->ime ? (t->ime_active ? "[中] " : "[英] ") : "";
+    size_t ime_tag_w = strlen(ime_tag);
+    if (ime_tag_w > 0) {
+        fputs(cli_c(CLR_DIM), stdout);
+        fputs(ime_tag, stdout);
+        fputs(cli_c(CLR_RESET), stdout);
+    }
     fputs(cli_c(CLR_CYAN), stdout);
     fputs(TUI_INPUT_PREFIX, stdout);
     fputs(cli_c(CLR_RESET), stdout);
-    if (t->input_len > 0)
-        fwrite(t->input, 1, t->input_len, stdout);
+    size_t input_w = tui_caret_print(t); /* 2.2.1.5 反显光标（黑白闪烁） */
     /* Session status (model · msgs · elapsed), right-aligned dim; hidden
      * when the typed line would overlap it. Drawn before the caret is
      * repositioned, so cursor math stays untouched. */
     if (t->status[0] && t->mode == CLI_TUI_MODE_CHAT) {
         size_t st_w = cli_disp_width(t->status) + 2;
-        size_t used_w = (size_t)strlen(TUI_INPUT_PREFIX) +
+        size_t used_w = ime_tag_w + (size_t)strlen(TUI_INPUT_PREFIX) +
                         cli_disp_width_of(t->input, t->input_len);
         if (used_w + st_w < (size_t)t->cols) {
             size_t scol = (size_t)t->cols - st_w + 2;
@@ -1147,8 +1184,7 @@ static void tui_render_input(cli_tui_t *t)
     }
     /* Place the cursor at the edit position (byte offset -> display width).
      * CJK chars occupy two columns, so the caret never drifts. */
-    size_t col = (size_t)strlen(TUI_INPUT_PREFIX) +
-                 cli_disp_width_of(t->input, t->input_col < t->input_len ? t->input_col : t->input_len);
+    size_t col = ime_tag_w + (size_t)strlen(TUI_INPUT_PREFIX) + input_w;
     tui_write_literal("\033[");
     snprintf(num, sizeof(num), "%zu", row);
     tui_write_literal(num);
@@ -1518,6 +1554,7 @@ enum {
     TUI_KEY_F8,          /* ESC [ 1 9 ~：全屏 ↔ 行渲染 切换（2.3.7） */
     TUI_KEY_F6,          /* ESC [ 1 7 ~：直达任务看板（2026-08-19） */
     TUI_KEY_F7,          /* ESC [ 1 8 ~：直达事件流 */
+    TUI_KEY_F4,          /* ESC O S / ESC [ 1 4 ~：内置输入法 中/英 切换 */
     TUI_KEY_PASTE_START, /* ESC [ 200 ~：bracketed paste 开始 */
     TUI_KEY_UNKNOWN,
 };
@@ -1588,7 +1625,7 @@ static int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
                 if (tui_wait_byte(t, &b, 50, eof) && b == '~')
                     return TUI_KEY_PGDN;
                 return TUI_KEY_UNKNOWN;
-            case '1': /* ESC[19~ = F8；ESC[1;5D 等 = Ctrl/Alt+Left/Right */
+            case '1': /* ESC[19~ = F8；ESC[14~ = F4；ESC[1;5D 等 = Ctrl/Alt+Left/Right */
             {
                 char semi, mod, dir;
                 if (!tui_wait_byte(t, &semi, 50, eof))
@@ -1597,6 +1634,11 @@ static int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
                     if (!tui_wait_byte(t, &dir, 50, eof) || dir != '~')
                         return TUI_KEY_UNKNOWN;
                     return TUI_KEY_F8;
+                }
+                if (semi == '4') { /* F4 (linux console): ESC [ 1 4 ~ */
+                    if (!tui_wait_byte(t, &dir, 50, eof) || dir != '~')
+                        return TUI_KEY_UNKNOWN;
+                    return TUI_KEY_F4;
                 }
                 if (semi == '7') { /* F6: ESC [ 1 7 ~ */
                     if (!tui_wait_byte(t, &dir, 50, eof) || dir != '~')
@@ -1643,6 +1685,21 @@ static int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
             return TUI_KEY_ALT_B;
         if (b == 'f')
             return TUI_KEY_ALT_F;
+        /* Application cursor mode (smkx): ESC O A/B/C/D = 方向键；
+         * ESC O S = F4（xterm 标准）。 */
+        if (b == 'O') {
+            char x;
+            if (!tui_wait_byte(t, &x, 50, eof))
+                return TUI_KEY_UNKNOWN;
+            switch (x) {
+            case 'A': return TUI_KEY_UP;
+            case 'B': return TUI_KEY_DOWN;
+            case 'C': return TUI_KEY_RIGHT;
+            case 'D': return TUI_KEY_LEFT;
+            case 'S': return TUI_KEY_F4;
+            default:  return TUI_KEY_UNKNOWN;
+            }
+        }
         return TUI_KEY_UNKNOWN;
     }
     return (unsigned char)c;
@@ -1683,6 +1740,131 @@ static void tui_input_append(cli_tui_t *t, char c)
     }
     t->input[t->input_len] = '\0';
     t->input_col++;
+}
+
+/* ==================== 输入光标（2.2.1.5 黑白交替闪烁） ==================== */
+
+#define CLI_CARET_BLINK_MS 500u /* 半周期 ≈ Word 默认光标闪烁频率（1s 全周期） */
+
+/* 推进闪烁状态机：到达半周期翻转反显状态。输入循环每轮调用（轮询节拍）。 */
+static void tui_caret_tick(cli_tui_t *t)
+{
+    uint64_t now = cli_now_ms();
+    if (now - t->caret_tick >= CLI_CARET_BLINK_MS) {
+        t->caret_visible = !t->caret_visible;
+        t->caret_tick = now;
+    }
+}
+
+/* 打印输入文本，光标处字符按 caret_visible 反显（黑白交替）。UTF-8 光标
+ * 位置以 input_col 字节定位，多字节字符整体反显；光标在行尾/空输入时
+ * 以反显空格块呈现（Word 光标行为）。返回文本显示宽度。 */
+static size_t tui_caret_print(cli_tui_t *t)
+{
+    size_t p = t->input_col < t->input_len ? t->input_col : t->input_len;
+    size_t w = cli_disp_width_of(t->input, t->input_len);
+    if (p > 0)
+        fwrite(t->input, 1, p, stdout);
+    if (p < t->input_len) {
+        size_t q = p + 1;
+        while (q < t->input_len && ((unsigned char)t->input[q] & 0xC0) == 0x80)
+            q++;
+        if (t->caret_visible) {
+            fputs(cli_c(CLR_REVERSE), stdout);
+            fwrite(t->input + p, 1, q - p, stdout);
+            fputs(cli_c(CLR_RESET), stdout);
+        } else {
+            fwrite(t->input + p, 1, q - p, stdout);
+        }
+        if (q < t->input_len)
+            fwrite(t->input + q, 1, t->input_len - q, stdout);
+    } else if (t->caret_visible) {
+        /* 行尾/空输入：反显空格块作为光标位置 */
+        fputs(cli_c(CLR_REVERSE), stdout);
+        fputs(" ", stdout);
+        fputs(cli_c(CLR_RESET), stdout);
+        w += 1;
+    }
+    return w;
+}
+
+/* ==================== 内置拼音输入法（2.2.3，commons/utils/ime） ============
+ * 无 IME 设备的中文输入路径：F4 中/英切换，拼音模式字母进 ime_buf 并
+ * 实时查候选，数字 1-9 / 空格上屏，退格删拼音，Enter 提交拼音原文，
+ * 其他键先提交拼音原文再按正常路径处理。词典加载失败（ime==NULL）时
+ * 整体降级禁用，英文输入路径完全不受影响。 */
+
+/* 拼音原文上屏：逐字节插入输入行光标处，清空拼音缓冲。 */
+static void tui_ime_commit_raw(cli_tui_t *t)
+{
+    for (size_t i = 0; i < t->ime_buf_len; i++)
+        tui_input_append(t, t->ime_buf[i]);
+    t->ime_buf_len = 0;
+    t->ime_buf[0] = '\0';
+    t->ime_cand_count = 0;
+}
+
+/* 上屏候选：UTF-8 逐字节插入光标处（tui_input_append 支持中插），清空
+ * 拼音缓冲并保持拼音模式，连续词组输入不中断。 */
+static void tui_ime_commit_cand(cli_tui_t *t, const char *text)
+{
+    if (!text)
+        return;
+    for (const unsigned char *p = (const unsigned char *)text; *p; p++)
+        tui_input_append(t, (char)*p);
+    t->ime_buf_len = 0;
+    t->ime_buf[0] = '\0';
+    t->ime_cand_count = 0;
+}
+
+/* 以当前拼音缓冲刷新候选列表。 */
+static void tui_ime_refresh(cli_tui_t *t)
+{
+    t->ime_cand_count =
+        airy_ime_query(t->ime, t->ime_buf, t->ime_cands,
+                       (int)(sizeof(t->ime_cands) / sizeof(t->ime_cands[0])));
+}
+
+/* 绘制拼音候选条（输入行上方一行）：拼音高亮 + 数字键候选。返回 1=已
+ * 绘制（占用该行）；0=无拼音态（调用方继续画分隔线/tab 候选等）。 */
+static int tui_ime_draw_cands(cli_tui_t *t, int input_row)
+{
+    if (!t->ime || !t->ime_active || t->ime_buf_len == 0)
+        return 0;
+    char num[16];
+    size_t brow = input_row > 1 ? (size_t)input_row - 1 : 1;
+    tui_write_literal("\033[");
+    snprintf(num, sizeof(num), "%zu", brow);
+    tui_write_literal(num);
+    tui_write_literal(";1H");
+    tui_clear_line();
+    fputs(cli_c(CLR_BOLD), stdout);
+    fputs(cli_c(CLR_CYAN), stdout);
+    fwrite(t->ime_buf, 1, t->ime_buf_len, stdout);
+    fputs(cli_c(CLR_RESET), stdout);
+    fputs(" ", stdout);
+    size_t used = cli_disp_width(t->ime_buf) + 1;
+    for (int i = 0; i < t->ime_cand_count; i++) {
+        const char *txt = t->ime_cands[i].text;
+        char tag[4];
+        snprintf(tag, sizeof(tag), "%d", i + 1);
+        size_t w = cli_disp_width(txt) + strlen(tag) + 1;
+        if (used + w > (size_t)t->cols)
+            break;
+        if (i == 0) {
+            fputs(cli_c(CLR_BG_BLUE), stdout);
+            fputs(cli_c(CLR_BOLD), stdout);
+        } else {
+            fputs(cli_c(CLR_DIM), stdout);
+        }
+        fputs(tag, stdout);
+        fputs(txt, stdout);
+        fputs(cli_c(CLR_RESET), stdout);
+        fputs(" ", stdout);
+        used += w;
+    }
+    fflush(stdout);
+    return 1;
 }
 
 /* 判断 input 末尾的 UTF-8 序列是否完整：ASCII 单字节恒完整；多字节序列
@@ -2083,14 +2265,23 @@ static void tui_line_redraw(cli_tui_t *t)
         tui_write_literal("\r\033[2K");
     }
     tui_clear_line();
+    /* 2.2.3 IME 状态标记：[中]/[英]（词典可用时显示，dim） */
+    const char *ime_tag = t->ime ? (t->ime_active ? "[中] " : "[英] ") : "";
+    size_t ime_tag_w = strlen(ime_tag);
+    if (ime_tag_w > 0) {
+        fputs(cli_c(CLR_DIM), stdout);
+        fputs(ime_tag, stdout);
+        fputs(cli_c(CLR_RESET), stdout);
+    }
     fputs(cli_c(CLR_CYAN), stdout);
     fputs(TUI_INPUT_PREFIX, stdout);
     fputs(cli_c(CLR_RESET), stdout);
-    if (t->input_len > 0)
-        fwrite(t->input, 1, t->input_len, stdout);
+    size_t input_w = tui_caret_print(t); /* 2.2.1.5 反显光标（黑白闪烁） */
+    /* 拼音候选条（输入条上方一行；不占用输入行本身） */
+    if (cli_term_input_active())
+        tui_ime_draw_cands(t, t->rows > 0 ? t->rows : 1);
     /* 光标落在编辑位置（UTF-8 显示宽度对齐，CJK 不漂移）。 */
-    size_t col = (size_t)strlen(TUI_INPUT_PREFIX) +
-                 cli_disp_width_of(t->input, t->input_len);
+    size_t col = ime_tag_w + (size_t)strlen(TUI_INPUT_PREFIX) + input_w;
     if (cli_term_input_active()) {
         tui_write_literal("\033[");
         snprintf(num, sizeof(num), "%d", t->rows > 0 ? t->rows : 1);
@@ -2138,15 +2329,40 @@ static int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
             saved_ok = 1;
     }
 #endif
+    /* 2.2.1.5：隐藏硬件光标，改用反显块自绘光标（黑白交替闪烁） */
+    fputs("\033[?25l", stdout);
+    t->caret_tick = cli_now_ms();
+    t->caret_visible = 1;
+#ifndef _WIN32
+    /* 2.2.1.1 环境突变自适应：行模式也监听 SIGWINCH，resize 后重建
+     * 三区（hero 固定、不重叠）。仅 raw mode 成功时安装。 */
+    if (saved_ok) {
+        signal(SIGWINCH, tui_sigwinch_handler);
+        g_tui_resize_pending = 0;
+    }
+#endif
     tui_line_redraw(t);
 
     int rc = 1;
     for (;;) {
         int eof = 0;
-        int key = tui_read_key(t, -1, &eof);
+        /* 以半周期超时轮询：到达闪烁节拍翻转光标并局部重绘输入行 */
+        int key = tui_read_key(t, (int)CLI_CARET_BLINK_MS, &eof);
         if (eof || key == 0) {
             rc = 0;
             break;
+        }
+        if (key == -1) {
+#ifndef _WIN32
+            if (g_tui_resize_pending) {
+                g_tui_resize_pending = 0;
+                /* 终端尺寸变化：滚动区与 hero 错位 → 重建三区 */
+                cli_tui_rebuild_three_zone(t);
+            }
+#endif
+            tui_caret_tick(t);
+            tui_line_redraw(t);
+            continue;
         }
         if (key == TUI_KEY_F8) {
             /* 行渲染 → 全屏 TUI（与 main.c 的 rl==2 分支一致）。 */
@@ -2154,6 +2370,62 @@ static int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
                 *out_len = 0;
             rc = 2;
             break;
+        }
+        /* 2.2.3 内置拼音输入法：F4 中/英切换。词典加载失败（ime==NULL）
+         * 时 F4 无效果，英文输入路径完全不变。 */
+        if (t->ime && key == TUI_KEY_F4) {
+            t->ime_active = !t->ime_active;
+            if (!t->ime_active)
+                tui_ime_commit_raw(t); /* 切回英文：拼音原文保留在输入行 */
+            tui_line_redraw(t);
+            continue;
+        }
+        if (t->ime && t->ime_active) {
+            if (key >= 'a' && key <= 'z') {
+                if (t->ime_buf_len < sizeof(t->ime_buf) - 1) {
+                    t->ime_buf[t->ime_buf_len++] = (char)key;
+                    t->ime_buf[t->ime_buf_len] = '\0';
+                    tui_ime_refresh(t);
+                }
+                tui_line_redraw(t);
+                continue;
+            }
+            if (key >= '1' && key <= '9') {
+                size_t i = (size_t)(key - '1');
+                if (i < (size_t)t->ime_cand_count)
+                    tui_ime_commit_cand(t, t->ime_cands[i].text);
+                tui_line_redraw(t);
+                continue;
+            }
+            if (key == ' ') {
+                if (t->ime_cand_count > 0)
+                    tui_ime_commit_cand(t, t->ime_cands[0].text);
+                else
+                    tui_ime_commit_raw(t); /* 无候选：空格输出拼音原文 */
+                tui_line_redraw(t);
+                continue;
+            }
+            if (key == 0x7f || key == 0x08) { /* 退格：删拼音；空则退出拼音 */
+                if (t->ime_buf_len > 0) {
+                    t->ime_buf[--t->ime_buf_len] = '\0';
+                    tui_ime_refresh(t);
+                } else {
+                    t->ime_active = 0;
+                }
+                tui_line_redraw(t);
+                continue;
+            }
+            if (key == '\n' || key == '\r') {
+                /* 提交拼音原文并交给下方 Enter 提交整个输入行 */
+                tui_ime_commit_raw(t);
+                t->ime_active = 0;
+            } else if (key >= 0x20 && key <= 0xFF) {
+                /* 标点/数字等：先提交拼音原文并退出拼音模式，按键继续
+                 * 走正常输入路径（如 "." 直接出英文句号）。 */
+                tui_ime_commit_raw(t);
+                t->ime_active = 0;
+                tui_line_redraw(t);
+            }
         }
         if (key == '\n' || key == '\r') {
             size_t n = t->input_len;
@@ -2304,9 +2576,13 @@ static int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
     }
 
 #ifndef _WIN32
-    if (saved_ok)
+    if (saved_ok) {
         tcsetattr(STDIN_FILENO, TCSANOW, &saved);
+        signal(SIGWINCH, SIG_DFL); /* 行模式退出：SIGWINCH 交还终端默认 */
+    }
 #endif
+    /* 2.2.1.5：恢复硬件光标（自绘反显光标只在输入期间接管） */
+    fputs("\033[?25h", stdout);
     return rc;
 }
 
@@ -2378,12 +2654,25 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
             else if (g_tui_resize_pending) {
                 g_tui_resize_pending = 0;
                 tui_get_size(t);
+                /* 2.2.2 环境突变自适应：终端窗口缩得过小（<7 行或 <11 列）
+                 * 全屏 TUI 无法可用渲染——自动退出全屏回到行渲染流式模式，
+                 * 而非留在不可用的全屏页面上（resize 触发时实时生效）。 */
+                if (t->rows <= 6 || t->cols <= 10) {
+                    if (out_len)
+                        *out_len = 0;
+                    return 3; /* 复用 F8 退出路径（cli_tui_leave + 行模式） */
+                }
                 cli_tui_redraw(t);
             }
 #endif
             else if (t->redraw_pending) {
                 t->redraw_pending = 0;
                 tui_redraw_tail(t);
+            } else if (t->mode == CLI_TUI_MODE_CHAT) {
+                /* 2.2.1.5：空闲轮询节拍驱动输入光标黑白交替闪烁 */
+                tui_caret_tick(t);
+                tui_render_input(t);
+                fflush(stdout);
             }
             continue;
         }
@@ -2393,6 +2682,69 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
             if (out_len)
                 *out_len = 0;
             return 3;
+        }
+        /* 2.2.3 内置拼音输入法：F4 中/英切换（chat 视图；词典未加载时
+         * ime==NULL，F4 无效果）。面板视图按 F4 会落入"打字即退出浏览"
+         * 分支返回对话，无拼音态残留。 */
+        if (t->ime && t->mode == CLI_TUI_MODE_CHAT && key == TUI_KEY_F4) {
+            t->ime_active = !t->ime_active;
+            if (!t->ime_active)
+                tui_ime_commit_raw(t); /* 切回英文：拼音原文保留在输入行 */
+            tui_render_input(t);
+            fflush(stdout);
+            continue;
+        }
+        if (t->ime && t->ime_active && t->mode == CLI_TUI_MODE_CHAT) {
+            if (key >= 'a' && key <= 'z') {
+                if (t->ime_buf_len < sizeof(t->ime_buf) - 1) {
+                    t->ime_buf[t->ime_buf_len++] = (char)key;
+                    t->ime_buf[t->ime_buf_len] = '\0';
+                    tui_ime_refresh(t);
+                }
+                tui_render_input(t);
+                fflush(stdout);
+                continue;
+            }
+            if (key >= '1' && key <= '9') {
+                size_t i = (size_t)(key - '1');
+                if (i < (size_t)t->ime_cand_count)
+                    tui_ime_commit_cand(t, t->ime_cands[i].text);
+                tui_render_input(t);
+                fflush(stdout);
+                continue;
+            }
+            if (key == ' ') {
+                if (t->ime_cand_count > 0)
+                    tui_ime_commit_cand(t, t->ime_cands[0].text);
+                else
+                    tui_ime_commit_raw(t); /* 无候选：空格输出拼音原文 */
+                tui_render_input(t);
+                fflush(stdout);
+                continue;
+            }
+            if (key == 0x7f || key == 0x08) { /* 退格：删拼音；空则退出拼音 */
+                if (t->ime_buf_len > 0) {
+                    t->ime_buf[--t->ime_buf_len] = '\0';
+                    tui_ime_refresh(t);
+                } else {
+                    t->ime_active = 0;
+                }
+                tui_render_input(t);
+                fflush(stdout);
+                continue;
+            }
+            if (key == '\n' || key == '\r') {
+                /* 提交拼音原文并交给下方 Enter 提交整个输入行 */
+                tui_ime_commit_raw(t);
+                t->ime_active = 0;
+            } else if (key >= 0x20 && key <= 0xFF) {
+                /* 标点/数字等：先提交拼音原文并退出拼音模式，按键继续
+                 * 走正常输入路径（如 "." 直接出英文句号）。 */
+                tui_ime_commit_raw(t);
+                t->ime_active = 0;
+                tui_render_input(t);
+                fflush(stdout);
+            }
         }
 
         /* ---- 阶段 4：视图模式（tab）切换 ---- */
@@ -2941,6 +3293,65 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
 
 /* ---- lifecycle ---- */
 
+void cli_tui_set_header_models(cli_tui_t *t, const char *t2, const char *t1f,
+                               const char *t1p)
+{
+    if (!t)
+        return;
+    t->hdr_t2[0] = t->hdr_t1f[0] = t->hdr_t1p[0] = '\0';
+    if (t2 && t2[0])
+        snprintf(t->hdr_t2, sizeof(t->hdr_t2), "%s", t2);
+    if (t1f && t1f[0])
+        snprintf(t->hdr_t1f, sizeof(t->hdr_t1f), "%s", t1f);
+    if (t1p && t1p[0])
+        snprintf(t->hdr_t1p, sizeof(t->hdr_t1p), "%s", t1p);
+}
+
+/* 2.2.1.2/2.2.1.3：重建行渲染三区（hero/对话/输入）。详情见 cli_tui.h。 */
+void cli_tui_rebuild_three_zone(cli_tui_t *t)
+{
+    if (!t || !cli_term_is_tty() || t->active)
+        return;
+    cli_term_header_unpin();
+    cli_out("\033[2J\033[H");
+    cli_print_system_header(t->hdr_t2[0] ? t->hdr_t2 : NULL,
+                            t->hdr_t1f[0] ? t->hdr_t1f : NULL,
+                            t->hdr_t1p[0] ? t->hdr_t1p : NULL);
+    for (size_t i = 0; i < g_history_count; i++) {
+        if (strcmp(g_history_roles[i], "user") == 0)
+            cli_render_user_message(g_history_contents[i]);
+        else
+            cli_render_super_agent(g_history_contents[i]);
+    }
+    if (cli_term_input_active())
+        cli_term_input_hop();
+    fflush(stdout);
+}
+
+/* 加载内置拼音词典（2.2.3）。路径优先级：AIRY_IME_DICT 环境变量 →
+ * $AIRY_HOME/share/agentrt/ime/airy_ime.dat（安装布局）→ 当前目录
+ * share/agentrt/ime/airy_ime.dat（开发/便携布局）。airy_ime_load 对不
+ * 存在/损坏文件 fail-closed 返回 NULL；这里顺次尝试，全部失败返回
+ * NULL（输入法整体降级禁用，英文输入不受影响）。 */
+static airy_ime_t *tui_ime_load_dict(void)
+{
+    const char *dict = getenv("AIRY_IME_DICT");
+    if (dict && dict[0]) {
+        airy_ime_t *ime = airy_ime_load(dict);
+        if (ime)
+            return ime;
+    }
+    const char *home = airy_home_dir();
+    if (home && home[0]) {
+        char path[AIRY_PATH_MAX];
+        snprintf(path, sizeof(path), "%s/share/agentrt/ime/airy_ime.dat", home);
+        airy_ime_t *ime = airy_ime_load(path);
+        if (ime)
+            return ime;
+    }
+    return airy_ime_load("share/agentrt/ime/airy_ime.dat");
+}
+
 int cli_tui_create(cli_tui_t **out_tui)
 {
     if (!out_tui)
@@ -2954,6 +3365,9 @@ int cli_tui_create(cli_tui_t **out_tui)
         g_default_tui = t;
     /* Recall past submitted commands (Up / Ctrl+R) from the previous session. */
     tui_cmd_hist_load(t);
+    /* 2.2.3 内置拼音输入法：词典加载失败仅降级（ime==NULL），不阻断启动 */
+    t->ime = tui_ime_load_dict();
+    t->ime_active = 0;
     /* 2.3.7 (2026-08-17)：交互默认行渲染流式模式，不自动进入全屏页面；
      * 全屏由 cli_tui_enter() 显式进入（F8 切换）。 */
     return 0;
@@ -2978,8 +3392,9 @@ int cli_tui_enter(cli_tui_t *t)
     t->active = 0; /* POSIX-only full-screen mode */
     return -1;
 #else
-    /* Enter alternate screen + bracketed paste + raw mode. */
-    fputs("\033[?1049h\033[?2004h\033[2J\033[H", stdout);
+    /* Enter alternate screen + bracketed paste + raw mode.
+     * 2.2.1.5：隐藏硬件光标，输入光标由反显块自绘（黑白交替闪烁）。 */
+    fputs("\033[?1049h\033[?2004h\033[?25l\033[2J\033[H", stdout);
     fflush(stdout);
 
     g_tui_resize_pending = 0;
@@ -3014,8 +3429,9 @@ int cli_tui_leave(cli_tui_t *t)
         tcsetattr(STDIN_FILENO, TCSANOW, &t->saved_termios);
     signal(SIGWINCH, SIG_DFL);
 #endif
-    /* 恢复全屏滚动区（\x1b[r），随后退出 alt screen。 */
-    fputs("\033[r\033[?2004l\033[?1049l", stdout);
+    /* 恢复全屏滚动区（\x1b[r），随后退出 alt screen。
+     * 2.2.1.5：退出前恢复硬件光标。 */
+    fputs("\033[r\033[?2004l\033[?25h\033[?1049l", stdout);
     fflush(stdout);
     t->active = 0;
     t->termios_saved = 0;
@@ -3069,6 +3485,7 @@ void cli_tui_destroy(cli_tui_t *t)
     tui_cmd_hist_reset(t);
     AIRY_FREE(t->cur);
     AIRY_FREE(t->input);
+    airy_ime_destroy(t->ime); /* 可为 NULL */
     if (g_default_tui == t)
         g_default_tui = NULL;
     AIRY_FREE(t);

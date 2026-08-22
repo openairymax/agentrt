@@ -207,6 +207,14 @@ static int cli_task_poll_input(void)
         line[--n] = '\0';
     if (n == 0)
         return 0;
+    /* 纯空白输入（空格/Tab 串）：跳过，不进对话（与主输入一致） */
+    {
+        size_t nz = 0;
+        while (nz < n && (line[nz] == ' ' || line[nz] == '\t'))
+            nz++;
+        if (nz == n)
+            return 0;
+    }
     /* 中断指令：不进入对话，直接打断任务（与 SIGINT 同语义） */
     if (strcmp(line, "quit") == 0 || strcmp(line, "exit") == 0 ||
         strcmp(line, "abort") == 0 || strcmp(line, "stop") == 0 ||
@@ -494,6 +502,484 @@ static int cli_task_result_render(const char *result, airy_err_t err, const char
     return task_succeeded;
 }
 
+/* 运行时上下文（2026-08-22 拆分自 main 初始化/清理段，SSoT 收敛）：
+ * 由 cli_setup_runtime 装配、cli_teardown_runtime 按序释放，main 不再
+ * 直接持有这些组件——初始化与清理的对称性收进同一处。 */
+typedef struct {
+    airy_roadmap_sched_t *rsched;
+    airy_work_hall_t *hall;
+    airy_hall_store_t *hall_store;
+    void *board_ud;
+    void *events_ud;
+    airy_artifact_validator_t *validator;
+    airy_governance_t *governance;
+    void *reviewer; /* cli_exec_review 句柄（不透明，仅透传销毁） */
+    const char *main_workspace_dir; /* 主工作区（AIRY_WORKSPACE_MAIN_DIR 或 cwd） */
+} cli_runtime_ctx_t;
+
+/* 核心引擎装配（2026-08-22 从 main 初始化段拆分，收敛圈复杂度）：
+ * loop 创建 → 记忆引擎注入（2.2.4 对话路径读写，cli_chat_reply 使用）→
+ * cognition 引擎接线（GCCP 交互回调、TC3 三模型注入、GRAD 决策链反馈）。
+ * out_cog 可空（主循环内 airy_cognition_process 使用）；任一失败返回
+ * NULL（调用方统一 return 1），不静默降级。 */
+static airy_core_loop_t *cli_setup_core_engines(const char *m_s2, const char *m_verify,
+                                                const char *m_expert,
+                                                airy_cognition_engine_t **out_cog)
+{
+    airy_core_loop_t *loop = NULL;
+    airy_err_t err = airy_loop_create(NULL, &loop);
+    if (err != AIRY_EOK || !loop) {
+        AIRY_LOG_ERROR("airy_cli: loop create failed (err=%d)", (int)err);
+        return NULL;
+    }
+
+    /* 2.2.4 对话记忆：把记忆引擎注入 CLI 对话路径（cli_chat_reply 读写），
+     * 此前对话零记忆接线——"记不住/想不准"的持久化接入点。 */
+    airy_memory_engine_t *mem = NULL;
+    airy_loop_get_engines(loop, NULL, &mem);
+    if (mem) {
+        g_cli_memory_engine = mem;
+        AIRY_LOG_INFO("airy_cli: chat memory engine attached");
+    }
+
+    airy_cognition_engine_t *cog = NULL;
+    airy_loop_get_engines(loop, &cog, NULL);
+    if (cog) {
+        airy_cognition_set_gccp_interact(cog, cli_gccp_interact, NULL);
+        AIRY_LOG_INFO("airy_cli: GCCP interaction callback attached");
+
+        /* Dual-thinking three-model injection (GRAD separation of powers; user-chosen models):
+          *   AIRY_MODEL_T2    -> model A (generator)
+          *   AIRY_MODEL_T1F   -> model B (context arbiter)
+          *   AIRY_MODEL_T1P   -> model C (logic verifier)
+          * Unset values use the provider default model (backward compatible).
+          * Values were read above for the combined system header. */
+        airy_cognition_set_tc3_models(cog, m_s2 && m_s2[0] ? m_s2 : NULL,
+                                      m_verify && m_verify[0] ? m_verify : NULL,
+                                      m_expert && m_expert[0] ? m_expert : NULL);
+        if ((m_s2 && m_s2[0]) || (m_verify && m_verify[0]) || (m_expert && m_expert[0])) {
+            AIRY_LOG_INFO("airy_cli: TC3 models injected (s2=%s verify=%s expert=%s)",
+                          m_s2 && m_s2[0] ? m_s2 : "(default)",
+                          m_verify && m_verify[0] ? m_verify : "(default)",
+                          m_expert && m_expert[0] ? m_expert : "(default)");
+        }
+
+        /* Decision B (2026-08-09): three model config points - t2=A (generator, cloud-first),
+          * t1-f=B (arbiter/daily chat, first to activate, local-first), t1-p=C (verifier);
+          * each may use cloud APIs or local endpoints (Ollama/vLLM); the user decides.
+          * The model panel was already rendered inside the blue-framed
+          * system header above (cli_print_system_header); only inject. */
+
+        airy_cognition_set_grad_enabled(cog, 1);
+        /* 2.3.14 GRAD 决策链可见性：注册 feedback 回调，任务规划期
+         * GRAD 阶段进度实时渲染为 [Dual Slow/Prof/Fast Think] 行。 */
+        airy_cognition_set_feedback(cog, cli_grad_feedback_cb, NULL);
+        AIRY_LOG_INFO("airy_cli: GRAD decision-chain feedback attached");
+    }
+    if (out_cog)
+        *out_cog = cog;
+
+    return loop;
+}
+
+/* 运行时上下文装配（2026-08-22 从 main 初始化段拆分，收敛圈复杂度）：
+ * rsched（蓝图调度 L2 反馈）→ 产物校验器 → 执行复核管线 → hall_store
+ * 事件流 → 统一治理 → work_hall 创建 → chat adapter → TUI 面板绑定。
+ * 失败（work_hall 无法创建）返回 AIRY_EOK 以外的错误码，调用方统一
+ * 清理并退出；其余子组件失败仅降级不阻断。 */
+static airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_tui_t *tui,
+                                    cli_runtime_ctx_t *rt)
+{
+    if (!loop || !rt)
+        return AIRY_EINVAL;
+    AIRY_MEMSET(rt, 0, sizeof(*rt));
+
+    airy_err_t err = AIRY_EOK;
+
+    /* 3. Blueprint scheduling (Roadmap Sched): result feedback hook (synergy point 1).
+      * Node final states feed back via progress_cb into the L2 cache / failure fingerprints / L1.
+      * P1e: L2 dual-write persistence ($AIRY_HOME/data/agentrt/roadmap/l2_semantic_cache.json,
+      * restored on restart); Embedding + HNSW vector index (MemoryRovol, degrades when unlinked).
+      * Creation failure only degrades (no feedback); the CLI main flow continues. */
+    airy_rs_config_t rs_cfg;
+    __builtin_memset(&rs_cfg, 0, sizeof(rs_cfg));
+    {
+        static char rs_persist_path[512];
+        snprintf(rs_persist_path, sizeof(rs_persist_path),
+                 "%s/agentrt/roadmap/l2_semantic_cache.json", airy_data_dir());
+        rs_cfg.l2_persist_path = rs_persist_path;
+    }
+    airy_roadmap_sched_t *rsched = NULL;
+    err = airy_roadmap_sched_create(&rs_cfg, &rsched);
+    if (err != AIRY_EOK || !rsched) {
+        AIRY_LOG_WARN("airy_cli: roadmap_sched create failed (err=%d), "
+                      "execution feed-back disabled",
+                      (int)err);
+        rsched = NULL;
+    }
+    rt->rsched = rsched;
+
+    /* Decision G (2026-08-09): validation gate - inject an artifact validator.
+      * Rules come from AIRY_VALIDATOR_RULES (JSON); default exit_code=0;
+      * node-level gates live in sched_d write_back; the CLI marks FAIL after wait. */
+    airy_artifact_validator_t *cli_validator = NULL;
+    {
+        const char *rules_json = getenv("AIRY_VALIDATOR_RULES");
+        if (!rules_json || !rules_json[0])
+            rules_json = "{\"exit_code\":0}";
+        airy_err_t vrc = airy_artifact_validator_from_json(&cli_validator, rules_json);
+        if (vrc != AIRY_SUCCESS) {
+            AIRY_LOG_WARN("airy_cli: output_validator create failed (err=%d), gate disabled",
+                          (int)vrc);
+            cli_validator = NULL;
+        }
+    }
+    rt->validator = cli_validator;
+    airy_work_hall_config_t wh_cfg;
+    __builtin_memset(&wh_cfg, 0, sizeof(wh_cfg));
+    wh_cfg.progress_cb = cli_progress_cb;
+    wh_cfg.roadmap_sched = rsched;
+    wh_cfg.output_validator = cli_validator;
+    /* 改进6（P3）: 执行复核管线——wait 返回前对聚合产物跑门禁 -> t2 语义
+     * 复核 -> t1-f 终裁，verdict 写 hall_store verify 事件并回灌 L2（PASS
+     * 可缓存 / DRIFT 不缓存 / REJECT 失效）。t2/t1-f 委托走 llm_d；
+     * llm_d 不可用时降级为纯确定性门禁。 */
+    wh_cfg.reviewer = cli_exec_review_create();
+    rt->reviewer = wh_cfg.reviewer;
+    if (wh_cfg.reviewer)
+        AIRY_LOG_INFO("airy_cli: execution review pipeline attached (gate -> t2 -> t1-f)");
+    /* Decision C (2026-08-09): task file model - full-visibility storage ($AIRY_HOME/data/agentrt/hall).
+      * Progress/result/issue events go to the hall store for replay and experience mining. */
+    airy_hall_store_t *hall_store = airy_hall_store_create(NULL);
+    if (!hall_store)
+        AIRY_LOG_WARN("airy_cli: hall store create failed, full visibility disabled");
+    g_cli_hall_store = hall_store;
+    rt->hall_store = hall_store;
+    wh_cfg.hall_store = hall_store;
+    /* P23 reconcile extension: execution-level failure auto re-dispatch
+     * (opt-in via AIRY_WORK_HALL_REDISPATCH_MAX, 0 = disabled).
+     * The main loop below calls airy_work_hall_redispatch_once() each
+     * iteration to drive the reconcile poll. */
+    {
+        const char *e_rd = getenv("AIRY_WORK_HALL_REDISPATCH_MAX");
+        const char *e_rd_delay = getenv("AIRY_WORK_HALL_REDISPATCH_DELAY_MS");
+        if (e_rd && e_rd[0] && strtol(e_rd, NULL, 10) > 0) {
+            wh_cfg.redispatch_max = (int32_t)strtol(e_rd, NULL, 10);
+            if (e_rd_delay && e_rd_delay[0])
+                wh_cfg.redispatch_delay_ms = (uint32_t)strtoul(e_rd_delay, NULL, 10);
+            AIRY_LOG_INFO("airy_cli: execution reconcile attached "
+                          "(redispatch_max=%d, delay_ms=%u)",
+                          wh_cfg.redispatch_max, wh_cfg.redispatch_delay_ms);
+        }
+    }
+    /* Decision E (2026-08-09): workspace isolation of the main workspace path.
+      * Enabled when AIRY_WORKSPACE_MAIN_DIR is set (snapshot the main workspace -> a sandbox
+      * -> merge artifacts back); otherwise unchanged (the executor touches the main workspace).
+      * AIRY_WORKSPACE_ISOLATION=0 disables isolation further (snapshot/merge return ENOTSUP).
+      * When unset, default the main workspace to the CLI's cwd so the agent acts
+      * on the real project tree (snapshot-isolated) instead of an empty dir —
+      * otherwise the agent exhausts its tool rounds exploring a bare workspace
+      * (P0-1 end-to-end: "create a test file" -> tool loop exceeded). */
+    {
+        const char *ws_main = getenv("AIRY_WORKSPACE_MAIN_DIR");
+        static char ws_main_buf[1024];
+        if (ws_main && ws_main[0]) {
+            wh_cfg.main_workspace_dir = ws_main;
+        } else {
+#if AIRY_PLATFORM_POSIX
+            if (getcwd(ws_main_buf, sizeof(ws_main_buf)))
+                wh_cfg.main_workspace_dir = ws_main_buf;
+#else
+            if (_getcwd(ws_main_buf, (int)sizeof(ws_main_buf)))
+                wh_cfg.main_workspace_dir = ws_main_buf;
+#endif
+        }
+        if (wh_cfg.main_workspace_dir)
+            AIRY_LOG_INFO("airy_cli: main workspace = %s", wh_cfg.main_workspace_dir);
+        rt->main_workspace_dir = wh_cfg.main_workspace_dir;
+    }
+    /* Decision F (2026-08-09): unified governance via environment variables (GRAD axiom II
+      * R_total runtime projection). AIRY_GOV_TOKEN_BUDGET (global budget, 0=unlimited) /
+      * AIRY_GOV_SLOTS (concurrent slots, 0=default 8) / AIRY_GOV_MAX_CONCURRENT (hard
+      * cap, 0=no hard cap) / AIRY_GOV_TOKEN_PER_NODE (per-node estimate, task-level
+      * gate) / AIRY_GOV_DEADLINE_MS (graph default deadline, 0=unlimited).
+      * If none are set (no budget and no slots), governance is off. */
+    airy_governance_t *governance = NULL;
+    {
+        const char *e_budget = getenv("AIRY_GOV_TOKEN_BUDGET");
+        const char *e_slots = getenv("AIRY_GOV_SLOTS");
+        if ((e_budget && e_budget[0] && strtoull(e_budget, NULL, 10) > 0) ||
+            (e_slots && e_slots[0] && strtoul(e_slots, NULL, 10) > 0)) {
+            airy_governance_config_t gcfg;
+            __builtin_memset(&gcfg, 0, sizeof(gcfg));
+            gcfg.token_budget = e_budget ? strtoull(e_budget, NULL, 10) : 0;
+            gcfg.concurrency_slots = e_slots ? (uint32_t)strtoul(e_slots, NULL, 10) : 0;
+            {
+                const char *e_max = getenv("AIRY_GOV_MAX_CONCURRENT");
+                const char *e_dl = getenv("AIRY_GOV_DEADLINE_MS");
+                if (e_max && e_max[0])
+                    gcfg.max_concurrent = (uint32_t)strtoul(e_max, NULL, 10);
+                if (e_dl && e_dl[0])
+                    gcfg.default_deadline_ms = strtoull(e_dl, NULL, 10);
+            }
+            governance = airy_governance_create(&gcfg);
+            if (governance) {
+                wh_cfg.governance = governance;
+                const char *e_per_node = getenv("AIRY_GOV_TOKEN_PER_NODE");
+                wh_cfg.token_per_node =
+                    (e_per_node && e_per_node[0]) ? strtoull(e_per_node, NULL, 10) : 0;
+                AIRY_LOG_INFO("airy_cli: unified governance attached "
+                              "(token_budget=%llu, slots=%u, max_concurrent=%u, "
+                              "token_per_node=%llu)",
+                              (unsigned long long)gcfg.token_budget, gcfg.concurrency_slots,
+                              gcfg.max_concurrent, (unsigned long long)wh_cfg.token_per_node);
+            } else {
+                AIRY_LOG_WARN("airy_cli: governance create failed, "
+                              "unified governance disabled");
+            }
+        }
+    }
+    rt->governance = governance;
+    airy_work_hall_t *hall = NULL;
+    err = airy_work_hall_create(&wh_cfg, loop, &hall);
+    if (err != AIRY_EOK || !hall) {
+        AIRY_LOG_ERROR("airy_cli: work hall create failed (err=%d)", (int)err);
+        if (wh_cfg.reviewer)
+            airy_execution_review_destroy(wh_cfg.reviewer);
+        rt->reviewer = NULL;
+        return AIRY_ERR_GENERIC_FAIL;
+    }
+    airy_work_hall_bind_ops(hall);
+    rt->hall = hall;
+
+    llm_svc_adapter_config_t chat_cfg;
+    __builtin_memset(&chat_cfg, 0, sizeof(chat_cfg));
+    chat_cfg.llm_d_service_name = "llm_d";
+    chat_cfg.channel_name = "coreloopthree-llm";
+    g_chat_adapter = llm_svc_adapter_create(&chat_cfg);
+    if (!g_chat_adapter)
+        AIRY_LOG_WARN("airy_cli: chat adapter create failed, "
+                      "falling back to task-only mode");
+
+    /* 阶段 4：TUI 面板数据源绑定（任务看板 = work_hall 实时；事件流 =
+     * hall_store gseq 因果序）。面板 ud 生命周期与调用方共存，退出前销毁。
+     * 2026-08-19：绑定可操作动作（详情/取消/过滤），面板从只读升级为可操作。
+     * 绑定不依赖 TUI 激活时刻（F8 之后随时可进入面板模式），ud 持有
+     * 会话级 hall/hall_store 指针，成本可忽略。 */
+    void *board_ud = NULL;
+    void *events_ud = NULL;
+    if (tui) {
+        cli_panel_board_create(hall, &board_ud);
+        cli_panel_events_create(hall_store, &events_ud);
+        if (board_ud) {
+            cli_tui_set_panel(tui, CLI_TUI_MODE_BOARD, board_ud, cli_panel_board_count,
+                              cli_panel_board_line);
+            cli_tui_set_panel_action(tui, CLI_TUI_MODE_BOARD, cli_panel_board_action);
+        }
+        if (events_ud) {
+            cli_tui_set_panel(tui, CLI_TUI_MODE_EVENTS, events_ud, cli_panel_events_count,
+                              cli_panel_events_line);
+            cli_tui_set_panel_action(tui, CLI_TUI_MODE_EVENTS, cli_panel_events_action);
+        }
+    }
+    rt->board_ud = board_ud;
+    rt->events_ud = events_ud;
+
+    return AIRY_EOK;
+}
+
+/* 运行时上下文按序释放（2026-08-22 新增，与 cli_setup_runtime 对称）：
+ * 面板 → reviewer → work_hall → validator → hall_store → governance →
+ * rsched。幂等：全部字段置 NULL，重复调用安全。 */
+static void cli_teardown_runtime(cli_runtime_ctx_t *rt)
+{
+    if (!rt)
+        return;
+    if (rt->events_ud)
+        cli_panel_events_destroy(rt->events_ud);
+    if (rt->board_ud)
+        cli_panel_board_destroy(rt->board_ud);
+    if (rt->reviewer)
+        airy_execution_review_destroy(rt->reviewer);
+    if (rt->hall)
+        airy_work_hall_destroy(rt->hall);
+    if (rt->validator)
+        airy_artifact_validator_destroy(rt->validator);
+    if (rt->hall_store)
+        airy_hall_store_destroy(rt->hall_store);
+    if (rt->governance)
+        airy_governance_destroy(rt->governance);
+    if (rt->rsched)
+        airy_roadmap_sched_destroy(rt->rsched);
+    AIRY_MEMSET(rt, 0, sizeof(*rt));
+}
+
+/* 蓝图三层快速路由（2026-08-22 从主循环提取，收敛圈复杂度）：
+ * L1 状态机命中（零 token）→ 渲染 next_step；L2 语义缓存命中（低 token）
+ * → 重放建议；两条命中路径均写决策链事件流并渲染 turn 分隔，返回 1
+ * （调用方 continue）。MISS_L3（或 rsched 为 NULL）→ 释放 rs_out 后
+ * 返回 0，调用方落回五阶段管线。 */
+static int cli_blueprint_fastpath(airy_roadmap_sched_t *rsched, const char *input,
+                                  uint64_t turn_start)
+{
+    if (!rsched)
+        return 0;
+    char *rs_out = NULL;
+    airy_rs_dispatch_t rs_disp = AIRY_RS_DISPATCH_MISS_L3;
+    airy_err_t rs_err = airy_roadmap_sched_process(rsched, input, NULL, &rs_out, &rs_disp);
+    if (rs_err == AIRY_EOK && rs_disp == AIRY_RS_DISPATCH_HIT_L1) {
+#ifdef AIRY_HAS_CJSON
+        char next_buf[128] = "";
+        if (rs_out) {
+            cJSON *r = cJSON_Parse(rs_out);
+            if (r) {
+                cJSON *n = cJSON_GetObjectItem(r, "next_step");
+                if (cJSON_IsString(n) && n->valuestring)
+                    AIRY_STRNCPY_TERM(next_buf, n->valuestring, sizeof(next_buf));
+                cJSON_Delete(r);
+            }
+        }
+        if (g_cli_json_mode) {
+            cJSON *jroot = cJSON_CreateObject();
+            cJSON_AddStringToObject(jroot, "role", "dual_think");
+            cJSON_AddStringToObject(jroot, "type", "l1_hit");
+            cJSON_AddBoolToObject(jroot, "success", 1);
+            cJSON_AddStringToObject(jroot, "next_step", next_buf);
+            char *js = cJSON_PrintUnformatted(jroot);
+            if (js) {
+                cli_outf("%s\n", js);
+                cJSON_free(js);
+            }
+            cJSON_Delete(jroot);
+        } else if (next_buf[0] && g_cli_print_mode) {
+            /* One-shot server mode (-p): L1 hit = the answer for this
+             * turn; emit the next-step with provenance on stderr. */
+            cli_trace("blueprint", "L1 state machine hit (zero token)");
+            cli_outf("%s\n", next_buf);
+        } else if (next_buf[0]) {
+            char line[1024];
+            snprintf(line, sizeof(line), "L1 blueprint state machine: advance to step "
+                                         "%s%s%s (zero token)",
+                     cli_c(CLR_CYAN), next_buf, cli_c(CLR_RESET));
+            cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
+                                 line);
+        } else
+#endif /* AIRY_HAS_CJSON */
+        {
+            char line[1024];
+            snprintf(line, sizeof(line), "L1 state machine hit (zero token): %s",
+                     rs_out ? rs_out : "{}");
+            cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
+                                 line);
+            cli_trace("blueprint", "%s", line);
+        }
+        /* 阶段 4：蓝图 L1 状态机命中 → 决策链事件（preflight，cognition） */
+        if (g_cli_hall_store) {
+            char ev[512];
+            snprintf(ev, sizeof(ev),
+                     "{\"event\":\"blueprint_hit\",\"layer\":\"L1\",\"result\":%s}",
+                     rs_out ? rs_out : "null");
+            airy_hall_store_write(g_cli_hall_store, "default", "preflight", NULL,
+                                  AIRY_HALL_CAT_CHAIN, "cognition", ev, NULL, 0);
+        }
+        AIRY_FREE(rs_out);
+        if (!g_cli_json_mode)
+            cli_render_turn_separator(cli_now_ms() - turn_start, NULL);
+        return 1;
+    }
+    if (rs_err == AIRY_EOK && rs_disp == AIRY_RS_DISPATCH_HIT_L2) {
+#ifdef AIRY_HAS_CJSON
+        char *sugg = NULL;
+        if (rs_out) {
+            cJSON *r = cJSON_Parse(rs_out);
+            if (r) {
+                cJSON *s = cJSON_GetObjectItem(r, "suggestion");
+                if (cJSON_IsString(s) && s->valuestring)
+                    sugg = AIRY_STRDUP(s->valuestring);
+                cJSON_Delete(r);
+            }
+        }
+        if (sugg && sugg[0]) {
+            if (g_cli_json_mode) {
+                cJSON *jroot = cJSON_CreateObject();
+                cJSON_AddStringToObject(jroot, "role", "super_agent");
+                cJSON_AddStringToObject(jroot, "type", "l2_hit");
+                cJSON_AddBoolToObject(jroot, "success", 1);
+                cJSON_AddStringToObject(jroot, "result", sugg);
+                char *js = cJSON_PrintUnformatted(jroot);
+                if (js) {
+                    cli_outf("%s\n", js);
+                    cJSON_free(js);
+                }
+                cJSON_Delete(jroot);
+            } else if (g_cli_print_mode) {
+                /* One-shot server mode (-p): the cached suggestion is the
+                 * result — emit it, with the replay provenance on stderr. */
+                cli_trace("blueprint",
+                          "L2 semantic cache hit (low token): replaying last result");
+                cli_render_markdown(sugg, 0);
+            } else {
+                cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
+                                     "L2 semantic cache hit (low token): replaying last result");
+                cli_render_super_agent(sugg);
+            }
+            AIRY_FREE(sugg);
+        } else
+#endif /* AIRY_HAS_CJSON */
+        {
+            char line[1024];
+            snprintf(line, sizeof(line), "L2 semantic cache hit (low token): %s",
+                     rs_out ? rs_out : "{}");
+            cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
+                                 line);
+        }
+        /* 阶段 4：蓝图 L2 语义缓存命中 → 决策链事件（preflight，cognition） */
+        if (g_cli_hall_store) {
+            char ev[512];
+            snprintf(ev, sizeof(ev),
+                     "{\"event\":\"blueprint_hit\",\"layer\":\"L2\",\"result\":%s}",
+                     rs_out ? rs_out : "null");
+            airy_hall_store_write(g_cli_hall_store, "default", "preflight", NULL,
+                                  AIRY_HALL_CAT_CHAIN, "cognition", ev, NULL, 0);
+        }
+        AIRY_FREE(rs_out);
+        if (!g_cli_json_mode)
+            cli_render_turn_separator(cli_now_ms() - turn_start, NULL);
+        return 1;
+    }
+    /* L3 全量规划（miss 或语义提示）：消费 rs_out 的 semantic_hint，
+     * 有相似历史任务建议时轻量提示（不改变路由，仅信息增量）。
+     * 命中率审计（2026-08-20）：此前 L2 语义命中被完全丢弃。 */
+    if (rs_out && rs_out[0]) {
+        char *hint = NULL;
+        cJSON *r = cJSON_Parse(rs_out);
+        if (r) {
+            const char *reason = NULL;
+            cJSON *rz = cJSON_GetObjectItem(r, "reason");
+            if (cJSON_IsString(rz))
+                reason = rz->valuestring;
+            if (reason && strcmp(reason, "semantic_hint") == 0) {
+                cJSON *s = cJSON_GetObjectItem(r, "suggestion");
+                if (cJSON_IsString(s) && s->valuestring)
+                    hint = AIRY_STRDUP(s->valuestring);
+            }
+            cJSON_Delete(r);
+        }
+        if (hint) {
+            cli_trace("blueprint", "L2 semantic hint for similar task");
+            if (!g_cli_print_mode && !g_cli_json_mode) {
+                char line[512];
+                snprintf(line, sizeof(line), "检测到相似历史任务，可参考：%s", hint);
+                cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK,
+                                     "blueprint", line);
+            }
+            AIRY_FREE(hint);
+        }
+    }
+    AIRY_FREE(rs_out);
+    return 0;
+}
+
 int main(int argc, char *argv[])
 {
     /* Server one-shot mode (-p/--print): run a single prompt then exit. */
@@ -587,6 +1073,10 @@ int main(int argc, char *argv[])
     char m_s2[128], m_verify[128], m_expert[128];
     cli_think_cfg_load(m_s2, sizeof(m_s2), m_verify, sizeof(m_verify),
                        m_expert, sizeof(m_expert));
+    /* 2.2.1.3：hero 模型名快照（终端 resize / F8 退出重建三区时用） */
+    cli_tui_set_header_models(tui, m_s2[0] ? m_s2 : NULL,
+                              m_verify[0] ? m_verify : NULL,
+                              m_expert[0] ? m_expert : NULL);
 
     cli_print_system_header(m_s2[0] ? m_s2 : NULL,
                             m_verify[0] ? m_verify : NULL,
@@ -601,195 +1091,32 @@ int main(int argc, char *argv[])
     /* Plain TTY: cli_print_system_header already pinned the blue-framed
      * header, keeping the system block fixed above the dialogue. */
 
-    airy_core_loop_t *loop = NULL;
-    airy_err_t err = airy_loop_create(NULL, &loop);
-    if (err != AIRY_EOK || !loop) {
-        AIRY_LOG_ERROR("airy_cli: loop create failed (err=%d)", (int)err);
-        return 1;
-    }
-
+    /* 核心引擎装配（2026-08-22 拆分自 main 初始化段）：loop 创建 +
+     * 记忆引擎注入（2.2.4 对话路径读写）+ cognition 引擎接线（GCCP
+     * 交互回调、TC3 三模型、GRAD 决策链反馈）。失败返回 NULL。 */
     airy_cognition_engine_t *cog = NULL;
-    airy_loop_get_engines(loop, &cog, NULL);
-    if (cog) {
-        airy_cognition_set_gccp_interact(cog, cli_gccp_interact, NULL);
-        AIRY_LOG_INFO("airy_cli: GCCP interaction callback attached");
+    airy_core_loop_t *loop = cli_setup_core_engines(m_s2, m_verify, m_expert, &cog);
+    if (!loop)
+        return 1;
 
-        /* Dual-thinking three-model injection (GRAD separation of powers; user-chosen models):
-          *   AIRY_MODEL_T2    -> model A (generator)
-          *   AIRY_MODEL_T1F   -> model B (context arbiter)
-          *   AIRY_MODEL_T1P   -> model C (logic verifier)
-          * Unset values use the provider default model (backward compatible).
-          * Values were read above for the combined system header. */
-        airy_cognition_set_tc3_models(cog, m_s2[0] ? m_s2 : NULL,
-                                      m_verify[0] ? m_verify : NULL,
-                                      m_expert[0] ? m_expert : NULL);
-        if (m_s2[0] || m_verify[0] || m_expert[0]) {
-            AIRY_LOG_INFO("airy_cli: TC3 models injected (s2=%s verify=%s expert=%s)",
-                          m_s2[0] ? m_s2 : "(default)",
-                          m_verify[0] ? m_verify : "(default)",
-                          m_expert[0] ? m_expert : "(default)");
-        }
-
-        /* Decision B (2026-08-09): three model config points - t2=A (generator, cloud-first),
-          * t1-f=B (arbiter/daily chat, first to activate, local-first), t1-p=C (verifier);
-          * each may use cloud APIs or local endpoints (Ollama/vLLM); the user decides.
-          * The model panel was already rendered inside the blue-framed
-          * system header above (cli_print_system_header); only inject. */
-
-        airy_cognition_set_grad_enabled(cog, 1);
-        /* 2.3.14 GRAD 决策链可见性：注册 feedback 回调，任务规划期
-         * GRAD 阶段进度实时渲染为 [Dual Slow/Prof/Fast Think] 行。 */
-        airy_cognition_set_feedback(cog, cli_grad_feedback_cb, NULL);
-        AIRY_LOG_INFO("airy_cli: GRAD decision-chain feedback attached");
-    }
+    /* 后续初始化段的错误码（rsched / work_hall 创建等） */
+    airy_err_t err = AIRY_EOK;
 
     /* 3. Blueprint scheduling (Roadmap Sched): result feedback hook (synergy point 1).
       * Node final states feed back via progress_cb into the L2 cache / failure fingerprints / L1.
       * P1e: L2 dual-write persistence ($AIRY_HOME/data/agentrt/roadmap/l2_semantic_cache.json,
       * restored on restart); Embedding + HNSW vector index (MemoryRovol, degrades when unlinked).
-      * Creation failure only degrades (no feedback); the CLI main flow continues. */
-    airy_rs_config_t rs_cfg;
-    __builtin_memset(&rs_cfg, 0, sizeof(rs_cfg));
-    {
-        static char rs_persist_path[512];
-        snprintf(rs_persist_path, sizeof(rs_persist_path),
-                 "%s/agentrt/roadmap/l2_semantic_cache.json", airy_data_dir());
-        rs_cfg.l2_persist_path = rs_persist_path;
-    }
-    airy_roadmap_sched_t *rsched = NULL;
-    err = airy_roadmap_sched_create(&rs_cfg, &rsched);
-    if (err != AIRY_EOK || !rsched) {
-        AIRY_LOG_WARN("airy_cli: roadmap_sched create failed (err=%d), "
-                      "execution feed-back disabled",
-                      (int)err);
-        rsched = NULL;
-    }
-
-    /* Decision G (2026-08-09): validation gate - inject an artifact validator.
-      * Rules come from AIRY_VALIDATOR_RULES (JSON); default exit_code=0;
-      * node-level gates live in sched_d write_back; the CLI marks FAIL after wait. */
-    airy_artifact_validator_t *cli_validator = NULL;
-    const char *rules_json = getenv("AIRY_VALIDATOR_RULES");
-    if (!rules_json || !rules_json[0])
-        rules_json = "{\"exit_code\":0}";
-    airy_err_t vrc = airy_artifact_validator_from_json(&cli_validator, rules_json);
-    if (vrc != AIRY_SUCCESS) {
-        AIRY_LOG_WARN("airy_cli: output_validator create failed (err=%d), gate disabled", (int)vrc);
-        cli_validator = NULL;
-    }
-    airy_work_hall_config_t wh_cfg;
-    __builtin_memset(&wh_cfg, 0, sizeof(wh_cfg));
-    wh_cfg.progress_cb = cli_progress_cb;
-    wh_cfg.roadmap_sched = rsched;
-    wh_cfg.output_validator = cli_validator;
-    /* 改进6（P3）: 执行复核管线——wait 返回前对聚合产物跑门禁 -> t2 语义
-     * 复核 -> t1-f 终裁，verdict 写 hall_store verify 事件并回灌 L2（PASS
-     * 可缓存 / DRIFT 不缓存 / REJECT 失效）。t2/t1-f 委托走 llm_d；
-     * llm_d 不可用时降级为纯确定性门禁。 */
-    wh_cfg.reviewer = cli_exec_review_create();
-    if (wh_cfg.reviewer)
-        AIRY_LOG_INFO("airy_cli: execution review pipeline attached (gate -> t2 -> t1-f)");
-    /* Decision C (2026-08-09): task file model - full-visibility storage ($AIRY_HOME/data/agentrt/hall).
-      * Progress/result/issue events go to the hall store for replay and experience mining. */
-    airy_hall_store_t *hall_store = airy_hall_store_create(NULL);
-    if (!hall_store)
-        AIRY_LOG_WARN("airy_cli: hall store create failed, full visibility disabled");
-    g_cli_hall_store = hall_store;
-    wh_cfg.hall_store = hall_store;
-    /* P23 reconcile extension: execution-level failure auto re-dispatch
-     * (opt-in via AIRY_WORK_HALL_REDISPATCH_MAX, 0 = disabled).
-     * The main loop below calls airy_work_hall_redispatch_once() each
-     * iteration to drive the reconcile poll. */
-    {
-        const char *e_rd = getenv("AIRY_WORK_HALL_REDISPATCH_MAX");
-        const char *e_rd_delay = getenv("AIRY_WORK_HALL_REDISPATCH_DELAY_MS");
-        if (e_rd && e_rd[0] && strtol(e_rd, NULL, 10) > 0) {
-            wh_cfg.redispatch_max = (int32_t)strtol(e_rd, NULL, 10);
-            if (e_rd_delay && e_rd_delay[0])
-                wh_cfg.redispatch_delay_ms = (uint32_t)strtoul(e_rd_delay, NULL, 10);
-            AIRY_LOG_INFO("airy_cli: execution reconcile attached "
-                          "(redispatch_max=%d, delay_ms=%u)",
-                          wh_cfg.redispatch_max, wh_cfg.redispatch_delay_ms);
-        }
-    }
-    /* Decision E (2026-08-09): workspace isolation of the main workspace path.
-      * Enabled when AIRY_WORKSPACE_MAIN_DIR is set (snapshot the main workspace -> a sandbox
-      * -> merge artifacts back); otherwise unchanged (the executor touches the main workspace).
-      * AIRY_WORKSPACE_ISOLATION=0 disables isolation further (snapshot/merge return ENOTSUP).
-      * When unset, default the main workspace to the CLI's cwd so the agent acts
-      * on the real project tree (snapshot-isolated) instead of an empty dir —
-      * otherwise the agent exhausts its tool rounds exploring a bare workspace
-      * (P0-1 end-to-end: "create a test file" -> tool loop exceeded). */
-    {
-        const char *ws_main = getenv("AIRY_WORKSPACE_MAIN_DIR");
-        static char ws_main_buf[1024];
-        if (ws_main && ws_main[0]) {
-            wh_cfg.main_workspace_dir = ws_main;
-        } else {
-#if AIRY_PLATFORM_POSIX
-            if (getcwd(ws_main_buf, sizeof(ws_main_buf)))
-                wh_cfg.main_workspace_dir = ws_main_buf;
-#else
-            if (_getcwd(ws_main_buf, (int)sizeof(ws_main_buf)))
-                wh_cfg.main_workspace_dir = ws_main_buf;
-#endif
-        }
-        if (wh_cfg.main_workspace_dir)
-            AIRY_LOG_INFO("airy_cli: main workspace = %s", wh_cfg.main_workspace_dir);
-    }
-    /* Decision F (2026-08-09): unified governance via environment variables (GRAD axiom II
-      * R_total runtime projection). AIRY_GOV_TOKEN_BUDGET (global budget, 0=unlimited) /
-      * AIRY_GOV_SLOTS (concurrent slots, 0=default 8) / AIRY_GOV_MAX_CONCURRENT (hard
-      * cap, 0=no hard cap) / AIRY_GOV_TOKEN_PER_NODE (per-node estimate, task-level
-      * gate) / AIRY_GOV_DEADLINE_MS (graph default deadline, 0=unlimited).
-      * If none are set (no budget and no slots), governance is off. */
-    airy_governance_t *governance = NULL;
-    {
-        const char *e_budget = getenv("AIRY_GOV_TOKEN_BUDGET");
-        const char *e_slots = getenv("AIRY_GOV_SLOTS");
-        if ((e_budget && e_budget[0] && strtoull(e_budget, NULL, 10) > 0) ||
-            (e_slots && e_slots[0] && strtoul(e_slots, NULL, 10) > 0)) {
-            airy_governance_config_t gcfg;
-            __builtin_memset(&gcfg, 0, sizeof(gcfg));
-            gcfg.token_budget = e_budget ? strtoull(e_budget, NULL, 10) : 0;
-            gcfg.concurrency_slots = e_slots ? (uint32_t)strtoul(e_slots, NULL, 10) : 0;
-            {
-                const char *e_max = getenv("AIRY_GOV_MAX_CONCURRENT");
-                const char *e_dl = getenv("AIRY_GOV_DEADLINE_MS");
-                if (e_max && e_max[0])
-                    gcfg.max_concurrent = (uint32_t)strtoul(e_max, NULL, 10);
-                if (e_dl && e_dl[0])
-                    gcfg.default_deadline_ms = strtoull(e_dl, NULL, 10);
-            }
-            governance = airy_governance_create(&gcfg);
-            if (governance) {
-                wh_cfg.governance = governance;
-                const char *e_per_node = getenv("AIRY_GOV_TOKEN_PER_NODE");
-                wh_cfg.token_per_node =
-                    (e_per_node && e_per_node[0]) ? strtoull(e_per_node, NULL, 10) : 0;
-                AIRY_LOG_INFO("airy_cli: unified governance attached "
-                              "(token_budget=%llu, slots=%u, max_concurrent=%u, "
-                              "token_per_node=%llu)",
-                              (unsigned long long)gcfg.token_budget, gcfg.concurrency_slots,
-                              gcfg.max_concurrent, (unsigned long long)wh_cfg.token_per_node);
-            } else {
-                AIRY_LOG_WARN("airy_cli: governance create failed, "
-                              "unified governance disabled");
-            }
-        }
-    }
-    airy_work_hall_t *hall = NULL;
-    err = airy_work_hall_create(&wh_cfg, loop, &hall);
-    if (err != AIRY_EOK || !hall) {
-        AIRY_LOG_ERROR("airy_cli: work hall create failed (err=%d)", (int)err);
-        if (wh_cfg.reviewer)
-            airy_execution_review_destroy(wh_cfg.reviewer);
-        if (rsched)
-            airy_roadmap_sched_destroy(rsched);
+      * Creation failure only degrades (no feedback); the CLI main flow continues.
+      * 运行时上下文装配（2026-08-22 拆分自 main）：rsched / validator /
+      * hall_store / governance / work_hall / chat adapter / 自愈 / TUI 面板，
+      * 统一收敛进 cli_runtime_ctx_t（cli_setup_runtime / cli_teardown_runtime
+      * 对称装配与释放，main 不直接持有组件）。 */
+    cli_runtime_ctx_t rt;
+    err = cli_setup_runtime(loop, tui, &rt);
+    if (err != AIRY_EOK) {
         airy_loop_destroy(loop);
         return 1;
     }
-    airy_work_hall_bind_ops(hall);
 
     /* Task-set cancellation: the engine holds g_cli_cancel; after SIGINT,
       * run_to_completion polls and aborts (after the current node finishes) */
@@ -797,19 +1124,10 @@ int main(int argc, char *argv[])
     if (err != AIRY_EOK)
         AIRY_LOG_WARN("airy_cli: set cancel flag failed (err=%d)", (int)err);
 
-    llm_svc_adapter_config_t chat_cfg;
-    __builtin_memset(&chat_cfg, 0, sizeof(chat_cfg));
-    chat_cfg.llm_d_service_name = "llm_d";
-    chat_cfg.channel_name = "coreloopthree-llm";
-    g_chat_adapter = llm_svc_adapter_create(&chat_cfg);
-    if (!g_chat_adapter)
-        AIRY_LOG_WARN("airy_cli: chat adapter create failed, "
-                      "falling back to task-only mode");
-
     char input[8192];
     int quit_flag = 0;
     int switch_tui_flag = 0;
-    cli_cmd_ctx_t cmd_ctx = {.hall = hall, .quit = &quit_flag, .switch_tui = &switch_tui_flag};
+    cli_cmd_ctx_t cmd_ctx = {.hall = rt.hall, .quit = &quit_flag, .switch_tui = &switch_tui_flag};
     int print_consumed = 0;
 
     /* 阶段 2 生命周期层 reconcile：agent 自愈重启（AIRY_SELF_HEAL=1 或
@@ -819,28 +1137,6 @@ int main(int argc, char *argv[])
         const char *e_sh_agents = getenv("AIRY_SELF_HEAL_AGENTS");
         if ((e_sh && e_sh[0] && strcmp(e_sh, "0") != 0) || (e_sh_agents && e_sh_agents[0]))
             cli_daemon_lifecycle_init(e_sh_agents);
-    }
-
-    /* 阶段 4：TUI 面板数据源绑定（任务看板 = work_hall 实时；事件流 =
-     * hall_store gseq 因果序）。面板 ud 生命周期与本函数共存，退出前销毁。
-     * 2026-08-19：绑定可操作动作（详情/取消/过滤），面板从只读升级为可操作。
-     * 绑定不依赖 TUI 激活时刻（F8 之后随时可进入面板模式），ud 持有
-     * 会话级 hall/hall_store 指针，成本可忽略。 */
-    void *board_ud = NULL;
-    void *events_ud = NULL;
-    if (tui) {
-        cli_panel_board_create(hall, &board_ud);
-        cli_panel_events_create(hall_store, &events_ud);
-        if (board_ud) {
-            cli_tui_set_panel(tui, CLI_TUI_MODE_BOARD, board_ud, cli_panel_board_count,
-                              cli_panel_board_line);
-            cli_tui_set_panel_action(tui, CLI_TUI_MODE_BOARD, cli_panel_board_action);
-        }
-        if (events_ud) {
-            cli_tui_set_panel(tui, CLI_TUI_MODE_EVENTS, events_ud, cli_panel_events_count,
-                              cli_panel_events_line);
-            cli_tui_set_panel_action(tui, CLI_TUI_MODE_EVENTS, cli_panel_events_action);
-        }
     }
 
     for (;;) {
@@ -859,7 +1155,7 @@ int main(int argc, char *argv[])
         /* P23 reconcile extension: fire due execution-level re-dispatches
          * (no-op when redispatch_max == 0). Controller-driven reconcile —
          * each turn polls the failed-execution queue. */
-        (void)airy_work_hall_redispatch_once(hall);
+        (void)airy_work_hall_redispatch_once(rt.hall);
         /* 阶段 2 生命周期层 reconcile：agent 自愈重启（AIRY_SELF_HEAL=1 或
          * AIRY_SELF_HEAL_AGENTS 列表启用；未启用时 no-op）。与执行层
          * redispatch 并列，构成声明式自愈第三层。 */
@@ -884,6 +1180,14 @@ int main(int argc, char *argv[])
                     input[--input_len] = '\0';
                 if (input_len == 0)
                     continue; /* 空行跳过；EOF 由 fgets 返回 NULL 终止循环 */
+                /* 纯空白行（空格/Tab）：跳过，不进入对话（与交互模式一致）。 */
+                {
+                    size_t nz = 0;
+                    while (nz < input_len && (input[nz] == ' ' || input[nz] == '\t'))
+                        nz++;
+                    if (nz == input_len)
+                        continue;
+                }
             }
             /* One-shot server mode still honors slash commands: /daemon etc.
              * are dispatchable, so scripting `-p "/daemon status"` works the
@@ -933,14 +1237,14 @@ int main(int argc, char *argv[])
                 continue;
             }
             if (rl == 3) {
-                /* 2.3.7：全屏 F8 → 退出回行渲染流式模式。 */
+                /* 2.3.7：全屏 F8 → 退出回行渲染流式模式。
+                 * 2.2.1.2 修复：退出 alt screen 后，主屏仍是进入 TUI 前
+                 * 的画面——直接重 pin 会让新输出与残留内容重叠（用户
+                 * 反馈"英雄区混乱/界面重叠"）。统一走三区重建：解 pin →
+                 * 清屏 → 重绘 hero → 重放对话历史 → 光标回滚动区末行。 */
                 cli_tui_leave(tui);
                 cli_render_set_tui(NULL);
-                /* Re-pin the same 6-line hero block; the count must match
-                 * CLI_HDR_LINES or the scroll region drifts and dialogue
-                 * output overlaps the header. The bottom row stays reserved
-                 * as the fixed input zone (three-zone layout). */
-                cli_term_header_pin(CLI_HDR_LINES, 2);
+                cli_tui_rebuild_three_zone(tui);
                 continue;
             }
             /* 三区布局：清掉输入行回显并把光标送回滚动区末行，之后无论
@@ -955,8 +1259,33 @@ int main(int argc, char *argv[])
             }
             if (input_len == 0)
                 continue;
+            /* 纯空白输入（空格/Tab 串）：静默跳过，不进入对话与命令分发。
+             * 此前仅跳过空串，空格串会被当作对话发给 LLM（无效轮次）。 */
+            {
+                size_t nz = 0;
+                while (nz < input_len && (input[nz] == ' ' || input[nz] == '\t'))
+                    nz++;
+                if (nz == input_len)
+                    continue;
+            }
             if (strcmp(input, "quit") == 0 || strcmp(input, "exit") == 0)
                 break;
+            /* hero 提示 "? /help 查看命令"：单独的 ? 即帮助入口，
+             * 不应作为对话发送给 LLM（2026-08-22 交互一致性修复）。
+             * trim 尾部空白后比较（用户可能输入 "? " 或 "？"）。 */
+            if (input[0] == '?' || input[0] == '\xef') { /* ? 或 UTF-8 ？(0xEF 起始) */
+                size_t tl = input_len;
+                while (tl > 0 && (input[tl - 1] == ' ' || input[tl - 1] == '\t'))
+                    tl--;
+                int is_qmark = (tl == 1 && input[0] == '?') ||
+                               (tl == 3 && (unsigned char)input[0] == 0xEF &&
+                                (unsigned char)input[1] == 0xBC &&
+                                (unsigned char)input[2] == 0x9F);
+                if (is_qmark) {
+                    cmd_help(NULL, &cmd_ctx);
+                    continue;
+                }
+            }
 
             if (cli_dispatch_command(input, &cmd_ctx)) {
                 if (quit_flag)
@@ -977,170 +1306,8 @@ int main(int argc, char *argv[])
           *   L1 state-machine hit (zero tokens) -> next step;
           *   L2 semantic-cache hit (few tokens) -> a suggestion;
           *   MISS_L3 -> falls through to the five-phase pipeline. */
-        if (rsched) {
-            char *rs_out = NULL;
-            airy_rs_dispatch_t rs_disp = AIRY_RS_DISPATCH_MISS_L3;
-            airy_err_t rs_err = airy_roadmap_sched_process(rsched, input, NULL, &rs_out, &rs_disp);
-            if (rs_err == AIRY_EOK && rs_disp == AIRY_RS_DISPATCH_HIT_L1) {
-#ifdef AIRY_HAS_CJSON
-                char next_buf[128] = "";
-                if (rs_out) {
-                    cJSON *r = cJSON_Parse(rs_out);
-                    if (r) {
-                        cJSON *n = cJSON_GetObjectItem(r, "next_step");
-                        if (cJSON_IsString(n) && n->valuestring)
-                            AIRY_STRNCPY_TERM(next_buf, n->valuestring, sizeof(next_buf));
-                        cJSON_Delete(r);
-                    }
-                }
-                if (g_cli_json_mode) {
-                    cJSON *jroot = cJSON_CreateObject();
-                    cJSON_AddStringToObject(jroot, "role", "dual_think");
-                    cJSON_AddStringToObject(jroot, "type", "l1_hit");
-                    cJSON_AddBoolToObject(jroot, "success", 1);
-                    cJSON_AddStringToObject(jroot, "next_step", next_buf);
-                    char *js = cJSON_PrintUnformatted(jroot);
-                    if (js) {
-                        cli_outf("%s\n", js);
-                        cJSON_free(js);
-                    }
-                    cJSON_Delete(jroot);
-                } else if (next_buf[0] && g_cli_print_mode) {
-                    /* One-shot server mode (-p): L1 hit = the answer for this
-                     * turn; emit the next-step with provenance on stderr. */
-                    cli_trace("blueprint", "L1 state machine hit (zero token)");
-                    cli_outf("%s\n", next_buf);
-                } else if (next_buf[0]) {
-                    char line[1024];
-                    snprintf(line, sizeof(line), "L1 blueprint state machine: advance to step "
-                                                 "%s%s%s (zero token)",
-                             cli_c(CLR_CYAN), next_buf, cli_c(CLR_RESET));
-                    cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
-                                         line);
-                } else
-#endif /* AIRY_HAS_CJSON */
-                {
-                    char line[1024];
-                    snprintf(line, sizeof(line), "L1 state machine hit (zero token): %s",
-                             rs_out ? rs_out : "{}");
-                    cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
-                                         line);
-                    cli_trace("blueprint", "%s", line);
-                }
-                /* 阶段 4：蓝图 L1 状态机命中 → 决策链事件（preflight，cognition） */
-                if (g_cli_hall_store) {
-                    char ev[512];
-                    snprintf(ev, sizeof(ev),
-                             "{\"event\":\"blueprint_hit\",\"layer\":\"L1\",\"result\":%s}",
-                             rs_out ? rs_out : "null");
-                    airy_hall_store_write(g_cli_hall_store, "default", "preflight", NULL,
-                                          AIRY_HALL_CAT_CHAIN, "cognition", ev, NULL, 0);
-                }
-                AIRY_FREE(rs_out);
-                if (!g_cli_json_mode)
-                    cli_render_turn_separator(cli_now_ms() - turn_start, NULL);
-                continue;
-            }
-            if (rs_err == AIRY_EOK && rs_disp == AIRY_RS_DISPATCH_HIT_L2) {
-#ifdef AIRY_HAS_CJSON
-                char *sugg = NULL;
-                if (rs_out) {
-                    cJSON *r = cJSON_Parse(rs_out);
-                    if (r) {
-                        cJSON *s = cJSON_GetObjectItem(r, "suggestion");
-                        if (cJSON_IsString(s) && s->valuestring)
-                            sugg = AIRY_STRDUP(s->valuestring);
-                        cJSON_Delete(r);
-                    }
-                }
-                if (sugg && sugg[0]) {
-                    if (g_cli_json_mode) {
-#ifdef AIRY_HAS_CJSON
-                        cJSON *jroot = cJSON_CreateObject();
-                        cJSON_AddStringToObject(jroot, "role", "super_agent");
-                        cJSON_AddStringToObject(jroot, "type", "l2_hit");
-                        cJSON_AddBoolToObject(jroot, "success", 1);
-                        cJSON_AddStringToObject(jroot, "result", sugg);
-                        char *js = cJSON_PrintUnformatted(jroot);
-                        if (js) {
-                            cli_outf("%s\n", js);
-                            cJSON_free(js);
-                        }
-                        cJSON_Delete(jroot);
-#else
-                        cli_outf("{\"role\":\"super_agent\",\"type\":\"l2_hit\",\"success\":true,"
-                                 "\"result\":\"%s\"}\n",
-                                 sugg);
-#endif /* AIRY_HAS_CJSON */
-                    } else if (g_cli_print_mode) {
-                        /* One-shot server mode (-p): the cached suggestion is the
-                         * result — emit it, with the replay provenance on stderr.
-                         * 走 markdown 渲染：缓存内容同样可能含 [code] 标签，
-                         * 直出会裸露（L2 重放绕过流式归一化）。 */
-                        cli_trace("blueprint",
-                                  "L2 semantic cache hit (low token): replaying last result");
-                        cli_render_markdown(sugg, 0);
-                    } else {
-                        cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
-                                             "L2 semantic cache hit (low token): replaying last result");
-                        cli_render_super_agent(sugg);
-                    }
-                    AIRY_FREE(sugg);
-                } else
-#endif /* AIRY_HAS_CJSON */
-                {
-                    char line[1024];
-                    snprintf(line, sizeof(line), "L2 semantic cache hit (low token): %s",
-                             rs_out ? rs_out : "{}");
-                    cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
-                                         line);
-                }
-                /* 阶段 4：蓝图 L2 语义缓存命中 → 决策链事件（preflight，cognition） */
-                if (g_cli_hall_store) {
-                    char ev[512];
-                    snprintf(ev, sizeof(ev),
-                             "{\"event\":\"blueprint_hit\",\"layer\":\"L2\",\"result\":%s}",
-                             rs_out ? rs_out : "null");
-                    airy_hall_store_write(g_cli_hall_store, "default", "preflight", NULL,
-                                          AIRY_HALL_CAT_CHAIN, "cognition", ev, NULL, 0);
-                }
-                AIRY_FREE(rs_out);
-                if (!g_cli_json_mode)
-                    cli_render_turn_separator(cli_now_ms() - turn_start, NULL);
-                continue;
-            }
-            /* L3 全量规划（miss 或语义提示）：消费 rs_out 的 semantic_hint，
-             * 有相似历史任务建议时轻量提示（不改变路由，仅信息增量）。
-             * 命中率审计（2026-08-20）：此前 L2 语义命中被完全丢弃。 */
-            if (rs_out && rs_out[0]) {
-                char *hint = NULL;
-                cJSON *r = cJSON_Parse(rs_out);
-                if (r) {
-                    const char *reason = NULL;
-                    cJSON *rz = cJSON_GetObjectItem(r, "reason");
-                    if (cJSON_IsString(rz))
-                        reason = rz->valuestring;
-                    if (reason && strcmp(reason, "semantic_hint") == 0) {
-                        cJSON *s = cJSON_GetObjectItem(r, "suggestion");
-                        if (cJSON_IsString(s) && s->valuestring)
-                            hint = AIRY_STRDUP(s->valuestring);
-                    }
-                    cJSON_Delete(r);
-                }
-                if (hint) {
-                    cli_trace("blueprint", "L2 semantic hint for similar task");
-                    if (!g_cli_print_mode && !g_cli_json_mode) {
-                        char line[512];
-                        snprintf(line, sizeof(line), "检测到相似历史任务，可参考：%s",
-                                 hint);
-                        cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK,
-                                             "blueprint", line);
-                    }
-                    AIRY_FREE(hint);
-                }
-            }
-            AIRY_FREE(rs_out);
-        }
+        if (cli_blueprint_fastpath(rt.rsched, input, turn_start))
+            continue;
 
         int is_task = cli_classify_input(input);
         cli_trace("intent", "%s", is_task ? "task" : "chat");
@@ -1183,8 +1350,8 @@ int main(int argc, char *argv[])
         }
         /* 4.1.5 Absorb converged blueprints: register the L1 state machine and reset the TTL,
           * so later "continue/next" hits L1 (zero-token progress). Failure only degrades. */
-        if (rsched)
-            airy_roadmap_sched_absorb(rsched, plan, NULL, NULL);
+        if (rt.rsched)
+            airy_roadmap_sched_absorb(rt.rsched, plan, NULL, NULL);
         cli_trace("plan", "plan_id=%s nodes=%zu entry=%zu",
                   plan->task_plan_id ? plan->task_plan_id : "?",
                   plan->task_plan_node_count, plan->task_plan_entry_count);
@@ -1256,9 +1423,9 @@ int main(int argc, char *argv[])
          * invariant_guard）判定产物。plan 生命周期覆盖 submit~wait，
          * 本轮结束后由调用方统一释放。 */
         if (!sched_remote)
-            airy_work_hall_set_blueprint(hall, plan);
+            airy_work_hall_set_blueprint(rt.hall, plan);
         if (sched_remote) {
-            err = cli_dag_submit_remote(sched_sock, wf, input, wh_cfg.main_workspace_dir, &exec_id);
+            err = cli_dag_submit_remote(sched_sock, wf, input, rt.main_workspace_dir, &exec_id);
             if (err != AIRY_EOK || !exec_id) {
                 char line[128];
                 snprintf(line, sizeof(line), "远程提交失败（%s），已回退本地执行。",
@@ -1273,13 +1440,13 @@ int main(int argc, char *argv[])
             }
         }
         if (!sched_remote) {
-            err = airy_work_hall_submit(hall, wf, input, &exec_id);
+            err = airy_work_hall_submit(rt.hall, wf, input, &exec_id);
             if (err != AIRY_EOK || !exec_id) {
                 char line[128];
                 snprintf(line, sizeof(line), "任务提交失败：%s", cli_err_desc((int)err));
                 cli_render_sub_agent_line(CLI_ROLE_ERROR, "hall", line);
                 /* 改进6（P3）: 提交失败即解绑蓝图（BORROW 指针随 plan 释放失效） */
-                airy_work_hall_set_blueprint(hall, NULL);
+                airy_work_hall_set_blueprint(rt.hall, NULL);
                 airy_workflow_free(wf);
                 airy_task_plan_free(plan);
                 continue;
@@ -1383,7 +1550,7 @@ int main(int argc, char *argv[])
                 }
             } else {
                 airy_work_hall_entry_t *entry = NULL;
-                airy_err_t st_err = airy_work_hall_status(hall, exec_id, &entry);
+                airy_err_t st_err = airy_work_hall_status(rt.hall, exec_id, &entry);
                 if (st_err != AIRY_EOK || !entry) {
                     cli_spinner_stop(0, "status query failed");
                     spin_running = 0;
@@ -1453,7 +1620,7 @@ int main(int argc, char *argv[])
         }
 
         uint32_t vf_before = 0;
-        airy_work_hall_verify_stats(hall, NULL, &vf_before, NULL);
+        airy_work_hall_verify_stats(rt.hall, NULL, &vf_before, NULL);
         char *result = NULL;
         cli_trace("wait", "%s exec=%s awaiting completion (polls=%d)", CLI_ICON_DIAMOND, exec_id,
                   board_polls);
@@ -1461,7 +1628,7 @@ int main(int argc, char *argv[])
          * 线程创建失败时退化回阻塞 wait（原语义，功能不受影响）。 */
         cli_task_wait_ctx_t wctx;
         __builtin_memset(&wctx, 0, sizeof(wctx));
-        wctx.hall = hall;
+        wctx.hall = rt.hall;
         wctx.sched_sock = sched_remote ? sched_sock : NULL;
         wctx.exec_id = exec_id;
         wctx.sched_remote = sched_remote;
@@ -1484,8 +1651,8 @@ int main(int argc, char *argv[])
             /* 线程创建失败：回退阻塞 wait（远程） */
             err = cli_dag_wait_remote(sched_sock, exec_id, &result);
         } else {
-            err = airy_work_hall_wait(hall, exec_id, 0, &result);
-            airy_work_hall_set_blueprint(hall, NULL);
+            err = airy_work_hall_wait(rt.hall, exec_id, 0, &result);
+            airy_work_hall_set_blueprint(rt.hall, NULL);
         }
         cli_trace("wait", "%s done err=%d has_result=%d", CLI_ICON_DONE, (int)err,
                   result ? 1 : 0);
@@ -1514,13 +1681,13 @@ int main(int argc, char *argv[])
          * 产物校验失败提示（详见 cli_task_result_render）；返回真实成败
          * 供下方 L2 语义缓存 absorb 决定 SUCCESS / NORMAL_FAIL 指纹。 */
         int task_succeeded =
-            cli_task_result_render(result, err, exec_id, g_cli_cancel, hall, vf_before);
+            cli_task_result_render(result, err, exec_id, g_cli_cancel, rt.hall, vf_before);
         /* L2 semantic cache write-back: register the executed blueprint under the
           * user's original intent, so a repeated or similar task hits L2 (low token)
           * instead of a full L3 replan. Absorb requires PASS + SUCCESS to admit;
           * a failed/canceled run is absorbed as a NORMAL_FAIL fingerprint instead
           * (never cached as a success, avoiding L2 cache poisoning). */
-        if (rsched && !g_cli_cancel && err == AIRY_EOK && result && input[0]) {
+        if (rt.rsched && !g_cli_cancel && err == AIRY_EOK && result && input[0]) {
             airy_rs_absorb_meta_t rmeta;
             __builtin_memset(&rmeta, 0, sizeof(rmeta));
             rmeta.node_id = input;
@@ -1534,7 +1701,7 @@ int main(int argc, char *argv[])
              * 产物入 L2 会作为"已验证成功"的记忆污染后续相似任务。
              * work_hall 已在 wait 返回前把 verdict 记录到 board entry。 */
             {
-                const char *rv = hall ? airy_work_hall_entry_verdict(hall, exec_id) : "";
+                const char *rv = rt.hall ? airy_work_hall_entry_verdict(rt.hall, exec_id) : "";
                 int review_rejected =
                     (strcmp(rv, "DRIFT") == 0 || strcmp(rv, "REJECT") == 0);
                 if (task_succeeded && !review_rejected) {
@@ -1545,7 +1712,7 @@ int main(int argc, char *argv[])
                     rmeta.verify = AIRY_RS_VERIFY_FAIL;
                 }
             }
-            airy_roadmap_sched_absorb(rsched, NULL, exec_id, &rmeta);
+            airy_roadmap_sched_absorb(rt.rsched, NULL, exec_id, &rmeta);
         }
         {
             char metrics[128];
@@ -1567,27 +1734,14 @@ int main(int argc, char *argv[])
 
     if (g_chat_adapter)
         llm_svc_adapter_destroy(g_chat_adapter);
-    /* 改进6（P3）: 释放执行复核器（t2/t1-f LLM 委托随 reviewer 销毁） */
-    if (wh_cfg.reviewer)
-        airy_execution_review_destroy(wh_cfg.reviewer);
-    airy_work_hall_destroy(hall);
-    if (cli_validator)
-        airy_artifact_validator_destroy(cli_validator);
-    if (hall_store)
-        airy_hall_store_destroy(hall_store);
-    if (governance)
-        airy_governance_destroy(governance);
-    if (rsched)
-        airy_roadmap_sched_destroy(rsched);
+    /* 运行时上下文统一释放（2026-08-22 收敛进 cli_teardown_runtime）：
+     * 面板 → reviewer → work_hall → validator → hall_store → governance
+     * → rsched，与 cli_setup_runtime 装配对称，main 不再逐组件释放。 */
+    cli_teardown_runtime(&rt);
     airy_loop_destroy(loop);
     /* Leave the full-screen TUI page (restore alt screen + raw mode) before
      * the farewell so it renders in the normal terminal again. The pinned
      * header scroll region only applies to the line-oriented mode. */
-    /* 阶段 4：面板数据源先于 TUI 引擎销毁（引擎不持有面板内存） */
-    if (events_ud)
-        cli_panel_events_destroy(events_ud);
-    if (board_ud)
-        cli_panel_board_destroy(board_ud);
     cli_render_set_tui(NULL);
     cli_tui_destroy(tui);
 

@@ -39,6 +39,12 @@
 #include <signal.h>
 #include <stddef.h>
 
+/* 对话记忆引擎（2.2.4）：由 main.c 在 loop 创建后注入，
+ * cli_chat.c 在对话路径读写记忆（此前对话路径零记忆接线）。 */
+struct airy_memory_engine;
+typedef struct airy_memory_engine airy_memory_engine_t;
+extern airy_memory_engine_t *g_cli_memory_engine;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
