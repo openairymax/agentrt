@@ -7,7 +7,10 @@
  *
  * When AIRY_THINK_SOCK is set, cognition planning goes through daemon RPC
  * (process method on think.sock, 120s timeout); the response is parsed
- * twice and the plan segment is restored to airy_task_plan_t. On failure
+ * twice and the plan segment is restored to airy_task_plan_t. GCCP
+ * two-pass interaction (P-A): when think_d returns gccp_need_interaction=1,
+ * the question set is rendered to the user via cli_gccp_interact and the
+ * collected answers are re-sent as gccp_answers (second pass). On failure
  * no data is fabricated; the caller falls back to the embedded engine.
  */
 
@@ -28,6 +31,144 @@
 #ifdef AIRY_HAS_CJSON
 #include <cjson/cJSON.h>
 #endif
+
+/* 单轮 think.process RPC：携带 prompt 与可选 gccp_answers 调用 think_d，
+ * 返回解析后的内层 JSON 根（OWNER，调用方 cJSON_Delete）。
+ * 失败返回 NULL，err_out（可选）带回错误码。 */
+static cJSON *cli_think_rpc_round(const char *think_sock, const char *prompt,
+                                  const char *gccp_answers, int *err_out)
+{
+    if (err_out)
+        *err_out = AIRY_SUCCESS;
+
+    cJSON *params = cJSON_CreateObject();
+    if (!params) {
+        if (err_out)
+            *err_out = AIRY_ERR_OUT_OF_MEMORY;
+        return NULL;
+    }
+    cJSON *prompt_str = cJSON_CreateString(prompt);
+    if (!prompt_str) {
+        cJSON_Delete(params);
+        if (err_out)
+            *err_out = AIRY_ERR_OUT_OF_MEMORY;
+        return NULL;
+    }
+    cJSON_AddItemToObject(params, "prompt", prompt_str);
+    if (gccp_answers && gccp_answers[0]) {
+        cJSON *ans_str = cJSON_CreateString(gccp_answers);
+        if (!ans_str) {
+            cJSON_Delete(params);
+            if (err_out)
+                *err_out = AIRY_ERR_OUT_OF_MEMORY;
+            return NULL;
+        }
+        cJSON_AddItemToObject(params, "gccp_answers", ans_str);
+    }
+
+    char *params_json = cJSON_PrintUnformatted(params);
+    cJSON_Delete(params);
+    if (!params_json) {
+        if (err_out)
+            *err_out = AIRY_ERR_OUT_OF_MEMORY;
+        return NULL;
+    }
+
+    char *rpc_result = NULL;
+    int rc = daemon_rpc_call(think_sock, "process", params_json, &rpc_result, 120000);
+    AIRY_FREE(params_json);
+    if (rc != AIRY_SUCCESS || !rpc_result) {
+        AIRY_FREE(rpc_result);
+        if (err_out)
+            *err_out = rc;
+        return NULL;
+    }
+
+    cJSON *outer = cJSON_Parse(rpc_result);
+    AIRY_FREE(rpc_result);
+    if (!outer) {
+        if (err_out)
+            *err_out = AIRY_ERR_PARSE_ERROR;
+        return NULL;
+    }
+    cJSON *inner_root = NULL;
+    if (cJSON_IsString(outer) && outer->valuestring)
+        inner_root = cJSON_Parse(outer->valuestring);
+    cJSON_Delete(outer);
+    if (!inner_root) {
+        if (err_out)
+            *err_out = AIRY_ERR_PARSE_ERROR;
+        return NULL;
+    }
+    return inner_root;
+}
+
+/* think_d 返回的 gccp_questions JSON 数组 -> airy_gccp_probe_t。
+ * 问题集来自远端引擎（与本地 probe 同构），prefill.raw_prompt 回填原始
+ * 指令供 cli_gccp_interact 的逐问追问使用。OWNER：airy_gccp_probe_free。 */
+static int cli_think_gccp_probe_build(const char *questions_json, const char *raw_prompt,
+                                      airy_gccp_probe_t **out_probe)
+{
+    if (!out_probe)
+        return AIRY_ERR_INVALID_PARAM;
+    *out_probe = NULL;
+    if (!questions_json || !questions_json[0] || !raw_prompt)
+        return AIRY_ERR_INVALID_PARAM;
+
+    cJSON *arr = cJSON_Parse(questions_json);
+    if (!cJSON_IsArray(arr)) {
+        if (arr)
+            cJSON_Delete(arr);
+        return AIRY_ERR_PARSE_ERROR;
+    }
+    int n = cJSON_GetArraySize(arr);
+
+    airy_gccp_probe_t *probe = (airy_gccp_probe_t *)AIRY_CALLOC(1, sizeof(airy_gccp_probe_t));
+    if (!probe) {
+        cJSON_Delete(arr);
+        return AIRY_ERR_OUT_OF_MEMORY;
+    }
+    probe->prefill = (airy_gccp_goal_t *)AIRY_CALLOC(1, sizeof(airy_gccp_goal_t));
+    if (!probe->prefill) {
+        AIRY_FREE(probe);
+        cJSON_Delete(arr);
+        return AIRY_ERR_OUT_OF_MEMORY;
+    }
+    probe->prefill->raw_prompt = AIRY_STRDUP(raw_prompt);
+    probe->question_count = (size_t)n;
+    probe->questions = (airy_gccp_question_t *)AIRY_CALLOC(
+        n > 0 ? (size_t)n : 1u, sizeof(airy_gccp_question_t));
+    if (!probe->questions) {
+        airy_gccp_probe_free(probe);
+        cJSON_Delete(arr);
+        return AIRY_ERR_OUT_OF_MEMORY;
+    }
+
+    for (int i = 0; i < n; i++) {
+        cJSON *qj = cJSON_GetArrayItem(arr, i);
+        if (!qj)
+            continue;
+        cJSON *f = cJSON_GetObjectItem(qj, "id");
+        if (cJSON_IsString(f) && f->valuestring)
+            AIRY_STRNCPY_TERM(probe->questions[i].id, f->valuestring,
+                              sizeof(probe->questions[i].id));
+        f = cJSON_GetObjectItem(qj, "question");
+        if (cJSON_IsString(f) && f->valuestring)
+            AIRY_STRNCPY_TERM(probe->questions[i].question, f->valuestring,
+                              sizeof(probe->questions[i].question));
+        f = cJSON_GetObjectItem(qj, "hint");
+        if (cJSON_IsString(f) && f->valuestring)
+            AIRY_STRNCPY_TERM(probe->questions[i].hint, f->valuestring,
+                              sizeof(probe->questions[i].hint));
+        f = cJSON_GetObjectItem(qj, "required");
+        if (f && cJSON_IsTrue(f))
+            probe->questions[i].required = 1;
+    }
+
+    cJSON_Delete(arr);
+    *out_probe = probe;
+    return AIRY_SUCCESS;
+}
 
 /* think.process plan segment -> airy_task_plan_t (nodes/goal/depends filled,
   * then the usual plan -> workflow -> hall chain) */
@@ -157,50 +298,66 @@ fail:
 }
 
 /* Remote dual-thinking via AIRY_THINK_SOCK: daemon_rpc_call(think.sock, "process", ..., 120s).
-  * Non-zero on failure (no fake data); the caller falls back to airy_cognition_process. */
+ * GCCP 两段式交互（P-A）：第一段无 gccp_answers，think_d 判定指令不完整时返回
+ * gccp_need_interaction=1 + gccp_questions；本函数转成 airy_gccp_probe_t 交给
+ * cli_gccp_interact 逐问收集答案，第二段携带 gccp_answers 重发，引擎完成目标
+ * 确认进入后续 Phase。两次挂起（第二段仍要求交互）视为失败，调用方回退内置
+ * 引擎。失败不伪造数据。 */
 airy_err_t cli_think_process_remote(const char *think_sock, const char *input,
-                                           size_t input_len, airy_task_plan_t **out_plan)
+                                    size_t input_len, airy_task_plan_t **out_plan)
 {
     (void)input_len;
     if (!think_sock || !think_sock[0] || !input || !out_plan)
         return AIRY_ERR_INVALID_PARAM;
     *out_plan = NULL;
 
-    cJSON *params = cJSON_CreateObject();
-    if (!params)
-        return AIRY_ERR_OUT_OF_MEMORY;
-    cJSON *prompt_str = cJSON_CreateString(input);
-    if (!prompt_str) {
-        cJSON_Delete(params);
-        return AIRY_ERR_OUT_OF_MEMORY;
-    }
-    cJSON_AddItemToObject(params, "prompt", prompt_str);
-    char *params_json = cJSON_PrintUnformatted(params);
-    cJSON_Delete(params);
-    if (!params_json)
-        return AIRY_ERR_OUT_OF_MEMORY;
+    /* 第一段：无 gccp_answers。 */
+    int rerr = AIRY_SUCCESS;
+    cJSON *inner = cli_think_rpc_round(think_sock, input, NULL, &rerr);
+    if (!inner)
+        return (airy_err_t)rerr;
 
-    char *rpc_result = NULL;
-    int rc = daemon_rpc_call(think_sock, "process", params_json, &rpc_result, 120000);
-    AIRY_FREE(params_json);
-    if (rc != AIRY_SUCCESS || !rpc_result) {
-        AIRY_FREE(rpc_result);
-        return (airy_err_t)rc;
+    /* 第二段：think_d 请求交互——向用户展示远端问题集并收集答案后重发。 */
+    cJSON *interact = cJSON_GetObjectItem(inner, "gccp_need_interaction");
+    if (interact && cJSON_IsTrue(interact)) {
+        cJSON *qjson = cJSON_GetObjectItem(inner, "gccp_questions");
+        const char *qstr = (cJSON_IsString(qjson) && qjson->valuestring) ?
+                               qjson->valuestring :
+                               "";
+        airy_gccp_probe_t *probe = NULL;
+        int perr = cli_think_gccp_probe_build(qstr, input, &probe);
+        cJSON_Delete(inner);
+        inner = NULL;
+        if (perr != AIRY_SUCCESS || !probe)
+            return (airy_err_t)perr;
+
+        /* 逐问收集答案。用户放弃（NULL）→ 空对象：引擎按默认约束收敛，
+         * 避免重发空答案导致再次挂起形成交互死循环。 */
+        char *answers = cli_gccp_interact(probe, NULL);
+        if (!answers) {
+            answers = AIRY_STRDUP("{}");
+            if (!answers) {
+                airy_gccp_probe_free(probe);
+                return AIRY_ERR_OUT_OF_MEMORY;
+            }
+        }
+        airy_gccp_probe_free(probe);
+
+        rerr = AIRY_SUCCESS;
+        inner = cli_think_rpc_round(think_sock, input, answers, &rerr);
+        AIRY_FREE(answers);
+        if (!inner)
+            return (airy_err_t)rerr;
+
+        /* 二次挂起（远端仍要求交互）：放弃远端，回退内置引擎。 */
+        cJSON *again = cJSON_GetObjectItem(inner, "gccp_need_interaction");
+        if (again && cJSON_IsTrue(again)) {
+            cJSON_Delete(inner);
+            return AIRY_ERR_GCCP_INTERACTION;
+        }
     }
 
-    cJSON *outer = cJSON_Parse(rpc_result);
-    AIRY_FREE(rpc_result);
-    if (!outer)
-        return AIRY_ERR_PARSE_ERROR;
-    cJSON *inner_root = NULL;
-    if (cJSON_IsString(outer) && outer->valuestring)
-        inner_root = cJSON_Parse(outer->valuestring);
-    if (!inner_root) {
-        cJSON_Delete(outer);
-        return AIRY_ERR_PARSE_ERROR;
-    }
-
-    cJSON *plan_json = cJSON_GetObjectItem(inner_root, "plan");
+    cJSON *plan_json = cJSON_GetObjectItem(inner, "plan");
     int perr = AIRY_SUCCESS;
     if (!cJSON_IsObject(plan_json))
         perr = AIRY_ERR_PARSE_ERROR;
@@ -209,8 +366,7 @@ airy_err_t cli_think_process_remote(const char *think_sock, const char *input,
     if (perr == AIRY_SUCCESS && !*out_plan)
         perr = AIRY_ERR_PARSE_ERROR;
 
-    cJSON_Delete(inner_root);
-    cJSON_Delete(outer);
+    cJSON_Delete(inner);
     return (airy_err_t)perr;
 }
 
