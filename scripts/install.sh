@@ -406,7 +406,7 @@ TUIEOF
 init_secrets() {
     local secrets="${AIRY_HOME}/config/secrets.env"
     if [ ! -f "${secrets}" ]; then
-        local template="${AIRY_SRC_DIR}/devtools/scripts/ops/templates/secrets.env.example"
+        local template="${AIRY_SRC_DIR}/tools/scripts/ops/templates/secrets.env.example"
         # 二进制模式无源码树：回退到随包分发的 config/secrets.env.example
         [ -f "${template}" ] || template="${AIRY_HOME}/config/secrets.env.example"
         if [ -f "${template}" ]; then
@@ -427,7 +427,7 @@ init_secrets() {
     # 模板授予 coding_v1 标准编码工具集；生产部署应按最小权限裁剪。
     # 权威路径 $AIRY_HOME/config/permission_rules.yaml（tool_d daemon_security
     # 在启动时读取 airy_config_dir()/permission_rules.yaml）。
-    local rules_tpl="${AIRY_SRC_DIR}/devtools/scripts/ops/templates/permission_rules.yaml"
+    local rules_tpl="${AIRY_SRC_DIR}/tools/scripts/ops/templates/permission_rules.yaml"
     [ -f "${rules_tpl}" ] || rules_tpl="${AIRY_HOME}/config/permission_rules.yaml.example"
     if [ -f "${rules_tpl}" ]; then
         if [ ! -f "${AIRY_HOME}/config/permission_rules.yaml" ]; then
@@ -605,8 +605,8 @@ EOF
     fi
 
     # daemon 启动编排脚本（bootstrap）：部署到 bin/（systemd 与手动启动引用）
-    if [ -f "${AIRY_SRC_DIR}/devtools/scripts/ops/bin/agentrt-bootstrap.sh" ]; then
-        cp -f "${AIRY_SRC_DIR}/devtools/scripts/ops/bin/agentrt-bootstrap.sh" "${AIRY_HOME}/bin/agentrt-bootstrap.sh"
+    if [ -f "${AIRY_SRC_DIR}/tools/scripts/ops/bin/agentrt-bootstrap.sh" ]; then
+        cp -f "${AIRY_SRC_DIR}/tools/scripts/ops/bin/agentrt-bootstrap.sh" "${AIRY_HOME}/bin/agentrt-bootstrap.sh"
         chmod 755 "${AIRY_HOME}/bin/agentrt-bootstrap.sh"
         log_ok "agentrt-bootstrap.sh 已部署到 bin/"
     elif [ -f "${AIRY_HOME}/bin/agentrt-bootstrap.sh" ]; then

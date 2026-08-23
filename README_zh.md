@@ -1,7 +1,7 @@
 # AgentRT 极境智能体运行底座平台工程 (AirymaxRT)
 
 > 面向 AI 智能体团队的奠基级运行时平台工程 — 定位类比 Kubernetes 之于微服务：为 Agent 团队提供标准化编排、调度、通信、记忆与安全的完整平台范式。
-> [airymaxhub](https://atomgit.com/openairymax/airymaxhub) 伞仓下用户态工程大管理仓 `agent-runtim` 内的管理仓，以 git submodule 形式聚合 7 个叶子仓。
+> [airymaxhub](https://atomgit.com/openairymax/airymaxhub) 伞仓下用户态工程大管理仓 `agent-workload`（v0.1.4 由 `agent-runtim` 改名）内的管理仓，以 git submodule 形式聚合 7 个叶子仓。
 
 **语言:** [English](README.md) | 简体中文
 
@@ -18,7 +18,7 @@
 
 本仓库是**管理仓**（git superproject），以 git submodule 形式聚合 **7 个叶子仓**，并继承原 AgentRT 单体仓库的**全部 git 历史**，以保持提交连续性。
 
-AgentRT 是 `airymaxhub` 伞仓下用户态工程大管理仓 `agent-runtim` 中的**管理仓**（伞仓同级另有内核态 `agent-linux`，以及顶层仓 `docs`、`closed-docs`、`devtools`、`closed-dev-build`）。Airymax 工作区共拆分为 38 个仓库：1 个伞仓 + 2 个工程大管理仓 + 4 个顶层仓 + 其下的管理仓与叶子仓。每个叶子仓可独立构建与版本控制，管理仓通过 git submodule 将它们钉合在一起，产出连贯、可复现的运行时平台。
+AgentRT 是 `airymaxhub` 伞仓下用户态工程大管理仓 `agent-workload` 中的**管理仓**（伞仓同级另有内核态 `agent-linux`，以及顶层仓 `docs`、`closed-docs`、`tools`、`closed-dev-build`）。Airymax 工作区共拆分为 38 个仓库：1 个伞仓 + 2 个工程大管理仓 + 4 个顶层仓 + 其下的管理仓与叶子仓。每个叶子仓可独立构建与版本控制，管理仓通过 git submodule 将它们钉合在一起，产出连贯、可复现的运行时平台。
 
 ### 0.1.2 能力（SSoT 收敛 + 平台本质补齐）
 
@@ -61,7 +61,7 @@ AgentRT 是 `airymaxhub` 伞仓下用户态工程大管理仓 `agent-runtim` 中
 
 ```
 airymaxhub/                     ← 伞仓（git superproject 根）
-├── agent-runtim/               ← 用户态工程大管理仓（v0.1.3）
+├── agent-workload/             ← 用户态工程大管理仓（v0.1.4 由 agent-runtim 改名）
 │   ├── agentrt/                ← 本仓库（管理仓）
 │   │   ├── atoms/              ← submodule：微核心原语（A 类）
 │   │   ├── commons/            ← submodule：共享基础工具库（A 类）
@@ -79,7 +79,7 @@ airymaxhub/                     ← 伞仓（git superproject 根）
 │   ├── ecosystem/              ← 生态管理仓
 │   └── products/               ← 产品管理仓
 ├── agent-linux/                ← 内核态工程大管理仓（原 agentrt-linux，v0.1.3 改名）
-├── devtools/                   ← 开发工具
+├── tools/                      ← 开发工具（v0.1.4 由 devtools 改名）
 ├── docs/                       ← 开放文档
 ├── closed-docs/                ← 内部文档
 └── closed-dev-build/           ← 内部构建/部署
