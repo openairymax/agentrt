@@ -126,6 +126,8 @@ void cli_history_clear(void);
 int cli_classify_heuristic(const char *input);
 int cli_classify_input(const char *input);
 void cli_chat_reply(const char *input);
+/* 2.1.1.5：读取最近一轮对话的真实 token/费用统计（main.c 回合分隔处展示） */
+void cli_chat_usage_get(uint64_t *tokens, double *cost);
 
 airy_err_t cli_think_process_remote(const char *think_sock, const char *input, size_t input_len,
                                     airy_task_plan_t **out_plan);
