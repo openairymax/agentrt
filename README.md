@@ -61,7 +61,7 @@ Product loop: **natural-language big-task instruction → GCCP intent confirmati
 
 ```
 airymaxhub/                     ← Umbrella repo (git superproject root)
-├── agent-runtim/               ← user-space engineering super-repo (v0.1.3)
+├── agent-workload/             ← user-space engineering super-repo (renamed from agent-runtim in v0.1.4)
 │   ├── agentrt/                ← THIS REPO (management repo)
 │   │   ├── atoms/              ← submodule: micro-core primitives (A-class)
 │   │   ├── commons/            ← submodule: shared foundation utilities (A-class)
@@ -79,7 +79,7 @@ airymaxhub/                     ← Umbrella repo (git superproject root)
 │   ├── ecosystem/              ← Ecosystem management repo
 │   └── products/               ← Products management repo
 ├── agent-linux/                ← kernel-space engineering super-repo (formerly agentrt-linux, renamed v0.1.3)
-├── devtools/                   ← Development tools
+├── tools/                      ← Development tools (renamed from devtools in v0.1.4)
 ├── docs/                       ← Open documentation
 ├── closed-docs/                ← Internal documentation
 └── closed-dev-build/           ← Internal build/deploy

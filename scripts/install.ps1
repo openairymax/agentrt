@@ -229,11 +229,11 @@ function Build-FromSource {
     Write-OK "源码构建安装完成"
 }
 
-# ─── secrets.env 模板（源码模式用 devtools 模板，二进制模式回退随包 config/） ─
+# ─── secrets.env 模板（源码模式用 tools 模板，二进制模式回退随包 config/） ─
 function Init-Secrets {
     $secrets = Join-Path $AIRY_HOME "config\secrets.env"
     if (-not (Test-Path $secrets)) {
-        $template = Join-Path $AIRY_SRC_DIR "devtools\scripts\ops\templates\secrets.env.example"
+        $template = Join-Path $AIRY_SRC_DIR "tools\scripts\ops\templates\secrets.env.example"
         if (-not (Test-Path $template)) { $template = Join-Path $AIRY_HOME "config\secrets.env.example" }
         if (Test-Path $template) {
             Copy-Item $template $secrets -Force
