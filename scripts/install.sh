@@ -676,11 +676,15 @@ print_summary() {
 EOF
 }
 
-# ─── PATH 引导（2026-08-22）────────────────────────────────────────────
+# ─── PATH 引导（2026-08-22 初版；2026-08-23 2.1.2.6 优化）──────────────
 # 历史教训：其他设备安装后用户直接输入 airymaxrt 报 command not found——
 # ${BIN_DIR}（默认 $HOME/.local/bin）未加入 PATH，而摘要宣称"任意路径输入
 # airymaxrt 即启动"造成误导。安装收尾时必须实测 PATH 并在缺失时给出
 # 精确、可复制的引导（临时/持久/完整路径三选一）。
+# 2.1.2.6 优化：
+#   - 持久生效给出"一键命令"（写 rc + 立即 export 合并，无需重启会话）
+#   - 检测全部存在的 shell rc（.bashrc/.zshrc/.profile），逐项给出
+#   - PATH 已就绪时输出确认，避免静默
 print_path_guidance() {
     _found=0
     _ifs="$IFS"
@@ -690,23 +694,44 @@ print_path_guidance() {
         if [ "$_p" = "$BIN_DIR" ]; then _found=1; break; fi
     done
     IFS="$_ifs"
-    [ "$_found" -eq 1 ] && return 0
-    log_warn "${BIN_DIR} 不在当前 PATH 中，无法直接输入 airymaxrt 启动。"
-    echo "  请按需选择以下任一种方式（重启终端后生效）："
-    echo "    1) 临时生效（当前终端）:"
-    echo "       export PATH=\"${BIN_DIR}:\$PATH\""
-    if [ -f "$HOME/.zshrc" ]; then
-        echo "    2) 持久生效（zsh）:"
-        echo "       echo 'export PATH=\"${BIN_DIR}:\$PATH\"' >> \"\$HOME/.zshrc\""
-    elif [ -f "$HOME/.bashrc" ]; then
-        echo "    2) 持久生效（bash）:"
-        echo "       echo 'export PATH=\"${BIN_DIR}:\$PATH\"' >> \"\$HOME/.bashrc\""
-    else
-        echo "    2) 持久生效（login shell）:"
-        echo "       echo 'export PATH=\"${BIN_DIR}:\$PATH\"' >> \"\$HOME/.profile\""
+
+    # 安装完整性兜底：BIN_DIR 下无启动器时提前告警（避免引导后仍 404）
+    if [ ! -x "$BIN_DIR/airymaxrt" ]; then
+        log_warn "${BIN_DIR}/airymaxrt 不存在——启动器安装可能未完成。"
+        echo "  请先检查上方安装日志，或使用完整路径排查："
+        echo "    ls -l \"${BIN_DIR}/airymaxrt\""
     fi
+
+    if [ "$_found" -eq 1 ]; then
+        log_ok "PATH 已包含 ${BIN_DIR}，可直接输入 airymaxrt 启动。"
+        return 0
+    fi
+
+    log_warn "${BIN_DIR} 不在当前 PATH 中，无法直接输入 airymaxrt 启动。"
+    echo "  请按需选择以下任一种方式："
+    echo ""
+    echo "    1) 临时生效（仅当前终端，立即可用）:"
+    echo "       export PATH=\"${BIN_DIR}:\$PATH\""
+    echo ""
+    echo "    2) 持久生效（推荐，一键命令——写入配置并立即生效）:"
+    _shown_rc=0
+    for _rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+        if [ -f "$_rc" ]; then
+            _rc_basename="${_rc##*/}"
+            echo "       # ${_rc_basename}"
+            echo "       echo 'export PATH=\"${BIN_DIR}:\$PATH\"' >> \"$_rc\" && export PATH=\"${BIN_DIR}:\$PATH\""
+            _shown_rc=1
+        fi
+    done
+    if [ "$_shown_rc" -eq 0 ]; then
+        echo "       # 未检测到 .bashrc/.zshrc/.profile，请手动执行后任选其一追加:"
+        echo "       echo 'export PATH=\"${BIN_DIR}:\$PATH\"' >> \"\$HOME/.bashrc\""
+    fi
+    echo ""
     echo "    3) 不改 PATH，改用完整路径启动:"
     echo "       ${BIN_DIR}/airymaxrt"
+    echo ""
+    echo "  提示：方式 2 对新开的终端永久生效；本终端立即执行方式 1 或方式 2 中的 export 即可先用。"
 }
 
 # ─── 主流程 ────────────────────────────────────────────────────────────
