@@ -32,6 +32,51 @@
 #include <cjson/cJSON.h>
 #endif
 
+/* 2.1.1.5/2.1.1.6：本轮对话真实 token/费用统计与思考链保留。
+ *
+ * llm_d 在响应的 usage/top-level 回填 total_tokens 与 cost_usd（含思考
+ * token，DeepSeek/OpenAI 的 completion_tokens 已包含 reasoning_tokens），
+ * 此处按轮累加；回合结束由 main.c 经 cli_chat_usage_get 读取展示，并在
+ * 下一轮开始前清零。reasoning_content 全量累积后写日志（折叠展示在
+ * 对话内，完整文本保留在日志，思考 token 不丢失）。 */
+static uint64_t g_chat_tokens_total = 0;
+static double g_chat_cost_total = 0.0;
+static char *g_chat_reasoning_acc = NULL;
+
+static void cli_chat_usage_add(const llm_response_t *resp)
+{
+    if (!resp)
+        return;
+    g_chat_tokens_total += resp->total_tokens;
+    g_chat_cost_total += resp->cost_usd;
+}
+
+static void cli_chat_reasoning_add(const char *reasoning)
+{
+    if (!reasoning || !reasoning[0])
+        return;
+    size_t old = g_chat_reasoning_acc ? strlen(g_chat_reasoning_acc) : 0;
+    size_t add = strlen(reasoning);
+    char *np = (char *)AIRY_REALLOC(g_chat_reasoning_acc, old + add + 2);
+    if (!np)
+        return;
+    g_chat_reasoning_acc = np;
+    if (old > 0)
+        g_chat_reasoning_acc[old++] = '\n';
+    __builtin_memcpy(g_chat_reasoning_acc + old, reasoning, add);
+    g_chat_reasoning_acc[old + add] = '\0';
+}
+
+/* 供 main.c 在回合结束时读取本轮消耗统计（随后由 cli_chat_reply 下一轮
+ * 开始时清零）。 */
+void cli_chat_usage_get(uint64_t *tokens, double *cost)
+{
+    if (tokens)
+        *tokens = g_chat_tokens_total;
+    if (cost)
+        *cost = g_chat_cost_total;
+}
+
 #ifdef AIRY_HAS_CJSON
 
 /* 对话记忆引擎（2.2.4）：main.c 注入，见 cli_internal.h */
@@ -1191,6 +1236,14 @@ void cli_chat_reply(const char *input)
         return;
     }
 
+    /* 2.1.1.5：新一轮开始清零统计（main.c 在上一轮结束后已读取展示）。 */
+    g_chat_tokens_total = 0;
+    g_chat_cost_total = 0.0;
+    if (g_chat_reasoning_acc) {
+        AIRY_FREE(g_chat_reasoning_acc);
+        g_chat_reasoning_acc = NULL;
+    }
+
     const char *t1f_model = cli_chat_t1f_cached();
     cli_trace("chat", "%s start model=%s", CLI_ICON_DIAMOND,
               (t1f_model && t1f_model[0]) ? t1f_model : "default");
@@ -1325,6 +1378,11 @@ void cli_chat_reply(const char *input)
             cli_msgbuf_free(&buf);
             return;
         }
+        /* 2.1.1.5/2.1.1.6：累计本轮真实 token/费用与思考链（工具轮与
+         * 最终轮都计入；reasoning 全量保留，折叠展示之外完整进日志）。 */
+        cli_chat_usage_add(resp);
+        if (resp->choices[0].reasoning_content)
+            cli_chat_reasoning_add(resp->choices[0].reasoning_content);
         int has_tools =
             resp->choices[0].tool_calls_json && resp->choices[0].tool_calls_json[0];
         if (has_tools && !force_summary && tool_rounds < CLI_CHAT_TOOL_MAX_ROUNDS) {
@@ -1445,6 +1503,10 @@ void cli_chat_reply(const char *input)
         AIRY_FREE(msgs);
         return;
     }
+    /* 2.1.1.5/2.1.1.6：累计本轮真实 token/费用与思考链（无 cJSON 平台） */
+    cli_chat_usage_add(final_resp);
+    if (final_resp->choices[0].reasoning_content)
+        cli_chat_reasoning_add(final_resp->choices[0].reasoning_content);
     if (spinner_on)
         cli_spinner_stop(1, NULL);
 #endif /* AIRY_HAS_CJSON */
@@ -1558,6 +1620,12 @@ void cli_chat_reply(const char *input)
 
     cli_history_add("user", input);
     cli_history_add("assistant", final_content);
+    /* 2.1.1.6：思考链全量保留——折叠展示之外的完整文本进日志（含工具
+     * 轮每轮的 reasoning_content），思考 token 不丢失、不污染对话正文。 */
+    if (g_chat_reasoning_acc && g_chat_reasoning_acc[0])
+        cli_trace("reasoning", "%s", g_chat_reasoning_acc);
+    AIRY_FREE(g_chat_reasoning_acc);
+    g_chat_reasoning_acc = NULL;
     cli_trace("chat", "%s done rounds=%d bytes=%zu", CLI_ICON_CHECK, tool_rounds,
               strlen(final_content));
 
