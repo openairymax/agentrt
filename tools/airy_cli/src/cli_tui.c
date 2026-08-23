@@ -3345,11 +3345,40 @@ void cli_tui_rebuild_three_zone(cli_tui_t *t)
     fflush(stdout);
 }
 
+/* 返回可执行文件所在目录（无尾分隔符），失败返回 -1。用于二进制包
+ * 解压即用布局：词典在 <exe>/../share/agentrt/ime/airy_ime.dat。 */
+static int tui_exe_dir(char *buf, size_t cap)
+{
+    if (!buf || cap < 2)
+        return -1;
+#ifdef _WIN32
+    DWORD n = GetModuleFileNameA(NULL, buf, (DWORD)cap);
+    if (n == 0 || n >= (DWORD)cap)
+        return -1;
+#else
+    ssize_t n = readlink("/proc/self/exe", buf, cap - 1);
+    if (n <= 0)
+        return -1;
+    buf[n] = '\0';
+#endif
+    char *slash = strrchr(buf, TUI_PATH_SEP);
+#ifdef _WIN32
+    char *bslash = strrchr(buf, '/');
+    if (bslash && (!slash || bslash > slash))
+        slash = bslash;
+#endif
+    if (!slash)
+        return -1;
+    *slash = '\0';
+    return (int)strlen(buf);
+}
+
 /* 加载内置拼音词典（2.2.3）。路径优先级：AIRY_IME_DICT 环境变量 →
- * $AIRY_HOME/share/agentrt/ime/airy_ime.dat（安装布局）→ 当前目录
- * share/agentrt/ime/airy_ime.dat（开发/便携布局）。airy_ime_load 对不
- * 存在/损坏文件 fail-closed 返回 NULL；这里顺次尝试，全部失败返回
- * NULL（输入法整体降级禁用，英文输入不受影响）。 */
+ * $AIRY_HOME/share/agentrt/ime/airy_ime.dat（安装布局）→ 可执行文件
+ * 同级上溯 share/agentrt/ime/airy_ime.dat（二进制包解压即用）→ 当前
+ * 目录 share/agentrt/ime/airy_ime.dat（开发/便携布局）。airy_ime_load
+ * 对不存在/损坏文件 fail-closed 返回 NULL；这里顺次尝试，全部失败
+ * 返回 NULL（输入法整体降级禁用，英文输入不受影响）。 */
 static airy_ime_t *tui_ime_load_dict(void)
 {
     const char *dict = getenv("AIRY_IME_DICT");
@@ -3365,6 +3394,19 @@ static airy_ime_t *tui_ime_load_dict(void)
         airy_ime_t *ime = airy_ime_load(path);
         if (ime)
             return ime;
+    }
+    /* 二进制包解压即用：bin/ 与 share/ 平级，跳过 $AIRY_HOME 缺失时
+     * 用户直接从包解压运行 airy_cli（未安装）也能用内置输入法。 */
+    {
+        char exe_dir[AIRY_PATH_MAX];
+        if (tui_exe_dir(exe_dir, sizeof(exe_dir)) > 0) {
+            char path[AIRY_PATH_MAX];
+            snprintf(path, sizeof(path),
+                     "%s/../share/agentrt/ime/airy_ime.dat", exe_dir);
+            airy_ime_t *ime = airy_ime_load(path);
+            if (ime)
+                return ime;
+        }
     }
     return airy_ime_load("share/agentrt/ime/airy_ime.dat");
 }
