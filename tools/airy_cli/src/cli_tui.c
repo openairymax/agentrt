@@ -1760,7 +1760,7 @@ static void tui_input_append(cli_tui_t *t, char c)
 
 /* ==================== 输入光标（2.2.1.5 黑白交替闪烁） ==================== */
 
-#define CLI_CARET_BLINK_MS 500u /* 半周期 ≈ Word 默认光标闪烁频率（1s 全周期） */
+#define CLI_CARET_BLINK_MS 265u /* 半周期 ≈ Word 默认光标闪烁频率（530ms 全周期） */
 
 /* 推进闪烁状态机：到达半周期翻转反显状态。输入循环每轮调用（轮询节拍）。 */
 static void tui_caret_tick(cli_tui_t *t)
