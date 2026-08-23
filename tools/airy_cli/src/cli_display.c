@@ -343,7 +343,7 @@ void cli_board_line(const char *tag, const char *id, const char *state, double p
  * The startup header is a blue box with the brand on the top edge:
  *
  *   ┌─ ◆ Airymax - Agent Runtime Platform Engineering ─┐
- *   │  版本 v0.1.2：对话 · 任务 · 蓝图调度 · 双思考 · … │
+ *   │  版本 v0.1.3：对话 · 任务 · 蓝图调度 · 双思考 · … │
  *   │  [For Thee] 你  [Super Agent] agentrt  …         │
  *   │  A·t2 → …  B·t1-f → …  C·t1-p → …               │
  *   │  ? /help 查看命令 · quit/exit 退出  "Agents…"     │
@@ -710,7 +710,7 @@ static void cli_hero_frame_bottom(const char *g)
 }
 
 /* One quiet capabilities row inside the frame, carrying the version and
- * what the runtime does at a glance: 版本 v0.1.2：对话 · 任务 · … */
+ * what the runtime does at a glance: 版本 v0.1.3：对话 · 任务 · … */
 static void cli_hero_capabilities(const char *g)
 {
     char text[160];

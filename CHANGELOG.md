@@ -4,7 +4,8 @@
 
 ## 📋 目录
 
-- [v0.1.2](#v012---2026-08-21) ⭐ 最新 — SSoT 收敛 / 平台本质补齐 / 品牌化 ID / CLI·TUI / orchestrator
+- [v0.1.3](#v013---2026-08-23) ⭐ 最新 — 内置拼音 IME / 三端运行画像 / 双思考落地
+- [v0.1.2](#v012---2026-08-21) — SSoT 收敛 / 平台本质补齐 / 品牌化 ID / CLI·TUI / orchestrator
 - [v0.1.1 框架化改造](#v011-框架化改造---2026-08-02) — GCCP / 工作大厅 / 双思考 / CLI
 - [v0.1.1](#v011---2026-07-12) — 奠基版本（Foundation Release）
 - [v0.1.0](#v010---2026-05-29) — 首个正式发行版
@@ -66,6 +67,43 @@
 - F8 TUI→CLI 切换后界面重叠、英雄区错乱（alt screen 退出未清屏）→ 恢复后清屏重建
 - 思考时大模型输出的 token 未保留 → GRAD 决策链 + feedback 持久化
 - arm64 二进制 glibc 兼容性（noble sysroot 产物要求 GLIBC_2.39）→ 改回 focal 容器原生构建（glibc 2.31）
+
+---
+
+## [v0.1.3] - 2026-08-23
+
+### 🎯 发布主题：内置拼音 IME / 三端运行画像 / 双思考系统落地
+
+0.1.3 聚焦交互体验与多环境运行：TUI/CLI 内置拼音输入法（F10 切换，词典
+随二进制包分发，解压即用）、顶部状态条与欢迎墙职责分离（消除英雄区重叠）、
+端云混合运行画像（auto/minimal/full 三档硬件自适应 + 硬件变化自动恢复）。
+
+### Added
+
+- **内置拼音输入法（IME）**（TUI + CLI，`airy_ime_*` 词库引擎）
+  - F10 中/英切换：输入框扩为两行（第一行输入 + 第二行候选区），激活即显
+    `[中]` 模式指示，拼音逐字刷新候选（1-9 选字 · 空格首候选 · Esc 上屏原文）
+  - 词典定位链：`AIRY_IME_DICT` → `$AIRY_HOME/share/agentrt/ime` →
+    exe 相对路径（包解压即用）→ 当前目录 → 源码树；缺失时 fail-closed 降级
+  - 词典随二进制包分发（`share/agentrt/ime/airy_ime.dat`），安装即用
+- **TUI 顶部状态条重设计**：4 行晶蓝 box 收敛为单行紧凑状态条（连接灯/
+  时间/模型/token/成本/阶段徽章），与 chat 空态欢迎墙职责分离，消除
+  "英雄区 + 系统头叠罗汉"重叠
+- **运行画像三档化（2.3.7）**：`AIRYRT_PROFILE=auto|minimal|full` 硬件自适应
+  （内存/核数/加速器综合判定），minimal 仅拉起核心链路（llm/think/agent/
+  tool）+ gateway，低资源设备不 OOM；monitor 检测硬件增强自动恢复全量
+
+### Changed
+
+- 版本口径统一为 **v0.1.3**：`CMakeLists.txt` / `Cargo.toml` / `Doxyfile` /
+  `scripts/install.sh` / `install.ps1` / `closed-dev-build/build.sh` /
+  二进制包 `install.sh` 同步
+
+### Fixed
+
+- F10 输入法无效果：TUI 构建时 `AIRY_COMMON_LIB` 需指向库文件路径而非
+  目录（build.rs `is_file()` 校验），`ime_linked` cfg 未生效即静默禁用
+- TUI 英雄区与 chat 空态欢迎墙内容重叠（品牌/状态/模型/记忆重复渲染）
 
 ---
 
