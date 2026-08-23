@@ -5,7 +5,7 @@
 cmake_minimum_required(VERSION 3.20)
 # 纯 C 项目（全仓无 .cpp/.cc 源文件）；仅声明 C 可避免 CXX 编译器
 # 缺失时（如 aarch64 交叉工具链仅装了 gcc 未装 g++）configure 失败。
-project(AgentRT VERSION 0.1.2 LANGUAGES C)
+project(AgentRT VERSION 0.1.3 LANGUAGES C)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR

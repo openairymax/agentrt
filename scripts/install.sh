@@ -64,7 +64,7 @@ log_err()   { printf "${C_RED}[FAIL]${C_NC} %s\n" "$1"; }
 # ─── 默认值 ──────────────────────────────────────────────────────────────
 AIRY_HOME="${AIRY_HOME:-$HOME/.airymaxrt}"
 AIRY_REPO_URL="${AIRY_REPO_URL:-https://atomgit.com/openairymax/airymaxhub.git}"
-AIRY_VERSION="${AIRY_VERSION:-v0.1.2}"
+AIRY_VERSION="${AIRY_VERSION:-v0.1.3}"
 AIRY_BUILD_JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 AIRY_MODE="${AIRY_MODE:-auto}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
@@ -187,7 +187,7 @@ do_uninstall() {
 
 # ─── 方式 A：完全体二进制 tarball（优先） ───────────────────────────────
 # 硬件自适应（2.3.5）：预编译包按架构分发——AIRY_RELEASE_URL 支持 {arch}
-# 占位符（自动替换为当前架构，如 .../agentrt-v0.1.2-linux-{arch}.tar.gz）；
+# 占位符（自动替换为当前架构，如 .../agentrt-v0.1.3-linux-{arch}.tar.gz）；
 # 架构不在预编译支持清单时告警并回退源码构建，避免跨架构运行错乱。
 install_binary() {
     local url="$1" arch

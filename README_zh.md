@@ -5,7 +5,7 @@
 
 **语言:** [English](README.md) | 简体中文
 
-[![Version](https://img.shields.io/badge/version-0.1.2-5a6b7e)](https://atomgit.com/openairymax/agentrt)
+[![Version](https://img.shields.io/badge/version-0.1.3-5a6b7e)](https://atomgit.com/openairymax/agentrt)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c\&logoColor=white)](https://en.cppreference.com/w/c/11)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=c%2B%2B\&logoColor=white)](https://isocpp.org)
