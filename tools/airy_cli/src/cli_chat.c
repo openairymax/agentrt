@@ -37,6 +37,27 @@
 /* 对话记忆引擎（2.2.4）：main.c 注入，见 cli_internal.h */
 airy_memory_engine_t *g_cli_memory_engine = NULL;
 
+/* 2.2.2.1：无信息量寒暄启发式——此类对话不应进记忆，避免垃圾累积
+ * 污染语义检索（匹配时返回 1）。仅作写入门槛，不做强制语义判断。 */
+static int cli_chat_is_greeting(const char *s)
+{
+    if (!s)
+        return 0;
+    size_t n = strlen(s);
+    if (n > 12)
+        return 0;
+    static const char *const greets[] = {
+        "你好", "您好", "哈喽", "嗨", "hello", "hi", "hey",
+        "谢谢", "感谢", "多谢", "thanks", "thank you", "thx",
+        "再见", "拜拜", "bye", "goodbye", "ok", "好的", "嗯", "收到",
+    };
+    for (size_t i = 0; i < sizeof(greets) / sizeof(greets[0]); i++) {
+        if (strcmp(s, greets[i]) == 0 || strncmp(s, greets[i], strlen(greets[i])) == 0)
+            return 1;
+    }
+    return 0;
+}
+
 /* 检索相关历史记忆，拼成 system 追加段（最多 3 条、每条截断 200 字符） */
 static void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t out_size)
 {
@@ -57,6 +78,9 @@ static void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t 
 
     size_t off = 0;
     off += snprintf(out_buf + off, out_size - off, "\n\n[相关历史记忆]");
+    /* 2.2.2.1：防自我回灌——跳过与当前输入相同/几乎相同的记忆（CLI 把
+     * 整轮写为 "用户: <input>\nAgentRT: <reply>"，查询常命中上一条自身）。 */
+    size_t input_prefix_len = strlen(input) + 7; /* "用户: " + input */
     for (size_t i = 0; i < res->memory_result_count; i++) {
         airy_memory_result_item_t *it =
             (res->memory_result_items && i < res->memory_result_count)
@@ -67,9 +91,14 @@ static void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t 
         airy_memory_record_t *r = it->memory_result_item_record;
         if (!r->memory_record_data || r->memory_record_data_len == 0)
             continue;
-        size_t n = r->memory_record_data_len < 200 ? r->memory_record_data_len : 200;
-        off += snprintf(out_buf + off, out_size - off, "\n- %.*s", (int)n,
-                        (const char *)r->memory_record_data);
+        const char *data = (const char *)r->memory_record_data;
+        size_t dlen = r->memory_record_data_len;
+        if (dlen >= input_prefix_len &&
+            strncmp(data, "用户: ", 5) == 0 &&
+            strncmp(data + 5, input, strlen(input)) == 0)
+            continue;
+        size_t n = dlen < 200 ? dlen : 200;
+        off += snprintf(out_buf + off, out_size - off, "\n- %.*s", (int)n, data);
         if (off >= out_size - 1)
             break;
     }
@@ -80,6 +109,10 @@ static void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t 
 static void cli_chat_mem_record(const char *input, const char *reply)
 {
     if (!g_cli_memory_engine || !input || !input[0] || !reply || !reply[0])
+        return;
+
+    /* 2.2.2.1：寒暄/无信息量回复不写记忆（避免垃圾条目累积抬高检索噪声） */
+    if (strlen(reply) < 8 || cli_chat_is_greeting(input))
         return;
 
     char content[1400];
