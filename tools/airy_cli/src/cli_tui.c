@@ -217,16 +217,22 @@ struct cli_tui_s {
 
     /* ---- 内置拼音输入法（airy_ime，2.2.3：无 IME 设备中文输入）----
      * F10 切换中/英（默认，可用 AIRY_IME_KEY=f9/f10 配置，F11 因终端
-     * 全屏冲突不可用）；拼音模式字母进 ime_buf，数字 1-9/空格上屏候选，
-     * 退格删拼音，Enter 提交拼音原文。词典加载失败时 ime==NULL 功能
-     * 整体禁用，不影响既有英文输入。 */
+     * 全屏冲突不可用）。拼音模式字母进 ime_buf；数字/空格上屏候选，
+     * 退格删拼音，,/. 或 PgUp/PgDn 翻页，←/→ 移动候选高亮，Enter 上屏
+     * 高亮候选（无候选时提交拼音原文），Esc 取消拼音。词典加载失败时
+     * ime==NULL 功能整体禁用，不影响既有英文输入。
+     * 0.1.3 微信式交互（2026-08-23）：候选池扩至 27（3 页 × 9），
+     * 分页渲染 + 高亮移动 + 页码指示。 */
     airy_ime_t *ime;         /* 词典句柄（加载失败=NULL） */
     int ime_active;          /* 拼音模式 */
     int ime_key;             /* 中/英切换键码（默认 TUI_KEY_F10，可配置） */
     char ime_buf[48];        /* 拼音缓冲（[a-z]，ü 以 v 表示） */
     size_t ime_buf_len;
-    airy_ime_cand_t ime_cands[9]; /* 候选（数字键 1-9 选择） */
-    int ime_cand_count;
+    airy_ime_cand_t ime_cands[27]; /* 候选池（分页：每页 9 个） */
+    int ime_cand_count;      /* 总候选数 */
+    int ime_page;            /* 当前页（0 起） */
+    int ime_pages;           /* 总页数（=ceil(count/9)） */
+    int ime_sel;             /* 页内高亮候选下标（0-8） */
 
     /* 2.2.1.5 输入光标：黑白反显交替闪烁，半周期 ≈ Word 默认（500ms）。
      * caret_visible=1 时光标处字符反显（白底黑字/黑底白字按终端配色），
@@ -1819,10 +1825,12 @@ static void tui_ime_commit_raw(cli_tui_t *t)
     t->ime_buf_len = 0;
     t->ime_buf[0] = '\0';
     t->ime_cand_count = 0;
+    t->ime_page = 0;
+    t->ime_sel = 0;
 }
 
 /* 上屏候选：UTF-8 逐字节插入光标处（tui_input_append 支持中插），清空
- * 拼音缓冲并保持拼音模式，连续词组输入不中断。 */
+ * 拼音缓冲并保持拼音模式，连续词组输入不中断（翻页/高亮归零）。 */
 static void tui_ime_commit_cand(cli_tui_t *t, const char *text)
 {
     if (!text)
@@ -1832,18 +1840,54 @@ static void tui_ime_commit_cand(cli_tui_t *t, const char *text)
     t->ime_buf_len = 0;
     t->ime_buf[0] = '\0';
     t->ime_cand_count = 0;
+    t->ime_page = 0;
+    t->ime_sel = 0;
 }
 
-/* 以当前拼音缓冲刷新候选列表。 */
+/* 以当前拼音缓冲刷新候选列表（微信式分页：候选池 27，每页 9 个）。
+ * 拼音变化后重置页码与高亮（新输入上下文从第一页首候选开始）。 */
 static void tui_ime_refresh(cli_tui_t *t)
 {
     t->ime_cand_count =
         airy_ime_query(t->ime, t->ime_buf, t->ime_cands,
                        (int)(sizeof(t->ime_cands) / sizeof(t->ime_cands[0])));
+    t->ime_pages = (t->ime_cand_count + 8) / 9;
+    if (t->ime_pages < 1)
+        t->ime_pages = 1;
+    if (t->ime_page >= t->ime_pages)
+        t->ime_page = t->ime_pages - 1;
+    if (t->ime_page < 0)
+        t->ime_page = 0;
+    if (t->ime_sel > 8)
+        t->ime_sel = 8;
+    if (t->ime_sel < 0)
+        t->ime_sel = 0;
 }
 
-/* 绘制拼音候选条（输入行上方一行）：拼音高亮 + 数字键候选。返回 1=已
- * 绘制（占用该行）；0=无拼音态（调用方继续画分隔线/tab 候选等）。 */
+/* 当前高亮候选在候选池中的绝对下标（-1=无候选）。 */
+static int tui_ime_sel_index(const cli_tui_t *t)
+{
+    int idx = t->ime_page * 9 + t->ime_sel;
+    if (idx < 0 || idx >= t->ime_cand_count)
+        return -1;
+    return idx;
+}
+
+/* 翻页（微信式，,/. 与 PgUp/PgDn）：越界回绕。 */
+static void tui_ime_page_flip(cli_tui_t *t, int dir)
+{
+    if (t->ime_pages <= 1)
+        return;
+    t->ime_page += dir;
+    if (t->ime_page < 0)
+        t->ime_page = t->ime_pages - 1;
+    if (t->ime_page >= t->ime_pages)
+        t->ime_page = 0;
+}
+
+/* 绘制拼音候选条（输入行上方一行，微信式分页）：拼音高亮 + 当前页
+ * 数字键候选（页内高亮以蓝底标记）+ 页码指示（多页时显示 ‹1/2›）。
+ * 返回 1=已绘制（占用该行）；0=无拼音态（调用方继续画分隔线/tab 候选等）。 */
 static int tui_ime_draw_cands(cli_tui_t *t, int input_row)
 {
     if (!t->ime || !t->ime_active || t->ime_buf_len == 0)
@@ -1861,14 +1905,20 @@ static int tui_ime_draw_cands(cli_tui_t *t, int input_row)
     fputs(cli_c(CLR_RESET), stdout);
     fputs(" ", stdout);
     size_t used = cli_disp_width(t->ime_buf) + 1;
-    for (int i = 0; i < t->ime_cand_count; i++) {
+    /* 当前页切片：page*9 .. min(page*9+9, count) */
+    int start = t->ime_page * 9;
+    int end = start + 9;
+    if (end > t->ime_cand_count)
+        end = t->ime_cand_count;
+    for (int i = start; i < end; i++) {
         const char *txt = t->ime_cands[i].text;
         char tag[4];
-        snprintf(tag, sizeof(tag), "%d", i + 1);
+        snprintf(tag, sizeof(tag), "%d", (i - start) + 1);
         size_t w = cli_disp_width(txt) + strlen(tag) + 1;
         if (used + w > (size_t)t->cols)
             break;
-        if (i == 0) {
+        if (i == t->ime_page * 9 + t->ime_sel) {
+            /* 页内高亮（微信式：蓝底反显当前选中） */
             fputs(cli_c(CLR_BG_BLUE), stdout);
             fputs(cli_c(CLR_BOLD), stdout);
         } else {
@@ -1879,6 +1929,16 @@ static int tui_ime_draw_cands(cli_tui_t *t, int input_row)
         fputs(cli_c(CLR_RESET), stdout);
         fputs(" ", stdout);
         used += w;
+    }
+    /* 页码指示：多页时尾部显示 ‹cur/total›（微信式翻页反馈） */
+    if (t->ime_pages > 1) {
+        char pgbuf[32];
+        snprintf(pgbuf, sizeof(pgbuf), " ‹%d/%d›", t->ime_page + 1, t->ime_pages);
+        if (used + (size_t)strlen(pgbuf) + 2 <= (size_t)t->cols) {
+            fputs(cli_c(CLR_DIM), stdout);
+            fputs(pgbuf, stdout);
+            fputs(cli_c(CLR_RESET), stdout);
+        }
     }
     fflush(stdout);
     return 1;
@@ -2408,17 +2468,64 @@ static int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
                 continue;
             }
             if (key >= '1' && key <= '9') {
+                /* 数字选字：选中当前页内第 N 个候选（微信式分页） */
                 size_t i = (size_t)(key - '1');
-                if (i < (size_t)t->ime_cand_count)
-                    tui_ime_commit_cand(t, t->ime_cands[i].text);
+                int idx = t->ime_page * 9 + (int)i;
+                if (i < 9 && idx >= 0 && idx < t->ime_cand_count)
+                    tui_ime_commit_cand(t, t->ime_cands[idx].text);
                 tui_line_redraw(t);
                 continue;
             }
             if (key == ' ') {
-                if (t->ime_cand_count > 0)
-                    tui_ime_commit_cand(t, t->ime_cands[0].text);
+                /* 空格：上屏高亮候选（微信式，默认高亮第一个） */
+                int idx = tui_ime_sel_index(t);
+                if (idx >= 0)
+                    tui_ime_commit_cand(t, t->ime_cands[idx].text);
                 else
                     tui_ime_commit_raw(t); /* 无候选：空格输出拼音原文 */
+                tui_line_redraw(t);
+                continue;
+            }
+            if (key == ',' || key == '.' || key == TUI_KEY_PGUP ||
+                key == TUI_KEY_PGDN) {
+                /* 翻页（微信式：,/. 与 PgUp/PgDn）；单页时标点走正常路径 */
+                if (key == TUI_KEY_PGUP)
+                    tui_ime_page_flip(t, -1);
+                else if (key == TUI_KEY_PGDN)
+                    tui_ime_page_flip(t, 1);
+                else if (t->ime_pages > 1)
+                    tui_ime_page_flip(t, (key == '.') ? 1 : -1);
+                else {
+                    tui_ime_commit_raw(t);
+                    t->ime_active = 0;
+                    tui_input_append(t, key);
+                    tui_line_redraw(t);
+                    continue;
+                }
+                tui_line_redraw(t);
+                continue;
+            }
+            if (key == TUI_KEY_LEFT || key == TUI_KEY_RIGHT) {
+                /* 页内高亮移动（微信式：←/→ 选中候选） */
+                int page_cnt = t->ime_cand_count - t->ime_page * 9;
+                if (page_cnt > 9)
+                    page_cnt = 9;
+                if (page_cnt > 0) {
+                    if (key == TUI_KEY_LEFT && t->ime_sel > 0)
+                        t->ime_sel--;
+                    else if (key == TUI_KEY_RIGHT &&
+                             t->ime_sel + 1 < page_cnt)
+                        t->ime_sel++;
+                    tui_line_redraw(t);
+                }
+                continue;
+            }
+            if (key == 0x1b) {
+                /* Esc：取消拼音（微信语义：清空缓冲，放弃组合） */
+                t->ime_buf_len = 0;
+                t->ime_buf[0] = '\0';
+                t->ime_cand_count = 0;
+                t->ime_active = 0;
                 tui_line_redraw(t);
                 continue;
             }
@@ -2433,9 +2540,15 @@ static int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
                 continue;
             }
             if (key == '\n' || key == '\r') {
-                /* 提交拼音原文并交给下方 Enter 提交整个输入行 */
-                tui_ime_commit_raw(t);
+                /* Enter：有候选时上屏高亮候选（微信语义），无候选时提交
+                 * 拼音原文；随后退出拼音态，由下方 Enter 提交整个输入行 */
+                int idx = tui_ime_sel_index(t);
+                if (idx >= 0)
+                    tui_ime_commit_cand(t, t->ime_cands[idx].text);
+                else
+                    tui_ime_commit_raw(t);
                 t->ime_active = 0;
+                tui_line_redraw(t);
             } else if (key >= 0x20 && key <= 0xFF) {
                 /* 标点/数字等：先提交拼音原文并退出拼音模式，按键继续
                  * 走正常输入路径（如 "." 直接出英文句号）。 */
@@ -2723,18 +2836,69 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
                 continue;
             }
             if (key >= '1' && key <= '9') {
+                /* 数字选字：当前页内第 N 个候选（微信式分页） */
                 size_t i = (size_t)(key - '1');
-                if (i < (size_t)t->ime_cand_count)
-                    tui_ime_commit_cand(t, t->ime_cands[i].text);
+                int idx = t->ime_page * 9 + (int)i;
+                if (i < 9 && idx >= 0 && idx < t->ime_cand_count)
+                    tui_ime_commit_cand(t, t->ime_cands[idx].text);
                 tui_render_input(t);
                 fflush(stdout);
                 continue;
             }
             if (key == ' ') {
-                if (t->ime_cand_count > 0)
-                    tui_ime_commit_cand(t, t->ime_cands[0].text);
+                /* 空格：上屏高亮候选（微信式，默认高亮第一个） */
+                int idx = tui_ime_sel_index(t);
+                if (idx >= 0)
+                    tui_ime_commit_cand(t, t->ime_cands[idx].text);
                 else
                     tui_ime_commit_raw(t); /* 无候选：空格输出拼音原文 */
+                tui_render_input(t);
+                fflush(stdout);
+                continue;
+            }
+            if (key == ',' || key == '.' || key == TUI_KEY_PGUP ||
+                key == TUI_KEY_PGDN) {
+                /* 翻页（微信式：,/. 与 PgUp/PgDn）；单页时标点走正常路径 */
+                if (key == TUI_KEY_PGUP)
+                    tui_ime_page_flip(t, -1);
+                else if (key == TUI_KEY_PGDN)
+                    tui_ime_page_flip(t, 1);
+                else if (t->ime_pages > 1)
+                    tui_ime_page_flip(t, (key == '.') ? 1 : -1);
+                else {
+                    tui_ime_commit_raw(t);
+                    t->ime_active = 0;
+                    tui_input_append(t, key);
+                    tui_render_input(t);
+                    fflush(stdout);
+                    continue;
+                }
+                tui_render_input(t);
+                fflush(stdout);
+                continue;
+            }
+            if (key == TUI_KEY_LEFT || key == TUI_KEY_RIGHT) {
+                /* 页内高亮移动（微信式：←/→ 选中候选） */
+                int page_cnt = t->ime_cand_count - t->ime_page * 9;
+                if (page_cnt > 9)
+                    page_cnt = 9;
+                if (page_cnt > 0) {
+                    if (key == TUI_KEY_LEFT && t->ime_sel > 0)
+                        t->ime_sel--;
+                    else if (key == TUI_KEY_RIGHT &&
+                             t->ime_sel + 1 < page_cnt)
+                        t->ime_sel++;
+                    tui_render_input(t);
+                    fflush(stdout);
+                }
+                continue;
+            }
+            if (key == 0x1b) {
+                /* Esc：取消拼音（微信语义：清空缓冲，放弃组合） */
+                t->ime_buf_len = 0;
+                t->ime_buf[0] = '\0';
+                t->ime_cand_count = 0;
+                t->ime_active = 0;
                 tui_render_input(t);
                 fflush(stdout);
                 continue;
@@ -2751,9 +2915,16 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
                 continue;
             }
             if (key == '\n' || key == '\r') {
-                /* 提交拼音原文并交给下方 Enter 提交整个输入行 */
-                tui_ime_commit_raw(t);
+                /* Enter：有候选时上屏高亮候选（微信语义），无候选时提交
+                 * 拼音原文；随后退出拼音态，由下方 Enter 提交整个输入行 */
+                int idx = tui_ime_sel_index(t);
+                if (idx >= 0)
+                    tui_ime_commit_cand(t, t->ime_cands[idx].text);
+                else
+                    tui_ime_commit_raw(t);
                 t->ime_active = 0;
+                tui_render_input(t);
+                fflush(stdout);
             } else if (key >= 0x20 && key <= 0xFF) {
                 /* 标点/数字等：先提交拼音原文并退出拼音模式，按键继续
                  * 走正常输入路径（如 "." 直接出英文句号）。 */
