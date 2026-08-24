@@ -51,7 +51,14 @@ extern "C" {
 
 #define CLI_SEP "  ──────────────────────────────────────────────"
 
+/* 版本号 SSoT（2.6.2 Unify Design）：单一来源为 agentrt/VERSION 文件，
+ * 由 airy_cli/CMakeLists.txt 构建期读取并通过 target_compile_definitions
+ * 注入（AIRY_CLI_VERSION="x.y.z"）；此处仅保留缺省回退，防止未走 CMake
+ * 注入的独立编译（如 IDE 单文件编译）出现未定义宏。版本更新只改
+ * VERSION 文件一处，CLI 与 TUI 自动同步。 */
+#ifndef AIRY_CLI_VERSION
 #define AIRY_CLI_VERSION "0.1.3"
+#endif
 
 /* 思考链折叠保留行数（2026-08-19：仅折叠思考链，结果完整展示）。
  * 思考链渲染为前 N 行 + 折叠尾，避免碎片刷屏；结果不折叠。 */
@@ -113,6 +120,7 @@ extern int g_cli_json_mode;
 /* Chat history buffer (defined in cli_chat.c) */
 extern char *g_history_roles[CLI_HISTORY_MAX_MSGS];
 extern char *g_history_contents[CLI_HISTORY_MAX_MSGS];
+extern char *g_history_reasonings[CLI_HISTORY_MAX_MSGS];
 extern size_t g_history_count;
 
 /* Command table (defined in main.c; enumerated by cmd_help in cli_cmds.c) */

@@ -77,6 +77,10 @@ void cli_chat_usage_get(uint64_t *tokens, double *cost)
         *cost = g_chat_cost_total;
 }
 
+/* 2.1.1.2：t1-p（PROF）模型缓存前向声明——GCCP 逐问确认（cli_gccp_interact
+ * 在文件前部）使用该模型槽。实现见文件后部（与 cli_chat_t1f_cached 同构）。 */
+static const char *cli_chat_t1p_cached(void);
+
 #ifdef AIRY_HAS_CJSON
 
 /* 对话记忆引擎（2.2.4）：main.c 注入，见 cli_internal.h */
@@ -150,8 +154,11 @@ static void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t 
     airy_memory_result_free(res);
 }
 
-/* 一轮对话完成后写入记忆：用户输入 + 回复（截断防噪声，只记事实） */
-static void cli_chat_mem_record(const char *input, const char *reply)
+/* 一轮对话完成后写入记忆：用户输入 + 回复（截断防噪声，只记事实）。
+ * 2.1.1.6 修订：携带思考链（reasoning）——记忆检索按 content 匹配，
+ * 拼接进记录后思考 token 可被下轮/下次会话召回（与 TUI 记忆的
+ * reasoning 语义对齐），不再"只存档不可用"。 */
+static void cli_chat_mem_record(const char *input, const char *reply, const char *reasoning)
 {
     if (!g_cli_memory_engine || !input || !input[0] || !reply || !reply[0])
         return;
@@ -160,12 +167,17 @@ static void cli_chat_mem_record(const char *input, const char *reply)
     if (strlen(reply) < 8 || cli_chat_is_greeting(input))
         return;
 
-    char content[1400];
+    char content[1800];
     int n = snprintf(content, sizeof(content), "用户: %s\nAgentRT: %s", input, reply);
     if (n <= 0)
         return;
-    if (n > 1200)
-        n = 1200;
+    if (reasoning && reasoning[0]) {
+        int rn = snprintf(content + n, (size_t)(sizeof(content) - n), "\n[reasoning] %s", reasoning);
+        if (rn > 0)
+            n += (rn < (int)(sizeof(content) - n - 1)) ? rn : (int)(sizeof(content) - n - 1);
+    }
+    if (n > 1600)
+        n = 1600;
 
     airy_memory_record_t rec;
     __builtin_memset(&rec, 0, sizeof(rec));
@@ -297,8 +309,11 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
         if (!answers_json)
             break;
         airy_gccp_step_t step;
-        airy_err_t serr = airy_gccp_step(g_chat_adapter, NULL, raw, raw_len, answers_json, 1, NULL,
-                                         &step);
+        /* 2.1.1.2 修复：GCCP 逐问确认走 t1-p（PROF）模型槽 */
+        const char *t1p_model = cli_chat_t1p_cached();
+        airy_err_t serr = airy_gccp_step(g_chat_adapter, NULL,
+                                         (t1p_model && t1p_model[0]) ? t1p_model : NULL, raw,
+                                         raw_len, answers_json, 1, NULL, &step);
         cJSON_free(answers_json);
         if (serr != AIRY_SUCCESS)
             break;
@@ -415,6 +430,9 @@ static const char *cli_chat_err_desc(int err)
 
 char *g_history_roles[CLI_HISTORY_MAX_MSGS];
 char *g_history_contents[CLI_HISTORY_MAX_MSGS];
+/* 2.1.1.6：历史携带每轮思考链——多轮对话上下文中前一轮的 reasoning 原样
+ * 保留并随 assistant 消息回传（DeepSeek 续轮规范要求，缺省会语义断裂）。 */
+char *g_history_reasonings[CLI_HISTORY_MAX_MSGS];
 size_t g_history_count = 0;
 
 static size_t cli_history_capacity(void)
@@ -428,7 +446,7 @@ static size_t cli_history_capacity(void)
     return 30;
 }
 
-static void cli_history_add(const char *role, const char *content)
+static void cli_history_add(const char *role, const char *content, const char *reasoning)
 {
     if (!role || !content)
         return;
@@ -437,16 +455,22 @@ static void cli_history_add(const char *role, const char *content)
 
         AIRY_FREE(g_history_roles[0]);
         AIRY_FREE(g_history_contents[0]);
+        AIRY_FREE(g_history_reasonings[0]);
         AIRY_FREE(g_history_roles[1]);
         AIRY_FREE(g_history_contents[1]);
+        AIRY_FREE(g_history_reasonings[1]);
         AIRY_MEMMOVE(&g_history_roles[0], &g_history_roles[2],
                      (g_history_count - 2) * sizeof(char *));
         AIRY_MEMMOVE(&g_history_contents[0], &g_history_contents[2],
+                     (g_history_count - 2) * sizeof(char *));
+        AIRY_MEMMOVE(&g_history_reasonings[0], &g_history_reasonings[2],
                      (g_history_count - 2) * sizeof(char *));
         g_history_count -= 2;
     }
     g_history_roles[g_history_count] = AIRY_STRDUP(role);
     g_history_contents[g_history_count] = AIRY_STRDUP(content);
+    g_history_reasonings[g_history_count] =
+        (reasoning && reasoning[0]) ? AIRY_STRDUP(reasoning) : NULL;
     g_history_count++;
 }
 
@@ -455,8 +479,40 @@ void cli_history_clear(void)
     for (size_t i = 0; i < g_history_count; i++) {
         AIRY_FREE(g_history_roles[i]);
         AIRY_FREE(g_history_contents[i]);
+        AIRY_FREE(g_history_reasonings[i]);
     }
     g_history_count = 0;
+}
+
+/* 2.1.1.6：思考链全量落盘——交互模式 cli_trace 是 no-op（仅 -p 模式
+ * 写 stderr），思考链此前只在内存折叠展示后即释放。这里独立追加写入
+ * $AIRY_HOME/logs/airy_reasoning.log（所有模式生效），思考 token 不丢失。
+ * 每轮带时间戳与角色前缀，便于按会话回溯。 */
+static void cli_chat_reasoning_persist(const char *text)
+{
+    if (!text || !text[0])
+        return;
+    const char *logdir = airy_log_dir();
+    if (!logdir || airy_mkdir_p(logdir) != 0)
+        return;
+    char logpath[512];
+    int plen = snprintf(logpath, sizeof(logpath), "%s/airy_reasoning.log", logdir);
+    if (plen < 0 || plen >= (int)sizeof(logpath))
+        return;
+    FILE *lf = fopen(logpath, "a");
+    if (!lf)
+        return;
+    time_t now = time(NULL);
+    struct tm tmv;
+#ifdef _WIN32
+    localtime_s(&tmv, &now);
+#else
+    localtime_r(&now, &tmv);
+#endif
+    char ts[40];
+    strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", &tmv);
+    fprintf(lf, "\n[%s] [assistant reasoning] %s\n", ts, text);
+    fclose(lf);
 }
 
 #define CLI_SYSTEM_PROMPT                                                       \
@@ -1222,6 +1278,21 @@ static const char *cli_chat_t1f_cached(void)
     return s_t1f;
 }
 
+/* 2.1.1.2 修复：t1-p（PROF）模型缓存——GCCP 意图确认（[Dual Prof Think]）
+ * 使用该模型槽，与 CLI 渲染标签一致。配置源与 t1f 同（cli_think_cfg_load：
+ * env > model.yaml think 段 > 默认）。 */
+static const char *cli_chat_t1p_cached(void)
+{
+    static char s_t1p[128];
+    static int s_loaded = 0;
+    if (!s_loaded) {
+        s_loaded = 1;
+        char t2[128], t1f[128];
+        cli_think_cfg_load(t2, sizeof(t2), t1f, sizeof(t1f), s_t1p, sizeof(s_t1p));
+    }
+    return s_t1p;
+}
+
 static cli_actor_t cli_chat_think_actor(void)
 {
     const char *t1f = cli_chat_t1f_cached();
@@ -1276,7 +1347,8 @@ void cli_chat_reply(const char *input)
     if (mem_sys[0])
         cli_msgbuf_push(&buf, "system", mem_sys, NULL, NULL, NULL);
     for (size_t hi = 0; hi < g_history_count; hi++)
-        cli_msgbuf_push(&buf, g_history_roles[hi], g_history_contents[hi], NULL, NULL, NULL);
+        cli_msgbuf_push(&buf, g_history_roles[hi], g_history_contents[hi], NULL, NULL,
+                        g_history_reasonings[hi]);
     cli_msgbuf_push(&buf, "user", input, NULL, NULL, NULL);
 
     /* 交互 TTY 走流式（打字机预览，完成后折叠/重绘最终形态）；
@@ -1443,10 +1515,14 @@ void cli_chat_reply(const char *input)
     if (spinner_on)
         cli_spinner_stop(1, NULL);
 
-    /* 2.2.4 对话记忆写入：一轮对话完成且有回复时落盘（用户输入+回复，
-     * 供下轮/下次会话检索注入；只记对话事实，不记内部思考链） */
+    /* 2.2.4 对话记忆写入：一轮对话完成且有回复时落盘（用户输入+回复+
+     * 思考链，供下轮/下次会话检索注入；2.1.1.6 起携带 reasoning）。 */
     if (final_resp && final_resp->choice_count > 0 && final_resp->choices[0].content) {
-        cli_chat_mem_record(input, final_resp->choices[0].content);
+        const char *mem_reasoning =
+            (final_resp->choices[0].reasoning_content && final_resp->choices[0].reasoning_content[0])
+                ? final_resp->choices[0].reasoning_content
+                : (g_chat_reasoning_acc ? g_chat_reasoning_acc : NULL);
+        cli_chat_mem_record(input, final_resp->choices[0].content, mem_reasoning);
     }
 #else
     /* 无 cJSON 平台：固定消息数组 + 单轮非流式（不带工具），保持纯对话。 */
@@ -1466,6 +1542,7 @@ void cli_chat_reply(const char *input)
     for (size_t hi = 0; hi < g_history_count; hi++) {
         msgs[mi].role = g_history_roles[hi];
         msgs[mi].content = g_history_contents[hi];
+        msgs[mi].reasoning_content = g_history_reasonings[hi];
         mi++;
     }
     msgs[mi].role = "user";
@@ -1530,6 +1607,23 @@ void cli_chat_reply(const char *input)
             cJSON_AddStringToObject(root, "content", final_content);
         else
             cJSON_AddStringToObject(root, "error", "reply failed");
+        /* 2.1.1.6：--json 结构化输出携带思考链（TUI RunResponse.thinking
+         * 已有先例），思考 token 不随 JSON 输出丢失。 */
+        const char *json_reasoning = (final_resp->choices && final_resp->choice_count > 0 &&
+                                      final_resp->choices[0].reasoning_content)
+                                         ? final_resp->choices[0].reasoning_content
+                                         : (g_chat_reasoning_acc ? g_chat_reasoning_acc : "");
+        if (json_reasoning && json_reasoning[0])
+            cJSON_AddStringToObject(root, "reasoning", json_reasoning);
+        if (final_resp) {
+            cJSON *usage = cJSON_CreateObject();
+            cJSON_AddNumberToObject(usage, "prompt_tokens", final_resp->prompt_tokens);
+            cJSON_AddNumberToObject(usage, "completion_tokens", final_resp->completion_tokens);
+            cJSON_AddNumberToObject(usage, "total_tokens", final_resp->total_tokens);
+            cJSON_AddNumberToObject(usage, "reasoning_tokens", final_resp->reasoning_tokens);
+            cJSON_AddNumberToObject(usage, "cost_usd", final_resp->cost_usd);
+            cJSON_AddItemToObject(root, "usage", usage);
+        }
         char *js = cJSON_PrintUnformatted(root);
         if (js) {
             cli_outf("%s\n", js);
@@ -1618,10 +1712,16 @@ void cli_chat_reply(const char *input)
         }
     }
 
-    cli_history_add("user", input);
-    cli_history_add("assistant", final_content);
-    /* 2.1.1.6：思考链全量保留——折叠展示之外的完整文本进日志（含工具
-     * 轮每轮的 reasoning_content），思考 token 不丢失、不污染对话正文。 */
+    /* 2.1.1.6：思考链全量保留——历史携带 reasoning（跨轮回传 DeepSeek
+     * 续轮规范）+ 独立日志落盘（所有模式），折叠展示之外的完整文本不丢失。 */
+    const char *round_reasoning = (final_resp->choices && final_resp->choice_count > 0 &&
+                                   final_resp->choices[0].reasoning_content)
+                                      ? final_resp->choices[0].reasoning_content
+                                      : (g_chat_reasoning_acc ? g_chat_reasoning_acc : "");
+    cli_history_add("user", input, NULL);
+    cli_history_add("assistant", final_content, round_reasoning);
+    cli_chat_reasoning_persist(round_reasoning);
+    /* -p 模式保持既有 stderr trace 通道（供脚本消费进度） */
     if (g_chat_reasoning_acc && g_chat_reasoning_acc[0])
         cli_trace("reasoning", "%s", g_chat_reasoning_acc);
     AIRY_FREE(g_chat_reasoning_acc);
