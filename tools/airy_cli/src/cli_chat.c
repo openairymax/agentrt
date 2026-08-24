@@ -77,6 +77,94 @@ void cli_chat_usage_get(uint64_t *tokens, double *cost)
         *cost = g_chat_cost_total;
 }
 
+/* 1.7 真实消耗会话差值：llm_d cost_tracker 是所有 LLM 请求（chat + task
+ * 双思考路径）的持久化真相源。会话首读记录起点快照，此后每次返回与起点
+ * 的差值 = 本会话真实消耗（含思考 token，completion_tokens 已含 reasoning）。
+ * llm_d 不可用时返回 0（调用方回退 chat 累计 g_chat_tokens_total）。 */
+static uint64_t g_llm_base_prompt = 0;
+static uint64_t g_llm_base_completion = 0;
+static double g_llm_base_cost = 0.0;
+static int g_llm_base_set = 0;
+
+static int cli_llm_d_usage_snapshot(uint64_t *out_prompt, uint64_t *out_completion,
+                                    double *out_cost)
+{
+    const char *sock = airy_runtime_dir_socket("llm.sock");
+    if (!sock || !sock[0])
+        return -1;
+
+    char *result = NULL;
+    int rc = daemon_rpc_call(sock, "get_stats", "{}", &result, 6000);
+    if (rc != 0 || !result)
+        return -1;
+
+    uint64_t prompt = 0, comp = 0;
+    double cost = 0.0;
+
+#ifdef AIRY_HAS_CJSON
+    cJSON *root = cJSON_Parse(result);
+    AIRY_FREE(result);
+    if (!root)
+        return -1;
+    cJSON *costj = cJSON_GetObjectItemCaseSensitive(root, "cost");
+    cJSON *arr = costj ? cJSON_GetObjectItemCaseSensitive(costj, "models") : NULL;
+    if (cJSON_IsArray(arr)) {
+        cJSON *item = NULL;
+        cJSON_ArrayForEach(item, arr) {
+            cJSON *pt = cJSON_GetObjectItemCaseSensitive(item, "prompt_tokens");
+            cJSON *ct = cJSON_GetObjectItemCaseSensitive(item, "completion_tokens");
+            cJSON *cu = cJSON_GetObjectItemCaseSensitive(item, "cost_usd");
+            if (cJSON_IsNumber(pt))
+                prompt += (uint64_t)pt->valuedouble;
+            if (cJSON_IsNumber(ct))
+                comp += (uint64_t)ct->valuedouble;
+            if (cJSON_IsNumber(cu))
+                cost += cu->valuedouble;
+        }
+    }
+    cJSON_Delete(root);
+#else
+    AIRY_FREE(result);
+    return -1;
+#endif
+
+    if (out_prompt)
+        *out_prompt = prompt;
+    if (out_completion)
+        *out_completion = comp;
+    if (out_cost)
+        *out_cost = cost;
+    return 0;
+}
+
+/* 1.7：全链路真实消耗（会话差值）；llm_d 离线回退 chat 累计。 */
+void cli_chat_usage_get_session(uint64_t *tokens, double *cost)
+{
+    uint64_t prompt = 0, comp = 0;
+    double c = 0.0;
+    if (cli_llm_d_usage_snapshot(&prompt, &comp, &c) != 0) {
+        cli_chat_usage_get(tokens, cost);
+        return;
+    }
+
+    if (!g_llm_base_set) {
+        g_llm_base_prompt = prompt;
+        g_llm_base_completion = comp;
+        g_llm_base_cost = c;
+        g_llm_base_set = 1;
+        if (tokens)
+            *tokens = 0;
+        if (cost)
+            *cost = 0.0;
+        return;
+    }
+
+    if (tokens)
+        *tokens = (prompt - g_llm_base_prompt) + (comp - g_llm_base_completion);
+    if (cost)
+        *cost = c - g_llm_base_cost;
+}
+
 /* 2.1.1.2：t1-p（PROF）模型缓存前向声明——GCCP 逐问确认（cli_gccp_interact
  * 在文件前部）使用该模型槽。实现见文件后部（与 cli_chat_t1f_cached 同构）。 */
 static const char *cli_chat_t1p_cached(void);

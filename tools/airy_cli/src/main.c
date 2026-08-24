@@ -1385,7 +1385,7 @@ int main(int argc, char *argv[])
             chat_metrics[0] = '\0';
             uint64_t toks = 0;
             double cost = 0.0;
-            cli_chat_usage_get(&toks, &cost);
+            cli_chat_usage_get_session(&toks, &cost);
             if (toks > 0 || cost > 0.0)
                 snprintf(chat_metrics, sizeof(chat_metrics), "Tokens: %llu · Cost: $%.6f",
                          (unsigned long long)toks, cost);
@@ -1801,9 +1801,19 @@ int main(int argc, char *argv[])
             airy_roadmap_sched_absorb(rt.rsched, NULL, exec_id, &rmeta);
         }
         {
-            char metrics[128];
-            snprintf(metrics, sizeof(metrics), "nodes=%zu deps=%zu", wf->node_count,
-                     wf->edge_count);
+            char metrics[192];
+            /* 1.7 任务回合分隔带全链路真实 token/费用（llm_d 会话差值，
+             * 覆盖认知规划/GRAD/执行的真实消耗；离线回退 chat 累计） */
+            uint64_t toks = 0;
+            double cost = 0.0;
+            cli_chat_usage_get_session(&toks, &cost);
+            if (toks > 0 || cost > 0.0)
+                snprintf(metrics, sizeof(metrics),
+                         "nodes=%zu deps=%zu · Tokens: %llu · Cost: $%.6f",
+                         wf->node_count, wf->edge_count, (unsigned long long)toks, cost);
+            else
+                snprintf(metrics, sizeof(metrics), "nodes=%zu deps=%zu",
+                         wf->node_count, wf->edge_count);
             cli_render_turn_separator(cli_now_ms() - turn_start, metrics);
         }
 

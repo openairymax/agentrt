@@ -144,6 +144,9 @@ int cli_classify_input(const char *input);
 void cli_chat_reply(const char *input);
 /* 2.1.1.5：读取最近一轮对话的真实 token/费用统计（main.c 回合分隔处展示） */
 void cli_chat_usage_get(uint64_t *tokens, double *cost);
+/* 1.7：读取全链路真实 token/费用会话差值（llm_d cost_tracker 真相源，
+ * 覆盖 chat + task 双思考路径；llm_d 离线回退 chat 累计） */
+void cli_chat_usage_get_session(uint64_t *tokens, double *cost);
 
 airy_err_t cli_think_process_remote(const char *think_sock, const char *input, size_t input_len,
                                     airy_task_plan_t **out_plan);
