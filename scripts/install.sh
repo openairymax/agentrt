@@ -221,7 +221,7 @@ install_binary() {
     # 防止下载到异架构包后静默安装（跨架构 daemon 启动即崩溃）。
     if tar -tzf "${tarball}" 2>/dev/null | grep -q "platform-${arch}"; then
         log_ok "二进制包架构校验通过（${arch}）"
-    elif tar -tzf "${tarball}" 2>/dev/null | grep -qE 'platform-(x86_64|aarch64|armv7l)'; then
+    elif tar -tzf "${tarball}" 2>/dev/null | grep -qE 'platform-(x86_64|aarch64|armv7l|riscv64)'; then
         log_err "二进制包架构与当前主机（${arch}）不匹配，拒绝安装"
         rm -f "${tarball}"
         return 1
@@ -517,7 +517,9 @@ detect_arch() {
     esac
 }
 # 预编译包支持的架构清单（binary 模式校验；其余架构回退源码构建）
-SUPPORTED_ARCHS="x86_64 aarch64 armv7l"
+# 与 CI release.yml build-riscv64 job（agentrt-<v>-linux-riscv64.tar.gz）
+# 及 sdk/tui/scripts/airymaxrt detect_arch 同口径。
+SUPPORTED_ARCHS="x86_64 aarch64 armv7l riscv64"
 
 detect_accel() {
     if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
