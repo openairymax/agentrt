@@ -19,6 +19,7 @@
 #include "airy_rt.h"
 #include "loop.h"
 #include "roadmap_sched.h"
+#include "lang_gateway.h"
 #include "platform.h"
 #include "cognition.h"
 #include "gccp.h"
@@ -238,6 +239,12 @@ static int cli_task_poll_input(void)
 llm_svc_adapter_t *g_chat_adapter = NULL;
 /* 阶段 4（2026-08-15）：决策链事件流句柄（hall_store 创建后赋值）。 */
 airy_hall_store_t *g_cli_hall_store = NULL;
+
+/* 1.3 推理语言网关：全局句柄（cli_setup_runtime 创建后赋值）+ 最新一轮
+ * 语言约束注入物（输入环节 process 填充，cli_chat.c 消费；每轮覆盖前释放）。 */
+airy_lang_gateway_t *g_cli_lang_gateway = NULL;
+char *g_cli_lang_sys_prompt = NULL;
+airy_lang_t g_cli_lang_output = AIRY_LANG_UNKNOWN;
 
 /* 会话开始时刻（TUI 状态栏耗时计算；交互模式才有意义）。 */
 static uint64_t g_session_start_ms;
@@ -515,6 +522,9 @@ typedef struct {
     airy_governance_t *governance;
     void *reviewer; /* cli_exec_review 句柄（不透明，仅透传销毁） */
     const char *main_workspace_dir; /* 主工作区（AIRY_WORKSPACE_MAIN_DIR 或 cwd） */
+    /* 1.3 推理语言网关：自然语言 → 标准推理指令（Canonical Data Format）。
+     * 输入环节标准化 + 语言约束注入 + 输出后处理；生命周期与 rsched 同级。 */
+    airy_lang_gateway_t *lang_gateway;
 } cli_runtime_ctx_t;
 
 /* 核心引擎装配（2026-08-22 从 main 初始化段拆分，收敛圈复杂度）：
@@ -785,6 +795,29 @@ static airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_tui_t *tui,
     rt->board_ud = board_ud;
     rt->events_ud = events_ud;
 
+    /* 1.3 推理语言网关：创建时自动对 llm_d 已配置模型执行 Tokenizer 特征
+     * 校准（lang_ratio），llm_d 不可用时降级为启发式决策（不阻断）。
+     * 输入环节标准化（自然语言 → Canonical Data Format）+ 语言约束注入
+     * + 输出后处理 + 每 100 次指令自动重校准（tick）。 */
+    {
+        airy_lang_gateway_config_t lg_cfg;
+        __builtin_memset(&lg_cfg, 0, sizeof(lg_cfg));
+        lg_cfg.auto_calibrate_on_create = 1;
+        airy_lang_gateway_t *lg = NULL;
+        airy_err_t lge = airy_lang_gateway_create(&lg_cfg, &lg);
+        if (lge != AIRY_EOK || !lg) {
+            AIRY_LOG_WARN("airy_cli: lang_gateway create failed (err=%d), "
+                          "language routing disabled",
+                          (int)lge);
+            lg = NULL;
+        } else {
+            AIRY_LOG_INFO("airy_cli: lang_gateway attached (tokenizer calibration "
+                          "on startup)");
+        }
+        rt->lang_gateway = lg;
+        g_cli_lang_gateway = lg;
+    }
+
     return AIRY_EOK;
 }
 
@@ -811,6 +844,8 @@ static void cli_teardown_runtime(cli_runtime_ctx_t *rt)
         airy_governance_destroy(rt->governance);
     if (rt->rsched)
         airy_roadmap_sched_destroy(rt->rsched);
+    if (rt->lang_gateway)
+        airy_lang_gateway_destroy(rt->lang_gateway);
     AIRY_MEMSET(rt, 0, sizeof(*rt));
 }
 
@@ -1297,6 +1332,37 @@ int main(int argc, char *argv[])
         cli_render_user_message(input);
 
         uint64_t turn_start = cli_now_ms();
+
+        /* 1.3 推理语言网关：输入标准化（自然语言 → Canonical Data Format）。
+         * 纯本地信号提取（语言/任务/上下文/代码含量）+ 多因子路由决策，
+         * 零 LLM 调用——省 token 从输入环节开始。语言约束 System Prompt
+         * 供 chat 路径注入首条 system；决策链渲染供用户感知推理/输出语言
+         * 策略。指令计数每 100 次自动触发 Tokenizer 特征重校准。 */
+        if (rt.lang_gateway) {
+            airy_canonical_request_t *lg_req = NULL;
+            if (airy_lang_gateway_process(rt.lang_gateway, input, NULL, 0,
+                                          &lg_req) == AIRY_EOK && lg_req) {
+                AIRY_FREE(g_cli_lang_sys_prompt);
+                g_cli_lang_sys_prompt =
+                    AIRY_STRDUP(lg_req->system_prompt ? lg_req->system_prompt : "");
+                g_cli_lang_output = lg_req->routing.output_lang;
+                char lg_line[192];
+                snprintf(lg_line, sizeof(lg_line), "推理语言: %s · 输出语言: %s · %s",
+                         airy_lang_name(lg_req->routing.reasoning_lang),
+                         airy_lang_name(lg_req->routing.output_lang),
+                         lg_req->routing.decision_reason
+                             ? lg_req->routing.decision_reason
+                             : "");
+                cli_render_sub_agent_line(CLI_ROLE_TRACE, "lang", lg_line);
+                cli_trace("lang", "detected=%s reasoning=%s output=%s",
+                          airy_lang_name(lg_req->signals.detected_lang),
+                          airy_lang_name(lg_req->routing.reasoning_lang),
+                          airy_lang_name(lg_req->routing.output_lang));
+                airy_lang_gateway_free_canonical(lg_req);
+            }
+            if (airy_lang_gateway_tick(rt.lang_gateway))
+                cli_trace("lang", "periodic tokenizer recalibration triggered");
+        }
 
         /* 4.0b Blueprint scheduling three-tier routing (checked before intent
           * classification: transfer commands like "continue/next" are pure
