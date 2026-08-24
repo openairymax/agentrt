@@ -624,18 +624,40 @@ EOF
     # 不在用户 PATH 中且安装器未提示。安装即引导：BIN_DIR 不在 PATH 时给出
     # 可复制的修复命令，并把结果写入 install.env（airymaxrt status/doctor
     # 可据此提示，避免"装上了却找不到命令"的困惑）。
-    _PATH_OK=1
-    case ":${PATH}:" in
-        *":${BIN_DIR}:"*) _PATH_OK=1 ;;
-        *) _PATH_OK=0 ;;
-    esac
+    # 2026-08-24 强化：
+    #   - 写入 AIRY_BIN_LINK（doctor/status 据此给出准确的修复路径，此前
+    #     该键从未写入，--prefix 自定义安装时诊断提示回退到错误的默认路径）；
+    #   - PATH 检测按段遍历（对含空格/glob 字符的 BIN_DIR 健壮，此前
+    #     case glob 匹配在这些路径下会误判）；
+    #   - 永久生效提示按当前 shell 选择 rc 文件（bash/zsh/fish/posix）。
+    echo "AIRY_BIN_LINK=${BIN_DIR}/airymaxrt" >> "${AIRY_HOME}/config/install.env"
+    _PATH_OK=0
+    _P_SEG="$PATH"
+    while [ -n "$_P_SEG" ]; do
+        _seg="${_P_SEG%%:*}"
+        if [ "$_seg" = "$BIN_DIR" ]; then
+            _PATH_OK=1
+            break
+        fi
+        if [ "$_seg" = "$_P_SEG" ]; then
+            _P_SEG=""
+        else
+            _P_SEG="${_P_SEG#*:}"
+        fi
+    done
     if [ "$_PATH_OK" = "1" ]; then
         log_ok "PATH 引导: ${BIN_DIR} 已在 PATH 中，可直接输入 airymaxrt"
         echo "AIRY_BIN_DIR_IN_PATH=yes" >> "${AIRY_HOME}/config/install.env"
     else
         log_warn "PATH 引导: ${BIN_DIR} 不在 PATH 中——当前 shell 输入 airymaxrt 会报 command not found"
         log_warn "  临时生效: export PATH=\"${BIN_DIR}:\$PATH\""
-        log_warn "  永久生效: echo 'export PATH=\"${BIN_DIR}:\$PATH\"' >> \"\$HOME/.bashrc\" && source \"\$HOME/.bashrc\""
+        _RC_FILE="$HOME/.bashrc"
+        case "$(basename "${SHELL:-/bin/sh}")" in
+            zsh) _RC_FILE="$HOME/.zshrc" ;;
+            fish) _RC_FILE="$HOME/.config/fish/config.fish" ;;
+            sh|dash|ash) _RC_FILE="$HOME/.profile" ;;
+        esac
+        log_warn "  永久生效: echo 'export PATH=\"${BIN_DIR}:\$PATH\"' >> \"${_RC_FILE}\" && source \"${_RC_FILE}\""
         echo "AIRY_BIN_DIR_IN_PATH=no" >> "${AIRY_HOME}/config/install.env"
     fi
 }
