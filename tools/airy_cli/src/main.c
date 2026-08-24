@@ -826,7 +826,7 @@ static int cli_blueprint_fastpath(airy_roadmap_sched_t *rsched, const char *inpu
         return 0;
     char *rs_out = NULL;
     airy_rs_dispatch_t rs_disp = AIRY_RS_DISPATCH_MISS_L3;
-    airy_err_t rs_err = airy_roadmap_sched_process(rsched, input, NULL, &rs_out, &rs_disp);
+    airy_err_t rs_err = airy_roadmap_sched_process(rsched, input, &rs_out, &rs_disp);
     if (rs_err == AIRY_EOK && rs_disp == AIRY_RS_DISPATCH_HIT_L1) {
 #ifdef AIRY_HAS_CJSON
         char next_buf[128] = "";
@@ -1391,9 +1391,18 @@ int main(int argc, char *argv[])
                 cli_render_sub_agent_line(CLI_ROLE_TRACE, "cognition",
                                           "Parallel sub-agent review completed");
                 if (g_cli_hall_store) {
-                    airy_hall_store_write(g_cli_hall_store, "default", "preflight", NULL,
-                                          AIRY_HALL_CAT_VERIFY, "cognition", review_report, NULL,
-                                          0);
+                    /* #12 修复：preflight VERIFY 事件 task_id 语义——此前用
+                     * 字面量 "preflight" 且 content 为裸 review_report，无法与
+                     * 后续执行（exec_id）及 BLUEPRINT 计划事件关联。改用
+                     * plan_id 作 task_id（计划审查归属计划，执行审查归属
+                     * exec_id），并在 content 中冗余 plan_id 便于决策链检索。 */
+                    const char *plan_id = (plan && plan->task_plan_id) ? plan->task_plan_id : "";
+                    char ev[512];
+                    snprintf(ev, sizeof(ev), "{\"plan_id\":\"%s\",\"reviews\":%s}",
+                             plan_id, review_report);
+                    airy_hall_store_write(g_cli_hall_store, "default",
+                                          plan_id[0] ? plan_id : "preflight", NULL,
+                                          AIRY_HALL_CAT_VERIFY, "cognition", ev, NULL, 0);
                 }
                 AIRY_FREE(review_report);
             }

@@ -618,6 +618,26 @@ EOF
     # 安装器自托管（供离线卸载）
     cp -f "$0" "${AIRY_HOME}/scripts/install.sh" 2>/dev/null || true
     log_ok "安装位置已固化: install.env + agentrt-env.sh + 启动器"
+
+    # ── PATH 引导检查（2.3.2.6，与 build.sh 同构）────────────────────────
+    # 二进制安装最常见的失败模式：`airymaxrt: command not found`——BIN_DIR
+    # 不在用户 PATH 中且安装器未提示。安装即引导：BIN_DIR 不在 PATH 时给出
+    # 可复制的修复命令，并把结果写入 install.env（airymaxrt status/doctor
+    # 可据此提示，避免"装上了却找不到命令"的困惑）。
+    _PATH_OK=1
+    case ":${PATH}:" in
+        *":${BIN_DIR}:"*) _PATH_OK=1 ;;
+        *) _PATH_OK=0 ;;
+    esac
+    if [ "$_PATH_OK" = "1" ]; then
+        log_ok "PATH 引导: ${BIN_DIR} 已在 PATH 中，可直接输入 airymaxrt"
+        echo "AIRY_BIN_DIR_IN_PATH=yes" >> "${AIRY_HOME}/config/install.env"
+    else
+        log_warn "PATH 引导: ${BIN_DIR} 不在 PATH 中——当前 shell 输入 airymaxrt 会报 command not found"
+        log_warn "  临时生效: export PATH=\"${BIN_DIR}:\$PATH\""
+        log_warn "  永久生效: echo 'export PATH=\"${BIN_DIR}:\$PATH\"' >> \"\$HOME/.bashrc\" && source \"\$HOME/.bashrc\""
+        echo "AIRY_BIN_DIR_IN_PATH=no" >> "${AIRY_HOME}/config/install.env"
+    fi
 }
 
 # ─── 17 daemon 完整性校验 ──────────────────────────────────────────────
