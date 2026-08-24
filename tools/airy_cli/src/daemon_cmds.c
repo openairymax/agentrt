@@ -28,9 +28,10 @@
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+/* winsock2.h 须先于 windows.h（惯用顺序，避免 winsock.h/winsock2.h 冲突） */
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <windows.h>
 #include <process.h>
 #include <sys/stat.h>
 #else
@@ -281,8 +282,15 @@ int cmd_daemons(const char *arg, void *ctx)
                     struct timeval tv;
                     tv.tv_sec = CLI_GW_PROBE_TIMEOUT_MS / 1000;
                     tv.tv_usec = (long)(CLI_GW_PROBE_TIMEOUT_MS % 1000) * 1000L;
-                    if (select(0, NULL, &wf, NULL, &tv) > 0)
-                        gw_ok = 1;
+                    if (select(0, NULL, &wf, NULL, &tv) > 0) {
+                        /* 连接被拒（RST）/网络不可达时 select 同样报告可写：
+                         * 须用 SO_ERROR 区分（对齐 POSIX 分支），避免误报 online。 */
+                        int soerr = 0;
+                        int slen = sizeof(soerr);
+                        if (getsockopt(s, SOL_SOCKET, SO_ERROR, (char *)&soerr, &slen) == 0 &&
+                            soerr == 0)
+                            gw_ok = 1;
+                    }
                 }
                 closesocket(s);
             }
@@ -355,10 +363,11 @@ static int cli_daemon_bin(const char *ns, char *buf, size_t cap)
 #else
     snprintf(buf, cap, "%s/bin/%s_d", cli_rt_base(), ns);
 #endif
-    struct stat st;
 #ifdef _WIN32
-    return (stat(buf, &st) == 0 && (st.st_mode & _S_IFREG)) ? 1 : 0;
+    struct _stat st;
+    return (_stat(buf, &st) == 0 && (st.st_mode & _S_IFREG)) ? 1 : 0;
 #else
+    struct stat st;
     return (stat(buf, &st) == 0 && S_ISREG(st.st_mode)) ? 1 : 0;
 #endif
 }
