@@ -182,6 +182,16 @@ do_uninstall() {
         rm -f "$link"
         log_ok "已移除启动器软链 ${link}"
     fi
+    # 移除自动追加的 PATH 引导行（install.env 记录 rc 路径，带标记范围删除）
+    rc_path="$(sed -n 's/^AIRY_PATH_RC=//p' "$env_file" 2>/dev/null | head -1)"
+    if [ -n "$rc_path" ] && [ -f "$rc_path" ]; then
+        if sed '\|# >>> AgentRT PATH bootstrap <<<|,\|# <<< AgentRT PATH bootstrap <<<|d' \
+            "$rc_path" > "$rc_path.airy_tmp" 2>/dev/null && mv "$rc_path.airy_tmp" "$rc_path"; then
+            log_ok "已从 ${rc_path} 移除 AgentRT PATH 引导行"
+        else
+            rm -f "$rc_path.airy_tmp" 2>/dev/null
+        fi
+    fi
     log_ok "卸载完成"
 }
 
@@ -442,6 +452,49 @@ init_secrets() {
     fi
 }
 
+# ─── PATH 自动引导（2.3.2.6 增强，2026-08-24） ────────────────────────
+# 根因：默认 BIN_DIR=~/.local/bin 在多数新系统不在 PATH——安装器此前只
+# 提示"请手动 export"，用户不执行就永远 command not found（只能完整路径
+# 启动）。彻底解决：安装时自动幂等追加 BIN_DIR 到当前 shell 的 rc 文件
+# （带标记行，可卸载移除），并固化 rc 路径到 install.env 供卸载与
+# airymaxrt 启动器自愈使用；rc 不可写时回退提示。
+path_rc_file() {
+    case "$(basename "${SHELL:-/bin/sh}")" in
+        zsh) echo "$HOME/.zshrc" ;;
+        fish) echo "$HOME/.config/fish/config.fish" ;;
+        sh|dash|ash) echo "$HOME/.profile" ;;
+        *) echo "$HOME/.bashrc" ;;
+    esac
+}
+
+# 返回 0 已引导（rc 含标记行或成功追加）；1 追加失败（已提示手动命令）。
+path_bootstrap() {
+    local rc
+    rc="$(path_rc_file)"
+    if [ -f "$rc" ] && grep -q '# >>> AgentRT PATH bootstrap <<<' "$rc" 2>/dev/null; then
+        log_info "PATH 引导: $rc 已包含 AgentRT PATH 行（幂等跳过）"
+        echo "AIRY_PATH_RC=$rc" >> "${AIRY_HOME}/config/install.env"
+        echo "AIRY_PATH_APPENDED=yes" >> "${AIRY_HOME}/config/install.env"
+        return 0
+    fi
+    local line
+    if [ "$(basename "$rc")" = "config.fish" ]; then
+        line="set -gx PATH \"${BIN_DIR}\" \$PATH"
+    else
+        line="export PATH=\"${BIN_DIR}:\$PATH\""
+    fi
+    if { printf '\n# >>> AgentRT PATH bootstrap <<<\n%s\n# <<< AgentRT PATH bootstrap <<<\n' "$line" ; } >> "$rc" 2>/dev/null; then
+        log_ok "PATH 引导: 已自动追加 ${BIN_DIR} 到 $rc（新开终端生效，或执行 source \"$rc\"）"
+        echo "AIRY_PATH_RC=$rc" >> "${AIRY_HOME}/config/install.env"
+        echo "AIRY_PATH_APPENDED=yes" >> "${AIRY_HOME}/config/install.env"
+        return 0
+    fi
+    log_warn "PATH 引导: 无法写入 $rc（自动追加失败），请手动执行:"
+    log_warn "  echo '${line}' >> \"$rc\" && source \"$rc\""
+    echo "AIRY_PATH_APPENDED=no" >> "${AIRY_HOME}/config/install.env"
+    return 1
+}
+
 # ─── 硬件评估与画像固化（2.3.5/2.3.6 硬件自适应裁剪） ──────────────
 # 与 airymaxrt 启动器 assess_hardware/detect_accel/detect_arch 同口径
 # （SSoT 单一判据，见 sdk/tui/scripts/airymaxrt）：
@@ -650,14 +703,7 @@ EOF
         echo "AIRY_BIN_DIR_IN_PATH=yes" >> "${AIRY_HOME}/config/install.env"
     else
         log_warn "PATH 引导: ${BIN_DIR} 不在 PATH 中——当前 shell 输入 airymaxrt 会报 command not found"
-        log_warn "  临时生效: export PATH=\"${BIN_DIR}:\$PATH\""
-        _RC_FILE="$HOME/.bashrc"
-        case "$(basename "${SHELL:-/bin/sh}")" in
-            zsh) _RC_FILE="$HOME/.zshrc" ;;
-            fish) _RC_FILE="$HOME/.config/fish/config.fish" ;;
-            sh|dash|ash) _RC_FILE="$HOME/.profile" ;;
-        esac
-        log_warn "  永久生效: echo 'export PATH=\"${BIN_DIR}:\$PATH\"' >> \"${_RC_FILE}\" && source \"${_RC_FILE}\""
+        path_bootstrap
         echo "AIRY_BIN_DIR_IN_PATH=no" >> "${AIRY_HOME}/config/install.env"
     fi
 }
