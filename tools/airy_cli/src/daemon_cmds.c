@@ -35,8 +35,10 @@
 #include <sys/stat.h>
 #else
 #include <arpa/inet.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <poll.h>
 #include <signal.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -46,6 +48,10 @@
 #endif
 
 #define CLI_RPC_TIMEOUT_MS 10000
+/* gateway TCP 探测超时：未监听端口在部分网络环境（WSL2/云 NAT/防火墙
+ * drop）下 connect 会阻塞至内核超时（~130s）。非阻塞 connect + poll
+ * 限时，保证 /daemons 在离线环境快速返回（1.11.6 稳定性）。 */
+#define CLI_GW_PROBE_TIMEOUT_MS 1000
 
 typedef struct {
     const char *ns;
@@ -254,16 +260,30 @@ int cmd_daemons(const char *arg, void *ctx)
         }
         int gw_ok = 0;
 #ifdef _WIN32
-        /* Windows：SOCKET 连接探测（与 daemon_rpc TCP 一致） */
+        /* Windows：非阻塞 connect + select 限时探测（WSAEWOULDBLOCK 后
+         * 可写即连接建立；避免离线端口阻塞拖慢 /daemons）。 */
         WSADATA wsa;
         if (WSAStartup(MAKEWORD(2, 2), &wsa) == 0) {
             SOCKET s = socket(AF_INET, SOCK_STREAM, 0);
             if (s != INVALID_SOCKET) {
+                u_long nb = 1;
+                ioctlsocket(s, FIONBIO, &nb);
                 struct sockaddr_in sa;
                 sa.sin_family = AF_INET;
                 sa.sin_port = htons((unsigned short)gw_port);
                 sa.sin_addr.s_addr = inet_addr("127.0.0.1");
-                gw_ok = (connect(s, (struct sockaddr *)&sa, sizeof(sa)) == 0);
+                if (connect(s, (struct sockaddr *)&sa, sizeof(sa)) == 0) {
+                    gw_ok = 1;
+                } else {
+                    fd_set wf;
+                    FD_ZERO(&wf);
+                    FD_SET(s, &wf);
+                    struct timeval tv;
+                    tv.tv_sec = CLI_GW_PROBE_TIMEOUT_MS / 1000;
+                    tv.tv_usec = (long)(CLI_GW_PROBE_TIMEOUT_MS % 1000) * 1000L;
+                    if (select(0, NULL, &wf, NULL, &tv) > 0)
+                        gw_ok = 1;
+                }
                 closesocket(s);
             }
             WSACleanup();
@@ -271,12 +291,27 @@ int cmd_daemons(const char *arg, void *ctx)
 #else
         int s = socket(AF_INET, SOCK_STREAM, 0);
         if (s >= 0) {
+            int flags = fcntl(s, F_GETFL, 0);
+            (void)fcntl(s, F_SETFL, flags | O_NONBLOCK);
             struct sockaddr_in sa;
             sa.sin_family = AF_INET;
             sa.sin_port = htons((unsigned short)gw_port);
             sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
             if (connect(s, (struct sockaddr *)&sa, sizeof(sa)) == 0) {
                 gw_ok = 1;
+            } else if (errno == EINPROGRESS) {
+                /* 未监听端口在 WSL2/防火墙 drop 环境会丢 SYN，阻塞 connect
+                 * 将挂起至内核超时（约 130s）——poll 限时后以 SO_ERROR 判定。 */
+                struct pollfd pfd;
+                pfd.fd = s;
+                pfd.events = POLLOUT;
+                pfd.revents = 0;
+                if (poll(&pfd, 1, CLI_GW_PROBE_TIMEOUT_MS) > 0) {
+                    int soerr = 0;
+                    socklen_t slen = sizeof(soerr);
+                    if (getsockopt(s, SOL_SOCKET, SO_ERROR, &soerr, &slen) == 0 && soerr == 0)
+                        gw_ok = 1;
+                }
             }
             close(s);
         }
