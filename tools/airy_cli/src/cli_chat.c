@@ -1344,6 +1344,10 @@ void cli_chat_reply(const char *input)
     char mem_sys[768];
     cli_chat_mem_inject_system(input, mem_sys, sizeof(mem_sys));
     cli_msgbuf_push(&buf, "system", cli_system_prompt_now(), NULL, NULL, NULL);
+    /* 1.3 推理语言网关：语言约束 System Prompt 注入（首条 system 之后）。
+     * 约束模型内部推理语言与最终输出语言，从源头抑制语言漂移。 */
+    if (g_cli_lang_sys_prompt && g_cli_lang_sys_prompt[0])
+        cli_msgbuf_push(&buf, "system", g_cli_lang_sys_prompt, NULL, NULL, NULL);
     if (mem_sys[0])
         cli_msgbuf_push(&buf, "system", mem_sys, NULL, NULL, NULL);
     for (size_t hi = 0; hi < g_history_count; hi++)
@@ -1525,10 +1529,11 @@ void cli_chat_reply(const char *input)
         cli_chat_mem_record(input, final_resp->choices[0].content, mem_reasoning);
     }
 #else
-    /* 无 cJSON 平台：固定消息数组 + 单轮非流式（不带工具），保持纯对话。 */
+    /* 无 cJSON 平台：固定消息数组 + 单轮非流式（不带工具），保持纯对话。
+     * 消息数 = 历史 + 2（首 system + 当前 user）+ 1（语言约束 system，可能缺省）。 */
     int stream_mode = 0;
     int tool_rounds = 0;
-    size_t msg_n = g_history_count + 2;
+    size_t msg_n = g_history_count + 3;
     llm_message_t *msgs = (llm_message_t *)AIRY_CALLOC(msg_n, sizeof(llm_message_t));
     if (!msgs) {
         cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "对话",
@@ -1539,6 +1544,12 @@ void cli_chat_reply(const char *input)
     msgs[mi].role = "system";
     msgs[mi].content = cli_system_prompt_now();
     mi++;
+    /* 1.3 推理语言网关：语言约束 System Prompt 注入（非 cJSON 平台） */
+    if (g_cli_lang_sys_prompt && g_cli_lang_sys_prompt[0] && mi < msg_n) {
+        msgs[mi].role = "system";
+        msgs[mi].content = g_cli_lang_sys_prompt;
+        mi++;
+    }
     for (size_t hi = 0; hi < g_history_count; hi++) {
         msgs[mi].role = g_history_roles[hi];
         msgs[mi].content = g_history_contents[hi];
@@ -1593,6 +1604,19 @@ void cli_chat_reply(const char *input)
                                     ? final_resp->choices[0].content
                                     : "";
 
+    /* 1.3 推理语言网关：输出后处理（语言漂移检测 + 术语一致性 + 润色）。
+     * 期望输出语言取路由决策 output_lang；仅作用于渲染与历史写入，
+     * 不修改 llm_d 原始响应（推理链条证据保留）。 */
+    char *lg_final = NULL;
+    const char *render_content = final_content;
+    if (g_cli_lang_gateway && final_content[0]) {
+        if (airy_lang_gateway_post_process(g_cli_lang_gateway, final_content,
+                                           g_cli_lang_output,
+                                           &lg_final) == AIRY_EOK &&
+            lg_final && lg_final[0])
+            render_content = lg_final;
+    }
+
     /* 最终回复渲染：
      *   --json  结构化 JSON（Codex exec 约定）
      *   -p      纯文本（Claude Code -p / Codex exec 约定；流式已直出）
@@ -1604,7 +1628,7 @@ void cli_chat_reply(const char *input)
         cJSON_AddStringToObject(root, "role", "super_agent");
         cJSON_AddStringToObject(root, "type", "chat");
         if (final_content[0])
-            cJSON_AddStringToObject(root, "content", final_content);
+            cJSON_AddStringToObject(root, "content", render_content);
         else
             cJSON_AddStringToObject(root, "error", "reply failed");
         /* 2.1.1.6：--json 结构化输出携带思考链（TUI RunResponse.thinking
@@ -1633,7 +1657,7 @@ void cli_chat_reply(const char *input)
 #else
         cli_outf("{\"role\":\"super_agent\",\"type\":\"chat\"");
         if (final_content[0])
-            cli_outf(",\"content\":\"%s\"", final_content);
+            cli_outf(",\"content\":\"%s\"", render_content);
         else
             cli_outf(",\"error\":\"reply failed\"");
         cli_outf("}\n");
@@ -1644,7 +1668,7 @@ void cli_chat_reply(const char *input)
          * 回复（thinking 模型可能只产生 reasoning_content）→ stderr
          * 明确告警，stdout 保持空串可解析（脚本不被打断）。 */
         if (!stream_mode)
-            cli_outf("%s\n", final_content);
+            cli_outf("%s\n", render_content);
         else if (final_content[0] == '\0' && g_chat_fold_phys == 0)
             fprintf(stderr,
                     "[chat] warning: empty reply (model returned no text; "
@@ -1689,7 +1713,7 @@ void cli_chat_reply(const char *input)
             if (final_content[0] != '\0') {
                 /* 结果完整渲染，不折叠（2026-08-19：仅折叠思考链，
                  * 结果必须完整展示；长结果靠终端滚动/TUI 视口浏览）。 */
-                cli_render_super_agent(final_content);
+                cli_render_super_agent(render_content);
             } else {
                 cli_render_super_agent(CLI_REPLY_EMPTY_HINT);
             }
@@ -1705,7 +1729,7 @@ void cli_chat_reply(const char *input)
                                      4, CLI_REPLY_FOLD_KEEP, 1);
             }
             if (final_content[0] != '\0') {
-                cli_render_super_agent(final_content);
+                cli_render_super_agent(render_content);
             } else {
                 cli_render_super_agent(CLI_REPLY_EMPTY_HINT);
             }
@@ -1719,7 +1743,7 @@ void cli_chat_reply(const char *input)
                                       ? final_resp->choices[0].reasoning_content
                                       : (g_chat_reasoning_acc ? g_chat_reasoning_acc : "");
     cli_history_add("user", input, NULL);
-    cli_history_add("assistant", final_content, round_reasoning);
+    cli_history_add("assistant", render_content, round_reasoning);
     cli_chat_reasoning_persist(round_reasoning);
     /* -p 模式保持既有 stderr trace 通道（供脚本消费进度） */
     if (g_chat_reasoning_acc && g_chat_reasoning_acc[0])
@@ -1730,6 +1754,7 @@ void cli_chat_reply(const char *input)
               strlen(final_content));
 
     llm_response_free(final_resp);
+    AIRY_FREE(lg_final);
 #ifdef AIRY_HAS_CJSON
     cli_msgbuf_free(&buf);
 #else
