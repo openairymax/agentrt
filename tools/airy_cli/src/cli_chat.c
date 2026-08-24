@@ -324,6 +324,11 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
     if (!answers)
         return NULL;
 
+    /* 交互开始清零：防止上次交互（用户 Ctrl-C / 异常中断）残留的
+     * 追问污染本次 probe 列表后的 LLM 追问区。 */
+    g_last_step_q[0] = '\0';
+    g_last_step_hint[0] = '\0';
+
     /* 原指令从 prefill 的 raw_prompt 取（probe 阶段已保存） */
     const char *raw = (probe->prefill && probe->prefill->raw_prompt) ? probe->prefill->raw_prompt :
                                                                        "（无原始指令）";
