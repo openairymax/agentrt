@@ -254,6 +254,7 @@ const cli_command_t CLI_COMMANDS[] = {
     {"/clear", "清屏并清空对话上下文", CLI_CAT_SESSION, 0, cmd_clear},
     {"/status", "查看执行大厅状态", CLI_CAT_SYSTEM, 0, cmd_status},
     {"/chain", "决策链可视化：/chain [task_id]（默认列出最近任务）", CLI_CAT_SYSTEM, 0, cmd_chain},
+    {"/orch", "流程编排：/orch <task>（七阶段管线：分解→规划→生成→批判→验证→审计→对齐）", CLI_CAT_SYSTEM, 1, cmd_orch},
     {"/quit", "退出 agentrt", CLI_CAT_SESSION, 0, cmd_quit},
     {"/tui", "切换到图形 TUI（agentrt-tui）", CLI_CAT_SESSION, 0, cmd_tui},
     {"/daemons", "查看全部 daemon 在线状态", CLI_CAT_SYSTEM, 0, cmd_daemons},

@@ -37,6 +37,8 @@ add_executable(airy_cli
     src/cli_review.c
     # 改进6（P3）: 执行复核管线 t2/t1-f LLM 语义委托（门禁 -> t2 -> t1-f）
     src/cli_exec_review.c
+    # S-5 编排管线：/orch 命令（orchestrator 七阶段流程编排）
+    src/cli_orch.c
 )
 
 # 链接模式：coreloopthree 与 llm/tool service 存在交叉引用（静态库 + 全局
