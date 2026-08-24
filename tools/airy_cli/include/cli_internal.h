@@ -193,6 +193,8 @@ int cli_live_board_active(void);
 void cli_live_board_extra(void);
 void cli_live_board_done(void);
 int cmd_help(const char *arg, void *ctx);
+/* S-5 编排管线用户入口（cli_orch.c）：orchestrator 七阶段编排 */
+int cmd_orch(const char *arg, void *ctx);
 
 /* Dual-thinking three-model config, unified with think_d's model.yaml.
  * Priority: env AIRY_MODEL_T2/T1F/T1P > model.yaml think section >
