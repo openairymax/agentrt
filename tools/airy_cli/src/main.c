@@ -1191,6 +1191,9 @@ int main(int argc, char *argv[])
          * (no-op when redispatch_max == 0). Controller-driven reconcile —
          * each turn polls the failed-execution queue. */
         (void)airy_work_hall_redispatch_once(rt.hall);
+        /* p6 (2026-08-24): board TTL housekeeping — purge terminal board
+         * entries past their retention window (same controller rhythm). */
+        (void)airy_work_hall_ttl_purge(rt.hall);
         /* 阶段 2 生命周期层 reconcile：agent 自愈重启（AIRY_SELF_HEAL=1 或
          * AIRY_SELF_HEAL_AGENTS 列表启用；未启用时 no-op）。与执行层
          * redispatch 并列，构成声明式自愈第三层。 */
