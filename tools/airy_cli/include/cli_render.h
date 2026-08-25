@@ -148,20 +148,22 @@ void cli_trace(const char *tag, const char *fmt, ...);
 #define cli_puts(s) cli_out(s)
 #define cli_putc(c) cli_outc(c)
 
-/* ANSI color helpers (no-op on Windows). */
-#define CLR_BOLD "\033[1m"
-#define CLR_DIM "\033[2m"
-#define CLR_UNDERLINE "\033[4m"
-#define CLR_CYAN "\033[36m"
-#define CLR_GREEN "\033[32m"
-#define CLR_YELLOW "\033[33m"
-#define CLR_RED "\033[31m"
-#define CLR_MAGENTA "\033[35m"
-#define CLR_BLUE "\033[34m"
-#define CLR_BG_GRAY "\033[48;5;236m"
-#define CLR_BG_BLUE "\033[48;5;24m"
-#define CLR_REVERSE "\033[7m"   /* 反显：2.2.1.5 输入光标黑白交替闪烁 */
-#define CLR_RESET "\033[0m"
+/* ANSI color helpers. 2026-08-25：经 cli_theme_seq() 解析，随终端背景
+ * 在浅色 / 深色主题间自动切换（见 cli_term.h theme 段；调用点零改动，
+ * 编译期常量场景不可用，仅用于 printf 参数）。 */
+#define CLR_BOLD cli_theme_seq(CLI_TH_BOLD)
+#define CLR_DIM cli_theme_seq(CLI_TH_DIM)
+#define CLR_UNDERLINE cli_theme_seq(CLI_TH_UNDERLINE)
+#define CLR_CYAN cli_theme_seq(CLI_TH_CYAN)
+#define CLR_GREEN cli_theme_seq(CLI_TH_GREEN)
+#define CLR_YELLOW cli_theme_seq(CLI_TH_YELLOW)
+#define CLR_RED cli_theme_seq(CLI_TH_RED)
+#define CLR_MAGENTA cli_theme_seq(CLI_TH_MAGENTA)
+#define CLR_BLUE cli_theme_seq(CLI_TH_BLUE)
+#define CLR_BG_GRAY cli_theme_seq(CLI_TH_BG_GRAY)
+#define CLR_BG_BLUE cli_theme_seq(CLI_TH_BG_BLUE)
+#define CLR_REVERSE cli_theme_seq(CLI_TH_REVERSE) /* 反显：输入光标闪烁 */
+#define CLR_RESET cli_theme_seq(CLI_TH_RESET)
 
 /* Small icon set shared across the CLI (Claude Code / Codex style). */
 #define CLI_ICON_USER "\u203A"          /* › user prompt  */

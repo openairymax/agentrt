@@ -315,3 +315,149 @@ void cli_term_input_hop(void)
     fflush(stdout);
 }
 
+/* ==================== 主题（浅色 / 深色，2026-08-25） ====================
+ *
+ * 配色随终端背景自适应：深色背景用高对比亮色，浅色背景切到深色调
+ * （256 色前景），分隔块背景换浅色变体，保证两种终端下角色标签与
+ * 背景块都可读。CLR_* 宏经 cli_theme_seq() 解析，调用点零改动。
+ */
+
+static cli_theme_mode_t g_theme_mode = CLI_THEME_AUTO;
+static int g_theme_probed = 0;
+
+/* 深色主题（默认）：与历史 16 色 / 256 色深底配色一致。 */
+static const char *const k_theme_dark[CLI_TH_COUNT] = {
+    [CLI_TH_BOLD]      = "\033[1m",
+    [CLI_TH_DIM]       = "\033[2m",
+    [CLI_TH_UNDERLINE] = "\033[4m",
+    [CLI_TH_CYAN]      = "\033[36m",
+    [CLI_TH_GREEN]     = "\033[32m",
+    [CLI_TH_YELLOW]    = "\033[33m",
+    [CLI_TH_RED]       = "\033[31m",
+    [CLI_TH_MAGENTA]   = "\033[35m",
+    [CLI_TH_BLUE]      = "\033[34m",
+    [CLI_TH_BG_GRAY]   = "\033[48;5;236m",
+    [CLI_TH_BG_BLUE]   = "\033[48;5;24m",
+    [CLI_TH_REVERSE]   = "\033[7m",
+    [CLI_TH_RESET]     = "\033[0m",
+};
+
+/* 浅色主题：前景用 256 色深色调（浅底上保持对比度），背景块换浅色。 */
+static const char *const k_theme_light[CLI_TH_COUNT] = {
+    [CLI_TH_BOLD]      = "\033[1m",
+    [CLI_TH_DIM]       = "\033[2m",
+    [CLI_TH_UNDERLINE] = "\033[4m",
+    [CLI_TH_CYAN]      = "\033[38;5;30m",   /* 深青 */
+    [CLI_TH_GREEN]     = "\033[38;5;28m",   /* 深绿 */
+    [CLI_TH_YELLOW]    = "\033[38;5;130m",  /* 深黄/棕 */
+    [CLI_TH_RED]       = "\033[38;5;124m",  /* 深红 */
+    [CLI_TH_MAGENTA]   = "\033[38;5;90m",   /* 深紫 */
+    [CLI_TH_BLUE]      = "\033[38;5;25m",   /* 深蓝 */
+    [CLI_TH_BG_GRAY]   = "\033[48;5;250m",  /* 浅灰 */
+    [CLI_TH_BG_BLUE]   = "\033[48;5;117m",  /* 浅蓝 */
+    [CLI_TH_REVERSE]   = "\033[7m",
+    [CLI_TH_RESET]     = "\033[0m",
+};
+
+#ifndef _WIN32
+#include <poll.h>
+
+/* OSC 11 背景色查询（xterm/kitty/ghostty 等）：发出查询后在 150ms 内
+ * 等待响应（poll 超时防止不支持 OSC 的终端阻塞启动）。响应形如
+ *   ESC ] 11 ; rgb:RRRR/GGGG/BBBB ESC \
+ * 每段 1~4 位 hex（xterm 用 4 位）；取前 2 位 hex 归一化到 0-255。 */
+static int query_terminal_background(unsigned char *or, unsigned char *og,
+                                     unsigned char *ob)
+{
+    if (!cli_term_is_tty())
+        return 0;
+    fputs("\033]11;?\033\\", stdout);
+    fflush(stdout);
+    char buf[128];
+    struct pollfd pfd;
+    pfd.fd = STDIN_FILENO;
+    pfd.events = POLLIN;
+    if (poll(&pfd, 1, 150) <= 0)
+        return 0;
+    ssize_t n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
+    if (n <= 0)
+        return 0;
+    buf[n] = '\0';
+    char *p = strstr(buf, "rgb:");
+    if (!p)
+        return 0;
+    p += 4;
+    unsigned int vals[3];
+    for (int i = 0; i < 3; i++) {
+        char *end = NULL;
+        unsigned long v = strtoul(p, &end, 16);
+        if (end == p)
+            return 0;
+        /* 1 位 hex（如 "f"）按 ANSI 惯例放大到 0xff */
+        unsigned int width = (unsigned int)(end - p);
+        if (width <= 1 && v <= 0xf)
+            v = (v << 4) | v;
+        vals[i] = (unsigned int)(v > 255 ? v / 257 : v); /* 4 位 hex → 8 位 */
+        if (*end == '\0' || i == 2)
+            break;
+        p = end + 1; /* 跳过 '/' */
+    }
+    *or = (unsigned char)vals[0];
+    *og = (unsigned char)vals[1];
+    *ob = (unsigned char)vals[2];
+    return 1;
+}
+#endif
+
+void cli_theme_init(void)
+{
+    if (g_theme_probed)
+        return;
+    g_theme_probed = 1;
+
+    const char *env = getenv("AIRY_CLI_THEME");
+    if (env && env[0]) {
+        if (strcmp(env, "light") == 0) {
+            g_theme_mode = CLI_THEME_LIGHT;
+            return;
+        }
+        if (strcmp(env, "dark") == 0) {
+            g_theme_mode = CLI_THEME_DARK;
+            return;
+        }
+        /* auto / 其他取值：继续检测 */
+    }
+    g_theme_mode = CLI_THEME_DARK; /* 无 TTY / 检测失败兜底 */
+#ifdef _WIN32
+    /* Windows 经典控制台 / Windows Terminal 用 COLORFGBG 暴露背景色
+     * （"fg;bg"，bg 0-15；>=7 即浅色）。 */
+    const char *cfbg = getenv("COLORFGBG");
+    if (cfbg && cfbg[0]) {
+        const char *slash = strrchr(cfbg, ';');
+        int bg = slash ? atoi(slash + 1) : atoi(cfbg);
+        if (bg >= 7)
+            g_theme_mode = CLI_THEME_LIGHT;
+    }
+#else
+    unsigned char r = 0, g = 0, b = 0;
+    if (query_terminal_background(&r, &g, &b)) {
+        double lum = (0.299 * (double)r + 0.587 * (double)g + 0.114 * (double)b) / 255.0;
+        g_theme_mode = (lum >= 0.5) ? CLI_THEME_LIGHT : CLI_THEME_DARK;
+    }
+#endif
+}
+
+cli_theme_mode_t cli_theme_mode(void)
+{
+    return g_theme_mode;
+}
+
+const char *cli_theme_seq(cli_theme_t th)
+{
+    if ((int)th < 0 || (int)th >= CLI_TH_COUNT)
+        return "\033[0m";
+    if (!cli_color_enabled())
+        return "";
+    return (g_theme_mode == CLI_THEME_LIGHT) ? k_theme_light[th] : k_theme_dark[th];
+}
+
