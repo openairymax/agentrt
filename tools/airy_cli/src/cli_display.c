@@ -742,14 +742,14 @@ static void cli_hero_capabilities(const char *g)
 static void cli_banner_legend(const char *g)
 {
     static const struct {
-        const char *color;
+        cli_theme_t color; /* 主题 token（CLR_* 宏为运行时函数，不可作静态初始化） */
         const char *name;
         const char *label;
     } roles[] = {
-        {CLR_CYAN, "For Thee", "你"},
-        {CLR_GREEN, "Super Agent", "agentrt"},
-        {CLR_YELLOW, "Dual Think", "思考"},
-        {CLR_MAGENTA, "Sub Agent", "执行体"},
+        {CLI_TH_CYAN, "For Thee", "你"},
+        {CLI_TH_GREEN, "Super Agent", "agentrt"},
+        {CLI_TH_YELLOW, "Dual Think", "思考"},
+        {CLI_TH_MAGENTA, "Sub Agent", "执行体"},
     };
 
     size_t w = cli_hero_frame_w();
@@ -772,7 +772,7 @@ static void cli_banner_legend(const char *g)
             used += 3;
         }
         cli_out("[");
-        cli_out(cli_c(roles[i].color));
+        cli_out(cli_c(cli_theme_seq(roles[i].color)));
         cli_out(roles[i].name);
         cli_out(cli_c(CLR_RESET));
         cli_out("]");

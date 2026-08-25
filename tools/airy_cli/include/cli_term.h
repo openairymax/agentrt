@@ -42,6 +42,48 @@ int cli_term_is_tty(void);
  * sequences (Trojan-Source hardening, same intent as Codex terminal_title). */
 void cli_term_title(const char *title);
 
+/* ---- theme (light / dark) support (2026-08-25) ----
+ *
+ * The CLI palette adapts to the terminal background so text stays readable on
+ * both dark and light terminals. Mode resolution: env AIRY_CLI_THEME=auto
+ * (default) | dark | light. "auto" queries the terminal background via OSC 11
+ * (POSIX TTY only); non-TTY / query failure / Windows fall back to dark.
+ *
+ * cli_render.h CLR_* macros resolve through cli_theme_seq() so every existing
+ * call site automatically follows the resolved theme — no per-site changes.
+ */
+
+typedef enum {
+    CLI_TH_BOLD = 0,    /* 粗体（与背景无关）      */
+    CLI_TH_DIM,         /* 弱化（与背景无关）      */
+    CLI_TH_UNDERLINE,   /* 下划线（与背景无关）    */
+    CLI_TH_CYAN,        /* 用户角色                */
+    CLI_TH_GREEN,       /* Super Agent 角色        */
+    CLI_TH_YELLOW,      /* Dual Think 角色         */
+    CLI_TH_RED,         /* 错误 / 警告             */
+    CLI_TH_MAGENTA,     /* Sub Agent 角色          */
+    CLI_TH_BLUE,        /* 通用强调               */
+    CLI_TH_BG_GRAY,     /* 分隔 / 背景块           */
+    CLI_TH_BG_BLUE,     /* 强调背景块             */
+    CLI_TH_REVERSE,     /* 反显（输入光标闪烁）    */
+    CLI_TH_RESET,       /* 重置                    */
+    CLI_TH_COUNT
+} cli_theme_t;
+
+typedef enum {
+    CLI_THEME_AUTO = 0, CLI_THEME_DARK, CLI_THEME_LIGHT
+} cli_theme_mode_t;
+
+/* One-time theme probe; call after cli_term_init(). Idempotent. */
+void cli_theme_init(void);
+
+/* Resolved theme mode (valid after cli_theme_init). */
+cli_theme_mode_t cli_theme_mode(void);
+
+/* ANSI sequence for a themed token; "" when color output is disabled. */
+const char *cli_theme_seq(cli_theme_t th);
+
+
 /* ---- fixed header support (TTY only, ANSI scroll region) ---- */
 
 /**

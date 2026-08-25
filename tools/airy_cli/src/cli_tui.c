@@ -225,7 +225,9 @@ struct cli_tui_s {
      * 分页渲染 + 高亮移动 + 页码指示。 */
     airy_ime_t *ime;         /* 词典句柄（加载失败=NULL） */
     int ime_active;          /* 拼音模式 */
-    int ime_key;             /* 中/英切换键码（默认 TUI_KEY_F10，可配置） */
+    int ime_key;             /* 中/英切换主键（默认 TUI_KEY_F10，可配置） */
+    int ime_key_alt;         /* 中/英切换备键（默认 TUI_KEY_F9：F10 常被
+                              * GNOME/Windows 终端占用为菜单键，双键兜底） */
     char ime_buf[48];        /* 拼音缓冲（[a-z]，ü 以 v 表示） */
     size_t ime_buf_len;
     airy_ime_cand_t ime_cands[27]; /* 候选池（分页：每页 9 个） */
@@ -1030,6 +1032,8 @@ static void tui_render_viewport(cli_tui_t *t)
 
 /* 拼音候选条（定义在输入法辅助段，此处前置声明供 tui_render_input 用）。 */
 static int tui_ime_draw_cands(cli_tui_t *t, int input_row);
+/* 中/英切换键命中判定（定义在输入法辅助段，前置声明供按键循环用）。 */
+static int tui_ime_key_hit(const cli_tui_t *t, int key);
 /* 反显光标打印（定义在光标辅助段，前置声明供输入行渲染用）。 */
 static size_t tui_caret_print(cli_tui_t *t);
 
@@ -2448,9 +2452,10 @@ static int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
             rc = 2;
             break;
         }
-        /* 2.2.3 内置拼音输入法：中/英切换（默认 F10，AIRY_IME_KEY 可配
-         * f9/f10）。词典加载失败（ime==NULL）时无效果，英文路径不变。 */
-        if (t->ime && key == t->ime_key) {
+        /* 2.2.3 内置拼音输入法：中/英切换（F10 主键 + F9 备键，
+         * AIRY_IME_KEY 可配）。词典加载失败（ime==NULL）时无效果，
+         * 英文路径不变。 */
+        if (tui_ime_key_hit(t, key)) {
             t->ime_active = !t->ime_active;
             if (!t->ime_active)
                 tui_ime_commit_raw(t); /* 切回英文：拼音原文保留在输入行 */
@@ -2813,10 +2818,11 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
                 *out_len = 0;
             return 3;
         }
-        /* 2.2.3 内置拼音输入法：中/英切换（默认 F10，AIRY_IME_KEY 可配；
-         * chat 视图；词典未加载时 ime==NULL 无效果）。面板视图按切换键
-         * 会落入"打字即退出浏览"分支返回对话，无拼音态残留。 */
-        if (t->ime && t->mode == CLI_TUI_MODE_CHAT && key == t->ime_key) {
+        /* 2.2.3 内置拼音输入法：中/英切换（F10 主键 + F9 备键，
+         * AIRY_IME_KEY 可配；chat 视图；词典未加载时 ime==NULL 无
+         * 效果）。面板视图按切换键会落入"打字即退出浏览"分支返回
+         * 对话，无拼音态残留。 */
+        if (t->mode == CLI_TUI_MODE_CHAT && tui_ime_key_hit(t, key)) {
             t->ime_active = !t->ime_active;
             if (!t->ime_active)
                 tui_ime_commit_raw(t); /* 切回英文：拼音原文保留在输入行 */
@@ -3582,9 +3588,11 @@ static airy_ime_t *tui_ime_load_dict(void)
     return airy_ime_load("share/agentrt/ime/airy_ime.dat");
 }
 
-/* 解析中/英切换键（2.2.3 可配置）：环境变量 AIRY_IME_KEY=f9/f10，
- * 默认 F10。F11 因终端模拟器全屏冲突（GNOME Terminal / Windows
- * Terminal / iTerm2 均默认 F11 全屏）不可用，显式拒绝。 */
+/* 解析中/英切换键（2.2.3 可配置）：环境变量 AIRY_IME_KEY=f9/f10/both，
+ * 默认 F10 主键 + F9 备键。F11 因终端模拟器全屏冲突（GNOME Terminal /
+ * Windows Terminal / iTerm2 均默认 F11 全屏）不可用，显式拒绝。F10 在
+ * GNOME/Windows 终端默认绑定"激活菜单"，字节到不了程序——保留 F9 为
+ * 备键（用户按 F9 同样切换），降低"按了没反应"的观感。 */
 static int tui_ime_key_resolve(void)
 {
     const char *key = getenv("AIRY_IME_KEY");
@@ -3593,9 +3601,34 @@ static int tui_ime_key_resolve(void)
             return TUI_KEY_F9;
         if (strcmp(key, "f10") == 0)
             return TUI_KEY_F10;
+        if (strcmp(key, "both") == 0)
+            return TUI_KEY_F10;
         /* 未知值回落默认，不阻断启动 */
     }
     return TUI_KEY_F10;
+}
+
+/* 备键解析：AIRY_IME_KEY=f9/f10 时备键为对侧；both/默认时备键 F9。
+ * 主键与备键不相等（f9 配置下主键 F9 备键 F10，反之亦然）。 */
+static int tui_ime_key_alt_resolve(void)
+{
+    const char *key = getenv("AIRY_IME_KEY");
+    if (key && key[0]) {
+        if (strcmp(key, "f9") == 0)
+            return TUI_KEY_F10;
+        if (strcmp(key, "f10") == 0)
+            return TUI_KEY_F9;
+        /* both / 未知值：备键 F9 */
+    }
+    return TUI_KEY_F9;
+}
+
+/* 中/英切换键命中判定：主键或备键任一即命中。 */
+static int tui_ime_key_hit(const cli_tui_t *t, int key)
+{
+    if (!t->ime)
+        return 0;
+    return key == t->ime_key || key == t->ime_key_alt;
 }
 
 int cli_tui_create(cli_tui_t **out_tui)
@@ -3611,10 +3644,17 @@ int cli_tui_create(cli_tui_t **out_tui)
         g_default_tui = t;
     /* Recall past submitted commands (Up / Ctrl+R) from the previous session. */
     tui_cmd_hist_load(t);
-    /* 2.2.3 内置拼音输入法：词典加载失败仅降级（ime==NULL），不阻断启动 */
+    /* 2.2.3 内置拼音输入法：词典加载失败仅降级（ime==NULL），不阻断
+     * 启动；但必须明确提示，避免"按 F10/F9 没反应"的静默困惑。
+     * 提示走 stderr（启动早期，未进 alt-screen）。 */
     t->ime = tui_ime_load_dict();
+    if (!t->ime)
+        fprintf(stderr,
+                "airy_cli: 警告 内置输入法词典未加载，F10/F9 中文输入不可用\n"
+                "          （可用 AIRY_IME_DICT=/path/to/airy_ime.dat 指定词典）\n");
     t->ime_active = 0;
     t->ime_key = tui_ime_key_resolve();
+    t->ime_key_alt = tui_ime_key_alt_resolve();
     /* 2.3.7 (2026-08-17)：交互默认行渲染流式模式，不自动进入全屏页面；
      * 全屏由 cli_tui_enter() 显式进入（F8 切换）。 */
     return 0;

@@ -1025,6 +1025,9 @@ int main(int argc, char *argv[])
     /* Terminal capability probe (TTY / color level / NO_COLOR) before any
      * output so every render call degrades consistently on servers and logs. */
     cli_term_init();
+    /* 2026-08-25：主题（浅色/深色）自适应——OSC 11 查询终端背景色，
+     * 需在进入交互 raw mode 前完成（此时 stdin 仍可读查询响应）。 */
+    cli_theme_init();
     cli_term_title("AgentRT · airy_cli");
 
     /* 运行时根解析 SSoT：airy_paths_init() 在 commons/platform 统一解析

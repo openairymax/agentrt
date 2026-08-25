@@ -404,6 +404,12 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
         airy_gccp_step_t step;
         /* 2.1.1.2 修复：GCCP 逐问确认走 t1-p（PROF）模型槽 */
         const char *t1p_model = cli_chat_t1p_cached();
+        /* 用户回答后 LLM 思考期间必须有可见反馈（此前 spinner 暂停且无
+         * 任何提示，模型响应慢时用户感知为"卡住"）——打印静态提示行，
+         * 不碰 spinner 状态机（planning spinner 由 pause/resume 管理）。 */
+        cli_outf("  %s◆%s %s意图收敛思考中…%s\n", cli_c(CLR_CYAN), cli_c(CLR_RESET),
+                 cli_c(CLR_DIM), cli_c(CLR_RESET));
+        fflush(stdout);
         airy_err_t serr = airy_gccp_step(g_chat_adapter, NULL,
                                          (t1p_model && t1p_model[0]) ? t1p_model : NULL, raw,
                                          raw_len, answers_json, 1, NULL, &step);

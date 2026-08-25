@@ -43,6 +43,10 @@ int cmd_help(const char *arg, void *ctx)
     }
     cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, NULL,
                          "普通输入直接对话或下达任务指令。");
+    cli_outf("  %s快捷键：%sF8%s 全屏↔行渲染切换 · %sF10/F9%s 内置输入法"
+             "中/英切换（AIRY_IME_KEY=f9/f10/both 可配置）\n",
+             cli_c(CLR_DIM), cli_c(CLR_CYAN), cli_c(CLR_RESET),
+             cli_c(CLR_CYAN), cli_c(CLR_RESET));
     return 0;
 }
 
