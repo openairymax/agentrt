@@ -95,8 +95,9 @@ int tui_ime_draw_cands(cli_tui_t *t, int input_row)
     tui_write_literal(num);
     tui_write_literal(";1H");
     tui_clear_line();
+    /* 拼音高亮：紫（轻盈科技感，区别于对话区青/蓝） */
     fputs(cli_c(CLR_BOLD), stdout);
-    fputs(cli_c(CLR_CYAN), stdout);
+    fputs(cli_c(CLR_MAGENTA), stdout);
     fwrite(t->ime_buf, 1, t->ime_buf_len, stdout);
     fputs(cli_c(CLR_RESET), stdout);
     fputs(" ", stdout);
@@ -114,9 +115,10 @@ int tui_ime_draw_cands(cli_tui_t *t, int input_row)
         if (used + w > (size_t)t->cols)
             break;
         if (i == t->ime_page * 9 + t->ime_sel) {
-            /* 页内高亮（微信式：蓝底反显当前选中） */
-            fputs(cli_c(CLR_BG_BLUE), stdout);
+            /* 页内高亮：反显 + 加粗 + 青前景（不依赖蓝底，深浅色终端均醒目） */
+            fputs(cli_c(CLR_REVERSE), stdout);
             fputs(cli_c(CLR_BOLD), stdout);
+            fputs(cli_c(CLR_CYAN), stdout);
         } else {
             fputs(cli_c(CLR_DIM), stdout);
         }
