@@ -32,6 +32,8 @@ param(
     [string]$Prefix,
     [string]$Mode = "auto",
     [string]$BinDir,
+    [string]$Channel = "stable",
+    [string]$FromFile,
     [switch]$Uninstall,
     [switch]$KeepData,
     [switch]$Yes,
@@ -54,16 +56,20 @@ if ($Help) {
 
 # ─── 参数 ────────────────────────────────────────────────────────────────
 $AIRY_HOME    = if ($Prefix) { $Prefix } elseif ($env:AIRY_HOME) { $env:AIRY_HOME } else { Join-Path $HOME ".airymaxrt" }
-$AIRY_VERSION = if ($env:AIRY_VERSION) { $env:AIRY_VERSION } else { "v0.1.4" }
+# 版本 SSoT：源码树内运行优先读 agentrt/VERSION，否则回退 v0.1.4
+$AIRY_VERSION = if ($env:AIRY_VERSION) { $env:AIRY_VERSION }
+                elseif (Test-Path (Join-Path $PSScriptRoot "..\VERSION")) { "v" + ((Get-Content (Join-Path $PSScriptRoot "..\VERSION")).Trim()) }
+                else { "v0.1.4" }
 $AIRY_REPO_URL = if ($env:AIRY_REPO_URL) { $env:AIRY_REPO_URL } else { "https://atomgit.com/openairymax/airymaxhub.git" }
+$AIRY_CHANNEL = if ($Channel) { $Channel } elseif ($env:AIRY_CHANNEL) { $env:AIRY_CHANNEL } else { "stable" }
 $AIRY_SRC_DIR = Join-Path $AIRY_HOME "src\airymaxhub"
 $MODULES_DIR  = Join-Path $AIRY_HOME "modules"
 $BIN_DIR      = if ($BinDir) { $BinDir } elseif ($env:AIRY_BIN_DIR) { $env:AIRY_BIN_DIR } else { Join-Path $HOME ".local\bin" }
 
-# 与 install.sh 的 17 daemon 清单保持一致（含 think_d/cupolas_d）
+# 与 install.sh 的 18 daemon 清单保持一致（含 think_d/cupolas_d/maths_d）
 $EXPECTED_DAEMONS = @("monit_d","observe_d","info_d","notify_d","sched_d","channel_d","mem_d",
                       "llm_d","tool_d","hook_d","plugin_d","agent_d","a2a_d","market_d","gateway_d",
-                      "think_d","cupolas_d")
+                      "think_d","cupolas_d","maths_d")
 
 function Require-Cmd {
     param([string]$Name)
@@ -96,7 +102,7 @@ function Init-Home {
 }
 
 function Stop-Daemons {
-    # 与 17 daemon 清单一致，避免卸载/停止残留进程
+    # 与 18 daemon 清单一致，避免卸载/停止残留进程
     foreach ($name in $EXPECTED_DAEMONS) {
         Get-Process -Name $name -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     }
@@ -146,9 +152,68 @@ if ($Uninstall) {
 function Install-Binary {
     param([string]$Url)
     $zip = Join-Path $AIRY_HOME "tmp\agentrt-$AIRY_VERSION.zip"
-    Write-Info "下载完全体二进制包: $Url"
-    curl.exe -fsSL --max-time 600 -o $zip $Url
-    if ($LASTEXITCODE -ne 0) { Write-Warn "release 下载失败，回退源码构建"; return $false }
+    $expectSha = ""
+    # 来源解析：a) manifest JSON（通道）→ 解析本平台制品 url+sha256；
+    #          b) 本地 zip（-FromFile）→ 直用；c) 远程 zip URL → 下载
+    if ($Url -like "*.json") {
+        $man = Join-Path $AIRY_HOME "tmp\manifest.json"
+        Write-Info "下载通道 manifest: $Url"
+        curl.exe -fsSL --max-time 60 -o $man $Url
+        if ($LASTEXITCODE -ne 0) { Write-Warn "manifest 下载失败，回退源码构建"; return $false }
+        # GPG 验签 manifest（权威校验链，与 install.sh/airymaxrt 同源）：
+        #   系统装有 gpg → fail-closed（验签失败拒绝安装）；
+        #   无 gpg 环境 → 降级 HTTPS + sha256（Windows 最小环境，显式告警）。
+        $asc = Join-Path $AIRY_HOME "tmp\manifest.json.asc"
+        curl.exe -fsSL --max-time 30 -o $asc "$Url.asc" 2>$null
+        if ((Get-Command gpg -ErrorAction SilentlyContinue)) {
+            $keyf = Join-Path $AIRY_HOME "tmp\agentrt.asc"
+            curl.exe -fsSL --max-time 30 -o $keyf "https://raw.atomgit.com/openairymax/agentrt/raw/main/latest/keys/agentrt.asc" 2>$null
+            if (-not (Test-Path $keyf) -and (Test-Path (Join-Path $AIRY_HOME "keys\agentrt.asc"))) {
+                Copy-Item (Join-Path $AIRY_HOME "keys\agentrt.asc") $keyf -Force
+            }
+            if (-not (Test-Path $keyf)) {
+                Write-Warn "发布公钥拉取失败，拒绝安装（fail-closed）"
+                return $false
+            }
+            gpg --batch --import $keyf 2>$null
+            gpg --batch --verify $asc $man 2>$null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Err "manifest 验签失败（GPG），拒绝安装"
+                return $false
+            }
+            Write-OK "manifest 验签通过（GPG）"
+        } elseif (-not (Test-Path $asc)) {
+            Write-Warn "manifest 签名缺失且无 gpg 环境（降级：仅 HTTPS + sha256）"
+        }
+        $plat = "windows-" + $env:PROCESSOR_ARCHITECTURE.ToLower()
+        if ($plat -eq "windows-amd64") { $plat = "windows-x64" }
+        $json = Get-Content $man -Raw | ConvertFrom-Json
+        $art = $json.releases.($json.latest).artifacts.$plat
+        if (-not $art -or -not $art.url) { Write-Warn "manifest 无 $plat 制品，回退源码构建"; return $false }
+        $Url = $art.url
+        $expectSha = [string]$art.sha256
+        Write-Info "通道 $AIRY_CHANNEL 最新制品（$plat）: $($Url.Split('/')[-1])"
+    }
+    if (Test-Path $Url) {
+        Write-Info "使用本地离线包: $Url"
+        $zip = $Url
+    } else {
+        Write-Info "下载完全体二进制包: $Url"
+        curl.exe -fsSL --max-time 600 -o $zip $Url
+        if ($LASTEXITCODE -ne 0) { Write-Warn "release 下载失败，回退源码构建"; return $false }
+    }
+    # sha256 校验（manifest 期望值，或相邻 .sha256 文件）
+    if (-not $expectSha -and (Test-Path "$zip.sha256")) {
+        $expectSha = (Get-Content "$zip.sha256").Split(' ')[0]
+    }
+    if ($expectSha) {
+        $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+        if ($hash -ne $expectSha.ToLower()) {
+            Write-Err "sha256 校验失败，拒绝安装"
+            return $false
+        }
+        Write-OK "sha256 校验通过"
+    }
     Expand-Archive -Path $zip -DestinationPath (Join-Path $AIRY_HOME "tmp") -Force
     # 包内必须含 agentrt-* 顶层目录（release.yml 打包约定），否则视为异常
     $pkgDir = Get-ChildItem (Join-Path $AIRY_HOME "tmp") -Directory | Where-Object { $_.Name -like "agentrt-*" } | Select-Object -First 1
@@ -163,8 +228,16 @@ function Install-Binary {
     # LICENSE/README（share/）随包分发；config/ 内置模板（secrets.env.example 等）
     Get-ChildItem (Join-Path $pkgDir.FullName "share") -ErrorAction SilentlyContinue | Copy-Item -Destination (Join-Path $AIRY_HOME "share") -Recurse -Force
     Get-ChildItem (Join-Path $pkgDir.FullName "config") -ErrorAction SilentlyContinue | Copy-Item -Destination (Join-Path $AIRY_HOME "config") -Force
+    # 签名公钥随包同步
+    if (Test-Path (Join-Path $pkgDir.FullName "keys\agentrt.asc")) {
+        New-Item -ItemType Directory -Force -Path (Join-Path $AIRY_HOME "keys") | Out-Null
+        Copy-Item (Join-Path $pkgDir.FullName "keys\agentrt.asc") (Join-Path $AIRY_HOME "keys") -Force
+    }
+    # 以实际安装包版本固化（manifest 通道可能高于默认 AIRY_VERSION）
+    $verNum = $pkgDir.Name -replace "^agentrt-", ""
+    if ($verNum) { $script:AIRY_VERSION = "v$verNum" }
     if ($copied -eq 0) { Write-Warn "release 包 bin/ 为空，回退源码构建"; return $false }
-    Write-OK "完全体二进制包安装完成"
+    Write-OK "完全体二进制包安装完成（v$verNum）"
     return $true
 }
 
@@ -262,6 +335,7 @@ function Finalize-Install {
         "# AirymaxRT 安装信息（由 install.ps1 生成，勿手改）",
         "AIRY_HOME=$AIRY_HOME",
         "AIRY_VERSION=$AIRY_VERSION",
+        "AIRY_CHANNEL=$AIRY_CHANNEL",
         "AIRY_BIN_LINK=$link",
         "INSTALLED_AT=$(Get-Date -Format o)",
         "AIRY_VAULT_PASSWORD=$vaultPassword"
@@ -370,10 +444,17 @@ Require-Cmd "curl"
 Init-Home
 
 $installed = $false
-if ($Mode -eq "binary" -or ($Mode -eq "auto" -and $env:AIRY_RELEASE_URL)) {
-    if ($env:AIRY_RELEASE_URL) { $installed = Install-Binary $env:AIRY_RELEASE_URL }
-    elseif ($Mode -eq "binary") { Write-Err "模式 binary 需要 AIRY_RELEASE_URL"; exit 1 }
+# 发布来源解析：-FromFile 离线包 > AIRY_RELEASE_URL 显式 URL > 官方通道 manifest
+# （默认，stable/beta 由 -Channel 决定；-Mode source 除外）
+$releaseUrl = $env:AIRY_RELEASE_URL
+if (-not $releaseUrl -and $Mode -ne "source") {
+    $releaseUrl = "https://raw.atomgit.com/openairymax/agentrt/raw/main/latest/manifest.$AIRY_CHANNEL.json"
 }
+if ($FromFile) { $installed = Install-Binary $FromFile }
+elseif ($Mode -eq "binary" -or ($Mode -eq "auto" -and $releaseUrl)) {
+    $installed = Install-Binary $releaseUrl
+}
+elseif ($Mode -eq "binary") { Write-Err "模式 binary 需要 AIRY_RELEASE_URL"; exit 1 }
 
 if (-not $installed) {
     Write-Info "进入源码构建模式（$Mode）"
