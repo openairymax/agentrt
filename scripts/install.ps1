@@ -88,7 +88,8 @@ function Check-Toolchain {
 }
 
 function Init-Home {
-    foreach ($sub in @("bin","lib","include","share","run","logs","config","data","tmp","cache","modules","scripts")) {
+    foreach ($sub in @("bin","lib","include","share","run","logs","config","data","tmp","cache","modules","scripts",
+                       "data\agentrt\logs","data\agentrt\tmp","data\agentrt\cache","data\agentrt\workspaces")) {
         New-Item -ItemType Directory -Force -Path (Join-Path $AIRY_HOME $sub) | Out-Null
     }
     Write-OK "AIRY_HOME 就绪: $AIRY_HOME"
@@ -268,6 +269,10 @@ function Finalize-Install {
 
     # 运行环境脚本（agentrt-env.ps1，含 Agent 工具 ACL 预授权，
     # fail-closed：无 AIRY_AGENT_ACL 时 agent 工具全部拒绝，对齐 install.sh）
+    # 路径体系与 install.sh / platform.h 一致（2026-08-25 铁律）：运行时
+    # 数据全量统一 $AIRY_HOME\data\agentrt（日志/缓存/临时/工作区），
+    # 顶层仅保留分发物、配置与易失 run/。此前 Windows 版把日志放顶层
+    # logs\、缓存放 cache\，与 daemon airy_paths_init 实际路径分叉。
     $aclTools = "fs_read,fs_write,fs_list,fs_glob,fs_grep,fs_edit,shell_run,web_search,web_fetch,git_diff,git_exec,git_apply"
     $agents = @("coding_v1","devops_v1","backend_v1","frontend_v1","tester_v1","architect_v1",
                 "product_manager_v1","data_engineer_v1","security_v1","reviewer_v1","analyst_v1")
@@ -277,7 +282,11 @@ function Finalize-Install {
         ('$env:AIRY_HOME = "' + $AIRY_HOME + '"'),
         # PowerShell 5.1 兼容：避免 ?? 运算符（PS7+ 才有）
         'if (-not $env:AIRY_RUNTIME_DIR) { $env:AIRY_RUNTIME_DIR = Join-Path $env:AIRY_HOME "run" }',
-        'if (-not $env:AIRY_LOG_DIR) { $env:AIRY_LOG_DIR = Join-Path $env:AIRY_HOME "logs" }',
+        'if (-not $env:AIRY_DATA_DIR) { $env:AIRY_DATA_DIR = Join-Path $env:AIRY_HOME "data" }',
+        'if (-not $env:AIRY_LOG_DIR) { $env:AIRY_LOG_DIR = Join-Path $env:AIRY_HOME "data\agentrt\logs" }',
+        'if (-not $env:AIRY_CACHE_DIR) { $env:AIRY_CACHE_DIR = Join-Path $env:AIRY_HOME "data\agentrt\cache" }',
+        'if (-not $env:AIRY_TMP_DIR) { $env:AIRY_TMP_DIR = Join-Path $env:AIRY_HOME "data\agentrt\tmp" }',
+        'if (-not $env:AIRY_WORKSPACE_DIR) { $env:AIRY_WORKSPACE_DIR = Join-Path $env:AIRY_HOME "data\agentrt\workspaces" }',
         'if (-not $env:AIRY_CONFIG_DIR) { $env:AIRY_CONFIG_DIR = Join-Path $env:AIRY_HOME "config" }',
         'if (-not $env:AIRY_BIN_DIR) { $env:AIRY_BIN_DIR = Join-Path $env:AIRY_HOME "bin" }',
         'if (-not $env:AIRY_LIB_DIR) { $env:AIRY_LIB_DIR = Join-Path $env:AIRY_HOME "lib" }',
@@ -289,15 +298,25 @@ function Finalize-Install {
 
     # 启动器（读 install.env 定位运行时根，任意路径执行 airymaxrt 即启动）
     # Windows zip 不构建 Rust TUI：优先 agentrt-tui.exe，回退 C 实现 airy_cli.exe
+    # 启动器头部固化真实 AIRY_HOME（-Prefix 自定义安装的关键：cmd 子进程
+    # 不继承父 shell 的 $env:AIRY_HOME，此前硬编码 %USERPROFILE%\.airymaxrt
+    # 导致自定义路径安装后启动器失效——历史故障，2026-08-25 修复）。
+    # 保留 findstr install.env 覆盖：环境变量显式设置 / install.env 变更时
+    # 以权威文件为准（幂等）。
     $launcher = Join-Path $AIRY_HOME "bin\airymaxrt.cmd"
+    $escapedHome = $AIRY_HOME.Replace('"','""')
     $cmdContent = @(
         "@echo off",
         "setlocal",
-        "set ""AIRY_HOME=%USERPROFILE%\.airymaxrt""",
-        "for /f ""tokens=2 delims=="" %%a in ('findstr /b ""AIRY_HOME="" ""%AIRY_HOME%\config\install.env"" 2^>nul') do set ""AIRY_HOME=%%a""",
-        "if exist ""%AIRY_HOME%\bin\agentrt-tui.exe"" (",
+        ("set ""AIRY_HOME={0}""" -f $escapedHome),
+        "if exist ""%AIRY_HOME%\config\install.env"" (",
+        "  for /f ""tokens=2 delims=="" %%a in ('findstr /b ""AIRY_HOME="" ""%AIRY_HOME%\config\install.env"" 2^>nul') do set ""AIRY_HOME=%%a""",
+        ")",
+        "if not exist ""%AIRY_HOME%\bin\agentrt-tui.exe"" goto :notfound",
         "  ""%AIRY_HOME%\bin\agentrt-tui.exe"" %*",
-        ") else if exist ""%AIRY_HOME%\bin\airy_cli.exe"" (",
+        "  goto :eof",
+        ":notfound",
+        "if exist ""%AIRY_HOME%\bin\airy_cli.exe"" (",
         "  ""%AIRY_HOME%\bin\airy_cli.exe"" %*",
         ") else (",
         "  echo [FAIL] agentrt-tui / airy_cli not found under %AIRY_HOME%\bin",

@@ -13,6 +13,8 @@
 
 #include "cli_internal.h"
 
+#include "cli_gw.h" /* 架构约束 2026-08-25：统一经 gateway 派发 */
+
 #include "memory.h" /* 对话记忆引擎 API（2.2.4 对话路径读写） */
 
 #include <stdio.h>
@@ -89,12 +91,10 @@ static int g_llm_base_set = 0;
 static int cli_llm_d_usage_snapshot(uint64_t *out_prompt, uint64_t *out_completion,
                                     double *out_cost)
 {
-    const char *sock = airy_runtime_dir_socket("llm.sock");
-    if (!sock || !sock[0])
-        return -1;
-
+    /* 架构约束（2026-08-25）：统一经 gateway 派发（llm.get_stats →
+     * gateway → SYS_SVC_CALL → llm_d），禁止直连 llm.sock。 */
     char *result = NULL;
-    int rc = daemon_rpc_call(sock, "get_stats", "{}", &result, 6000);
+    int rc = cli_gw_call("llm.get_stats", "{}", 6000, &result);
     if (rc != 0 || !result)
         return -1;
 
@@ -195,11 +195,112 @@ static int cli_chat_is_greeting(const char *s)
     return 0;
 }
 
-/* 检索相关历史记忆，拼成 system 追加段（最多 3 条、每条截断 200 字符） */
+/* gateway 统一记忆注入（mem_d，与 TUI/gateway 共享召回；失败回退 L1）。
+ * CLI 曾用 coreloop L1 记忆引擎（memoryrovol），与 gateway 的 mem_d 是两套
+ * 存储——CLI/TUI 切换后"记不住上一句"的直接根因。统一后共享同一记忆库。 */
+static int cli_chat_mem_inject_gw(const char *input, char *out_buf, size_t out_size)
+{
+    if (!input || !input[0] || !out_buf || out_size < 16)
+        return -1;
+    out_buf[0] = '\0';
+
+    cJSON *params = cJSON_CreateObject();
+    if (!params)
+        return -1;
+    cJSON_AddStringToObject(params, "query", input);
+    cJSON_AddNumberToObject(params, "limit", 3);
+    char *pstr = cJSON_PrintUnformatted(params);
+    cJSON_Delete(params);
+    if (!pstr)
+        return -1;
+
+    char *res_json = NULL;
+    if (cli_gw_call("mem.search", pstr, 6000, &res_json) != 0) {
+        AIRY_FREE(pstr);
+        return -1;
+    }
+    AIRY_FREE(pstr);
+
+    cJSON *root = cJSON_Parse(res_json);
+    AIRY_FREE(res_json);
+    if (!root)
+        return -1;
+    cJSON *results = cJSON_GetObjectItem(root, "results");
+    if (!cJSON_IsArray(results)) {
+        cJSON_Delete(root);
+        return -1;
+    }
+
+    size_t off = 0;
+    if (out_size > 0) {
+        int w0 = snprintf(out_buf + off, out_size - off, "\n\n[相关历史记忆]");
+        if (w0 > 0)
+            off += ((size_t)w0 < out_size - off) ? (size_t)w0 : (out_size - off - 1);
+    }
+
+    /* 防自我回灌：跳过与当前输入相同/几乎相同的记忆（"用户: "=9 字节 UTF-8） */
+    size_t input_prefix_len = strlen(input) + 9;
+    int n_items = cJSON_GetArraySize(results);
+    for (int i = 0; i < n_items && off < out_size - 1; i++) {
+        cJSON *item = cJSON_GetArrayItem(results, i);
+        cJSON *rid = cJSON_GetObjectItem(item, "record_id");
+        if (!cJSON_IsString(rid) || !rid->valuestring[0])
+            continue;
+
+        cJSON *gparams = cJSON_CreateObject();
+        if (!gparams)
+            continue;
+        cJSON_AddStringToObject(gparams, "record_id", rid->valuestring);
+        char *gstr = cJSON_PrintUnformatted(gparams);
+        cJSON_Delete(gparams);
+        if (!gstr)
+            continue;
+        char *gjson = NULL;
+        if (cli_gw_call("mem.get", gstr, 6000, &gjson) != 0) {
+            AIRY_FREE(gstr);
+            continue;
+        }
+        AIRY_FREE(gstr);
+        cJSON *groot = cJSON_Parse(gjson);
+        AIRY_FREE(gjson);
+        if (!groot)
+            continue;
+        cJSON *data = cJSON_GetObjectItem(groot, "data");
+        if (cJSON_IsString(data)) {
+            const char *rec = data->valuestring;
+            size_t dlen = strlen(rec);
+            if (!(dlen >= input_prefix_len && strncmp(rec, "用户: ", 9) == 0 &&
+                  strncmp(rec + 9, input, strlen(input)) == 0)) {
+                size_t n = dlen < 200 ? dlen : 200;
+                if (off < out_size - 1) {
+                    int w1 = snprintf(out_buf + off, out_size - off, "\n- %.*s", (int)n, rec);
+                    if (w1 > 0)
+                        off += ((size_t)w1 < out_size - off) ? (size_t)w1 : (out_size - off - 1);
+                }
+            }
+        }
+        cJSON_Delete(groot);
+        if (off >= out_size - 1)
+            break;
+    }
+    cJSON_Delete(root);
+    return off > 0 ? 0 : -1;
+}
+
+/* 检索相关历史记忆，拼成 system 追加段（最多 3 条、每条截断 200 字符）。
+ * 统一经 gateway（mem_d）召回，与 TUI 共享记忆库；gateway 不可用时回退
+ * 进程内 L1 记忆引擎（离线/单机降级）。 */
 static void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t out_size)
 {
     out_buf[0] = '\0';
-    if (!g_cli_memory_engine || !input || !input[0] || out_size < 16)
+    if (!input || !input[0] || out_size < 16)
+        return;
+
+    if (cli_chat_mem_inject_gw(input, out_buf, out_size) == 0)
+        return;
+
+    /* ── 回退：进程内 L1 记忆引擎（gateway/mem_d 不可用） ── */
+    if (!g_cli_memory_engine)
         return;
 
     airy_memory_query_t q;
@@ -214,10 +315,16 @@ static void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t 
         return;
 
     size_t off = 0;
-    off += snprintf(out_buf + off, out_size - off, "\n\n[相关历史记忆]");
+    /* P3-3：snprintf 返回"应写长度"，钳制累加防 pos 越过容量（无符号
+     * 下溢越界写） */
+    if (out_size > 0) {
+        int w0 = snprintf(out_buf + off, out_size - off, "\n\n[相关历史记忆]");
+        if (w0 > 0)
+            off += ((size_t)w0 < out_size - off) ? (size_t)w0 : (out_size - off - 1);
+    }
     /* 2.2.2.1：防自我回灌——跳过与当前输入相同/几乎相同的记忆（CLI 把
      * 整轮写为 "用户: <input>\nAgentRT: <reply>"，查询常命中上一条自身）。 */
-    size_t input_prefix_len = strlen(input) + 7; /* "用户: " + input */
+    size_t input_prefix_len = strlen(input) + 9; /* "用户: "(9 字节 UTF-8) + input */
     for (size_t i = 0; i < res->memory_result_count; i++) {
         airy_memory_result_item_t *it =
             (res->memory_result_items && i < res->memory_result_count)
@@ -230,25 +337,83 @@ static void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t 
             continue;
         const char *data = (const char *)r->memory_record_data;
         size_t dlen = r->memory_record_data_len;
+        /* "用户: " 在 UTF-8 下为 9 字节（"用户"=6 字节 + 空格冒号空格=3）。
+         * 前缀比较与偏移必须用 9，否则过滤分支永不命中，自我回灌继续发生。 */
         if (dlen >= input_prefix_len &&
-            strncmp(data, "用户: ", 5) == 0 &&
-            strncmp(data + 5, input, strlen(input)) == 0)
+            strncmp(data, "用户: ", 9) == 0 &&
+            strncmp(data + 9, input, strlen(input)) == 0)
             continue;
         size_t n = dlen < 200 ? dlen : 200;
-        off += snprintf(out_buf + off, out_size - off, "\n- %.*s", (int)n, data);
+        if (off < out_size - 1) {
+            int w1 = snprintf(out_buf + off, out_size - off, "\n- %.*s", (int)n, data);
+            if (w1 > 0)
+                off += ((size_t)w1 < out_size - off) ? (size_t)w1 : (out_size - off - 1);
+        }
         if (off >= out_size - 1)
             break;
     }
     airy_memory_result_free(res);
 }
 
+/* gateway 统一记忆写回（mem_d，与 TUI 共享存储；失败回退 L1）。 */
+static int cli_chat_mem_record_gw(const char *input, const char *reply, const char *reasoning)
+{
+    if (!input || !input[0] || !reply || !reply[0])
+        return -1;
+    /* 寒暄/无信息量回复不写记忆（避免垃圾条目累积抬高检索噪声） */
+    if (strlen(reply) < 8 || cli_chat_is_greeting(input))
+        return 0; /* 有意跳过，非失败 */
+
+    char content[1800];
+    int n = snprintf(content, sizeof(content), "用户: %s\nAgentRT: %s", input, reply);
+    if (n <= 0)
+        return -1;
+    if (reasoning && reasoning[0]) {
+        int rn = snprintf(content + n, (size_t)(sizeof(content) - n), "\n[reasoning] %s", reasoning);
+        if (rn > 0)
+            n += (rn < (int)(sizeof(content) - n - 1)) ? rn : (int)(sizeof(content) - n - 1);
+    }
+    if (n > 1600)
+        n = 1600;
+    content[n] = '\0';
+
+    cJSON *params = cJSON_CreateObject();
+    if (!params)
+        return -1;
+    cJSON_AddStringToObject(params, "data", content);
+    cJSON *meta = cJSON_CreateObject();
+    if (meta) {
+        cJSON_AddStringToObject(meta, "source", "cli");
+        cJSON_AddStringToObject(meta, "kind", "chat");
+        cJSON_AddItemToObject(params, "metadata", meta);
+    }
+    char *pstr = cJSON_PrintUnformatted(params);
+    cJSON_Delete(params);
+    if (!pstr)
+        return -1;
+    char *res = NULL;
+    int rc = cli_gw_call("mem.write", pstr, 6000, &res);
+    AIRY_FREE(pstr);
+    AIRY_FREE(res);
+    return rc == 0 ? 0 : -1;
+}
+
 /* 一轮对话完成后写入记忆：用户输入 + 回复（截断防噪声，只记事实）。
  * 2.1.1.6 修订：携带思考链（reasoning）——记忆检索按 content 匹配，
  * 拼接进记录后思考 token 可被下轮/下次会话召回（与 TUI 记忆的
- * reasoning 语义对齐），不再"只存档不可用"。 */
+ * reasoning 语义对齐），不再"只存档不可用"。
+ * 统一经 gateway（mem_d）写回，与 TUI 共享记忆库；gateway 不可用时
+ * 回退进程内 L1 记忆引擎（离线/单机降级）。 */
 static void cli_chat_mem_record(const char *input, const char *reply, const char *reasoning)
 {
-    if (!g_cli_memory_engine || !input || !input[0] || !reply || !reply[0])
+    if (!input || !input[0] || !reply || !reply[0])
+        return;
+
+    if (cli_chat_mem_record_gw(input, reply, reasoning) == 0)
+        return;
+
+    /* ── 回退：进程内 L1 记忆引擎 ── */
+    if (!g_cli_memory_engine)
         return;
 
     /* 2.2.2.1：寒暄/无信息量回复不写记忆（避免垃圾条目累积抬高检索噪声） */
@@ -901,9 +1066,9 @@ static void cli_tool_absolutize_path(cJSON *args, const char *key)
 }
 
 /* 执行一个工具调用，返回回填模型的 result JSON（OWNER，AIRY_FREE）。
- * 统一走 tool_d daemon RPC（tool.sock execute，带 ACL fail-closed），与
- * gateway agent.run 同一路径；不直连 builtin 库（那会绕过权限边界）。
- * tool_d 离线或 RPC 失败时返回可诊断的错误 JSON。 */
+ * 架构约束（2026-08-25）：统一经 gateway 派发（tool.execute → gateway →
+ * SYS_SVC_CALL → tool_d，带 ACL fail-closed），与 gateway agent.run 同一
+ * 路径；不直连 tool.sock / builtin 库（那会绕过权限边界）。 */
 static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int *out_ok)
 {
     if (!tool_id || !args_json) {
@@ -911,9 +1076,6 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
             *out_ok = 0;
         return AIRY_STRDUP("{\"ok\":false,\"error\":\"missing tool arguments\"}");
     }
-
-    char sock[512];
-    snprintf(sock, sizeof(sock), "%s/tool.sock", cli_rt_dir());
 
     cJSON *params = cJSON_CreateObject();
     if (!params) {
@@ -958,16 +1120,16 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
     }
 
     char *result_json = NULL;
-    int rpc_ret = daemon_rpc_call(sock, "execute", params_json, &result_json,
-                                  CLI_TOOL_RPC_TIMEOUT_MS);
+    int rpc_ret = cli_gw_call("tool.execute", params_json, CLI_TOOL_RPC_TIMEOUT_MS,
+                              &result_json);
     AIRY_FREE(params_json);
     if (rpc_ret != 0 || !result_json) {
-        cli_trace("chat", "%s tool rpc fail tool=%s ret=%d sock=%s", CLI_ICON_CROSS, tool_id,
-                  rpc_ret, sock);
+        cli_trace("chat", "%s tool rpc fail tool=%s ret=%d (via gateway)", CLI_ICON_CROSS,
+                  tool_id, rpc_ret);
         AIRY_FREE(result_json);
         if (out_ok)
             *out_ok = 0;
-        return AIRY_STRDUP("{\"ok\":false,\"error\":\"tool_d unreachable\"}");
+        return AIRY_STRDUP("{\"ok\":false,\"error\":\"tool_d unreachable (via gateway)\"}");
     }
 
     /* daemon_rpc_call 已解包 JSON-RPC 的 result 字段：result_json 即

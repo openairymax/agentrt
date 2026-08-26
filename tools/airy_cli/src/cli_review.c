@@ -25,6 +25,7 @@
 #include "cli_review.h"
 
 #include "cli_render.h"
+#include "cli_gw.h" /* 架构约束 2026-08-25：统一经 gateway 派发 */
 #include "daemon_rpc_client.h"
 #include "airy_memory.h"
 #include "logging.h"
@@ -200,8 +201,10 @@ static void *cli_review_worker(void *arg)
     snprintf(spec, sizeof(spec), "{\"agent_spec\":{\"role\":\"reviewer\",\"topic\":\"%s\"}}",
              job->topic);
 
+    /* 架构约束（2026-08-25）：统一经 gateway 派发（agent.spawn →
+     * gateway → SYS_SVC_CALL → agent_d），禁止直连 agent.sock。 */
     char *resp = NULL;
-    int rc = daemon_rpc_call(job->sock, "spawn", spec, &resp, CLI_REVIEW_SPAWN_TIMEOUT_MS);
+    int rc = cli_gw_call("agent.spawn", spec, CLI_REVIEW_SPAWN_TIMEOUT_MS, &resp);
     if (rc != 0 || !resp) {
         AIRY_FREE(resp);
         return NULL;
@@ -225,7 +228,7 @@ static void *cli_review_worker(void *arg)
         return NULL;
 
     resp = NULL;
-    rc = daemon_rpc_call(job->sock, "invoke", params_str, &resp, CLI_REVIEW_INVOKE_TIMEOUT_MS);
+    rc = cli_gw_call("agent.invoke", params_str, CLI_REVIEW_INVOKE_TIMEOUT_MS, &resp);
     AIRY_FREE(params_str);
     if (rc == 0 && resp)
         job->output = cli_review_rpc_field(resp, "output");
@@ -251,9 +254,10 @@ int cli_cognition_review(const char *agent_sock, const char *task, const airy_ta
     if (!sock[0])
         return 0;
 
-    /* agent_d must be reachable; a failed probe degrades silently. */
+    /* agent_d must be reachable; a failed probe degrades silently.
+     * 架构约束（2026-08-25）：统一经 gateway 派发（agent.health_check）。 */
     char *hc = NULL;
-    int hc_rc = daemon_rpc_call(sock, "health_check", NULL, &hc, CLI_REVIEW_HEALTH_TIMEOUT_MS);
+    int hc_rc = cli_gw_call("agent.health_check", NULL, CLI_REVIEW_HEALTH_TIMEOUT_MS, &hc);
     if (hc_rc != 0) {
         AIRY_FREE(hc);
         return 0;

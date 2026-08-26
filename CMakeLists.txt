@@ -64,7 +64,11 @@ option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" OF
 option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(BUILD_TESTS "Build unit tests" ON)
 option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
-option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" ON)
+# 生产默认 OFF：ASan/LSan/UBSan 仅用于开发与测试（CI 泄漏检测显式 ON）。
+# 默认 ON 曾导致发布二进制携带 sanitizer 运行时（性能开销 2-3x、退出时
+# 输出泄漏报告、TUI 构建因库被判定 ASan 插桩而拒绝链接 IME）。
+# 需要检测时显式传 -DENABLE_SANITIZERS=ON。
+option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
 option(AIRY_BUILD_ALL "Build all AgentRT components" ON)
 # IRON-8 生产就绪：MemoryRovol 为默认记忆提供商（L1-L4 四层记忆卷载），
 # 默认启用而非显式开关。外部源缺失时 atoms/memoryrovol/CMakeLists.txt
@@ -436,6 +440,26 @@ if(libevent_FOUND OR LIBEVENT_FOUND)
 else()
     set(AIRY_HAS_LIBEVENT FALSE CACHE BOOL "libevent available")
     airy_print_warn("libevent not found, event-loop features disabled")
+endif()
+
+# --- nghttp2（HTTP/2）---
+# 前置探测：daemons/（gateway_d）在 gateway/ 之前 add_subdirectory，
+# 若在子模块探测则首次 configure 时 AIRY_HAS_HTTP2 恒为 FALSE，HTTP/2
+# 首次构建被静默禁用、二次 configure 才生效。根级先行探测保证首次即正确
+# （gateway/ 子模块保留同逻辑，CACHE 已设时幂等）。
+find_library(_NGHTTP2_LIBRARY NAMES nghttp2)
+if(NOT _NGHTTP2_LIBRARY)
+    find_file(_NGHTTP2_LIBRARY
+        NAMES libnghttp2.so.14 libnghttp2.so.19 libnghttp2.so
+        PATHS /usr/lib/x86_64-linux-gnu /usr/lib /usr/local/lib
+    )
+endif()
+if(_NGHTTP2_LIBRARY)
+    set(AIRY_HAS_HTTP2 TRUE CACHE BOOL "nghttp2 available")
+    airy_print_ok("nghttp2 found: ${_NGHTTP2_LIBRARY} (HTTP/2 gateway enabled)")
+else()
+    set(AIRY_HAS_HTTP2 FALSE CACHE BOOL "nghttp2 available")
+    airy_print_warn("nghttp2 not found, HTTP/2 gateway disabled")
 endif()
 
 # --- GTest ---

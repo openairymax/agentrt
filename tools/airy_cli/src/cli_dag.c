@@ -13,6 +13,8 @@
 
 #include "cli_internal.h"
 
+#include "cli_gw.h" /* 架构约束 2026-08-25：统一经 gateway 派发 */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -152,8 +154,10 @@ airy_err_t cli_dag_submit_remote(const char *sched_sock, const taskflow_workflow
     if (!params_json)
         return AIRY_ERR_OUT_OF_MEMORY;
 
+    /* 架构约束（2026-08-25）：统一经 gateway 派发（sched.dag_submit →
+     * gateway → SYS_SVC_CALL → sched_d），禁止直连 sched.sock。 */
     char *rpc_result = NULL;
-    int rc = daemon_rpc_call(sched_sock, "dag_submit", params_json, &rpc_result, 30000);
+    int rc = cli_gw_call("sched.dag_submit", params_json, 30000, &rpc_result);
     AIRY_FREE(params_json);
     if (rc != AIRY_SUCCESS || !rpc_result) {
         AIRY_FREE(rpc_result);
@@ -195,8 +199,9 @@ cli_dag_poll_rc_t cli_dag_poll_remote(const char *sched_sock, const char *dag_id
     if (!params_json)
         return CLI_DAG_POLL_ERROR;
 
+    /* 架构约束（2026-08-25）：统一经 gateway 派发（sched.dag_status） */
     char *rpc_result = NULL;
-    int rc = daemon_rpc_call(sched_sock, "dag_status", params_json, &rpc_result, 10000);
+    int rc = cli_gw_call("sched.dag_status", params_json, 10000, &rpc_result);
     AIRY_FREE(params_json);
     if (rc != AIRY_SUCCESS || !rpc_result) {
         AIRY_FREE(rpc_result);
@@ -303,7 +308,8 @@ airy_err_t cli_dag_wait_remote(const char *sched_sock, const char *dag_id, char 
                 cJSON_Delete(cparams);
                 if (cparams_json) {
                     char *cres = NULL;
-                    (void)daemon_rpc_call(sched_sock, "dag_cancel", cparams_json, &cres, 5000);
+                    /* 架构约束（2026-08-25）：统一经 gateway 派发（sched.dag_cancel） */
+                    (void)cli_gw_call("sched.dag_cancel", cparams_json, 5000, &cres);
                     AIRY_FREE(cparams_json);
                     AIRY_FREE(cres);
                 }
@@ -407,8 +413,9 @@ int cli_dag_node_board_tick(cli_dag_board_t *b, const char *sched_sock, const ch
     if (!params_json)
         return 0;
 
+    /* 架构约束（2026-08-25）：统一经 gateway 派发（sched.dag_status） */
     char *rpc_result = NULL;
-    int rc = daemon_rpc_call(sched_sock, "dag_status", params_json, &rpc_result, 10000);
+    int rc = cli_gw_call("sched.dag_status", params_json, 10000, &rpc_result);
     AIRY_FREE(params_json);
     if (rc != AIRY_SUCCESS || !rpc_result) {
         AIRY_FREE(rpc_result);
@@ -488,8 +495,9 @@ int cli_dag_board_snapshot(const char *sched_sock, const char *dag_id,
     if (!params_json)
         return 0;
 
+    /* 架构约束（2026-08-25）：统一经 gateway 派发（sched.dag_status） */
     char *rpc_result = NULL;
-    int rc = daemon_rpc_call(sched_sock, "dag_status", params_json, &rpc_result, 10000);
+    int rc = cli_gw_call("sched.dag_status", params_json, 10000, &rpc_result);
     AIRY_FREE(params_json);
     if (rc != AIRY_SUCCESS || !rpc_result) {
         AIRY_FREE(rpc_result);

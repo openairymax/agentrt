@@ -15,10 +15,14 @@
  */
 
 #include "cli_internal.h"
+#include "cli_gw.h"
 
+#include <cjson/cJSON.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /* ================================================================
  * 任务看板面板
@@ -134,6 +138,23 @@ int cli_panel_board_line(void *ud, size_t idx, char *out, size_t cap)
 /* 任务看板可操作动作（2026-08-19）：DETAIL 查看选中任务详情 /
  * CANCEL 请求取消选中任务。动作期间重新拉取列表解析 sel（事件处理时
  * 引擎刚重绘过，entries 缓存有效，但拉取最新状态更稳）。 */
+/* P3-3：钳制追加（snprintf 返回"应写长度"，盲累加会越过容量下溢越界写） */
+static size_t panel_append(char *out, size_t cap, size_t o, const char *fmt, ...)
+{
+    if (!out || cap == 0 || o >= cap - 1)
+        return o;
+    va_list ap;
+    va_start(ap, fmt);
+    int w = vsnprintf(out + o, cap - o, fmt, ap);
+    va_end(ap);
+    if (w < 0)
+        return o;
+    size_t written = (size_t)w;
+    if (written >= cap - o)
+        written = cap - o - 1;
+    return o + written;
+}
+
 int cli_panel_board_action(void *ud, int action, size_t sel, char *out, size_t cap)
 {
     cli_board_panel_t *p = (cli_board_panel_t *)ud;
@@ -151,16 +172,16 @@ int cli_panel_board_action(void *ud, int action, size_t sel, char *out, size_t c
         airy_work_hall_entry_t *e = entries[sel];
         if (action == CLI_TUI_ACT_DETAIL) {
             size_t o = 0;
-            o += snprintf(out + o, cap - o, "◆ 执行 ID  %s\n", e->execution_id);
-            o += snprintf(out + o, cap - o, "  工作流    %s\n",
-                          e->workflow_name[0] ? e->workflow_name : e->workflow_id);
-            o += snprintf(out + o, cap - o, "  状态      %s %.0f%%\n", e->state,
-                          e->progress * 100.0);
-            o += snprintf(out + o, cap - o, "  复核      %s\n",
-                          e->review_verdict[0] ? e->review_verdict : "-");
-            o += snprintf(out + o, cap - o, "  输入      %.*s\n",
-                          (int)(e->input_json ? strlen(e->input_json) : 0),
-                          e->input_json ? e->input_json : "");
+            o = panel_append(out, cap, o, "◆ 执行 ID  %s\n", e->execution_id);
+            o = panel_append(out, cap, o, "  工作流    %s\n",
+                             e->workflow_name[0] ? e->workflow_name : e->workflow_id);
+            o = panel_append(out, cap, o, "  状态      %s %.0f%%\n", e->state,
+                             e->progress * 100.0);
+            o = panel_append(out, cap, o, "  复核      %s\n",
+                             e->review_verdict[0] ? e->review_verdict : "-");
+            o = panel_append(out, cap, o, "  输入      %.*s\n",
+                             (int)(e->input_json ? strlen(e->input_json) : 0),
+                             e->input_json ? e->input_json : "");
             ok = 1;
         } else if (action == CLI_TUI_ACT_CANCEL) {
             airy_err_t err = airy_work_hall_cancel(p->hall, e->execution_id);
@@ -310,5 +331,150 @@ int cli_panel_events_action(void *ud, int action, size_t sel, char *out, size_t 
     else
         snprintf(out, cap, "过滤：%s",
                  airy_hall_category_name((airy_hall_category_t)p->filter_cat));
+    return 1;
+}
+
+/* ================================================================
+ * 记忆链面板（2026-08-25，F5）
+ *
+ * 数据源：gateway → syscall → mem_d 的 mem.recent（最近记录倒序，
+ * 含完整内容）。count() 秒级节流拉取并缓存渲染行（TUI 200ms 轮询
+ * 时不会打爆 gateway）；line() 从缓存输出。不直连 daemon socket。
+ * ================================================================ */
+
+#define CLI_PANEL_MEM_LIMIT 12
+#define CLI_PANEL_MEM_GW_TIMEOUT_MS 5000
+
+typedef struct {
+    char *lines[CLI_PANEL_MEM_LIMIT]; /* 渲染后的行（1 行 / 条记忆） */
+    size_t count;
+    time_t last_fetch;                /* 上次拉取时刻（秒级节流） */
+} cli_mem_panel_t;
+
+/* Unix 时间戳 → "MM-DD HH:MM"（本地时区；线程安全 localtime_r） */
+static void cli_panel_mem_time(uint64_t ts, char *out, size_t cap)
+{
+    time_t t = (time_t)ts;
+    struct tm ltm;
+#if defined(_WIN32)
+    if (localtime_s(&ltm, &t) == 0) {
+        strftime(out, cap, "%m-%d %H:%M", &ltm);
+    } else {
+        snprintf(out, cap, "%llu", (unsigned long long)ts);
+    }
+#else
+    if (localtime_r(&t, &ltm)) {
+        strftime(out, cap, "%m-%d %H:%M", &ltm);
+    } else {
+        snprintf(out, cap, "%llu", (unsigned long long)ts);
+    }
+#endif
+}
+
+/* 记录内容摘要（首行，去 user: 前缀，UTF-8 安全截断） */
+static void cli_panel_mem_summary(const char *data, char *out, size_t cap)
+{
+    const char *p = data ? data : "";
+    const char *nl = strchr(p, '\n');
+    size_t len = nl ? (size_t)(nl - p) : strlen(p);
+    if (strncmp(p, "user: ", 6) == 0) {
+        p += 6;
+        len = (len > 6) ? len - 6 : 0;
+    }
+    if (len > 56)
+        len = 56;
+    while (len > 0 && ((unsigned char)p[len] & 0xC0) == 0x80)
+        len--;
+    if (len >= cap)
+        len = cap - 1;
+    __builtin_memcpy(out, p, len);
+    out[len] = '\0';
+}
+
+static void cli_panel_mem_fetch(cli_mem_panel_t *p)
+{
+    for (size_t i = 0; i < p->count; i++)
+        AIRY_FREE(p->lines[i]);
+    p->count = 0;
+
+    char *res = NULL;
+    if (cli_gw_call("mem.recent", "{\"limit\":12}", CLI_PANEL_MEM_GW_TIMEOUT_MS, &res) != 0 ||
+        !res) {
+        AIRY_FREE(res);
+        return;
+    }
+    cJSON *root = cJSON_Parse(res);
+    AIRY_FREE(res);
+    if (!root)
+        return;
+    cJSON *records = cJSON_GetObjectItem(root, "records");
+    size_t n = cJSON_IsArray(records) ? (size_t)cJSON_GetArraySize(records) : 0;
+    if (n > CLI_PANEL_MEM_LIMIT)
+        n = CLI_PANEL_MEM_LIMIT;
+    for (size_t i = 0; i < n; i++) {
+        cJSON *item = cJSON_GetArrayItem(records, (int)i);
+        cJSON *rid = cJSON_GetObjectItem(item, "record_id");
+        cJSON *ts = cJSON_GetObjectItem(item, "created_at");
+        cJSON *data = cJSON_GetObjectItem(item, "data");
+        cJSON *lenj = cJSON_GetObjectItem(item, "len");
+        const char *id = cJSON_IsString(rid) ? rid->valuestring : "";
+        uint64_t created = cJSON_IsNumber(ts) ? (uint64_t)ts->valuedouble : 0;
+        const char *d = cJSON_IsString(data) ? data->valuestring : "";
+        long dlen = cJSON_IsNumber(lenj) ? (long)lenj->valuedouble : (long)strlen(d);
+
+        char timestr[32], sum[64];
+        cli_panel_mem_time(created, timestr, sizeof(timestr));
+        cli_panel_mem_summary(d, sum, sizeof(sum));
+
+        char *line = (char *)AIRY_MALLOC(192);
+        if (!line)
+            break;
+        snprintf(line, 192, "%s[%s]%s %s%s%s%s  %s%ldB %.*s%s",
+                 cli_c(CLR_DIM), timestr, cli_c(CLR_RESET),
+                 cli_c(CLR_CYAN), sum, dlen > 56 ? "…" : "", cli_c(CLR_RESET),
+                 cli_c(CLR_DIM), dlen, 8, id, cli_c(CLR_RESET));
+        p->lines[p->count++] = line;
+    }
+    cJSON_Delete(root);
+}
+
+void cli_panel_mem_create(void **out_ud)
+{
+    *out_ud = NULL;
+    cli_mem_panel_t *p = (cli_mem_panel_t *)AIRY_CALLOC(1, sizeof(*p));
+    if (!p)
+        return;
+    *out_ud = p;
+}
+
+void cli_panel_mem_destroy(void *ud)
+{
+    cli_mem_panel_t *p = (cli_mem_panel_t *)ud;
+    if (!p)
+        return;
+    for (size_t i = 0; i < p->count; i++)
+        AIRY_FREE(p->lines[i]);
+    AIRY_FREE(p);
+}
+
+size_t cli_panel_mem_count(void *ud)
+{
+    cli_mem_panel_t *p = (cli_mem_panel_t *)ud;
+    if (!p)
+        return 0;
+    time_t now = time(NULL);
+    if (now != p->last_fetch) { /* 秒级节流刷新 */
+        p->last_fetch = now;
+        cli_panel_mem_fetch(p);
+    }
+    return p->count;
+}
+
+int cli_panel_mem_line(void *ud, size_t idx, char *out, size_t cap)
+{
+    cli_mem_panel_t *p = (cli_mem_panel_t *)ud;
+    if (!p || idx >= p->count || !p->lines[idx])
+        return 0;
+    snprintf(out, cap, "%s", p->lines[idx]);
     return 1;
 }

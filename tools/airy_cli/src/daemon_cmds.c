@@ -17,14 +17,17 @@
 
 #include "daemon_cmds.h"
 #include "daemon_rpc_client.h"
+#include "cli_gw.h"
 #include "airy_memory.h"
 #include "cli_render.h"
 #include "logger.h"
 #include "platform.h"
 
+#include <cjson/cJSON.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -149,10 +152,21 @@ static const char *cli_ns_sock(const char *ns)
 #endif
 }
 
+/**
+ * @brief 通用 daemon 服务方法调用（统一经 gateway 派发）。
+ *
+ * 架构约束（2026-08-25）：所有客户端（CLI/TUI/其他）必须经 gateway 派发
+ * 到微核心服务，禁止直连 daemon socket。因此业务方法调用（<ns>.<method>）
+ * 一律走 cli_gw_call → gateway（gateway 内部再经 SYS_SVC_CALL 派发到 daemon）。
+ * 注：daemon 生命周期管理（start/stop/status 探测、shutdown）属宿主进程
+ * 管理范畴，仍直连 daemon socket（见 cli_daemon_online/cli_daemon_stop）。
+ */
 static void cli_rpc_print(const char *ns, const char *method, const char *params_json)
 {
     char *result = NULL;
-    int rc = daemon_rpc_call(cli_ns_sock(ns), method, params_json, &result, CLI_RPC_TIMEOUT_MS);
+    char full_method[160];
+    snprintf(full_method, sizeof(full_method), "%s.%s", ns, method);
+    int rc = cli_gw_call(full_method, params_json, CLI_RPC_TIMEOUT_MS, &result);
     if (rc != 0 || !result) {
         char line[160];
         snprintf(line, sizeof(line), "%s.%s 调用失败：%s", ns, method, cli_err_desc(rc));
@@ -299,8 +313,10 @@ int cmd_daemons(const char *arg, void *ctx)
 #else
         int s = socket(AF_INET, SOCK_STREAM, 0);
         if (s >= 0) {
+            /* P2-2：F_GETFL 失败时 flags=-1，F_SETFL 会破坏 fd 标志位 */
             int flags = fcntl(s, F_GETFL, 0);
-            (void)fcntl(s, F_SETFL, flags | O_NONBLOCK);
+            if (flags >= 0)
+                (void)fcntl(s, F_SETFL, flags | O_NONBLOCK);
             struct sockaddr_in sa;
             sa.sin_family = AF_INET;
             sa.sin_port = htons((unsigned short)gw_port);
@@ -346,7 +362,7 @@ int cmd_daemons(const char *arg, void *ctx)
  *
  * 服务器工业场景：CLI 需能一键管理 agentrt 的全部 daemon，无需手动逐个
  * 拉起进程。daemon 二进制约定在 $AIRY_HOME/bin/<ns>_d（Windows 为
- * <ns>_d.exe），日志写入 $AIRY_HOME/logs/<ns>_d.log；停止优先走 daemon
+ * <ns>_d.exe），日志写入 $AIRY_HOME/data/agentrt/logs/<ns>_d.log；停止优先走 daemon
  * 注册的优雅 "shutdown" RPC，避免直接杀进程丢失状态。 */
 
 /* AIRY_HOME 根目录（$AIRY_HOME，缺省 $HOME/.airymaxrt）。 */
@@ -398,11 +414,7 @@ static int cli_daemon_start(const char *ns)
     }
 
     char logf[640];
-#ifdef _WIN32
-    snprintf(logf, sizeof(logf), "%s\\logs\\%s_d.log", cli_rt_base(), ns);
-#else
-    snprintf(logf, sizeof(logf), "%s/logs/%s_d.log", cli_rt_base(), ns);
-#endif
+    snprintf(logf, sizeof(logf), "%s/%s_d.log", airy_log_dir(), ns);
 
 #ifdef _WIN32
     {
@@ -842,16 +854,267 @@ int cmd_models(const char *arg, void *ctx)
     return 0;
 }
 
+/* ================================================================
+ * 记忆链展示（mem.*，2026-08-25）
+ *
+ * /mem          → 记忆链：count + 最近记录（mem.recent），逐条渲染
+ * /mem <query>  → 检索记忆：mem.search 命中后逐条 mem.get 取内容
+ * /mem get <id> → 单条记忆详情
+ *
+ * 全部经 gateway 派发（cli_gw_call），不直连 daemon socket。
+ * ================================================================ */
+
+/* Unix 时间戳 → "MM-DD HH:MM"（本地时区；线程安全 localtime_r） */
+static void cli_mem_time(uint64_t ts, char *out, size_t cap)
+{
+    time_t t = (time_t)ts;
+    struct tm ltm;
+#if defined(_WIN32)
+    if (localtime_s(&ltm, &t) == 0) {
+        strftime(out, cap, "%m-%d %H:%M", &ltm);
+    } else {
+        snprintf(out, cap, "%llu", (unsigned long long)ts);
+    }
+#else
+    if (localtime_r(&t, &ltm)) {
+        strftime(out, cap, "%m-%d %H:%M", &ltm);
+    } else {
+        snprintf(out, cap, "%llu", (unsigned long long)ts);
+    }
+#endif
+}
+
+/* 取记录内容首行（user: 之后的部分），作为列表摘要 */
+static void cli_mem_summary(const char *data, char *out, size_t cap)
+{
+    const char *p = data ? data : "";
+    const char *nl = strchr(p, '\n');
+    size_t len = nl ? (size_t)(nl - p) : strlen(p);
+    /* 跳过 "user: " 前缀，摘要聚焦用户意图 */
+    if (strncmp(p, "user: ", 6) == 0) {
+        p += 6;
+        len = (len > 6) ? len - 6 : 0;
+    }
+    if (len > 60)
+        len = 60;
+    while (len > 0 && ((unsigned char)p[len] & 0xC0) == 0x80)
+        len--;
+    if (len >= cap)
+        len = cap - 1;
+    __builtin_memcpy(out, p, len);
+    out[len] = '\0';
+}
+
+/* 单条记忆记录渲染（含序号与时间） */
+static void cli_mem_render_item(size_t idx, cJSON *item)
+{
+    cJSON *rid = cJSON_GetObjectItem(item, "record_id");
+    cJSON *ts = cJSON_GetObjectItem(item, "created_at");
+    cJSON *data = cJSON_GetObjectItem(item, "data");
+    cJSON *lenj = cJSON_GetObjectItem(item, "len");
+
+    const char *id = cJSON_IsString(rid) ? rid->valuestring : "?";
+    uint64_t created = cJSON_IsNumber(ts) ? (uint64_t)ts->valuedouble : 0;
+    const char *d = cJSON_IsString(data) ? data->valuestring : "";
+    long dlen = cJSON_IsNumber(lenj) ? (long)lenj->valuedouble : (long)strlen(d);
+
+    char timestr[32], sum[64];
+    cli_mem_time(created, timestr, sizeof(timestr));
+    cli_mem_summary(d, sum, sizeof(sum));
+
+    cli_out(cli_c(CLR_DIM));
+    cli_outf("  %-2zu%s", idx, CLI_ICON_BULLET);
+    cli_out(cli_c(CLR_RESET));
+    cli_out(cli_c(CLR_DIM));
+    cli_outf(" [%s] ", timestr);
+    cli_out(cli_c(CLR_RESET));
+    cli_out(sum);
+    if (dlen > 60)
+        cli_outf("…");
+    cli_out(cli_c(CLR_DIM));
+    cli_outf("  (%ldB %.*s)", dlen, 8, id);
+    cli_out(cli_c(CLR_RESET));
+    cli_outc('\n');
+}
+
+/* /mem：记忆链（count + 最近记录） */
+static void cli_mem_render_chain(void)
+{
+    char *res = NULL;
+    int total = 0;
+    if (cli_gw_call("mem.count", NULL, CLI_RPC_TIMEOUT_MS, &res) == 0 && res) {
+        cJSON *r = cJSON_Parse(res);
+        if (r) {
+            cJSON *c = cJSON_GetObjectItem(r, "count");
+            if (cJSON_IsNumber(c))
+                total = (int)c->valuedouble;
+            cJSON_Delete(r);
+        }
+        AIRY_FREE(res);
+    } else {
+        AIRY_FREE(res);
+        cli_render_sub_agent_line(CLI_ROLE_ERROR, "mem", "记忆服务不可用（mem.count）");
+        return;
+    }
+
+    char hdr[160];
+    snprintf(hdr, sizeof(hdr), "记忆链 · 共 %d 条（最近 %d 条）", total, 6);
+    cli_render_sub_agent_line(CLI_ROLE_STATUS, "mem", hdr);
+
+    if (cli_gw_call("mem.recent", "{\"limit\":6}", CLI_RPC_TIMEOUT_MS, &res) != 0 || !res) {
+        AIRY_FREE(res);
+        cli_render_sub_agent_line(CLI_ROLE_ERROR, "mem", "记忆链读取失败（mem.recent）");
+        return;
+    }
+    cJSON *root = cJSON_Parse(res);
+    AIRY_FREE(res);
+    if (!root) {
+        cli_render_sub_agent_line(CLI_ROLE_ERROR, "mem", "记忆链响应解析失败");
+        return;
+    }
+    cJSON *records = cJSON_GetObjectItem(root, "records");
+    size_t n = cJSON_IsArray(records) ? (size_t)cJSON_GetArraySize(records) : 0;
+    if (n == 0) {
+        cli_outf("  %s 暂无记忆记录，对话一次即可生成记忆\n", CLI_ICON_INFO);
+        cJSON_Delete(root);
+        return;
+    }
+    for (size_t i = 0; i < n; i++) {
+        cJSON *item = cJSON_GetArrayItem(records, (int)i);
+        cli_mem_render_item(i + 1, item);
+    }
+    cJSON_Delete(root);
+}
+
+/* /mem <query>：检索记忆并逐条取内容 */
+static void cli_mem_render_search(const char *query)
+{
+    char params[1024];
+    snprintf(params, sizeof(params), "{\"query\":\"%s\",\"limit\":5}", query);
+
+    char *res = NULL;
+    if (cli_gw_call("mem.search", params, CLI_RPC_TIMEOUT_MS, &res) != 0 || !res) {
+        AIRY_FREE(res);
+        cli_render_sub_agent_line(CLI_ROLE_ERROR, "mem", "记忆检索失败（mem.search）");
+        return;
+    }
+    cJSON *root = cJSON_Parse(res);
+    AIRY_FREE(res);
+    if (!root) {
+        cli_render_sub_agent_line(CLI_ROLE_ERROR, "mem", "记忆检索响应解析失败");
+        return;
+    }
+    cJSON *results = cJSON_GetObjectItem(root, "results");
+    size_t n = cJSON_IsArray(results) ? (size_t)cJSON_GetArraySize(results) : 0;
+    char hdr[192];
+    snprintf(hdr, sizeof(hdr), "检索记忆 “%s” · %zu 条命中", query, n);
+    cli_render_sub_agent_line(CLI_ROLE_STATUS, "mem", hdr);
+
+    for (size_t i = 0; i < n; i++) {
+        cJSON *hit = cJSON_GetArrayItem(results, (int)i);
+        cJSON *rid = cJSON_GetObjectItem(hit, "record_id");
+        cJSON *score = cJSON_GetObjectItem(hit, "score");
+        const char *id = cJSON_IsString(rid) ? rid->valuestring : "";
+
+        /* 逐条取内容（命中记录在服务端可被删除，取失败则仅展示 id）。
+         * 注意：data 指针指向 cJSON 内部内存，必须先拷贝到本地缓冲再
+         * cJSON_Delete（否则后续摘要读取为 use-after-free）。 */
+        char gp[256];
+        snprintf(gp, sizeof(gp), "{\"record_id\":\"%s\"}", id);
+        char *g = NULL;
+        cJSON *detail = NULL;
+        if (cli_gw_call("mem.get", gp, CLI_RPC_TIMEOUT_MS, &g) == 0 && g) {
+            detail = cJSON_Parse(g);
+            AIRY_FREE(g);
+        } else {
+            AIRY_FREE(g);
+        }
+
+        char dcopy[8192];
+        dcopy[0] = '\0';
+        long dlen = 0;
+        if (detail) {
+            cJSON *dj = cJSON_GetObjectItem(detail, "data");
+            cJSON *lj = cJSON_GetObjectItem(detail, "length");
+            if (cJSON_IsString(dj) && dj->valuestring) {
+                size_t dl = strlen(dj->valuestring);
+                if (dl >= sizeof(dcopy))
+                    dl = sizeof(dcopy) - 1;
+                __builtin_memcpy(dcopy, dj->valuestring, dl);
+                dcopy[dl] = '\0';
+                dlen = cJSON_IsNumber(lj) ? (long)lj->valuedouble : (long)dl;
+            }
+            cJSON_Delete(detail);
+        }
+
+        char sum[64];
+        cli_mem_summary(dcopy, sum, sizeof(sum));
+        cli_out(cli_c(CLR_DIM));
+        cli_outf("  %-2zu%s", i + 1, CLI_ICON_BULLET);
+        cli_out(cli_c(CLR_RESET));
+        cli_outf(" %.3f  ", cJSON_IsNumber(score) ? score->valuedouble : 0.0);
+        cli_out(sum);
+        if (dlen > 60)
+            cli_outf("…");
+        cli_out(cli_c(CLR_DIM));
+        cli_outf("  (%.*s)", 8, id);
+        cli_out(cli_c(CLR_RESET));
+        cli_outc('\n');
+    }
+    cJSON_Delete(root);
+}
+
+/* /mem get <id>：单条记忆详情（多行完整内容） */
+static void cli_mem_render_get(const char *record_id)
+{
+    char params[512];
+    snprintf(params, sizeof(params), "{\"record_id\":\"%s\"}", record_id);
+
+    char *res = NULL;
+    if (cli_gw_call("mem.get", params, CLI_RPC_TIMEOUT_MS, &res) != 0 || !res) {
+        AIRY_FREE(res);
+        cli_render_sub_agent_line(CLI_ROLE_ERROR, "mem", "记忆读取失败（mem.get）");
+        return;
+    }
+    cJSON *root = cJSON_Parse(res);
+    AIRY_FREE(res);
+    if (!root) {
+        cli_render_sub_agent_line(CLI_ROLE_ERROR, "mem", "记忆响应解析失败");
+        return;
+    }
+    cJSON *data = cJSON_GetObjectItem(root, "data");
+    cJSON *lenj = cJSON_GetObjectItem(root, "length");
+    cJSON *meta = cJSON_GetObjectItem(root, "metadata");
+    char hdr[160];
+    snprintf(hdr, sizeof(hdr), "记忆 %s · %ldB", record_id,
+             cJSON_IsNumber(lenj) ? (long)lenj->valuedouble : 0L);
+    cli_render_sub_agent_line(CLI_ROLE_STATUS, "mem", hdr);
+    if (cJSON_IsString(meta)) {
+        cli_out(cli_c(CLR_DIM));
+        cli_outf("  元数据: %s\n", meta->valuestring);
+        cli_out(cli_c(CLR_RESET));
+    }
+    if (cJSON_IsString(data) && data->valuestring) {
+        cli_out(cli_c(CLR_RESET));
+        cli_outf("%s\n", data->valuestring);
+    } else {
+        cli_outf("  %s 记录为空或已删除\n", CLI_ICON_INFO);
+    }
+    cJSON_Delete(root);
+}
+
 int cmd_mem(const char *arg, void *ctx)
 {
     (void)ctx;
-    if (!arg || arg[0] == '\0') {
-        cli_rpc_print("mem", "count", NULL);
+    if (arg && strncmp(arg, "get ", 4) == 0) {
+        cli_mem_render_get(arg + 4);
         return 0;
     }
-    char params[1024];
-    snprintf(params, sizeof(params), "{\"query\":\"%s\"}", arg);
-    cli_rpc_print("mem", "search", params);
+    if (arg && arg[0] != '\0') {
+        cli_mem_render_search(arg);
+        return 0;
+    }
+    cli_mem_render_chain();
     return 0;
 }
 
