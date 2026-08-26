@@ -58,6 +58,8 @@ typedef enum {
     CLI_TUI_MODE_CHAT = 0,  /* 对话（默认视图） */
     CLI_TUI_MODE_BOARD,     /* 任务看板（任务大厅实时状态） */
     CLI_TUI_MODE_EVENTS,    /* 事件流（hall_store gseq 全局因果序回放） */
+    CLI_TUI_MODE_HW,        /* 硬件信息（F2：本机 CPU/内存/OS/架构实时展示） */
+    CLI_TUI_MODE_MEM,       /* 记忆链（F5：mem_d 最近记忆记录实时展示） */
     CLI_TUI_MODE_MAX
 } cli_tui_mode_t;
 
@@ -300,6 +302,16 @@ void cli_tui_rebuild_three_zone(cli_tui_t *tui);
  * call that emits progress without reading input).
  */
 void cli_tui_redraw(cli_tui_t *tui);
+
+/**
+ * @brief Poll a single key without blocking (task-wait loop support).
+ *
+ * TUI 全屏激活时从 raw mode 读取一个按键；未激活 / 无输入返回 0，
+ * EOF 返回 -1（*eof=1），否则返回按键码（0x03 = Ctrl+C，与
+ * cli_tui_readline 的语义一致）。用于任务执行期间开放中断能力——
+ * raw mode 关闭 ISIG 后 Ctrl+C 不再产生 SIGINT，必须在此显式识别。
+ */
+int cli_tui_poll_key(cli_tui_t *tui, int *eof);
 
 #ifdef __cplusplus
 }

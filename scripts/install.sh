@@ -74,6 +74,15 @@ AIRY_PROFILE="${AIRY_PROFILE:-auto}"
 AIRY_SRC_DIR="${AIRY_HOME}/src/airymaxhub"
 MODULES_DIR="${AIRY_HOME}/modules"
 
+# 源码子模块根：兼容两种仓库布局——
+#   A) 平铺：$AIRY_SRC_DIR/agentrt、$AIRY_SRC_DIR/ecosystem、…
+#   B) 管理仓 submodule：$AIRY_SRC_DIR/agent-workload/agentrt、…/ecosystem、…
+# 统一以 $AIRY_SRC_APP 作为 app 源码根，后续引用全部基于该变量。
+AIRY_SRC_APP="${AIRY_SRC_DIR}/agent-workload"
+if [ ! -d "${AIRY_SRC_APP}/agentrt" ]; then
+    AIRY_SRC_APP="${AIRY_SRC_DIR}"
+fi
+
 # 17 个 daemon 完整清单（安装后逐一校验，含 think_d/cupolas_d）
 EXPECTED_DAEMONS="monit_d observe_d info_d notify_d sched_d channel_d mem_d
                   llm_d tool_d hook_d plugin_d agent_d a2a_d market_d gateway_d
@@ -131,9 +140,11 @@ check_toolchain() {
 init_home() {
     mkdir -p "${AIRY_HOME}"/bin "${AIRY_HOME}"/lib "${AIRY_HOME}"/include \
              "${AIRY_HOME}"/share "${AIRY_HOME}"/run \
-             "${AIRY_HOME}"/logs "${AIRY_HOME}"/config "${AIRY_HOME}"/data \
-             "${AIRY_HOME}"/tmp "${AIRY_HOME}"/cache "${AIRY_HOME}"/modules \
-             "${AIRY_HOME}"/scripts
+             "${AIRY_HOME}"/config "${AIRY_HOME}"/data \
+             "${AIRY_HOME}"/tmp \
+             "${AIRY_HOME}"/data/agentrt/logs "${AIRY_HOME}"/data/agentrt/tmp \
+             "${AIRY_HOME}"/data/agentrt/cache "${AIRY_HOME}"/data/agentrt/workspaces \
+             "${AIRY_HOME}"/modules "${AIRY_HOME}"/scripts
     chmod 700 "${AIRY_HOME}/config" 2>/dev/null || true
     log_ok "AIRY_HOME 就绪: ${AIRY_HOME}"
 }
@@ -297,7 +308,7 @@ build_and_install() {
     fi
 
     log_info "cmake 配置（${cmake_args}）…"
-    cmake -S "${AIRY_SRC_DIR}/agentrt" -B "${build_dir}" ${cmake_args} \
+    cmake -S "${AIRY_SRC_APP}/agentrt" -B "${build_dir}" ${cmake_args} \
         || { log_err "cmake 配置失败"; exit 1; }
     log_info "构建（-j${AIRY_BUILD_JOBS}）…"
     cmake --build "${build_dir}" -j"${AIRY_BUILD_JOBS}" || { log_err "构建失败"; exit 1; }
@@ -314,21 +325,21 @@ install_python_deps() {
     log_info "安装 Python 依赖到 ${AIRY_HOME}/lib …"
     local pkg
     for pkg in airymax_agents airymax_agents_rs; do
-        [ -d "${AIRY_SRC_DIR}/ecosystem/agents/${pkg}" ] || { log_warn "跳过: ecosystem/agents/${pkg}"; continue; }
+        [ -d "${AIRY_SRC_APP}/ecosystem/agents/${pkg}" ] || { log_warn "跳过: ecosystem/agents/${pkg}"; continue; }
         rsync -a --exclude tests --exclude __pycache__ --exclude .git --exclude examples \
-            "${AIRY_SRC_DIR}/ecosystem/agents/${pkg}" "${AIRY_HOME}/lib/" 2>/dev/null \
-            || cp -r "${AIRY_SRC_DIR}/ecosystem/agents/${pkg}" "${AIRY_HOME}/lib/"
+            "${AIRY_SRC_APP}/ecosystem/agents/${pkg}" "${AIRY_HOME}/lib/" 2>/dev/null \
+            || cp -r "${AIRY_SRC_APP}/ecosystem/agents/${pkg}" "${AIRY_HOME}/lib/"
     done
     for pkg in openlab markets contrib app; do
-        [ -d "${AIRY_SRC_DIR}/ecosystem/openlab/${pkg}" ] || { log_warn "跳过: ecosystem/openlab/${pkg}"; continue; }
+        [ -d "${AIRY_SRC_APP}/ecosystem/openlab/${pkg}" ] || { log_warn "跳过: ecosystem/openlab/${pkg}"; continue; }
         rsync -a --exclude tests --exclude __pycache__ --exclude .git --exclude examples \
-            "${AIRY_SRC_DIR}/ecosystem/openlab/${pkg}" "${AIRY_HOME}/lib/" 2>/dev/null \
-            || cp -r "${AIRY_SRC_DIR}/ecosystem/openlab/${pkg}" "${AIRY_HOME}/lib/"
+            "${AIRY_SRC_APP}/ecosystem/openlab/${pkg}" "${AIRY_HOME}/lib/" 2>/dev/null \
+            || cp -r "${AIRY_SRC_APP}/ecosystem/openlab/${pkg}" "${AIRY_HOME}/lib/"
     done
-    if [ -d "${AIRY_SRC_DIR}/sdk/sdk-python/agentrt" ]; then
+    if [ -d "${AIRY_SRC_APP}/sdk/sdk-python/agentrt" ]; then
         rsync -a --exclude tests --exclude __pycache__ --exclude .git \
-            "${AIRY_SRC_DIR}/sdk/sdk-python/agentrt" "${AIRY_HOME}/lib/" 2>/dev/null \
-            || cp -r "${AIRY_SRC_DIR}/sdk/sdk-python/agentrt" "${AIRY_HOME}/lib/"
+            "${AIRY_SRC_APP}/sdk/sdk-python/agentrt" "${AIRY_HOME}/lib/" 2>/dev/null \
+            || cp -r "${AIRY_SRC_APP}/sdk/sdk-python/agentrt" "${AIRY_HOME}/lib/"
     fi
     if command -v python3 >/dev/null 2>&1; then
         if PYTHONPATH="${AIRY_HOME}/lib" python3 -c "import agentrt, airymax_agents, openlab, markets" 2>/dev/null; then
@@ -346,7 +357,7 @@ install_python_deps() {
 #（2.6：本地源码构建 memoryrovol 全功能开启）。无源码则跳过，
 # TUI 降级 JsonlMemory（真实可用后备）。
 build_mr_oss() {
-    local mr_src="${AIRY_SRC_DIR}/products/memoryrovol"
+    local mr_src="${AIRY_SRC_APP}/products/memoryrovol"
     [ -d "$mr_src" ] || { log_warn "products/memoryrovol 源码缺失，跳过 OSS 库构建（TUI 降级 JsonlMemory）"; return 0; }
     local mr_build="${AIRY_HOME}/build-mr-oss"
     log_info "构建 MemoryRovol OSS 库（L1+L2，TUI 独立链接）…"
@@ -366,7 +377,7 @@ build_mr_oss() {
 
 # ─── Rust TUI 构建（源码模式附带） ─────────────────────────────────────
 build_tui() {
-    [ -d "${AIRY_SRC_DIR}/sdk/tui" ] || return 0
+    [ -d "${AIRY_SRC_APP}/sdk/tui" ] || return 0
     # AIRY_HOME 需 export 给 cargo 子进程：TUI build.rs 据此定位
     # $AIRY_HOME/lib/libagentrt_memoryrovol.a（TUI memoryrovol 全功能链接）。
     export AIRY_HOME
@@ -378,7 +389,7 @@ build_tui() {
     # 禁止 cargo 在源码树 sdk/tui/target 落盘（曾有 1.7G 泄漏）。
     export CARGO_TARGET_DIR="${AIRY_HOME}/target"
     log_info "构建 agentrt-tui（Rust TUI，产物 → ${CARGO_TARGET_DIR}）…"
-    ( cd "${AIRY_SRC_DIR}/sdk/tui" && cargo build --release ) 2>/dev/null || { log_warn "TUI 构建失败，跳过"; return 0; }
+    ( cd "${AIRY_SRC_APP}/sdk/tui" && cargo build --release ) 2>/dev/null || { log_warn "TUI 构建失败，跳过"; return 0; }
     [ -f "${CARGO_TARGET_DIR}/release/agentrt-tui" ] && \
         cp -f "${CARGO_TARGET_DIR}/release/agentrt-tui" "${AIRY_HOME}/bin/agentrt-tui"
     log_ok "agentrt-tui 部署完成"
@@ -429,24 +440,25 @@ init_secrets() {
     else
         log_ok "secrets.env 已存在，跳过"
     fi
-    [ -f "${AIRY_SRC_DIR}/ecosystem/manager/configs/agentrt.yaml" ] && \
-        cp -f "${AIRY_SRC_DIR}/ecosystem/manager/configs/agentrt.yaml" "${AIRY_HOME}/config/" 2>/dev/null || true
-    [ -f "${AIRY_SRC_DIR}/ecosystem/manager/model/model.yaml" ] && \
-        cp -f "${AIRY_SRC_DIR}/ecosystem/manager/model/model.yaml" "${AIRY_HOME}/config/" 2>/dev/null || true
+    [ -f "${AIRY_SRC_APP}/ecosystem/manager/configs/agentrt.yaml" ] && \
+        cp -f "${AIRY_SRC_APP}/ecosystem/manager/configs/agentrt.yaml" "${AIRY_HOME}/config/" 2>/dev/null || true
+    [ -f "${AIRY_SRC_APP}/ecosystem/manager/model/model.yaml" ] && \
+        cp -f "${AIRY_SRC_APP}/ecosystem/manager/model/model.yaml" "${AIRY_HOME}/config/" 2>/dev/null || true
     # 工具级权限规则（fail-closed：缺文件时 tool_d/agent_d 拒绝全部工具调用）。
     # 模板授予 coding_v1 标准编码工具集；生产部署应按最小权限裁剪。
     # 权威路径 $AIRY_HOME/config/permission_rules.yaml（tool_d daemon_security
     # 在启动时读取 airy_config_dir()/permission_rules.yaml）。
     local rules_tpl="${AIRY_SRC_DIR}/tools/scripts/ops/templates/permission_rules.yaml"
     [ -f "${rules_tpl}" ] || rules_tpl="${AIRY_HOME}/config/permission_rules.yaml.example"
-    if [ -f "${rules_tpl}" ]; then
-        if [ ! -f "${AIRY_HOME}/config/permission_rules.yaml" ]; then
-            cp "${rules_tpl}" "${AIRY_HOME}/config/permission_rules.yaml"
-            chmod 600 "${AIRY_HOME}/config/permission_rules.yaml"
-            log_ok "已部署工具权限规则 ${AIRY_HOME}/config/permission_rules.yaml"
-        else
-            log_ok "permission_rules.yaml 已存在，跳过"
-        fi
+    # 二进制包已内嵌 config/permission_rules.yaml（install_binary 拷贝），
+    # 该文件在即视为已部署，避免"模板未找到"误导告警。
+    if [ -f "${AIRY_HOME}/config/permission_rules.yaml" ]; then
+        chmod 600 "${AIRY_HOME}/config/permission_rules.yaml"
+        log_ok "工具权限规则已就位 ${AIRY_HOME}/config/permission_rules.yaml（包内嵌）"
+    elif [ -f "${rules_tpl}" ]; then
+        cp "${rules_tpl}" "${AIRY_HOME}/config/permission_rules.yaml"
+        chmod 600 "${AIRY_HOME}/config/permission_rules.yaml"
+        log_ok "已部署工具权限规则 ${AIRY_HOME}/config/permission_rules.yaml"
     else
         log_warn "未找到 permission_rules.yaml 模板，工具调用将 fail-closed 拒绝"
     fi
@@ -535,9 +547,27 @@ detect_accel() {
 
 assess_hardware() {
     local mem_kib mem_avail_kib nproc_val accel profile
-    mem_kib="$(awk '/^MemTotal:/{print $2}' /proc/meminfo 2>/dev/null || echo 0)"
-    mem_avail_kib="$(awk '/^MemAvailable:/{print $2}' /proc/meminfo 2>/dev/null || echo "$mem_kib")"
-    nproc_val="$(nproc 2>/dev/null || echo 1)"
+    # 跨平台内存探测：Linux 读 /proc/meminfo；macOS/BSD 无 /proc，回退
+    # sysctl（hw.memsize 单位字节 → KiB）。此前仅 /proc 导致 macOS 恒判
+    # minimal（非致命但画像错误，2026-08-25 修复）。
+    if [ -r /proc/meminfo ]; then
+        mem_kib="$(awk '/^MemTotal:/{print $2}' /proc/meminfo 2>/dev/null || echo 0)"
+        mem_avail_kib="$(awk '/^MemAvailable:/{print $2}' /proc/meminfo 2>/dev/null || echo "${mem_kib:-0}")"
+    elif command -v sysctl >/dev/null 2>&1; then
+        mem_kib="$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1024 ))"
+        mem_avail_kib="$mem_kib"
+    else
+        mem_kib=0
+        mem_avail_kib=0
+    fi
+    # 跨平台 CPU 核数：nproc（GNU）→ sysctl hw.ncpu（macOS/BSD）→ 1
+    if command -v nproc >/dev/null 2>&1; then
+        nproc_val="$(nproc 2>/dev/null || echo 1)"
+    elif command -v sysctl >/dev/null 2>&1; then
+        nproc_val="$(sysctl -n hw.ncpu 2>/dev/null || echo 1)"
+    else
+        nproc_val=1
+    fi
     accel="$(detect_accel)"
     if [ -n "$mem_kib" ] && [ "$mem_kib" -gt 0 ] && \
        [ "$mem_kib" -ge $((2560 * 1024)) ] && \
@@ -585,12 +615,13 @@ persist_profile() {
 # ─── 固化安装位置 + 生成运行环境 + 启动器软链 ──────────────────────────
 finalize_install() {
     # 生成 vault 主密钥口令（AES-256-GCM 凭据加密）。随机强口令，缺失回退链：
-    # openssl rand → /dev/urandom hexdump → 时间戳+urandom 哈希（极低概率兜底）。
+    # openssl rand → od /dev/urandom（POSIX：BSD od 亦支持 -N，替代 GNU
+    # head -c）→ 时间戳+urandom 哈希 cksum（POSIX，替代 Linux 特有 sha256sum）。
     local vault_password
     vault_password=$(openssl rand -hex 32 2>/dev/null \
-        || { head -c 32 /dev/urandom 2>/dev/null | od -An -tx1 | tr -d ' \n'; })
+        || { od -An -tx1 -N32 /dev/urandom 2>/dev/null | tr -d ' \n'; })
     if [ -z "${vault_password}" ]; then
-        vault_password="$( { date +%s%N; head -c 64 /dev/urandom 2>/dev/null; } | sha256sum | cut -c1-64 )"
+        vault_password="$( { date '+%s%N'; od -An -tx1 -N64 /dev/urandom 2>/dev/null; } | cksum | cut -c1-64 )"
     fi
     {
         echo "# AgentRT 安装信息（由 install.sh 生成，勿手改）"
@@ -602,34 +633,46 @@ finalize_install() {
     } > "${AIRY_HOME}/config/install.env"
     chmod 600 "${AIRY_HOME}/config/install.env"
 
-    cat > "${AIRY_HOME}/bin/agentrt-env.sh" <<EOF
+    # 引号 heredoc（<<'EOF'）：dash + set -u 下 \${...} 在无引号 heredoc 中会被
+    # 错误展开（"AIRY_CONFIG_DIR: parameter not set" 中止写入，agentrt-env.sh
+    # 变空文件——2026-08-25 实测复现）。引号 heredoc 杜绝一切展开，AIRY_HOME
+    # 实际值用占位符 __AIRY_HOME__ + sed 注入。
+    cat > "${AIRY_HOME}/bin/agentrt-env.sh" <<'AIRY_ENV_EOF'
 #!/bin/sh
 # AgentRT 运行环境（由 install.sh 生成，source 使用）
 # AIRY_HOME 以调用方显式设置优先（隔离测试/多实例/--prefix 自定义安装），
 # 缺省回退安装时固化值；无条件 export 会覆盖显式设置，导致 daemon 群与
 # 调用方等待探测的 socket 目录分叉（历史故障：socket 未就绪 + 第二实例
 # 抢占生产 socket）。
-AIRY_HOME="\${AIRY_HOME:-${AIRY_HOME}}"
+AIRY_HOME="${AIRY_HOME:-__AIRY_HOME__}"
 export AIRY_HOME
-export AIRY_RUNTIME_DIR="\${AIRY_RUNTIME_DIR:-\$AIRY_HOME/run}"
-export AIRY_LOG_DIR="\${AIRY_LOG_DIR:-\$AIRY_HOME/logs}"
-export AIRY_CONFIG_DIR="\${AIRY_CONFIG_DIR:-\$AIRY_HOME/config}"
-export AIRY_BIN_DIR="\${AIRY_BIN_DIR:-\$AIRY_HOME/bin}"
-export AIRY_LIB_DIR="\${AIRY_LIB_DIR:-\$AIRY_HOME/lib}"
+export AIRY_RUNTIME_DIR="${AIRY_RUNTIME_DIR:-$AIRY_HOME/run}"
+# 运行时数据全量统一于 $AIRY_HOME/data/agentrt（2026-08-25）：日志/缓存/
+# 临时/持久化工作区均收敛其下，顶层仅保留分发物、用户配置与易失 run/。
+export AIRY_LOG_DIR="${AIRY_LOG_DIR:-$AIRY_HOME/data/agentrt/logs}"
+export AIRY_CONFIG_DIR="${AIRY_CONFIG_DIR:-$AIRY_HOME/config}"
+export AIRY_BIN_DIR="${AIRY_BIN_DIR:-$AIRY_HOME/bin}"
+export AIRY_LIB_DIR="${AIRY_LIB_DIR:-$AIRY_HOME/lib}"
+export AIRY_DATA_DIR="${AIRY_DATA_DIR:-$AIRY_HOME/data}"
+export AIRY_CACHE_DIR="${AIRY_CACHE_DIR:-$AIRY_HOME/data/agentrt/cache}"
+export AIRY_TMP_DIR="${AIRY_TMP_DIR:-$AIRY_HOME/data/agentrt/tmp}"
+export AIRY_WORKSPACE_DIR="${AIRY_WORKSPACE_DIR:-$AIRY_HOME/data/agentrt/workspaces}"
 # Python 字节码缓存收敛：editable 安装的包源码位于源码区，PYTHONPYCACHEPREFIX
-# 将所有 __pycache__ 重定向到 $AIRY_HOME/cache/pycache，禁止落盘源码区。
-export PYTHONPYCACHEPREFIX="\${PYTHONPYCACHEPREFIX:-\$AIRY_HOME/cache/pycache}"
+# 将所有 __pycache__ 重定向到 $AIRY_HOME/data/agentrt/cache/pycache，禁止落盘源码区。
+export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-$AIRY_HOME/data/agentrt/cache/pycache}"
 # Agent 工具 ACL：默认不设（fail-closed，以 $AIRY_CONFIG_DIR/permission_rules.yaml
 # 为唯一权威源，按角色最小权限授权）。高级部署可显式覆盖收紧，如
 # AIRY_AGENT_ACL="coding_v1=fs_read,fs_glob"。
-export AIRY_AGENT_ACL="\${AIRY_AGENT_ACL:-}"
-export PATH="\${AIRY_HOME}/bin:\$PATH"
-EOF
+export AIRY_AGENT_ACL="${AIRY_AGENT_ACL:-}"
+export PATH="${AIRY_HOME}/bin:$PATH"
+AIRY_ENV_EOF
+    sed "s|__AIRY_HOME__|${AIRY_HOME}|g" "${AIRY_HOME}/bin/agentrt-env.sh" > "${AIRY_HOME}/bin/agentrt-env.sh.tmp" && \
+        mv "${AIRY_HOME}/bin/agentrt-env.sh.tmp" "${AIRY_HOME}/bin/agentrt-env.sh"
     chmod 700 "${AIRY_HOME}/bin/agentrt-env.sh"
 
     # 启动器软链：任意路径输入 airymaxrt 即启动（读 install.env 定位运行时根）
-    if [ -f "${AIRY_SRC_DIR}/sdk/tui/scripts/airymaxrt" ]; then
-        cp -f "${AIRY_SRC_DIR}/sdk/tui/scripts/airymaxrt" "${AIRY_HOME}/bin/airymaxrt"
+    if [ -f "${AIRY_SRC_APP}/sdk/tui/scripts/airymaxrt" ]; then
+        cp -f "${AIRY_SRC_APP}/sdk/tui/scripts/airymaxrt" "${AIRY_HOME}/bin/airymaxrt"
         chmod 755 "${AIRY_HOME}/bin/airymaxrt"
     elif [ -f "${AIRY_HOME}/bin/agentrt-tui" ]; then
         # 二进制模式无源码：生成轻量启动器。
@@ -854,12 +897,12 @@ main() {
         prepare_source
 
         # 模式 B：无闭源源码 → 下载预编译模块包（URL 未配置时跳过，闭源功能受限）
-        if [ ! -d "${AIRY_SRC_DIR}/agentrt/atoms" ] && [ "$AIRY_MODE" != "source" ]; then
+        if [ ! -d "${AIRY_SRC_APP}/agentrt/atoms" ] && [ "$AIRY_MODE" != "source" ]; then
             fetch_prebuilt_module "atoms" "${AIRY_ATOMS_PREBUILT_URL:-}" "atoms" || \
                 log_warn "atoms 预编译包不可用；如需完整功能请配置 AIRY_ATOMS_PREBUILT_URL 或使用本地源码"
             fetch_prebuilt_module "memoryrovol" "${AIRY_MEMORYROVOL_PREBUILT_URL:-}" "memoryrovol" || \
                 log_warn "memoryrovol 预编译包不可用（无授权将自动降级 OSS/builtin）"
-        elif [ "$AIRY_MODE" = "source" ] && [ -d "${AIRY_SRC_DIR}/agentrt/atoms" ]; then
+        elif [ "$AIRY_MODE" = "source" ] && [ -d "${AIRY_SRC_APP}/agentrt/atoms" ]; then
             log_ok "模式 C：本地闭源源码（atoms/memoryrovol）全量构建"
         fi
 

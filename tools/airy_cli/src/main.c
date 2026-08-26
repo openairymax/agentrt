@@ -190,8 +190,24 @@ static int cli_task_poll_input(void)
     if (g_cli_print_mode || g_cli_json_mode)
         return 0;
     cli_tui_t *tui = cli_tui_get_default();
-    if (tui && cli_tui_active(tui))
+    if (tui && cli_tui_active(tui)) {
+        /* TUI 全屏下 stdin 走 raw mode（ISIG 已关闭，Ctrl+C 不产生
+         * SIGINT）。任务等待段必须主动读取按键：0x03 = Ctrl+C 置
+         * g_cli_cancel（与行模式 SIGINT 同语义），其余按键忽略
+         * （任务执行期间不插入对话，避免打断执行画面）。 */
+        int eof = 0;
+        int key = cli_tui_poll_key(tui, &eof);
+        if (eof) {
+            /* 终端关闭（EOF）：等同中断，置取消位避免误判为正常完成 */
+            g_cli_cancel = 1;
+            return -1;
+        }
+        if (key == 0x03) { /* Ctrl+C */
+            g_cli_cancel = 1;
+            return -1;
+        }
         return 0;
+    }
 #ifndef _WIN32
     struct pollfd pfd;
     pfd.fd = STDIN_FILENO;
@@ -268,7 +284,7 @@ const cli_command_t CLI_COMMANDS[] = {
     {"/channels", "列出消息通道", CLI_CAT_RESOURCE, 0, cmd_channels},
     {"/market", "搜索市场（/market skill 搜技能）", CLI_CAT_RESOURCE, 0, cmd_market},
     {"/models", "列出 LLM 模型", CLI_CAT_RESOURCE, 0, cmd_models},
-    {"/mem", "记忆检索：/mem [query]", CLI_CAT_RESOURCE, 1, cmd_mem},
+    {"/mem", "记忆链：/mem（最近记忆） /mem <query>（检索） /mem get <id>（详情）", CLI_CAT_RESOURCE, 0, cmd_mem},
     {"/a2a", "发现 A2A 智能体", CLI_CAT_RESOURCE, 0, cmd_a2a},
     {"/metrics", "查询观测指标", CLI_CAT_SYSTEM, 0, cmd_metrics},
     {"/alerts", "查看监控告警", CLI_CAT_SYSTEM, 0, cmd_alerts},
@@ -519,6 +535,7 @@ typedef struct {
     airy_hall_store_t *hall_store;
     void *board_ud;
     void *events_ud;
+    void *mem_ud;
     airy_artifact_validator_t *validator;
     airy_governance_t *governance;
     void *reviewer; /* cli_exec_review 句柄（不透明，仅透传销毁） */
@@ -779,9 +796,11 @@ static airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_tui_t *tui,
      * 会话级 hall/hall_store 指针，成本可忽略。 */
     void *board_ud = NULL;
     void *events_ud = NULL;
+    void *mem_ud = NULL;
     if (tui) {
         cli_panel_board_create(hall, &board_ud);
         cli_panel_events_create(hall_store, &events_ud);
+        cli_panel_mem_create(&mem_ud);
         if (board_ud) {
             cli_tui_set_panel(tui, CLI_TUI_MODE_BOARD, board_ud, cli_panel_board_count,
                               cli_panel_board_line);
@@ -792,9 +811,14 @@ static airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_tui_t *tui,
                               cli_panel_events_line);
             cli_tui_set_panel_action(tui, CLI_TUI_MODE_EVENTS, cli_panel_events_action);
         }
+        if (mem_ud) {
+            cli_tui_set_panel(tui, CLI_TUI_MODE_MEM, mem_ud, cli_panel_mem_count,
+                              cli_panel_mem_line);
+        }
     }
     rt->board_ud = board_ud;
     rt->events_ud = events_ud;
+    rt->mem_ud = mem_ud;
 
     /* 1.3 推理语言网关：创建时自动对 llm_d 已配置模型执行 Tokenizer 特征
      * 校准（lang_ratio），llm_d 不可用时降级为启发式决策（不阻断）。
@@ -833,6 +857,8 @@ static void cli_teardown_runtime(cli_runtime_ctx_t *rt)
         cli_panel_events_destroy(rt->events_ud);
     if (rt->board_ud)
         cli_panel_board_destroy(rt->board_ud);
+    if (rt->mem_ud)
+        cli_panel_mem_destroy(rt->mem_ud);
     if (rt->reviewer)
         airy_execution_review_destroy(rt->reviewer);
     if (rt->hall)
@@ -1268,7 +1294,11 @@ int main(int argc, char *argv[])
                 if (cli_tui_active(tui)) {
                     cli_tui_reset_history(tui);
                     cli_render_set_tui(tui);
-                    cli_term_header_unpin();
+                    /* 注意：不要在 alt screen 内调用 cli_term_header_unpin()
+                     * （Bug-3）。它向 alt screen 写 \033[r 重置滚动区并把光标
+                     * 移到末行——在 TUI 首次 redraw 建立自己的滚动区之前，
+                     * 任何向 stdout 直写光标的代码都会破坏 TUI 内部状态。
+                     * 全屏 TUI 拥有整屏，无需继承行模式的滚动区。 */
                     cli_print_system_header(m_s2[0] ? m_s2 : NULL,
                                             m_verify[0] ? m_verify : NULL,
                                             m_expert[0] ? m_expert : NULL);
@@ -1732,6 +1762,11 @@ int main(int argc, char *argv[])
             /* 任务在后台推进；主线程轮询输入直到完成/取消 */
             while (!wctx.done && !g_cli_cancel) {
                 int input_rc = cli_task_poll_input();
+                if (input_rc == 1) {
+                    /* 插入对话：回复渲染在看板块下方，原位重绘几何失效，
+                     * 看板退化为追加行模式（与轮询段一致，避免界面重叠）。 */
+                    cli_live_board_done();
+                }
                 if (input_rc < 0)
                     break; /* 用户打断：g_cli_cancel 已置位 */
                 airy_sleep_ms(200);
@@ -1863,7 +1898,7 @@ int main(int argc, char *argv[])
             snprintf(gw_url, sizeof(gw_url), "%s", gw);
         else
             snprintf(gw_url, sizeof(gw_url), "http://127.0.0.1:8080");
-        char *const argv[] = {(char *)tui_bin, "--gateway-url", gw_url, NULL};
+        char *const argv[] = {(char *)tui_bin, "--gateway-url", gw_url, "--resume", NULL};
         execve(tui_bin, argv, environ);
         /* exec 失败（二进制缺失等）：提示后正常退出，不崩溃。 */
         cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "tui",

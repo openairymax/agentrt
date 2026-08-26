@@ -290,6 +290,10 @@ static const char *tui_mode_name(cli_tui_mode_t m)
         return "任务看板";
     case CLI_TUI_MODE_EVENTS:
         return "事件流";
+    case CLI_TUI_MODE_HW:
+        return "硬件信息";
+    case CLI_TUI_MODE_MEM:
+        return "记忆链";
     default:
         return "?";
     }
@@ -323,6 +327,9 @@ void cli_tui_mode_set(cli_tui_t *t, cli_tui_mode_t m)
         t->detail_active = 0;
         t->detail_len = 0;
     }
+    /* 记忆链：默认尾部实时跟随（新记忆即现） */
+    if (m == CLI_TUI_MODE_MEM)
+        t->follow = 1;
     t->note[0] = '\0';
     t->dirty = 1;
 }
@@ -839,6 +846,119 @@ static void tui_render_header(cli_tui_t *t)
     }
 }
 
+/* 架构字符串（编译期判定，跨平台）：与 install.sh detect_arch 同口径。 */
+static const char *tui_arch_name(void)
+{
+#if defined(_WIN32) || defined(_WIN64)
+# if defined(_M_ARM64)
+    return "arm64";
+# elif defined(_M_X64)
+    return "x86_64";
+# else
+    return "windows";
+# endif
+#elif defined(__APPLE__)
+# if defined(__aarch64__)
+    return "arm64";
+# else
+    return "x86_64";
+# endif
+#else
+# if defined(__riscv)
+    return "riscv64";
+# elif defined(__aarch64__)
+    return "aarch64";
+# elif defined(__arm__)
+    return "armv7l";
+# else
+    return "x86_64";
+# endif
+#endif
+}
+
+/* ---- 硬件信息面板（F2，2026-08-25）----
+ * 静态渲染本机实时环境：OS/版本/主机名、CPU 型号/核心数、内存总量/可用、
+ * 架构、统一数据根路径。airy_get_sysinfo 跨平台采集（Linux/macOS/Windows）。 */
+
+/* 面板行写入：定位到视口第 row 行（相对 start_row）→ 清行 → 打印格式化文本。 */
+static void tui_hw_line(size_t row, size_t start_row, const char *fmt, ...)
+{
+    va_list ap;
+    char buf[512];
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    tui_write_literal("\033[");
+    char num[16];
+    snprintf(num, sizeof(num), "%zu", start_row + row);
+    tui_write_literal(num);
+    tui_write_literal(";1H");
+    tui_clear_line();
+    fputs(buf, stdout);
+}
+
+static void tui_render_hw_panel(cli_tui_t *t, size_t rows, size_t start_row)
+{
+    airy_sysinfo_t si;
+    int ok = (airy_get_sysinfo(&si) == AIRY_SUCCESS);
+
+    size_t r = 0;
+    tui_hw_line(r++, start_row, "%s%s%s  %s%s%s", cli_c(CLR_BOLD),
+                cli_c(CLR_CYAN), tui_mode_name(t->mode), cli_c(CLR_DIM),
+                "· 本机实时环境 · F2/Esc 返回", cli_c(CLR_RESET));
+
+    if (!ok) {
+        tui_hw_line(r++, start_row, "%s%s 硬件信息采集失败（airy_get_sysinfo）%s",
+                    cli_c(CLR_RED), cli_c(CLR_RESET), cli_c(CLR_RESET));
+        for (; r < rows; r++)
+            tui_hw_line(r, start_row, " ");
+        return;
+    }
+
+    char mem_total[32], mem_free[32];
+    {
+        uint64_t mt = si.memory_total, mf = si.memory_free;
+        const char *unit = "B";
+        if (mt >= (1024ULL * 1024 * 1024)) {
+            mt /= (1024 * 1024 * 1024);
+            mf /= (1024 * 1024 * 1024);
+            unit = "GiB";
+        } else if (mt >= 1024 * 1024) {
+            mt /= (1024 * 1024);
+            mf /= (1024 * 1024);
+            unit = "MiB";
+        }
+        snprintf(mem_total, sizeof(mem_total), "%llu %s",
+                 (unsigned long long)mt, unit);
+        snprintf(mem_free, sizeof(mem_free), "%llu %s",
+                 (unsigned long long)mf, unit);
+    }
+
+    tui_hw_line(r++, start_row, "%sOS%s       %s%s%s", cli_c(CLR_DIM),
+                cli_c(CLR_RESET), cli_c(CLR_BOLD),
+                si.os_name[0] ? si.os_name : "unknown", cli_c(CLR_RESET));
+    if (si.os_version[0])
+        tui_hw_line(r++, start_row, "%s版本%s     %s", cli_c(CLR_DIM),
+                    cli_c(CLR_RESET), si.os_version);
+    tui_hw_line(r++, start_row, "%s主机名%s   %s%s%s", cli_c(CLR_DIM),
+                cli_c(CLR_RESET), cli_c(CLR_BOLD),
+                si.hostname[0] ? si.hostname : "unknown", cli_c(CLR_RESET));
+    tui_hw_line(r++, start_row, "%sCPU%s      %s（%u 核）", cli_c(CLR_DIM),
+                cli_c(CLR_RESET),
+                si.cpu_model[0] ? si.cpu_model : "unknown", si.cpu_count);
+    tui_hw_line(r++, start_row, "%s内存%s     %s（可用 %s）", cli_c(CLR_DIM),
+                cli_c(CLR_RESET), mem_total, mem_free);
+    tui_hw_line(r++, start_row, "%s架构%s     %s", cli_c(CLR_DIM),
+                cli_c(CLR_RESET), tui_arch_name());
+    tui_hw_line(r++, start_row, "%s数据根%s   %s", cli_c(CLR_DIM),
+                cli_c(CLR_RESET), airy_data_dir());
+    tui_hw_line(r++, start_row, "%s运行时%s   %s", cli_c(CLR_DIM),
+                cli_c(CLR_RESET), airy_runtime_dir());
+
+    for (r = r + 1; r < rows; r++)
+        tui_hw_line(r, start_row, " ");
+}
+
 static void tui_render_viewport(cli_tui_t *t)
 {
     size_t rows = tui_middle_rows(t);
@@ -852,6 +972,14 @@ static void tui_render_viewport(cli_tui_t *t)
         const cli_tui_panel_count_fn count = t->panel[t->mode].count;
         const cli_tui_panel_line_fn line = t->panel[t->mode].line;
         const void *ud = t->panel[t->mode].ud;
+
+        /* ---- 硬件信息面板（F2，2026-08-25）：静态渲染本机环境，不走
+         * 面板回调（无动态列表）。airy_get_sysinfo 跨平台采集 CPU/内存/
+         * OS/主机名；追加 daemon 在线概览与统一数据根路径。 */
+        if (t->mode == CLI_TUI_MODE_HW) {
+            tui_render_hw_panel(t, rows, start_row);
+            return;
+        }
 
         /* ---- 任务详情视图（BOARD，Enter 进入，Esc/Enter 返回）---- */
         if (t->detail_active) {
@@ -963,11 +1091,16 @@ static void tui_render_viewport(cli_tui_t *t)
             if (rel < lines) {
                 char buf[512];
                 if (rel == 0) {
+                    const char *hint;
+                    if (t->mode == CLI_TUI_MODE_MEM)
+                        hint = "· 尾部实时刷新  ↑↓ 回放  Esc 返回";
+                    else
+                        hint = t->follow ? "· 跟随中(f 关)" : "· 回放浏览(f 跟随)";
                     snprintf(buf, sizeof(buf), "%s%s%s  %s%zu 条%s  %s%s%s",
                              cli_c(CLR_BOLD), cli_c(CLR_CYAN),
                              tui_mode_name(t->mode), cli_c(CLR_DIM), total,
                              cli_c(CLR_RESET), cli_c(CLR_DIM),
-                             t->follow ? "· 跟随中(f 关)" : "· 回放浏览(f 跟随)",
+                             hint,
                              cli_c(CLR_RESET));
                     if (t->note[0]) {
                         snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf),
@@ -1569,6 +1702,8 @@ enum {
     TUI_KEY_F9,          /* ESC [ 2 0 ~：内置输入法快捷键可选项（AIRY_IME_KEY=f9） */
     TUI_KEY_F10,         /* ESC [ 2 1 ~：内置输入法 中/英 切换（默认，可配置） */
     TUI_KEY_F4,          /* ESC O S / ESC [ 1 4 ~：F4（linux console/xterm 应用键区） */
+    TUI_KEY_F2,          /* ESC O Q / ESC [ 1 2 ~：F2（硬件信息面板，2026-08-25） */
+    TUI_KEY_F5,          /* ESC O T / ESC [ 1 5 ~：F5（记忆链面板，2026-08-25） */
     TUI_KEY_PASTE_START, /* ESC [ 200 ~：bracketed paste 开始 */
     TUI_KEY_UNKNOWN,
 };
@@ -1664,6 +1799,16 @@ static int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
                         return TUI_KEY_UNKNOWN;
                     return TUI_KEY_F7;
                 }
+                if (semi == '2') { /* F2: ESC [ 1 2 ~（xterm 标准 F2 序列） */
+                    if (!tui_wait_byte(t, &dir, 50, eof) || dir != '~')
+                        return TUI_KEY_UNKNOWN;
+                    return TUI_KEY_F2;
+                }
+                if (semi == '5') { /* F5: ESC [ 1 5 ~（xterm 标准 F5 序列） */
+                    if (!tui_wait_byte(t, &dir, 50, eof) || dir != '~')
+                        return TUI_KEY_UNKNOWN;
+                    return TUI_KEY_F5;
+                }
                 if (semi != ';')
                     return TUI_KEY_UNKNOWN;
                 if (!tui_wait_byte(t, &mod, 50, eof))
@@ -1722,7 +1867,9 @@ static int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
             case 'B': return TUI_KEY_DOWN;
             case 'C': return TUI_KEY_RIGHT;
             case 'D': return TUI_KEY_LEFT;
+            case 'Q': return TUI_KEY_F2;  /* F2（应用键区 smkx：ESC O Q） */
             case 'S': return TUI_KEY_F4;
+            case 'T': return TUI_KEY_F5;  /* F5（应用键区 smkx：ESC O T） */
             default:  return TUI_KEY_UNKNOWN;
             }
         }
@@ -2967,6 +3114,33 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
             fflush(stdout);
             continue;
         }
+        /* 2026-08-25：F2 直达硬件信息面板（再次按 F2 返回对话） */
+        if (key == TUI_KEY_F2) {
+            cli_tui_mode_set(t,
+                             (t->mode == CLI_TUI_MODE_HW) ? CLI_TUI_MODE_CHAT
+                                                          : CLI_TUI_MODE_HW);
+            cli_tui_redraw(t);
+            fflush(stdout);
+            continue;
+        }
+        /* 2026-08-25：F5 直达记忆链面板（再次按 F5 返回对话） */
+        if (key == TUI_KEY_F5) {
+            cli_tui_mode_set(t,
+                             (t->mode == CLI_TUI_MODE_MEM) ? CLI_TUI_MODE_CHAT
+                                                           : CLI_TUI_MODE_MEM);
+            cli_tui_redraw(t);
+            fflush(stdout);
+            continue;
+        }
+        /* 硬件信息面板：静态视图，Esc 返回对话，其余按键不进入面板动作。 */
+        if (t->mode == CLI_TUI_MODE_HW) {
+            if (key == 0x1b) {
+                cli_tui_mode_set(t, CLI_TUI_MODE_CHAT);
+                cli_tui_redraw(t);
+                fflush(stdout);
+            }
+            continue;
+        }
 
         /* ---- 面板模式（任务看板/事件流）：可操作浏览 ---- */
         if (t->mode != CLI_TUI_MODE_CHAT) {
@@ -3511,6 +3685,11 @@ void cli_tui_rebuild_three_zone(cli_tui_t *t)
     cli_print_system_header(t->hdr_t2[0] ? t->hdr_t2 : NULL,
                             t->hdr_t1f[0] ? t->hdr_t1f : NULL,
                             t->hdr_t1p[0] ? t->hdr_t1p : NULL);
+    /* P0（F8 退出全屏后英雄区混乱）：必须在重放历史之前重建 DECSTBM 滚动区
+     * 并恢复 footer 计数——unpin 已把 g_footer_lines 清零，若拖到重放之后再
+     * pin，长历史会把刚画好的 hero 滚出屏外，且 input_hop 因 footer=0 变成
+     * no-op（光标定位失效）。先 pin 后重放，hero/对话/输入三区才真正固定。 */
+    cli_term_header_pin(CLI_HDR_LINES, 2);
     for (size_t i = 0; i < g_history_count; i++) {
         if (strcmp(g_history_roles[i], "user") == 0)
             cli_render_user_message(g_history_contents[i]);
@@ -3648,10 +3827,18 @@ int cli_tui_create(cli_tui_t **out_tui)
      * 启动；但必须明确提示，避免"按 F10/F9 没反应"的静默困惑。
      * 提示走 stderr（启动早期，未进 alt-screen）。 */
     t->ime = tui_ime_load_dict();
-    if (!t->ime)
+    if (!t->ime) {
         fprintf(stderr,
                 "airy_cli: 警告 内置输入法词典未加载，F10/F9 中文输入不可用\n"
                 "          （可用 AIRY_IME_DICT=/path/to/airy_ime.dat 指定词典）\n");
+    } else if (cli_term_is_tty()) {
+        /* 2026-08-25：词典就绪时给出明确提示，避免"按 F10/F9 没反应"的
+         * 静默困惑。F10 在 VS Code/GNOME Terminal 等常被占用（调试单步/
+         * 菜单键），明确告知 F9 备键。 */
+        fprintf(stderr,
+                "airy_cli: 内置输入法就绪：输入拼音后按 F10/F9 切换中/英（F9 为备键，"
+                "F10 被终端占用时用 F9）\n");
+    }
     t->ime_active = 0;
     t->ime_key = tui_ime_key_resolve();
     t->ime_key_alt = tui_ime_key_alt_resolve();
@@ -3781,4 +3968,21 @@ void cli_tui_destroy(cli_tui_t *t)
 int cli_tui_active(const cli_tui_t *t)
 {
     return t && t->active;
+}
+
+/* 任务执行期间（wait 循环）TUI 模式非阻塞按键读取：
+ *   - 0   无输入（未激活 / 超时）
+ *   - -1  EOF（*eof=1）
+ *   - 其他 按键码（0x03 = Ctrl+C 等，与 readline 同语义）
+ * 供 main.c 的 cli_task_poll_input 在 TUI 全屏下开放中断能力（此前
+ * TUI 激活时任务等待段 stdin 无人读取，Ctrl+C 因 raw mode 关闭 ISIG
+ * 也不产生 SIGINT，任务无法通过快捷键退出）。 */
+int cli_tui_poll_key(cli_tui_t *t, int *eof)
+{
+    if (!t || !cli_tui_active(t)) {
+        if (eof)
+            *eof = 0;
+        return 0;
+    }
+    return tui_read_key(t, 0, eof);
 }

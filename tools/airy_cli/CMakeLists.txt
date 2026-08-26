@@ -39,6 +39,8 @@ add_executable(airy_cli
     src/cli_exec_review.c
     # S-5 编排管线：/orch 命令（orchestrator 七阶段流程编排）
     src/cli_orch.c
+    # 架构约束（2026-08-25）：统一网关客户端（所有客户端必须经 gateway 派发）
+    src/cli_gw.c
 )
 
 # 链接模式：coreloopthree 与 llm/tool service 存在交叉引用（静态库 + 全局

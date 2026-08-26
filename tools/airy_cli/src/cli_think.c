@@ -16,6 +16,8 @@
 
 #include "cli_internal.h"
 
+#include "cli_gw.h" /* 架构约束 2026-08-25：统一经 gateway 派发 */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -74,8 +76,11 @@ static cJSON *cli_think_rpc_round(const char *think_sock, const char *prompt,
         return NULL;
     }
 
+    /* 架构约束（2026-08-25）：统一经 gateway 派发（think.process →
+     * gateway → SYS_SVC_CALL → think_d），禁止直连 think.sock。 */
+    (void)think_sock;
     char *rpc_result = NULL;
-    int rc = daemon_rpc_call(think_sock, "process", params_json, &rpc_result, 120000);
+    int rc = cli_gw_call("think.process", params_json, 120000, &rpc_result);
     AIRY_FREE(params_json);
     if (rc != AIRY_SUCCESS || !rpc_result) {
         AIRY_FREE(rpc_result);
@@ -498,11 +503,13 @@ void cli_think_cfg_load(char *t2, size_t t2c, char *t1f, size_t t1fc,
     if (t1p[0] == '\0')
         cli_think_cfg_yaml_get(path, "think", "think1_prof_model", t1p, t1pc);
 
-    /* think 段留空 = llm.model 默认 */
+    /* think 段留空 = 默认模型（v2：顶层 default_model 或 llm.model） */
     if (t2[0] && t1f[0] && t1p[0])
         return;
     char def_model[128] = "";
     cli_think_cfg_yaml_get(path, "llm", "model", def_model, sizeof(def_model));
+    if (def_model[0] == '\0')
+        cli_think_cfg_yaml_get(path, "", "default_model", def_model, sizeof(def_model));
     if (def_model[0]) {
         if (t2[0] == '\0')
             snprintf(t2, t2c, "%s", def_model);

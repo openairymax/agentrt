@@ -232,6 +232,11 @@ size_t cli_panel_board_count(void *ud);
 int cli_panel_board_line(void *ud, size_t idx, char *out, size_t cap);
 size_t cli_panel_events_count(void *ud);
 int cli_panel_events_line(void *ud, size_t idx, char *out, size_t cap);
+/* 记忆链面板（2026-08-25）：经 gateway mem.recent 拉取，1s 节流刷新 */
+void cli_panel_mem_create(void **out_ud);
+void cli_panel_mem_destroy(void *ud);
+size_t cli_panel_mem_count(void *ud);
+int cli_panel_mem_line(void *ud, size_t idx, char *out, size_t cap);
 /* 面板可操作动作（2026-08-19）：TUI 引擎按键触发，动作在 CLI 层执行 */
 int cli_panel_board_action(void *ud, int action, size_t sel, char *out, size_t cap);
 int cli_panel_events_action(void *ud, int action, size_t sel, char *out, size_t cap);
