@@ -30,7 +30,13 @@ add_executable(airy_cli
     src/cli_cmds.c
     src/cli_render.c
     src/cli_term.c
+    # TUI 引擎（2026-08-27 域拆分：cli_tui.c 3988 行 → 6 文件）
     src/cli_tui.c
+    src/tui_keys.c
+    src/tui_input.c
+    src/tui_ime.c
+    src/tui_history.c
+    src/tui_render.c
     # 阶段 4: TUI 面板数据源（任务看板 / 事件流）
     src/cli_panel.c
     # 阶段 4（item 4）: 认知阶段并行子 agent 审查（事实/风险）
