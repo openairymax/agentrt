@@ -71,12 +71,17 @@ log_err()   { printf "${C_RED}[FAIL]${C_NC} %s\n" "$1"; }
 # ─── 默认值 ──────────────────────────────────────────────────────────────
 AIRY_HOME="${AIRY_HOME:-$HOME/.airymaxrt}"
 AIRY_REPO_URL="${AIRY_REPO_URL:-https://atomgit.com/openairymax/airymaxhub.git}"
-# 版本 SSoT：优先读取同仓 agentrt/VERSION（源码树内运行），
-# 否则回退默认 v0.1.4（curl 管道 / 裸脚本场景无 VERSION 文件可读）。
-if [ -z "${AIRY_VERSION:-}" ] && [ -f "$(dirname "$0")/../VERSION" ]; then
+# 版本 SSoT：优先读取同仓 agentrt/VERSION（源码树内运行），否则回退默认值。
+# 注意：curl 管道 / 裸脚本场景无 VERSION 文件可读，默认值只作占位——
+# 源码构建路径会以 clone 到的 agentrt/VERSION 为准（见 prepare_source），
+# 二进制路径以 manifest/实际包版本为准（install_binary 固化）。
+AIRY_VERSION_SPECIFIED=0
+if [ -n "${AIRY_VERSION:-}" ]; then
+    AIRY_VERSION_SPECIFIED=1
+elif [ -f "$(dirname "$0")/../VERSION" ]; then
     AIRY_VERSION="v$(cat "$(dirname "$0")/../VERSION" | tr -d '[:space:]')"
 fi
-AIRY_VERSION="${AIRY_VERSION:-v0.1.4}"
+AIRY_VERSION="${AIRY_VERSION:-v0.1.5}"
 AIRY_BUILD_JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 AIRY_MODE="${AIRY_MODE:-auto}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
@@ -400,11 +405,18 @@ prepare_source() {
     if [ ! -d "${AIRY_SRC_DIR}/.git" ]; then
         log_info "git 拉取 airymaxhub（${AIRY_REPO_URL}）…"
         mkdir -p "$(dirname "${AIRY_SRC_DIR}")"
-        # 管理仓 clone（公开子仓递归）；闭源子仓（closed-docs /
-        # closed-dev-build，.gitmodules 标 update=none）由预编译模块包
-        # 补齐，避免认证失败中断
-        git clone --depth 1 -b "${AIRY_VERSION}" "${AIRY_REPO_URL}" "${AIRY_SRC_DIR}" \
-            || { log_err "git 拉取失败（若子仓私有，请配置 AIRY_RELEASE_URL 走二进制模式）"; exit 1; }
+        # 版本来源二选一：
+        #   - 用户显式指定 AIRY_VERSION → 固定 tag 精确安装（可复现/回滚）；
+        #   - 未指定（curl 管道等无 VERSION 场景）→ clone 默认分支，随后从
+        #     agentrt/VERSION 读取真实版本（SSoT 单一来源），杜绝 install.sh
+        #     内置默认版本与当前发布漂移导致 clone 到不存在/过期 tag。
+        if [ "$AIRY_VERSION_SPECIFIED" = "1" ]; then
+            git clone --depth 1 -b "${AIRY_VERSION}" "${AIRY_REPO_URL}" "${AIRY_SRC_DIR}" \
+                || { log_err "git 拉取失败（若子仓私有，请配置 AIRY_RELEASE_URL 走二进制模式）"; exit 1; }
+        else
+            git clone --depth 1 "${AIRY_REPO_URL}" "${AIRY_SRC_DIR}" \
+                || { log_err "git 拉取失败（若子仓私有，请配置 AIRY_RELEASE_URL 走二进制模式）"; exit 1; }
+        fi
         # --recursive：agentrt 的 7 个核心子仓（atoms/commons/daemons/gateway/
         # cupolas/protocols/heapstore）与 sdk/ecosystem 子仓均为公开仓，必须
         # 一并拉取，否则模式 C 源码构建缺核心源码必然失败。闭源子仓
@@ -414,6 +426,16 @@ prepare_source() {
     else
         log_info "airymaxhub 源码已存在，复用本地源码树"
         git -C "${AIRY_SRC_DIR}" fetch --all --tags --depth 1 >/dev/null 2>&1 || true
+    fi
+
+    # 源码版本 SSoT：以 agentrt/VERSION 为权威（重探测布局：管理仓 submodule
+    # 或平铺两种布局）。
+    if [ -d "${AIRY_SRC_APP}/agentrt" ]; then :; else AIRY_SRC_APP="${AIRY_SRC_DIR}"; fi
+    local real_ver
+    real_ver="$(cat "${AIRY_SRC_APP}/agentrt/VERSION" 2>/dev/null | tr -d '[:space:]')"
+    if [ -n "$real_ver" ]; then
+        AIRY_VERSION="v${real_ver}"
+        log_ok "源码版本（SSoT）: ${AIRY_VERSION}"
     fi
     log_ok "源码就绪: ${AIRY_SRC_DIR}"
 }

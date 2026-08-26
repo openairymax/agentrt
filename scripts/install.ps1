@@ -56,10 +56,14 @@ if ($Help) {
 
 # ─── 参数 ────────────────────────────────────────────────────────────────
 $AIRY_HOME    = if ($Prefix) { $Prefix } elseif ($env:AIRY_HOME) { $env:AIRY_HOME } else { Join-Path $HOME ".airymaxrt" }
-# 版本 SSoT：源码树内运行优先读 agentrt/VERSION，否则回退 v0.1.4
+# 版本 SSoT：显式 AIRY_VERSION 优先；源码树内运行读 agentrt/VERSION；
+# 否则回退占位默认值（源码构建路径会以 clone 到的 agentrt/VERSION 为准，
+# 二进制路径以 manifest/实际包版本为准）。
+$AiryVersionSpecified = $false
+if ($env:AIRY_VERSION) { $AiryVersionSpecified = $true }
 $AIRY_VERSION = if ($env:AIRY_VERSION) { $env:AIRY_VERSION }
                 elseif (Test-Path (Join-Path $PSScriptRoot "..\VERSION")) { "v" + ((Get-Content (Join-Path $PSScriptRoot "..\VERSION")).Trim()) }
-                else { "v0.1.4" }
+                else { "v0.1.5" }
 $AIRY_REPO_URL = if ($env:AIRY_REPO_URL) { $env:AIRY_REPO_URL } else { "https://atomgit.com/openairymax/airymaxhub.git" }
 $AIRY_CHANNEL = if ($Channel) { $Channel } elseif ($env:AIRY_CHANNEL) { $env:AIRY_CHANNEL } else { "stable" }
 $AIRY_SRC_DIR = Join-Path $AIRY_HOME "src\airymaxhub"
@@ -261,7 +265,14 @@ function Build-FromSource {
     if (-not (Test-Path (Join-Path $AIRY_SRC_DIR ".git"))) {
         Write-Info "git 拉取 airymaxhub（$AIRY_REPO_URL）…"
         New-Item -ItemType Directory -Force -Path (Split-Path $AIRY_SRC_DIR) | Out-Null
-        git clone --depth 1 -b $AIRY_VERSION $AIRY_REPO_URL $AIRY_SRC_DIR
+        # 版本来源二选一：显式 AIRY_VERSION → 固定 tag 精确安装；
+        # 未指定 → clone 默认分支，随后从 agentrt/VERSION 读取真实版本
+        # （SSoT 单一来源），杜绝脚本内置默认版本与当前发布漂移。
+        if ($AiryVersionSpecified) {
+            git clone --depth 1 -b $AIRY_VERSION $AIRY_REPO_URL $AIRY_SRC_DIR
+        } else {
+            git clone --depth 1 $AIRY_REPO_URL $AIRY_SRC_DIR
+        }
         if ($LASTEXITCODE -ne 0) { Write-Err "git 拉取失败（子仓私有时请配置 AIRY_RELEASE_URL 走二进制模式）"; throw "git clone failed" }
         # --recursive：agentrt 的 7 个核心子仓（atoms/commons/daemons/gateway/
         # cupolas/protocols/heapstore）与 sdk/ecosystem 子仓均为公开仓，必须
@@ -270,6 +281,17 @@ function Build-FromSource {
         git -C $AIRY_SRC_DIR submodule update --init --recursive --depth 1 2>$null
     } else {
         Write-Info "airymaxhub 源码已存在，复用本地源码树"
+    }
+    # 源码版本 SSoT：以 agentrt/VERSION 为权威（兼容管理仓 submodule 布局）
+    $srcApp = Join-Path $AIRY_SRC_DIR "agent-workload"
+    if (-not (Test-Path (Join-Path $srcApp "agentrt\VERSION"))) { $srcApp = $AIRY_SRC_DIR }
+    $verFile = Join-Path $srcApp "agentrt\VERSION"
+    if (Test-Path $verFile) {
+        $realVer = (Get-Content $verFile -Raw).Trim()
+        if ($realVer) {
+            $AIRY_VERSION = "v$realVer"
+            Write-OK "源码版本（SSoT）: $AIRY_VERSION"
+        }
     }
     Write-OK "源码就绪: $AIRY_SRC_DIR"
 
