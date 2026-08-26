@@ -502,24 +502,39 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
     /* 追问上限：基础问题数 + 4，防止 LLM 无限追问（用户主导交互的护栏） */
     size_t max_rounds = probe->question_count + 4;
 
-    /* 待问队列：先按 probe 顺序走，之后由 LLM 动态生成追问。
-     * 每轮索引 round 指向 probe->questions[round]（越界即表示进入 LLM 追问区）。 */
+    /* 待问队列：固定问题（probe 顺序）与 LLM 动态追问交错。
+     * q8a 修复：此前每轮 round < question_count 时无条件用固定问题，
+     * LLM 经 airy_gccp_step 生成的追问要等全部固定问题问完才被消费——
+     * 用户回答 Q1 后 LLM 判断"最不确定维度是 X"并生成追问，循环却继续
+     * 问固定 Q2，LLM 每轮推理被丢弃。现改为：step 返回追问时下一轮
+     * 优先消费（llm_q_pending），固定问题退为追问用尽后的兜底——真正
+     * 实现"每个问题用户回答后，模型推理后再据推理结果问下一问"。 */
+    int llm_q_pending = 0;
+    size_t base_round = 0; /* 固定问题区游标（独立于总轮次） */
     for (size_t round = 0; round < max_rounds; round++) {
-        /* 本轮问题：probe 原始问题 or LLM 上一步生成的追问 */
+        /* 本轮问题：LLM 追问 > 固定问题 > 上轮遗留追问 */
         airy_gccp_question_t local_q;
         __builtin_memset(&local_q, 0, sizeof(local_q));
         const airy_gccp_question_t *q = NULL;
-        if (round < probe->question_count) {
-            q = &probe->questions[round];
-        } else {
-            /* 进入 LLM 追问区：使用上一轮 step 生成的问题（question 非空才有意义） */
-            if (!g_last_step_q[0])
-                break; /* 没有可用追问：结束 */
+        if (llm_q_pending) {
+            /* 优先消费 LLM 上一步生成的针对性追问 */
             snprintf(local_q.id, sizeof(local_q.id), "followup%zu", round);
             AIRY_STRNCPY_TERM(local_q.question, g_last_step_q, sizeof(local_q.question));
             AIRY_STRNCPY_TERM(local_q.hint, g_last_step_hint, sizeof(local_q.hint));
             local_q.required = 0;
             q = &local_q;
+            llm_q_pending = 0;
+        } else if (base_round < probe->question_count) {
+            q = &probe->questions[base_round++];
+        } else if (g_last_step_q[0]) {
+            /* 固定问题问完：消费 LLM 遗留追问 */
+            snprintf(local_q.id, sizeof(local_q.id), "followup%zu", round);
+            AIRY_STRNCPY_TERM(local_q.question, g_last_step_q, sizeof(local_q.question));
+            AIRY_STRNCPY_TERM(local_q.hint, g_last_step_hint, sizeof(local_q.hint));
+            local_q.required = 0;
+            q = &local_q;
+        } else {
+            break; /* 没有可用追问：结束 */
         }
 
         cli_outf("  %sQ%zu%s [%s]%s %s\n", cli_c(CLR_CYAN), round + 1, cli_c(CLR_RESET), q->id,
@@ -577,7 +592,7 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
         fflush(stdout);
         airy_err_t serr = airy_gccp_step(g_chat_adapter, NULL,
                                          (t1p_model && t1p_model[0]) ? t1p_model : NULL, raw,
-                                         raw_len, answers_json, 1, NULL, &step);
+                                         raw_len, answers_json, 1, q, &step);
         cJSON_free(answers_json);
         if (serr != AIRY_SUCCESS)
             break;
@@ -590,6 +605,7 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
         if (step.question[0]) {
             AIRY_STRNCPY_TERM(g_last_step_q, step.question, sizeof(g_last_step_q));
             AIRY_STRNCPY_TERM(g_last_step_hint, step.hint, sizeof(g_last_step_hint));
+            llm_q_pending = 1; /* 下一轮优先消费 LLM 针对性追问 */
         }
     }
 
