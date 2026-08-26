@@ -54,7 +54,7 @@ if ($Help) {
 
 # ─── 参数 ────────────────────────────────────────────────────────────────
 $AIRY_HOME    = if ($Prefix) { $Prefix } elseif ($env:AIRY_HOME) { $env:AIRY_HOME } else { Join-Path $HOME ".airymaxrt" }
-$AIRY_VERSION = if ($env:AIRY_VERSION) { $env:AIRY_VERSION } else { "v0.1.3" }
+$AIRY_VERSION = if ($env:AIRY_VERSION) { $env:AIRY_VERSION } else { "v0.1.4" }
 $AIRY_REPO_URL = if ($env:AIRY_REPO_URL) { $env:AIRY_REPO_URL } else { "https://atomgit.com/openairymax/airymaxhub.git" }
 $AIRY_SRC_DIR = Join-Path $AIRY_HOME "src\airymaxhub"
 $MODULES_DIR  = Join-Path $AIRY_HOME "modules"
