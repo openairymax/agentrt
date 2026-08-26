@@ -38,11 +38,18 @@
 #
 # 参数：
 #   --prefix <path>  --mode <auto|binary|hybrid|source>  --bin-dir <path>
-#   --profile <full|minimal|auto>  --uninstall [--keep-data] [--yes]  --help
+#   --profile <full|minimal|auto>  --channel <stable|beta>  --from-file <tarball>
+#   --uninstall [--keep-data] [--yes]  --help
+#
+# 发布通道（2.3.7）：--channel stable|beta 选择官方滚动通道；未指定
+# AIRY_RELEASE_URL 时默认拉取官方通道 manifest（GPG 验签 + 本平台制品解析），
+# 不再强制源码构建。--from-file <tarball> 支持离线包安装（跳过网络，
+# 仅 sha256 + 架构自检）。AIRY_RELEASE_URL 亦支持直接指向 tarball URL
+# （{arch} 占位符）或 manifest JSON。官方制品仓库：atomgit.com/openairymax/agentrt。
 #
 # 安装完成后：固化 install.env（含 AIRY_BIN_LINK）、生成 agentrt-env.sh、
 # 软链 airymaxrt 启动器到 PATH（任意路径输入 airymaxrt 即启动），
-# 校验 17 个 daemon 全部就位。
+# 校验 18 个 daemon 全部就位。
 #
 # 卸载：sh install.sh --uninstall 或 airymaxrt uninstall（停止 daemon +
 #       删除 $AIRY_HOME + 移除 PATH 软链；--keep-data 保留记忆数据）。
@@ -64,12 +71,25 @@ log_err()   { printf "${C_RED}[FAIL]${C_NC} %s\n" "$1"; }
 # ─── 默认值 ──────────────────────────────────────────────────────────────
 AIRY_HOME="${AIRY_HOME:-$HOME/.airymaxrt}"
 AIRY_REPO_URL="${AIRY_REPO_URL:-https://atomgit.com/openairymax/airymaxhub.git}"
+# 版本 SSoT：优先读取同仓 agentrt/VERSION（源码树内运行），
+# 否则回退默认 v0.1.4（curl 管道 / 裸脚本场景无 VERSION 文件可读）。
+if [ -z "${AIRY_VERSION:-}" ] && [ -f "$(dirname "$0")/../VERSION" ]; then
+    AIRY_VERSION="v$(cat "$(dirname "$0")/../VERSION" | tr -d '[:space:]')"
+fi
 AIRY_VERSION="${AIRY_VERSION:-v0.1.4}"
 AIRY_BUILD_JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 AIRY_MODE="${AIRY_MODE:-auto}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
 UNINSTALL=0; KEEP_DATA=0; YES=0
+# 出厂预装 maths-toolkit（数学计算后端：MCP-Mathematics + sympy-mcp，
+# 共享 $AIRY_HOME/venv）。默认开启，安装失败降级警告，不阻断主流程。
+WITH_MATHS=1
 AIRY_PROFILE="${AIRY_PROFILE:-auto}"
+# 发布通道（自更新器/二进制安装共用）：stable | beta。AIRY_RELEASE_URL
+# 指向 manifest JSON 时按通道解析本平台制品；指向 tarball 时直用。
+AIRY_CHANNEL="${AIRY_CHANNEL:-stable}"
+AIRY_FROM_FILE="${AIRY_FROM_FILE:-}"
+case "$AIRY_CHANNEL" in stable|beta) ;; *) log_err "非法 --channel: ${AIRY_CHANNEL}（支持 stable|beta）"; exit 1 ;; esac
 
 AIRY_SRC_DIR="${AIRY_HOME}/src/airymaxhub"
 MODULES_DIR="${AIRY_HOME}/modules"
@@ -83,10 +103,11 @@ if [ ! -d "${AIRY_SRC_APP}/agentrt" ]; then
     AIRY_SRC_APP="${AIRY_SRC_DIR}"
 fi
 
-# 17 个 daemon 完整清单（安装后逐一校验，含 think_d/cupolas_d）
+# 18 个 daemon 完整清单（安装后逐一校验，含 think_d/cupolas_d/maths_d；
+# 与 agentrt-bootstrap.sh 的分层清单保持一致）
 EXPECTED_DAEMONS="monit_d observe_d info_d notify_d sched_d channel_d mem_d
                   llm_d tool_d hook_d plugin_d agent_d a2a_d market_d gateway_d
-                  think_d cupolas_d"
+                  think_d cupolas_d maths_d"
 
 # ─── 参数解析 ────────────────────────────────────────────────────────────
 while [ $# -gt 0 ]; do
@@ -95,9 +116,13 @@ while [ $# -gt 0 ]; do
         --mode)      AIRY_MODE="$2"; shift 2 ;;
         --bin-dir)   BIN_DIR="$2"; shift 2 ;;
         --profile)   AIRY_PROFILE="$2"; shift 2 ;;
+        --channel)   AIRY_CHANNEL="$2"; shift 2 ;;
+        --from-file) AIRY_FROM_FILE="$2"; shift 2 ;;
         --uninstall) UNINSTALL=1; shift ;;
         --keep-data) KEEP_DATA=1; shift ;;
         --yes)       YES=1; shift ;;
+        --with-maths)    WITH_MATHS=1; shift ;;
+        --without-maths) WITH_MATHS=0; shift ;;
         --help|-h)   sed -n '2,52p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) log_err "未知参数: $1（--help 查看用法）"; exit 1 ;;
     esac
@@ -210,8 +235,62 @@ do_uninstall() {
 # 硬件自适应（2.3.5）：预编译包按架构分发——AIRY_RELEASE_URL 支持 {arch}
 # 占位符（自动替换为当前架构，如 .../agentrt-v0.1.3-linux-{arch}.tar.gz）；
 # 架构不在预编译支持清单时告警并回退源码构建，避免跨架构运行错乱。
+# 2.3.7 发布通道：AIRY_RELEASE_URL 亦支持 manifest JSON（.../manifest.stable.json）
+# ——下载后 GPG 验签（内置公钥）+ 按当前平台解析制品 url/sha256；本地离线包
+# 可直接传 tarball 路径（--from-file / AIRY_FROM_FILE），仅做 sha256 + 架构自检。
+
+# 官方发布 GPG 公钥（manifest 权威签名；与 tools/scripts/ci/release/keys/agentrt.asc
+# 及 sdk/tui/scripts/airymaxrt AIRY_GPG_PUBKEY 同源，指纹见 keys/agentrt.fingerprint）
+AIRY_GPG_PUBKEY='-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mDMEao7uahYJKwYBBAHaRw8BAQdAk8Ou1tA2EfX5xZT4ET79YJESeqINPyFF86MK
+cpPAQDO0NEFnZW50UlQgUmVsZWFzZSBTaWduaW5nIDxyZWxlYXNlQGFnZW50cnQu
+YWlyeW1heC5pbz6IkwQTFgoAOxYhBIbDf3xc3cxA57s+YuQ19/HMJP+EBQJqju5q
+AhsDBQsJCAcCAiICBhUKCQgLAgQWAgMBAh4HAheAAAoJEOQ19/HMJP+EepEBANYY
+xAN1mQL4gulwMvH3xjiL6aEVm1PFjus33MXJrDmKAQDEck2sowTfLa1WneqUY93D
+QpegwKdM5Y9YiANOL8FODQ==
+=EPz8
+-----END PGP PUBLIC KEY BLOCK-----'
+
+# GPG 验签（独立 homedir 隔离用户 keyring；签名缺失拒绝——防供应链攻击
+# 的 fail-closed 约束。公钥优先级：发布源 latest/keys/ 在线拉取（支持轮换）
+# → 本地 $AIRY_HOME/keys/ → 内嵌公钥（首次引导兜底））。
+verify_gpg_sig() { # <file> <sig.asc>
+    [ -s "$2" ] || { log_warn "缺少签名文件（fail-closed），拒绝安装"; return 1; }
+    local gnupg="${AIRY_HOME}/tmp/gnupg-install" keyf
+    mkdir -p "$gnupg" && chmod 700 "$gnupg"
+    keyf="$gnupg/agentrt.asc"
+    if [ -z "${AIRY_NO_NETWORK:-}" ]; then
+        curl -fsSL --max-time 30 -o "$keyf" \
+            "https://raw.atomgit.com/${AIRY_RELEASE_OWNER:-openairymax/agentrt}/raw/main/latest/keys/agentrt.asc" >/dev/null 2>&1 || true
+    fi
+    if [ ! -s "$keyf" ] && [ -f "${AIRY_HOME}/keys/agentrt.asc" ]; then
+        cp -f "${AIRY_HOME}/keys/agentrt.asc" "$keyf" 2>/dev/null || true
+    fi
+    [ -s "$keyf" ] || printf '%s\n' "$AIRY_GPG_PUBKEY" > "$keyf"
+    gpg --batch --quiet --no-tty --homedir "$gnupg" --import "$keyf" >/dev/null 2>&1 || return 1
+    gpg --batch --no-tty --homedir "$gnupg" --verify "$2" "$1" >/dev/null 2>&1
+}
+
+# manifest 字段提取（python3 优先，回退 sed 单行提取）
+parse_manifest() { # <manifest> <platform> <field:url|sha256>
+    if command -v python3 >/dev/null 2>&1; then
+        python3 - "$1" "$2" "$3" <<'PYEOF'
+import json, sys
+try:
+    m = json.load(open(sys.argv[1]))
+    rel = m.get("releases", {}).get(m.get("latest", ""), {})
+    print(rel.get("artifacts", {}).get(sys.argv[2], {}).get(sys.argv[3], ""))
+except Exception:
+    pass
+PYEOF
+        return 0
+    fi
+    sed -n "s/.*\"$3\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$1" | head -1
+}
+
 install_binary() {
-    local url="$1" arch
+    local url="$1" arch expect_sha=""
     local tarball="${AIRY_HOME}/tmp/agentrt-${AIRY_VERSION}.tar.gz"
     arch="$(detect_arch)"
     log_info "硬件架构: ${arch}（预编译支持: ${SUPPORTED_ARCHS}）"
@@ -220,13 +299,51 @@ install_binary() {
         *) log_warn "架构 ${arch} 无预编译包（支持: ${SUPPORTED_ARCHS}），回退源码构建"
            return 1 ;;
     esac
-    # URL {arch} 占位符替换（POSIX sed，兼容 sh）
-    url="$(printf '%s' "$url" | sed "s/{arch}/${arch}/g")"
-    log_info "下载完全体二进制包: ${url}"
-    if ! curl -fsSL --max-time 600 -o "${tarball}" "${url}"; then
-        log_warn "release 下载失败，回退源码构建"
-        rm -f "${tarball}"
-        return 1
+
+    # 来源解析：a) manifest JSON（通道）→ GPG 验签 + 解析本平台制品；
+    #          b) 本地 tarball（--from-file / AIRY_FROM_FILE）→ 直用；
+    #          c) 远程 tarball URL（{arch} 占位符）→ 下载，相邻 .sha256 自动校验
+    if [ "${url##*.}" = "json" ]; then
+        local man="${AIRY_HOME}/tmp/manifest.json" man_asc="${AIRY_HOME}/tmp/manifest.json.asc" plat
+        curl -fsSL --max-time 60 -o "$man" "$url" || { log_warn "manifest 下载失败，回退源码构建"; return 1; }
+        curl -fsSL --max-time 60 -o "$man_asc" "${url}.asc" >/dev/null 2>&1 || true
+        verify_gpg_sig "$man" "$man_asc" || { log_warn "manifest 验签失败（GPG），拒绝安装"; return 1; }
+        [ -s "$man_asc" ] && log_ok "manifest 验签通过（GPG）"
+        plat="linux-${arch}"
+        [ "$(uname -s 2>/dev/null)" = "Darwin" ] && plat="macos-$(uname -m 2>/dev/null)"
+        url="$(parse_manifest "$man" "$plat" url)"
+        expect_sha="$(parse_manifest "$man" "$plat" sha256)"
+        [ -n "$url" ] || { log_warn "manifest 无 ${plat} 制品，回退源码构建"; return 1; }
+        log_info "通道 ${AIRY_CHANNEL} 最新制品（${plat}）: $(basename "${url%%\?*}")"
+    elif [ -f "$url" ]; then
+        log_info "使用本地离线包: $url"
+        tarball="$url"
+    else
+        # URL {arch} 占位符替换（POSIX sed，兼容 sh）
+        url="$(printf '%s' "$url" | sed "s/{arch}/${arch}/g")"
+    fi
+
+    # 下载（仅远程来源）
+    if [ ! -f "$tarball" ]; then
+        log_info "下载完全体二进制包: ${url}"
+        if ! curl -fsSL --max-time 600 -o "${tarball}" "${url}"; then
+            log_warn "release 下载失败，回退源码构建"
+            rm -f "${tarball}"
+            return 1
+        fi
+    fi
+    # sha256 校验（manifest 期望值，或相邻 .sha256 文件）
+    if [ -z "$expect_sha" ] && [ -f "${tarball}.sha256" ]; then
+        expect_sha="$(cut -d' ' -f1 "${tarball}.sha256" 2>/dev/null)"
+    fi
+    if [ -n "$expect_sha" ]; then
+        if printf '%s  %s\n' "$expect_sha" "$tarball" | sha256sum -c - >/dev/null 2>&1; then
+            log_ok "sha256 校验通过"
+        else
+            log_err "sha256 校验失败，拒绝安装"
+            rm -f "$tarball"
+            return 1
+        fi
     fi
     # 包内架构自校验：tarball 根含 platform-<arch> 标识文件时交叉校验，
     # 防止下载到异架构包后静默安装（跨架构 daemon 启动即崩溃）。
@@ -250,7 +367,16 @@ install_binary() {
     if [ -d "${extracted}/config" ]; then
         cp -f "${extracted}"/config/* "${AIRY_HOME}/config/" 2>/dev/null || true
     fi
-    log_ok "完全体二进制包安装完成"
+    # 签名公钥随包同步（自更新器/下次安装复用）
+    if [ -f "${extracted}/keys/agentrt.asc" ]; then
+        mkdir -p "${AIRY_HOME}/keys"
+        cp -f "${extracted}/keys/agentrt.asc" "${AIRY_HOME}/keys/" 2>/dev/null || true
+    fi
+    # 以实际安装包版本固化（manifest 通道可能高于默认 AIRY_VERSION）
+    local ver_num
+    ver_num="$(basename "$extracted" | sed 's/^agentrt-//')"
+    [ -n "$ver_num" ] && AIRY_VERSION="v${ver_num}"
+    log_ok "完全体二进制包安装完成（v${ver_num:-${AIRY_VERSION}}）"
     return 0
 }
 
@@ -347,6 +473,33 @@ install_python_deps() {
         else
             log_warn "lib/ 导入校验失败（检查源码包结构）"
         fi
+    fi
+}
+
+# ─── 出厂预装 maths-toolkit（数学计算后端） ─────────────────────────────
+# MCP-Mathematics + sympy-mcp 组合，共享 $AIRY_HOME/venv，默认不装
+# einsteinpy。python3 缺失或安装失败时降级警告（maths_d 纯 C 快速路径
+# 仍可用），不阻断 agentrt 主流程。--without-maths 可跳过。
+install_maths_toolkit() {
+    if [ "$WITH_MATHS" != "1" ]; then
+        log_info "已跳过 maths-toolkit（--without-maths）"
+        return 0
+    fi
+    local toolkit="${AIRY_SRC_APP}/ecosystem/markets/tools/maths-toolkit/install.sh"
+    if [ ! -f "$toolkit" ]; then
+        log_warn "maths-toolkit 安装器不存在（${toolkit}），跳过数学后端预装"
+        return 0
+    fi
+    if ! command -v python3 >/dev/null 2>&1; then
+        log_warn "未找到 python3，跳过 maths-toolkit（maths_d 纯 C 快速路径可用）"
+        return 0
+    fi
+    log_info "出厂预装数学计算后端（MCP-Mathematics + sympy-mcp，共享 venv，清华源）…"
+    if sh "$toolkit" --airy-home "${AIRY_HOME}" >/dev/null 2>&1; then
+        log_ok "maths-toolkit 安装完成（maths_d 符号计算后端已就绪）"
+    else
+        log_warn "maths-toolkit 安装失败（网络/依赖问题），已降级：maths_d 纯 C 快速路径可用；"
+        log_warn "可稍后手动安装: sh ${toolkit} --airy-home ${AIRY_HOME}"
     fi
 }
 
@@ -627,6 +780,7 @@ finalize_install() {
         echo "# AgentRT 安装信息（由 install.sh 生成，勿手改）"
         echo "AIRY_HOME=${AIRY_HOME}"
         echo "AIRY_VERSION=${AIRY_VERSION}"
+        echo "AIRY_CHANNEL=${AIRY_CHANNEL}"
         echo "AIRY_BIN_LINK=${BIN_DIR}/airymaxrt"
         echo "INSTALLED_AT=$(date -Is 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S%z')"
         echo "AIRY_VAULT_PASSWORD=${vault_password}"
@@ -768,8 +922,21 @@ verify_daemons() {
         fi
         log_warn "daemon 校验未全通过，缺失:${missing}（可能为二进制包未含全部组件）"
     else
-        log_ok "17 个 daemon 全部就位"
+        log_ok "18 个 daemon 全部就位"
     fi
+}
+
+# ─── 安装后自检：版本一致性 + 更新通道提示 ──────────────────────────────
+post_install_selfcheck() {
+    local ver_installed=""
+    if [ -f "${AIRY_HOME}/config/install.env" ]; then
+        ver_installed="$(sed -n 's/^AIRY_VERSION=//p' "${AIRY_HOME}/config/install.env" 2>/dev/null | head -1)"
+    fi
+    log_ok "已安装版本: ${ver_installed:-v?}（通道: ${AIRY_CHANNEL}）"
+    if [ "${AIRY_CHANNEL}" = "beta" ]; then
+        log_warn "beta 通道发布更频繁；正式环境建议 'airymaxrt update --channel stable' 切回"
+    fi
+    log_info "更新检查: airymaxrt update --check    升级: airymaxrt update"
 }
 
 # ─── 版本信息 ──────────────────────────────────────────────────────────
@@ -881,13 +1048,17 @@ main() {
     init_home
 
     local installed=1
-    # 模式选择：binary 显式或 auto（有 release URL 且未显式 source）
-    if [ "$AIRY_MODE" = "binary" ] || { [ "$AIRY_MODE" = "auto" ] && [ -n "${AIRY_RELEASE_URL:-}" ]; }; then
-        if [ -n "${AIRY_RELEASE_URL:-}" ]; then
-            install_binary "${AIRY_RELEASE_URL}" && installed=0
-        elif [ "$AIRY_MODE" = "binary" ]; then
-            log_err "模式 binary 需要 AIRY_RELEASE_URL"; exit 1
-        fi
+    # 发布来源解析：--from-file 离线包 > AIRY_RELEASE_URL 显式 URL >
+    # 官方通道 manifest（默认，stable/beta 由 --channel 决定；--mode source 除外）。
+    # manifest 路径走 GPG 验签 + 平台解析；失败自动降级源码构建。
+    local release_url="${AIRY_RELEASE_URL:-}"
+    if [ -z "$release_url" ] && [ "${AIRY_MODE:-auto}" != "source" ]; then
+        release_url="https://raw.atomgit.com/openairymax/agentrt/raw/main/latest/manifest.${AIRY_CHANNEL}.json"
+    fi
+    if [ -n "$AIRY_FROM_FILE" ]; then
+        install_binary "$AIRY_FROM_FILE" && installed=0
+    elif [ "$AIRY_MODE" = "binary" ] || { [ "$AIRY_MODE" = "auto" ] && [ -n "$release_url" ]; }; then
+        install_binary "$release_url" && installed=0
     fi
 
     if [ "$installed" -ne 0 ]; then
@@ -924,12 +1095,16 @@ main() {
     # airymaxrt 启动器按画像拉起 daemon 集，monitor 监控外设增强自动恢复）。
     persist_profile
 
+    # 出厂预装 maths-toolkit（数学计算后端，默认开启，可 --without-maths 跳过）
+    install_maths_toolkit
+
     finalize_install
     if [ "$installed" -eq 0 ]; then
         verify_daemons strict
     else
         verify_daemons
     fi
+    post_install_selfcheck
     print_summary
     print_path_guidance
     log_ok "安装完成"
