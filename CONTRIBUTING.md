@@ -51,7 +51,7 @@ sudo apt install -y build-essential cmake gcc g++ libssl-dev \
     libevent-dev libcurl4-openssl-dev
 
 # 3. 安装 Python 依赖
-cd ecosystem/openlab && pip install -r requirements.txt
+cd ecosystem/agents && pip install -r orchestration/requirements.txt
 ```
 
 ### 2.3 构建项目
