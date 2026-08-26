@@ -64,7 +64,7 @@ log_err()   { printf "${C_RED}[FAIL]${C_NC} %s\n" "$1"; }
 # ─── 默认值 ──────────────────────────────────────────────────────────────
 AIRY_HOME="${AIRY_HOME:-$HOME/.airymaxrt}"
 AIRY_REPO_URL="${AIRY_REPO_URL:-https://atomgit.com/openairymax/airymaxhub.git}"
-AIRY_VERSION="${AIRY_VERSION:-v0.1.3}"
+AIRY_VERSION="${AIRY_VERSION:-v0.1.4}"
 AIRY_BUILD_JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 AIRY_MODE="${AIRY_MODE:-auto}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"

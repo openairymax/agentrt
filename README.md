@@ -5,7 +5,7 @@
 
 **Language:** English | [简体中文](README_zh.md)
 
-[![Version](https://img.shields.io/badge/version-0.1.3-5a6b7e)](https://atomgit.com/openairymax/agentrt)
+[![Version](https://img.shields.io/badge/version-0.1.4-5a6b7e)](https://atomgit.com/openairymax/agentrt)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=c%2B%2B&logoColor=white)](https://isocpp.org)
@@ -82,7 +82,7 @@ airymaxhub/                     ← Umbrella repo (git superproject root)
 ├── tools/                      ← Development tools (renamed from devtools in v0.1.4)
 ├── docs/                       ← Open documentation
 ├── closed-docs/                ← Internal documentation
-└── closed-dev-build/           ← Internal build/deploy
+└── devbuild-closed/           ← Internal build/deploy (formerly closed-dev-build / build-closed)
 ```
 
 ## Leaf Repositories

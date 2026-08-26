@@ -710,7 +710,7 @@ static void cli_hero_frame_bottom(const char *g)
 }
 
 /* One quiet capabilities row inside the frame, carrying the version and
- * what the runtime does at a glance: 版本 v0.1.3：对话 · 任务 · … */
+ * what the runtime does at a glance: 版本 v0.1.4：对话 · 任务 · … */
 static void cli_hero_capabilities(const char *g)
 {
     char text[160];

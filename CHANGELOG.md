@@ -4,7 +4,8 @@
 
 ## 📋 目录
 
-- [v0.1.3](#v013---2026-08-23) ⭐ 最新 — 内置拼音 IME / 三端运行画像 / 双思考落地
+- [v0.1.4](#v014---2026-08-26) ⭐ 最新 — 模型配置 v3 / 全链路稳定性 / 构建产物治理
+- [v0.1.3](#v013---2026-08-23) — 内置拼音 IME / 三端运行画像 / 双思考落地
 - [v0.1.2](#v012---2026-08-21) — SSoT 收敛 / 平台本质补齐 / 品牌化 ID / CLI·TUI / orchestrator
 - [v0.1.1 框架化改造](#v011-框架化改造---2026-08-02) — GCCP / 工作大厅 / 双思考 / CLI
 - [v0.1.1](#v011---2026-07-12) — 奠基版本（Foundation Release）
@@ -22,11 +23,60 @@
 
 ---
 
-## [Unreleased]
+## [v0.1.4] - 2026-08-26
 
-### 发布主题：真实计费闭环 + 记忆状态机 + CLI/TUI 体验与二进制分发
+### 🎯 发布主题：模型配置 v3 / 全链路稳定性 / 构建产物治理
+
+0.1.4 聚焦"系统稳定生产运行"：模型配置收敛为 v3 表格（修复运行时
+`model.yaml` 非法 YAML 导致 llm_d 注册表为空、路由回退的根因）；修复
+TUI 文字不可复制、长工具循环 60s 截断、工具上限英文占位符、非法 UTF-8
+导致 DeepSeek 400 等"无回复"根因；并完成构建产物治理（源码区零构建）、
+`build-closed` → `devbuild-closed` 改名、daemons README 全面更新。
 
 ### Added
+
+- **模型配置 v3**（`model.yaml` SSoT + 运行时同步）：表格形式字段统一
+  抽象（name/mode/api_format/base_url/model_id/api_key_env + 高级配置），
+  双思考 `think:` 段模型角色显式引用 models 表 model_id（留空 = 默认模型）；
+  `secrets.env` 精简为 3 个 Key 位 + 可选覆盖段，注释清晰
+- **llm_d 注册表修复（根因）**：运行时 model.yaml 首条目重复 `name:` 键
+  使 libyaml 解析失败 → models 表为空 → 注册表空 → 全部路由回退
+  （"not in registry" WARN）。修复后 `llm.list_models` 真实返回
+  deepseek-chat / GLM-4.7-Flash / llama-3-8b，模型直达
+- **gateway 工具循环加固**：轮数上限可配置（`AIRY_GW_SSE_MAX_TOOL_LOOPS`，
+  默认 8）；上限兜底文案改为可读中文"任务步骤较多，已达执行轮数上限…"；
+  `max_tokens` 默认 2048→4096 且可配（`AIRY_GW_SSE_MAX_TOKENS`），减少
+  工具调用被截断导致的循环空转
+- **gateway 非法 UTF-8 清洗**：请求体解析前 + 记忆注入时清洗无效字节
+  （→ U+FFFD），杜绝 DeepSeek "invalid unicode code point" 400 导致前端无回复
+- **TUI 文字可复制**：移除 `EnableMouseCapture`（无 Mouse 事件处理，纯负收益），
+  恢复终端原生拖拽选择
+- **TUI 流式无总超时**：`stream_chat` 改用独立无总超时 client（连接 10s 兜底），
+  长工具循环不再被 60s 总超时中途截断
+- **manager.py 兼容 v3**：`model_providers()` 同时支持旧 `providers` 段与
+  v2/v3 `models` 表格，`model show/validate` 恢复可用
+- **构建产物治理（源码区零构建）**：删除 `agent-workload/AgentRT-build`（414M）
+  与 `agentrt/build` 残留；CI/Dev 构建脚本默认 BUILD_DIR 改 `$HOME/.airymaxrt-build`
+  （`AGENTRT_BUILD_DIR` 仍可覆盖）；`cleanup_builds.sh` 由"保留"改为删除
+- **`build-closed` → `devbuild-closed`**：目录/子模块/引用全面改名（远程地址
+  `git@atomgit.com:openairymax/devbuild-closed.git` 已正确）
+- **daemons README 全面更新**：12→17 daemons（mem_d/agent_d/a2a_d/think_d/
+  cupolas_d 补全表格/架构/依赖图/构建产物）；补写空 README（think_d/agent_d/
+  a2a_d）；版本对齐 0.1.3→0.1.4
+
+### Changed
+
+- 版本口径统一为 **v0.1.4**：`VERSION` / `CMakeLists.txt` / `agentrt.yaml`
+- `model.yaml` 高级配置字段并入每行模型条目（不再拆行重复键）
+
+### Fixed
+
+- TUI 围棋小游戏请求返回 `(tool loop limit reached)` 占位符 → 可读中文提示
+- TUI 无回复（DeepSeek 400 invalid unicode）→ gateway 请求体/记忆 UTF-8 清洗
+- TUI 长工具循环被 60s 总超时截断 → 流式独立无超时 client
+- llm_d 注册表为空导致全部路由回退 → 修复 model.yaml 非法 YAML
+
+### Added（承接 Unreleased 累积开发内容）
 
 - **token 真实计费闭环**（2.1.1.5/2.1.1.6，llm_d + CoreLoopThree）
   - OpenAI 兼容流式端点显式声明 `stream_options.include_usage`，流式响应真实回传 usage
@@ -61,7 +111,7 @@
 - 二进制包（airymax-binary v0.1.2）：x86_64 与 arm64（focal/glibc 2.31 兼容）双架构重建，含 IME 词典；arm64 在 aarch64 容器内原生构建保证 glibc 兼容
 - 工程研究："一切皆插件"机制科研论证（M1-M8 机制本质 + 纯 C 等价性 + Airymax 语义命名：回卷机制/依赖宣言/服务索引/认知事件总线/能力契约环/能力编成单/会话能力套件/自成长）写入内部文档 `closed-docs/agentrt/07-subsystem-specs/13-module-boundaries.md` 第 4 节，论证结论纳入开发计划（P0-P3 + 远期 P4）
 
-### Fixed
+### Fixed（承接 Unreleased 累积内容）
 
 - 流式请求 usage 统计为 0（缺 include_usage + 流式帧未解析）→ 真实计费
 - F8 TUI→CLI 切换后界面重叠、英雄区错乱（alt screen 退出未清屏）→ 恢复后清屏重建
