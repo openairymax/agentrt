@@ -284,6 +284,7 @@ const cli_command_t CLI_COMMANDS[] = {
     {"/channels", "列出消息通道", CLI_CAT_RESOURCE, 0, cmd_channels},
     {"/market", "搜索市场（/market skill 搜技能）", CLI_CAT_RESOURCE, 0, cmd_market},
     {"/models", "列出 LLM 模型", CLI_CAT_RESOURCE, 0, cmd_models},
+    {"/apikey", "配置模型 API Key：/apikey list | set <N> <key>（N=model.yaml 行号）", CLI_CAT_SECURITY, 0, cmd_apikey},
     {"/mem", "记忆链：/mem（最近记忆） /mem <query>（检索） /mem get <id>（详情）", CLI_CAT_RESOURCE, 0, cmd_mem},
     {"/a2a", "发现 A2A 智能体", CLI_CAT_RESOURCE, 0, cmd_a2a},
     {"/metrics", "查询观测指标", CLI_CAT_SYSTEM, 0, cmd_metrics},

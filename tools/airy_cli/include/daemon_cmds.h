@@ -28,6 +28,7 @@ int cmd_plugins(const char *arg, void *ctx);
 int cmd_channels(const char *arg, void *ctx);
 int cmd_market(const char *arg, void *ctx);
 int cmd_models(const char *arg, void *ctx);
+int cmd_apikey(const char *arg, void *ctx);
 int cmd_mem(const char *arg, void *ctx);
 int cmd_a2a(const char *arg, void *ctx);
 int cmd_metrics(const char *arg, void *ctx);
