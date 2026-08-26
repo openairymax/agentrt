@@ -36,6 +36,7 @@
 #include <ws2tcpip.h>
 #include <windows.h>
 #include <process.h>
+#include <io.h>
 #include <sys/stat.h>
 #else
 #include <arpa/inet.h>
@@ -851,6 +852,229 @@ int cmd_models(const char *arg, void *ctx)
 {
     (void)ctx;
     cli_rpc_print("llm", "list_models", NULL);
+    return 0;
+}
+
+/* ================================================================
+ * 模型 API Key 配置（/apikey，q8f）
+ *
+ * /apikey list         → 列出 secrets.env 中全部 MODEL_*_API_KEY 位（打码）
+ * /apikey set <N> <key> → 更新/追加 MODEL_N_API_KEY=<key>（N 为 model.yaml
+ *                         连接表行号，与 api_key_env 自动映射一致）
+ *
+ * 直接读写 $AIRY_HOME/config/secrets.env（chmod 600），无需重启 daemon
+ * （llm_d 每次请求实时读 api_key_env 对应变量）。
+ * ================================================================ */
+
+/* secrets.env 绝对路径：AIRY_CONFIG_DIR 优先，回退 AIRY_HOME/config */
+static int cli_secrets_path(char *buf, size_t cap)
+{
+    const char *cdir = getenv("AIRY_CONFIG_DIR");
+    if (cdir && cdir[0]) {
+        snprintf(buf, cap, "%s/secrets.env", cdir);
+        return 1;
+    }
+    const char *home = getenv("AIRY_HOME");
+    if (home && home[0]) {
+        snprintf(buf, cap, "%s/config/secrets.env", home);
+        return 1;
+    }
+    return 0;
+}
+
+/* key 打码：sk-xxxx…wxyz（前 4 后 4，中间省略）；短 key 全打码 */
+static void cli_secret_masked(const char *val, char *out, size_t cap)
+{
+    size_t len = val ? strlen(val) : 0;
+    if (len == 0) {
+        snprintf(out, cap, "(empty)");
+        return;
+    }
+    if (len <= 8) {
+        snprintf(out, cap, "****");
+        return;
+    }
+    snprintf(out, cap, "%.*s…%s", 4, val, val + len - 4);
+}
+
+int cmd_apikey(const char *arg, void *ctx)
+{
+    (void)ctx;
+    char path[AIRY_PATH_MAX];
+    if (!cli_secrets_path(path, sizeof(path))) {
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey",
+                             "无法定位 secrets.env（未设置 AIRY_HOME/AIRY_CONFIG_DIR）");
+        return 0;
+    }
+
+    if (!arg || arg[0] == '\0' || strncmp(arg, "list", 4) == 0) {
+        /* ── list：逐行列出 MODEL_*_API_KEY（打码） ── */
+        FILE *f = fopen(path, "r");
+        if (!f) {
+            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey",
+                                 "无法读取 secrets.env（文件不存在或不可读）");
+            return 0;
+        }
+        char line[1024];
+        int found = 0;
+        cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUB_AGENT, "apikey",
+                             "已配置模型 Key 位（值打码，完整值见 secrets.env）:");
+        while (fgets(line, sizeof(line), f)) {
+            char *eq = strchr(line, '=');
+            if (!eq)
+                continue;
+            *eq = '\0';
+            char *val = eq + 1;
+            size_t vlen = strlen(val);
+            while (vlen > 0 && (val[vlen - 1] == '\n' || val[vlen - 1] == '\r'))
+                val[--vlen] = '\0';
+            if (strncmp(line, "MODEL_", 6) == 0 && strstr(line, "_API_KEY") != NULL) {
+                char masked[64];
+                cli_secret_masked(val, masked, sizeof(masked));
+                cli_outf("  %s %s %s= %s%s\n", cli_c(CLR_GREEN), line, cli_c(CLR_RESET),
+                         cli_c(CLR_DIM), masked);
+                cli_outf("%s", cli_c(CLR_RESET));
+                found = 1;
+            }
+        }
+        fclose(f);
+        if (!found)
+            cli_outf("  %s（无 Key 位；使用 /apikey set <N> <key> 添加）%s\n",
+                     cli_c(CLR_DIM), cli_c(CLR_RESET));
+        return 0;
+    }
+
+    if (strncmp(arg, "set ", 4) != 0) {
+        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
+                             "/apikey list | set <N> <key>（N = model.yaml 连接表行号）");
+        return 0;
+    }
+
+    /* ── set <N> <key> ── */
+    const char *rest = arg + 4;
+    char *sp = strchr(rest, ' ');
+    if (!sp) {
+        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
+                             "/apikey set <N> <key>");
+        return 0;
+    }
+    size_t nlen = (size_t)(sp - rest);
+    if (nlen == 0 || nlen > 4) {
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey",
+                             "行号 N 非法（1-64）");
+        return 0;
+    }
+    char num[8];
+    __builtin_memcpy(num, rest, nlen);
+    num[nlen] = '\0';
+    for (size_t i = 0; i < nlen; i++) {
+        if (num[i] < '0' || num[i] > '9') {
+            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey",
+                                 "行号 N 非法（须为数字）");
+            return 0;
+        }
+    }
+    int idx = atoi(num);
+    if (idx < 1 || idx > 64) {
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey",
+                             "行号 N 超出范围（1-64）");
+        return 0;
+    }
+    const char *key = sp + 1;
+    if (!key[0]) {
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey", "key 为空");
+        return 0;
+    }
+
+    /* 读入现有内容（保留注释与其它行） */
+    FILE *f = fopen(path, "r");
+    char **lines = NULL;
+    size_t line_count = 0;
+    if (f) {
+        char lbuf[1024];
+        while (fgets(lbuf, sizeof(lbuf), f)) {
+            char **nl = (char **)AIRY_REALLOC(lines, (line_count + 1) * sizeof(char *));
+            if (!nl) {
+                for (size_t i = 0; i < line_count; i++)
+                    AIRY_FREE(lines[i]);
+                AIRY_FREE(lines);
+                fclose(f);
+                cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey", "OOM");
+                return 0;
+            }
+            lines = nl;
+            lines[line_count] = AIRY_STRDUP(lbuf);
+            line_count++;
+        }
+        fclose(f);
+    }
+
+    char var_name[32];
+    snprintf(var_name, sizeof(var_name), "MODEL_%d_API_KEY", idx);
+    int replaced = 0;
+
+    /* 写入：匹配现有行（忽略行首空白），否则追加到文件尾部 */
+    const char *tmp_path = NULL;
+    FILE *wf = NULL;
+    {
+        char tmp[AIRY_PATH_MAX];
+        snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+        tmp_path = tmp;
+        wf = fopen(tmp, "w");
+    }
+    if (!wf) {
+        for (size_t i = 0; i < line_count; i++)
+            AIRY_FREE(lines[i]);
+        AIRY_FREE(lines);
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey",
+                             "无法写入 secrets.env");
+        return 0;
+    }
+
+    for (size_t i = 0; i < line_count; i++) {
+        const char *src = lines[i];
+        const char *p = src;
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (strncmp(p, var_name, strlen(var_name)) == 0 && p[strlen(var_name)] == '=') {
+            fprintf(wf, "%s=%s\n", var_name, key);
+            replaced = 1;
+        } else {
+            fputs(src, wf);
+        }
+    }
+    if (!replaced)
+        fprintf(wf, "%s=%s\n", var_name, key);
+    if (fclose(wf) != 0) {
+        for (size_t i = 0; i < line_count; i++)
+            AIRY_FREE(lines[i]);
+        AIRY_FREE(lines);
+        remove(tmp_path);
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey", "写入失败");
+        return 0;
+    }
+
+#if defined(_WIN32)
+    _chmod(tmp_path, _S_IREAD | _S_IWRITE);
+#else
+    chmod(tmp_path, 0600);
+#endif
+    if (rename(tmp_path, path) != 0) {
+        remove(tmp_path);
+        for (size_t i = 0; i < line_count; i++)
+            AIRY_FREE(lines[i]);
+        AIRY_FREE(lines);
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey", "写回失败");
+        return 0;
+    }
+    for (size_t i = 0; i < line_count; i++)
+        AIRY_FREE(lines[i]);
+    AIRY_FREE(lines);
+
+    char ok[128];
+    snprintf(ok, sizeof(ok), "%s 已%s（%s，权限 600）", var_name,
+             replaced ? "更新" : "添加", path);
+    cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "apikey", ok);
     return 0;
 }
 

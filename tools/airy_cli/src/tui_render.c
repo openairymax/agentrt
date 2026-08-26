@@ -211,6 +211,19 @@ static void tui_render_hw_panel(cli_tui_t *t, size_t rows, size_t start_row)
     tui_hw_line(r++, start_row, "%s运行时%s   %s", cli_c(CLR_DIM),
                 cli_c(CLR_RESET), airy_runtime_dir());
 
+    /* q8f：GPU 探测行（commons airy_get_gpu_info，best-effort）——
+     * 无 GPU/探测工具缺失时显示"未报告"，不误报错误。 */
+    {
+        char gpu[160];
+        if (airy_get_gpu_info(gpu, sizeof(gpu)) == AIRY_SUCCESS && gpu[0]) {
+            tui_hw_line(r++, start_row, "%sGPU%s      %s%s%s", cli_c(CLR_DIM),
+                        cli_c(CLR_RESET), cli_c(CLR_BOLD), gpu, cli_c(CLR_RESET));
+        } else {
+            tui_hw_line(r++, start_row, "%sGPU%s      %s（未报告）%s", cli_c(CLR_DIM),
+                        cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_RESET));
+        }
+    }
+
     for (r = r + 1; r < rows; r++)
         tui_hw_line(r, start_row, " ");
 }
