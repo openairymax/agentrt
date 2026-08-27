@@ -131,9 +131,16 @@ extern char *g_history_contents[CLI_HISTORY_MAX_MSGS];
 extern char *g_history_reasonings[CLI_HISTORY_MAX_MSGS];
 extern size_t g_history_count;
 
-/* Command table (defined in main.c; enumerated by cmd_help in cli_cmds.c) */
+/* Command table (defined in airy_cli_cmdline.c; enumerated by cmd_help in
+ * cli_cmds.c and by TUI Tab completion) */
 extern const cli_command_t CLI_COMMANDS[];
 size_t cli_commands_count(void);
+
+/* 命令分发与参数解析（airy_cli_cmdline.c；main.c 主循环调用）：
+ * cli_dispatch_command 匹配 /name，未命中返回 0 以便落回普通输入；
+ * cli_parse_args 返回 0=继续启动，1=已输出帮助/错误并退出。 */
+int cli_dispatch_command(const char *input, void *ctx);
+int cli_parse_args(int argc, char *argv[], const char **out_print_prompt);
 
 char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data);
 void cli_history_clear(void);

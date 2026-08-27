@@ -26,6 +26,9 @@ add_executable(airy_cli
     # main.c 域拆分（2026-08-27：1930 行 → 3 个职责模块）
     src/core/airy_cli_pipeline.c
     src/core/airy_cli_exec.c
+    # main.c 二轮拆分（2026-08-27：893 行 → 3 个职责模块）
+    src/core/airy_cli_cmdline.c
+    src/core/airy_cli_taskflow.c
     # daemon_cmds.c 域拆分（2026-08-27：1480 行 → 3 个命名空间模块）
     src/cmd/airy_cli_cmd_system.c
     src/cmd/airy_cli_cmd_cognition.c
@@ -37,6 +40,10 @@ add_executable(airy_cli
     src/chat/cli_chat_gccp.c
     src/chat/cli_chat_history.c
     src/chat/cli_chat_tools.c
+    # cli_chat.c 二轮拆分（2026-08-27：802 行 → 4 个职责模块）
+    src/chat/cli_chat_classify.c
+    src/chat/cli_chat_stream.c
+    src/chat/cli_chat_finalize.c
     src/cmd/cli_classify.c
     src/render/cli_think.c
     src/core/cli_dag.c
@@ -58,6 +65,12 @@ add_executable(airy_cli
     src/tui/tui_history.c
     src/tui/tui_render.c
     src/tui/tui_panel_dispatch.c
+    # cli_tui.c 二轮拆分（2026-08-27：1102 行 → 3 个职责模块）
+    src/tui/tui_readline.c
+    src/tui/tui_readline_nav.c
+    # tui_input.c 二轮拆分（2026-08-27：835 行 → 3 个职责模块）
+    src/tui/tui_complete.c
+    src/tui/tui_line_readline.c
     # 阶段 4: TUI 面板数据源（任务看板 / 事件流）
     src/tui/cli_panel.c
     # 阶段 4（item 4）: 认知阶段并行子 agent 审查（事实/风险）
