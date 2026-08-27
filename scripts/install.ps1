@@ -369,7 +369,7 @@ function Finalize-Install {
     # 数据全量统一 $AIRY_HOME\data\agentrt（日志/缓存/临时/工作区），
     # 顶层仅保留分发物、配置与易失 run/。此前 Windows 版把日志放顶层
     # logs\、缓存放 cache\，与 daemon airy_paths_init 实际路径分叉。
-    $aclTools = "fs_read,fs_write,fs_list,fs_glob,fs_grep,fs_edit,shell_run,web_search,web_fetch,git_diff,git_exec,git_apply"
+    $aclTools = "fs_read,fs_write,fs_list,fs_glob,fs_grep,fs_edit,fs_delete,shell_run,web_search,web_fetch,git_diff,git_exec,git_apply"
     $agents = @("coding_v1","devops_v1","backend_v1","frontend_v1","tester_v1","architect_v1",
                 "product_manager_v1","data_engineer_v1","security_v1","reviewer_v1","analyst_v1")
     $aclDefault = ($agents | ForEach-Object { "$_=$aclTools" }) -join ";"
