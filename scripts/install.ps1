@@ -4,7 +4,7 @@
 # 位置：agentrt 管理仓 scripts/install.ps1（v0.1.2 起自伞仓 scripts/ 迁移，
 #       构建系统与安装器属 IRON-9 [IND] 完全独立层；伞仓保留兼容重定向）。
 # 用法：
-#   powershell -ExecutionPolicy Bypass -Command "irm https://raw.atomgit.com/openairymax/airymaxhub/raw/main/agentrt/scripts/install.ps1 | iex"
+#   powershell -ExecutionPolicy Bypass -Command "irm https://raw.atomgit.com/openairymax/agentrt/raw/main/scripts/install.ps1 | iex"
 #   powershell -ExecutionPolicy Bypass -File install.ps1 -Prefix "$HOME\.airymaxrt"
 #   powershell -ExecutionPolicy Bypass -File install.ps1 -Uninstall -Yes
 #
