@@ -8,7 +8,6 @@
 [![Version](https://img.shields.io/badge/version-0.1.5-5a6b7e)](https://atomgit.com/openairymax/agentrt)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c\&logoColor=white)](https://en.cppreference.com/w/c/11)
-[![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=c%2B%2B\&logoColor=white)](https://isocpp.org)
 
 ***
 
@@ -69,7 +68,7 @@ airymaxhub/                     ← 伞仓（git superproject 根）
 │   │   ├── heapstore/          ← submodule：堆式存储（A 类）
 │   │   ├── protocols/          ← submodule：AgentsIPC & A2A/A2T 协议栈
 │   │   ├── gateway/            ← submodule：HTTP/WS/Stdio → JSON-RPC 2.0 网关
-│   │   ├── daemons/            ← submodule：12 个运行时守护进程
+│   │   ├── daemons/            ← submodule：18 个运行时守护进程
 │   │   ├── contracts/          ← 契约头文件（符号链接 → atoms/contracts）
 │   │   ├── cmake/              ← 构建系统模块（v0.1.2 起自伞仓迁入，IRON-9 [IND] 独立层）
 │   │   ├── scripts/            ← 官方安装器 install.sh/install.ps1（v0.1.2 起自伞仓迁入）
@@ -95,7 +94,7 @@ airymaxhub/                     ← 伞仓（git superproject 根）
 | **heapstore** | `git@atomgit.com:openairymax/heapstore.git` | A  | 堆式运行时数据持久化                                                                                                                              |
 | **protocols** | `git@atomgit.com:openairymax/protocols.git` | —  | AgentsIPC（128 字节消息头）& A2A/A2T 协议栈                                                                                                       |
 | **gateway**   | `git@atomgit.com:openairymax/gateway.git`   | —  | HTTP/WS/Stdio → JSON-RPC 2.0 网关守护进程（`gateway_d`）                                                                                        |
-| **daemons**   | `git@atomgit.com:openairymax/daemons.git`   | —  | 12 个运行时守护进程：`gateway_d`、`llm_d`、`tool_d`、`sched_d`、`market_d`、`monit_d`、`channel_d`、`info_d`、`notify_d`、`observe_d`、`hook_d`、`plugin_d` |
+| **daemons**   | `git@atomgit.com:openairymax/daemons.git`   | —  | 18 个运行时守护进程：`gateway_d`、`llm_d`、`tool_d`、`sched_d`、`market_d`、`monit_d`、`channel_d`、`info_d`、`notify_d`、`observe_d`、`hook_d`、`plugin_d`、`mem_d`、`agent_d`、`a2a_d`、`think_d`、`cupolas_d`、`maths_d` |
 
 > **分类说明：** A = 基础/原子层（被上层依赖）；B = 行为/安全层；— = 服务/组合层。
 
@@ -105,7 +104,7 @@ AgentRT 采用循环分层架构。每一层仅依赖其下层；支撑层提供
 
 ```
 ⬇️  SDK 层     — Python / Go / Rust / TypeScript SDK                          (sdk/ 仓)
-⇅   服务层     — 12 个守护进程服务                                            (daemons/)
+⇅   服务层     — 18 个守护进程服务                                            (daemons/)
 ⇅   协议层     — AgentsIPC & A2A/A2T 协议栈                                   (protocols/)
 ⇅   网关层     — HTTP / WS / Stdio → JSON-RPC 2.0 网关守护进程                (gateway/)
 ⇅   存储层     — 堆式运行时数据持久化                                         (heapstore/)
@@ -118,7 +117,7 @@ AgentRT 采用循环分层架构。每一层仅依赖其下层；支撑层提供
 **各层职责：**
 
 - **SDK 层** — 多语言绑定（Python/Go/Rust/TypeScript），向智能体开发者暴露 AgentRT API。位于栈顶，通过依赖支撑层基础库闭合循环。
-- **服务层** — 17 个长驻守护进程，实现运行时编排：调度、工具分发、LLM 桥接、双思考、记忆、多智能体协作、监控、通知与插件管理。
+- **服务层** — 18 个长驻守护进程，实现运行时编排：调度、工具分发、LLM 桥接、双思考、记忆、多智能体协作、监控、通知与插件管理。
 - **协议层** — AgentsIPC（固定 128 字节消息头）用于进程内与跨进程消息传递，以及 A2A（智能体间）与 A2T（智能体-工具）协议栈。
 - **网关层** — `gateway_d` 将 HTTP、WebSocket、stdio 传输统一翻译为 JSON-RPC 2.0 流，提供进入运行时的外部入口。
 - **存储层** — `heapstore` 提供堆式持久化，承载运行时状态、智能体记忆与瞬态数据。
@@ -131,7 +130,7 @@ AgentRT 采用循环分层架构。每一层仅依赖其下层；支撑层提供
 ### 前置条件
 
 - **操作系统**：Ubuntu 22.04+ / macOS 13+ / Windows 11 (WSL2)
-- **编译器**：GCC 11+ / Clang 14+（要求 C11 与 C++17）
+- **编译器**：GCC 11+ / Clang 14+（要求 C11）
 - **构建工具**：CMake 3.20+，Ninja（推荐）或 Make
 - **依赖库**：libsqlite3-dev、libcjson-dev、libyaml-dev、libcurl4-openssl-dev、libssl-dev
 

@@ -294,4 +294,7 @@ int tui_ime_key_alt_resolve(void);
 /* lifecycle 域（cli_tui.c）：rebuild_three_zone 依赖行渲染历史（g_history） */
 void cli_tui_rebuild_three_zone(cli_tui_t *tui);
 
+/* panel dispatch 域（tui_panel_dispatch.c）：面板模式按键分派 */
+int tui_panel_dispatch(cli_tui_t *t, int key);
+
 #endif /* AIRY_CLI_TUI_INTERNAL_H */
