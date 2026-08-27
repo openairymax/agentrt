@@ -621,19 +621,18 @@ init_secrets() {
         cp -f "${AIRY_SRC_APP}/ecosystem/manager/model/model.yaml" "${AIRY_HOME}/config/" 2>/dev/null || true
     # 工具级权限规则（fail-closed：缺文件时 tool_d/agent_d 拒绝全部工具调用）。
     # 模板授予 coding_v1 标准编码工具集；生产部署应按最小权限裁剪。
-    # 权威路径 $AIRY_HOME/config/permission_rules.yaml（tool_d daemon_security
-    # 在启动时读取 airy_config_dir()/permission_rules.yaml）。
+    # 权威路径 $AIRY_HOME/config/cupolas/permission_rules.yaml
+    # （daemon_cupolas_bootstrap.c 启动时读取，缺 cupolas 才回退
+    #  $AIRY_HOME/config/permission_rules.yaml 兼容旧部署）。
+    # 注意：模板是 SSoT，必须每次覆盖（不跳过已存在文件），否则模板演进
+    # （如新增工具授权 fs_delete）无法随重装生效，造成运行时 ACL 陈旧。
     local rules_tpl="${AIRY_SRC_DIR}/tools/scripts/ops/templates/permission_rules.yaml"
-    [ -f "${rules_tpl}" ] || rules_tpl="${AIRY_HOME}/config/permission_rules.yaml.example"
-    # 二进制包已内嵌 config/permission_rules.yaml（install_binary 拷贝），
-    # 该文件在即视为已部署，避免"模板未找到"误导告警。
-    if [ -f "${AIRY_HOME}/config/permission_rules.yaml" ]; then
-        chmod 600 "${AIRY_HOME}/config/permission_rules.yaml"
-        log_ok "工具权限规则已就位 ${AIRY_HOME}/config/permission_rules.yaml（包内嵌）"
-    elif [ -f "${rules_tpl}" ]; then
-        cp "${rules_tpl}" "${AIRY_HOME}/config/permission_rules.yaml"
-        chmod 600 "${AIRY_HOME}/config/permission_rules.yaml"
-        log_ok "已部署工具权限规则 ${AIRY_HOME}/config/permission_rules.yaml"
+    [ -f "${rules_tpl}" ] || rules_tpl="${AIRY_HOME}/config/permission_rules.yaml"
+    if [ -f "${rules_tpl}" ]; then
+        mkdir -p "${AIRY_HOME}/config/cupolas"
+        cp -f "${rules_tpl}" "${AIRY_HOME}/config/cupolas/permission_rules.yaml"
+        chmod 600 "${AIRY_HOME}/config/cupolas/permission_rules.yaml"
+        log_ok "已部署工具权限规则 ${AIRY_HOME}/config/cupolas/permission_rules.yaml"
     else
         log_warn "未找到 permission_rules.yaml 模板，工具调用将 fail-closed 拒绝"
     fi
