@@ -472,17 +472,11 @@ build_and_install() {
 install_python_deps() {
     log_info "安装 Python 依赖到 ${AIRY_HOME}/lib …"
     local pkg
-    for pkg in airymax_agents airymax_agents_rs; do
+    for pkg in airymax_agents airymax_agents_rs orchestration; do
         [ -d "${AIRY_SRC_APP}/ecosystem/agents/${pkg}" ] || { log_warn "跳过: ecosystem/agents/${pkg}"; continue; }
         rsync -a --exclude tests --exclude __pycache__ --exclude .git --exclude examples \
             "${AIRY_SRC_APP}/ecosystem/agents/${pkg}" "${AIRY_HOME}/lib/" 2>/dev/null \
             || cp -r "${AIRY_SRC_APP}/ecosystem/agents/${pkg}" "${AIRY_HOME}/lib/"
-    done
-    for pkg in openlab markets contrib app; do
-        [ -d "${AIRY_SRC_APP}/ecosystem/openlab/${pkg}" ] || { log_warn "跳过: ecosystem/openlab/${pkg}"; continue; }
-        rsync -a --exclude tests --exclude __pycache__ --exclude .git --exclude examples \
-            "${AIRY_SRC_APP}/ecosystem/openlab/${pkg}" "${AIRY_HOME}/lib/" 2>/dev/null \
-            || cp -r "${AIRY_SRC_APP}/ecosystem/openlab/${pkg}" "${AIRY_HOME}/lib/"
     done
     if [ -d "${AIRY_SRC_APP}/sdk/sdk-python/agentrt" ]; then
         rsync -a --exclude tests --exclude __pycache__ --exclude .git \
@@ -490,8 +484,8 @@ install_python_deps() {
             || cp -r "${AIRY_SRC_APP}/sdk/sdk-python/agentrt" "${AIRY_HOME}/lib/"
     fi
     if command -v python3 >/dev/null 2>&1; then
-        if PYTHONPATH="${AIRY_HOME}/lib" python3 -c "import agentrt, airymax_agents, openlab, markets" 2>/dev/null; then
-            log_ok "Python 依赖可导入 (agentrt/airymax_agents/openlab/markets)"
+        if PYTHONPATH="${AIRY_HOME}/lib" python3 -c "import agentrt, airymax_agents, orchestration" 2>/dev/null; then
+            log_ok "Python 依赖可导入 (agentrt/airymax_agents/orchestration)"
         else
             log_warn "lib/ 导入校验失败（检查源码包结构）"
         fi
