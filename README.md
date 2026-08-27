@@ -8,7 +8,6 @@
 [![Version](https://img.shields.io/badge/version-0.1.5-5a6b7e)](https://atomgit.com/openairymax/agentrt)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
-[![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=c%2B%2B&logoColor=white)](https://isocpp.org)
 
 ---
 
@@ -69,7 +68,7 @@ airymaxhub/                     ← Umbrella repo (git superproject root)
 │   │   ├── heapstore/          ← submodule: heap-backed storage (A-class)
 │   │   ├── protocols/          ← submodule: AgentsIPC & A2A/A2T protocol stack
 │   │   ├── gateway/            ← submodule: HTTP/WS/Stdio → JSON-RPC 2.0 gateway
-│   │   ├── daemons/            ← submodule: 12 runtime daemons
+│   │   ├── daemons/            ← submodule: 18 runtime daemons
 │   │   ├── contracts/          ← contract headers (symlink → atoms/contracts)
 │   │   ├── cmake/              ← build-system modules (moved from umbrella since v0.1.2, IRON-9 [IND])
 │   │   ├── scripts/            ← official installer install.sh/install.ps1 (moved from umbrella since v0.1.2)
@@ -95,7 +94,7 @@ airymaxhub/                     ← Umbrella repo (git superproject root)
 | **heapstore** | `git@atomgit.com:openairymax/heapstore.git` | A | Heap-backed runtime data persistence |
 | **protocols** | `git@atomgit.com:openairymax/protocols.git` | — | AgentsIPC (128-byte message header) & A2A/A2T protocol stack |
 | **gateway** | `git@atomgit.com:openairymax/gateway.git` | — | HTTP/WS/Stdio → JSON-RPC 2.0 gateway daemon (`gateway_d`) |
-| **daemons** | `git@atomgit.com:openairymax/daemons.git` | — | 17 runtime daemons: `gateway_d`, `llm_d`, `tool_d`, `sched_d`, `market_d`, `monit_d`, `channel_d`, `info_d`, `notify_d`, `observe_d`, `hook_d`, `plugin_d`, `mem_d`, `agent_d`, `a2a_d`, `think_d`, `cupolas_d` |
+| **daemons** | `git@atomgit.com:openairymax/daemons.git` | — | 18 runtime daemons: `gateway_d`, `llm_d`, `tool_d`, `sched_d`, `market_d`, `monit_d`, `channel_d`, `info_d`, `notify_d`, `observe_d`, `hook_d`, `plugin_d`, `mem_d`, `agent_d`, `a2a_d`, `think_d`, `cupolas_d`, `maths_d` |
 
 > **Class legend:** A = foundational/atomic (depended upon by upper layers); B = behavioral/safety; — = service/composition layer.
 
@@ -105,7 +104,7 @@ AgentRT follows a cyclic layered architecture. Each layer depends only on the la
 
 ```
 ⬇️  SDK Layer          — Python / Go / Rust / TypeScript SDKs                       (sdk/ repo)
-⇅   Service Layer      — 12 daemon services                                          (daemons/)
+⇅   Service Layer      — 18 daemon services                                          (daemons/)
 ⇅   Protocol Layer     — AgentsIPC & A2A/A2T protocol stack                          (protocols/)
 ⇅   Gateway Layer      — HTTP / WS / Stdio → JSON-RPC 2.0 gateway daemon             (gateway/)
 ⇅   Storage Layer      — Heap-backed runtime data persistence                        (heapstore/)
@@ -118,7 +117,7 @@ AgentRT follows a cyclic layered architecture. Each layer depends only on the la
 **Layer responsibilities:**
 
 - **SDK Layer** — Language bindings (Python/Go/Rust/TypeScript) that expose AgentRT APIs to agent developers. Sits at the top of the stack and closes the cycle by depending on the Support Layer foundation.
-- **Service Layer** — 12 long-running daemon processes that implement runtime orchestration: scheduling, tool dispatch, LLM bridging, monitoring, notifications, and plugin management.
+- **Service Layer** — 18 long-running daemon processes that implement runtime orchestration: scheduling, tool dispatch, LLM bridging, dual-think cognition, memory, multi-agent collaboration, monitoring, notifications, and plugin management.
 - **Protocol Layer** — AgentsIPC (fixed 128-byte message header) for in-process and cross-process messaging, plus A2A (agent-to-agent) and A2T (agent-to-tool) protocol stacks.
 - **Gateway Layer** — `gateway_d` translates HTTP, WebSocket, and stdio transports into a unified JSON-RPC 2.0 stream, providing the external entry point into the runtime.
 - **Storage Layer** — `heapstore` provides heap-backed persistence for runtime state, agent memory, and transient data.
@@ -131,7 +130,7 @@ AgentRT follows a cyclic layered architecture. Each layer depends only on the la
 ### Prerequisites
 
 - **OS**: Ubuntu 22.04+ / macOS 13+ / Windows 11 (WSL2)
-- **Compiler**: GCC 11+ / Clang 14+ (C11 and C++17 required)
+- **Compiler**: GCC 11+ / Clang 14+ (C11 required)
 - **Build Tools**: CMake 3.20+, Ninja (recommended) or Make
 - **Libraries**: libsqlite3-dev, libcjson-dev, libyaml-dev, libcurl4-openssl-dev, libssl-dev
 

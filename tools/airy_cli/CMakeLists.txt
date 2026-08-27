@@ -19,40 +19,55 @@ endif()
 message(STATUS "airy_cli version (SSoT): ${AIRY_CLI_VERSION}")
 
 # 源/头分离布局（2026-08-19）：include/ 公共头，src/ 实现
+# 2026-08-27 目录原子化：src/ 按功能域组织
+#   core/ 入口与编排管线 · cmd/ 命令面 · chat/ 对话会话 · tui/ 终端界面 · render/ 渲染与展示
 add_executable(airy_cli
-    src/main.c
-    src/daemon_cmds.c
-    src/cli_chat.c
+    src/core/main.c
+    # main.c 域拆分（2026-08-27：1930 行 → 3 个职责模块）
+    src/core/airy_cli_pipeline.c
+    src/core/airy_cli_exec.c
+    # daemon_cmds.c 域拆分（2026-08-27：1480 行 → 3 个命名空间模块）
+    src/cmd/airy_cli_cmd_system.c
+    src/cmd/airy_cli_cmd_cognition.c
+    src/cmd/airy_cli_cmd_capability.c
+    src/chat/cli_chat.c
     # cli_chat.c 域拆分（2026-08-27：2040 行 → 6 个职责模块）
-    src/cli_chat_usage.c
-    src/cli_chat_memory.c
-    src/cli_chat_gccp.c
-    src/cli_chat_history.c
-    src/cli_chat_tools.c
-    src/cli_classify.c
-    src/cli_think.c
-    src/cli_dag.c
-    src/cli_display.c
-    src/cli_cmds.c
-    src/cli_render.c
-    src/cli_term.c
-    # TUI 引擎（2026-08-27 域拆分：cli_tui.c 3988 行 → 6 文件）
-    src/cli_tui.c
-    src/tui_keys.c
-    src/tui_input.c
-    src/tui_ime.c
-    src/tui_history.c
-    src/tui_render.c
+    src/chat/cli_chat_usage.c
+    src/chat/cli_chat_memory.c
+    src/chat/cli_chat_gccp.c
+    src/chat/cli_chat_history.c
+    src/chat/cli_chat_tools.c
+    src/cmd/cli_classify.c
+    src/render/cli_think.c
+    src/core/cli_dag.c
+    # cli_display.c 域拆分（2026-08-27：963 行 → 3 个展示职责模块）
+    src/render/cli_display.c
+    src/render/cli_live_board.c
+    src/render/cli_banner.c
+    src/cmd/cli_cmds.c
+    # cli_render.c 域拆分（2026-08-27：1695 行 → 3 个渲染职责模块）
+    src/render/cli_render.c
+    src/render/airy_cli_markdown.c
+    src/render/airy_cli_output.c
+    src/core/cli_term.c
+    # TUI 引擎（2026-08-27 域拆分：cli_tui.c 3988 行 → 7 文件）
+    src/tui/cli_tui.c
+    src/tui/tui_keys.c
+    src/tui/tui_input.c
+    src/tui/tui_ime.c
+    src/tui/tui_history.c
+    src/tui/tui_render.c
+    src/tui/tui_panel_dispatch.c
     # 阶段 4: TUI 面板数据源（任务看板 / 事件流）
-    src/cli_panel.c
+    src/tui/cli_panel.c
     # 阶段 4（item 4）: 认知阶段并行子 agent 审查（事实/风险）
-    src/cli_review.c
+    src/cmd/cli_review.c
     # 改进6（P3）: 执行复核管线 t2/t1-f LLM 语义委托（门禁 -> t2 -> t1-f）
-    src/cli_exec_review.c
+    src/cmd/cli_exec_review.c
     # S-5 编排管线：/orch 命令（orchestrator 七阶段流程编排）
-    src/cli_orch.c
+    src/core/cli_orch.c
     # 架构约束（2026-08-25）：统一网关客户端（所有客户端必须经 gateway 派发）
-    src/cli_gw.c
+    src/cmd/cli_gw.c
 )
 
 # 链接模式：coreloopthree 与 llm/tool service 存在交叉引用（静态库 + 全局
@@ -124,6 +139,12 @@ endif()
 # tools/airy_cli 起算，源码树为 agentrt/tools/airy_cli → ../../）
 set(CLI_INC_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    # 2026-08-27 目录原子化：src/ 子目录供跨域裸名 include 解析
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/cmd
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/chat
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tui
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/render
     ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/coreloopthree/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/taskflow/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/include
@@ -154,7 +175,7 @@ install(TARGETS airy_cli RUNTIME DESTINATION bin)
 
 # 2.5.x 意图分辨启发式单测（纯函数，独立于 LLM/daemon）
 if(BUILD_TESTS)
-    add_executable(test_cli_classify tests/test_cli_classify.c src/cli_classify.c)
+    add_executable(test_cli_classify tests/test_cli_classify.c src/cmd/cli_classify.c)
     target_include_directories(test_cli_classify PRIVATE ${CLI_INC_DIRS})
     target_compile_definitions(test_cli_classify PRIVATE AIRY_HAS_CJSON=1)
     # 借 coreloopthree 的 interface include（types.h 等传递依赖）——
