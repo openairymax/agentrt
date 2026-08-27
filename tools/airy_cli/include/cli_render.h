@@ -43,7 +43,7 @@ extern "C" {
 
 /* One-shot server mode flags (defined in main.c): -p/--print suppresses
  * execution chrome; --json switches command/task output to structured JSON.
- * Exported via the render header so command handlers (cmd/*/cli_cmds)
+ * Exported via the render header so command handlers (cmd/cli_cmds)
  * can bypass the suppression for command *responses* (server scripting). */
 extern int g_cli_print_mode;
 extern int g_cli_json_mode;
