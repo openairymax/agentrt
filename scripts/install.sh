@@ -6,7 +6,7 @@
 #       构建系统与安装器属 IRON-9 [IND] 完全独立层，随 agentrt 仓独立演进；
 #       伞仓 scripts/ 保留兼容重定向入口）。
 # 用法：
-#   curl -fsSL https://raw.atomgit.com/openairymax/airymaxhub/raw/main/agentrt/scripts/install.sh | sh
+#   sh <(curl -fsSL https://raw.atomgit.com/openairymax/agentrt/raw/main/scripts/install.sh) --channel stable
 #   sh install.sh --prefix "$HOME/.airymaxrt"        # 自定义路径
 #   sh install.sh --uninstall                        # 一键卸载
 #
