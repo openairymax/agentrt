@@ -23,6 +23,12 @@ add_executable(airy_cli
     src/main.c
     src/daemon_cmds.c
     src/cli_chat.c
+    # cli_chat.c 域拆分（2026-08-27：2040 行 → 6 个职责模块）
+    src/cli_chat_usage.c
+    src/cli_chat_memory.c
+    src/cli_chat_gccp.c
+    src/cli_chat_history.c
+    src/cli_chat_tools.c
     src/cli_classify.c
     src/cli_think.c
     src/cli_dag.c

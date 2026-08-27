@@ -148,6 +148,45 @@ void cli_chat_usage_get(uint64_t *tokens, double *cost);
  * 覆盖 chat + task 双思考路径；llm_d 离线回退 chat 累计） */
 void cli_chat_usage_get_session(uint64_t *tokens, double *cost);
 
+/* ===== cli_chat.c 域拆分（2026-08-27：2040 行 → 6 个职责模块） ===== */
+
+/* cli_chat_usage.c：对话轮 token/费用统计与思考链累计/清零 */
+void cli_chat_usage_add(const llm_response_t *resp);
+void cli_chat_usage_reset(void);
+void cli_chat_reasoning_add(const char *reasoning);
+const char *cli_chat_reasoning_peek(void);
+
+/* cli_chat_memory.c：对话记忆注入/写回（gateway mem_d 优先，L1 回退） */
+void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t out_size);
+void cli_chat_mem_record(const char *input, const char *reply, const char *reasoning);
+
+/* cli_chat_gccp.c：GCCP 逐问交互（cli_chat_t1p_cached 实现仍在 cli_chat.c） */
+const char *cli_chat_t1p_cached(void);
+
+/* cli_chat_history.c：历史缓冲 / 错误描述 / 系统提示词 */
+const char *cli_chat_err_desc(int err);
+void cli_history_add(const char *role, const char *content, const char *reasoning);
+const char *cli_system_prompt_now(void);
+void cli_chat_reasoning_persist(const char *text);
+
+/* cli_chat_tools.c：聊天工具回路（schema / 消息缓冲 / 工具执行 / 工具轮） */
+#define CLI_CHAT_TOOL_MAX_ROUNDS 8
+#define CLI_CHAT_TOOL_RESULT_CAP 12000 /* 单工具结果回填模型的最大字节数 */
+typedef struct {
+    llm_message_t *msgs;
+    size_t count;
+    size_t cap;
+    char **owned;
+    size_t owned_count;
+    size_t owned_cap;
+} cli_chat_msgbuf_t;
+extern const char *cli_chat_tools_json;
+void cli_msgbuf_free(cli_chat_msgbuf_t *b);
+void cli_msgbuf_push(cli_chat_msgbuf_t *b, const char *role, const char *content,
+                     const char *tool_call_id, const char *tool_calls_json,
+                     const char *reasoning_content);
+int cli_chat_tool_round(cli_chat_msgbuf_t *b, const llm_response_t *resp);
+
 airy_err_t cli_think_process_remote(const char *think_sock, const char *input, size_t input_len,
                                     airy_task_plan_t **out_plan);
 
