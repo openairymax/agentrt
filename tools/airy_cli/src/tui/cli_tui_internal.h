@@ -3,11 +3,14 @@
 
 /**
  * @file cli_tui_internal.h
- * @brief TUI 引擎内部共享头（域拆分：engine/keys/input/ime/history/render）。
+ * @brief TUI 引擎内部共享头（域拆分：engine/keys/input/ime/history/render/
+ *        readline/nav）。
  *
  * 原 cli_tui.c（3988 行）按功能域拆分后，跨文件共享的结构体定义与
  * 内部函数声明统一收敛于此，保持 cli_tui.h 公共 API 不变（对外仍为
- * 不透明 cli_tui_t）。此头仅限 airy_cli/src 内部使用。
+ * 不透明 cli_tui_t）。2026-08-27 二轮拆分新增 readline 域
+ * （tui_readline.c 主循环 / tui_readline_nav.c 导航键分派）。
+ * 此头仅限 airy_cli/src 内部使用。
  */
 
 #ifndef AIRY_CLI_TUI_INTERNAL_H
@@ -278,6 +281,11 @@ size_t tui_caret_print(cli_tui_t *t);
 void tui_caret_tick(cli_tui_t *t);
 void tui_line_redraw(cli_tui_t *t);
 int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap, size_t *out_len);
+
+/* readline 域（tui_readline.c / tui_readline_nav.c）：全屏 readline 主循环。
+ * tui_readline_arrow_keys 返回 0 = 正常处理继续；-1 = 请求终止 readline
+ * （粘贴内 EOF），调用方应 return 0。 */
+int tui_readline_arrow_keys(cli_tui_t *t, int key);
 
 /* ime 域（tui_ime.c） */
 void tui_ime_commit_raw(cli_tui_t *t);

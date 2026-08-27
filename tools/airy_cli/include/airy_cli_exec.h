@@ -16,6 +16,7 @@
 #include "work_hall.h"
 #include "plan_to_dag.h"
 #include "taskflow_advanced.h"
+#include "airy_cli_pipeline.h" /* cli_runtime_ctx_t */
 
 #include <signal.h>
 #include <stddef.h>
@@ -55,6 +56,14 @@ void cli_chain_record_submit(const char *exec_id, const airy_task_plan_t *plan,
  * (caller uses this for L2 cache absorb decision). */
 int cli_task_result_render(const char *result, airy_err_t err, const char *exec_id,
                             int canceled, airy_work_hall_t *hall, uint32_t vf_before);
+
+/* Run one full task turn: cognition planning → DAG adaption → submit →
+ * board polling → wait → result summary.  Extracted from main.c's main
+ * loop (2026-08-27 domain split).  Returns 1 when the caller should
+ * continue the loop early (planning / submission failure), 0 on normal
+ * completion. */
+int cli_run_task_pipeline(cli_runtime_ctx_t *rt, airy_cognition_engine_t *cog,
+                          const char *input, size_t input_len, uint64_t turn_start);
 
 #ifdef __cplusplus
 }
