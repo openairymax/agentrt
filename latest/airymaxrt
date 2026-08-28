@@ -1,0 +1,1584 @@
+#!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+#
+# airymaxrt — AirymaxRT 一键启动入口
+#
+# 在任意项目目录执行 `airymaxrt` 即可进入交互界面：
+#   1. 定位组件（TUI / gateway_d / llm_d）
+#   2. gateway 在线 → 直接进入 TUI；离线 → 自动拉起 llm_d + gateway_d
+#   3. TUI 退出后清理本次拉起的守护进程（不影响已运行的外部 gateway）；
+#      外部强杀（timeout/SIGTERM）同样经 trap 回收，不残留 daemon
+#
+# 安装（加入 PATH 即可）：
+#   ln -s "$PWD/sdk/tui/scripts/airymaxrt" ~/bin/airymaxrt
+#
+# 日志（排查问题）：
+#   - 终端：INFO/WARN/ERROR（彩色，带时间戳与级别）
+#   - 文件：$AIRY_HOME/logs/airymaxrt.log（全量含 DEBUG，关键节点均有打点）
+#   - 级别：AIRYRT_LOG_LEVEL=debug|info|warn|error（默认 info）
+#
+# 环境变量（均可覆盖默认值）：
+#   AIRYRT_HOME       伞仓根（默认：脚本路径上溯自动推断）
+#   AIRY_HOME         运行时根（默认 ~/.airymaxrt，等价 kubelet 节点运行时根）
+#   AIRY_RUNTIME_DIR  运行时目录（默认 $AIRY_HOME/run，llm.sock 所在目录）
+#   AIRY_GATEWAY_PORT gateway HTTP 端口（默认 8080）
+#   AIRY_MODEL_CONFIG llm_d 模型配置（默认 $AIRYRT_HOME/ecosystem/manager/model/model.yaml）
+#   AIRY_AGENT_FILE   Agent 定义文件（默认 agents/main.agent.yaml，相对当前目录）
+#   AIRY_TUI_BIN / AIRY_GATEWAY_BIN / AIRY_LLM_BIN  组件路径覆盖
+#   AIRYRT_LOG_LEVEL 日志级别（默认 info；debug 可看到完整排查信息）
+#   AIRYRT_PROFILE   运行画像：auto（按可用内存自动裁剪，默认；<2.5GiB 时
+#                     自动降为 minimal）| full（全量 17 daemon：16 socket +
+#                     gateway）| minimal
+#                     （最小 daemon 集，仅 llm/think/agent/tool + gateway）。
+#                     低资源设备（如树莓派 4B 2GB）建议 minimal，可显著降低
+#                     内存占用；非核心 daemon 未拉起时 gateway 自动降级。
+#                     硬件变化（内存扩容/插入显卡）后执行 `airymaxrt profile`
+#                     重新评估，或 `airymaxrt monitor --daemon` 后台常驻监控，
+#                     检测到能力增强自动恢复被裁剪的 daemon（--stop 停止）。
+#   AIRYRT_FORCE_TUI 强制 TUI 模式（跳过终端能力评估，默认自动评估：
+#                     TERM=dumb/unknown 或屏幕 <20 行/<60 列时自动降级 CLI）。
+#
+# 组件缺失时：TUI 缺失报错退出；gateway_d/llm_d 缺失则以 OFFLINE 模式进入 TUI。
+
+set -euo pipefail
+
+# ── 定位伞仓根 ──────────────────────────────────────────────────────────────
+# 解析符号链接得到脚本真实路径（支持 ~/bin/airymaxrt → 仓库 scripts/airymaxrt）
+_SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$_SOURCE" ]; do
+    _DIR="$(cd -P "$(dirname "$_SOURCE")" && pwd)"
+    _SOURCE="$(readlink "$_SOURCE")"
+    case "$_SOURCE" in
+        /*) ;;
+        *) _SOURCE="$_DIR/$_SOURCE" ;;
+    esac
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$_SOURCE")" && pwd)"
+AIRYRT_HOME="${AIRYRT_HOME:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
+
+# ── 配置 ─────────────────────────────────────────────────────────────────────
+# AIRY_HOME 解析（路径统一，2026-08-28）：启动器自身所在安装根
+# （$AIRY_HOME/bin/airymaxrt → ../config/install.env）→ 官方统一安装根
+# ~/.airymaxrt。伞仓并列布局（<workspace>/.airymaxrt）与
+# ~/.local/share/airymaxrt 历史候选移除——社区用户与本地开发同一逻辑。
+# 环境变量残留防护：AIRY_HOME 指向不存在目录（终端残留 export / 半删除
+# 安装）时告警并回退统一路径（历史故障：启动器 exec 已删除路径报 not
+# found；Trae 持久终端的残留变量劫持安装与启动目标）。
+if [ -n "${AIRY_HOME:-}" ] && [ ! -d "${AIRY_HOME}" ]; then
+    printf '\033[1;33m[WARN]\033[0m AIRY_HOME=%s 不存在（疑似终端残留环境变量），已忽略并回退统一路径\n' "$AIRY_HOME" >&2
+    AIRY_HOME=""
+fi
+if [ -z "${AIRY_HOME:-}" ]; then
+    for _CAND in "${SCRIPT_DIR}/../config/install.env" \
+                 "$HOME/.airymaxrt/config/install.env"; do
+        if [ -f "$_CAND" ] && _HOME="$(sed -n 's/^AIRY_HOME=//p' "$_CAND" 2>/dev/null | head -1)"; then
+            if [ -n "$_HOME" ]; then
+                AIRY_HOME="$_HOME"
+                break
+            fi
+        fi
+    done
+fi
+AIRY_HOME="${AIRY_HOME:-$HOME/.airymaxrt}"
+# 导出给子进程（TUI / airy_cli / daemon 群统一运行时根，避免默认 $HOME 分叉）
+export AIRY_HOME
+RUNTIME_DIR="${AIRY_RUNTIME_DIR:-$AIRY_HOME/run}"
+GATEWAY_PORT="${AIRY_GATEWAY_PORT:-8080}"
+GATEWAY_URL="http://127.0.0.1:${GATEWAY_PORT}"
+
+# 模型配置优先取安装目录 $AIRY_HOME/config/model.yaml（install.sh/build.sh 已固化），
+# 兼容旧源码树路径 $AIRYRT_HOME/ecosystem/manager/model/model.yaml。
+if [ -f "${AIRY_MODEL_CONFIG:-$AIRY_HOME/config/model.yaml}" ]; then
+    MODEL_CONFIG="${AIRY_MODEL_CONFIG:-$AIRY_HOME/config/model.yaml}"
+else
+    MODEL_CONFIG="${AIRY_MODEL_CONFIG:-$AIRYRT_HOME/ecosystem/manager/model/model.yaml}"
+fi
+AGENT_FILE="${AIRY_AGENT_FILE:-agents/main.agent.yaml}"
+
+# ── 日志系统：debug 全量写文件，info+ 打印终端 ─────────────────────────────
+LOG_FILE="$AIRY_HOME/logs/airymaxrt.log"
+AIRYRT_LOG_LEVEL="${AIRYRT_LOG_LEVEL:-info}"
+mkdir -p "$AIRY_HOME/logs" "$RUNTIME_DIR"
+
+_log_num() {
+    case "$1" in
+        debug) echo 0 ;;
+        info)  echo 1 ;;
+        warn)  echo 2 ;;
+        error) echo 3 ;;
+        *)     echo 1 ;;
+    esac
+}
+LOG_LEVEL_NUM="$(_log_num "$AIRYRT_LOG_LEVEL")"
+
+log() { # log <debug|info|warn|error> <消息...>
+    local lvl="$1"
+    shift
+    [ "$(_log_num "$lvl")" -ge "$LOG_LEVEL_NUM" ] || return 0
+    local line
+    line="[$(date '+%Y-%m-%d %H:%M:%S')] [$(printf '%s' "$lvl" | tr '[:lower:]' '[:upper:]')] $*"
+    # 终端日志统一走 stderr：避免被 $(cmd) 命令替换捕获（stdout 仅承载命令结果）。
+    # 正常启动路径（AIRYRT_TERM_LOG=quiet）时 INFO 只写文件不进终端，
+    # 让全屏 TUI 页面干净启动；status/doctor 子命令仍保留终端 INFO。
+    if [ "${AIRYRT_TERM_LOG:-}" != "quiet" ] || [ "$lvl" != "info" ]; then
+        case "$lvl" in
+            info)  printf '\033[1;36m%s\033[0m\n' "$line" >&2 ;;
+            warn)  printf '\033[1;33m%s\033[0m\n' "$line" >&2 ;;
+            error) printf '\033[1;31m%s\033[0m\n' "$line" >&2 ;;
+        esac
+    fi
+    printf '%s\n' "$line" >>"$LOG_FILE"
+}
+
+# ── PATH 自愈（2.3.2.6 增强，2026-08-24）──────────────────────────────
+# 根因：默认 BIN_DIR=~/.local/bin 在多数新系统不在 PATH，旧安装器只提示
+# 不自动修复 → 其他机器安装后输入 airymaxrt 报 command not found，只能
+# 完整路径启动。此处兜底：以任意方式（含完整路径）启动时，若 BIN_DIR 软链
+# 目录不在 PATH，自动幂等追加到当前 shell 的 rc 文件（带标记，卸载可移除）。
+path_rc_file() {
+    case "$(basename "${SHELL:-/bin/sh}")" in
+        zsh) echo "$HOME/.zshrc" ;;
+        fish) echo "$HOME/.config/fish/config.fish" ;;
+        sh|dash|ash) echo "$HOME/.profile" ;;
+        *) echo "$HOME/.bashrc" ;;
+    esac
+}
+path_self_heal() {
+    [ -f "$AIRY_HOME/config/install.env" ] || return 0
+    local _binl _bind
+    _binl="$(sed -n 's/^AIRY_BIN_LINK=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
+    _binl="${_binl:-$HOME/.local/bin/airymaxrt}"
+    _bind="${_binl%/airymaxrt}"
+    local _in_path=0 _p _seg
+    _p="$PATH"
+    while [ -n "$_p" ]; do
+        _seg="${_p%%:*}"
+        if [ "$_seg" = "$_bind" ]; then _in_path=1; break; fi
+        if [ "$_seg" = "$_p" ]; then _p=""; else _p="${_p#*:}"; fi
+    done
+    [ "$_in_path" = "1" ] && return 0
+    local _rc _line
+    _rc="$(path_rc_file)"
+    if grep -q '# >>> AgentRT PATH bootstrap <<<' "$_rc" 2>/dev/null; then
+        log debug "PATH 自愈: $_rc 已含引导行，跳过"
+        return 0
+    fi
+    if [ "$(basename "$_rc")" = "config.fish" ]; then
+        _line="set -gx PATH \"${_bind}\" \$PATH"
+    else
+        _line="export PATH=\"${_bind}:\$PATH\""
+    fi
+    if printf '\n# >>> AgentRT PATH bootstrap <<<\n%s\n# <<< AgentRT PATH bootstrap <<<\n' "$_line" >> "$_rc" 2>/dev/null; then
+        log warn "PATH 自愈: 已自动将 ${_bind} 追加到 $_rc（新开终端生效，或 source \"$_rc\"）"
+    else
+        log warn "PATH 自愈: 无法写入 $_rc——手动执行: echo '${_line}' >> \"$_rc\" && source \"$_rc\""
+    fi
+}
+
+# ── 硬件评估（2.3.2：内存/核数/加速器综合画像，支持运行中监控恢复）────────
+# assess_hardware 输出 `画像建议|MemTotal KiB|MemAvailable KiB|CPU 核数|加速器`
+#   - minimal：MemTotal < 2.5GiB 或 MemAvailable < 1.5GiB 或 CPU 核数 < 3
+#     （端侧/低配设备：树莓派 4B 2GB 等，避免全量 daemon 群 OOM）
+#   - full：资源充足（大型服务器/个人电脑）
+# 加速器探测（当前记录并随状态展示；为本地推理能力预留判定依据）：
+#   - nvidia：nvidia-smi 可用（显卡数量）
+#   - rocm：AMD ROCm 运行时可用
+#   - dri：/dev/dri 渲染节点（Intel/AMD iGPU 或亮机卡）
+#   - none：无可见加速器
+# 架构检测（uname -m 归一化）：与 install.sh detect_arch 同口径（SSoT），
+# 记录在画像中供 status 展示；install.sh 二进制模式以 {arch} 占位符
+# 选择预编译包（见 agentrt/scripts/install.sh install_binary）。
+detect_arch() {
+    case "$(uname -m 2>/dev/null)" in
+        x86_64|amd64)     echo "x86_64" ;;
+        aarch64|arm64)    echo "aarch64" ;;
+        armv7l|armv6l|armhf) echo "armv7l" ;;
+        riscv64)          echo "riscv64" ;;
+        *)                echo "unknown" ;;
+    esac
+}
+detect_accel() {
+    if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
+        echo "nvidia:$(nvidia-smi -L 2>/dev/null | wc -l)"
+    elif command -v rocm-smi >/dev/null 2>&1; then
+        echo "rocm"
+    elif [ -d /dev/dri ] && ls /dev/dri/renderD* >/dev/null 2>&1; then
+        echo "dri"
+    else
+        echo "none"
+    fi
+}
+
+assess_hardware() {
+    local mem_kib mem_avail_kib nproc_val accel profile
+    mem_kib="$(awk '/^MemTotal:/{print $2}' /proc/meminfo 2>/dev/null || echo 0)"
+    mem_avail_kib="$(awk '/^MemAvailable:/{print $2}' /proc/meminfo 2>/dev/null || echo "$mem_kib")"
+    nproc_val="$(nproc 2>/dev/null || echo 1)"
+    accel="$(detect_accel)"
+    if [ -n "$mem_kib" ] && [ "$mem_kib" -gt 0 ] && \
+       [ "$mem_kib" -ge $((2560 * 1024)) ] && \
+       [ "$mem_avail_kib" -ge $((1536 * 1024)) ] && \
+       [ "$nproc_val" -ge 3 ]; then
+        profile="full"
+    else
+        profile="minimal"
+    fi
+    printf '%s|%s|%s|%s|%s' "$profile" "${mem_kib:-0}" "${mem_avail_kib:-0}" "$nproc_val" "$accel"
+}
+
+# 画像持久化：install.sh 固化 AIRY_PROFILE=minimal，但硬件变化（内存扩容/
+# 外设接入）后 profile/profile 子命令的调整需跨会话生效——写入独立 profile.env
+# 而非改动 install.env（安装信息保持只读），启动时 profile.env 优先。
+PROFILE_ENV="$AIRY_HOME/config/profile.env"
+if [ -f "$PROFILE_ENV" ]; then
+    # shellcheck disable=SC1090
+    . "$PROFILE_ENV"
+fi
+
+# ── 运行画像：full | minimal | auto（按硬件自动裁剪 daemon 集）────────
+# auto 模式经 assess_hardware 综合判定（内存总量/可用内存/CPU 核数），
+# 低资源设备自动降为 minimal（仅 llm/think/agent/tool + gateway），
+# 其余能力 daemon 缺位时 gateway 自动降级，避免 2GB 设备 OOM。
+# AIRYRT_PROFILE_RAW 记录解析前设置：monitor 据其区分「auto（可自动调整）」
+# 与「显式 full/minimal（尊重用户选择，仅提示）」。
+AIRYRT_PROFILE_RAW="${AIRYRT_PROFILE:-${AIRY_PROFILE:-auto}}"
+AIRYRT_PROFILE="$AIRYRT_PROFILE_RAW"
+case "$AIRYRT_PROFILE" in
+    full|minimal|auto) ;;
+    *) log error "无效的 AIRYRT_PROFILE='$AIRYRT_PROFILE'（支持 full|minimal|auto）"
+       exit 2 ;;
+esac
+if [ "$AIRYRT_PROFILE" = "auto" ]; then
+    _HW_ASSESS="$(assess_hardware)"
+    AIRYRT_PROFILE="${_HW_ASSESS%%|*}"
+    log info "硬件评估: 内存 ${_HW_ASSESS#*|}"
+    log info "自动画像: $AIRYRT_PROFILE"
+fi
+log debug "AIRYRT_PROFILE=$AIRYRT_PROFILE"
+
+
+# ── 启动进度行（2.1/2.2 启动体验优化） ─────────────────────────────────────
+# quiet 模式（AIRYRT_TERM_LOG=quiet）下 INFO 不进终端，用户执行 airymaxrt
+# 后等待 daemon 群拉起期间看到的是"黑屏无反馈"，感知为"系统不能正常启用"
+# （2.1 用户反馈）。boot_line 在 quiet 下仍打印精简进度到 stderr：
+#   - TUI 路径：进入全屏（alt-screen）后这些行被清屏覆盖，不残留
+#   - CLI 流式路径：stdout 承载对话结果，stderr 进度不影响结果解析
+# 每行以 `›` 引导、无时间戳（非日志，是进度），warn/error 走 log 通道。
+boot_line() { # <消息...>
+    printf '\033[2m›\033[0m %s\n' "$*" >&2
+}
+
+# ── 关键 daemon 就绪诊断（2.2 启动可靠性优化） ─────────────────────────────
+# daemon 群 socket 未全部就绪时逐项诊断：对话/工具/认知关键链路（llm/think/
+# agent/tool）未就绪必须明确报错并附日志尾部（此前 `wait_all_socks || true`
+# 静默容忍，用户进入界面后对话挂起——"界面能进、对话全挂"）；非关键链路
+# 降级为 WARN 提示（界面可用但该能力受限）。
+diag_daemons() { # 遍历剩余 WAIT_SOCKS（未就绪项）
+    local spec name sock critical=0 _lines _l
+    for spec in "${WAIT_SOCKS[@]}"; do
+        name="${spec%%|*}"; sock="${spec#*|}"
+        case "$name" in
+            llm_d|think_d|agent_d|tool_d)
+                log error "关键服务未就绪: $name（对话/认知/执行链路必需）"
+                log error "  日志: $AIRY_HOME/logs/${name}.out（尾部）:"
+                _lines="$(tail -n 8 "$AIRY_HOME/logs/${name}.out" 2>/dev/null | sed 's/^/  /')" || true
+                while IFS= read -r _l; do
+                    [ -n "$_l" ] && log error "$_l"
+                done <<<"$_lines"
+                critical=1
+                ;;
+            *)
+                log warn "$name 未就绪（非关键链路，界面可用但该能力受限），日志: $AIRY_HOME/logs/${name}.out"
+                ;;
+        esac
+    done
+    if [ "$critical" = "1" ]; then
+        log error "关键 daemon 未就绪，可执行 'airymaxrt doctor' 检查组件，"
+        log error "或删除 $RUNTIME_DIR 下残留 socket 后重试（详见上方日志尾部）"
+    fi
+}
+
+# ── 密钥加载：secrets.env（set -a 自动 export 给子进程）───────────────────
+# 权威单一来源：$AIRY_HOME/config/secrets.env（install.sh init_secrets 生成）。
+# 历史多候选（$AIRYRT_HOME/.airymaxrt、$PWD/.airymaxrt）按路径统一原则移除
+# （2026-08-28）；$PWD 候选还构成在不可信目录加载密钥的供应链风险。
+_SECRET_FILE="$AIRY_HOME/config/secrets.env"
+if [ -f "$_SECRET_FILE" ]; then
+    log info "加载密钥文件: $_SECRET_FILE"
+    set -a
+    # shellcheck disable=SC1090
+    . "$_SECRET_FILE"
+    set +a
+fi
+
+log debug "==== airymaxrt 启动 ===="
+log debug "配置: AIRYRT_HOME=$AIRYRT_HOME AIRY_HOME=$AIRY_HOME RUNTIME_DIR=$RUNTIME_DIR"
+log debug "配置: GATEWAY_URL=$GATEWAY_URL MODEL_CONFIG=$MODEL_CONFIG AGENT_FILE=$AGENT_FILE"
+
+# ── 运行环境注入：agentrt-env.sh（build.sh 生成，含 AIRY_AGENT_ACL 等）──────
+# daemon 群与前端统一继承该环境；不 source 时 daemon 以 fail-closed 运行，
+# agent 工具全部被 ACL 拒绝（历史故障：airymaxrt 拉起的 agent_d 无 ACL，
+# 任务执行阶段 shell_run/fs_* 全部 Permission denied）。
+# 注意：历史版本 agentrt-env.sh 以 `export AIRY_HOME=安装值` 硬编码覆盖
+# 调用方显式设置（隔离测试/多实例/--prefix 自定义安装），导致 daemon 群
+# 与脚本等待探测的 socket 目录分叉——socket 永远"未就绪"、第二实例 unlink
+# 生产 socket 造成服务假死（2026-08-20 冷启动复现）。AIRY_HOME 权威值以
+# 脚本解析为准（install.env 固化），source 后强制恢复，RUNTIME_DIR 同源重算。
+if [ -f "$AIRY_HOME/bin/agentrt-env.sh" ]; then
+    log debug "注入运行环境: $AIRY_HOME/bin/agentrt-env.sh"
+    _AIRY_HOME_RESOLVED="$AIRY_HOME"
+    # shellcheck disable=SC1090
+    . "$AIRY_HOME/bin/agentrt-env.sh"
+    AIRY_HOME="$_AIRY_HOME_RESOLVED"
+    export AIRY_HOME
+    RUNTIME_DIR="${AIRY_RUNTIME_DIR:-$AIRY_HOME/run}"
+    log debug "agentrt-env.sh 注入后恢复 AIRY_HOME=$AIRY_HOME RUNTIME_DIR=$RUNTIME_DIR"
+fi
+
+# ── 组件定位 ─────────────────────────────────────────────────────────────────
+# find_tool <env_name> <command_name> <候选路径...>
+#   优先显式环境变量，其次伞仓内构建产物，最后 PATH 中的命令。
+find_tool() {
+    local env_name="$1" cmd_name="$2"
+    shift 2
+    if [ -n "${!env_name:-}" ]; then
+        log debug "$env_name 环境变量覆盖: ${!env_name}"
+        if [ -x "${!env_name}" ]; then
+            echo "${!env_name}"
+            return
+        fi
+        log warn "$env_name 指向的路径不可执行: ${!env_name}"
+    fi
+    local c
+    for c in "$@"; do
+        if [ -x "$c" ]; then
+            log debug "找到 $cmd_name: $c"
+            echo "$c"
+            return
+        fi
+        log debug "候选不存在: $c"
+    done
+    local from_path
+    if from_path="$(command -v "$cmd_name" 2>/dev/null)"; then
+        log debug "PATH 中找到 $cmd_name: $from_path"
+        echo "$from_path"
+    else
+        log warn "未找到 $cmd_name（PATH 与候选路径均无）"
+    fi
+}
+
+TUI_BIN="$(find_tool AIRY_TUI_BIN agentrt-tui \
+    "$AIRY_HOME/bin/agentrt-tui" \
+    "$AIRYRT_HOME/sdk/tui/target/release/agentrt-tui" \
+    "$AIRYRT_HOME/sdk/tui/target/debug/agentrt-tui")"
+
+# 流式 CLI（非 TTY 降级前端）：C 版 airy_cli，进程内直连 daemon 群，
+# 无 TTY（管道/CI/SSH 重定向）时以流式行输出工作，无需全屏。
+CLI_BIN="$(find_tool AIRY_CLI_BIN airy_cli \
+    "$AIRY_HOME/bin/airy_cli" \
+    "$AIRYRT_HOME/agentrt/build/tools/airy_cli/airy_cli" \
+    "$AIRYRT_HOME/build/tools/airy_cli/airy_cli")"
+
+GATEWAY_BIN="$(find_tool AIRY_GATEWAY_BIN gateway_d \
+    "$AIRY_HOME/bin/gateway_d" \
+    "$AIRYRT_HOME/agentrt/build/bin/gateway_d" \
+    "$AIRYRT_HOME/build/bin/gateway_d")"
+
+LLM_BIN="$(find_tool AIRY_LLM_BIN llm_d \
+    "$AIRY_HOME/bin/llm_d" \
+    "$AIRYRT_HOME/agentrt/build/bin/llm_d" \
+    "$AIRYRT_HOME/build/bin/llm_d")"
+
+THINK_BIN="$(find_tool AIRY_THINK_BIN think_d \
+    "$AIRY_HOME/bin/think_d" \
+    "$AIRYRT_HOME/agentrt/build/bin/think_d" \
+    "$AIRYRT_HOME/build/bin/think_d")"
+
+log debug "组件定位结果: TUI_BIN=${TUI_BIN:-（缺失）}"
+log debug "组件定位结果: CLI_BIN=${CLI_BIN:-（缺失）}"
+log debug "组件定位结果: GATEWAY_BIN=${GATEWAY_BIN:-（缺失）}"
+log debug "组件定位结果: LLM_BIN=${LLM_BIN:-（缺失）}"
+log debug "组件定位结果: THINK_BIN=${THINK_BIN:-（缺失）}"
+
+# ── 等待辅助（每轮打点，便于排查就绪时序） ─────────────────────────────────
+# gateway 无 /health HTTP 端点，就绪检测使用 JSON-RPC ping（HTTP POST）。
+wait_for_health() { # <url> <秒数>
+    local url="$1" tries="$2" i
+    log debug "健康检查开始: $url（最多 ${tries}s）"
+    for ((i = 0; i < tries; i++)); do
+        if curl -fsS -m 1 -X POST -H 'Content-Type: application/json' \
+            -d '{"jsonrpc":"2.0","method":"ping","id":1}' "$url" >/dev/null 2>&1; then
+            log debug "健康检查通过: $url（第 $((i + 1)) 次尝试）"
+            return 0
+        fi
+        log debug "健康检查未就绪: $url（第 $((i + 1)) 次尝试）"
+        sleep 1
+    done
+    log debug "健康检查超时: $url"
+    return 1
+}
+
+# _sock_alive <socket路径>：真实服务探测（0=daemon 在监听并响应，可复用）。
+# 仅查文件存在（-S）不可靠：崩溃/重复拉起后可能残留无监听者的
+# 死 socket（stale），此时 connect 返回 ECONNREFUSED。
+# 更隐蔽的场景（2026-08-19）：daemon 被强杀后，其 agent runner 子进程
+# 仍持有继承的监听 fd，connect 可以成功但无人 accept/响应——仅做
+# connect 探测会误判在线而复用死 daemon，表现为界面能进、任务挂起
+# （health_check recv 超时）。因此连接成功后追加一次 health_check
+# JSON-RPC 往返：1.5s 内收到响应才算在线。
+# 探测工具优先级：python3 > nc（Unix socket）> ss -l（Linux，仅连通）。
+_sock_alive() { # <socket路径>
+    local path="$1"
+    [ -S "$path" ] || return 1
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -c "import socket,sys; s=socket.socket(socket.AF_UNIX); s.settimeout(1.5); s.connect(sys.argv[1]); s.sendall(b'{\"jsonrpc\":\"2.0\",\"method\":\"health_check\",\"params\":{},\"id\":1}\n'); s.recv(1)" "$path" 2>/dev/null
+    elif command -v nc >/dev/null 2>&1; then
+        nc -zU "$path" 2>/dev/null
+    elif command -v ss >/dev/null 2>&1; then
+        # ss -lx 列出 Unix domain socket（-lntu 是 TCP/UDP，不匹配）。
+        # 无 python3/nc 的回退仅验证「有监听者」，无法区分孤儿 socket。
+        ss -lx 2>/dev/null | grep -qF "$path" 2>/dev/null
+    else
+        # 最终回退：bash 内置 /dev/unix 路径不可用，用 curl 探测
+        # gateway JSON-RPC（仅适用于 gateway.sock）。通用场景返回 1
+        # 由调用方按 stale socket 处理。
+        return 1
+    fi
+}
+
+# ── 硬件监控补齐（2.3.2：monitor/profile 共用）────────────────────────────
+# _ensure_daemon <bin路径> <socket路径>：socket 未就绪则独立后台拉起。
+# 与 _launch_daemon 的差异：不绑定本次会话生命周期（会话退出不回收）——
+# 由后续 airymaxrt 会话的复用探测（_sock_alive）接管管理，适合常驻补齐。
+_ensure_daemon() {
+    local bin="$1" sock="$2" bname
+    [ -x "$bin" ] || return 0
+    bname="${bin##*/}"
+    if _sock_alive "$sock"; then
+        log debug "补齐跳过: $bname 已在运行（$sock）"
+        return 0
+    fi
+    if [ -S "$sock" ]; then
+        log warn "$bname stale socket（无监听），移除后补齐: $sock"
+        rm -f "$sock"
+    fi
+    nohup "$bin" >"$AIRY_HOME/logs/${bname}.out" 2>&1 &
+    log info "补齐 daemon: $bname（PID=$!），日志: $AIRY_HOME/logs/${bname}.out"
+}
+
+# full 画像的 12 个能力 daemon（minimal 裁剪项）：硬件增强后自动恢复。
+# 顺序与正常启动路径一致（hook→plugin→monit→sched→channel→market→
+# cupolas→mem→a2a→info→notify→observe）。
+ensure_aux_daemons() {
+    _ensure_daemon "$(find_tool AIRY_HOOK_BIN hook_d "$AIRY_HOME/bin/hook_d" "$AIRYRT_HOME/agentrt/build/bin/hook_d" "$AIRYRT_HOME/build/bin/hook_d")" "$RUNTIME_DIR/hook.sock"
+    _ensure_daemon "$(find_tool AIRY_PLUGIN_BIN plugin_d "$AIRY_HOME/bin/plugin_d" "$AIRYRT_HOME/agentrt/build/bin/plugin_d" "$AIRYRT_HOME/build/bin/plugin_d")" "$RUNTIME_DIR/plugin.sock"
+    _ensure_daemon "$(find_tool AIRY_MONIT_BIN monit_d "$AIRY_HOME/bin/monit_d" "$AIRYRT_HOME/agentrt/build/bin/monit_d" "$AIRYRT_HOME/build/bin/monit_d")" "$RUNTIME_DIR/monit.sock"
+    _ensure_daemon "$(find_tool AIRY_SCHED_BIN sched_d "$AIRY_HOME/bin/sched_d" "$AIRYRT_HOME/agentrt/build/bin/sched_d" "$AIRYRT_HOME/build/bin/sched_d")" "$RUNTIME_DIR/sched.sock"
+    _ensure_daemon "$(find_tool AIRY_CHANNEL_BIN channel_d "$AIRY_HOME/bin/channel_d" "$AIRYRT_HOME/agentrt/build/bin/channel_d" "$AIRYRT_HOME/build/bin/channel_d")" "$RUNTIME_DIR/channel.sock"
+    _ensure_daemon "$(find_tool AIRY_MARKET_BIN market_d "$AIRY_HOME/bin/market_d" "$AIRYRT_HOME/agentrt/build/bin/market_d" "$AIRYRT_HOME/build/bin/market_d")" "$RUNTIME_DIR/market.sock"
+    _ensure_daemon "$(find_tool AIRY_CUPOLAS_BIN cupolas_d "$AIRY_HOME/bin/cupolas_d" "$AIRYRT_HOME/agentrt/build/bin/cupolas_d" "$AIRYRT_HOME/build/bin/cupolas_d")" "$RUNTIME_DIR/cupolas.sock"
+    _ensure_daemon "$(find_tool AIRY_MEM_BIN mem_d "$AIRY_HOME/bin/mem_d" "$AIRYRT_HOME/agentrt/build/bin/mem_d" "$AIRYRT_HOME/build/bin/mem_d")" "$RUNTIME_DIR/mem.sock"
+    _ensure_daemon "$(find_tool AIRY_A2A_BIN a2a_d "$AIRY_HOME/bin/a2a_d" "$AIRYRT_HOME/agentrt/build/bin/a2a_d" "$AIRYRT_HOME/build/bin/a2a_d")" "$RUNTIME_DIR/a2a.sock"
+    _ensure_daemon "$(find_tool AIRY_INFO_BIN info_d "$AIRY_HOME/bin/info_d" "$AIRYRT_HOME/agentrt/build/bin/info_d" "$AIRYRT_HOME/build/bin/info_d")" "$RUNTIME_DIR/info.sock"
+    _ensure_daemon "$(find_tool AIRY_NOTIFY_BIN notify_d "$AIRY_HOME/bin/notify_d" "$AIRYRT_HOME/agentrt/build/bin/notify_d" "$AIRYRT_HOME/build/bin/notify_d")" "$RUNTIME_DIR/notify.sock"
+    _ensure_daemon "$(find_tool AIRY_OBSERVE_BIN observe_d "$AIRY_HOME/bin/observe_d" "$AIRYRT_HOME/agentrt/build/bin/observe_d" "$AIRYRT_HOME/build/bin/observe_d")" "$RUNTIME_DIR/observe.sock"
+}
+
+# 画像状态持久化（profile 子命令/monitor 使用）
+write_profile_state() { # <full|minimal|auto>
+    mkdir -p "$AIRY_HOME/config"
+    printf 'AIRY_PROFILE=%s\n' "$1" >"$PROFILE_ENV"
+    chmod 600 "$PROFILE_ENV" 2>/dev/null || true
+    log info "运行画像已持久化: $PROFILE_ENV（AIRY_PROFILE=$1）"
+}
+
+# 更新画像中单个变量（外设变化时仅刷新对应行，保留其余固化信息）：
+# monitor 检测到加速器增删时用——AIRY_HW_ACCEL 行存在则替换，否则追加。
+upsert_profile_var() { # <KEY> <值>
+    local key="$1" val="$2"
+    mkdir -p "$AIRY_HOME/config"
+    if grep -q "^${key}=" "$PROFILE_ENV" 2>/dev/null; then
+        sed -i "s|^${key}=.*|${key}=${val}|" "$PROFILE_ENV"
+    else
+        printf '%s=%s\n' "$key" "$val" >>"$PROFILE_ENV"
+    fi
+    chmod 600 "$PROFILE_ENV" 2>/dev/null || true
+}
+
+# ── 自更新器：airymaxrt update ──────────────────────────────────────────────
+# 协议（与 tools/scripts/ci/release/publish-release.sh 对称）：
+#   1. 读 install.env 当前版本/通道
+#   2. 下载通道 manifest（latest/manifest.<channel>.json）→ GPG 验签
+#   3. 版本比较 → 下载当前平台 tarball → sha256 校验 → 架构自检
+#   4. 备份 bin/lib/include/share 到 .rollback/ → 热替换 → 更新 install.env
+#   5. 替换后自检；--rollback 手动恢复上次备份
+# 官方制品仓库：atomgit.com/openairymax/agentrt（releases 附件 + latest/ 固定入口）
+# 通道：stable / beta（tag 含 -beta./-rc. 归 beta）。
+AIRY_GPG_PUBKEY='-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mDMEapD+dRYJKwYBBAHaRw8BAQdAGSOAehOJq5v9tS7zKCTqEbgCgJl5RnZPPyKl
+7NT7jrK0LEFpcnltYXggUmVsZWFzZSA8cmVsZWFzZUBhZ2VudHJ0LmFpcnltYXgu
+aW8+iJMEExYKADsWIQQASrAsWjQu4WO/uo675Qnj4UIl2wUCapD+dQIbAwULCQgH
+AgIiAgYVCgkICwIEFgIDAQIeBwIXgAAKCRC75Qnj4UIl2x7hAP9VmhSr9rWweDzl
+ElUYAoks0MRBG4TfYtP2saRAYqKt9QEAtHFEGmxAjcJmcuRl8KHzivu1JLEG2Yu6
+eemKaxR31gM=
+=myQU
+-----END PGP PUBLIC KEY BLOCK-----'
+
+# 版本比较（SemVer 简化：点分数字 + -beta.N/-rc.N 后缀）：输出 -1|0|1
+ver_cmp() { # <a> <b>
+    local a="$1" b="$2" apr="" bpr=""
+    a="${a#v}"; b="${b#v}"
+    case "$a" in *-*) apr="${a#*-}"; a="${a%%-*}";; esac
+    case "$b" in *-*) bpr="${b#*-}"; b="${b%%-*}";; esac
+    local -a av bv
+    IFS='.' read -r -a av <<< "$a"
+    IFS='.' read -r -a bv <<< "$b"
+    local n=$(( ${#av[@]} > ${#bv[@]} ? ${#av[@]} : ${#bv[@]} )) i x y
+    for ((i=0; i<n; i++)); do
+        x="${av[$i]:-0}"; y="${bv[$i]:-0}"
+        (( x > y )) && { echo 1; return; }
+        (( x < y )) && { echo -1; return; }
+    done
+    if [ -z "$apr" ] && [ -z "$bpr" ]; then echo 0; return; fi
+    if [ -z "$apr" ]; then echo 1; return; fi   # 正式版 > prerelease
+    if [ -z "$bpr" ]; then echo -1; return; fi
+    local an="${apr##*.}" bn="${bpr##*.}"
+    (( an > bn )) && echo 1 || { (( an < bn )) && echo -1 || echo 0; }
+}
+
+# 当前平台键（manifest artifacts 键名，与打包命名对齐）：linux-x86_64 / macos-arm64
+runtime_platform() {
+    local os arch
+    case "$(uname -s 2>/dev/null)" in
+        Darwin) os="macos"; arch="$(uname -m 2>/dev/null)" ;;   # arm64 / x86_64
+        *)      os="linux"; arch="$(detect_arch)" ;;
+    esac
+    echo "${os}-${arch}"
+}
+
+# manifest 字段提取（python3 优先，回退 grep 顶层键）
+manifest_get() { # <manifest> <latest|artifact:<platform>>
+    local f="$1" mode="$2"
+    if command -v python3 >/dev/null 2>&1; then
+        python3 - "$f" "$mode" <<'PYEOF'
+import json, sys
+try:
+    m = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(1)
+mode = sys.argv[2]
+if mode == "latest":
+    print(m.get("latest", ""))
+elif mode.startswith("artifact:"):
+    plat = mode.split(":", 1)[1]
+    rel = m.get("releases", {}).get(m.get("latest", ""), {})
+    art = rel.get("artifacts", {}).get(plat, {})
+    print(art.get("url", ""))
+    print(art.get("sha256", ""))
+PYEOF
+        return 0
+    fi
+    # 回退：仅顶层 latest / 单行 artifact 提取
+    case "$mode" in
+        latest) sed -n 's/.*"latest"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$f" | head -1 ;;
+        artifact:*) : ;;
+    esac
+}
+
+# AtomGit raw 域（raw.atomgit.com/.../raw/...）对非 Markdown 文件返回
+# HTML 预览页（"暂不支持预览"，403），不可作原始文件直链。改用 v5
+# contents API：匿名 GET /repos/{owner}/{repo}/contents/<path>?ref=main
+# 返回 JSON（content 为 base64），python3 解码优先，无 python3 时回退
+# sed 提取 + base64 -d（content 为单行 base64，不含引号，提取安全）。
+fetch_repo_file() { # <repo_path> <dest>
+    local api="https://api.atomgit.com/api/v5/repos/${AIRY_RELEASE_OWNER:-openairymax/agentrt}/contents/$1?ref=main"
+    local tmp="$AIRY_HOME/tmp/contents.$$"
+    mkdir -p "$(dirname "$tmp")" 2>/dev/null
+    curl -fsSL --max-time 60 -o "$tmp" "$api" || { rm -f "$tmp"; return 1; }
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -c 'import json,sys,base64; sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin).get("content","").replace("\n","")))' < "$tmp" > "$2" || { rm -f "$tmp"; return 1; }
+    else
+        sed -n 's/.*"content"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp" | tr -d '\n' | base64 -d > "$2" 2>/dev/null || { rm -f "$tmp"; return 1; }
+    fi
+    rm -f "$tmp"
+    [ -s "$2" ]
+}
+
+# GPG 验签（独立 homedir，不污染用户 keyring；签名缺失拒绝——fail-closed
+# 防供应链攻击。公钥优先级：发布源 latest/keys/ 在线拉取（支持轮换）→
+# 本地 $AIRY_HOME/keys/ → 内置公钥（首次引导兜底））。
+verify_gpg_sig() { # <file> <sig.asc>
+    local f="$1" sig="$2"
+    [ -s "$sig" ] || { log warn "缺少签名文件（fail-closed），拒绝更新"; return 1; }
+    local GNUPG="$AIRY_HOME/tmp/gnupg-update"
+    mkdir -p "$GNUPG"
+    chmod 700 "$GNUPG"
+    local KEYF="$GNUPG/agentrt.asc"
+    if [ -z "${AIRY_NO_NETWORK:-}" ]; then
+        fetch_repo_file "latest/keys/agentrt.asc" "$KEYF" >/dev/null 2>&1 || true
+    fi
+    if [ ! -s "$KEYF" ] && [ -f "$AIRY_HOME/keys/agentrt.asc" ]; then
+        cp -f "$AIRY_HOME/keys/agentrt.asc" "$KEYF" 2>/dev/null || true
+    fi
+    [ -s "$KEYF" ] || printf '%s\n' "$AIRY_GPG_PUBKEY" > "$KEYF"
+    gpg --batch --quiet --no-tty --homedir "$GNUPG" --import "$KEYF" >/dev/null 2>&1 || return 1
+    gpg --batch --no-tty --homedir "$GNUPG" --verify "$sig" "$f" >/dev/null 2>&1
+}
+
+# 替换包体：sha256 强制校验 → 备份 → 热替换 → 自检 → 失败自动回滚 →
+# 更新 install.env。期望校验值由调用方传入（manifest 或 --sha256/相邻 .sha256），
+# 缺期望值直接拒绝（问题 12：离线包/远程包统一防绕过验签口径）。
+apply_package() { # <tarball> [expect_sha]
+    local tarball="$1" expect_sha="$2" arch="$(detect_arch)"
+    local TMPD="$AIRY_HOME/tmp/apply.$$"
+    rm -rf "$TMPD"; mkdir -p "$TMPD"
+    # sha256 强制校验（fail-closed）
+    if [ -n "$expect_sha" ]; then
+        if ! echo "${expect_sha}  ${tarball}" | sha256sum -c - >/dev/null 2>&1; then
+            log error "sha256 校验失败，拒绝安装"; rm -rf "$TMPD"; return 1
+        fi
+        log ok "sha256 校验通过"
+    else
+        log error "缺少 sha256 期望值，拒绝安装（防供应链绕过）"; rm -rf "$TMPD"; return 1
+    fi
+    # 架构自检（同 install.sh install_binary 口径）
+    if tar -tzf "$tarball" 2>/dev/null | grep -q "platform-${arch}"; then
+        log info "架构校验通过（${arch}）"
+    elif tar -tzf "$tarball" 2>/dev/null | grep -qE 'platform-(x86_64|aarch64|armv7l|riscv64)'; then
+        log error "制品架构与当前主机（${arch}）不匹配，拒绝更新"
+        rm -rf "$TMPD"; return 1
+    fi
+    tar -xzf "$tarball" -C "$TMPD" || { log error "解压失败"; rm -rf "$TMPD"; return 1; }
+    local extracted="$(find "$TMPD" -maxdepth 1 -type d -name 'agentrt-*' | head -1)"
+    [ -n "$extracted" ] || { log error "包结构异常（缺 agentrt-* 顶层目录）"; rm -rf "$TMPD"; return 1; }
+    local new_ver="$(basename "$extracted" | sed 's/^agentrt-//')"
+    # 备份当前版本
+    local cur_ver="$(sed -n 's/^AIRY_VERSION=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
+    local bkup="$AIRY_HOME/.rollback/${cur_ver:-pre-update}"
+    rm -rf "$bkup"; mkdir -p "$bkup"
+    for d in bin lib include share; do
+        [ -d "$AIRY_HOME/$d" ] && cp -r "$AIRY_HOME/$d" "$bkup/" 2>/dev/null || true
+    done
+    log info "已备份当前版本: .rollback/（${cur_ver:-pre-update}）"
+    # 热替换（保留 config 用户配置/data/run/logs）
+    [ -d "$extracted/bin" ]     && cp -f "$extracted"/bin/*     "$AIRY_HOME/bin/"    2>/dev/null || true
+    [ -d "$extracted/lib" ]     && cp -f "$extracted"/lib/*     "$AIRY_HOME/lib/"    2>/dev/null || true
+    [ -d "$extracted/include" ] && cp -rf "$extracted"/include/* "$AIRY_HOME/include/" 2>/dev/null || true
+    [ -d "$extracted/share" ]   && cp -rf "$extracted"/share/*   "$AIRY_HOME/share/"   2>/dev/null || true
+    if [ -d "$extracted/config" ]; then
+        for f in "$extracted"/config/*; do
+            [ -f "$f" ] || continue
+            b="$(basename "$f")"
+            case "$b" in
+                secrets.env) continue ;;   # 用户敏感配置绝不覆盖
+                *) [ -f "$AIRY_HOME/config/$b" ] || cp -f "$f" "$AIRY_HOME/config/" 2>/dev/null || true ;;
+            esac
+        done
+    fi
+    # 同步签名公钥（新包自带时）
+    [ -f "$extracted/keys/agentrt.asc" ] && cp -f "$extracted/keys/agentrt.asc" "$AIRY_HOME/keys/" 2>/dev/null || true
+    # 自检：关键二进制存在（防止不完整包静默替换导致 daemon 群起不来）
+    if [ ! -x "$AIRY_HOME/bin/airy_cli" ] && [ ! -x "$AIRY_HOME/bin/agentrt-bootstrap.sh" ]; then
+        log error "热替换自检失败（bin/ 关键组件缺失），自动回滚…"
+        for d in bin lib include share; do
+            [ -d "$bkup/$d" ] && cp -rf "$bkup/$d"/* "$AIRY_HOME/$d/" 2>/dev/null || true
+        done
+        rm -rf "$TMPD"
+        return 1
+    fi
+    # 固化新版本到 install.env
+    if [ -f "$AIRY_HOME/config/install.env" ]; then
+        sed -i "s|^AIRY_VERSION=.*|AIRY_VERSION=v${new_ver}|" "$AIRY_HOME/config/install.env" 2>/dev/null || \
+            printf 'AIRY_VERSION=v%s\n' "$new_ver" >> "$AIRY_HOME/config/install.env"
+    fi
+    rm -rf "$TMPD"
+    # 回滚备份只保留最近 3 份（问题 11：rollback 目录无限膨胀清理）
+    ls -1d "$AIRY_HOME"/.rollback/*/ 2>/dev/null | sort -r | tail -n +4 | while read -r old; do
+        rm -rf "$old"
+    done
+    log ok "更新完成: v${new_ver}（重跑 airymaxrt 生效）"
+    return 0
+}
+
+airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--rollback] [--file <tarball>] [--sha256 <hash>]
+    local CHECK=0 CHANNEL="" ROLLBACK=0 FILE="" SHA256="" inst_env="$AIRY_HOME/config/install.env"
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --check|-c) CHECK=1 ;;
+            --channel) CHANNEL="${2:-}"; shift ;;
+            --rollback) ROLLBACK=1 ;;
+            --file|-f) FILE="${2:-}"; shift ;;
+            --sha256) SHA256="${2:-}"; shift ;;
+            --yes|-y) : ;;   # 幂等：非交互本就默认继续
+            *) log error "未知参数: $1（--check/--channel/--rollback/--file/--sha256）"; return 2 ;;
+        esac
+        shift
+    done
+    # 当前版本/通道（install.env 固化，安装信息只读）
+    local cur_ver="" cur_ch="stable"
+    if [ -f "$inst_env" ]; then
+        cur_ver="$(sed -n 's/^AIRY_VERSION=//p' "$inst_env" | head -1)"
+        cur_ch="$(sed -n 's/^AIRY_CHANNEL=//p' "$inst_env" | head -1)"
+    fi
+    CHANNEL="${CHANNEL:-${cur_ch:-stable}}"
+    case "$CHANNEL" in stable|beta|rc) ;; *) log error "通道无效: $CHANNEL（stable|beta|rc）"; return 2 ;; esac
+
+    # 回滚
+    if [ "$ROLLBACK" = "1" ]; then
+        local rb="$(ls -1d "$AIRY_HOME"/.rollback/*/ 2>/dev/null | sort -r | head -1)"
+        [ -n "$rb" ] || { log error "无可用回滚备份（.rollback/ 为空）"; return 1; }
+        log info "回滚到: $(basename "$rb")…"
+        for d in bin lib include share; do
+            [ -d "$rb/$d" ] && cp -rf "$rb/$d"/* "$AIRY_HOME/$d/" 2>/dev/null || true
+        done
+        # 恢复版本号（备份目录名即被回滚版本的 AIRY_VERSION）
+        if [ -f "$inst_env" ]; then
+            local rb_ver="$(basename "$rb")"
+            if [ "$rb_ver" != "pre-update" ]; then
+                sed -i "s|^AIRY_VERSION=.*|AIRY_VERSION=${rb_ver}|" "$inst_env" 2>/dev/null || \
+                    printf 'AIRY_VERSION=%s\n' "$rb_ver" >> "$inst_env"
+            fi
+        fi
+        log ok "回滚完成（重新运行 airymaxrt 生效）"
+        return 0
+    fi
+
+    # 本地离线包更新（需 sha256 强制校验：--sha256 <hash> 或相邻 .sha256 文件，
+    # 缺期望值拒绝 —— 问题 12：离线包不得绕过验签）
+    if [ -n "$FILE" ]; then
+        [ -f "$FILE" ] || { log error "本地包不存在: $FILE"; return 1; }
+        local expect_sha="$SHA256"
+        if [ -z "$expect_sha" ] && [ -f "${FILE}.sha256" ]; then
+            expect_sha="$(cut -d' ' -f1 "${FILE}.sha256" 2>/dev/null)"
+        fi
+        if [ -z "$expect_sha" ]; then
+            log error "离线包必须提供校验值：--sha256 <hash> 或相邻 ${FILE}.sha256（防供应链绕过）"
+            return 1
+        fi
+        log info "应用本地离线包: $(basename "$FILE")（sha256 强制校验）…"
+        apply_package "$FILE" "$expect_sha"
+        return $?
+    fi
+
+    # 远程通道更新（manifest 经 contents API 拉取：raw 域对 JSON 返回
+    # HTML 预览页不可直连，见 fetch_repo_file 注释）
+    local TMPD="$AIRY_HOME/tmp/update.$$"
+    rm -rf "$TMPD"; mkdir -p "$TMPD"
+    log info "检查更新（通道: ${CHANNEL}，当前: ${cur_ver:-<未安装>}）…"
+    fetch_repo_file "latest/manifest.${CHANNEL}.json" "$TMPD/manifest.json" \
+        || { log error "manifest 下载失败（latest/manifest.${CHANNEL}.json）"; rm -rf "$TMPD"; return 1; }
+    fetch_repo_file "latest/manifest.${CHANNEL}.json.asc" "$TMPD/manifest.json.asc" >/dev/null 2>&1 || true
+    verify_gpg_sig "$TMPD/manifest.json" "$TMPD/manifest.json.asc" || { log error "manifest 验签失败（GPG），拒绝更新"; rm -rf "$TMPD"; return 1; }
+    log info "manifest 验签通过（GPG）"
+    local latest="$(manifest_get "$TMPD/manifest.json" latest)"
+    [ -n "$latest" ] || { log error "manifest 解析失败"; rm -rf "$TMPD"; return 1; }
+    local cmp="$(ver_cmp "${cur_ver:-0.0.0}" "$latest")"
+    if [ "$cmp" = "0" ] || [ "$cmp" = "1" ]; then
+        log info "已是最新: ${cur_ver:-<未安装>}（最新 ${latest}）"
+        rm -rf "$TMPD"
+        return 0
+    fi
+    log info "发现新版本: ${cur_ver:-<未安装>} → ${latest}（${CHANNEL}）"
+    [ "$CHECK" = "1" ] && { log info "仅检查模式：更新可用"; rm -rf "$TMPD"; return 0; }
+    # 当前平台制品
+    local plat="$(runtime_platform)"
+    local art_url art_sha
+    art_url="$(manifest_get "$TMPD/manifest.json" "artifact:${plat}" | sed -n 1p)"
+    art_sha="$(manifest_get "$TMPD/manifest.json" "artifact:${plat}" | sed -n 2p)"
+    [ -n "$art_url" ] || { log error "当前平台 ${plat} 无可用制品"; rm -rf "$TMPD"; return 1; }
+    local tarball="$TMPD/$(basename "${art_url%%\?*}")"
+    log info "下载制品: ${art_url}"
+    curl -fsSL --max-time 600 -o "$tarball" "$art_url" || { log error "制品下载失败"; rm -rf "$TMPD"; return 1; }
+    # sha256 校验收敛到 apply_package（fail-closed：manifest 缺 sha256 拒绝）
+    apply_package "$tarball" "$art_sha"
+    local rc=$?
+    rm -rf "$TMPD"
+    return $rc
+}
+
+# ── 子命令：help / status / doctor / uninstall ──────────────────────────────
+# 86：CLI/TUI 随时转换——`cli` 子命令不直接 exec（否则跳过 daemon 群启动，
+# CLI 直连 socket 时群未拉起会报"目标不存在"），而是置 FORCE_CLI 标记后
+# 走统一默认流程：先确保守护进程群就绪，再由 launch_frontend 选择前端。
+AIRYRT_FORCE_CLI=0
+CLI_ARGS=()
+CMD="${1:-}"
+case "$CMD" in
+    --help|-h|help)
+        echo "用法: airymaxrt [--gateway-url URL] [--agent-file FILE]"
+        echo "      airymaxrt cli [airy_cli 参数]  强制 CLI 模式（默认 TUI；随时可切换）"
+        echo "      airymaxrt profile [full|minimal|auto]  查看/切换运行画像（硬件自适应）"
+        echo "      airymaxrt monitor   硬件监控：检测到能力增强自动恢复功能"
+        echo "                        （monitor --daemon 后台常驻 / --stop 停止）"
+        echo "      airymaxrt status      查看运行时状态"
+        echo "      airymaxrt doctor      组件健康检查"
+        echo "      airymaxrt update      自更新（--check 仅检查 / --channel stable|beta|rc"
+        echo "                            切通道 / --rollback 回滚 / --file 离线包"
+        echo "                            （离线包需 --sha256 或相邻 .sha256））"
+        echo "      airymaxrt uninstall   一键卸载（--keep-data 保留记忆数据）"
+        exit 0
+        ;;
+    cli)
+        # 86: CLI/TUI 随时转换——显式请求 CLI 前端（默认走 TUI）。
+        # 透传剩余参数给 airy_cli；未传参数时以 TTY 交互模式运行。
+        # 退出后重新执行 airymaxrt（无参数）即回到 TUI。
+        if [ -z "$CLI_BIN" ]; then
+            log error "airy_cli 未找到（CLI_BIN 为空）"
+            exit 1
+        fi
+        AIRYRT_FORCE_CLI=1
+        shift
+        CLI_ARGS=("$@")
+        ;;
+    profile)
+        # 2.3.2: 查看/切换运行画像（full|minimal|auto）。硬件变化（内存扩容、
+        # 插入显卡等外设）后执行 `airymaxrt profile` 重新评估；指定画像时
+        # 持久化并立即补齐被裁剪的能力 daemon。
+        case "${2:-}" in
+            ""|status)
+                _HW="$(assess_hardware)"
+                _HW_P="${_HW%%|*}"
+                _HW_REST="${_HW#*|}"
+                _MEM_TOTAL="${_HW_REST%%|*}"
+                _MEM_REST="${_HW_REST#*|}"
+                _MEM_AVAIL="${_MEM_REST%%|*}"
+                _CPU="${_MEM_REST#*|}"
+                _CPU="${_CPU%%|*}"
+                _ACCEL="${_HW_REST##*|}"
+                log info "当前画像: ${AIRYRT_PROFILE:-auto}（硬件建议: $_HW_P）"
+                log info "硬件快照: $(detect_arch) · 内存 ${_MEM_TOTAL}KiB/可用 ${_MEM_AVAIL}KiB · CPU ${_CPU} 核 · 加速器 ${_ACCEL}"
+                exit 0
+                ;;
+            full|minimal|auto)
+                if [ "$2" = "auto" ]; then
+                    _HW="$(assess_hardware)"
+                    log info "自动评估画像: ${_HW%%|*}"
+                    write_profile_state auto
+                    AIRYRT_PROFILE="auto"
+                else
+                    write_profile_state "$2"
+                    AIRYRT_PROFILE="$2"
+                fi
+                if [ "$AIRYRT_PROFILE" = "full" ]; then
+                    log info "full 画像：补齐能力 daemon…"
+                    ensure_aux_daemons
+                fi
+                log info "画像已生效: $AIRYRT_PROFILE（下次启动持久生效）"
+                exit 0
+                ;;
+            *)
+                log error "无效画像 '$2'（支持 full|minimal|auto）"
+                exit 2
+                ;;
+        esac
+        ;;
+    monitor)
+        # 2.3.2: 硬件监控——周期评估硬件画像，检测到能力增强（内存扩容/
+        # 外设接入）时自动补齐被裁剪 daemon，实现"硬件变化自动恢复功能"；
+        # 资源下降时提示主动裁剪。
+        #   airymaxrt monitor              前台监控（Ctrl+C 干净退出）
+        #   airymaxrt monitor --daemon     后台常驻（PID 记录 $RUNTIME_DIR/
+        #                                   airymaxrt-monitor.pid）——端侧/服务
+        #                                   器部署后无需保持终端，插入显卡等
+        #                                   外设增强即自动恢复全量功能
+        #   airymaxrt monitor --stop       停止后台监控
+        # 判定依据：硬件建议画像与「当前生效画像」不一致即动作（而非前后
+        # 两次建议比较——后者在 minimal 状态下永远等不到变化，增强永不触发）。
+        case "${2:-}" in
+            --daemon|--background|-d)
+                _MON_PID_FILE="$RUNTIME_DIR/airymaxrt-monitor.pid"
+                if [ -f "$_MON_PID_FILE" ] && \
+                   [ -n "$(cat "$_MON_PID_FILE" 2>/dev/null)" ] && \
+                   kill -0 "$(cat "$_MON_PID_FILE" 2>/dev/null)" 2>/dev/null; then
+                    log warn "硬件监控已在后台运行（PID=$(cat "$_MON_PID_FILE" 2>/dev/null)）"
+                    exit 0
+                fi
+                mkdir -p "$RUNTIME_DIR"
+                # 递归以真实脚本绝对路径启动，避免软链/相对路径在后台失效；
+                # 环境变量（AIRY_HOME/AIRYRT_PROFILE 等）已 export，子进程继承。
+                nohup bash "$SCRIPT_DIR/airymaxrt" monitor \
+                    >"$AIRY_HOME/logs/airymaxrt-monitor.log" 2>&1 &
+                echo "$!" >"$_MON_PID_FILE"
+                log info "硬件监控后台运行（PID=$!，日志 $AIRY_HOME/logs/airymaxrt-monitor.log）"
+                exit 0
+                ;;
+            --stop)
+                _MON_PID_FILE="$RUNTIME_DIR/airymaxrt-monitor.pid"
+                if [ -f "$_MON_PID_FILE" ]; then
+                    _MON_PID="$(cat "$_MON_PID_FILE" 2>/dev/null)"
+                    if [ -n "$_MON_PID" ] && kill -0 "$_MON_PID" 2>/dev/null; then
+                        kill "$_MON_PID" 2>/dev/null
+                        log info "硬件监控已停止（PID=$_MON_PID）"
+                    else
+                        log warn "硬件监控未在运行（陈旧 PID 文件）"
+                    fi
+                    rm -f "$_MON_PID_FILE"
+                else
+                    log warn "未找到后台监控 PID 文件（未在后台运行？）"
+                fi
+                exit 0
+                ;;
+        esac
+        trap 'log info "硬件监控退出"; exit 0' INT TERM
+        _INT="${AIRYRT_MONITOR_INTERVAL:-10}"
+        _HINTED=""   # 已提示的画像值：差异持续时只提示一次，回归一致后重置
+        log info "硬件监控启动（间隔 ${_INT}s，Ctrl+C 退出），当前画像: ${AIRYRT_PROFILE}"
+        while true; do
+            _HW="$(assess_hardware)"
+            _CUR="${_HW%%|*}"
+            _SNAP="${_HW#*|}"
+            # 外设变化检测：加速器增删（插卡/拔卡、驱动启用/禁用）不改变
+            # 画像但改变本地推理能力——与画像固化值对比，变化即提示并刷新
+            # profile.env（AIRY_HW_ACCEL）。AIRY_HW_ACCEL 由 install.sh
+            # persist_profile 固化、本脚本启动时 source 导入。
+            _ACCEL_NOW="${_SNAP##*|}"
+            _ACCEL_BASE="${AIRY_HW_ACCEL:-none}"
+            if [ "$_ACCEL_NOW" != "$_ACCEL_BASE" ]; then
+                log info "外设变化: 加速器 ${_ACCEL_BASE} → ${_ACCEL_NOW}"
+                upsert_profile_var AIRY_HW_ACCEL "$_ACCEL_NOW"
+                if [ "$_ACCEL_NOW" != "none" ]; then
+                    log info "检测到加速器（${_ACCEL_NOW}），本地推理能力可用（可配置本地模型）"
+                else
+                    log warn "加速器已不可见，本地推理将不可用（远程 LLM 不受影响）"
+                fi
+            fi
+            if [ "$_CUR" != "$AIRYRT_PROFILE" ]; then
+                if [ "$_CUR" = "full" ]; then
+                    if [ "$AIRYRT_PROFILE_RAW" != "auto" ]; then
+                        if [ "$_HINTED" != "$_CUR" ]; then
+                            log warn "检测到硬件能力增强（$_SNAP），但画像为显式设置 ${AIRYRT_PROFILE}"
+                            log warn "执行 'airymaxrt profile full' 可立即恢复全量功能"
+                            _HINTED="$_CUR"
+                        fi
+                    else
+                        log info "检测到硬件能力增强（$_SNAP），自动恢复全量功能"
+                        write_profile_state full
+                        AIRYRT_PROFILE=full
+                        ensure_aux_daemons
+                        _HINTED=""
+                    fi
+                elif [ "$_HINTED" != "$_CUR" ]; then
+                    log warn "检测到资源下降（$_SNAP，建议 minimal），当前画像 ${AIRYRT_PROFILE}"
+                    log warn "可执行 'airymaxrt profile minimal' 主动裁剪，或重启进入 minimal"
+                    _HINTED="$_CUR"
+                fi
+            else
+                _HINTED=""
+            fi
+            sleep "$_INT"
+        done
+        ;;
+    status)
+        log info "AIRY_HOME=$AIRY_HOME"
+        log info "画像: ${AIRYRT_PROFILE:-auto} · 架构: $(detect_arch) · 加速器: $(detect_accel)"
+        log info "组件: TUI=${TUI_BIN:-缺失} GATEWAY=${GATEWAY_BIN:-缺失} LLM=${LLM_BIN:-缺失}"
+        # PATH 引导闭环（2.3.2.6）：安装器（build.sh/install.sh）把 BIN_DIR
+        # 是否在 PATH 固化进 install.env，此处消费并向用户给出可复制修复命令，
+        # 避免"装上了却输入 airymaxrt 报 command not found"的困惑。
+        if [ -f "$AIRY_HOME/config/install.env" ]; then
+            _BP="$(sed -n 's/^AIRY_BIN_DIR_IN_PATH=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
+            _BL="$(sed -n 's/^AIRY_BIN_LINK=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
+            _BL="${_BL:-$HOME/.local/bin/airymaxrt}"
+            _BD="${_BL%/airymaxrt}"
+            if [ "$_BP" = "no" ]; then
+                log warn "PATH 引导: ${_BD} 不在 PATH 中——当前 shell 输入 airymaxrt 会报 command not found"
+                log warn "  临时生效: export PATH=\"${_BD}:\$PATH\""
+                _RC_S="$HOME/.bashrc"
+                case "$(basename "${SHELL:-/bin/sh}")" in
+                    zsh) _RC_S="$HOME/.zshrc" ;;
+                    fish) _RC_S="$HOME/.config/fish/config.fish" ;;
+                    sh|dash|ash) _RC_S="$HOME/.profile" ;;
+                esac
+                log warn "  永久生效: echo 'export PATH=\"${_BD}:\$PATH\"' >> \"${_RC_S}\" && source \"${_RC_S}\""
+            else
+                log info "PATH 引导: ${_BD} 已在 PATH 中（输入 airymaxrt 即可启动）"
+            fi
+        fi
+        if wait_for_health "$GATEWAY_URL" 1; then
+            log info "gateway: 在线（$GATEWAY_URL）"
+        else
+            log warn "gateway: 离线"
+        fi
+        # daemon 群状态以关键 socket 可连接为权威判据（_sock_alive 含
+        # health_check 往返）。不用 pgrep：进程名匹配会把容器/其他实例的
+        # 同名进程算作本实例运行中，出现「status 显示运行中但 gateway 离线、
+        # llm.sock 未就绪」的矛盾（2026-08-22）。llm/think/agent/tool 是
+        # 对话与执行的核心链路，任一未就绪即提示不完整。
+        _core_ok=1
+        for _c in llm think agent tool; do
+            if ! _sock_alive "$RUNTIME_DIR/$_c.sock"; then
+                log warn "$_c.sock: 未就绪"
+                _core_ok=0
+            fi
+        done
+        if [ "$_core_ok" = "1" ]; then
+            log info "daemon 群: 核心链路（llm/think/agent/tool）全部就绪"
+        else
+            log warn "daemon 群: 核心链路未全部就绪（运行 airymaxrt 拉起，或查看 logs/ 诊断）"
+        fi
+        exit 0
+        ;;
+    doctor)
+        miss=0
+        for name in TUI_BIN GATEWAY_BIN LLM_BIN THINK_BIN; do
+            eval "val=\${$name:-}"
+            if [ -n "$val" ] && [ -x "$val" ]; then log info "$name: $val"; else log warn "$name: 缺失"; miss=1; fi
+        done
+        if [ -f "$AIRY_HOME/config/secrets.env" ]; then log info "secrets.env: 就绪"; else log warn "secrets.env: 缺失（LLM 不可用）"; miss=1; fi
+        if [ -f "$AIRY_HOME/config/install.env" ]; then log info "install.env: 就绪"; else log warn "install.env: 缺失"; fi
+        if command -v curl >/dev/null 2>&1; then log info "curl: 就绪"; else log warn "curl: 缺失"; miss=1; fi
+        # PATH 引导检查（2.3.2.6）：install.env 固化结果 + 实时 PATH 双重校验，
+        # 实时校验可捕获安装后用户改 PATH 的场景。BIN_DIR 按段遍历（对含
+        # 空格/glob 字符的路径健壮），永久生效提示按当前 shell 选 rc 文件。
+        _BL_D="$(sed -n 's/^AIRY_BIN_LINK=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
+        _BL_D="${_BL_D:-$HOME/.local/bin/airymaxrt}"
+        _BD_D="${_BL_D%/airymaxrt}"
+        _PATH_FOUND=0
+        _P_SEG="$PATH"
+        while [ -n "$_P_SEG" ]; do
+            _seg="${_P_SEG%%:*}"
+            if [ "$_seg" = "$_BD_D" ]; then
+                _PATH_FOUND=1
+                break
+            fi
+            if [ "$_seg" = "$_P_SEG" ]; then _P_SEG=""; else _P_SEG="${_P_SEG#*:}"; fi
+        done
+        if [ "$_PATH_FOUND" = "1" ]; then
+            log info "PATH: ${_BD_D} 在 PATH 中"
+        else
+            log warn "PATH: ${_BD_D} 不在 PATH 中——输入 airymaxrt 会报 command not found"
+            _RC_D="$HOME/.bashrc"
+            case "$(basename "${SHELL:-/bin/sh}")" in
+                zsh) _RC_D="$HOME/.zshrc" ;;
+                fish) _RC_D="$HOME/.config/fish/config.fish" ;;
+                sh|dash|ash) _RC_D="$HOME/.profile" ;;
+            esac
+            log warn "  永久生效: echo 'export PATH=\"${_BD_D}:\$PATH\"' >> \"${_RC_D}\" && source \"${_RC_D}\""
+            miss=1
+        fi
+        if [ "$miss" = "0" ]; then log info "doctor: 全部就绪"; else log warn "doctor: 存在缺失项"; fi
+        exit 0
+        ;;
+    uninstall)
+        inst="${AIRY_HOME}/scripts/install.sh"
+        if [ -f "$inst" ]; then
+            log info "委托安装器执行卸载: $inst"
+            shift
+            exec sh "$inst" --uninstall "$@"
+        else
+            log warn "未找到安装器脚本，请手动删除: $AIRY_HOME"
+            exit 1
+        fi
+        ;;
+    update)
+        # 自更新器：检查/执行官方通道更新（stable|beta），GPG 验签 + sha256 校验
+        shift
+        airymaxrt_update "$@"
+        exit $?
+        ;;
+esac
+# 正常启动：透传剩余参数给 TUI
+# 终端日志统一默认 quiet：INFO 只写日志文件、不打印终端。全屏 TUI 下
+# 避免与界面混排；CLI 流式（-p）下 stdout 承载对话结果，启动 INFO 混入
+# 会污染输出（用户反馈"对话结果和日志混在一起"）。warn/error 仍打印
+# 终端（启动失败的可见性不牺牲）。显式 AIRYRT_TERM_LOG=verbose 可恢复
+# 终端 INFO（排查 daemon 拉起时序用）。
+if [ -z "${AIRYRT_TERM_LOG:-}" ]; then
+    AIRYRT_TERM_LOG=quiet
+fi
+
+# ── 前置检查 ─────────────────────────────────────────────────────────────────
+# TUI 与 CLI 至少需要一个：TUI 缺失时降级到 airy_cli（有 TTY 亦同）。
+if [ -z "$TUI_BIN" ] && [ -z "$CLI_BIN" ]; then
+    log error "未找到 agentrt-tui 与 airy_cli，请先构建："
+    log error "  TUI: cd \"$AIRYRT_HOME/sdk/tui\" && cargo build --release"
+    log error "  CLI: cd \"$AIRYRT_HOME/agentrt\" && cmake --build build --target airy_cli"
+    exit 1
+fi
+if [ -n "$TUI_BIN" ]; then
+    log info "组件就绪: TUI=$(basename "$TUI_BIN")"
+else
+    log warn "agentrt-tui 未找到，将使用 airy_cli 作为前端"
+fi
+
+# PATH 自愈兜底：BIN_DIR 不在 PATH 时自动追加 rc（幂等），
+# 兼容旧安装（安装时未自动引导）与安装后手动改 PATH 的场景。
+path_self_heal
+
+# ── 智能双模前端启动（2026-08-15 用户决策：所有端统一经 airymaxrt 启动）──
+#   有 TTY（交互终端/SSH -t） → Rust TUI（全屏，交互丰富）
+#   无 TTY（管道/CI/脚本重定向）→ C 版 airy_cli 流式（-p 单轮，stdin 读指令）
+# 前端以子进程运行：bash 保持信号处理能力，外部强杀经 trap 转 exit，
+# cleanup 可回收前端与本次拉起的 daemons。
+# 交互前端独占屏幕：清屏后 hero/banner 从屏幕第 1 行开始渲染。
+# 不清屏时 boot 输出（"正在启动守护进程群…"等）占据顶部数行，hero 从
+# boot 之后打印，而 cli_term_header_pin 固定从第 7 行设滚动区——对话
+# 输出从第 7 行起覆盖 hero 下半部（2026-08-20 实测复现：英雄区只剩
+# 一行框线）。boot 进度已完整记录于 airymaxrt.log，此处仅清当前屏。
+clear_front_screen() {
+    if [ -t 1 ]; then
+        printf '\033[2J\033[H' >&1
+    fi
+}
+
+# ── 终端全屏能力评估（2026-08-21）────────────────────────────────────────
+# TUI 除需要 TTY 外，还要求终端具备全屏渲染能力：
+#   - TERM=dumb/unknown/空（cron、脚本化环境、部分 CI）→ 不支持 ANSI 全屏
+#   - 屏幕过小（<20 行或 <60 列）→ 三区布局/侧边栏无法完整渲染
+# 满足条件才启用 Rust TUI；否则自动降级 airy_cli（TTY 交互 / 非 TTY 流式），
+# 实现"显示能力实时适配、自动切换最优前端"。AIRYRT_FORCE_TUI=1 强制 TUI。
+terminal_capable_tui() {
+    [ -n "${AIRYRT_FORCE_TUI:-}" ] && return 0
+    local term rows cols
+    term="${TERM:-dumb}"
+    case "$term" in
+        dumb|unknown|"") return 1 ;;
+    esac
+    if command -v stty >/dev/null 2>&1; then
+        read -r rows cols < <(stty size 2>/dev/null || printf "24 80")
+        if [ "${rows:-0}" -lt 20 ] || [ "${cols:-0}" -lt 60 ]; then
+            log debug "终端尺寸过小（${rows}x${cols}），TUI 降级 CLI"
+            return 1
+        fi
+    fi
+    return 0
+}
+
+launch_frontend() {
+    log debug "TTY 检测: stdin=$([ -t 0 ] && echo tty || echo pipe) stdout=$([ -t 1 ] && echo tty || echo pipe)"
+    # tmp 清理（1.8.3）：$AIRY_HOME/tmp 为易失运行时目录——取消会话残留
+    # （airy_cl3_cancel_* 等）超过 24h 未修改的旧文件/目录在每次进入前端前
+    # 回收，避免 tmp 无限膨胀（运行中的会话 mtime 新鲜，不受影响）。
+    if [ -d "$AIRY_HOME/tmp" ]; then
+        find "$AIRY_HOME/tmp" -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null
+        log debug "tmp 清理: 已回收超过 24h 未修改的临时文件/目录"
+    fi
+    # 86：显式 CLI 模式（airymaxrt cli [airy_cli 参数]）。带参数时透传
+    # （如 -p "指令" 单轮流式）；无参数且为 TTY 时进入 CLI 交互模式。
+    if [ "$AIRYRT_FORCE_CLI" = "1" ]; then
+        if [ -n "$CLI_BIN" ]; then
+            if [ -t 0 ] && [ -t 1 ] && [ "${#CLI_ARGS[@]}" -eq 0 ]; then
+                clear_front_screen
+                log debug "执行: \"$CLI_BIN\"（CLI 交互模式，TUI 让位）"
+                log info "进入交互界面（airy_cli，Ctrl+C 退出）"
+                "$CLI_BIN" <&0 &
+            else
+                log debug "执行: \"$CLI_BIN\" ${CLI_ARGS[*]:-}"
+                "$CLI_BIN" "${CLI_ARGS[@]}" <&0 &
+            fi
+            TUI_PID=$!
+            wait "$TUI_PID" || return $?
+            return 0
+        fi
+        log warn "airy_cli 不可用，回退默认前端"
+    fi
+    # 前端选择：有 TTY 且 TUI 可用 → Rust TUI；否则 → airy_cli。
+    # airy_cli 在 TTY 下以交互模式运行（无 -p），支持完整对话。
+    # 前端子进程必须显式继承脚本 stdin（<&0）：非交互 bash 会把后台命令的
+    # stdin 重定向为 /dev/null（POSIX 行为），导致 TUI 收不到按键、CLI
+    # 的 fgets 立即 EOF（表现为「airymaxrt 无输出即退出」）。
+    if [ -t 0 ] && [ -t 1 ] && [ -n "$TUI_BIN" ] && [ "$GATEWAY_DOWN" != "1" ] && terminal_capable_tui; then
+        clear_front_screen
+        log debug "执行: \"$TUI_BIN\" --gateway-url \"$GATEWAY_URL\" --agent-file \"$AGENT_FILE\""
+        log info "进入交互界面（Rust TUI，Ctrl+C 退出）"
+        "$TUI_BIN" --gateway-url "$GATEWAY_URL" --agent-file "$AGENT_FILE" <&0 &
+        TUI_PID=$!
+        wait "$TUI_PID"
+        local rc=$?
+        # TUI 异常退出（崩溃/被信号打断，code≠0）且终端仍交互 → 无缝续接
+        # CLI 交互模式，保证会话不中断（2.2.2 CLI/TUI 随时转换）。正常
+        # 退出（用户 Q，code=0）则按用户意愿结束。
+        if [ "$rc" -ne 0 ] && [ -n "$CLI_BIN" ] && [ -t 0 ] && [ -t 1 ]; then
+            log warn "TUI 异常退出（code=$rc），自动续接 CLI 交互模式"
+            clear_front_screen
+            log info "进入交互界面（airy_cli，/quit 退出）"
+            "$CLI_BIN" <&0 &
+            TUI_PID=$!
+            wait "$TUI_PID"
+        fi
+        return 0
+    elif [ -n "$CLI_BIN" ]; then
+        if [ -t 0 ] && [ -t 1 ]; then
+            clear_front_screen
+            log debug "执行: \"$CLI_BIN\"（TTY 交互模式，TUI 不可用降级）"
+            log info "进入交互界面（airy_cli，Ctrl+C 退出）"
+            "$CLI_BIN" <&0 &
+        else
+            log debug "执行: \"$CLI_BIN\" -p（非 TTY 流式单轮，stdin 读指令）"
+            log info "进入流式 CLI（airy_cli，非 TTY 环境；stdin 读指令）"
+            "$CLI_BIN" -p <&0 &
+        fi
+    else
+        clear_front_screen
+        log warn "airy_cli 不可用，回退 Rust TUI（可能需要 TTY）"
+        "$TUI_BIN" --gateway-url "$GATEWAY_URL" --agent-file "$AGENT_FILE" <&0 &
+    fi
+    TUI_PID=$!
+    wait "$TUI_PID" || return $?
+    return 0
+}
+
+# ── 状态判断：gateway 是否在线 ───────────────────────────────────────────
+# 重要：gateway 在线 ≠ daemon 群在线。常驻 gateway 在前次会话后可能仍存活，
+# 而 llm/agent/tool 等 daemon 已退出——此前逻辑在 gateway 在线时直接进入
+# 界面、不拉起 daemon，表现为"界面能进、对话全挂（服务不可达）"。
+# 统一改为：无论 gateway 状态如何，先确保 daemon 群就绪（缺失即拉起），
+# 再决定前端（TUI 依赖 gateway；CLI 直连 daemon 群）。
+GATEWAY_DOWN=0
+GATEWAY_ALIVE=0
+if wait_for_health "$GATEWAY_URL" 1; then
+    GATEWAY_ALIVE=1
+    log info "gateway 在线（$GATEWAY_URL），本次复用（不重复拉起）"
+else
+    log info "gateway 离线（$GATEWAY_URL），将一并拉起"
+fi
+log info "确保守护进程群就绪…"
+boot_line "正在启动守护进程群…"
+
+# ── 拉起守护进程（仅本次会话，退出后清理） ─────────────────────────────────
+DAEMONS_STARTED=0
+ALL_DAEMON_PIDS=()
+GATEWAY_PID=""
+TUI_PID=""
+
+# _stop_all <PID...>：并行 TERM → 统一轮询 → KILL 兜底，确保进程真正退出。
+# 相对旧版逐个停止（16 个 daemon 串行 TERM+轮询可累加至数十秒），并行回收
+# 的总时长收敛为最慢单个进程的退出时间（实测多数 daemon 2-6s 内优雅退出）。
+_stop_all() {
+    local pids=("$@") i j remaining deadline
+    [ "${#pids[@]}" -eq 0 ] && return 0
+    log debug "并行停止 ${#pids[@]} 个进程：发送 TERM"
+    for i in "${!pids[@]}"; do
+        if kill -0 "${pids[$i]}" 2>/dev/null; then
+            kill "${pids[$i]}" 2>/dev/null || true
+        else
+            pids[$i]=""   # 已退出，标记跳过
+        fi
+    done
+    # 统一轮询（0.5s 步长，最长 15s）：守护进程需执行完整清理链
+    # （IPC/SD 心跳 join/传输 teardown），过短会误杀优雅清理中的进程。
+    deadline=$((SECONDS + 15))
+    remaining="${#pids[@]}"
+    while [ "$remaining" -gt 0 ] && [ "$SECONDS" -lt "$deadline" ]; do
+        remaining=0
+        for j in "${!pids[@]}"; do
+            [ -n "${pids[$j]}" ] || continue
+            if ! kill -0 "${pids[$j]}" 2>/dev/null; then
+                log info "已停止进程（PID=${pids[$j]}）"
+                pids[$j]=""
+            else
+                remaining=$((remaining + 1))
+            fi
+        done
+        [ "$remaining" -gt 0 ] && sleep 0.5
+    done
+    # 未响应 TERM 的残留进程强制 KILL
+    for j in "${!pids[@]}"; do
+        if [ -n "${pids[$j]}" ] && kill -0 "${pids[$j]}" 2>/dev/null; then
+            log warn "进程（PID=${pids[$j]}）未响应 TERM，强制 KILL"
+            kill -9 "${pids[$j]}" 2>/dev/null || true
+        fi
+    done
+}
+
+cleanup() {
+    if [ "$DAEMONS_STARTED" != "1" ] && [ -z "$TUI_PID" ]; then
+        log debug "清理跳过：本次未拉起任何进程"
+        return 0
+    fi
+    log debug "清理开始：停止本次拉起的 TUI 与守护进程"
+    # 收集本次拉起的全部进程（TUI + gateway + daemons），并行 TERM 回收。
+    # 注意：无论 gateway 是否复用（GATEWAY_PID 可能为空），本次会话拉起的
+    # daemon 一律回收——此前以 GATEWAY_PID 非空为门，复用场景下 daemon 不
+    # 被停止，cleanup 末尾 `wait` 等待未退出的 daemon 子进程而永久挂起。
+    local stop_pids=()
+    [ -n "$TUI_PID" ] && stop_pids+=("$TUI_PID")
+    [ -n "$GATEWAY_PID" ] && stop_pids+=("$GATEWAY_PID")
+    stop_pids+=("${ALL_DAEMON_PIDS[@]}")
+    _stop_all "${stop_pids[@]}"
+    wait 2>/dev/null || true
+    # 清理本次拉起的 daemon socket 文件（2.2 启动优化）：优雅退出后
+    # unlink 本次登记的 socket，避免 stale socket 残留污染 run 目录——
+    # 残留 socket 会让后续 status 误报"未就绪"、甚至被复用判定误用。
+    # DAEMON_SOCKS 只登记本次拉起（复用实例不在其中，不受影响），且
+    # 不随 wait_all_socks 缩减，保证退出时完整清理。
+    for sock in "${DAEMON_SOCKS[@]:-}"; do
+        if [ -n "$sock" ] && [ -S "$sock" ]; then
+            rm -f "$sock" 2>/dev/null
+            log debug "清理 stale socket: $sock"
+        fi
+    done
+    log debug "清理完成"
+}
+trap cleanup EXIT
+# 外部信号（如 timeout 强杀）转入 exit 路径，确保 EXIT trap（cleanup）执行，
+# 不残留本次拉起的 TUI / gateway_d / llm_d 进程。bash 默认对未 trap 的
+# SIGTERM 直接终止、不执行 EXIT trap，这正是此前残留的根因。
+trap 'exit 143' TERM
+trap 'exit 130' INT
+
+if [ -z "$GATEWAY_BIN" ] && [ -z "$LLM_BIN" ]; then
+    log warn "gateway_d 与 llm_d 均未找到，将以 OFFLINE 模式进入（对话功能不可用）。"
+    log warn "构建 daemons：cd \"$AIRYRT_HOME/agentrt\" && cmake -B build && cmake --build build -j"
+else
+    # ---- 清理 run/ 下的 stale pid 文件（2026-08-22）----
+    # bootstrap 时代的 daemon 退出后残留 *.pid（airymaxrt 自身不写 pid 文件），
+    # 干扰 run 目录观感且误导诊断。启动前统一清理：pid 无对应存活进程即删。
+    # 存活进程的 pid 文件保留（避免误删正在运行实例的标记）。
+    for _pf in "$RUNTIME_DIR"/*.pid; do
+        [ -f "$_pf" ] || continue
+        _p="$(cat "$_pf" 2>/dev/null)"
+        if [ -z "$_p" ] || ! kill -0 "$_p" 2>/dev/null; then
+            rm -f "$_pf"
+            log debug "清理 stale pid 文件: $_pf"
+        fi
+    done
+    # ---- 运行时日志清理（2.2.1.7 强化运行时日志）----
+    # agent 子进程日志（logs/agent_*.log）无轮转会无限累积；daemon 的
+    # *.out（stdout/stderr 重定向）同样只增不减。启动前清理 7 天前的
+    # 陈旧文件（保留近期便于排障），幂等且不影响正在写入的当前日志。
+    _LOG_KEEP_DAYS="${AIRYRT_LOG_KEEP_DAYS:-7}"
+    if command -v find >/dev/null 2>&1 && [ -d "$AIRY_HOME/logs" ]; then
+        _CUTOFF=$(( $(date +%s) - _LOG_KEEP_DAYS * 86400 ))
+        while IFS= read -r _old; do
+            [ -n "$_old" ] || continue
+            rm -f "$_old"
+            log debug "清理过期运行时日志: $_old"
+        done < <(find "$AIRY_HOME/logs" -maxdepth 1 -type f \
+                     \( -name 'agent_*.log' -o -name '*.out' -o -name '*.pid' \) \
+                     ! -newermt "@$_CUTOFF" -print 2>/dev/null)
+    fi
+    # ---- 并行拉起全部守护进程（0.1.2 启动优化） ----
+    # 16 个 Unix socket daemon + gateway_d 一次性后台拉起：daemon 启动即 bind
+    # 自身 socket，对等连接在请求时建立，启动互不阻塞；随后统一轮询等待全部
+    # socket 就绪。相对旧版顺序拉起（16 个串行、每个 1s 轮询粒度 ≈ 17s），
+    # 并行版总耗时收敛为最慢单个 daemon 的启动时间（实测 ~2s）。
+    ALL_DAEMON_PIDS=()   # 本次拉起的 daemon PID（cleanup 统一回收）
+    DAEMONS_STARTED=1
+    REUSED_COUNT=0       # 复用已在线实例数（状态展示用，避免误导"0 个"）
+    declare -a WAIT_SOCKS=()   # 待等待 socket 规格：`名称|socket路径`
+    declare -a DAEMON_SOCKS=() # 本次拉起的 socket 路径（cleanup 清理用）
+    # 本次拉起的 socket 路径（只增不减，独立于 WAIT_SOCKS）：wait_all_socks
+    # 会随就绪把条目移出 WAIT_SOCKS，cleanup 若用 WAIT_SOCKS 清理会因数组已
+    # 空而漏删残留 socket（2.2 启动优化）。
+
+    # _launch_daemon <bin> <socket路径>：后台拉起并登记等待（不等待就绪）。
+    # 去重与 stale socket 处理沿用顺序版逻辑；返回 0=已复用/已拉起。
+    _launch_daemon() {
+        local bin="$1" sock="$2" bname
+        bname="${bin##*/}"
+        bname="${bname:-daemon}"
+        if [ ! -x "$bin" ]; then
+            log warn "$bname 未找到，跳过"
+            return 0
+        fi
+        # 去重：同名 daemon 已运行（socket 可连接 → 进程真实监听）→ 复用。
+        # 判定用连接探测而非 pgrep -f 完整路径：daemon 以相对路径启动时
+        # pgrep 匹配不到，会误判离线而重复拉起（历史故障：多实例抢占
+        # tool.sock/llm.sock，新实例 unlink 旧 socket 造成死链）。
+        if _sock_alive "$sock"; then
+            REUSED_COUNT=$((REUSED_COUNT + 1))
+            log info "$bname 已在运行（复用 $sock）"
+            return 0
+        fi
+        # socket 存在但无监听（崩溃残留/上次会话未清理）→ 先移除，否则
+        # 新实例 bind 报 Address already in use 而启动失败。
+        if [ -S "$sock" ]; then
+            log warn "$bname 检测到 stale socket（无监听），移除后重新拉起: $sock"
+            rm -f "$sock"
+        fi
+        # nohup 忽略 SIGHUP：终端会话异常退出（SSH 断连/终端关闭）时 daemon
+        # 不被进程组 SIGHUP 连带杀死（历史故障：会话退出后 daemon 群全灭、
+        # 残留 defunct 僵尸）。$! 语义不变（nohup 对可执行文件直接 exec），
+        # cleanup 按 PID TERM 回收仍有效；正常退出（TUI/CLI 结束）时由
+        # cleanup 主动回收本次拉起的 daemon，行为与之前一致。
+        nohup "$bin" >"$AIRY_HOME/logs/${bname}.out" 2>&1 &
+        ALL_DAEMON_PIDS+=("$!")
+        WAIT_SOCKS+=("$bname|$sock")
+        DAEMON_SOCKS+=("$sock")
+        log info "$bname 已拉起（PID=$!），日志: $AIRY_HOME/logs/${bname}.out"
+    }
+
+    # ---- 并行拉起 16 个 socket daemon ----
+    # llm_d：核心依赖，--manager 指定模型配置（provider/endpoint 来源）
+    if [ -x "$LLM_BIN" ]; then
+        if _sock_alive "$RUNTIME_DIR/llm.sock"; then
+            REUSED_COUNT=$((REUSED_COUNT + 1))
+            log info "llm_d 已在运行（复用 $RUNTIME_DIR/llm.sock）"
+        else
+            if [ -S "$RUNTIME_DIR/llm.sock" ]; then
+                log warn "llm_d 检测到 stale socket（无监听），移除后重新拉起: $RUNTIME_DIR/llm.sock"
+                rm -f "$RUNTIME_DIR/llm.sock"
+            fi
+            if [ -f "$MODEL_CONFIG" ]; then
+                log debug "llm_d 使用模型配置: $MODEL_CONFIG"
+                nohup "$LLM_BIN" --manager "$MODEL_CONFIG" >"$AIRY_HOME/logs/llm_d.out" 2>&1 &
+            else
+                log warn "模型配置不存在（$MODEL_CONFIG），llm_d 使用默认配置"
+                nohup "$LLM_BIN" >"$AIRY_HOME/logs/llm_d.out" 2>&1 &
+            fi
+            ALL_DAEMON_PIDS+=("$!")
+            WAIT_SOCKS+=("llm_d|$RUNTIME_DIR/llm.sock")
+            DAEMON_SOCKS+=("$RUNTIME_DIR/llm.sock")
+            log info "llm_d 已拉起（PID=$!），日志: $AIRY_HOME/logs/llm_d.out"
+        fi
+    fi
+
+    # think_d：双思考（GCCP+GRAD），gateway 经 think.sock 调用
+    if [ -n "$THINK_BIN" ]; then
+        _launch_daemon "$THINK_BIN" "$RUNTIME_DIR/think.sock"
+    else
+        log warn "think_d 未找到，双思考（GCCP+GRAD）不可用，gateway 将降级直连"
+    fi
+
+    # 其余 daemon：full 画像全量接线（agent/tool/hook/plugin/monit/sched/
+    # channel/market/cupolas/mem/a2a/info/notify/observe）；minimal 画像仅
+    # 保留核心执行链路（agent/tool），其余能力 daemon 不拉起（gateway 自动
+    # 降级），以控制低内存设备的内存占用（AIRYRT_PROFILE=minimal）。
+    _launch_daemon "$(find_tool AIRY_AGENT_BIN agent_d "$AIRY_HOME/bin/agent_d" "$AIRYRT_HOME/agentrt/build/bin/agent_d" "$AIRYRT_HOME/build/bin/agent_d")" "$RUNTIME_DIR/agent.sock"
+    _launch_daemon "$(find_tool AIRY_TOOL_BIN tool_d "$AIRY_HOME/bin/tool_d" "$AIRYRT_HOME/agentrt/build/bin/tool_d" "$AIRYRT_HOME/build/bin/tool_d")" "$RUNTIME_DIR/tool.sock"
+    if [ "$AIRYRT_PROFILE" != "minimal" ]; then
+        _launch_daemon "$(find_tool AIRY_HOOK_BIN hook_d "$AIRY_HOME/bin/hook_d" "$AIRYRT_HOME/agentrt/build/bin/hook_d" "$AIRYRT_HOME/build/bin/hook_d")" "$RUNTIME_DIR/hook.sock"
+        _launch_daemon "$(find_tool AIRY_PLUGIN_BIN plugin_d "$AIRY_HOME/bin/plugin_d" "$AIRYRT_HOME/agentrt/build/bin/plugin_d" "$AIRYRT_HOME/build/bin/plugin_d")" "$RUNTIME_DIR/plugin.sock"
+        _launch_daemon "$(find_tool AIRY_MONIT_BIN monit_d "$AIRY_HOME/bin/monit_d" "$AIRYRT_HOME/agentrt/build/bin/monit_d" "$AIRYRT_HOME/build/bin/monit_d")" "$RUNTIME_DIR/monit.sock"
+        _launch_daemon "$(find_tool AIRY_SCHED_BIN sched_d "$AIRY_HOME/bin/sched_d" "$AIRYRT_HOME/agentrt/build/bin/sched_d" "$AIRYRT_HOME/build/bin/sched_d")" "$RUNTIME_DIR/sched.sock"
+        _launch_daemon "$(find_tool AIRY_CHANNEL_BIN channel_d "$AIRY_HOME/bin/channel_d" "$AIRYRT_HOME/agentrt/build/bin/channel_d" "$AIRYRT_HOME/build/bin/channel_d")" "$RUNTIME_DIR/channel.sock"
+        _launch_daemon "$(find_tool AIRY_MARKET_BIN market_d "$AIRY_HOME/bin/market_d" "$AIRYRT_HOME/agentrt/build/bin/market_d" "$AIRYRT_HOME/build/bin/market_d")" "$RUNTIME_DIR/market.sock"
+        _launch_daemon "$(find_tool AIRY_CUPOLAS_BIN cupolas_d "$AIRY_HOME/bin/cupolas_d" "$AIRYRT_HOME/agentrt/build/bin/cupolas_d" "$AIRYRT_HOME/build/bin/cupolas_d")" "$RUNTIME_DIR/cupolas.sock"
+        _launch_daemon "$(find_tool AIRY_MEM_BIN mem_d "$AIRY_HOME/bin/mem_d" "$AIRYRT_HOME/agentrt/build/bin/mem_d" "$AIRYRT_HOME/build/bin/mem_d")" "$RUNTIME_DIR/mem.sock"
+        _launch_daemon "$(find_tool AIRY_A2A_BIN a2a_d "$AIRY_HOME/bin/a2a_d" "$AIRYRT_HOME/agentrt/build/bin/a2a_d" "$AIRYRT_HOME/build/bin/a2a_d")" "$RUNTIME_DIR/a2a.sock"
+        _launch_daemon "$(find_tool AIRY_INFO_BIN info_d "$AIRY_HOME/bin/info_d" "$AIRYRT_HOME/agentrt/build/bin/info_d" "$AIRYRT_HOME/build/bin/info_d")" "$RUNTIME_DIR/info.sock"
+        _launch_daemon "$(find_tool AIRY_NOTIFY_BIN notify_d "$AIRY_HOME/bin/notify_d" "$AIRYRT_HOME/agentrt/build/bin/notify_d" "$AIRYRT_HOME/build/bin/notify_d")" "$RUNTIME_DIR/notify.sock"
+        _launch_daemon "$(find_tool AIRY_OBSERVE_BIN observe_d "$AIRY_HOME/bin/observe_d" "$AIRYRT_HOME/agentrt/build/bin/observe_d" "$AIRYRT_HOME/build/bin/observe_d")" "$RUNTIME_DIR/observe.sock"
+    else
+        log info "minimal 画像：仅拉起核心 daemon（llm/think/agent/tool），其余能力 daemon 已裁剪"
+    fi
+
+    # ---- gateway_d：统一协议入口（HTTP/WS/HTTP2），与 daemon 群并行拉起 ----
+    # 端口自适应：默认端口不可 bind（如残留半开连接占位）时自动探测 8083+
+    # 可用端口，避免 "8080 被占 → gateway 起不来 → TUI 连不上" 的启动失败。
+    # 探测必须与 gateway 实际 bind 行为对齐：加 SO_REUSEADDR，否则 TIME_WAIT
+    # 残留（上个会话刚关闭的连接）会让裸 bind 探测误报"被占用"，导致端口
+    # 每次启动都漂移（8080→8083），而 gateway（airy_sock_create_tcp_server
+    # 设置 SO_REUSEADDR）实际能正常 bind 8080。
+    _gw_port_available() { # <port>：探测端口是否可 bind（返回 0=可用）
+        # 优先 python3（精确 SO_REUSEADDR bind 测试），回退 bash /dev/tcp
+        # 连接探测（gateway 使用 SO_REUSEADDR，TIME_WAIT 不阻塞实际 bind）。
+        if command -v python3 >/dev/null 2>&1; then
+            python3 -c "import socket,sys; s=socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1); s.bind(('127.0.0.1',int(sys.argv[1]))); s.close()" "$1" 2>/dev/null
+        else
+            # bash /dev/tcp：连接成功=有进程监听（端口被占），失败=可用
+            (echo >/dev/tcp/127.0.0.1/"$1") 2>/dev/null && return 1
+            return 0
+        fi
+    }
+    GW_START="yes"   # 默认启动；gateway 已在线或探测到在线实例时置 no 复用
+    if [ "$GATEWAY_ALIVE" = "1" ]; then
+        GW_START="no"
+        log info "gateway 已在线（$GATEWAY_URL），复用（生命周期不受本次会话管理）"
+    else
+        for _p in "$GATEWAY_PORT" $(seq 8083 8090); do
+            if _gw_port_available "$_p"; then
+                if [ "$_p" != "$GATEWAY_PORT" ]; then
+                    log warn "端口 $GATEWAY_PORT 被占用（残留连接），gateway 改用端口 $_p"
+                    GATEWAY_PORT="$_p"
+                    GATEWAY_URL="http://127.0.0.1:${GATEWAY_PORT}"
+                fi
+                break
+            fi
+            # 端口不可 bind 但已有健康 gateway 在线 → 直接复用（避免重复拉起，
+            # 此前缺陷：复用后仍无条件启动新实例，产生双 gateway 与进程泄漏）
+            if wait_for_health "http://127.0.0.1:$_p" 1; then
+                if [ "$_p" != "$GATEWAY_PORT" ]; then
+                    log info "端口 $_p 已有在线 gateway，直接复用"
+                    GATEWAY_PORT="$_p"
+                    GATEWAY_URL="http://127.0.0.1:${GATEWAY_PORT}"
+                fi
+                GW_START="no"
+                break
+            fi
+        done
+    fi
+    if [ "$GW_START" = "yes" ]; then
+        log debug "执行: nohup \"$GATEWAY_BIN\" -h 127.0.0.1 -p \"$GATEWAY_PORT\" > \"$AIRY_HOME/logs/gateway_d.out\" 2>&1 &"
+        nohup "$GATEWAY_BIN" -h 127.0.0.1 -p "$GATEWAY_PORT" >"$AIRY_HOME/logs/gateway_d.out" 2>&1 &
+        GATEWAY_PID=$!
+        log info "gateway_d 已拉起（PID=$GATEWAY_PID），日志: $AIRY_HOME/logs/gateway_d.out"
+    else
+        log info "gateway 复用在线实例（$GATEWAY_URL），本次会话不接管其生命周期"
+    fi
+
+    # ---- 统一等待全部 daemon socket 就绪（并行探测，0.25s 粒度）----
+    wait_all_socks() {
+        [ "${#WAIT_SOCKS[@]}" -eq 0 ] && return 0
+        local deadline=$((SECONDS + 10)) spec name sock
+        local remaining=() all_done
+        while [ "${#WAIT_SOCKS[@]}" -gt 0 ] && [ "$SECONDS" -lt "$deadline" ]; do
+            remaining=()
+            all_done=1
+            for spec in "${WAIT_SOCKS[@]}"; do
+                name="${spec%%|*}"; sock="${spec#*|}"
+                if _sock_alive "$sock"; then
+                    log info "$name 就绪（$sock）"
+                else
+                    remaining+=("$spec")
+                    all_done=0
+                fi
+            done
+            WAIT_SOCKS=("${remaining[@]}")
+            [ "$all_done" = "1" ] && return 0
+            sleep 0.25
+        done
+        for spec in "${WAIT_SOCKS[@]}"; do
+            name="${spec%%|*}"
+            log warn "$name socket 未就绪，查看日志: $AIRY_HOME/logs/${name}.out"
+        done
+        return 1
+    }
+    WAIT_TOTAL="${#WAIT_SOCKS[@]}"   # 本次新拉起的 daemon 数（复用实例不在其中）
+    # wait_all_socks 置于 if 条件：set -e 下直接调用返回非 0 会中止脚本，
+    # 必须让调用方接管返回值才能走到诊断/降级分支。
+    if wait_all_socks; then
+        # 状态展示区分「复用」与「新拉」：此前仅显示新拉数，daemon 全在线
+        # 复用时误显"就绪（0 个）"，用户误判系统未启动（2026-08-20 反馈）。
+        if [ "$REUSED_COUNT" -gt 0 ] && [ "$WAIT_TOTAL" -gt 0 ]; then
+            boot_line "守护进程群就绪（复用 ${REUSED_COUNT} 个 + 新拉 ${WAIT_TOTAL} 个）"
+        elif [ "$REUSED_COUNT" -gt 0 ]; then
+            boot_line "守护进程群就绪（在线 ${REUSED_COUNT} 个全部复用）"
+        else
+            boot_line "守护进程群就绪（${WAIT_TOTAL} 个）"
+        fi
+    else
+        # 未就绪项逐项诊断（关键链路明确报错 + 日志尾部，非关键链路 WARN）
+        diag_daemons
+        boot_line "守护进程群部分未就绪（未就绪 ${#WAIT_SOCKS[@]} 个，详见上方诊断）"
+    fi
+
+    if wait_for_health "$GATEWAY_URL" 15; then
+        log info "gateway 就绪（$GATEWAY_URL）"
+        boot_line "gateway 就绪（$GATEWAY_URL）"
+    else
+        log warn "gateway 未能就绪（$GATEWAY_URL），查看日志: $AIRY_HOME/logs/gateway_d.out"
+        boot_line "gateway 未就绪（$GATEWAY_URL），降级模式…"
+        if [ -n "$CLI_BIN" ]; then
+            # CLI 直连 daemon 群（Unix socket），不依赖 gateway HTTP：
+            # gateway 起不来时降级到 CLI，而不是整站退出（用户痛点：多数
+            # 场景仅对话/工具/任务，无需 gateway HTTP 协议入口）。
+            GATEWAY_DOWN=1
+            log warn "降级：使用 airy_cli 直连 daemon 群（不依赖 gateway）"
+        else
+            log error "TUI 依赖 gateway，但当前无 airy_cli 可降级"
+            log error "可执行 'airymaxrt doctor' 检查组件，或删除 $RUNTIME_DIR 下残留 socket 后重试"
+            exit 1
+        fi
+    fi
+fi
+
+# ── 前台进入交互界面（退出后由 EXIT trap 清理本次拉起的 daemons）──────────
+# 智能双模由 launch_frontend 统一处理（有 TTY → Rust TUI；非 TTY → airy_cli 流式）。
+launch_frontend
+rc=$?
+log info "交互界面退出（exit=$rc）"
+exit $rc
