@@ -2,26 +2,26 @@
   "schema": 1,
   "channel": "stable",
   "latest": "v0.1.5",
-  "updated_at": "2026-08-28T02:59:56Z",
+  "updated_at": "2026-08-28T13:47:39Z",
   "releases": {
     "v0.1.5": {
       "yanked": false,
-      "notes": "",
+      "notes": "AgentRT 0.1.5 生产发布（三架构完全体二进制：x86_64 / aarch64 / riscv64）。\n\n- 18 daemon + airy_cli + agentrt-tui + agentrt-bootstrap.sh 完全体包\n- 出厂预装 permission_rules.yaml（工具 ACL）与 maths-toolkit（数学计算后端）\n- 发布链路：cosign 制品签名 + GPG manifest 签名（防供应链攻击）",
       "artifacts": {
         "linux-aarch64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.5/agentrt-v0.1.5-linux-aarch64.tar.gz",
-          "sha256": "112b507bb16fdd01756aa15e80ecc3a5108a45a2a0e21c515906d05740a221cf",
-          "size": 24394786
+          "sha256": "208e3262f3e4fa074de79fc68e4bd05258e1dec962fa63ddb56de7d632415333",
+          "size": 27111474
         },
         "linux-riscv64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.5/agentrt-v0.1.5-linux-riscv64.tar.gz",
-          "sha256": "92dab92e2529e3a86128631a42d9b9123b98158a885bb637110e9968ac210769",
-          "size": 26153763
+          "sha256": "fb0b4ea2dd1c6e6d2c01b247d231a4c8825848f07ce4d83d8b236d710ff7afb5",
+          "size": 26159178
         },
         "linux-x86_64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.5/agentrt-v0.1.5-linux-x86_64.tar.gz",
-          "sha256": "d8ba7480053b560f886b2f30e640075922d98e685f18eefd53ea2455a2460cd8",
-          "size": 25052508
+          "sha256": "2ee03b619de93fe069c106576ec006d5af2515d01b19903d999dfb2292aaf4e7",
+          "size": 24910983
         }
       }
     }
