@@ -5,8 +5,11 @@
 # 位置：agentrt 管理仓 scripts/install.sh（v0.1.2 起自伞仓 scripts/ 迁移，
 #       构建系统与安装器属 IRON-9 [IND] 完全独立层，随 agentrt 仓独立演进；
 #       伞仓 scripts/ 保留兼容重定向入口）。
-# 用法：
-#   sh <(curl -fsSL https://raw.atomgit.com/openairymax/agentrt/raw/main/scripts/install.sh) --channel stable
+# 用法（一键安装；AtomGit raw 域对 .sh 返回 HTML 预览页不可直连，
+# 经 v5 contents API 匿名拉取后解码执行）：
+#   curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
+#     | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
+#     | sh -s -- --channel stable
 #   sh install.sh --prefix "$HOME/.airymaxrt"        # 自定义路径
 #   sh install.sh --uninstall                        # 一键卸载
 #
@@ -265,6 +268,25 @@ eemKaxR31gM=
 =myQU
 -----END PGP PUBLIC KEY BLOCK-----'
 
+# AtomGit raw 域（raw.atomgit.com/.../raw/...）对非 Markdown 文件返回
+# HTML 预览页（"暂不支持预览"，403），不可作原始文件直链。改用 v5
+# contents API：匿名 GET /repos/{owner}/{repo}/contents/<path>?ref=main
+# 返回 JSON（content 为 base64），python3 解码优先，无 python3 时回退
+# sed 提取 + base64 -d（content 为单行 base64，不含引号，提取安全）。
+fetch_repo_file() { # <repo_path> <dest>
+    local api="https://api.atomgit.com/api/v5/repos/${AIRY_RELEASE_OWNER:-openairymax/agentrt}/contents/$1?ref=main"
+    local tmp="${AIRY_HOME}/tmp/contents.$$"
+    mkdir -p "$(dirname "$tmp")" 2>/dev/null
+    curl -fsSL --max-time 60 -o "$tmp" "$api" || { rm -f "$tmp"; return 1; }
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -c 'import json,sys,base64; sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin).get("content","").replace("\n","")))' < "$tmp" > "$2" || { rm -f "$tmp"; return 1; }
+    else
+        sed -n 's/.*"content"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp" | tr -d '\n' | base64 -d > "$2" 2>/dev/null || { rm -f "$tmp"; return 1; }
+    fi
+    rm -f "$tmp"
+    [ -s "$2" ]
+}
+
 # GPG 验签（独立 homedir 隔离用户 keyring；签名缺失拒绝——防供应链攻击
 # 的 fail-closed 约束。公钥优先级：发布源 latest/keys/ 在线拉取（支持轮换）
 # → 本地 $AIRY_HOME/keys/ → 内嵌公钥（首次引导兜底））。
@@ -274,8 +296,7 @@ verify_gpg_sig() { # <file> <sig.asc>
     mkdir -p "$gnupg" && chmod 700 "$gnupg"
     keyf="$gnupg/agentrt.asc"
     if [ -z "${AIRY_NO_NETWORK:-}" ]; then
-        curl -fsSL --max-time 30 -o "$keyf" \
-            "https://raw.atomgit.com/${AIRY_RELEASE_OWNER:-openairymax/agentrt}/raw/main/latest/keys/agentrt.asc" >/dev/null 2>&1 || true
+        fetch_repo_file "latest/keys/agentrt.asc" "$keyf" >/dev/null 2>&1 || true
     fi
     if [ ! -s "$keyf" ] && [ -f "${AIRY_HOME}/keys/agentrt.asc" ]; then
         cp -f "${AIRY_HOME}/keys/agentrt.asc" "$keyf" 2>/dev/null || true
@@ -318,8 +339,19 @@ install_binary() {
     #          c) 远程 tarball URL（{arch} 占位符）→ 下载，相邻 .sha256 自动校验
     if [ "${url##*.}" = "json" ]; then
         local man="${AIRY_HOME}/tmp/manifest.json" man_asc="${AIRY_HOME}/tmp/manifest.json.asc" plat
-        curl -fsSL --max-time 60 -o "$man" "$url" || { log_warn "manifest 下载失败，回退源码构建"; return 1; }
-        curl -fsSL --max-time 60 -o "$man_asc" "${url}.asc" >/dev/null 2>&1 || true
+        # 官方仓 manifest 经 contents API 拉取（raw 域对 JSON 返回 HTML，
+        # 见 fetch_repo_file）；外部自定义 URL 保持直连。
+        case "$url" in
+            *openairymax/agentrt*)
+                local man_path="latest/${url##*/}"
+                fetch_repo_file "$man_path" "$man" || { log_warn "manifest 下载失败，回退源码构建"; return 1; }
+                fetch_repo_file "$man_path.asc" "$man_asc" >/dev/null 2>&1 || true
+                ;;
+            *)
+                curl -fsSL --max-time 60 -o "$man" "$url" || { log_warn "manifest 下载失败，回退源码构建"; return 1; }
+                curl -fsSL --max-time 60 -o "$man_asc" "${url}.asc" >/dev/null 2>&1 || true
+                ;;
+        esac
         verify_gpg_sig "$man" "$man_asc" || { log_warn "manifest 验签失败（GPG），拒绝安装"; return 1; }
         [ -s "$man_asc" ] && log_ok "manifest 验签通过（GPG）"
         plat="linux-${arch}"
@@ -1082,10 +1114,12 @@ main() {
     local installed=1
     # 发布来源解析：--from-file 离线包 > AIRY_RELEASE_URL 显式 URL >
     # 官方通道 manifest（默认，stable/beta 由 --channel 决定；--mode source 除外）。
-    # manifest 路径走 GPG 验签 + 平台解析；失败自动降级源码构建。
+    # manifest 实际经 contents API 拉取（install_binary 内 fetch_repo_file，
+    # raw 域对 JSON 返回 HTML 不可用）；此 URL 仅作 .json 路由判定与
+    # 文件名提取。失败自动降级源码构建。
     local release_url="${AIRY_RELEASE_URL:-}"
     if [ -z "$release_url" ] && [ "${AIRY_MODE:-auto}" != "source" ]; then
-        release_url="https://raw.atomgit.com/openairymax/agentrt/raw/main/latest/manifest.${AIRY_CHANNEL}.json"
+        release_url="https://atomgit.com/openairymax/agentrt/latest/manifest.${AIRY_CHANNEL}.json"
     fi
     if [ -n "$AIRY_FROM_FILE" ]; then
         install_binary "$AIRY_FROM_FILE" && installed=0
