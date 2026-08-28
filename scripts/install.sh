@@ -422,6 +422,12 @@ install_binary() {
         mkdir -p "${AIRY_HOME}/keys"
         cp -f "${extracted}/keys/agentrt.asc" "${AIRY_HOME}/keys/" 2>/dev/null || true
     fi
+    # 数学计算后端（maths-toolkit）随包分发：纯 Python + 安装器，无架构
+    # 依赖，解包至 modules/ 供 install_maths_toolkit 调用（二进制模式必备）。
+    if [ -d "${extracted}/modules/maths-toolkit" ]; then
+        mkdir -p "${AIRY_HOME}/modules"
+        cp -rf "${extracted}/modules/maths-toolkit" "${AIRY_HOME}/modules/" 2>/dev/null || true
+    fi
     # 以实际安装包版本固化（manifest 通道可能高于默认 AIRY_VERSION）
     local ver_num
     ver_num="$(basename "$extracted" | sed 's/^agentrt-//')"
@@ -546,9 +552,15 @@ install_maths_toolkit() {
         log_info "已跳过 maths-toolkit（--without-maths）"
         return 0
     fi
-    local toolkit="${AIRY_SRC_APP}/ecosystem/markets/tools/maths-toolkit/install.sh"
-    if [ ! -f "$toolkit" ]; then
-        log_warn "maths-toolkit 安装器不存在（${toolkit}），跳过数学后端预装"
+    local toolkit=""
+    # 源码模式：airymaxhub 源码树内；二进制模式：随完全体包分发的 modules/
+    if [ -f "${AIRY_SRC_APP}/ecosystem/markets/tools/maths-toolkit/install.sh" ]; then
+        toolkit="${AIRY_SRC_APP}/ecosystem/markets/tools/maths-toolkit/install.sh"
+    elif [ -f "${AIRY_HOME}/modules/maths-toolkit/install.sh" ]; then
+        toolkit="${AIRY_HOME}/modules/maths-toolkit/install.sh"
+    fi
+    if [ -z "$toolkit" ]; then
+        log_warn "maths-toolkit 安装器不存在（源码与二进制模式均未携带），跳过数学后端预装"
         return 0
     fi
     if ! command -v python3 >/dev/null 2>&1; then
@@ -915,38 +927,44 @@ fi
 [ -n "\$_AH" ] || _AH="\$HOME/.airymaxrt"
 AIRY_HOME="\$_AH"
 export AIRY_HOME
-# update 子命令自举：二进制模式不含完整更新器（tarball 仅带 agentrt-tui），
-# 经 v5 contents API 匿名拉取完整 launcher（bash）后转交执行。
-# 源为公开 agentrt 仓 latest/airymaxrt（发布流水线随 manifest 一并推送）；
-# sdk 仓私有，匿名不可达，不能作自举源。raw 域对非 md 文件返回 HTML
-# 预览页不可直连，必须走 contents API。信任模型与安装器自举一致
-# （install.sh 同样经 contents API 分发），更新器内部再对 manifest 做
-# GPG fail-closed 验签 + sha256 强制校验。
-if [ "\$1" = "update" ]; then
-    _FULL="\$AIRY_HOME/bin/airymaxrt-full"
-    _TMP="\$AIRY_HOME/tmp/airymaxrt-full.\$\$"
-    mkdir -p "\$AIRY_HOME/tmp" || exit 1
-    curl -fsSL --max-time 60 -o "\$_TMP" \
-        "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/latest/airymaxrt?ref=main" || {
-        echo "airymaxrt update: 更新器下载失败（api.atomgit.com 不可达）" >&2
-        rm -f "\$_TMP"; exit 1
-    }
-    if command -v python3 >/dev/null 2>&1; then
-        python3 -c 'import json,sys,base64; sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin).get("content","").replace("\n","")))' < "\$_TMP" > "\$_FULL" || {
-            echo "airymaxrt update: 更新器解码失败" >&2
+# 管理命令自举：二进制模式轻量启动器仅提供 TUI 入口（agentrt-tui），
+# 完整启动器（含 start/status/doctor/cli/profile/monitor/uninstall/update
+# 等管理命令）随发布以 latest/airymaxrt 分发（sdk 仓私有，匿名不可达，
+# 须经公开 agentrt 仓 contents API 匿名拉取，raw 域对非 md 文件返回
+# HTML 预览页不可直连）。信任模型与安装器自举一致，更新器内部再对
+# manifest 做 GPG fail-closed 验签 + sha256 强制校验。
+# update 每次强制重新拉取（完整启动器自身负责后续自更新）；其余管理
+# 命令复用已缓存的完整启动器，避免频繁网络往返。
+case "\$1" in
+    cli|profile|monitor|status|doctor|uninstall|update)
+        _FULL="\$AIRY_HOME/bin/airymaxrt-full"
+        if [ "\$1" != "update" ] && [ -s "\$_FULL" ]; then
+            exec bash "\$_FULL" "\$@"
+        fi
+        _TMP="\$AIRY_HOME/tmp/airymaxrt-full.\$\$"
+        mkdir -p "\$AIRY_HOME/tmp" || exit 1
+        curl -fsSL --max-time 60 -o "\$_TMP" \
+            "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/latest/airymaxrt?ref=main" || {
+            echo "airymaxrt \$1: 完整启动器下载失败（api.atomgit.com 不可达）" >&2
             rm -f "\$_TMP"; exit 1
         }
-    else
-        sed -n 's/.*"content"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "\$_TMP" | tr -d '\n' | base64 -d > "\$_FULL" 2>/dev/null || {
-            echo "airymaxrt update: 更新器解码失败（无 python3，base64 回退失败）" >&2
-            rm -f "\$_TMP"; exit 1
-        }
-    fi
-    rm -f "\$_TMP"
-    chmod 755 "\$_FULL"
-    [ -s "\$_FULL" ] || { echo "airymaxrt update: 更新器为空" >&2; exit 1; }
-    exec bash "\$_FULL" "\$@"
-fi
+        if command -v python3 >/dev/null 2>&1; then
+            python3 -c 'import json,sys,base64; sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin).get("content","").replace("\n","")))' < "\$_TMP" > "\$_FULL" || {
+                echo "airymaxrt \$1: 完整启动器解码失败" >&2
+                rm -f "\$_TMP"; exit 1
+            }
+        else
+            sed -n 's/.*"content"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "\$_TMP" | tr -d '\n' | base64 -d > "\$_FULL" 2>/dev/null || {
+                echo "airymaxrt \$1: 完整启动器解码失败（无 python3，base64 回退失败）" >&2
+                rm -f "\$_TMP"; exit 1
+            }
+        fi
+        rm -f "\$_TMP"
+        chmod 755 "\$_FULL"
+        [ -s "\$_FULL" ] || { echo "airymaxrt \$1: 完整启动器为空" >&2; exit 1; }
+        exec bash "\$_FULL" "\$@"
+        ;;
+esac
 exec "\$AIRY_HOME/bin/agentrt-tui" "\$@"
 EOF
         chmod 755 "${AIRY_HOME}/bin/airymaxrt"
