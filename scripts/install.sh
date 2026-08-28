@@ -20,7 +20,8 @@
 #      全量源码编译（AIRY_MODE=source 或检测到本地源码树时）。
 #
 # 路径体系（与 platform.h AIRY_HOME 完全一致，全产物收敛）：
-#   $AIRY_HOME            = ${AIRY_HOME:-$HOME/.airymaxrt}（--prefix 覆盖）
+#   $AIRY_HOME            = $HOME/.airymaxrt（强制统一；--prefix 显式覆盖，
+#                            环境变量 AIRY_HOME 不再继承——防终端残留劫持）
 #   $AIRY_HOME/bin  lib  include  config  run  logs  data  tmp  cache
 #   $AIRY_HOME/modules    — 闭源预编译模块包（atoms/memoryrovol）
 #   $AIRY_HOME/src        — 源码树（构建模式）
@@ -69,7 +70,14 @@ log_warn()  { printf "${C_YELLOW}[WARN]${C_NC} %s\n" "$1"; }
 log_err()   { printf "${C_RED}[FAIL]${C_NC} %s\n" "$1"; }
 
 # ─── 默认值 ──────────────────────────────────────────────────────────────
-AIRY_HOME="${AIRY_HOME:-$HOME/.airymaxrt}"
+# 安装路径强制统一 $HOME/.airymaxrt（社区用户与本地开发同一逻辑，2026-08-28）。
+# 环境变量 AIRY_HOME 不再继承——历史故障：Trae 持久终端残留 export
+# AIRY_HOME=<已删除目录>，静默劫持安装位置与启动器目标。需要非默认位置时
+# 用显式 --prefix 参数（安装完成后打印实际位置，无隐藏状态）。
+if [ -n "${AIRY_HOME:-}" ] && [ "${AIRY_HOME}" != "${HOME}/.airymaxrt" ]; then
+    log_warn "已忽略环境变量 AIRY_HOME=${AIRY_HOME}（防残留劫持）；安装位置统一为 \${HOME}/.airymaxrt，非默认位置请用 --prefix"
+fi
+AIRY_HOME="${HOME}/.airymaxrt"
 AIRY_REPO_URL="${AIRY_REPO_URL:-https://atomgit.com/openairymax/airymaxhub.git}"
 # 版本 SSoT：优先读取同仓 agentrt/VERSION（源码树内运行），否则回退默认值。
 # 注意：curl 管道 / 裸脚本场景无 VERSION 文件可读，默认值只作占位——
@@ -858,8 +866,17 @@ while [ -L "\$_SELF" ]; do
     esac
 done
 _DIR="\$(cd -P "\$(dirname "\$_SELF")" && pwd)"
-AIRY_HOME="\${AIRY_HOME:-\$(sed -n 's/^AIRY_HOME=//p' "\${_DIR}/../config/install.env" 2>/dev/null | head -1)}"
-AIRY_HOME="\${AIRY_HOME:-\${_DIR}/..}"
+# 解析顺序：环境变量（须通过 agentrt-tui 存在性校验——终端残留 export
+# 指向已删除目录时自动失效）→ install.env 固化值（同样校验）→
+# 默认统一安装根。
+_AH="\${AIRY_HOME:-}"
+[ -n "\$_AH" ] && [ -x "\$_AH/bin/agentrt-tui" ] || _AH=""
+if [ -z "\$_AH" ]; then
+    _AH="\$(sed -n 's/^AIRY_HOME=//p' "\${_DIR}/../config/install.env" 2>/dev/null | head -1)"
+    [ -x "\$_AH/bin/agentrt-tui" ] || _AH=""
+fi
+[ -n "\$_AH" ] || _AH="\$HOME/.airymaxrt"
+AIRY_HOME="\$_AH"
 export AIRY_HOME
 exec "\$AIRY_HOME/bin/agentrt-tui" "\$@"
 EOF
@@ -1082,9 +1099,15 @@ main() {
         check_toolchain
         prepare_source
 
-        # 模式 B：无闭源源码 → 下载预编译模块包（URL 未配置时跳过，闭源功能受限）
+        # 模式 B：无闭源源码 → 下载预编译模块包。atoms 默认指向官方
+        # Release 附件直链（publish-release.sh 上传口径：releases/download/
+        # <tag>/<file>，文件名含 detect_arch 架构），环境变量可覆盖；
+        # 下载失败仅降级警告（闭源功能受限），不阻断安装。memoryrovol
+        # 为授权分发、无公开发布，保持显式 URL 配置制（未配置即跳过）。
         if [ ! -d "${AIRY_SRC_APP}/agentrt/atoms" ] && [ "$AIRY_MODE" != "source" ]; then
-            fetch_prebuilt_module "atoms" "${AIRY_ATOMS_PREBUILT_URL:-}" "atoms" || \
+            fetch_prebuilt_module "atoms" \
+                "${AIRY_ATOMS_PREBUILT_URL:-https://atomgit.com/openairymax/agentrt/releases/download/${AIRY_VERSION}/airy-atoms-prebuilt-${AIRY_VERSION}-linux-$(detect_arch).tar.gz}" \
+                "atoms" || \
                 log_warn "atoms 预编译包不可用；如需完整功能请配置 AIRY_ATOMS_PREBUILT_URL 或使用本地源码"
             fetch_prebuilt_module "memoryrovol" "${AIRY_MEMORYROVOL_PREBUILT_URL:-}" "memoryrovol" || \
                 log_warn "memoryrovol 预编译包不可用（无授权将自动降级 OSS/builtin）"
