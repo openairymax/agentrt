@@ -2,7 +2,7 @@
   "schema": 1,
   "channel": "stable",
   "latest": "v0.1.5",
-  "updated_at": "2026-08-28T13:47:39Z",
+  "updated_at": "2026-08-28T14:01:49Z",
   "releases": {
     "v0.1.5": {
       "yanked": false,
@@ -10,18 +10,18 @@
       "artifacts": {
         "linux-aarch64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.5/agentrt-v0.1.5-linux-aarch64.tar.gz",
-          "sha256": "208e3262f3e4fa074de79fc68e4bd05258e1dec962fa63ddb56de7d632415333",
-          "size": 27111474
+          "sha256": "58b211af01cc90f52b80d0e98678e429a3af974720b3c3d59028a3edfa48ad3e",
+          "size": 27112009
         },
         "linux-riscv64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.5/agentrt-v0.1.5-linux-riscv64.tar.gz",
-          "sha256": "fb0b4ea2dd1c6e6d2c01b247d231a4c8825848f07ce4d83d8b236d710ff7afb5",
-          "size": 26159178
+          "sha256": "e8744c40c5a66f8ba2595b716e53f38447d145d27dc37fb7643cf23710e2c140",
+          "size": 26162052
         },
         "linux-x86_64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.5/agentrt-v0.1.5-linux-x86_64.tar.gz",
-          "sha256": "2ee03b619de93fe069c106576ec006d5af2515d01b19903d999dfb2292aaf4e7",
-          "size": 24910983
+          "sha256": "92bf85b020f96c83c2e0269e9c7850b45c7659076079381cfe3f689b389ff5a7",
+          "size": 24909248
         }
       }
     }
