@@ -927,16 +927,49 @@ fi
 [ -n "\$_AH" ] || _AH="\$HOME/.airymaxrt"
 AIRY_HOME="\$_AH"
 export AIRY_HOME
-# 管理命令自举：二进制模式轻量启动器仅提供 TUI 入口（agentrt-tui），
-# 完整启动器（含 start/status/doctor/cli/profile/monitor/uninstall/update
-# 等管理命令）随发布以 latest/airymaxrt 分发（sdk 仓私有，匿名不可达，
-# 须经公开 agentrt 仓 contents API 匿名拉取，raw 域对非 md 文件返回
-# HTML 预览页不可直连）。信任模型与安装器自举一致，更新器内部再对
-# manifest 做 GPG fail-closed 验签 + sha256 强制校验。
-# update 每次强制重新拉取（完整启动器自身负责后续自更新）；其余管理
-# 命令复用已缓存的完整启动器，避免频繁网络往返。
+# PATH 自愈（与完整启动器对齐）：BIN_DIR 软链目录不在 PATH 时自动追加
+# 当前 shell 的 rc 文件（带 AgentRT 标记行，幂等，卸载可移除）。根治
+# 社区用户"一键安装后 command not found"——安装器已引导过 rc，此处再兜底
+# 覆盖 rc 丢失/换 shell/多用户等场景。
+_BINLINK="\$(sed -n 's/^AIRY_BIN_LINK=//p' "\${AIRY_HOME}/config/install.env" 2>/dev/null | head -1)"
+_BINLINK="\${_BINLINK:-\$HOME/.local/bin/airymaxrt}"
+_BINDIR="\${_BINLINK%/airymaxrt}"
+_INPATH=0
+_P="\$PATH"
+while [ -n "\$_P" ]; do
+    _SEG="\${_P%%:*}"
+    [ "\$_SEG" = "\$_BINDIR" ] && _INPATH=1
+    [ "\$_SEG" = "\$_P" ] && _P="" || _P="\${_P#*:}"
+    [ "\$_INPATH" = "1" ] && break
+done
+if [ "\$_INPATH" != "1" ] && [ -n "\$_BINDIR" ]; then
+    case "\$(basename "\${SHELL:-/bin/sh}")" in
+        zsh) _RC="\$HOME/.zshrc" ;;
+        fish) _RC="\$HOME/.config/fish/config.fish" ;;
+        sh|dash|ash) _RC="\$HOME/.profile" ;;
+        *) _RC="\$HOME/.bashrc" ;;
+    esac
+    if ! grep -q '# >>> AgentRT PATH bootstrap <<<' "\$_RC" 2>/dev/null; then
+        if [ "\$(basename "\$_RC")" = "config.fish" ]; then
+            _LINE="set -gx PATH \"\${_BINDIR}\" \$PATH"
+        else
+            _LINE="export PATH=\"\${_BINDIR}:\$PATH\""
+        fi
+        printf '\n# >>> AgentRT PATH bootstrap <<<\n%s\n# <<< AgentRT PATH bootstrap <<<\n' "\$_LINE" >> "\$_RC" 2>/dev/null \
+            && echo "airymaxrt: 已自动将 \${_BINDIR} 追加到 \$_RC（新开终端生效，或 source \"\$_RC\"）" >&2
+    fi
+fi
+# 管理命令自举：二进制模式轻量启动器仅提供 TUI/CLI 前端入口，完整启动器
+# （含 start/status/doctor/cli/profile/monitor/uninstall/update 等管理命令）
+# 随发布以 latest/airymaxrt 分发（sdk 仓私有，匿名不可达，须经公开 agentrt
+# 仓 contents API 匿名拉取，raw 域对非 md 文件返回 HTML 预览页不可直连）。
+# 信任模型与安装器自举一致，更新器内部再对 manifest 做 GPG fail-closed
+# 验签 + sha256 强制校验。
+# update 每次强制重新拉取（完整启动器自身负责后续自更新）；其余管理命令
+# 复用已缓存的完整启动器，避免频繁网络往返。start 亦自举（完整启动器负责
+# 拉起守护进程群 + 前端；缓存存在时零网络）。
 case "\$1" in
-    cli|profile|monitor|status|doctor|uninstall|update)
+    start|cli|profile|monitor|status|doctor|uninstall|update)
         _FULL="\$AIRY_HOME/bin/airymaxrt-full"
         if [ "\$1" != "update" ] && [ -s "\$_FULL" ]; then
             exec bash "\$_FULL" "\$@"
@@ -965,7 +998,20 @@ case "\$1" in
         exec bash "\$_FULL" "\$@"
         ;;
 esac
-exec "\$AIRY_HOME/bin/agentrt-tui" "\$@"
+# 前端选择（与完整启动器一致）：有 TTY 且 TUI 可用 → TUI；否则 → airy_cli
+# 流式（非 TTY 环境，stdin 读指令）。修复旧版无 TTY 时透传参数给
+# agentrt-tui 报 "unexpected argument" 的问题。
+if [ -t 0 ] && [ -t 1 ] && [ -x "\$AIRY_HOME/bin/agentrt-tui" ]; then
+    exec "\$AIRY_HOME/bin/agentrt-tui"
+fi
+if [ -x "\$AIRY_HOME/bin/airy_cli" ]; then
+    exec "\$AIRY_HOME/bin/airy_cli" -p
+fi
+if [ -x "\$AIRY_HOME/bin/agentrt-tui" ]; then
+    exec "\$AIRY_HOME/bin/agentrt-tui"
+fi
+echo "airymaxrt: 未找到可执行前端（agentrt-tui / airy_cli 均缺失）" >&2
+exit 1
 EOF
         chmod 755 "${AIRY_HOME}/bin/airymaxrt"
     fi
