@@ -55,7 +55,13 @@ if ($Help) {
 }
 
 # ─── 参数 ────────────────────────────────────────────────────────────────
-$AIRY_HOME    = if ($Prefix) { $Prefix } elseif ($env:AIRY_HOME) { $env:AIRY_HOME } else { Join-Path $HOME ".airymaxrt" }
+# 安装路径强制统一 $HOME\.airymaxrt（与 install.sh 同逻辑，2026-08-28）。
+# 环境变量 AIRY_HOME 不再继承——历史故障：持久终端残留 export AIRY_HOME=
+# <已删除目录>，静默劫持安装位置。非默认位置请用显式 -Prefix 参数。
+if ($env:AIRY_HOME -and (Join-Path $env:AIRY_HOME "") -ne (Join-Path $HOME ".airymaxrt\")) {
+    Write-Warn "已忽略环境变量 AIRY_HOME=$env:AIRY_HOME（防残留劫持）；安装位置统一为 ~\.airymaxrt，非默认位置请用 -Prefix"
+}
+$AIRY_HOME    = if ($Prefix) { $Prefix } else { Join-Path $HOME ".airymaxrt" }
 # 版本 SSoT：显式 AIRY_VERSION 优先；源码树内运行读 agentrt/VERSION；
 # 否则回退占位默认值（源码构建路径会以 clone 到的 agentrt/VERSION 为准，
 # 二进制路径以 manifest/实际包版本为准）。
