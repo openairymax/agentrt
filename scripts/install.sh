@@ -5,15 +5,18 @@
 # 位置：agentrt 管理仓 scripts/install.sh（v0.1.2 起自伞仓 scripts/ 迁移，
 #       构建系统与安装器属 IRON-9 [IND] 完全独立层，随 agentrt 仓独立演进；
 #       伞仓 scripts/ 保留兼容重定向入口）。
-# 用法（一键安装；AtomGit raw 域对 .sh 返回 HTML 预览页不可直连，
-# 经 v5 contents API 匿名拉取后解码执行。必须用 bash 而非 sh 管道：
-# dash 的 `sh -s` 不接收位置参数，`sh -s -- <args>` 参数全丢，
+# 用法（一键安装，安装器随 release 附件分发匿名直连。必须用 bash 而非
+# sh 管道：dash 的 `sh -s` 不接收位置参数，`sh -s -- <args>` 参数全丢，
 # --prefix/--channel 等将静默回落默认值）：
-#   curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
-#     | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
+#   curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.5/install.sh" \
 #     | bash -s -- --channel stable
 #   bash install.sh --prefix "$HOME/.airymaxrt"       # 自定义路径
 #   bash install.sh --uninstall                       # 一键卸载
+# 后备（tag 未定或要装 main 最新安装器；AtomGit raw 域对 .sh 返回 HTML
+# 预览页不可直连，经 v5 contents API 匿名拉取后解码执行）：
+#   curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
+#     | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
+#     | bash -s -- --channel stable
 #
 # 安装策略（三模式，按可达性自动降级）：
 #   模式 A 二进制：AIRY_RELEASE_URL 指向完全体 tarball（含闭源模块预编译产物），
