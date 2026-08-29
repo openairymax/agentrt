@@ -1028,6 +1028,30 @@ case "\$1" in
         [ -s "\$_FULL" ] || { echo "airymaxrt \$1: 完整启动器为空" >&2; exit 1; }
         exec bash "\$_FULL" "\$@"
         ;;
+    "")
+        # 默认前端入口（无参数）：先确保守护进程群就绪再进入前端。
+        # 0.1.6 社区缺陷修复：此前无参数直接 exec 前端，daemon 群未拉起，
+        # CLI/TUI 全部离线（"online 0/17"）。优先复用已缓存的完整启动器
+        #（含 daemon 群拉起 + 前端选择）；无缓存则本地 bootstrap start
+        #（幂等：已运行实例复用，离线可用，无需网络）。
+        _FULL="\$AIRY_HOME/bin/airymaxrt-full"
+        if [ -s "\$_FULL" ]; then
+            exec bash "\$_FULL"
+        fi
+        if [ -x "\$AIRY_HOME/bin/agentrt-bootstrap.sh" ]; then
+            _GW_READY=0
+            if command -v curl >/dev/null 2>&1; then
+                curl -fsS --max-time 1 -X POST http://127.0.0.1:8080/ \
+                    -H 'Content-Type: application/json' \
+                    -d '{"jsonrpc":"2.0","id":1,"method":"ping","params":{}}' \
+                    >/dev/null 2>&1 && _GW_READY=1
+            fi
+            if [ "\$_GW_READY" != "1" ]; then
+                echo "airymaxrt: gateway 离线，拉起守护进程群…" >&2
+                "\$AIRY_HOME/bin/agentrt-bootstrap.sh" start >/dev/null 2>&1 || true
+            fi
+        fi
+        ;;
 esac
 # 前端选择（与完整启动器一致）：有 TTY 且 TUI 可用 → TUI；否则 → airy_cli
 # 流式（非 TTY 环境，stdin 读指令）。修复旧版无 TTY 时透传参数给
