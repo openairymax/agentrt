@@ -11,7 +11,7 @@ endif()
 # 版本号 SSoT（2.6.2 Unify Design）：单一来源 agentrt/VERSION（如 0.1.5）。
 # 构建期读取并注入 AIRY_CLI_VERSION 宏；文件缺失时回退 cli_internal.h 缺省值。
 set(AIRY_CLI_VERSION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION")
-set(AIRY_CLI_VERSION "0.1.5a")
+set(AIRY_CLI_VERSION "0.1.6")
 if(EXISTS "${AIRY_CLI_VERSION_FILE}")
     file(STRINGS "${AIRY_CLI_VERSION_FILE}" AIRY_CLI_VERSION_RAW LIMIT_COUNT 1)
     string(STRIP "${AIRY_CLI_VERSION_RAW}" AIRY_CLI_VERSION)
