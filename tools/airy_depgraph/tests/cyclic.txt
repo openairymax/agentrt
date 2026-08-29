@@ -1,0 +1,4 @@
+# 环检测用例：有环图（期望退出码 1，报环路径）
+alpha: beta
+beta: gamma
+gamma: alpha

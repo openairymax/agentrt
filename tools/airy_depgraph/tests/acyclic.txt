@@ -1,0 +1,5 @@
+# 环检测用例：无环图（期望退出码 0）
+alpha:
+beta: alpha
+gamma: alpha beta
+delta: beta
