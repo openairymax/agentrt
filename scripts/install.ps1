@@ -69,7 +69,7 @@ $AiryVersionSpecified = $false
 if ($env:AIRY_VERSION) { $AiryVersionSpecified = $true }
 $AIRY_VERSION = if ($env:AIRY_VERSION) { $env:AIRY_VERSION }
                 elseif (Test-Path (Join-Path $PSScriptRoot "..\VERSION")) { "v" + ((Get-Content (Join-Path $PSScriptRoot "..\VERSION")).Trim()) }
-                else { "v0.1.6" }
+                else { "v0.1.6a" }
 $AIRY_REPO_URL = if ($env:AIRY_REPO_URL) { $env:AIRY_REPO_URL } else { "https://atomgit.com/openairymax/airymaxhub.git" }
 $AIRY_CHANNEL = if ($Channel) { $Channel } elseif ($env:AIRY_CHANNEL) { $env:AIRY_CHANNEL } else { "stable" }
 $AIRY_SRC_DIR = Join-Path $AIRY_HOME "src\airymaxhub"

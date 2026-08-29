@@ -3,9 +3,18 @@
 # Copyright (c) 2026 SPHARX. All Rights Reserved.
 
 cmake_minimum_required(VERSION 3.20)
+# 版本 SSoT：project() 版本号从根 VERSION 文件注入（与 gateway/commons/CLI
+# 一致）。VERSION 允许字母后缀（如 0.1.6a），而 CMake/CPack 仅接受数字版本，
+# 故剥离尾部字母取数字部分（0.1.6a -> 0.1.6），避免硬编码漂移。
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" AIRY_VERSION_RAW LIMIT_COUNT 1)
+string(STRIP "${AIRY_VERSION_RAW}" AIRY_VERSION_RAW)
+string(REGEX REPLACE "([0-9.]+).*" "\\1" AIRY_VERSION_NUM "${AIRY_VERSION_RAW}")
+if(NOT AIRY_VERSION_NUM)
+    set(AIRY_VERSION_NUM "0.1.6")
+endif()
 # 纯 C 项目（全仓无 .cpp/.cc 源文件）；仅声明 C 可避免 CXX 编译器
 # 缺失时（如 aarch64 交叉工具链仅装了 gcc 未装 g++）configure 失败。
-project(AgentRT VERSION 0.1.5 LANGUAGES C)
+project(AgentRT VERSION ${AIRY_VERSION_NUM} LANGUAGES C)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR
