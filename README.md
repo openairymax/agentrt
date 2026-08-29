@@ -88,7 +88,7 @@ airymaxhub/                     ← Umbrella repo (git superproject root)
 
 | Module | Repository URL | Class | Description |
 |--------|---------------|-------|-------------|
-| **atoms** | `git@atomgit.com:openairymax/atoms.git` | A | Micro-core primitives: `corekern`, `coreloopthree`, `syscall`, `taskflow`, `frameworks`, `memory` |
+| **atoms** | `git@atomgit.com:openairymax/atoms.git` | A | Micro-core primitives: `corekern`, `coreloopthree`, `syscall`, `taskflow`, `memory` (5 modules, frameworks removed since 0.1.5a) |
 | **commons** | `git@atomgit.com:openairymax/commons.git` | A | Shared foundation library: 24+ util modules (logging, sync, memory, string, ipc, etc.) |
 | **cupolas** | `git@atomgit.com:openairymax/cupolas.git` | B | Safety dome: 4-layer inherent security (sandbox, RBAC, sanitization, audit) |
 | **heapstore** | `git@atomgit.com:openairymax/heapstore.git` | A | Heap-backed runtime data persistence |
@@ -109,7 +109,7 @@ AgentRT follows a cyclic layered architecture. Each layer depends only on the la
 ⇅   Gateway Layer      — HTTP / WS / Stdio → JSON-RPC 2.0 gateway daemon             (gateway/)
 ⇅   Storage Layer      — Heap-backed runtime data persistence                        (heapstore/)
 ⇅   Security Layer     — 4-layer inherent safety dome                                (cupolas/)
-⇅   Kernel Layer       — 7 atomic microkernel modules                                (atoms/)
+⇅   Kernel Layer       — 5 atomic microkernel modules                                (atoms/)
 ⇅   Support Layer      — Unified foundation library (24+ util modules)               (commons/)
 ⬆️  SDK Layer          — (cyclic) SDKs bind back to foundation & expose to consumers  (sdk/ repo)
 ```
@@ -122,8 +122,41 @@ AgentRT follows a cyclic layered architecture. Each layer depends only on the la
 - **Gateway Layer** — `gateway_d` translates HTTP, WebSocket, and stdio transports into a unified JSON-RPC 2.0 stream, providing the external entry point into the runtime.
 - **Storage Layer** — `heapstore` provides heap-backed persistence for runtime state, agent memory, and transient data.
 - **Security Layer** — `cupolas` enforces 4-layer inherent security: sandbox isolation, RBAC authorization, input/output sanitization, and audit logging.
-- **Kernel Layer** — `atoms` contains the 7 atomic microkernel modules (`corekern`, `coreloopthree`, `syscall`, `taskflow`, `frameworks`, `memory`) that provide scheduling, cognitive loops, and memory primitives.
+- **Kernel Layer** — `atoms` contains the 5 atomic microkernel modules (`corekern`, `coreloopthree`, `syscall`, `taskflow`, `memory`) that provide scheduling, cognitive loops, and memory primitives.
 - **Support Layer** — `commons` provides the 24+ shared utility modules (logging, synchronization, memory, string handling, IPC helpers) that every other layer builds upon.
+
+## Quick Install (End Users)
+
+One-line install for end users — no compilation required. The installer always
+picks the **latest release** (`releases/download/latest/`), so the command never
+needs a version bump, and runs GPG verification + sha256 checksum + architecture
+self-check (x86_64 / aarch64 / riscv64) automatically:
+
+```bash
+# Linux / macOS
+curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash
+
+# Windows PowerShell
+powershell -ExecutionPolicy Bypass -Command "irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 | iex"
+```
+
+Common variants:
+
+```bash
+# Custom prefix (default: $HOME/.airymaxrt)
+curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | \
+   bash -s -- --prefix "$HOME/.airymaxrt"
+
+# Beta channel (more aggressive updates)
+curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash -s -- --channel beta
+
+# Uninstall (--keep-data preserves memory data)
+curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash -s -- --uninstall
+```
+
+After install, `airymaxrt` is on PATH and `airymaxrt start` launches the runtime.
+The installer auto-profiles the hardware (full/minimal runtime profile) and the
+`airymaxrt monitor` daemon restores trimmed features when you add RAM or GPUs.
 
 ## Build
 
