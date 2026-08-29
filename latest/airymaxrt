@@ -526,7 +526,27 @@ QpegwKdM5Y9YiANOL8FODQ==
 =EPz8
 -----END PGP PUBLIC KEY BLOCK-----'
 
-# 版本比较（SemVer 简化：点分数字 + -beta.N/-rc.N 后缀）：输出 -1|0|1
+# 版本字段比较（点分数字 + 字母补丁后缀，如 5 vs 5a：空后缀 < 字母后缀
+# < b < ...，即 0.1.5 < 0.1.5a < 0.1.5b）：输出 -1|0|1
+# 2026-08-29 修复：v0.1.5a 字母后缀曾触发 bash 算术错误
+# （"5a: value too great for base"）导致 ver_cmp 误判相等，0.1.5 用户
+# 无法自动升级到 0.1.5a。数字部分强制 10# 十进制（防前导零）。
+field_cmp() {
+    local x="$1" y="$2" xn="" yn="" xl="" yl=""
+    xn="${x%%[a-zA-Z]*}"; xl="${x#$xn}"
+    yn="${y%%[a-zA-Z]*}"; yl="${y#$yn}"
+    xn="${xn:-0}"; yn="${yn:-0}"
+    if (( 10#$xn > 10#$yn )); then echo 1; return; fi
+    if (( 10#$xn < 10#$yn )); then echo -1; return; fi
+    if [ -z "$xl" ] && [ -z "$yl" ]; then echo 0; return; fi
+    if [ -z "$xl" ]; then echo -1; return; fi   # 5 < 5a
+    if [ -z "$yl" ]; then echo 1; return; fi    # 5a > 5
+    if [[ "$xl" < "$yl" ]]; then echo -1; return; fi
+    if [[ "$xl" > "$yl" ]]; then echo 1; return; fi
+    echo 0
+}
+
+# 版本比较（SemVer 简化：点分字段 + -beta.N/-rc.N 后缀）：输出 -1|0|1
 ver_cmp() { # <a> <b>
     local a="$1" b="$2" apr="" bpr=""
     a="${a#v}"; b="${b#v}"
@@ -535,17 +555,17 @@ ver_cmp() { # <a> <b>
     local -a av bv
     IFS='.' read -r -a av <<< "$a"
     IFS='.' read -r -a bv <<< "$b"
-    local n=$(( ${#av[@]} > ${#bv[@]} ? ${#av[@]} : ${#bv[@]} )) i x y
+    local n=$(( ${#av[@]} > ${#bv[@]} ? ${#av[@]} : ${#bv[@]} )) i c
     for ((i=0; i<n; i++)); do
-        x="${av[$i]:-0}"; y="${bv[$i]:-0}"
-        (( x > y )) && { echo 1; return; }
-        (( x < y )) && { echo -1; return; }
+        c="$(field_cmp "${av[$i]:-0}" "${bv[$i]:-0}")"
+        if [ "$c" = "1" ]; then echo 1; return; fi
+        if [ "$c" = "-1" ]; then echo -1; return; fi
     done
     if [ -z "$apr" ] && [ -z "$bpr" ]; then echo 0; return; fi
     if [ -z "$apr" ]; then echo 1; return; fi   # 正式版 > prerelease
     if [ -z "$bpr" ]; then echo -1; return; fi
     local an="${apr##*.}" bn="${bpr##*.}"
-    (( an > bn )) && echo 1 || { (( an < bn )) && echo -1 || echo 0; }
+    (( 10#$an > 10#$bn )) && echo 1 || { (( 10#$an < 10#$bn )) && echo -1 || echo 0; }
 }
 
 # 当前平台键（manifest artifacts 键名，与打包命名对齐）：linux-x86_64 / macos-arm64
