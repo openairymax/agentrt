@@ -10,8 +10,10 @@
 # `sh -s` 不接收位置参数，`sh -s -- <args>` 参数全丢，--prefix/--channel
 # 等将静默回落默认值）：
 #   curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" \
-#     | bash -s -- --channel stable
-#   bash install.sh --prefix "$HOME/.airymaxrt"       # 自定义路径
+#     | bash
+#     # ↑ 最简形式：通道默认 stable（--channel 仅 beta 等非常规通道时需指定）
+#   curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" \
+#     | bash -s -- --prefix "$HOME/.airymaxrt"       # 自定义路径
 #   bash install.sh --uninstall                       # 一键卸载
 # 后备（latest 附件不可达或要装 main 分支最新安装器；AtomGit raw 域对
 # .sh 返回 HTML 预览页不可直连，经 v5 contents API 匿名拉取后解码执行）：
@@ -410,7 +412,17 @@ install_binary() {
     extracted="$(find "${AIRY_HOME}/tmp" -maxdepth 1 -type d -name 'agentrt-*' | head -1)"
     [ -n "$extracted" ] || { log_warn "release 包结构异常，回退源码构建"; return 1; }
     cp -f "${extracted}"/bin/* "${AIRY_HOME}/bin/" 2>/dev/null || true
-    cp -f "${extracted}"/lib/* "${AIRY_HOME}/lib/" 2>/dev/null || true
+    # lib/（.so 自包含）部署 + 校验：0.1.5a 旧包曾缺 libcjson.so.1 导致
+    # daemon/airy_cli 启动即失败（社区反馈）。包内 lib/ 含 .so 时必须
+    # 确认部署成功，缺失即 fail-closed（不再静默吞错）。
+    if [ -d "${extracted}/lib" ] && ls "${extracted}"/lib/*.so* >/dev/null 2>&1; then
+        mkdir -p "${AIRY_HOME}/lib"
+        cp -f "${extracted}"/lib/* "${AIRY_HOME}/lib/" 2>/dev/null
+        if ! ls "${AIRY_HOME}"/lib/*.so* >/dev/null 2>&1; then
+            log_err "lib/ 部署失败（.so 未就位），二进制将无法启动"
+            return 1
+        fi
+    fi
     cp -rf "${extracted}"/include/* "${AIRY_HOME}/include/" 2>/dev/null || true
     # LICENSE/README（share/licenses|share/doc）随包分发，满足许可证随二进制分发要求
     cp -rf "${extracted}"/share/* "${AIRY_HOME}/share/" 2>/dev/null || true
@@ -900,6 +912,12 @@ export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-$AIRY_HOME/data/agentrt/cache
 # AIRY_AGENT_ACL="coding_v1=fs_read,fs_glob"。
 export AIRY_AGENT_ACL="${AIRY_AGENT_ACL:-}"
 export PATH="${AIRY_HOME}/bin:$PATH"
+# 运行时 .so 兜底（0.1.6 社区 bug 根治：0.1.5a 旧包未做 .so 自包含，二进制
+# 依赖 libcjson.so.1 等非系统库且无 $ORIGIN/../lib RUNPATH，系统无 libcjson1
+# 时 daemon/airy_cli/agentrt-tui 启动即失败）。二进制内置 $ORIGIN/../lib
+# RUNPATH 为主路径，此处 LD_LIBRARY_PATH 为兜底——即便包部署路径异常，
+# 只要 $AIRY_HOME/lib 存在即可正常加载。
+export LD_LIBRARY_PATH="${AIRY_HOME}/lib:${LD_LIBRARY_PATH:-}"
 AIRY_ENV_EOF
     sed "s|__AIRY_HOME__|${AIRY_HOME}|g" "${AIRY_HOME}/bin/agentrt-env.sh" > "${AIRY_HOME}/bin/agentrt-env.sh.tmp" && \
         mv "${AIRY_HOME}/bin/agentrt-env.sh.tmp" "${AIRY_HOME}/bin/agentrt-env.sh"
