@@ -788,6 +788,14 @@ if(AIRY_BUILD_ALL)
         airy_print_warn("airy_cli module not found or disabled")
     endif()
 
+    # 依赖图门禁工具（0.1.6 P1-2）：commons 子域依赖声明 + Kahn 拓扑排序 +
+    # 环检测（fail-closed）+ 依赖图报告；复用 taskflow graph_engine
+    if(BUILD_COMMONS AND BUILD_ATOMS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/airy_depgraph/CMakeLists.txt")
+        add_subdirectory(tools/airy_depgraph)
+    else()
+        airy_print_warn("airy_depgraph module not found or disabled")
+    endif()
+
     # toolkit 包含多种语言 SDK，需要特殊处理
     if(BUILD_TOOLKIT)
         airy_print_info("Toolkit modules require additional configuration for each language SDK")
