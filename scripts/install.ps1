@@ -11,7 +11,7 @@
 # 安装策略（三模式，与 install.sh 对齐）：
 #   模式 A 二进制：AIRY_RELEASE_URL 指向完全体 zip（含闭源模块预编译产物），
 #      下载解压到 $AIRY_HOME，秒级安装、无需工具链（完全体二进制为主）。
-#   模式 B 混合构建：公开源码编译；闭源模块（atoms/memoryrovol）下载预编译包
+#   模式 B 混合构建：公开源码编译；闭源模块（atoms/memory/memoryrovol）下载预编译包
 #      到 $AIRY_HOME\modules 后链接（AIRY_ATOMS_PREBUILT_DIR /
 #      MEMORYROVOL_PRO_LIB）。
 #   模式 C 全源码构建：本地持有闭源模块源码，全量编译（-Mode source）。

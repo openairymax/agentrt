@@ -71,7 +71,7 @@ option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
 option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
 option(AIRY_BUILD_ALL "Build all AgentRT components" ON)
 # IRON-8 生产就绪：MemoryRovol 为默认记忆提供商（L1-L4 四层记忆卷载），
-# 默认启用而非显式开关。外部源缺失时 atoms/memoryrovol/CMakeLists.txt
+# 默认启用而非显式开关。外部源缺失时 atoms/memory/memoryrovol/CMakeLists.txt
 # 自动降级为 builtin provider，不会破坏构建。
 option(AIRY_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" ON)
 option(AIRY_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe functions)" ON)

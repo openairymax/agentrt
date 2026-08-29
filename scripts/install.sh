@@ -1256,7 +1256,7 @@ main() {
             fetch_prebuilt_module "memoryrovol" "${AIRY_MEMORYROVOL_PREBUILT_URL:-}" "memoryrovol" || \
                 log_warn "memoryrovol 预编译包不可用（无授权将自动降级 OSS/builtin）"
         elif [ "$AIRY_MODE" = "source" ] && [ -d "${AIRY_SRC_APP}/agentrt/atoms" ]; then
-            log_ok "模式 C：本地闭源源码（atoms/memoryrovol）全量构建"
+            log_ok "模式 C：本地闭源源码（atoms/memory/memoryrovol）全量构建"
         fi
 
         if [ "${AIRY_NO_BUILD:-}" != "1" ]; then
