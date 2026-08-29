@@ -32,7 +32,7 @@
 #   $AIRY_HOME            = $HOME/.airymaxrt（强制统一；--prefix 显式覆盖，
 #                            环境变量 AIRY_HOME 不再继承——防终端残留劫持）
 #   $AIRY_HOME/bin  lib  include  config  run  logs  data  tmp  cache
-#   $AIRY_HOME/modules    — 闭源预编译模块包（atoms/memoryrovol）
+#   $AIRY_HOME/modules    — 闭源预编译模块包（atoms/memory/memoryrovol）
 #   $AIRY_HOME/src        — 源码树（构建模式）
 #   $AIRY_HOME/build      — out-of-source 构建目录（构建模式）
 #   $AIRY_HOME/scripts    — 安装器自托管（install/uninstall 副本）
@@ -1111,6 +1111,28 @@ post_install_selfcheck() {
         log_warn "beta 通道发布更频繁；正式环境建议 'airymaxrt update --channel stable' 切回"
     fi
     log_info "更新检查: airymaxrt update --check    升级: airymaxrt update"
+
+    # 运行时依赖自包含校验（2026-08-29 社区 bug 根治）：agentrt-tui/daemons
+    # 依赖 libcjson.so.1 等非系统 .so，随包 lib/ + $ORIGIN/../lib RUNPATH
+    # 交付。安装后立刻验证所有 ELF 二进制无未解析依赖，尽早暴露缺失。
+    local _missing=0 _b
+    for _b in "${AIRY_HOME}"/bin/*; do
+        [ -f "$_b" ] || continue
+        # 仅检查 ELF 可执行（跳过 .sh 包装器）
+        if head -c4 "$_b" 2>/dev/null | od -An -tx1 | grep -q "7f 45 4c 46"; then
+            if command -v ldd >/dev/null 2>&1 && ldd "$_b" 2>/dev/null | grep -q "not found"; then
+                log_warn "$(basename "$_b") 存在未解析动态库依赖:"
+                ldd "$_b" 2>/dev/null | grep "not found" | sed 's/^/    /'
+                _missing=$((_missing+1))
+            fi
+        fi
+    done
+    if [ "$_missing" -gt 0 ]; then
+        log_warn "检测到 ${_missing} 个二进制缺少运行时库。"
+        log_warn "若 libcjson.so.1 等随包 .so 未生效，请确认 AIRY_LIB_PATH 已含 ${AIRY_HOME}/lib，或重装本版本。"
+    else
+        log_ok "运行时依赖校验通过（全部二进制动态库解析正常）"
+    fi
 }
 
 # ─── 版本信息 ──────────────────────────────────────────────────────────

@@ -110,6 +110,14 @@ airy_print_info("Memory backend:   ${AIRY_MEMORY_BACKEND}")
 airy_print_info("MemoryRovol Pro:  ${AIRY_WITH_MEMORYROVOL}")
 airy_print_info("Sanitizers:       ${ENABLE_SANITIZERS}")
 
+# 运行时库自包含（2026-08-29 社区 bug 根治：agentrt-tui/daemons 依赖
+# libcjson.so.1 等非系统库，目标机无该库则 "error while loading shared
+# libraries"）。全部二进制携带 $ORIGIN/../lib RUNPATH；发布打包时把
+# 非系统核心 .so 随包放入 lib/，安装后无需目标机预装 cJSON/OpenSSL 等。
+set(CMAKE_BUILD_RPATH "$ORIGIN/../lib")
+set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
+
 # 关键路径验证：确认核心目录存在
 airy_print_info("Path check: Source root = ${CMAKE_CURRENT_SOURCE_DIR}")
 foreach(_dir atoms commons protocols gateway daemons cupolas heapstore)
@@ -610,10 +618,9 @@ if(AIRY_BUILD_ALL)
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/src/cognition/critique
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/src/cognition/foundation
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/memory
-            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/memory/src
+            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/memory/builtin
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/taskflow/include
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/syscall/include
-            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/frameworks/include
         )
     endif()
 
