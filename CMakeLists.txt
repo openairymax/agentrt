@@ -615,7 +615,7 @@ if(AIRY_BUILD_ALL)
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/corekern/include
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/include
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/src/cognition
-            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/src/cognition/critique
+            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/src/cognition/grad
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/src/cognition/foundation
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/memory
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/memory/builtin
