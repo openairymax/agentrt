@@ -580,8 +580,12 @@ install_maths_toolkit() {
         log_warn "未找到 python3，跳过 maths-toolkit（maths_d 纯 C 快速路径可用）"
         return 0
     fi
-    log_info "出厂预装数学计算后端（MCP-Mathematics + sympy-mcp，共享 venv，清华源）…"
-    if sh "$toolkit" --airy-home "${AIRY_HOME}" >/dev/null 2>&1; then
+    log_info "出厂预装数学计算后端（包内离线 wheel 优先 + 在线自动更新，失败降级纯 C 快速路径）…"
+    # 子安装器优先 bash（兼容 sh 异常/被替换的环境，如部分容器 dash 静默
+    # 不执行）；无 bash 时回退 sh。子安装器失败不阻断 agentrt 主流程。
+    local run_sh="sh"
+    command -v bash >/dev/null 2>&1 && run_sh="bash"
+    if "$run_sh" "$toolkit" --airy-home "${AIRY_HOME}" >/dev/null 2>&1; then
         # 安装器返回 0 不代表依赖就绪（2026-08-29 教训：maths-toolkit 曾
         # 在 pip 失败时静默返回 0）；此处校验 venv+sympy 真实可用才报 OK。
         if [ -x "${AIRY_HOME}/venv/bin/python3" ] && \
@@ -589,11 +593,11 @@ install_maths_toolkit() {
             log_ok "maths-toolkit 安装完成（maths_d 符号计算后端已就绪）"
         else
             log_warn "maths-toolkit 安装器返回成功但后端不可用（venv/sympy 缺失），已降级：maths_d 纯 C 快速路径可用；"
-            log_warn "可稍后手动安装: sh ${toolkit} --airy-home ${AIRY_HOME}"
+            log_warn "包内已内置离线 wheel，可重试: sh ${toolkit} --airy-home ${AIRY_HOME}"
         fi
     else
-        log_warn "maths-toolkit 安装失败（网络/依赖问题），已降级：maths_d 纯 C 快速路径可用；"
-        log_warn "可稍后手动安装: sh ${toolkit} --airy-home ${AIRY_HOME}"
+        log_warn "maths-toolkit 安装失败（离线 wheel 与在线源均不可用），已降级：maths_d 纯 C 快速路径可用；"
+        log_warn "包内已内置离线 wheel，可重试: sh ${toolkit} --airy-home ${AIRY_HOME}"
     fi
 }
 
@@ -978,9 +982,9 @@ if [ "\$_INPATH" != "1" ] && [ -n "\$_BINDIR" ]; then
     esac
     if ! grep -q '# >>> AgentRT PATH bootstrap <<<' "\$_RC" 2>/dev/null; then
         if [ "\$(basename "\$_RC")" = "config.fish" ]; then
-            _LINE="set -gx PATH \"\${_BINDIR}\" \$PATH"
+            _LINE=\$(printf 'set -gx PATH "%s" $PATH' "\$_BINDIR")
         else
-            _LINE="export PATH=\"\${_BINDIR}:\$PATH\""
+            _LINE=\$(printf 'export PATH="%s:\$PATH"' "\$_BINDIR")
         fi
         printf '\n# >>> AgentRT PATH bootstrap <<<\n%s\n# <<< AgentRT PATH bootstrap <<<\n' "\$_LINE" >> "\$_RC" 2>/dev/null \
             && echo "airymaxrt: 已自动将 \${_BINDIR} 追加到 \$_RC（新开终端生效，或 source \"\$_RC\"）" >&2
