@@ -39,14 +39,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Frame width: adapts to the terminal, clamped for readability. */
+/* Frame width: adapts to the terminal, clamped for readability.
+ * 0.1.6b：去掉 74 列最小钳制——窄终端（<78 列）下 74 宽的框必然折行，
+ * hero 变 12+ 物理行，pin 在 7 行导致对话覆盖 hero 尾部（下框线消失 +
+ * 重叠乱码）。框宽不得超过终端，内容行由 cli_hero_clip 截断保框。 */
 static size_t cli_hero_frame_w(void)
 {
     int rows = 0, cols = 0;
     cli_term_size(&rows, &cols);
     size_t w = (cols > 4) ? (size_t)cols - 4 : 74;
-    if (w < 74)
-        w = 74;
     if (w > 110)
         w = 110;
     return w;
