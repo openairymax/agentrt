@@ -58,7 +58,7 @@ extern "C" {
  * 注入的独立编译（如 IDE 单文件编译）出现未定义宏。版本更新只改
  * VERSION 文件一处，CLI 与 TUI 自动同步。 */
 #ifndef AIRY_CLI_VERSION
-#define AIRY_CLI_VERSION "0.1.6"
+#define AIRY_CLI_VERSION "0.1.6a"
 #endif
 
 /* 思考链折叠保留行数（2026-08-19：仅折叠思考链，结果完整展示）。
