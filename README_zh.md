@@ -88,7 +88,7 @@ airymaxhub/                     ← 伞仓（git superproject 根）
 
 | 模块            | 仓库 URL                                      | 分类 | 说明                                                                                                                                      |
 | ------------- | ------------------------------------------- | -- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **atoms**     | `git@atomgit.com:openairymax/atoms.git`     | A  | 微核心原语：`corekern`、`coreloopthree`、`syscall`、`taskflow`、`frameworks`、`memory`                                                             |
+| **atoms**     | `git@atomgit.com:openairymax/atoms.git`     | A  | 微核心原语：`corekern`、`coreloopthree`、`syscall`、`taskflow`、`memory`（5 模块，frameworks 自 0.1.5a 撤销）                                                             |
 | **commons**   | `git@atomgit.com:openairymax/commons.git`   | A  | 共享基础库：24+ 工具模块（logging、sync、memory、string、ipc 等）                                                                                        |
 | **cupolas**   | `git@atomgit.com:openairymax/cupolas.git`   | B  | 安全穹顶：四层内生安全（沙箱、RBAC、净化、审计）                                                                                                              |
 | **heapstore** | `git@atomgit.com:openairymax/heapstore.git` | A  | 堆式运行时数据持久化                                                                                                                              |
@@ -109,7 +109,7 @@ AgentRT 采用循环分层架构。每一层仅依赖其下层；支撑层提供
 ⇅   网关层     — HTTP / WS / Stdio → JSON-RPC 2.0 网关守护进程                (gateway/)
 ⇅   存储层     — 堆式运行时数据持久化                                         (heapstore/)
 ⇅   安全层     — 四层内生安全穹顶                                             (cupolas/)
-⇅   内核层     — 7 个原子微内核模块                                           (atoms/)
+⇅   内核层     — 5 个原子微内核模块                                           (atoms/)
 ⇅   支撑层     — 统一基础库（24+ 工具模块）                                    (commons/)
 ⬆️  SDK 层     — （循环）SDK 回绑基础库并向上暴露给消费者                      (sdk/ 仓)
 ```
@@ -122,8 +122,40 @@ AgentRT 采用循环分层架构。每一层仅依赖其下层；支撑层提供
 - **网关层** — `gateway_d` 将 HTTP、WebSocket、stdio 传输统一翻译为 JSON-RPC 2.0 流，提供进入运行时的外部入口。
 - **存储层** — `heapstore` 提供堆式持久化，承载运行时状态、智能体记忆与瞬态数据。
 - **安全层** — `cupolas` 实施四层内生安全：沙箱隔离、RBAC 授权、输入输出净化、审计日志。
-- **内核层** — `atoms` 包含 7 个原子微内核模块（`corekern`、`coreloopthree`、`syscall`、`taskflow`、`frameworks`、`memory`），提供调度、认知循环与记忆原语。
+- **内核层** — `atoms` 包含 5 个原子微内核模块（`corekern`、`coreloopthree`、`syscall`、`taskflow`、`memory`），提供调度、认知循环与记忆原语。
 - **支撑层** — `commons` 提供 24+ 共享工具模块（日志、同步、内存、字符串处理、IPC 助手等），是所有其他层的构建基础。
+
+## 一键安装（终端用户）
+
+终端用户一行安装，无需编译。安装器始终选择**最新 release**
+（`releases/download/latest/`），命令永不因版本升级而变动；自动完成
+GPG 验签 + sha256 校验 + 架构自检（x86_64 / aarch64 / riscv64）：
+
+```bash
+# Linux / macOS
+curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash
+
+# Windows PowerShell
+powershell -ExecutionPolicy Bypass -Command "irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 | iex"
+```
+
+常用变体：
+
+```bash
+# 自定义安装路径（默认 $HOME/.airymaxrt）
+curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | \
+   bash -s -- --prefix "$HOME/.airymaxrt"
+
+# 测试通道（更激进更新）
+curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash -s -- --channel beta
+
+# 卸载（--keep-data 保留记忆数据）
+curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash -s -- --uninstall
+```
+
+安装完成后 `airymaxrt` 即入 PATH，`airymaxrt start` 拉起运行时。安装器
+自动按硬件裁剪运行画像（full/minimal），`airymaxrt monitor` 常驻检测外设
+增强（加内存/插显卡）后自动恢复被裁剪功能。
 
 ## 构建
 
