@@ -100,7 +100,7 @@ if [ -n "${AIRY_VERSION:-}" ]; then
 elif [ -f "$(dirname "$0")/../VERSION" ]; then
     AIRY_VERSION="v$(cat "$(dirname "$0")/../VERSION" | tr -d '[:space:]')"
 fi
-AIRY_VERSION="${AIRY_VERSION:-v0.1.6a}"
+AIRY_VERSION="${AIRY_VERSION:-v0.1.6b}"
 AIRY_BUILD_JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 AIRY_MODE="${AIRY_MODE:-auto}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
@@ -958,6 +958,16 @@ fi
 [ -n "\$_AH" ] || _AH="\$HOME/.airymaxrt"
 AIRY_HOME="\$_AH"
 export AIRY_HOME
+# 运行环境注入（0.1.6b 缺陷修复：社区"很多库找不到 / daemon 群起不来"）。
+# 包内 lib/ 自带全部第三方 .so，但 DT_RUNPATH 非传递性——daemon 的直接
+# 依赖可经 \$ORIGIN/../lib 找到，而 libcurl 等的传递依赖只能走系统路径；
+# 宿主缺 gnutls/ssh/rtmp 等库时 daemon 启动即失败。source 安装期生成的
+# agentrt-env.sh（含 LD_LIBRARY_PATH=\$AIRY_HOME/lib），使无参数入口后续
+# 的 bootstrap 与前端全部继承（bootstrap 侧亦有同源兜底）。
+if [ -f "\${AIRY_HOME}/bin/agentrt-env.sh" ]; then
+    . "\${AIRY_HOME}/bin/agentrt-env.sh"
+    AIRY_HOME="\$_AH"
+fi
 # PATH 自愈（与完整启动器对齐）：BIN_DIR 软链目录不在 PATH 时自动追加
 # 当前 shell 的 rc 文件（带 AgentRT 标记行，幂等，卸载可移除）。根治
 # 社区用户"一键安装后 command not found"——安装器已引导过 rc，此处再兜底
