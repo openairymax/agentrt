@@ -29,7 +29,7 @@
 ### 核心技术文档
 
 - **[CoreLoopThree 架构](agentrt/atoms/coreloopthree/README.md)** - 三层认知运行时详解
-- **[MemoryRovol 架构](agentrt/atoms/memoryrovol/README.md)** - 四层记忆系统详解
+- **[MemoryRovol 架构](agentrt/atoms/memory/memoryrovol/README.md)** - 四层记忆系统详解
 - **[微核心设计](docs/10-architecture/microkernel.md)** - 微核心架构详解
 - **[系统调用](docs/10-architecture/05-syscall.md)** - 系统调用接口规范
 - **[IPC 通信](docs/10-architecture/ipc.md)** - 进程间通信机制
