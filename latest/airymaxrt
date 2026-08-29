@@ -815,6 +815,22 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
     apply_package "$tarball" "$art_sha"
     local rc=$?
     rm -rf "$TMPD"
+    if [ "$rc" = "0" ]; then
+        # 0.1.6a 修复：更新后重生成入口启动器。apply_package 仅热替换
+        # bin/，而轻量启动器（$AIRY_HOME/bin/airymaxrt）模板内嵌于
+        # install.sh，不会被更新刷新——旧轻量启动器无参数直通前端、
+        # daemon 群未拉起（社区"online 0/17"）。以完整启动器自身覆盖
+        # 入口：其默认流程先确保守护进程群就绪再进前端（与 start/无参数
+        # 语义一致），且离线可用、不依赖网络。
+        local _entry="$AIRY_HOME/bin/airymaxrt"
+        if [ -s "$_SOURCE" ] && [ "$_SOURCE" != "$(readlink -f "$_entry" 2>/dev/null || echo "$_entry")" ]; then
+            if cp -f "$_SOURCE" "$_entry" 2>/dev/null && chmod 755 "$_entry"; then
+                log info "入口启动器已重生成（no-args 将自动拉起守护进程群）"
+            else
+                log warn "入口启动器重生成失败（可运行 airymaxrt start 或重装修复）"
+            fi
+        fi
+    fi
     return $rc
 }
 

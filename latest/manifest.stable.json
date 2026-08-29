@@ -1,27 +1,27 @@
 {
   "schema": 1,
   "channel": "stable",
-  "latest": "v0.1.6",
-  "updated_at": "2026-08-29T14:59:18Z",
+  "latest": "v0.1.6a",
+  "updated_at": "2026-08-29T16:00:42Z",
   "releases": {
-    "v0.1.6": {
+    "v0.1.6a": {
       "yanked": false,
-      "notes": "",
+      "notes": "AgentRT v0.1.6a (patch)\n\nFixes a system-level defect in the 0.1.6 binary install: running\n`airymaxrt` with no arguments launched the frontend directly without\nstarting the daemon fleet, so every component reported offline\n(\"online 0/17\") and no feature was usable.\n\nChanges:\n\n- scripts/install: binary-mode launcher now brings up the daemon fleet\n  on default (no-args) launch — reuse cached full launcher, otherwise\n  bootstrap start (idempotent, offline-capable) before entering the\n  frontend.\n- launcher (latest/airymaxrt): after `airymaxrt update`, regenerate the\n  entry launcher so existing 0.1.6 installs get the same no-args fix.\n- Version SSoT sync to 0.1.6a (VERSION, installers, CLI/gateway/commons\n  fallbacks, root CMakeLists now injects project() from the VERSION\n  file).\n\nExisting users: run `airymaxrt update` to upgrade from 0.1.6.\nNew users: one-line install automatically gets the fixed launcher.",
       "artifacts": {
         "linux-aarch64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6/agentrt-v0.1.6-linux-aarch64.tar.gz",
-          "sha256": "9c66eb9f40954269634b154d2133f399530b15c4c392bb1f4815020f1b02d58b",
-          "size": 34467100
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6a/agentrt-v0.1.6a-linux-aarch64.tar.gz",
+          "sha256": "ea5fa8c3b613d9342b4faecde737c9db8c506d42944b7c5c21b55a5c56f4c207",
+          "size": 34466319
         },
         "linux-riscv64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6/agentrt-v0.1.6-linux-riscv64.tar.gz",
-          "sha256": "0507d551a7a83721e0c65aa31e4e4ae240be5bd3a53acc1dddc252a8ab91ec16",
-          "size": 36263003
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6a/agentrt-v0.1.6a-linux-riscv64.tar.gz",
+          "sha256": "9f155a86b464bc6c415967dbd58e621eb31e23f31e7e67ec815bf06ab01673eb",
+          "size": 36262959
         },
         "linux-x86_64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6/agentrt-v0.1.6-linux-x86_64.tar.gz",
-          "sha256": "8baa49cc521fc9f36572d26d39084e577a0208ddfbf47051d4edfcb1ebb65f6b",
-          "size": 39279397
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6a/agentrt-v0.1.6a-linux-x86_64.tar.gz",
+          "sha256": "857e7cbb573e24a3e22269ac31c7da40742d2090c59ea74da72f5554678c967a",
+          "size": 39279603
         }
       }
     }
