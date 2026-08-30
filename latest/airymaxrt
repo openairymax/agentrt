@@ -649,6 +649,18 @@ plat_name() {
     esac
 }
 
+# 数字平台名 → 旧 uname 原始名（0.1.6d 及更早的 manifest 平台键）。
+# 与发布侧 publish-release.sh ALIAS 表保持同口径（SSoT）。
+plat_legacy_name() {
+    case "$1" in
+        linux-x64|macos-x64|win-x64)      echo "${1%-x64}-x86_64" ;;
+        linux-x86|win-x86)                echo "${1%-x86}-i686" ;;
+        linux-arm64|macos-arm64|win-arm64) echo "${1%-arm64}-aarch64" ;;
+        linux-arm32)                      echo "linux-armv7l" ;;
+        *)                                echo "" ;;
+    esac
+}
+
 runtime_platform() {
     local os arch
     case "$(uname -s 2>/dev/null)" in
@@ -935,7 +947,24 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
     local art_url art_sha
     art_url="$(manifest_get "$TMPD/manifest.json" "artifact:${plat}" | sed -n 1p)"
     art_sha="$(manifest_get "$TMPD/manifest.json" "artifact:${plat}" | sed -n 2p)"
-    [ -n "$art_url" ] || { log error "当前平台 ${plat} 无可用制品"; rm -rf "$TMPD"; return 1; }
+    # 0.1.6f 社区反馈：旧命名（linux-x86_64 等）fallback。0.1.6e 起制品
+    # 采用数字命名（linux-x64），但存量旧安装器/旧 manifest 可能仍用
+    # uname 原始名；发布侧 manifest 已带别名键，此处再兜底一次，保证
+    # 双向兼容（新启动器遇旧 manifest 也能更新）。
+    if [ -z "$art_url" ]; then
+        local legacy="$(plat_legacy_name "$plat")"
+        if [ -n "$legacy" ]; then
+            art_url="$(manifest_get "$TMPD/manifest.json" "artifact:${legacy}" | sed -n 1p)"
+            art_sha="$(manifest_get "$TMPD/manifest.json" "artifact:${legacy}" | sed -n 2p)"
+            [ -n "$art_url" ] && log warn "平台键 ${plat} 未命中，已用兼容命名 ${legacy}"
+        fi
+    fi
+    [ -n "$art_url" ] || {
+        log error "当前平台 ${plat} 无可用制品"
+        log error "若您安装的是旧版本（≤v0.1.6d），安装器已过旧无法自举更新；"
+        log error "请重新执行一键安装命令（见官网 install 指南）更新安装器后重试。"
+        rm -rf "$TMPD"; return 1
+    }
     local tarball="$TMPD/$(basename "${art_url%%\?*}")"
     log info "下载制品: ${art_url}"
     curl -fsSL --max-time 600 -o "$tarball" "$art_url" || { log error "制品下载失败"; rm -rf "$TMPD"; return 1; }

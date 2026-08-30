@@ -49,6 +49,16 @@
 
 ### Fixed
 
+- **更新器平台命名兼容（根治旧安装器 `airymaxrt update` 报"无可用制品"）**：
+  0.1.6e 起制品改用数字命名（linux-x64/arm64/arm32/x86），而 ≤0.1.6d 安装的
+  旧启动器仍以 uname 原始名（linux-x86_64/aarch64/armv7l/i686）查 manifest，
+  报"当前平台 linux-x86_64 无可用制品"且无法自举更新。系统性修复（非打补丁）：
+  - 发布侧 manifest 为标准平台键补充旧命名别名（同一 url/sha256/size），
+    一次发布惠及全部存量旧安装器（实测远端 manifest 双命名命中）；
+  - 更新器/安装器平台匹配增加 `plat_legacy_name` 旧名兜底反查，双向兼容
+    （新启动器遇旧 manifest、旧安装器遇新 manifest 均能更新）；
+  - "无可用制品"错误补充补救指引（提示重新执行一键安装更新安装器）。
+
 - **syscurl 隔离（根治树莓派 `curl_easy_ssls_import` 崩溃）**：airymaxrt
   全局注入 `$AIRY_HOME/lib` 到 LD_LIBRARY_PATH 使 daemon 群解析包内
   .so，但同一注入劫持系统 curl（Debian/Ubuntu 新版 curl 依赖
