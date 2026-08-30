@@ -207,7 +207,7 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, airy_cognition_engine_t *cog,
             }
             if (node_board) {
                 cli_spinner_pause();
-                if (cli_live_board_active())
+                if (cli_board_active())
                     cli_dag_board_snapshot(sched_sock, exec_id, cli_live_board_set_node);
                 else {
                     int nb_terminal =
@@ -330,7 +330,7 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, airy_cognition_engine_t *cog,
     }
     cli_trace("wait", "%s done err=%d has_result=%d", CLI_ICON_DONE, (int)err,
               result ? 1 : 0);
-    if (spin_running && cli_live_board_active() && !g_cli_cancel) {
+    if (spin_running && cli_board_active() && !g_cli_cancel) {
         if (sched_remote)
             cli_dag_board_snapshot(sched_sock, exec_id, cli_live_board_set_node);
         cli_spinner_pause();

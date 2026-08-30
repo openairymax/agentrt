@@ -252,7 +252,7 @@ void cli_term_header_unpin(void)
  * 否则返回 0 / no-op，piped / logged 输出保持传统换行提示符布局。
  */
 
-int cli_term_input_active(void)
+int cli_term_input_on(void)
 {
     if (!cli_term_is_tty() || g_footer_lines <= 0)
         return 0;
@@ -263,7 +263,7 @@ int cli_term_input_active(void)
 
 int cli_term_input_begin(void)
 {
-    if (!cli_term_input_active())
+    if (!cli_term_input_on())
         return 0;
     int rows = 0, cols = 0;
     cli_term_size(&rows, &cols);
@@ -287,7 +287,7 @@ int cli_term_input_begin(void)
 
 void cli_term_input_submit(void)
 {
-    if (!cli_term_input_active())
+    if (!cli_term_input_on())
         return;
     int rows = 0, cols = 0;
     cli_term_size(&rows, &cols);
@@ -303,7 +303,7 @@ void cli_term_input_submit(void)
 
 void cli_term_input_hop(void)
 {
-    if (!cli_term_input_active())
+    if (!cli_term_input_on())
         return;
     int rows = 0, cols = 0;
     cli_term_size(&rows, &cols);
@@ -366,7 +366,7 @@ static const char *const k_theme_light[CLI_TH_COUNT] = {
  * 等待响应（poll 超时防止不支持 OSC 的终端阻塞启动）。响应形如
  *   ESC ] 11 ; rgb:RRRR/GGGG/BBBB ESC \
  * 每段 1~4 位 hex（xterm 用 4 位）；取前 2 位 hex 归一化到 0-255。 */
-static int query_terminal_background(unsigned char *or, unsigned char *og,
+static int term_query_bg(unsigned char *or, unsigned char *og,
                                      unsigned char *ob)
 {
     if (!cli_term_is_tty())
@@ -440,7 +440,7 @@ void cli_theme_init(void)
     }
 #else
     unsigned char r = 0, g = 0, b = 0;
-    if (query_terminal_background(&r, &g, &b)) {
+    if (term_query_bg(&r, &g, &b)) {
         double lum = (0.299 * (double)r + 0.587 * (double)g + 0.114 * (double)b) / 255.0;
         g_theme_mode = (lum >= 0.5) ? CLI_THEME_LIGHT : CLI_THEME_DARK;
     }

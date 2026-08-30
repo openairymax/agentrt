@@ -137,7 +137,7 @@ void cli_term_cursor_to(int row, int col);
 /**
  * @brief True when a fixed bottom input strip is in effect.
  */
-int cli_term_input_active(void);
+int cli_term_input_on(void);
 
 /**
  * @brief Move the cursor to the fixed input line and clear it.

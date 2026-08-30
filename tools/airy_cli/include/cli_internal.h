@@ -235,7 +235,7 @@ void cli_board_line(const char *tag, const char *id, const char *state, double p
 void cli_live_board_begin(const taskflow_workflow_t *wf);
 void cli_live_board_set_node(const char *node_id, const char *state);
 int cli_live_board_refresh(const char *agg_state, double agg_progress);
-int cli_live_board_active(void);
+int cli_board_active(void);
 void cli_live_board_extra(void);
 void cli_live_board_done(void);
 int cmd_help(const char *arg, void *ctx);

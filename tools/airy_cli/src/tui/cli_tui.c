@@ -316,7 +316,7 @@ void cli_tui_rebuild_three_zone(cli_tui_t *t)
         else
             cli_render_super_agent(g_history_contents[i]);
     }
-    if (cli_term_input_active())
+    if (cli_term_input_on())
         cli_term_input_hop();
     fflush(stdout);
 }
