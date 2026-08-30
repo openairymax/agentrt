@@ -22,9 +22,11 @@ extern int g_cli_print_mode;
 #include <stdlib.h>
 #include <string.h>
 
-/* ---- role-tagged conversation line ---- */
+/* ---- role-tagged conversation line ----
+ * v2：角色头宽度 24 → 20，内容起始列由 28 缩进至 24——消息流更紧凑，
+ * 长对话下可视信息密度更高。 */
 
-#define CLI_ROLE_HDR_W 24
+#define CLI_ROLE_HDR_W 20
 
 static void cli_pad_role_header(const char *hdr)
 {
@@ -100,27 +102,25 @@ void cli_render_user_message(const char *content)
         return;
     const char *g = cli_gutter(2);
     const char *col = cli_render_role_color(CLI_ROLE_USER);
-    const char *bg = cli_c(CLR_BG_GRAY);
     const char *name = cli_render_actor_name(CLI_ACTOR_USER);
     char hdr[CLI_ROLE_HDR_W + 1];
 
     snprintf(hdr, sizeof(hdr), "[%s]", name);
 
+    /* v2：去掉 CLR_BG_GRAY 全行背景块（视觉厚重、多行内容像补丁），
+     * 改 "›" 前缀 + 角色色——与助手消息同构（同为 [头] + 内容），
+     * 靠角色色与图标区分身份，消息流整体更干净。 */
     cli_outc('\n');
     cli_out(g);
-    cli_out(bg);
     cli_out(col);
     cli_out(hdr);
     cli_out(cli_c(CLR_RESET));
     cli_pad_role_header(hdr);
-    cli_out(bg);
     cli_out(col);
     cli_out(CLI_ICON_USER " ");
     cli_out(cli_c(CLR_RESET));
     if (content && content[0]) {
-        cli_out(bg);
         cli_out(content);
-        cli_out(cli_c(CLR_RESET));
     }
     cli_outc('\n');
     cli_outc('\n');
@@ -183,8 +183,8 @@ void cli_render_turn_separator(uint64_t elapsed_ms, const char *metrics)
 
     int rows = 0, cols = 0;
     cli_term_size(&rows, &cols);
-    size_t dash_left = 12;
-    size_t dash_right = 12;
+    size_t dash_left = 8; /* v2：12 → 8，分隔线更轻，不喧宾夺主 */
+    size_t dash_right = 8;
     (void)rows;
     (void)cols;
 
