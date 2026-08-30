@@ -384,11 +384,28 @@ install_binary() {
     local tarball="${AIRY_HOME}/tmp/agentrt-${AIRY_VERSION}.tar.gz"
     arch="$(detect_arch)"
     log_info "硬件架构: ${arch}（预编译支持: ${SUPPORTED_ARCHS}）"
-    case " ${SUPPORTED_ARCHS} " in
-        *" ${arch} "*) ;;
-        *) log_warn "架构 ${arch} 无预编译包（支持: ${SUPPORTED_ARCHS}），回退源码构建"
-           return 1 ;;
-    esac
+    # 离线包（--from-file）放行任意架构（本地构建包不受官方三架构限制）；
+    # 在线安装严格按官方三架构校验。
+    if [ -z "${AIRY_FROM_FILE:-}" ]; then
+        case " ${SUPPORTED_ARCHS} " in
+            *" ${arch} "*) ;;
+            *)
+                # 兼容性指引（2026-08-30 树莓派 32 位用户空间教训）：32 位
+                # ARM（armhf，常见于 64 位内核 + 32 位系统）无预编译包时不
+                # 静默回退，给出明确可操作的路径；返回 1 后主流程仍会尝试
+                # 源码构建兜底。
+                if [ "$arch" = "armv7l" ]; then
+                    log_err "检测到 32 位 ARM 用户空间（armhf）。预编译包仅支持 64 位架构：${SUPPORTED_ARCHS}"
+                    log_err "请二选一："
+                    log_err "  1) 使用 64 位系统镜像（树莓派 OS 64-bit / Ubuntu arm64 / Debian arm64）后重装；"
+                    log_err "  2) 源码构建：AIRY_MODE=source bash install.sh（需 C 工具链 + 依赖库）"
+                else
+                    log_warn "架构 ${arch} 无预编译包（支持: ${SUPPORTED_ARCHS}），回退源码构建"
+                fi
+                return 1
+                ;;
+        esac
+    fi
 
     # 来源解析：a) manifest JSON（通道）→ GPG 验签 + 解析本平台制品；
     #          b) 本地 tarball（--from-file / AIRY_FROM_FILE）→ 直用；
@@ -842,7 +859,11 @@ detect_arch() {
 # 预编译包支持的架构清单（binary 模式校验；其余架构回退源码构建）
 # 与 CI release.yml build-riscv64 job（agentrt-<v>-linux-riscv64.tar.gz）
 # 及 sdk/tui/scripts/airymaxrt detect_arch 同口径。
-SUPPORTED_ARCHS="x86_64 aarch64 armv7l riscv64"
+# 三架构收敛（2026-08-30 教训）：仅发布 x86_64/aarch64/riscv64 预编译包，
+# 不增加第四包；32 位 ARM（armhf）等边缘硬件走"检测正确 + 明确指引 +
+# 源码构建兜底"，绝不误装其他架构二进制（树莓派 32 位用户空间曾误装
+# aarch64 包致全部 daemon exec 失败）。
+SUPPORTED_ARCHS="x86_64 aarch64 riscv64"
 
 detect_accel() {
     if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
