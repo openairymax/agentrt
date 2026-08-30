@@ -39,18 +39,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Frame width: adapts to the terminal, clamped for readability.
- * 0.1.6b：去掉 74 列最小钳制——窄终端（<78 列）下 74 宽的框必然折行，
- * hero 变 12+ 物理行，pin 在 7 行导致对话覆盖 hero 尾部（下框线消失 +
- * 重叠乱码）。框宽不得超过终端，内容行由 cli_hero_clip 截断保框。 */
+/* Frame width: v2 设计固定为 60 列，不再随终端宽度浮动——浮宽依赖每次
+ * 终端查询与字符宽度计算，任一误差（CJK 渲染差异/字体连字）都会让竖线
+ * 错位。固定宽保证任何终端渲染一致。终端不足时返回 0：调用方降级为
+ * 无框纯文本（同样 6 行，CLI_HDR_LINES 不变），绝不错位。 */
+#define CLI_HERO_FRAME_W 60u
 static size_t cli_hero_frame_w(void)
 {
     int rows = 0, cols = 0;
     cli_term_size(&rows, &cols);
-    size_t w = (cols > 4) ? (size_t)cols - 4 : 74;
-    if (w > 110)
-        w = 110;
-    return w;
+    if (cols <= 0)
+        return CLI_HERO_FRAME_W; /* 宽度未知（非 TTY 重定向等）：按固定宽 */
+    return (cols >= (int)CLI_HERO_FRAME_W + 6) ? CLI_HERO_FRAME_W : 0;
 }
 
 /* Content budget inside the frame: each row is
@@ -116,24 +116,40 @@ static void cli_hero_line_end(size_t used, size_t w)
     cli_outc('\n');
 }
 
-/* Top edge with the brand in the title area: ┌─ ◆ Airymax - Agent Runtime
- * Platform Engineering ──────────────────────────┐ */
+/* Top edge with the brand + version: ┌─ Airymax AgentRT · v0.1.6f ─┐
+ * v2：品牌与版本合入顶框一行（原 4 行内容不变，行数仍为 6，CLI_HDR_LINES
+ * 兼容）；窄终端（w==0）降级为无框纯文本，同样 6 行（含结尾空行）。 */
 static void cli_hero_brand(const char *g)
 {
     size_t w = cli_hero_frame_w();
+    char title[96];
+    snprintf(title, sizeof(title), "Airymax AgentRT · v%s", AIRY_CLI_VERSION);
+    if (!w) {
+        cli_out(g);
+        cli_out(cli_c(CLR_BOLD));
+        cli_out(cli_c(CLR_CYAN));
+        cli_out("◆ ");
+        cli_out(cli_c(CLR_RESET));
+        cli_out("Airymax AgentRT");
+        cli_out(cli_c(CLR_DIM));
+        cli_outf(" · v%s", AIRY_CLI_VERSION);
+        cli_out(cli_c(CLR_RESET));
+        cli_outc('\n');
+        return;
+    }
     size_t used = 3; /* "┌─ " */
     cli_out(g);
     cli_out(cli_c(CLR_BLUE));
     cli_out("┌─ ");
+    cli_out(cli_c(CLR_RESET));
     cli_out(cli_c(CLR_BOLD));
     cli_out(cli_c(CLR_CYAN));
     char buf[96];
-    /* leave one cell for a "─" filler before "┐" */
+    /* 留一个 "─" 到 "┐"，顶框视觉收束 */
     size_t tmax = cli_hero_content_max(w);
     if (tmax > 1)
         tmax -= 1;
-    size_t tw = cli_hero_clip("◆ Airymax - Agent Runtime Platform Engineering",
-                              tmax, buf, sizeof(buf));
+    size_t tw = cli_hero_clip(title, tmax, buf, sizeof(buf));
     cli_out(buf);
     cli_out(cli_c(CLR_RESET));
     used += tw;
@@ -161,133 +177,116 @@ static void cli_hero_frame_bottom(const char *g)
     cli_outc('\n');
 }
 
-/* One quiet capabilities row inside the frame, carrying the version and
- * what the runtime does at a glance: 版本 v0.1.5：对话 · 任务 · … */
+/* One quiet capabilities row: what the runtime does at a glance. v2 精简
+ * 文本并去掉行首冗余空格（原 " 版本 v..." 双空格 + 版本已上移顶框）。 */
 static void cli_hero_capabilities(const char *g)
 {
-    char text[160];
-    /* 1 leading space matches the other hero rows ("│ [For Thee]",
-     * "│ A·t2", "│ ? /help") so all content is left-aligned inside
-     * the frame. */
-    snprintf(text, sizeof(text), " 版本 v%s：对话 · 任务 · 蓝图调度 · 双思考 · GCCP · 工具执行",
-             AIRY_CLI_VERSION);
+    static const char *text = "对话 · 任务 · 蓝图调度 · 双思考 · GCCP · 工具执行";
     size_t w = cli_hero_frame_w();
+    if (!w) {
+        cli_out(g);
+        cli_out(cli_c(CLR_DIM));
+        cli_out(text);
+        cli_out(cli_c(CLR_RESET));
+        cli_outc('\n');
+        return;
+    }
     size_t budget = cli_hero_content_max(w);
-    char out[160];
+    char out[96];
     size_t tw = cli_hero_clip(text, budget, out, sizeof(out));
     size_t used = 2 + tw; /* "│ " + content */
     cli_out(g);
     cli_out(cli_c(CLR_BLUE));
-    cli_out("│");
+    cli_out("│ ");
     cli_out(cli_c(CLR_RESET));
-    cli_out(" ");
     cli_out(cli_c(CLR_DIM));
     cli_out(out);
     cli_out(cli_c(CLR_RESET));
     cli_hero_line_end(used, w);
 }
 
-/* Four-role conversation legend. Each bracket keeps its role color so the
- * scheme [For Thee] / [Super Agent] / [Dual Think] / [Sub Agent] is visible
- * at a glance on startup and stays consistent with every conversation line.
- * On narrow terminals later roles are dropped before the frame wraps. */
-static void cli_banner_legend(const char *g)
+/* Four-role conversation legend. v2：去掉长英文名方括号（[For Thee]
+ * [Super Agent]...），改短标签 + 角色色 + "·" 分隔——窄终端下信息保留率
+ * 高（原版 60 列只剩一个角色），且视觉更轻。 */
+static void cli_hero_roles(const char *g)
 {
     static const struct {
         cli_theme_t color; /* 主题 token（CLR_* 宏为运行时函数，不可作静态初始化） */
         const char *name;
-        const char *label;
     } roles[] = {
-        {CLI_TH_CYAN, "For Thee", "你"},
-        {CLI_TH_GREEN, "Super Agent", "agentrt"},
-        {CLI_TH_YELLOW, "Dual Think", "思考"},
-        {CLI_TH_MAGENTA, "Sub Agent", "执行体"},
+        {CLI_TH_CYAN, "你"},
+        {CLI_TH_GREEN, "agentrt"},
+        {CLI_TH_YELLOW, "思考"},
+        {CLI_TH_MAGENTA, "执行体"},
     };
-
     size_t w = cli_hero_frame_w();
+    if (!w) {
+        cli_out(g);
+        for (size_t i = 0; i < sizeof(roles) / sizeof(roles[0]); i++) {
+            if (i > 0) {
+                cli_out(cli_c(CLR_DIM));
+                cli_out(" · ");
+                cli_out(cli_c(CLR_RESET));
+            }
+            cli_out(cli_c(cli_theme_seq(roles[i].color)));
+            cli_out(roles[i].name);
+            cli_out(cli_c(CLR_RESET));
+        }
+        cli_outc('\n');
+        return;
+    }
     size_t budget = cli_hero_content_max(w);
     size_t used = 2; /* "│ " */
     cli_out(g);
     cli_out(cli_c(CLR_BLUE));
-    cli_out("│");
+    cli_out("│ ");
     cli_out(cli_c(CLR_RESET));
-    cli_out(" ");
     for (size_t i = 0; i < sizeof(roles) / sizeof(roles[0]); i++) {
-        size_t seg = 2 + cli_disp_width(roles[i].name) +
-                     1 + cli_disp_width(roles[i].label);
+        size_t seg = cli_disp_width(roles[i].name);
         if (i > 0)
-            seg += 3;
+            seg += 3; /* " · " */
         if (used + seg > budget)
-            break; /* narrow terminal: drop the remaining roles */
+            break; /* 窄框：丢弃剩余角色 */
         if (i > 0) {
-            cli_out("   ");
+            cli_out(cli_c(CLR_DIM));
+            cli_out(" · ");
+            cli_out(cli_c(CLR_RESET));
             used += 3;
         }
-        cli_out("[");
         cli_out(cli_c(cli_theme_seq(roles[i].color)));
         cli_out(roles[i].name);
         cli_out(cli_c(CLR_RESET));
-        cli_out("]");
-        used += 2 + cli_disp_width(roles[i].name);
-        cli_outf(" %s", roles[i].label);
-        used += 1 + cli_disp_width(roles[i].label);
+        used += cli_disp_width(roles[i].name);
     }
-    cli_out(cli_c(CLR_RESET));
     cli_hero_line_end(used, w);
 }
 
-/* Emit one "key → model" segment for the model row. The model name is
- * clipped to the remaining budget (UTF-8 safe) so a narrow terminal keeps
- * the frame intact. Returns 0 when not even the key + arrow fit (stop the
- * row). */
+/* Emit one "key=model" segment for the model row. v2：连接符由 " → "
+ * 改 "="，间隔 2 空格——同语义下更紧凑，60 列固定框内三槽必然放下。 */
 static int cli_hero_model_seg(const char *key, const char *model,
                               size_t *used, size_t budget, int lead_sep)
 {
-    size_t sep = lead_sep ? 3 : 0;
+    size_t sep = lead_sep ? 2 : 0;
     size_t key_w = cli_disp_width(key);
     size_t model_w = cli_disp_width(model);
-    if (*used + sep + key_w + 3 + model_w <= budget) {
-        if (lead_sep) {
-            cli_out("   ");
-            *used += 3;
-        }
-        cli_out(cli_c(CLR_CYAN));
-        cli_out(key);
-        cli_out(cli_c(CLR_RESET));
-        *used += key_w;
-        cli_out(cli_c(CLR_DIM));
-        cli_out(" → ");
-        cli_out(cli_c(CLR_RESET));
-        *used += 3;
-        cli_out(cli_c(CLR_YELLOW));
-        cli_out(model);
-        cli_out(cli_c(CLR_RESET));
-        *used += model_w;
-        return 1;
-    }
-    size_t left = (*used + sep + key_w + 3 <= budget)
-                      ? budget - *used - sep - key_w - 3
-                      : 0;
-    if (left < 2)
+    if (*used + sep + key_w + 1 + model_w > budget)
         return 0;
-    char buf[64];
-    size_t mw = cli_hero_clip(model, left, buf, sizeof(buf));
     if (lead_sep) {
-        cli_out("   ");
-        *used += 3;
+        cli_out("  ");
+        *used += 2;
     }
     cli_out(cli_c(CLR_CYAN));
     cli_out(key);
     cli_out(cli_c(CLR_RESET));
     *used += key_w;
     cli_out(cli_c(CLR_DIM));
-    cli_out(" → ");
+    cli_out("=");
     cli_out(cli_c(CLR_RESET));
-    *used += 3;
+    *used += 1;
     cli_out(cli_c(CLR_YELLOW));
-    cli_out(buf);
+    cli_out(model);
     cli_out(cli_c(CLR_RESET));
-    *used += mw;
+    *used += model_w;
     return 1;
 }
 
@@ -301,17 +300,34 @@ static void cli_model_line(const char *g, const char *t2, const char *t1f,
     const char *b = (t1f && t1f[0]) ? t1f : "默认";
     const char *c = (t1p && t1p[0]) ? t1p : "默认";
 
+    static const char *const keys[] = {"A·t2", "B·t1-f", "C·t1-p"};
+    const char *models[] = {a, b, c};
     size_t w = cli_hero_frame_w();
+    if (!w) {
+        cli_out(g);
+        for (size_t i = 0; i < 3; i++) {
+            if (i > 0) {
+                cli_out("  ");
+            }
+            cli_out(cli_c(CLR_CYAN));
+            cli_out(keys[i]);
+            cli_out(cli_c(CLR_RESET));
+            cli_out(cli_c(CLR_DIM));
+            cli_out("=");
+            cli_out(cli_c(CLR_RESET));
+            cli_out(cli_c(CLR_YELLOW));
+            cli_out(models[i]);
+            cli_out(cli_c(CLR_RESET));
+        }
+        cli_outc('\n');
+        return;
+    }
     size_t budget = cli_hero_content_max(w);
     size_t used = 2; /* "│ " */
     cli_out(g);
     cli_out(cli_c(CLR_BLUE));
-    cli_out("│");
+    cli_out("│ ");
     cli_out(cli_c(CLR_RESET));
-    cli_out(" ");
-
-    static const char *const keys[] = {"A·t2", "B·t1-f", "C·t1-p"};
-    const char *models[] = {a, b, c};
     for (size_t i = 0; i < 3; i++) {
         if (!cli_hero_model_seg(keys[i], models[i], &used, budget, i > 0))
             break;
@@ -319,19 +335,41 @@ static void cli_model_line(const char *g, const char *t2, const char *t1f,
     cli_hero_line_end(used, w);
 }
 
-/* In-frame footer row: command hints + the project motto. Lives inside the
- * frame so the whole system header reads as one pinned block above the
- * dialogue. */
+/* In-frame footer row: command hints + the project motto. v2：精简措辞，
+ * motto 短版（"Agents, To the open air." 无引号包裹改直引），窄框 clip。 */
 static void cli_hero_footer(const char *g)
 {
     size_t w = cli_hero_frame_w();
+    static const char *motto = "· \"Agents, To the open air.\"";
+    if (!w) {
+        cli_out(g);
+        cli_out(cli_c(CLR_DIM));
+        cli_out("? ");
+        cli_out(cli_c(CLR_RESET));
+        cli_out(cli_c(CLR_YELLOW));
+        cli_out("/help");
+        cli_out(cli_c(CLR_RESET));
+        cli_out(cli_c(CLR_DIM));
+        cli_out(" 帮助 · ");
+        cli_out(cli_c(CLR_RESET));
+        cli_out(cli_c(CLR_YELLOW));
+        cli_out("quit");
+        cli_out(cli_c(CLR_RESET));
+        cli_out(cli_c(CLR_DIM));
+        cli_out(" 退出 ");
+        cli_out(cli_c(CLR_RESET));
+        cli_out(cli_c(CLR_DIM));
+        cli_out(motto);
+        cli_out(cli_c(CLR_RESET));
+        cli_outc('\n');
+        return;
+    }
     size_t budget = cli_hero_content_max(w);
     size_t used = 2; /* "│ " */
     cli_out(g);
     cli_out(cli_c(CLR_BLUE));
-    cli_out("│");
+    cli_out("│ ");
     cli_out(cli_c(CLR_RESET));
-    cli_out(" ");
 
     cli_out(cli_c(CLR_DIM));
     cli_out("? ");
@@ -342,27 +380,22 @@ static void cli_hero_footer(const char *g)
     cli_out(cli_c(CLR_RESET));
     used += 5;
     cli_out(cli_c(CLR_DIM));
-    cli_out(" 查看命令 · ");
+    cli_out(" 帮助 · ");
     cli_out(cli_c(CLR_RESET));
-    used += cli_disp_width(" 查看命令 · ");
+    used += cli_disp_width(" 帮助 · ");
     cli_out(cli_c(CLR_YELLOW));
     cli_out("quit");
     cli_out(cli_c(CLR_RESET));
     used += 4;
     cli_out(cli_c(CLR_DIM));
-    cli_out("/exit");
+    cli_out(" 退出 ");
     cli_out(cli_c(CLR_RESET));
-    used += 5;
-    cli_out(cli_c(CLR_DIM));
-    cli_out(" 退出");
-    cli_out(cli_c(CLR_RESET));
-    used += 1 + cli_disp_width("退出");
+    used += cli_disp_width(" 退出 ");
 
-    /* The motto is clipped to whatever room remains (narrow terminals). */
+    /* The motto is clipped to whatever room remains (narrow frames). */
     size_t left = budget - used;
     if (left >= 2) {
         char buf[64];
-        static const char *motto = "  \"Agents, To the open air.\"";
         size_t mw = cli_hero_clip(motto, left, buf, sizeof(buf));
         cli_out(cli_c(CLR_DIM));
         cli_out(buf);
@@ -374,11 +407,9 @@ static void cli_hero_footer(const char *g)
 
 /* ---- unified blue-framed system header ----
  *
- * Title edge + version/capabilities + role legend + model config + footer
- * hints, all enclosed in a blue frame (6 pinned lines including the two
- * edges). The whole block is pinned so conversation output scrolls below
- * it (Terminal feedback: "system header must stay fixed"); the frame marks
- * the boundary between the system header and the dialogue.
+ * v2：固定 60 列蓝框（终端过窄自动降级无框纯文本），品牌+版本入顶框，
+ * 角色短标签，模型 "=" 紧凑格式。共 6 行（含顶/底框或结尾空行），
+ * 与 CLI_HDR_LINES=6 严格对应，pin 永不偏移。
  */
 void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
 {
@@ -390,10 +421,13 @@ void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
     const char *g = cli_gutter_pad(2);
     cli_hero_brand(g);
     cli_hero_capabilities(g);
-    cli_banner_legend(g);
+    cli_hero_roles(g);
     cli_model_line(g, t2, t1f, t1p);
     cli_hero_footer(g);
-    cli_hero_frame_bottom(g);
+    if (cli_hero_frame_w())
+        cli_hero_frame_bottom(g);
+    else
+        cli_outc('\n'); /* 无框降级：空行补齐第 6 行，pin 行数不变 */
 
     /* Full-screen TUI page pins its own header boundary (history-based)
      * after this; non-TTY output just scrolls. Only interactive plain
