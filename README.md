@@ -136,8 +136,12 @@ self-check (x86_64 / aarch64 / riscv64) automatically:
 # Linux / macOS
 curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash
 
-# Windows PowerShell
+# Windows PowerShell (no prebuilt Windows binaries yet — the installer
+# falls back to a source build and needs git/CMake/a compiler; if `irm`
+# returns empty on your network for the 302 asset redirect, use the
+# curl.exe variant below)
 powershell -ExecutionPolicy Bypass -Command "irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 | iex"
+powershell -ExecutionPolicy Bypass -Command "curl.exe -fsSL https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 -o $env:TEMP\airymaxrt-install.ps1; & $env:TEMP\airymaxrt-install.ps1"
 ```
 
 Common variants:

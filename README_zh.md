@@ -135,8 +135,11 @@ GPG 验签 + sha256 校验 + 架构自检（x86_64 / aarch64 / riscv64）：
 # Linux / macOS
 curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash
 
-# Windows PowerShell
+# Windows PowerShell（Windows 暂未发布预编译二进制包，安装器自动转源码
+# 构建，需预装 git/CMake/编译器；irm 在部分网络对附件 302 重定向返回空，
+# 此时改用下方 curl.exe 命令）
 powershell -ExecutionPolicy Bypass -Command "irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 | iex"
+powershell -ExecutionPolicy Bypass -Command "curl.exe -fsSL https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 -o $env:TEMP\airymaxrt-install.ps1; & $env:TEMP\airymaxrt-install.ps1"
 ```
 
 常用变体：
