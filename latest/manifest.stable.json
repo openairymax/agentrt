@@ -2,26 +2,26 @@
   "schema": 1,
   "channel": "stable",
   "latest": "v0.1.6c",
-  "updated_at": "2026-08-30T05:04:22Z",
+  "updated_at": "2026-08-30T05:35:08Z",
   "releases": {
     "v0.1.6c": {
       "yanked": false,
-      "notes": "AgentRT v0.1.6c 发布\n\n启动链路系统性修复（0.1.6c）：\n- AIRY_HOME 权威运行根：全部 AIRY_* 子目录从最终 AIRY_HOME 强制派生，父环境残留旧值不再劫持 daemon 启动目录\n- LD_LIBRARY_PATH 幂等兜底：AIRY_HOME/lib 始终在首位，修复老用户升级后 libssl.so.1.1 等传递依赖缺失\n- set -u 防护：agent_d 启动不再因 AGENTRT_MODEL_CONFIG 未定义中断 daemon 群\n- 三入口统一（bootstrap / env.sh / airymaxrt 启动器）同纪律修复，带残留环境实测 18 daemon 全部 ONLINE\n\n0.1.6 改进方案（P0/P1/P2 全量落地）：\n- P0 减法收敛：memory 合并、frameworks 撤销、DAG 实证门、分配器真重复消除、五认知机制物理聚合、tests 统一\n- P1 底座强化：commons 原子化、依赖图最小机制、gateway 统一能力网关、插件机制子集\n- P2 生态收尾：独立 clone 组装、事件流单一真相源、SSoT 技术点登记 + CI 门禁\n- 生态层 S-1~S-7 收敛：注册表单一权威、悬空引用清零、schema 校验、一致性测试",
+      "notes": "## AgentRT 0.1.6c 修复发布\n\n### 关键修复\n\n- **交叉打包运行时依赖收集根治**：aarch64/riscv64 包原实现仅收集 bin 一层直接 NEEDED，漏收 libcurl 等库的传递依赖（libidn2 / librtmp / libssh / libpsl / libgssapi / libldap / libzstd / libbrotli / libz / libssl 等 40+ 库），导致目标机 daemon 启动失败（`No such file or directory`）。改为 BFS 递归 NEEDED 展开至闭包收敛，三架构包运行时依赖树完整自包含。\n- **打包验证 fail-closed 门禁**：任一 NEEDED 未解析即中止构建并报错出库，交叉与容器（qemu/ldd）两条打包路径一致，杜绝缺陷包外发。\n- **AIRY_HOME 权威覆盖**：env.sh / bootstrap / launcher 全部从最终 AIRY_HOME 派生 AIRY_* 子目录，防父环境残留变量劫持。\n- **LD_LIBRARY_PATH 幂等兜底**：AIRY_HOME 定稿后注入包内 lib/，避免重复注入与过早注入。\n- **pytest 缓存根治**：禁用 cacheprovider、PYTHONPYCACHEPREFIX 重定向、dont_write_bytecode 防源码区缓存污染。\n\n### 验证\n\n- 三架构（x86_64 / aarch64 / riscv64）依赖闭包校验全部通过，sha256 校验一致\n- x86_64 完整冒烟：18 daemon 全部 ONLINE\n- aarch64 / riscv64 制品在 qemu 用户态下真实 exec 验证通过",
       "artifacts": {
         "linux-aarch64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6c/agentrt-v0.1.6c-linux-aarch64.tar.gz",
-          "sha256": "bba192f90482b4d99c2dc161d550c0aed16da0c3ede2088145d94819032617cd",
-          "size": 34505870
+          "sha256": "221c4532278ca81d475f0dc437a9741d1f42f45bdfa10fdc358feae1f279973e",
+          "size": 38811613
         },
         "linux-riscv64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6c/agentrt-v0.1.6c-linux-riscv64.tar.gz",
-          "sha256": "3c9ee8d2efa46b618582ba9f09a3004f2d15d38e1099c1f540b1f4aae48e8eae",
-          "size": 36303808
+          "sha256": "032a35506e43ef8597aa8e81e19af9a79089d6637bea270a38a06826d47c81ac",
+          "size": 41015080
         },
         "linux-x86_64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6c/agentrt-v0.1.6c-linux-x86_64.tar.gz",
-          "sha256": "c8a8c41140154ec3d8317f7d9f38d9490c94e6c890134012aaab2a38c5df6396",
-          "size": 44165451
+          "sha256": "152240c6ae2d229cf28f160b4b2e9d7f8aad7ee06c8f38c9f1d93f36a2f940d7",
+          "size": 44166484
         }
       }
     }
