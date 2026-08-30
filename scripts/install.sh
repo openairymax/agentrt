@@ -145,7 +145,7 @@ AIRY_VERSION="${AIRY_VERSION:-v0.1.6c}"
 AIRY_BUILD_JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 AIRY_MODE="${AIRY_MODE:-auto}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
-UNINSTALL=0; KEEP_DATA=0; YES=0
+UNINSTALL=0; REINSTALL=0; KEEP_DATA=0; YES=0
 # 出厂预装 maths-toolkit（数学计算后端：MCP-Mathematics + sympy-mcp，
 # 共享 $AIRY_HOME/venv）。默认开启，安装失败降级警告，不阻断主流程。
 WITH_MATHS=1
