@@ -61,7 +61,11 @@
   - `env_set()` 幂等写 install.env（原 `>>` 直接追加，重装后键多行
     膨胀）；跨平台 grep -v + mv，不依赖 sed -i 的 GNU/BSD 差异；
   - 更新器 `sed_inplace()` 跨平台原地编辑，替换 3 处 sed -i
-    （macOS BSD sed "illegal option" 静默失败致版本键不更新）。
+    （macOS BSD sed "illegal option" 静默失败致版本键不更新）；
+  - 包内架构自检命名漂移修复：制品标记自 0.1.6e 起为数字平台名
+    （platform-x64 等），安装器/更新器自检仍 grep uname 原始名
+    （platform-x86_64）两边对不上致自检静默失效；统一走
+    `plat_name()` 同口径，异架构包明确拒绝。
 
 ### Quality
 

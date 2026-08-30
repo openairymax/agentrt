@@ -525,11 +525,14 @@ install_binary() {
             return 1
         fi
     fi
-    # 包内架构自校验：tarball 根含 platform-<arch> 标识文件时交叉校验，
+    # 包内架构自校验：tarball 根含 platform-<plat> 标识文件时交叉校验，
     # 防止下载到异架构包后静默安装（跨架构 daemon 启动即崩溃）。
-    if tar -tzf "${tarball}" 2>/dev/null | grep -q "platform-${arch}"; then
+    # 0.1.6g 修复：制品标记自 0.1.6e 起改用数字平台名（platform-x64 等），
+    # 原 grep 仍用 uname 原始名（platform-x86_64），两边对不上导致自检
+    # 静默失效（既不放行也不拒绝）；统一走 plat_name() 同口径。
+    if tar -tzf "${tarball}" 2>/dev/null | grep -q "platform-$(plat_name "${arch}")"; then
         log_ok "二进制包架构校验通过（${arch}）"
-    elif tar -tzf "${tarball}" 2>/dev/null | grep -qE 'platform-(x86_64|aarch64|armv7l|riscv64)'; then
+    elif tar -tzf "${tarball}" 2>/dev/null | grep -qE 'platform-(x64|x86|arm64|arm32|riscv64|riscv32)'; then
         log_err "二进制包架构与当前主机（${arch}）不匹配，拒绝安装"
         rm -f "${tarball}"
         return 1
