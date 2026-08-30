@@ -14,6 +14,7 @@
 #     # ↑ 最简形式：通道默认 stable（--channel 仅 beta 等非常规通道时需指定）
 #   curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" \
 #     | bash -s -- --prefix "$HOME/.airymaxrt"       # 自定义路径
+#   bash install.sh --reinstall                       # 强制重装（清缓存+停旧 daemon）
 #   bash install.sh --uninstall                       # 一键卸载
 # 后备（latest 附件不可达或要装 main 分支最新安装器；AtomGit raw 域对
 # .sh 返回 HTML 预览页不可直连，经 v5 contents API 匿名拉取后解码执行）：
@@ -51,6 +52,7 @@
 # 参数：
 #   --prefix <path>  --mode <auto|binary|hybrid|source>  --bin-dir <path>
 #   --profile <full|minimal|auto>  --channel <stable|beta>  --from-file <tarball>
+#   --reinstall     强制重装：清本地包缓存强制下载最新版 + 先停旧 daemon
 #   --uninstall [--keep-data] [--yes]  --help
 #
 # 发布通道（2.3.7）：--channel stable|beta 选择官方滚动通道；未指定
@@ -79,6 +81,47 @@ log_info()  { printf "${C_CYAN}[INFO]${C_NC} %s\n" "$1"; }
 log_ok()    { printf "${C_GREEN}[ OK ]${C_NC} %s\n" "$1"; }
 log_warn()  { printf "${C_YELLOW}[WARN]${C_NC} %s\n" "$1"; }
 log_err()   { printf "${C_RED}[FAIL]${C_NC} %s\n" "$1"; }
+
+# ─── 进度反馈（进度条 + 转圈动效；非 TTY 自动静默） ─────────────────────
+# 与颜色检测同判据：stderr 为 TTY（交互终端）时启用，管道/重定向时静默，
+# 防止转义序列污染日志。curl 进度条（--progress-bar）与 -s 互斥，
+# 非 TTY 回落 -s 保持原静默行为。
+if [ -t 2 ]; then
+    CURL_FLAG="--progress-bar -S"
+    HAS_TTY=1
+else
+    CURL_FLAG="-s"
+    HAS_TTY=0
+fi
+
+# 转圈动效：命令后台运行时在 stderr 画旋转字符，结束清行（POSIX 兼容）
+spinner() { # <pid> <label>
+    local _sp_pid="$1" _sp_label="$2" _sp_i=0 _sp_c='|'
+    while kill -0 "$_sp_pid" 2>/dev/null; do
+        case "$_sp_i" in
+            0) _sp_c='|' ;; 1) _sp_c='/' ;; 2) _sp_c='-' ;; 3) _sp_c='\' ;;
+        esac
+        printf '\r\033[K[%s] %s' "$_sp_c" "$_sp_label" >&2
+        _sp_i=$(( (_sp_i + 1) % 4 ))
+        sleep 0.1
+    done
+    printf '\r\033[K' >&2
+}
+
+# 带转圈执行命令：<label> <cmd...>——命令输出静音（进度经转圈呈现），
+# 退出码原样返回；非 TTY 时直接静默执行，行为与调用方一致。
+run_spin() { # <label> <cmd...>
+    local _rs_label="$1"
+    shift
+    if [ "$HAS_TTY" = "1" ]; then
+        "$@" >/dev/null 2>&1 &
+        local _rs_pid=$!
+        spinner "$_rs_pid" "$_rs_label"
+        wait "$_rs_pid"
+        return $?
+    fi
+    "$@" >/dev/null 2>&1
+}
 
 # ─── 默认值 ──────────────────────────────────────────────────────────────
 # 安装路径强制统一 $HOME/.airymaxrt（社区用户与本地开发同一逻辑，2026-08-28）。
@@ -143,6 +186,7 @@ while [ $# -gt 0 ]; do
         --channel)   AIRY_CHANNEL="$2"; shift 2 ;;
         --from-file) AIRY_FROM_FILE="$2"; shift 2 ;;
         --uninstall) UNINSTALL=1; shift ;;
+        --reinstall) REINSTALL=1; shift ;;
         --keep-data) KEEP_DATA=1; shift ;;
         --yes)       YES=1; shift ;;
         --with-maths)    WITH_MATHS=1; shift ;;
@@ -199,13 +243,19 @@ init_home() {
 }
 
 # ─── 停止运行中的 daemon ────────────────────────────────────────────────
+# 返回 0 = 有 daemon 被停止；返回 1 = 无运行进程（新装/已停）。调用方
+# 据此决定是否提示"已停止旧 daemon"。与 bootstrap stop 同一判据（按
+# 二进制绝对路径 pkill，避免误杀同名进程）。
 stop_daemons() {
-    local bin="$1"
-    [ -d "$bin" ] || return 0
+    local bin="$1" found=0 d
+    [ -d "$bin" ] || return 1
     for d in ${EXPECTED_DAEMONS}; do
-        [ -x "${bin}/${d}" ] && pkill -f "${bin}/${d}" >/dev/null 2>&1
+        if [ -x "${bin}/${d}" ] && pkill -f "${bin}/${d}" >/dev/null 2>&1; then
+            found=1
+        fi
     done
-    sleep 1
+    [ "$found" = "1" ] && sleep 1
+    return $(( found == 0 ))
 }
 
 # ─── 一键卸载 ────────────────────────────────────────────────────────────
@@ -457,7 +507,7 @@ fetch_prebuilt_module() {
     if [ -d "$dest" ]; then log_ok "${name} 预编译模块已就位"; return 0; fi
     log_info "下载闭源预编译模块 ${name}…"
     local tarball="${AIRY_HOME}/tmp/${dirname}.tar.gz"
-    curl -fsSL --max-time 600 -o "$tarball" "$url" || { log_warn "${name} 下载失败"; return 1; }
+    curl -fL ${CURL_FLAG} --max-time 600 -o "$tarball" "$url" || { log_warn "${name} 下载失败"; return 1; }
     mkdir -p "$dest"
     tar -xzf "$tarball" -C "$dest" || { log_warn "${name} 解压失败"; return 1; }
     log_ok "${name} 预编译模块就位: ${dest}"
@@ -585,7 +635,8 @@ install_maths_toolkit() {
     # 不执行）；无 bash 时回退 sh。子安装器失败不阻断 agentrt 主流程。
     local run_sh="sh"
     command -v bash >/dev/null 2>&1 && run_sh="bash"
-    if "$run_sh" "$toolkit" --airy-home "${AIRY_HOME}" >/dev/null 2>&1; then
+    if run_spin "预装数学计算后端（maths-toolkit：离线 wheel 优先，失败降级纯 C 快速路径）…" \
+        "$run_sh" "$toolkit" --airy-home "${AIRY_HOME}"; then
         # 安装器返回 0 不代表依赖就绪（2026-08-29 教训：maths-toolkit 曾
         # 在 pip 失败时静默返回 0）；此处校验 venv+sympy 真实可用才报 OK。
         if [ -x "${AIRY_HOME}/venv/bin/python3" ] && \
@@ -1022,7 +1073,7 @@ fi
 # 复用已缓存的完整启动器，避免频繁网络往返。start 亦自举（完整启动器负责
 # 拉起守护进程群 + 前端；缓存存在时零网络）。
 case "\$1" in
-    start|cli|profile|monitor|status|doctor|uninstall|update)
+    start|cli|profile|monitor|status|doctor|uninstall|update|reinstall)
         _FULL="\$AIRY_HOME/bin/airymaxrt-full"
         if [ "\$1" != "update" ] && [ -s "\$_FULL" ]; then
             exec bash "\$_FULL" "\$@"
@@ -1311,6 +1362,13 @@ main() {
 
     init_home
 
+    # 重装模式：清本地缓存强制下载最新版 + 先停旧 daemon（防旧进程占用二进制）
+    if [ "$REINSTALL" = "1" ]; then
+        log_warn "重装模式：清除本地包缓存并停止旧 daemon，强制下载最新版本…"
+        rm -f "${AIRY_HOME}"/tmp/agentrt-*.tar.gz 2>/dev/null || true
+        stop_daemons "$AIRY_HOME/bin"
+    fi
+
     local installed=1
     # 发布来源解析：--from-file 离线包 > AIRY_RELEASE_URL 显式 URL >
     # 官方通道 manifest（默认，stable/beta 由 --channel 决定；--mode source 除外）。
@@ -1366,6 +1424,13 @@ main() {
     # 二进制包同样适用（无论安装模式，自动识别硬件、固化画像；
     # airymaxrt 启动器按画像拉起 daemon 集，monitor 监控外设增强自动恢复）。
     persist_profile
+
+    # 重装/版本更新后自动停止旧 daemon：旧进程仍持有旧 .so/二进制，
+    # 不杀则下次 airymaxrt 仍复用旧代码（2026-08-30 用户反馈）。新装
+    # 无运行进程则静默跳过（stop_daemons 返回 1）。
+    if stop_daemons "$AIRY_HOME/bin"; then
+        log_ok "已自动停止旧版本 daemon（新版本已就位，运行 airymaxrt 启动）"
+    fi
 
     # 出厂预装 maths-toolkit（数学计算后端，默认开启，可 --without-maths 跳过）
     install_maths_toolkit
