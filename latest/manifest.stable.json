@@ -1,27 +1,37 @@
 {
   "schema": 1,
   "channel": "stable",
-  "latest": "v0.1.6c",
-  "updated_at": "2026-08-30T05:35:08Z",
+  "latest": "v0.1.6d",
+  "updated_at": "2026-08-30T07:55:10Z",
   "releases": {
-    "v0.1.6c": {
+    "v0.1.6d": {
       "yanked": false,
-      "notes": "## AgentRT 0.1.6c 修复发布\n\n### 关键修复\n\n- **交叉打包运行时依赖收集根治**：aarch64/riscv64 包原实现仅收集 bin 一层直接 NEEDED，漏收 libcurl 等库的传递依赖（libidn2 / librtmp / libssh / libpsl / libgssapi / libldap / libzstd / libbrotli / libz / libssl 等 40+ 库），导致目标机 daemon 启动失败（`No such file or directory`）。改为 BFS 递归 NEEDED 展开至闭包收敛，三架构包运行时依赖树完整自包含。\n- **打包验证 fail-closed 门禁**：任一 NEEDED 未解析即中止构建并报错出库，交叉与容器（qemu/ldd）两条打包路径一致，杜绝缺陷包外发。\n- **AIRY_HOME 权威覆盖**：env.sh / bootstrap / launcher 全部从最终 AIRY_HOME 派生 AIRY_* 子目录，防父环境残留变量劫持。\n- **LD_LIBRARY_PATH 幂等兜底**：AIRY_HOME 定稿后注入包内 lib/，避免重复注入与过早注入。\n- **pytest 缓存根治**：禁用 cacheprovider、PYTHONPYCACHEPREFIX 重定向、dont_write_bytecode 防源码区缓存污染。\n\n### 验证\n\n- 三架构（x86_64 / aarch64 / riscv64）依赖闭包校验全部通过，sha256 校验一致\n- x86_64 完整冒烟：18 daemon 全部 ONLINE\n- aarch64 / riscv64 制品在 qemu 用户态下真实 exec 验证通过",
+      "notes": "# AgentRT v0.1.6d\n\n## 六架构全面兼容\n\n- 新增 **i686（32 位 x86）** 与 **armv7l（32 位 ARM）** 二进制制品，与既有 x86_64 / aarch64 / riscv64 构成 x86、ARM、RISC-V 三大架构 32/64 位全面覆盖\n- `install.sh detect_arch` 以 `getconf LONG_BIT` 复判用户空间位数，根治 64 位内核 + 32 位用户空间的架构误判（树莓派 armhf 故障根因）\n- Landlock syscall 号按架构表补齐 i386（443/444/445）\n- 原子类型 ILP32 兼容修复（`uint_fast32_t`），32 位目标不再报 conflicting types\n- TUI 架构标签补齐 i686 / riscv32\n\n## 构建打包台能力增强\n\n- 免 root 交叉工具链引导（从 Ubuntu 发行包解压，含 libc + multiarch 依赖库 + 工具链 cmake）\n- 第三方 CMake config（cJSON/libwebsockets）内嵌绝对路径规避：toolchain 层 `CMAKE_DISABLE_FIND_PACKAGE_*` 禁用，回退 pkg-config\n- 传递依赖闭包收集 + fail-closed ELF NEEDED 校验，杜绝跨架构漏包\n- CMake 缓存失效自动重配置（prefix 漂移 / 构建文件缺失检测）\n\n## 安装体验改进\n\n- 修复 `set -u` 下 REINSTALL 未初始化导致的安装崩溃（影响全新安装）\n- 安装器默认版本升级至 v0.1.6d\n\n## 质量与稳定性\n\n- 全量单元/集成测试 191/191 通过（含 e2e_core、DAG、IPC 总线、监控链路）\n- 容器端到端验证：ubuntu:20.04 离线二进制安装 + 18 daemon 全部 ONLINE",
       "artifacts": {
         "linux-aarch64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6c/agentrt-v0.1.6c-linux-aarch64.tar.gz",
-          "sha256": "221c4532278ca81d475f0dc437a9741d1f42f45bdfa10fdc358feae1f279973e",
-          "size": 38811613
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6d/agentrt-v0.1.6d-linux-aarch64.tar.gz",
+          "sha256": "b50c9195a3d65118472da82149e48ea80b4134d5c3af30d13cc6b64376828c9f",
+          "size": 35790763
+        },
+        "linux-armv7l": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6d/agentrt-v0.1.6d-linux-armv7l.tar.gz",
+          "sha256": "73bb58acad292a766a86af741014223c0af2b463d3cf88bbd5685f5a80b1a3b7",
+          "size": 34013360
+        },
+        "linux-i686": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6d/agentrt-v0.1.6d-linux-i686.tar.gz",
+          "sha256": "9ac6f7afc9b16ca59cbe7f23c35004337006a7bb95bd1c068d1435976b77bc8f",
+          "size": 38026617
         },
         "linux-riscv64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6c/agentrt-v0.1.6c-linux-riscv64.tar.gz",
-          "sha256": "032a35506e43ef8597aa8e81e19af9a79089d6637bea270a38a06826d47c81ac",
-          "size": 41015080
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6d/agentrt-v0.1.6d-linux-riscv64.tar.gz",
+          "sha256": "355740e8d3a4f9826009d0dd6b24740a05b70c547c9c2b86c4e19f65198baaee",
+          "size": 38025584
         },
         "linux-x86_64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6c/agentrt-v0.1.6c-linux-x86_64.tar.gz",
-          "sha256": "152240c6ae2d229cf28f160b4b2e9d7f8aad7ee06c8f38c9f1d93f36a2f940d7",
-          "size": 44166484
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6d/agentrt-v0.1.6d-linux-x86_64.tar.gz",
+          "sha256": "a45b189e8db77554094a202044d9e9b64d641d1ba94d22f40609b196c1e4994c",
+          "size": 44181069
         }
       }
     }

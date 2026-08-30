@@ -192,22 +192,38 @@ path_self_heal() {
 # 记录在画像中供 status 展示；install.sh 二进制模式以 {arch} 占位符
 # 选择预编译包（见 agentrt/scripts/install.sh install_binary）。
 detect_arch() {
-    case "$(uname -m 2>/dev/null)" in
-        x86_64|amd64)     echo "x86_64" ;;
+    local _m _bits
+    _m="$(uname -m 2>/dev/null)"
+    # 与 install.sh detect_arch 同口径（SSoT）：uname -m 报内核架构，
+    # 64 位内核 + 32 位用户空间（树莓派 armhf / 老 x86）误报 64 位且无对应
+    # 加载器，装 64 位包后 daemon exec 全部失败（2026-08-30 树莓派实测）。
+    # 以用户空间位数（getconf LONG_BIT）复判，三架构 32/64 位全覆盖。
+    _bits="$(getconf LONG_BIT 2>/dev/null)"
+    case "$_m" in
+        x86_64|amd64)
+            if [ "$_bits" = "64" ] || [ -f /lib64/ld-linux-x86-64.so.2 ]; then
+                echo "x86_64"
+            else
+                echo "i686"
+            fi
+            ;;
+        i386|i486|i586|i686|x86) echo "i686" ;;
         aarch64|arm64)
-            # 与 install.sh detect_arch 同口径（SSoT）：uname -m 报内核架构，
-            # 64 位内核 + 32 位用户空间（armhf）误报 aarch64 且无 aarch64
-            # 加载器，装 aarch64 包后 daemon exec 全部 "No such file or directory"
-            # （2026-08-30 树莓派实测）。以用户空间位数 / 加载器存在性复判。
-            if [ "$(getconf LONG_BIT 2>/dev/null)" = "64" ] || \
-               [ -f /lib/ld-linux-aarch64.so.1 ]; then
+            if [ "$_bits" = "64" ] || [ -f /lib/ld-linux-aarch64.so.1 ]; then
                 echo "aarch64"
             else
                 echo "armv7l"
             fi
             ;;
         armv7l|armv6l|armhf) echo "armv7l" ;;
-        riscv64)          echo "riscv64" ;;
+        riscv64)
+            if [ "$_bits" = "64" ] || [ -f /lib/ld-linux-riscv64-lp64d.so.1 ]; then
+                echo "riscv64"
+            else
+                echo "riscv32"
+            fi
+            ;;
+        riscv32|riscv) echo "riscv32" ;;
         *)                echo "unknown" ;;
     esac
 }
@@ -776,6 +792,25 @@ apply_package() { # <tarball> [expect_sha]
     return 0
 }
 
+# 更新/重装后回收仍驻留内存的旧版本 daemon 群：热替换只换磁盘二进制，
+# 运行中的进程仍执行旧代码（含旧 so 映射），必须回收；下次 airymaxrt
+# 启动自然拉起新版本。pkill -f 按绝对路径匹配，避免误杀其他实例。
+# 与 install.sh EXPECTED_DAEMONS 同清单（18 daemon）。
+stop_running_daemons() {
+    local found=0 d
+    for d in monit_d observe_d info_d notify_d sched_d channel_d mem_d \
+             llm_d tool_d hook_d plugin_d agent_d a2a_d market_d gateway_d \
+             think_d cupolas_d maths_d; do
+        if [ -x "$AIRY_HOME/bin/$d" ] && pkill -f "$AIRY_HOME/bin/$d" >/dev/null 2>&1; then
+            found=1
+        fi
+    done
+    if [ "$found" = "1" ]; then
+        sleep 2
+        log info "旧版本 daemon 已自动停止（下次启动加载新版本）"
+    fi
+}
+
 airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--rollback] [--file <tarball>] [--sha256 <hash>]
     local CHECK=0 CHANNEL="" ROLLBACK=0 FILE="" SHA256="" inst_env="$AIRY_HOME/config/install.env"
     while [ $# -gt 0 ]; do
@@ -833,7 +868,9 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
         fi
         log info "应用本地离线包: $(basename "$FILE")（sha256 强制校验）…"
         apply_package "$FILE" "$expect_sha"
-        return $?
+        local f_rc=$?
+        [ "$f_rc" = "0" ] && stop_running_daemons
+        return $f_rc
     fi
 
     # 远程通道更新（manifest 经 contents API 拉取：raw 域对 JSON 返回
@@ -869,6 +906,7 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
     apply_package "$tarball" "$art_sha"
     local rc=$?
     rm -rf "$TMPD"
+    [ "$rc" = "0" ] && stop_running_daemons
     return $rc
 }
 
