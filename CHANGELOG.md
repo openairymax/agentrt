@@ -24,6 +24,31 @@
 
 ---
 
+## [v0.1.6f] - 2026-08-30
+
+### 🎯 发布主题：时间校对服务 / platform 强化 / 安装体验
+
+0.1.6f 聚焦系统时序稳定性与跨平台能力强化。
+
+### Added
+
+- **时间校对服务（任务1）**：`commons/platform` 新增时间服务域
+  （`platform_time.h`）：
+  - 逻辑墙钟（`airy_time_wall_ms` / `airy_time_wall_sec`）：由单调时钟驱动，
+    校正后不受用户修改系统时间影响，天然单调递增，保证系统时序稳定；
+  - SNTP 校对（`airy_time_sync_once`）：联网时以「当前时区标准时间」
+    （UTC + 本地时区偏移）为准，覆盖宿主机系统时间与时区标准时间的
+    偏差；离线时自动回退宿主机系统时间；
+  - 周期校对（`airy_time_sync_start/stop`）：后台线程按默认 3600s
+    间隔复校，失败按 2x 指数退避（上限 24h），成功后恢复标准间隔；
+  - 时区偏移（`airy_time_tz_offset`）：Hinnant 算法跨平台计算，
+    不依赖 timegm/_mkgmtime，含夏令时；
+  - 服务器可配置：`AIRY_NTP_SERVERS` 环境变量（逗号分隔）覆盖默认
+    pool.ntp.org / ntp.aliyun.com / time.google.com。
+- monit_d 作为校对宿主：启动即后台同步，指标/告警时间戳改用逻辑墙钟。
+
+---
+
 ## [v0.1.6c] - 2026-08-30
 
 ### 🎯 发布主题：启动链路兜底 / 生态 SSoT 收敛 / 独立组装
