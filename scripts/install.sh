@@ -494,6 +494,15 @@ install_binary() {
         url="$(printf '%s' "$url" | sed "s/{arch}/${arch}/g")"
     fi
 
+    # ── 解压前清理（结构性修复 0.1.6g）──────────────────────────────────
+    # 铁律：清理必须在"下载"之前执行。历史根因：清理曾放在下载之后、
+    # 解压之前，glob 一次误匹配（无尾斜杠）即删除刚下载的 tarball 自身
+    #（树莓派 arm32 安装实测 "tar: Cannot open: No such file or directory"）。
+    # 顺序前移后，任何清理都只能触及上一轮残留，永远无法影响本轮下载
+    # 的 tarball；尾斜杠（agentrt-*/）保留，只匹配旧解压目录（杜绝 find
+    # 命中旧目录 → 拷贝旧 bin / 版本误显示 0.1.6c 的历史故障）。
+    rm -rf "${AIRY_HOME}"/tmp/agentrt-*/ 2>/dev/null || true
+
     # 下载（仅远程来源）
     if [ ! -f "$tarball" ]; then
         log_info "下载完全体二进制包: ${url}"
@@ -525,13 +534,6 @@ install_binary() {
         rm -f "${tarball}"
         return 1
     fi
-    # 0.1.6y 修复：解压前清理 tmp 中旧 agentrt-* 残留，杜绝 find 命中旧目录
-    #（历史故障：命中旧目录 → 拷贝旧 bin、版本误显示为旧版本 0.1.6c）。
-    # 0.1.6f 修复：清理必须带尾斜杠（agentrt-*/）只匹配旧解压目录，绝不能
-    # 匹配 tarball 自身——此前 rm -rf .../tmp/agentrt-* 把刚下载的
-    # agentrt-v0.1.6f.tar.gz 一并删除，tar 解压报 "Cannot open: No such
-    # file or directory"（树莓派 arm32 安装实测 2026-08-31）。
-    rm -rf "${AIRY_HOME}"/tmp/agentrt-*/ 2>/dev/null || true
     tar -xzf "${tarball}" -C "${AIRY_HOME}/tmp" || { log_err "release 包解压失败（tar）"; rm -f "$tarball"; return 1; }
     local extracted
     extracted="$(find "${AIRY_HOME}/tmp" -maxdepth 1 -type d -name 'agentrt-*' | head -1)"

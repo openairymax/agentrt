@@ -51,9 +51,11 @@
   - curl 符号崩溃全量隔离：`syscurl()` 剔除 `$AIRY_HOME/lib` 后调
     系统 curl，覆盖完整启动器 / 一键安装器 6 处 / 轻量启动器模板
     2 处（原 `airymaxrt update` 树莓派必崩）；
-  - 解压前清理 glob 带尾斜杠（`agentrt-*/`），杜绝误删刚下载的
-    tarball（原 `rm -rf agentrt-*` 把 `agentrt-v0.1.6f.tar.gz` 一并
-    删除致 tar "Cannot open"）；
+  - 解压前清理**结构性重排**：清理动作前移到下载之前执行（原在下载
+    之后、解压之前，glob 一次误匹配即删除刚下载的 tarball 自身致
+    tar "Cannot open"，树莓派 arm32 安装实测）；顺序前移后任何清理
+    只能触及上一轮残留、永远无法影响本轮 tarball，辅以尾斜杠
+    （`agentrt-*/`）只匹配旧解压目录，双重免疫该类故障；
   - 源码构建路径 `cmake --install` 与 daemon 产物 fail-closed（原
     `|| true` 静默吞错，残缺安装显示"安装完成"）；
   - `env_set()` 幂等写 install.env（原 `>>` 直接追加，重装后键多行
