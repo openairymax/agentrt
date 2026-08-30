@@ -47,6 +47,25 @@
     pool.ntp.org / ntp.aliyun.com / time.google.com。
 - monit_d 作为校对宿主：启动即后台同步，指标/告警时间戳改用逻辑墙钟。
 
+### Changed
+
+- **platform 强化（任务2）**：
+  - 原子语义降级：`airy_atomic_*`（cancel_token 热路径）由 seq_cst 全
+    屏障降为 acquire/release；once-init CAS（uuid/network/logger/
+    checkpoint/resource_guard）与日志采样计数器（AIRY_ATOMIC_FETCH_ADD）
+    同步降级。x86_64 基准：seq_cst store 4.12ns → release 0.24ns
+    （**17x**）；ARM/RISC-V 上 load/store 消除 dmb 全屏障收益更大；
+  - 随机数线程局部缓冲池（Windows BCrypt / POSIX /dev/urandom 批量
+    预取 64B）：`airy_random_uint32` POSIX 实测 833ns → 63ns（**13x**）；
+  - 架构识别宏：`AIRY_ARCH_X86_64/X86/ARM/ARM64/RISCV/LOONGARCH/PPC64`
+    + `AIRY_ARCH_NAME/AIRY_ARCH_LE` + `airy_arch_name()`，覆盖
+    x86/ARM/RISC-V 全系（含大端判定）；
+  - 64 位原子架构兼容：顶层 CMake 探测 `__atomic_always_lock_free(8)`
+    能力，无原生 8 字节原子（riscv32/armv6）时自动链接 libatomic，
+    消除链接期 `__atomic_*_8` undefined reference；
+  - 新增平台性能微基准 `tests/bench/bench_platform_perf.c`（独立
+    运行，不注册 ctest）。
+
 ---
 
 ## [v0.1.6c] - 2026-08-30
