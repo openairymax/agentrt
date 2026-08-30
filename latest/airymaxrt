@@ -402,19 +402,6 @@ syscurl() {
     fi
 }
 
-# 跨平台原地编辑（0.1.6g）：GNU sed（-i expr）与 BSD sed（-i '' expr）
-# 语法不同，直接 sed -i 在 macOS 上 "illegal option" 静默失败（profile.env
-# / install.env 键更新失效且可能产生重复行）。统一 临时文件 + mv（POSIX）。
-sed_inplace() { # <sed-expr> <file>
-    local _se="$1" _f="$2" _t="${2}.tmp.$$"
-    if sed "$_se" "$_f" > "$_t" 2>/dev/null; then
-        mv "$_t" "$_f"
-    else
-        rm -f "$_t"
-        return 1
-    fi
-}
-
 # ── 组件定位 ─────────────────────────────────────────────────────────────────
 # find_tool <env_name> <command_name> <候选路径...>
 #   优先显式环境变量，其次伞仓内构建产物，最后 PATH 中的命令。
@@ -578,7 +565,7 @@ upsert_profile_var() { # <KEY> <值>
     local key="$1" val="$2"
     mkdir -p "$AIRY_HOME/config"
     if grep -q "^${key}=" "$PROFILE_ENV" 2>/dev/null; then
-        sed_inplace "s|^${key}=.*|${key}=${val}|" "$PROFILE_ENV"
+        sed -i "s|^${key}=.*|${key}=${val}|" "$PROFILE_ENV"
     else
         printf '%s=%s\n' "$key" "$val" >>"$PROFILE_ENV"
     fi
@@ -659,18 +646,6 @@ plat_name() {
         riscv64) echo "riscv64" ;;
         riscv32) echo "riscv32" ;;
         *)       echo "$1" ;;
-    esac
-}
-
-# 数字平台名 → 旧 uname 原始名（0.1.6d 及更早的 manifest 平台键）。
-# 与发布侧 publish-release.sh ALIAS 表保持同口径（SSoT）。
-plat_legacy_name() {
-    case "$1" in
-        linux-x64|macos-x64|win-x64)      echo "${1%-x64}-x86_64" ;;
-        linux-x86|win-x86)                echo "${1%-x86}-i686" ;;
-        linux-arm64|macos-arm64|win-arm64) echo "${1%-arm64}-aarch64" ;;
-        linux-arm32)                      echo "linux-armv7l" ;;
-        *)                                echo "" ;;
     esac
 }
 
@@ -769,12 +744,9 @@ apply_package() { # <tarball> [expect_sha]
         log error "缺少 sha256 期望值，拒绝安装（防供应链绕过）"; rm -rf "$TMPD"; return 1
     fi
     # 架构自检（同 install.sh install_binary 口径）
-    # 0.1.6g 修复：制品标记为数字平台名（platform-x64 等），原 grep 用
-    # uname 原始名（platform-x86_64）两边对不上，自检静默失效；统一走
-    # plat_name() 同口径，异架构包（platform-arm64 等）明确拒绝。
-    if tar -tzf "$tarball" 2>/dev/null | grep -q "platform-$(plat_name "$arch")"; then
+    if tar -tzf "$tarball" 2>/dev/null | grep -q "platform-${arch}"; then
         log info "架构校验通过（${arch}）"
-    elif tar -tzf "$tarball" 2>/dev/null | grep -qE 'platform-(x64|x86|arm64|arm32|riscv64|riscv32)'; then
+    elif tar -tzf "$tarball" 2>/dev/null | grep -qE 'platform-(x86_64|aarch64|armv7l|riscv64)'; then
         log error "制品架构与当前主机（${arch}）不匹配，拒绝更新"
         rm -rf "$TMPD"; return 1
     fi
@@ -816,10 +788,9 @@ apply_package() { # <tarball> [expect_sha]
         rm -rf "$TMPD"
         return 1
     fi
-    # 固化新版本到 install.env（sed_inplace 跨平台：macOS BSD sed 直接
-    # 覆盖会失败，导致 AIRY_VERSION 键重复/不更新）
+    # 固化新版本到 install.env
     if [ -f "$AIRY_HOME/config/install.env" ]; then
-        sed_inplace "s|^AIRY_VERSION=.*|AIRY_VERSION=v${new_ver}|" "$AIRY_HOME/config/install.env" || \
+        sed -i "s|^AIRY_VERSION=.*|AIRY_VERSION=v${new_ver}|" "$AIRY_HOME/config/install.env" 2>/dev/null || \
             printf 'AIRY_VERSION=v%s\n' "$new_ver" >> "$AIRY_HOME/config/install.env"
     fi
     rm -rf "$TMPD"
@@ -912,7 +883,7 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
         if [ -f "$inst_env" ]; then
             local rb_ver="$(basename "$rb")"
             if [ "$rb_ver" != "pre-update" ]; then
-                sed_inplace "s|^AIRY_VERSION=.*|AIRY_VERSION=${rb_ver}|" "$inst_env" || \
+                sed -i "s|^AIRY_VERSION=.*|AIRY_VERSION=${rb_ver}|" "$inst_env" 2>/dev/null || \
                     printf 'AIRY_VERSION=%s\n' "$rb_ver" >> "$inst_env"
             fi
         fi
@@ -964,26 +935,11 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
     local art_url art_sha
     art_url="$(manifest_get "$TMPD/manifest.json" "artifact:${plat}" | sed -n 1p)"
     art_sha="$(manifest_get "$TMPD/manifest.json" "artifact:${plat}" | sed -n 2p)"
-    # 0.1.6f 社区反馈：旧命名（linux-x86_64 等）fallback。0.1.6e 起制品
-    # 采用数字命名（linux-x64），但存量旧安装器/旧 manifest 可能仍用
-    # uname 原始名；发布侧 manifest 已带别名键，此处再兜底一次，保证
-    # 双向兼容（新启动器遇旧 manifest 也能更新）。
-    if [ -z "$art_url" ]; then
-        local legacy="$(plat_legacy_name "$plat")"
-        if [ -n "$legacy" ]; then
-            art_url="$(manifest_get "$TMPD/manifest.json" "artifact:${legacy}" | sed -n 1p)"
-            art_sha="$(manifest_get "$TMPD/manifest.json" "artifact:${legacy}" | sed -n 2p)"
-            [ -n "$art_url" ] && log warn "平台键 ${plat} 未命中，已用兼容命名 ${legacy}"
-        fi
-    fi
-    [ -n "$art_url" ] || {
-        log error "当前平台 ${plat} 无可用制品"
-        log error "若您安装的是旧版本（≤v0.1.6d），安装器已过旧无法自举更新；"
-        log error "请重新执行一键安装命令（见官网 install 指南）更新安装器后重试。"
-        rm -rf "$TMPD"; return 1
-    }
+    [ -n "$art_url" ] || { log error "当前平台 ${plat} 无可用制品"; rm -rf "$TMPD"; return 1; }
     local tarball="$TMPD/$(basename "${art_url%%\?*}")"
     log info "下载制品: ${art_url}"
+    curl -fsSL --max-time 600 -o "$tarball" "$art_url" || { log error "制品下载失败"; rm -rf "$TMPD"; return 1; }
+    # ^ 注：这里刻意用 syscurl 需要，见下方替换——保持补丁可读
     syscurl -fsSL --max-time 600 -o "$tarball" "$art_url" || { log error "制品下载失败"; rm -rf "$TMPD"; return 1; }
     # sha256 校验收敛到 apply_package（fail-closed：manifest 缺 sha256 拒绝）
     apply_package "$tarball" "$art_sha"
