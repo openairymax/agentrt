@@ -420,8 +420,7 @@ PYEOF
 }
 
 install_binary() {
-    local url="$1" arch expect_sha="" legacy=""
-    local tarball="${AIRY_HOME}/tmp/agentrt-${AIRY_VERSION}.tar.gz"
+    local url="$1" arch expect_sha="" legacy="" tarball=""
     arch="$(detect_arch)"
     log_info "硬件架构: ${arch}（预编译支持: ${SUPPORTED_ARCHS}）"
     # 离线包（--from-file）放行任意架构（本地构建包不受官方发布清单限制）；
@@ -494,6 +493,16 @@ install_binary() {
         url="$(printf '%s' "$url" | sed "s/{arch}/${arch}/g")"
     fi
 
+    # 0.1.6g 结构性修复：远程 tarball 的本地文件名 = 远端 basename
+    #（如 agentrt-v0.1.6g-linux-x64.tar.gz），而非"脚本默认版本拼接名"。
+    # 历史故障（2026-08-31 复现实测）：脚本默认 AIRY_VERSION 与 manifest
+    # 实际版本漂移时，拼接名命中 tmp 残留的旧 tarball → 跳过下载 →
+    # sha256 门禁被跳过（无期望值）→ 静默安装旧版二进制。basename 命名
+    # 使"同名 = 同制品"，残留只能是同版本同平台，sha256 门禁正常兜底。
+    if [ -z "$tarball" ] && [ -n "$url" ]; then
+        tarball="${AIRY_HOME}/tmp/$(basename "${url%%\?*}")"
+    fi
+
     # ── 解压前清理（结构性修复 0.1.6g）──────────────────────────────────
     # 铁律：清理必须在"下载"之前执行。历史根因：清理曾放在下载之后、
     # 解压之前，glob 一次误匹配（无尾斜杠）即删除刚下载的 tarball 自身
@@ -503,7 +512,10 @@ install_binary() {
     # 命中旧目录 → 拷贝旧 bin / 版本误显示 0.1.6c 的历史故障）。
     rm -rf "${AIRY_HOME}"/tmp/agentrt-*/ 2>/dev/null || true
 
-    # 下载（仅远程来源）
+    # 下载（仅远程来源；同制品残留允许复用，0 字节截断残留则重下）
+    if [ -f "$tarball" ] && [ ! -s "$tarball" ]; then
+        rm -f "$tarball"
+    fi
     if [ ! -f "$tarball" ]; then
         log_info "下载完全体二进制包: ${url}"
         if ! syscurl -fsSL --max-time 600 -o "${tarball}" "${url}"; then
