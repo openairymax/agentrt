@@ -5,22 +5,20 @@
 # 位置：agentrt 管理仓 scripts/install.sh（v0.1.2 起自伞仓 scripts/ 迁移，
 #       构建系统与安装器属 IRON-9 [IND] 完全独立层，随 agentrt 仓独立演进；
 #       伞仓 scripts/ 保留兼容重定向入口）。
-# 用法（一键安装，安装器随 release 附件分发匿名直连；URL 用 latest 自动
-# 指向最新 release，无需随版本改命令。必须用 bash 而非 sh 管道：dash 的
-# `sh -s` 不接收位置参数，`sh -s -- <args>` 参数全丢，--prefix/--channel
-# 等将静默回落默认值）：
-#   curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" \
-#     | bash
-#     # ↑ 最简形式：通道默认 stable（--channel 仅 beta 等非常规通道时需指定）
-#   curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" \
-#     | bash -s -- --prefix "$HOME/.airymaxrt"       # 自定义路径
-#   bash install.sh --reinstall                       # 强制重装（清缓存+停旧 daemon）
-#   bash install.sh --uninstall                       # 一键卸载
-# 后备（latest 附件不可达或要装 main 分支最新安装器；AtomGit raw 域对
-# .sh 返回 HTML 预览页不可直连，经 v5 contents API 匿名拉取后解码执行）：
+# 用法（一键安装。安装器权威源 = agentrt 仓 main 分支 scripts/install.sh：
+# release 附件无法覆盖更新（AtomGit API 不支持替换附件），git push 即时
+# 生效，经 v5 contents API 匿名拉取最可靠。必须用 bash 而非 sh 管道：
+# dash 的 `sh -s` 不接收位置参数，--prefix/--channel 等将静默回落默认值）：
 #   curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
 #     | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
-#     | bash -s -- --channel stable
+#     | bash
+#     # ↑ 最简形式：通道默认 stable（--channel 仅 beta 等非常规通道时需指定）
+#     # 自定义路径：同上管道，末尾改为 `bash -s -- --prefix "$HOME/.airymaxrt"`
+#   bash install.sh --reinstall                       # 强制重装（清缓存+停旧 daemon）
+#   bash install.sh --uninstall                       # 一键卸载
+# 兼容入口（release 附件，latest 指向最新 release；同版本重发可能滞后，
+# 但磁盘副本运行时会自动自举到 git main 最新版，见 installer_self_bootstrap）：
+#   curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash
 #
 # 安装策略（三模式，按可达性自动降级）：
 #   模式 A 二进制：AIRY_RELEASE_URL 指向完全体 tarball（含闭源模块预编译产物），
@@ -823,7 +821,19 @@ path_bootstrap() {
 detect_arch() {
     case "$(uname -m 2>/dev/null)" in
         x86_64|amd64)     echo "x86_64" ;;
-        aarch64|arm64)    echo "aarch64" ;;
+        aarch64|arm64)
+            # 关键（2026-08-30 树莓派实测）：uname -m 报告的是内核架构。
+            # 64 位内核 + 32 位用户空间（armhf）时误报 aarch64，用户空间无
+            # /lib/ld-linux-aarch64.so.1 加载器，装 aarch64 包后全部 daemon
+            # exec 即报 "No such file or directory"。判据：用户空间 C long
+            # 位数（getconf LONG_BIT）或 aarch64 动态加载器存在性。
+            if [ "$(getconf LONG_BIT 2>/dev/null)" = "64" ] || \
+               [ -f /lib/ld-linux-aarch64.so.1 ]; then
+                echo "aarch64"
+            else
+                echo "armv7l"
+            fi
+            ;;
         armv7l|armv6l|armhf) echo "armv7l" ;;
         riscv64)          echo "riscv64" ;;
         *)                echo "unknown" ;;
@@ -1350,7 +1360,40 @@ print_path_guidance() {
 }
 
 # ─── 主流程 ────────────────────────────────────────────────────────────
+# 安装器自举（系统性解决安装器无法更新，2026-08-30）：
+# AtomGit API 不支持删除/替换 release 附件，同版本重发后一键命令仍拿旧
+# 安装器。权威源定为 agentrt 仓 main 分支 scripts/install.sh（git push
+# 即生效），本机磁盘副本（含 $AIRY_HOME/scripts/install.sh 自托管副本）
+# 每次运行比对远程 hash，不同则用远程最新版重执行。curl 管道/stdin 场景
+# （$0 非文件）跳过；AIRY_INSTALLER_BOOTSTRAPPED 守卫防递归。
+installer_self_bootstrap() {
+    [ "${AIRY_INSTALLER_BOOTSTRAPPED:-0}" = "1" ] && return 0
+    [ -f "$0" ] || return 0
+    command -v python3 >/dev/null 2>&1 || return 0
+    command -v curl >/dev/null 2>&1 || return 0
+    local local_sha
+    local_sha="$(sha256sum "$0" 2>/dev/null | awk '{print $1}')"
+    [ -n "$local_sha" ] || return 0
+    local api="https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main"
+    local tmp remote_content remote_sha
+    tmp="$(curl -fsSL --max-time 30 "$api" 2>/dev/null)" || return 0
+    remote_content="$(printf '%s' "$tmp" | python3 -c 'import sys,json,base64;d=json.load(sys.stdin);sys.stdout.write(base64.b64decode(d.get("content","")).decode())' 2>/dev/null)" || return 0
+    [ -n "$remote_content" ] || return 0
+    remote_sha="$(printf '%s' "$remote_content" | sha256sum | awk '{print $1}')"
+    [ -n "$remote_sha" ] || return 0
+    [ "$remote_sha" = "$local_sha" ] && return 0
+    log_info "检测到安装器新版本，切换到远程最新版执行…"
+    export AIRY_INSTALLER_BOOTSTRAPPED=1
+    local tmp_inst
+    tmp_inst="$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/airymaxrt-installer.$$")"
+    printf '%s' "$remote_content" > "$tmp_inst" || { rm -f "$tmp_inst"; return 0; }
+    chmod 755 "$tmp_inst"
+    exec "$tmp_inst" "$@"
+}
+
 main() {
+    # 自举必须最先执行：让 --reinstall/--uninstall/全新安装都基于最新安装器
+    installer_self_bootstrap "$@"
     print_banner
     log_info "Airymax AgentRT 安装程序"
     log_info "AIRY_HOME = ${AIRY_HOME} | 模式 = ${AIRY_MODE}"
