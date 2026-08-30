@@ -474,11 +474,31 @@ install_binary() {
         rm -f "${tarball}"
         return 1
     fi
-    tar -xzf "${tarball}" -C "${AIRY_HOME}/tmp"
+    # 0.1.6y 修复：解压前清理 tmp 中旧 agentrt-* 残留，杜绝 find 命中旧目录
+    #（历史故障：命中旧目录 → 拷贝旧 bin、版本误显示为旧版本 0.1.6c）。
+    rm -rf "${AIRY_HOME}"/tmp/agentrt-* 2>/dev/null || true
+    tar -xzf "${tarball}" -C "${AIRY_HOME}/tmp" || { log_err "release 包解压失败（tar）"; rm -f "$tarball"; return 1; }
     local extracted
     extracted="$(find "${AIRY_HOME}/tmp" -maxdepth 1 -type d -name 'agentrt-*' | head -1)"
     [ -n "$extracted" ] || { log_warn "release 包结构异常，回退源码构建"; return 1; }
-    cp -f "${extracted}"/bin/* "${AIRY_HOME}/bin/" 2>/dev/null || true
+    # 0.1.6y 自动计算：daemon 清单以制品 bin/*_d 为准（后续 daemon 增删不再
+    # 改脚本硬编码；gateway_d 为 HTTP 服务亦属 *_d 自动纳入）。
+    EXPECTED_DAEMONS="$(for _f in "${extracted}"/bin/*_d; do [ -f "$_f" ] && basename "$_f"; done)"
+    # bin/ 拷贝必须 fail-closed：静默失败（磁盘/权限/残留干扰）会导致 daemon
+    # 未就位却显示"全部就位"（树莓派 0.1.6e 实测：18 个就位但启动时
+    # llm_d No such file）。lib/ 已有同类校验，bin/ 补齐。
+    mkdir -p "${AIRY_HOME}/bin"
+    if [ -n "$EXPECTED_DAEMONS" ]; then
+        cp -f "${extracted}"/bin/* "${AIRY_HOME}/bin/" 2>/dev/null || true
+        local _binok=1 _d2
+        for _d2 in ${EXPECTED_DAEMONS}; do
+            [ -x "${AIRY_HOME}/bin/${_d2}" ] || { _binok=0; log_err "bin/ 部署失败，缺失: ${_d2}（检查磁盘/权限）"; break; }
+        done
+        [ "$_binok" = "1" ] || return 1
+    else
+        log_err "release 包缺失 daemon 二进制（bin/*_d 为空，制品不完整）"
+        return 1
+    fi
     # lib/（.so 自包含）部署 + 校验：0.1.5a 旧包曾缺 libcjson.so.1 导致
     # daemon/airy_cli 启动即失败（社区反馈）。包内 lib/ 含 .so 时必须
     # 确认部署成功，缺失即 fail-closed（不再静默吞错）。
@@ -1049,10 +1069,11 @@ AIRY_ENV_EOF
     if [ -f "${AIRY_SRC_APP}/sdk/tui/scripts/airymaxrt" ]; then
         cp -f "${AIRY_SRC_APP}/sdk/tui/scripts/airymaxrt" "${AIRY_HOME}/bin/airymaxrt"
         chmod 755 "${AIRY_HOME}/bin/airymaxrt"
-    elif [ -f "${AIRY_HOME}/bin/agentrt-tui" ]; then
-        # 二进制模式无源码：生成轻量启动器。
-        # 从启动器自身位置推导 AIRY_HOME（含软链解析，POSIX 兼容），
-        # 使 BIN_DIR 软链在未 export AIRY_HOME 的任意 shell 中也可用。
+    else
+        # 二进制模式无源码：无论 TUI 是否存在都生成轻量启动器（前端选择
+        # 逻辑：有 TTY+TUI → TUI；否则 → airy_cli；管理命令自举 airymaxrt-full）。
+        # 历史 bug：elif 依赖 agentrt-tui 存在，arm32 等无 TUI 架构整段跳过，
+        # bin/airymaxrt 不生成 → 用户继续运行旧版残留启动器（清单/格式错乱）。
         cat > "${AIRY_HOME}/bin/airymaxrt" <<EOF
 #!/bin/sh
 _SELF="\$0"
@@ -1064,14 +1085,14 @@ while [ -L "\$_SELF" ]; do
     esac
 done
 _DIR="\$(cd -P "\$(dirname "\$_SELF")" && pwd)"
-# 解析顺序：环境变量（须通过 agentrt-tui 存在性校验——终端残留 export
+# 解析顺序：环境变量（须通过 airy_cli 存在性校验——终端残留 export
 # 指向已删除目录时自动失效）→ install.env 固化值（同样校验）→
 # 默认统一安装根。
 _AH="\${AIRY_HOME:-}"
-[ -n "\$_AH" ] && [ -x "\$_AH/bin/agentrt-tui" ] || _AH=""
+[ -n "\$_AH" ] && [ -x "\$_AH/bin/airy_cli" ] || _AH=""
 if [ -z "\$_AH" ]; then
     _AH="\$(sed -n 's/^AIRY_HOME=//p' "\${_DIR}/../config/install.env" 2>/dev/null | head -1)"
-    [ -x "\$_AH/bin/agentrt-tui" ] || _AH=""
+    [ -x "\$_AH/bin/airy_cli" ] || _AH=""
 fi
 [ -n "\$_AH" ] || _AH="\$HOME/.airymaxrt"
 AIRY_HOME="\$_AH"
@@ -1278,7 +1299,7 @@ verify_daemons() {
         fi
         log_warn "daemon 校验未全通过，缺失:${missing}（可能为二进制包未含全部组件）"
     else
-        log_ok "18 个 daemon 全部就位"
+        log_ok "$(printf '%s' $EXPECTED_DAEMONS | wc -w | tr -d ' ') 个 daemon 全部就位"
     fi
 }
 
