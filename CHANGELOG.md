@@ -47,6 +47,16 @@
     pool.ntp.org / ntp.aliyun.com / time.google.com。
 - monit_d 作为校对宿主：启动即后台同步，指标/告警时间戳改用逻辑墙钟。
 
+### Fixed
+
+- **syscurl 隔离（根治树莓派 `curl_easy_ssls_import` 崩溃）**：airymaxrt
+  全局注入 `$AIRY_HOME/lib` 到 LD_LIBRARY_PATH 使 daemon 群解析包内
+  .so，但同一注入劫持系统 curl（Debian/Ubuntu 新版 curl 依赖
+  `curl_easy_ssls_import`，包内旧 libcurl 无此符号 → 崩溃）。0.1.6c 仅
+  "补写注入行"属打补丁；本轮根治：所有下载/更新/探测类网络操作经
+  `syscurl()` 临时剔除 `$AIRY_HOME/lib` 后调用系统 libcurl，与 daemon
+  进程空间彻底隔离（实测隔离后系统 curl 正常访问 HTTP 200）。
+
 ### Changed
 
 - **platform 强化（任务2）**：
