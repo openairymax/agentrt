@@ -16,6 +16,10 @@
 #     # 自定义路径：同上管道，末尾改为 `bash -s -- --prefix "$HOME/.airymaxrt"`
 #   bash install.sh --reinstall                       # 强制重装（清缓存+停旧 daemon）
 #   bash install.sh --uninstall                       # 一键卸载
+# 三命令快速参考（安装完成后日常运维）：
+#   安装   curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash
+#   更新   airymaxrt update           （--check 仅检查 / --channel stable|beta / --rollback 回滚）
+#   重装   bash install.sh --reinstall
 # 兼容入口（release 附件，latest 指向最新 release；同版本重发可能滞后，
 # 但磁盘副本运行时会自动自举到 git main 最新版，见 installer_self_bootstrap）：
 #   curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash
@@ -380,7 +384,7 @@ PYEOF
 }
 
 install_binary() {
-    local url="$1" arch expect_sha=""
+    local url="$1" arch expect_sha="" legacy=""
     local tarball="${AIRY_HOME}/tmp/agentrt-${AIRY_VERSION}.tar.gz"
     arch="$(detect_arch)"
     log_info "硬件架构: ${arch}（预编译支持: ${SUPPORTED_ARCHS}）"
@@ -433,6 +437,17 @@ install_binary() {
         [ "$(uname -s 2>/dev/null)" = "Darwin" ] && plat="macos-$(uname -m 2>/dev/null)"
         url="$(parse_manifest "$man" "$plat" url)"
         expect_sha="$(parse_manifest "$man" "$plat" sha256)"
+        # 0.1.6f 社区反馈：旧 manifest（≤0.1.6d 命名 linux-x86_64 等）或
+        # 新 manifest（linux-x64 数字命名）双向兼容——主键未命中时按别名表
+        # 反查，杜绝"无可用制品"假阴性。
+        if [ -z "$url" ]; then
+            legacy="$(plat_legacy_name "$plat")"
+            if [ -n "$legacy" ]; then
+                url="$(parse_manifest "$man" "$legacy" url)"
+                expect_sha="$(parse_manifest "$man" "$legacy" sha256)"
+                [ -n "$url" ] && log_info "平台键 ${plat} 未命中，已用兼容命名 ${legacy}"
+            fi
+        fi
         [ -n "$url" ] || { log_warn "manifest 无 ${plat} 制品，回退源码构建"; return 1; }
         log_info "通道 ${AIRY_CHANNEL} 最新制品（${plat}）: $(basename "${url%%\?*}")"
     elif [ -f "$url" ]; then
@@ -914,6 +929,18 @@ plat_name() {
         riscv64) echo "riscv64" ;;
         riscv32) echo "riscv32" ;;
         *)       echo "$1" ;;
+    esac
+}
+# 数字平台名 → 旧 uname 原始名（0.1.6d 及更早的 manifest 平台键）。
+# 与 publish-release.sh ALIAS 表、latest/airymaxrt plat_legacy_name 同口径
+# （SSoT），仅用于 manifest 主键未命中时的兼容反查。
+plat_legacy_name() {
+    case "$1" in
+        linux-x64|macos-x64|win-x64)       echo "${1%-x64}-x86_64" ;;
+        linux-x86|win-x86)                 echo "${1%-x86}-i686" ;;
+        linux-arm64|macos-arm64|win-arm64) echo "${1%-arm64}-aarch64" ;;
+        linux-arm32)                       echo "linux-armv7l" ;;
+        *)                                 echo "" ;;
     esac
 }
 
