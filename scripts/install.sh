@@ -384,27 +384,29 @@ install_binary() {
     local tarball="${AIRY_HOME}/tmp/agentrt-${AIRY_VERSION}.tar.gz"
     arch="$(detect_arch)"
     log_info "硬件架构: ${arch}（预编译支持: ${SUPPORTED_ARCHS}）"
-    # 离线包（--from-file）放行任意架构（本地构建包不受官方三架构限制）；
-    # 在线安装严格按官方三架构校验。
+    # 离线包（--from-file）放行任意架构（本地构建包不受官方发布清单限制）；
+    # 在线安装严格按官方发布清单校验。
     if [ -z "${AIRY_FROM_FILE:-}" ]; then
         case " ${SUPPORTED_ARCHS} " in
             *" ${arch} "*) ;;
             *)
-                # 兼容性指引（2026-08-30 树莓派 32 位用户空间教训）：32 位
-                # ARM（armhf，常见于 64 位内核 + 32 位系统）无预编译包时不
-                # 静默回退，给出明确可操作的路径；返回 1 后主流程仍会尝试
-                # 源码构建兜底。
-                if [ "$arch" = "armv7l" ]; then
-                    log_err "检测到 32 位 ARM 用户空间（armhf）。预编译包仅支持 64 位架构：${SUPPORTED_ARCHS}"
-                    log_err "请二选一："
-                    log_err "  1) 使用 64 位系统镜像（树莓派 OS 64-bit / Ubuntu arm64 / Debian arm64）后重装；"
-                    log_err "  2) 源码构建：AIRY_MODE=source bash install.sh（需 C 工具链 + 依赖库）"
-                else
-                    log_warn "架构 ${arch} 无预编译包（支持: ${SUPPORTED_ARCHS}），回退源码构建"
-                fi
+                # 兼容性指引（2026-08-30 树莓派 32 位用户空间教训）：不支持
+                # 的架构不静默回退，给出明确可操作的路径；返回 1 后主流程
+                # 仍会尝试源码构建兜底。
+                log_err "检测到架构 ${arch}，不在官方预编译发布清单（${SUPPORTED_ARCHS}）内"
+                log_err "请源码构建：AIRY_MODE=source bash install.sh（需 C 工具链 + 依赖库）"
                 return 1
                 ;;
         esac
+        # riscv32 已入六架构清单，但 glibc riscv32 用户态生态未就绪
+        # （Ubuntu 等发行版无 riscv32 libc），预编译制品暂不发布；明确
+        # 指引回退源码构建，杜绝拉取缺制品后的隐性回退。
+        if [ "$arch" = "riscv32" ]; then
+            log_err "检测到 32 位 RISC-V（riscv32/ilp32d）。glibc riscv32 用户态生态"
+            log_err "尚未成熟（主流发行版无 riscv32 libc），官方预编译包暂不可用。"
+            log_err "请源码构建：AIRY_MODE=source bash install.sh（需 RISC-V 工具链）"
+            return 1
+        fi
     fi
 
     # 来源解析：a) manifest JSON（通道）→ GPG 验签 + 解析本平台制品；
