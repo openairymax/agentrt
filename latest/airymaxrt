@@ -83,7 +83,9 @@ fi
 AIRY_HOME="${AIRY_HOME:-$HOME/.airymaxrt}"
 # 导出给子进程（TUI / airy_cli / daemon 群统一运行时根，避免默认 $HOME 分叉）
 export AIRY_HOME
-RUNTIME_DIR="${AIRY_RUNTIME_DIR:-$AIRY_HOME/run}"
+# 0.1.6c 系统性修复：AIRY_HOME 为权威运行根，RUNTIME_DIR 一律从最终
+# AIRY_HOME 派生（父环境残留的旧 AIRY_RUNTIME_DIR 会使 socket 探测分叉）。
+RUNTIME_DIR="${AIRY_HOME}/run"
 GATEWAY_PORT="${AIRY_GATEWAY_PORT:-8080}"
 GATEWAY_URL="http://127.0.0.1:${GATEWAY_PORT}"
 
@@ -332,9 +334,23 @@ if [ -f "$AIRY_HOME/bin/agentrt-env.sh" ]; then
     . "$AIRY_HOME/bin/agentrt-env.sh"
     AIRY_HOME="$_AIRY_HOME_RESOLVED"
     export AIRY_HOME
-    RUNTIME_DIR="${AIRY_RUNTIME_DIR:-$AIRY_HOME/run}"
+    RUNTIME_DIR="${AIRY_HOME}/run"
     log debug "agentrt-env.sh 注入后恢复 AIRY_HOME=$AIRY_HOME RUNTIME_DIR=$RUNTIME_DIR"
 fi
+
+# ── 运行库路径兜底（0.1.6c 系统性修复）─────────────────────────────────────
+# 包内 lib/ 自带全部第三方 .so（curl/gnutls/ssh/ssl1.1 等传递依赖），但
+# DT_RUNPATH 非传递性——daemon 的直接依赖可经 $ORIGIN/../lib 找到，而
+# libcurl 等的传递依赖只能走系统路径或 LD_LIBRARY_PATH。老用户（0.1.5a
+# 及更早安装）的 agentrt-env.sh 无 LD_LIBRARY_PATH 注入行，且 airymaxrt
+# update 的热替换不重新生成 env.sh → daemon 群"很多库找不到"起不来
+# （Ubuntu 24.04 无 libssl.so.1.1 等）。此处幂等兜底：无论 env.sh 版本
+# 如何，确保 $AIRY_HOME/lib 始终在 LD_LIBRARY_PATH 首位（已含则跳过），
+# 覆盖 daemon 群 + CLI + TUI 全部子进程。bootstrap.sh 侧已有同源兜底。
+case ":$LD_LIBRARY_PATH:" in
+    *":$AIRY_HOME/lib:"*) ;;
+    *) export LD_LIBRARY_PATH="$AIRY_HOME/lib:${LD_LIBRARY_PATH:-}" ;;
+esac
 
 # ── 组件定位 ─────────────────────────────────────────────────────────────────
 # find_tool <env_name> <command_name> <候选路径...>
@@ -714,6 +730,19 @@ apply_package() { # <tarball> [expect_sha]
             printf 'AIRY_VERSION=v%s\n' "$new_ver" >> "$AIRY_HOME/config/install.env"
     fi
     rm -rf "$TMPD"
+    # 0.1.6c 系统性修复：热替换后自愈 agentrt-env.sh。老用户（0.1.5a 及
+    # 更早安装）的 env.sh 无 LD_LIBRARY_PATH 注入行，而 apply_package 只
+    # 热替换 bin/lib/include/share/config，不重新生成 env.sh——升级后
+    # daemon 传递依赖（libcurl→libssl.so.1.1 等）仍无法解析（"很多库
+    # 找不到"，Ubuntu 24.04 无 libssl.so.1.1）。幂等补写：env.sh 缺失
+    # LD_LIBRARY_PATH 行时追加，不覆盖用户已有注入。
+    if [ -f "$AIRY_HOME/bin/agentrt-env.sh" ] \
+       && ! grep -q 'LD_LIBRARY_PATH' "$AIRY_HOME/bin/agentrt-env.sh" 2>/dev/null; then
+        printf '\nexport LD_LIBRARY_PATH="${AIRY_HOME}/lib:${LD_LIBRARY_PATH:-}"\n' \
+            >> "$AIRY_HOME/bin/agentrt-env.sh"
+        chmod 700 "$AIRY_HOME/bin/agentrt-env.sh" 2>/dev/null || true
+        log info "agentrt-env.sh 已补写 LD_LIBRARY_PATH 注入（0.1.6c 自愈）"
+    fi
     # 0.1.6a 修复：更新后重生成入口启动器。apply_package 仅热替换 bin/，
     # 而轻量启动器（$AIRY_HOME/bin/airymaxrt）模板内嵌于 install.sh，
     # 不会被更新刷新——旧轻量启动器无参数直通前端、daemon 群未拉起
