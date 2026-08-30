@@ -159,6 +159,22 @@ if ($Uninstall) {
 }
 
 # ─── 模式 A：完全体二进制 zip（优先） ────────────────────────────────────
+# 仓库文件经 AtomGit v5 contents API 获取（与 install.sh fetch_repo_file
+# 同源）：主域 raw 路径对非 Markdown 返回 HTML 预览页、raw.atomgit.com
+# 子域部分网络 403/不可达（0.1.6b 社区实测"暂不支持预览"）；contents
+# API 匿名 GET 返回 base64 JSON，无重定向，可靠。
+function Fetch-RepoFile {
+    param([string]$RepoPath, [string]$Dest)
+    $api = "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/$RepoPath?ref=main"
+    try {
+        $resp = Invoke-RestMethod -Uri $api -Headers @{ "User-Agent" = "agentrt-installer" } -TimeoutSec 60
+        if ($null -eq $resp -or $null -eq $resp.content) { return $false }
+        $bytes = [Convert]::FromBase64String(($resp.content -replace "\s", ""))
+        [System.IO.File]::WriteAllBytes($Dest, $bytes)
+        return (Test-Path $Dest) -and ((Get-Item $Dest).Length -gt 0)
+    } catch { return $false }
+}
+
 function Install-Binary {
     param([string]$Url)
     $zip = Join-Path $AIRY_HOME "tmp\agentrt-$AIRY_VERSION.zip"
@@ -167,19 +183,28 @@ function Install-Binary {
     #          b) 本地 zip（-FromFile）→ 直用；c) 远程 zip URL → 下载
     if ($Url -like "*.json") {
         $man = Join-Path $AIRY_HOME "tmp\manifest.json"
-        Write-Info "下载通道 manifest: $Url"
-        curl.exe -fsSL --max-time 60 -o $man $Url
-        if ($LASTEXITCODE -ne 0) { Write-Warn "manifest 下载失败，回退源码构建"; return $false }
+        if (Test-Path $Url) {
+            # 本地 manifest（通道入口已经 contents API 获取）→ 直用
+            Copy-Item $Url $man -Force
+            Write-Info "使用已获取的通道 manifest"
+        } else {
+            Write-Info "下载通道 manifest: $Url"
+            curl.exe -fsSL --max-time 60 -o $man $Url
+            if ($LASTEXITCODE -ne 0) { Write-Warn "manifest 下载失败，回退源码构建"; return $false }
+        }
         # GPG 验签 manifest（权威校验链，与 install.sh/airymaxrt 同源）：
         #   系统装有 gpg → fail-closed（验签失败拒绝安装）；
         #   无 gpg 环境 → 降级 HTTPS + sha256（Windows 最小环境，显式告警）。
         $asc = Join-Path $AIRY_HOME "tmp\manifest.json.asc"
-        curl.exe -fsSL --max-time 30 -o $asc "$Url.asc" 2>$null
+        $ascSrc = "$Url.asc"
+        if (Test-Path $ascSrc) { Copy-Item $ascSrc $asc -Force }
+        else { curl.exe -fsSL --max-time 30 -o $asc $ascSrc 2>$null }
         if ((Get-Command gpg -ErrorAction SilentlyContinue)) {
             $keyf = Join-Path $AIRY_HOME "tmp\agentrt.asc"
-            curl.exe -fsSL --max-time 30 -o $keyf "https://atomgit.com/openairymax/agentrt/raw/main/latest/keys/agentrt.asc" 2>$null
-            if (-not (Test-Path $keyf) -and (Test-Path (Join-Path $AIRY_HOME "keys\agentrt.asc"))) {
-                Copy-Item (Join-Path $AIRY_HOME "keys\agentrt.asc") $keyf -Force
+            if (-not (Fetch-RepoFile "latest/keys/agentrt.asc" $keyf)) {
+                if (Test-Path (Join-Path $AIRY_HOME "keys\agentrt.asc")) {
+                    Copy-Item (Join-Path $AIRY_HOME "keys\agentrt.asc") $keyf -Force
+                }
             }
             if (-not (Test-Path $keyf)) {
                 Write-Warn "发布公钥拉取失败，拒绝安装（fail-closed）"
@@ -476,7 +501,18 @@ $installed = $false
 # （默认，stable/beta 由 -Channel 决定；-Mode source 除外）
 $releaseUrl = $env:AIRY_RELEASE_URL
 if (-not $releaseUrl -and $Mode -ne "source") {
-    $releaseUrl = "https://atomgit.com/openairymax/agentrt/raw/main/latest/manifest.$AIRY_CHANNEL.json"
+    # 通道 manifest 经 v5 contents API 获取（无重定向；主域 raw 返回 HTML
+    # 预览页、raw.atomgit.com 子域部分网络不可达——0.1.6b 修复，与 install.sh
+    # fetch_repo_file 同源）。本地文件交给 Install-Binary 直用。
+    $manLocal = Join-Path $AIRY_HOME "tmp\manifest.$AIRY_CHANNEL.json"
+    if (Fetch-RepoFile "latest/manifest.$AIRY_CHANNEL.json" $manLocal) {
+        Fetch-RepoFile "latest/manifest.$AIRY_CHANNEL.json.asc" "$manLocal.asc" | Out-Null
+        $releaseUrl = $manLocal
+        Write-Info "通道 manifest 已获取（$AIRY_CHANNEL）"
+    } else {
+        Write-Warn "通道 manifest 获取失败，回退源码构建"
+        $releaseUrl = ""
+    }
 }
 if ($FromFile) { $installed = Install-Binary $FromFile }
 elseif ($Mode -eq "binary" -or ($Mode -eq "auto" -and $releaseUrl)) {
