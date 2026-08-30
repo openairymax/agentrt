@@ -1,27 +1,27 @@
 {
   "schema": 1,
   "channel": "stable",
-  "latest": "v0.1.6a",
-  "updated_at": "2026-08-29T16:00:42Z",
+  "latest": "v0.1.6b",
+  "updated_at": "2026-08-30T02:07:46Z",
   "releases": {
-    "v0.1.6a": {
+    "v0.1.6b": {
       "yanked": false,
-      "notes": "AgentRT v0.1.6a (patch)\n\nFixes a system-level defect in the 0.1.6 binary install: running\n`airymaxrt` with no arguments launched the frontend directly without\nstarting the daemon fleet, so every component reported offline\n(\"online 0/17\") and no feature was usable.\n\nChanges:\n\n- scripts/install: binary-mode launcher now brings up the daemon fleet\n  on default (no-args) launch — reuse cached full launcher, otherwise\n  bootstrap start (idempotent, offline-capable) before entering the\n  frontend.\n- launcher (latest/airymaxrt): after `airymaxrt update`, regenerate the\n  entry launcher so existing 0.1.6 installs get the same no-args fix.\n- Version SSoT sync to 0.1.6a (VERSION, installers, CLI/gateway/commons\n  fallbacks, root CMakeLists now injects project() from the VERSION\n  file).\n\nExisting users: run `airymaxrt update` to upgrade from 0.1.6.\nNew users: one-line install automatically gets the fixed launcher.",
+      "notes": "AgentRT v0.1.6b (patch)\n\nv0.1.6a could not start on many systems: the daemon fleet failed to come\nup (\"many libraries not found\", all daemons/gateway/heapstore offline),\nthe hero banner corrupted its bottom border in narrow terminals, and\nbinaries required GLIBC >= 2.38 so older distros refused to run them.\n\nRoot causes (all fixed in 0.1.6b):\n\n- DT_RUNPATH is not transitive: a daemon's direct deps were found via\n  $ORIGIN/../lib, but the transitive deps of those libs (libcurl ->\n  libgnutls/librtmp/libssh/libldap, ...) were resolved only through the\n  host system paths. On hosts missing those libs, every daemon died at\n  startup. Fix: the launcher/bootstrap now sources agentrt-env.sh which\n  injects LD_LIBRARY_PATH=<install>/lib (transitive for all children);\n  the runtime libs are self-contained inside the package lib/.\n- Binaries were built on a glibc 2.39 host, so every artifact demanded\n  GLIBC >= 2.38 (\"one user could start it, several could not\"). Fix:\n  all three architectures are now built inside ubuntu:20.04 containers\n  (glibc 2.31 baseline) and the .so closure is collected inside the\n  container against that baseline, so the package runs on Ubuntu 20.04\n  and newer.\n- Hero banner: the frame width had a hard 74-column minimum, so on\n  terminals narrower than ~78 cols the frame wrapped, grew past the\n  pinned 7 lines, and the dialogue overwrote the bottom border (missing\n  bottom line + overlapping garbled text). Fix: the frame now adapts to\n  the terminal width (UTF-8-safe clipping keeps the box intact).\n- Build chain fixes: single OpenSSL authority inside the build container\n  (self-built 3.0.17, libdir normalized to lib/ so find_package resolves\n  one version — the system 1.1.1f on Ubuntu 20.04 does not export\n  EVP_DigestSignUpdate), apt toolchain reinstalled on every container\n  instance (previous flag-file skip left new instances without gcc), and\n  the Rust TUI linker is chosen on demand (ld.lld only when present).\n\nUpgrade: run `airymaxrt update` (0.1.6a users) or reinstall with the\none-line installer to get the fixed launcher + self-contained libs.",
       "artifacts": {
         "linux-aarch64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6a/agentrt-v0.1.6a-linux-aarch64.tar.gz",
-          "sha256": "ea5fa8c3b613d9342b4faecde737c9db8c506d42944b7c5c21b55a5c56f4c207",
-          "size": 34466319
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6b/agentrt-v0.1.6b-linux-aarch64.tar.gz",
+          "sha256": "b2f28687edbb3cda9239c31dc085eaa6c9ff358f688659550faf42db9537b1de",
+          "size": 43439992
         },
         "linux-riscv64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6a/agentrt-v0.1.6a-linux-riscv64.tar.gz",
-          "sha256": "9f155a86b464bc6c415967dbd58e621eb31e23f31e7e67ec815bf06ab01673eb",
-          "size": 36262959
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6b/agentrt-v0.1.6b-linux-riscv64.tar.gz",
+          "sha256": "797ab52e9cf52d97ef8dbdda13c9639fa488aa9fd54e2dfd365b66d964bc7ed9",
+          "size": 42582919
         },
         "linux-x86_64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6a/agentrt-v0.1.6a-linux-x86_64.tar.gz",
-          "sha256": "857e7cbb573e24a3e22269ac31c7da40742d2090c59ea74da72f5554678c967a",
-          "size": 39279603
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6b/agentrt-v0.1.6b-linux-x86_64.tar.gz",
+          "sha256": "22dab3562ed2deb9d8ee13f079f73d9e1def63aa25881735fdf1538986c117f3",
+          "size": 44123700
         }
       }
     }
