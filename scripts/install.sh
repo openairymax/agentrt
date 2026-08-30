@@ -968,6 +968,14 @@ if [ -f "\${AIRY_HOME}/bin/agentrt-env.sh" ]; then
     . "\${AIRY_HOME}/bin/agentrt-env.sh"
     AIRY_HOME="\$_AH"
 fi
+# 0.1.6c 系统性修复：幂等运行库路径兜底。老用户（0.1.5a 及更早安装）的
+# agentrt-env.sh 无 LD_LIBRARY_PATH 注入行（airymaxrt update 热替换不重新
+# 生成 env.sh），仅 source 不会注入；此处确保 \$AIRY_HOME/lib 始终在
+# LD_LIBRARY_PATH 首位（已含则跳过），与完整启动器 airymaxrt 兜底同源。
+case ":\${LD_LIBRARY_PATH:-}:" in
+    *":\${AIRY_HOME}/lib:"*) ;;
+    *) export LD_LIBRARY_PATH="\${AIRY_HOME}/lib:\${LD_LIBRARY_PATH:-}" ;;
+esac
 # PATH 自愈（与完整启动器对齐）：BIN_DIR 软链目录不在 PATH 时自动追加
 # 当前 shell 的 rc 文件（带 AgentRT 标记行，幂等，卸载可移除）。根治
 # 社区用户"一键安装后 command not found"——安装器已引导过 rc，此处再兜底
