@@ -36,6 +36,7 @@
 #include <sys/stat.h>
 #else
 #include <arpa/inet.h>
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
@@ -71,6 +72,43 @@ const cli_daemon_desc_t CLI_DAEMONS[] = {
     {"a2a", "a2a.sock", "health_check"},
 };
 
+/* 运行时自动发现（0.1.6y）：枚举 $AIRY_HOME/bin 下所有 *_d 后缀可执行
+   （排除 gateway_d 与 maths_d——前者为 HTTP 服务、后者为符号计算后端
+   无 socket）动态生成 daemon 表。daemon 增删后 /daemons 与 /rpc 自动
+   适配，无需改硬编码表。
+   socket 名约定 = ns + ".sock"（与 CLI_DAEMONS 一致）。无 AIRY_HOME 或
+   目录不可枚举时返回 0，调用方回退 CLI_DAEMONS 默认表。 */
+static size_t cli_daemons_discover(cli_daemon_desc_t *out, size_t cap)
+{
+    size_t n = 0;
+    const char *home = getenv("AIRY_HOME");
+    if (!home || !*home) return 0;
+    char bin[1024];
+    snprintf(bin, sizeof(bin), "%s/bin", home);
+    DIR *dir = opendir(bin);
+    if (!dir) return 0;
+    struct dirent *ent;
+    while ((ent = readdir(dir)) != NULL && n < cap) {
+        const char *name = ent->d_name;
+        size_t len = strlen(name);
+        if (len < 3 || strcmp(name + len - 2, "_d") != 0) continue;
+        if (strcmp(name, "gateway_d") == 0 || strcmp(name, "maths_d") == 0) continue;
+        static char ns_pool[32][32];
+        static char sock_pool[32][64];
+        size_t nlen = len - 2;
+        if (nlen >= sizeof(ns_pool[n])) nlen = sizeof(ns_pool[n]) - 1;
+        __builtin_memcpy(ns_pool[n], name, nlen);
+        ns_pool[n][nlen] = '\0';
+        snprintf(sock_pool[n], sizeof(sock_pool[n]), "%s.sock", ns_pool[n]);
+        out[n].ns = ns_pool[n];
+        out[n].sock = sock_pool[n];
+        out[n].health_method = "health_check";
+        n++;
+    }
+    closedir(dir);
+    return n;
+}
+
 const char *cli_rt_dir(void)
 {
     return airy_runtime_dir();
@@ -78,22 +116,29 @@ const char *cli_rt_dir(void)
 
 int cli_ns_resolve(const char *in, char *out, size_t out_cap)
 {
-    for (size_t i = 0; i < CLI_DAEMONS_COUNT; i++) {
-        if (strcmp(in, CLI_DAEMONS[i].ns) == 0) {
-            AIRY_STRNCPY_TERM(out, CLI_DAEMONS[i].ns, out_cap);
-            return 0;
-        }
-    }
-    size_t in_len = strlen(in);
+    size_t i, in_len = strlen(in);
+    char trimmed[64];
+    const char *probe = in;
     if (in_len > 2 && strcmp(in + in_len - 2, "_d") == 0) {
-        char trimmed[64];
         size_t tlen = in_len - 2;
         if (tlen >= sizeof(trimmed)) tlen = sizeof(trimmed) - 1;
         __builtin_memcpy(trimmed, in, tlen);
         trimmed[tlen] = '\0';
-        for (size_t i = 0; i < CLI_DAEMONS_COUNT; i++) {
-            if (strcmp(trimmed, CLI_DAEMONS[i].ns) == 0) {
-                AIRY_STRNCPY_TERM(out, CLI_DAEMONS[i].ns, out_cap);
+        probe = trimmed;
+    }
+    for (i = 0; i < CLI_DAEMONS_COUNT; i++) {
+        if (strcmp(probe, CLI_DAEMONS[i].ns) == 0) {
+            AIRY_STRNCPY_TERM(out, CLI_DAEMONS[i].ns, out_cap);
+            return 0;
+        }
+    }
+    /* 0.1.6y：默认表未命中时运行时发现（daemon 增删后自动可寻址） */
+    {
+        cli_daemon_desc_t dyn[32];
+        size_t n = cli_daemons_discover(dyn, 32);
+        for (i = 0; i < n; i++) {
+            if (strcmp(probe, dyn[i].ns) == 0) {
+                AIRY_STRNCPY_TERM(out, dyn[i].ns, out_cap);
                 return 0;
             }
         }
@@ -202,19 +247,24 @@ int cmd_daemons(const char *arg, void *ctx)
 {
     (void)arg; (void)ctx;
     int online = 0;
+    /* 0.1.6y：运行时发现 daemon 表（daemon 增删自动适配），失败回退默认表 */
+    cli_daemon_desc_t dyn[32];
+    size_t dcount = cli_daemons_discover(dyn, 32);
+    size_t total = dcount ? dcount : CLI_DAEMONS_COUNT;
+    const cli_daemon_desc_t *tab = dcount ? dyn : CLI_DAEMONS;
     if (!g_cli_print_mode)
         cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "daemon", "health check");
-    for (size_t i = 0; i < CLI_DAEMONS_COUNT; i++) {
+    for (size_t i = 0; i < total; i++) {
         char *result = NULL;
-        int rc = daemon_rpc_call(cli_ns_sock(CLI_DAEMONS[i].ns), CLI_DAEMONS[i].health_method,
+        int rc = daemon_rpc_call(cli_ns_sock(tab[i].ns), tab[i].health_method,
                                  NULL, &result, 6000);
         if (rc == 0 && result) {
-            if (g_cli_print_mode) cli_outf("%s online\n", CLI_DAEMONS[i].ns);
-            else cli_render_task_line(NULL, CLI_DAEMONS[i].ns, "online", 1.0);
+            if (g_cli_print_mode) cli_outf("%s online\n", tab[i].ns);
+            else cli_render_task_line(NULL, tab[i].ns, "online", 1.0);
             online++;
         } else {
-            if (g_cli_print_mode) cli_outf("%s offline\n", CLI_DAEMONS[i].ns);
-            else cli_render_task_line(NULL, CLI_DAEMONS[i].ns, "offline", 0.0);
+            if (g_cli_print_mode) cli_outf("%s offline\n", tab[i].ns);
+            else cli_render_task_line(NULL, tab[i].ns, "offline", 0.0);
         }
         AIRY_FREE(result);
     }
@@ -284,7 +334,7 @@ int cmd_daemons(const char *arg, void *ctx)
     }
     {
         char line[64];
-        snprintf(line, sizeof(line), "online %d/%zu", online, CLI_DAEMONS_COUNT + 1);
+        snprintf(line, sizeof(line), "online %d/%zu", online, total + 1);
         if (g_cli_print_mode) cli_outf("%s\n", line);
         else cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "daemon", line);
     }
