@@ -836,34 +836,48 @@ path_bootstrap() {
 # 架构检测（uname -m 归一化）：二进制模式按架构选择预编译包
 # （AIRY_RELEASE_URL 支持 {arch} 占位符），并固化到画像供后续校验。
 detect_arch() {
-    case "$(uname -m 2>/dev/null)" in
-        x86_64|amd64)     echo "x86_64" ;;
+    local _m _bits
+    _m="$(uname -m 2>/dev/null)"
+    # 用户空间位数复判（0.1.6c 教训）：uname -m 报告内核架构，64 位内核 +
+    # 32 位用户空间（树莓派 armhf / 老 x86 系统）会误报 64 位。以
+    # getconf LONG_BIT（用户空间 C long 位数）为主判据，缺失时用加载器
+    # 存在性兜底。三架构（x86/ARM/RISC-V）的 32/64 位全覆盖。
+    _bits="$(getconf LONG_BIT 2>/dev/null)"
+    case "$_m" in
+        x86_64|amd64)
+            if [ "$_bits" = "64" ] || [ -f /lib64/ld-linux-x86-64.so.2 ]; then
+                echo "x86_64"
+            else
+                echo "i686"
+            fi
+            ;;
+        i386|i486|i586|i686|x86) echo "i686" ;;
         aarch64|arm64)
-            # 关键（2026-08-30 树莓派实测）：uname -m 报告的是内核架构。
-            # 64 位内核 + 32 位用户空间（armhf）时误报 aarch64，用户空间无
-            # /lib/ld-linux-aarch64.so.1 加载器，装 aarch64 包后全部 daemon
-            # exec 即报 "No such file or directory"。判据：用户空间 C long
-            # 位数（getconf LONG_BIT）或 aarch64 动态加载器存在性。
-            if [ "$(getconf LONG_BIT 2>/dev/null)" = "64" ] || \
-               [ -f /lib/ld-linux-aarch64.so.1 ]; then
+            if [ "$_bits" = "64" ] || [ -f /lib/ld-linux-aarch64.so.1 ]; then
                 echo "aarch64"
             else
                 echo "armv7l"
             fi
             ;;
         armv7l|armv6l|armhf) echo "armv7l" ;;
-        riscv64)          echo "riscv64" ;;
+        riscv64)
+            if [ "$_bits" = "64" ] || [ -f /lib/ld-linux-riscv64-lp64d.so.1 ]; then
+                echo "riscv64"
+            else
+                echo "riscv32"
+            fi
+            ;;
+        riscv32|riscv) echo "riscv32" ;;
         *)                echo "unknown" ;;
     esac
 }
 # 预编译包支持的架构清单（binary 模式校验；其余架构回退源码构建）
 # 与 CI release.yml build-riscv64 job（agentrt-<v>-linux-riscv64.tar.gz）
 # 及 sdk/tui/scripts/airymaxrt detect_arch 同口径。
-# 三架构收敛（2026-08-30 教训）：仅发布 x86_64/aarch64/riscv64 预编译包，
-# 不增加第四包；32 位 ARM（armhf）等边缘硬件走"检测正确 + 明确指引 +
-# 源码构建兜底"，绝不误装其他架构二进制（树莓派 32 位用户空间曾误装
-# aarch64 包致全部 daemon exec 失败）。
-SUPPORTED_ARCHS="x86_64 aarch64 riscv64"
+# 六架构全覆盖（2026-08-30 决策：硬件使用最大化）：x86（x86_64/i686）、
+# ARM（aarch64/armv7l）、RISC-V（riscv64/riscv32）的 32 与 64 位全兼容；
+# detect_arch 以用户空间位数复判，杜绝 64 位内核 + 32 位用户空间误装。
+SUPPORTED_ARCHS="x86_64 aarch64 riscv64 i686 armv7l riscv32"
 
 detect_accel() {
     if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
