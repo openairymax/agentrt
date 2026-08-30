@@ -347,7 +347,7 @@ fi
 # （Ubuntu 24.04 无 libssl.so.1.1 等）。此处幂等兜底：无论 env.sh 版本
 # 如何，确保 $AIRY_HOME/lib 始终在 LD_LIBRARY_PATH 首位（已含则跳过），
 # 覆盖 daemon 群 + CLI + TUI 全部子进程。bootstrap.sh 侧已有同源兜底。
-case ":$LD_LIBRARY_PATH:" in
+case ":${LD_LIBRARY_PATH:-}:" in
     *":$AIRY_HOME/lib:"*) ;;
     *) export LD_LIBRARY_PATH="$AIRY_HOME/lib:${LD_LIBRARY_PATH:-}" ;;
 esac
@@ -881,6 +881,7 @@ case "$CMD" in
         echo "                            切通道 / --rollback 回滚 / --file 离线包"
         echo "                            （离线包需 --sha256 或相邻 .sha256））"
         echo "      airymaxrt uninstall   一键卸载（--keep-data 保留记忆数据）"
+        echo "      airymaxrt reinstall   强制重装（清缓存下载最新版 + 停旧 daemon）"
         exit 0
         ;;
     cli)
@@ -1132,6 +1133,17 @@ case "$CMD" in
             exec sh "$inst" --uninstall "$@"
         else
             log warn "未找到安装器脚本，请手动删除: $AIRY_HOME"
+            exit 1
+        fi
+        ;;
+    reinstall)
+        inst="${AIRY_HOME}/scripts/install.sh"
+        if [ -f "$inst" ]; then
+            log info "委托安装器执行重装: $inst"
+            shift
+            exec sh "$inst" --reinstall "$@"
+        else
+            log warn "未找到安装器脚本: $inst（请重新运行官方 install.sh 一键安装）"
             exit 1
         fi
         ;;
