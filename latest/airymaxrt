@@ -194,7 +194,18 @@ path_self_heal() {
 detect_arch() {
     case "$(uname -m 2>/dev/null)" in
         x86_64|amd64)     echo "x86_64" ;;
-        aarch64|arm64)    echo "aarch64" ;;
+        aarch64|arm64)
+            # 与 install.sh detect_arch 同口径（SSoT）：uname -m 报内核架构，
+            # 64 位内核 + 32 位用户空间（armhf）误报 aarch64 且无 aarch64
+            # 加载器，装 aarch64 包后 daemon exec 全部 "No such file or directory"
+            # （2026-08-30 树莓派实测）。以用户空间位数 / 加载器存在性复判。
+            if [ "$(getconf LONG_BIT 2>/dev/null)" = "64" ] || \
+               [ -f /lib/ld-linux-aarch64.so.1 ]; then
+                echo "aarch64"
+            else
+                echo "armv7l"
+            fi
+            ;;
         armv7l|armv6l|armhf) echo "armv7l" ;;
         riscv64)          echo "riscv64" ;;
         *)                echo "unknown" ;;
