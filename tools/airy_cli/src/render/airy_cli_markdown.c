@@ -196,7 +196,7 @@ static int cli_table_parse_row(const char *line, cli_table_row_t *row)
     return row->cell_count > 0;
 }
 
-static int cli_table_is_separator(const cli_table_row_t *row)
+static int cli_table_sep(const cli_table_row_t *row)
 {
     for (size_t i = 0; i < row->cell_count; i++) {
         const char *c = row->cells[i];
@@ -227,7 +227,7 @@ static void cli_table_flush(cli_table_row_t *table, size_t *table_rows, const ch
             }
         }
         for (size_t t = 0; t < rows; t++) {
-            if (cli_table_is_separator(&table[t])) continue;
+            if (cli_table_sep(&table[t])) continue;
             cli_out(g);
             for (size_t c = 0; c < table[t].cell_count; c++) {
                 const char *cell = table[t].cells[c];
@@ -316,7 +316,7 @@ void cli_render_markdown(const char *text, size_t indent)
         if (content[0] == '|') {
             cli_table_row_t row;
             if (cli_table_parse_row(content, &row)) {
-                if (!in_table && cli_table_is_separator(&row)) {
+                if (!in_table && cli_table_sep(&row)) {
                     cli_table_row_free(&row);
                     AIRY_FREE(line);
                     continue;

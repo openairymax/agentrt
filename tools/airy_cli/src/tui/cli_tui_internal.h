@@ -275,7 +275,7 @@ void tui_input_word_right(cli_tui_t *t);
 void tui_input_transpose(cli_tui_t *t);
 void tui_input_kill_save(cli_tui_t *t, const char *text, size_t n);
 void tui_input_yank(cli_tui_t *t);
-int tui_input_tab_complete(cli_tui_t *t);
+int tui_tab_complete(cli_tui_t *t);
 int tui_input_utf8_complete(const char *s, size_t len);
 size_t tui_caret_print(cli_tui_t *t);
 void tui_caret_tick(cli_tui_t *t);

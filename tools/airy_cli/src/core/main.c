@@ -270,7 +270,7 @@ int main(int argc, char *argv[])
                 continue;
             }
             cli_term_input_submit();
-            if (input_len > 0 && cli_term_input_active()) {
+            if (input_len > 0 && cli_term_input_on()) {
                 cli_term_input_begin();
                 cli_outf("%sairy>%s", cli_c(CLR_DIM), cli_c(CLR_RESET));
                 cli_term_input_hop();
@@ -395,7 +395,7 @@ int main(int argc, char *argv[])
     }
 
     if (!g_cli_print_mode) {
-        if (cli_term_input_active())
+        if (cli_term_input_on())
             cli_term_input_submit();
         else
             cli_outc('\n');

@@ -469,7 +469,7 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
             continue;
         }
         if (key == '\t') { /* Tab: complete the current token */
-            if (tui_input_tab_complete(t)) {
+            if (tui_tab_complete(t)) {
                 tui_render_input(t);
                 fflush(stdout);
             }

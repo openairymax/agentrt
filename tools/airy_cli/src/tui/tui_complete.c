@@ -77,7 +77,7 @@ static size_t tui_tab_complete_fs(cli_tui_t *t, const char *dir, const char *bas
     return n;
 }
 
-int tui_input_tab_complete(cli_tui_t *t)
+int tui_tab_complete(cli_tui_t *t)
 {
     if (!t->input || t->input_len == 0)
         return 0;

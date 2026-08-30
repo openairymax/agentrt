@@ -95,7 +95,7 @@ static uint64_t g_llm_base_completion = 0;
 static double g_llm_base_cost = 0.0;
 static int g_llm_base_set = 0;
 
-static int cli_llm_d_usage_snapshot(uint64_t *out_prompt, uint64_t *out_completion,
+static int cli_llm_usage_snap(uint64_t *out_prompt, uint64_t *out_completion,
                                     double *out_cost)
 {
     /* 架构约束（2026-08-25）：统一经 gateway 派发（llm.get_stats →
@@ -149,7 +149,7 @@ void cli_chat_usage_get_session(uint64_t *tokens, double *cost)
 {
     uint64_t prompt = 0, comp = 0;
     double c = 0.0;
-    if (cli_llm_d_usage_snapshot(&prompt, &comp, &c) != 0) {
+    if (cli_llm_usage_snap(&prompt, &comp, &c) != 0) {
         cli_chat_usage_get(tokens, cost);
         return;
     }

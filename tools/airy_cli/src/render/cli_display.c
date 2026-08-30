@@ -9,7 +9,7 @@
  * 执行计划列表（拓扑序）、节点级进度回调分发与降级看板行。自 2026-08-27
  * 起本文件只保留这三块职责：live plan board（TTY 原位重绘）拆至
  * cli_live_board.c，启动横幅（蓝框 hero）拆至 cli_banner.c。跨文件的
- * 拓扑序 helper（cli_plan_topology_build）与 UTF-8 安全截断
+ * 拓扑序 helper（cli_plan_topo_build）与 UTF-8 安全截断
  * （cli_hero_clip）经 cli_display_internal.h 共享，保证静态计划与重绘
  * 看板的节点次序、截断观感一致。所有终端输出仍走角色化渲染层
  * （cli_render.c），整个 CLI 共享一套视觉语言。
@@ -131,7 +131,7 @@ static int cli_plan_ready(const taskflow_workflow_t *wf, size_t idx,
  * cli_print_plan_list()/cli_live_board_begin(); cycles fall back to natural
  * order so the render never stalls.
  */
-int cli_plan_topology_build(const taskflow_workflow_t *wf, size_t count, size_t *order,
+int cli_plan_topo_build(const taskflow_workflow_t *wf, size_t count, size_t *order,
                             unsigned char *scratch)
 {
     if (!wf || !order || !scratch || count == 0 || wf->node_count == 0)
@@ -192,7 +192,7 @@ void cli_print_plan_list(const taskflow_workflow_t *wf)
 
     size_t *order = (size_t *)AIRY_MALLOC(n * sizeof(size_t));
     unsigned char *scratch = (unsigned char *)AIRY_CALLOC(n, 1);
-    if (!order || !scratch || !cli_plan_topology_build(wf, n, order, scratch)) {
+    if (!order || !scratch || !cli_plan_topo_build(wf, n, order, scratch)) {
         AIRY_FREE(order);
         AIRY_FREE(scratch);
         return;
@@ -290,7 +290,7 @@ void cli_progress_cb(const char *execution_id, const char *node_id, taskflow_sta
     /* Live plan board 激活（TTY 原位重绘）：回调线程只记录节点状态快照，
      * 由主线程轮询循环统一重绘看板块——避免回调线程直接写终端的交错风险，
      * 也保证图标编排与 footer 汇总来自同一帧数据。 */
-    if (cli_live_board_active()) {
+    if (cli_board_active()) {
         static const char *const st[] = {"pending",  "ready",  "running", "waiting",
                                          "completed", "failed", "canceled", "skipped",
                                          "retrying"};

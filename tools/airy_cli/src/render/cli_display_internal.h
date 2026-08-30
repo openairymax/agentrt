@@ -40,7 +40,7 @@ extern "C" {
  * Returns 1 on success, 0 when the caller should skip rendering entirely
  * (OOM already released the scratch).
  */
-int cli_plan_topology_build(const taskflow_workflow_t *wf, size_t count, size_t *order,
+int cli_plan_topo_build(const taskflow_workflow_t *wf, size_t count, size_t *order,
                             unsigned char *scratch);
 
 /**

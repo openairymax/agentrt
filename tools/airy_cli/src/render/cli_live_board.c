@@ -153,7 +153,7 @@ void cli_live_board_begin(const taskflow_workflow_t *wf)
     size_t *order = (size_t *)AIRY_MALLOC(g_live_board.n * sizeof(size_t));
     unsigned char *scratch = (unsigned char *)AIRY_CALLOC(g_live_board.n, 1);
     if (!order || !scratch ||
-        !cli_plan_topology_build(wf, g_live_board.n, order, scratch)) {
+        !cli_plan_topo_build(wf, g_live_board.n, order, scratch)) {
         AIRY_FREE(order);
         AIRY_FREE(scratch);
         return;
@@ -247,7 +247,7 @@ void cli_live_board_extra(void)
     g_live_board.extra_below++;
 }
 
-int cli_live_board_active(void)
+int cli_board_active(void)
 {
     return g_live_board.active;
 }

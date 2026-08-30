@@ -16,7 +16,7 @@
 void tui_line_redraw(cli_tui_t *t)
 {
     char num[16];
-    if (cli_term_input_active()) {
+    if (cli_term_input_on()) {
         /* 三区布局：提示符画在固定底部输入条（绝对定位）。 */
         tui_write_literal("\033[");
         snprintf(num, sizeof(num), "%d", t->rows > 0 ? t->rows : 1);
@@ -40,11 +40,11 @@ void tui_line_redraw(cli_tui_t *t)
     fputs(cli_c(CLR_RESET), stdout);
     size_t input_w = tui_caret_print(t); /* 2.2.1.5 反显光标（黑白闪烁） */
     /* 拼音候选条（输入条上方一行；不占用输入行本身） */
-    if (cli_term_input_active())
+    if (cli_term_input_on())
         tui_ime_draw_cands(t, t->rows > 0 ? t->rows : 1);
     /* 光标落在编辑位置（UTF-8 显示宽度对齐，CJK 不漂移）。 */
     size_t col = ime_tag_w + (size_t)strlen(TUI_INPUT_PREFIX) + input_w;
-    if (cli_term_input_active()) {
+    if (cli_term_input_on()) {
         tui_write_literal("\033[");
         snprintf(num, sizeof(num), "%d", t->rows > 0 ? t->rows : 1);
         tui_write_literal(num);
@@ -372,7 +372,7 @@ int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
             continue;
         }
         if (key == '\t') {
-            if (tui_input_tab_complete(t))
+            if (tui_tab_complete(t))
                 tui_line_redraw(t);
             continue;
         }
