@@ -429,7 +429,7 @@ install_binary() {
         esac
         verify_gpg_sig "$man" "$man_asc" || { log_warn "manifest 验签失败（GPG），拒绝安装"; return 1; }
         [ -s "$man_asc" ] && log_ok "manifest 验签通过（GPG）"
-        plat="linux-${arch}"
+        plat="linux-$(plat_name "${arch}")"
         [ "$(uname -s 2>/dev/null)" = "Darwin" ] && plat="macos-$(uname -m 2>/dev/null)"
         url="$(parse_manifest "$man" "$plat" url)"
         expect_sha="$(parse_manifest "$man" "$plat" sha256)"
@@ -880,6 +880,22 @@ detect_arch() {
 # ARM（aarch64/armv7l）、RISC-V（riscv64/riscv32）的 32 与 64 位全兼容；
 # detect_arch 以用户空间位数复判，杜绝 64 位内核 + 32 位用户空间误装。
 SUPPORTED_ARCHS="x86_64 aarch64 riscv64 i686 armv7l riscv32"
+
+# 制品平台命名（0.1.6e 起，用户定案）：32/64 数字形式，弃用 i686/armv7l
+# 易误导字样。技术架构名（detect_arch 输出）→ 制品平台后缀：
+#   x86_64→x64  i686→x86  aarch64→arm64  armv7l→arm32  riscv64→riscv64  riscv32→riscv32
+# 与 build.sh PLATFORM 映射、latest/airymaxrt runtime_platform 同口径。
+plat_name() {
+    case "$1" in
+        x86_64)  echo "x64" ;;
+        i686)    echo "x86" ;;
+        aarch64) echo "arm64" ;;
+        armv7l)  echo "arm32" ;;
+        riscv64) echo "riscv64" ;;
+        riscv32) echo "riscv32" ;;
+        *)       echo "$1" ;;
+    esac
+}
 
 detect_accel() {
     if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then

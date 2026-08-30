@@ -611,14 +611,28 @@ ver_cmp() { # <a> <b>
     (( 10#$an > 10#$bn )) && echo 1 || { (( 10#$an < 10#$bn )) && echo -1 || echo 0; }
 }
 
-# 当前平台键（manifest artifacts 键名，与打包命名对齐）：linux-x86_64 / macos-arm64
+# 当前平台键（manifest artifacts 键名，与打包命名对齐）：linux-x64 / macos-arm64
+# 制品平台命名（0.1.6e 起，用户定案）：32/64 数字形式，弃用 i686/armv7l
+# 易误导字样。与 install.sh plat_name、build.sh PLATFORM 映射同口径。
+plat_name() {
+    case "$1" in
+        x86_64)  echo "x64" ;;
+        i686)    echo "x86" ;;
+        aarch64) echo "arm64" ;;
+        armv7l)  echo "arm32" ;;
+        riscv64) echo "riscv64" ;;
+        riscv32) echo "riscv32" ;;
+        *)       echo "$1" ;;
+    esac
+}
+
 runtime_platform() {
     local os arch
     case "$(uname -s 2>/dev/null)" in
         Darwin) os="macos"; arch="$(uname -m 2>/dev/null)" ;;   # arm64 / x86_64
         *)      os="linux"; arch="$(detect_arch)" ;;
     esac
-    echo "${os}-${arch}"
+    echo "${os}-$(plat_name "${arch}")"
 }
 
 # manifest 字段提取（python3 优先，回退 grep 顶层键）
@@ -1170,6 +1184,25 @@ case "$CMD" in
             esac
             log warn "  永久生效: echo 'export PATH=\"${_BD_D}:\$PATH\"' >> \"${_RC_D}\" && source \"${_RC_D}\""
             miss=1
+        fi
+        # 运行库完整性（0.1.6e 防御：旧用户热替换不完整/缺库导致 daemon 群
+        # 起不来——如 Ubuntu 24.04 缺 libssl.so.1.1）。逐个关键二进制
+        # ldd 检测 not found；缺库即提示 reinstall 干净重装。
+        _LD_MISS=""
+        for _b in "$AIRY_HOME"/bin/*_d "$AIRY_HOME"/bin/airy_cli "$AIRY_HOME"/bin/agentrt-tui; do
+            [ -x "$_b" ] || continue
+            _nf="$(ldd "$_b" 2>/dev/null | grep -F 'not found' || true)"
+            if [ -n "$_nf" ]; then
+                _LD_MISS="$_LD_MISS
+  $(basename "$_b"): $(echo "$_nf" | sed 's/.*=> not found/缺/' | tr '\n' '; ')"
+                miss=1
+            fi
+        done
+        if [ -n "$_LD_MISS" ]; then
+            log warn "运行库缺失（daemon 将无法启动）:$_LD_MISS"
+            log warn "  修复: airymaxrt reinstall（干净重装，保留 config/data）"
+        else
+            log info "运行库: 全部可解析"
         fi
         if [ "$miss" = "0" ]; then log info "doctor: 全部就绪"; else log warn "doctor: 存在缺失项"; fi
         exit 0
