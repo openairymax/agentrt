@@ -567,6 +567,34 @@ if(WIN32)
 endif()
 
 # ============================================================
+# 64 位原子操作架构兼容（0.1.6f 强化）
+# C11 _Atomic int64_t/uint64_t/double 在部分 32 位目标上无法编译为
+# 原生指令：riscv32（RV32A 无 64 位原子指令）、armv6 等会生成对
+# libatomic 的 libcall（__atomic_load_8/__atomic_store_8/__atomic_*_8）。
+# i686（cmpxchg8b）与 armv7l（ldrexd/strexd）通常原生 lock-free。
+# 通过编译链接探测决定是否需要显式链接 libatomic，避免 riscv32 等
+# 架构链接期 undefined reference。探测代码故意做一次 64 位原子
+# 读写+CAS：若无原生支持，链接阶段将因 libatomic libcall 失败。
+# ============================================================
+include(CheckCSourceCompiles)
+check_c_source_compiles("
+#include <stdatomic.h>
+_Atomic long long g_atomic64;
+int main(void) {
+    long long v = 0;
+    atomic_store_explicit(&g_atomic64, 42LL, memory_order_relaxed);
+    (void)atomic_load_explicit(&g_atomic64, memory_order_relaxed);
+    (void)atomic_compare_exchange_strong_explicit(&g_atomic64, &v, 1LL,
+                                                  memory_order_relaxed, memory_order_relaxed);
+    return 0;
+}
+" AIRY_HAVE_NATIVE_ATOMIC64)
+if(NOT AIRY_HAVE_NATIVE_ATOMIC64)
+    message(STATUS "64-bit atomics not native on this target; linking libatomic")
+    target_link_libraries(airy_platform_libs INTERFACE atomic)
+endif()
+
+# ============================================================
 # 测试链接选项统一管理（BAN-26: 禁止硬编码链接器标志）
 # --allow-multiple-definition 仅在 Linux/GNU ld 下有效
 # ============================================================
