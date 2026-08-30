@@ -1,37 +1,37 @@
 {
   "schema": 1,
   "channel": "stable",
-  "latest": "v0.1.6d",
-  "updated_at": "2026-08-30T07:55:10Z",
+  "latest": "v0.1.6e",
+  "updated_at": "2026-08-30T12:29:28Z",
   "releases": {
-    "v0.1.6d": {
+    "v0.1.6e": {
       "yanked": false,
-      "notes": "# AgentRT v0.1.6d\n\n## 六架构全面兼容\n\n- 新增 **i686（32 位 x86）** 与 **armv7l（32 位 ARM）** 二进制制品，与既有 x86_64 / aarch64 / riscv64 构成 x86、ARM、RISC-V 三大架构 32/64 位全面覆盖\n- `install.sh detect_arch` 以 `getconf LONG_BIT` 复判用户空间位数，根治 64 位内核 + 32 位用户空间的架构误判（树莓派 armhf 故障根因）\n- Landlock syscall 号按架构表补齐 i386（443/444/445）\n- 原子类型 ILP32 兼容修复（`uint_fast32_t`），32 位目标不再报 conflicting types\n- TUI 架构标签补齐 i686 / riscv32\n\n## 构建打包台能力增强\n\n- 免 root 交叉工具链引导（从 Ubuntu 发行包解压，含 libc + multiarch 依赖库 + 工具链 cmake）\n- 第三方 CMake config（cJSON/libwebsockets）内嵌绝对路径规避：toolchain 层 `CMAKE_DISABLE_FIND_PACKAGE_*` 禁用，回退 pkg-config\n- 传递依赖闭包收集 + fail-closed ELF NEEDED 校验，杜绝跨架构漏包\n- CMake 缓存失效自动重配置（prefix 漂移 / 构建文件缺失检测）\n\n## 安装体验改进\n\n- 修复 `set -u` 下 REINSTALL 未初始化导致的安装崩溃（影响全新安装）\n- 安装器默认版本升级至 v0.1.6d\n\n## 质量与稳定性\n\n- 全量单元/集成测试 191/191 通过（含 e2e_core、DAG、IPC 总线、监控链路）\n- 容器端到端验证：ubuntu:20.04 离线二进制安装 + 18 daemon 全部 ONLINE",
+      "notes": "# AgentRT v0.1.6e\n\n## 修复：libssl.so.1.1 传递依赖崩溃（社区用户启动失败根因）\n\n- 根治 Ubuntu 24.04（仅 libssl.so.3）等宿主上 daemon 群与 airy_cli 报\n  `libssl.so.1.1: cannot open shared object file` 的启动失败：构建容器内\n  自编译 libcurl 8.5.0 与 libwebsockets 4.3.3，统一链接自编译 OpenSSL\n  3.0.17（libssl.so.3），消除同进程双 OpenSSL ABI 与宿主缺库崩溃\n- gateway/gateway_d 链接优先自编译 libwebsockets 的 `websockets_shared`\n  imported target，杜绝回退命中容器系统 apt 版（libssl.so.1.1 崩溃链）\n\n## 制品命名更新（32/64 数字形式，行业惯例）\n\n- `linux-x86_64` → `linux-x64`；`linux-i686` → `linux-x86`\n- `linux-aarch64` → `linux-arm64`；`linux-armv7l` → `linux-arm32`\n- 安装器/更新器/doctor 全链同步：检测架构与制品平台名解耦，弃用\n  i686/armv7l 易误导字样\n\n## 其他\n\n- doctor 新增运行库完整性检查（ldd 缺失检测，缺库提示重装）\n- 全量单元/集成测试通过（192/192）",
       "artifacts": {
-        "linux-aarch64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6d/agentrt-v0.1.6d-linux-aarch64.tar.gz",
-          "sha256": "b50c9195a3d65118472da82149e48ea80b4134d5c3af30d13cc6b64376828c9f",
-          "size": 35790763
+        "linux-arm32": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6e/agentrt-v0.1.6e-linux-arm32.tar.gz",
+          "sha256": "f674283ba0db1ff83d28053c9a5a3c793e473a6ead2a1cc0d9f24afec3c90962",
+          "size": 34013827
         },
-        "linux-armv7l": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6d/agentrt-v0.1.6d-linux-armv7l.tar.gz",
-          "sha256": "73bb58acad292a766a86af741014223c0af2b463d3cf88bbd5685f5a80b1a3b7",
-          "size": 34013360
-        },
-        "linux-i686": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6d/agentrt-v0.1.6d-linux-i686.tar.gz",
-          "sha256": "9ac6f7afc9b16ca59cbe7f23c35004337006a7bb95bd1c068d1435976b77bc8f",
-          "size": 38026617
+        "linux-arm64": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6e/agentrt-v0.1.6e-linux-arm64.tar.gz",
+          "sha256": "95f20b18ccd35f436ea5d36eb060c4d2b9476f4c04e11185a0dbff53f1d26e96",
+          "size": 38823114
         },
         "linux-riscv64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6d/agentrt-v0.1.6d-linux-riscv64.tar.gz",
-          "sha256": "355740e8d3a4f9826009d0dd6b24740a05b70c547c9c2b86c4e19f65198baaee",
-          "size": 38025584
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6e/agentrt-v0.1.6e-linux-riscv64.tar.gz",
+          "sha256": "fc2f09288f4192684b9e07c2701048ccd0538d84ff1d8cdea193f40f558c71a9",
+          "size": 41017495
         },
-        "linux-x86_64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6d/agentrt-v0.1.6d-linux-x86_64.tar.gz",
-          "sha256": "a45b189e8db77554094a202044d9e9b64d641d1ba94d22f40609b196c1e4994c",
-          "size": 44181069
+        "linux-x64": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6e/agentrt-v0.1.6e-linux-x64.tar.gz",
+          "sha256": "09c3a0b97f9c93d18def89e1f857e48ff087c03f986444be2cf8b1c6bcdc32ac",
+          "size": 40237776
+        },
+        "linux-x86": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6e/agentrt-v0.1.6e-linux-x86.tar.gz",
+          "sha256": "bf426c3914e95b632e76f047761b4ed3fc5953b9ed564a4677f67dc46d69406f",
+          "size": 35871150
         }
       }
     }
