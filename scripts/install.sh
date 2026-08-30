@@ -181,6 +181,21 @@ syscurl() {
     fi
 }
 
+# 幂等写 install.env（0.1.6g）：先删除同名键再追加——多次安装/引导不会
+# 让键重复膨胀（此前 `>>` 直接追加，重装后 AIRY_PATH_RC 等出现多行）。
+# 跨平台：grep -v + mv，不依赖 sed -i 的 GNU/BSD 语法差异（macOS 兼容）。
+env_set() { # <key=value>
+    local _k="${1%%=*}" _f="${AIRY_HOME}/config/install.env"
+    mkdir -p "$(dirname "$_f")" 2>/dev/null || true
+    [ -f "$_f" ] || : > "$_f"
+    if grep -v "^${_k}=" "$_f" > "$_f.tmp" 2>/dev/null; then
+        mv "$_f.tmp" "$_f"
+    else
+        rm -f "$_f.tmp"
+    fi
+    echo "$1" >> "$_f"
+}
+
 AIRY_SRC_DIR="${AIRY_HOME}/src/airymaxhub"
 MODULES_DIR="${AIRY_HOME}/modules"
 
@@ -283,7 +298,7 @@ stop_daemons() {
 
 # ─── 一键卸载 ────────────────────────────────────────────────────────────
 do_uninstall() {
-    local home="$1" keep_data="$2" yes="$3" env_file link size ans
+    local home="$1" keep_data="$2" yes="$3" env_file link size ans rc_path
     env_file="${home}/config/install.env"
     if [ -f "$env_file" ]; then
         home="$(sed -n 's/^AIRY_HOME=//p' "$env_file" | head -1)"
@@ -651,11 +666,21 @@ build_and_install() {
         || { log_err "cmake 配置失败"; exit 1; }
     log_info "构建（-j${AIRY_BUILD_JOBS}）…"
     cmake --build "${build_dir}" -j"${AIRY_BUILD_JOBS}" || { log_err "构建失败"; exit 1; }
+    # 0.1.6g：cmake --install 与 bin/ 拷贝 fail-closed（此前 `|| true` 静默
+    # 吞错——磁盘满/权限不足时"安装完成"实为残缺安装，daemon 缺失只有
+    # 到 verify_daemons 才暴露，且源码构建模式无 bin/*_d 清单校验）。
     log_info "安装到 ${AIRY_HOME}…"
-    cmake --install "${build_dir}" || true
+    cmake --install "${build_dir}" || { log_err "安装失败（cmake --install）"; exit 1; }
     if [ -d "${build_dir}/bin" ]; then
         cp -f "${build_dir}"/bin/* "${AIRY_HOME}/bin/" 2>/dev/null || true
     fi
+    # 与 install_binary 同口径校验：daemon 二进制必须就位（否则后续
+    # verify_daemons 必然失败，提前报错给用户明确根因）。
+    local _d2 _binok=1
+    for _d2 in ${EXPECTED_DAEMONS:-}; do
+        [ -x "${AIRY_HOME}/bin/${_d2}" ] || { _binok=0; log_err "构建产物缺失 daemon: ${_d2}"; break; }
+    done
+    [ "$_binok" = "1" ] || { log_err "源码构建安装不完整，请检查磁盘空间与权限后重试"; exit 1; }
     log_ok "源码构建安装完成"
 }
 
@@ -863,8 +888,8 @@ path_bootstrap() {
     rc="$(path_rc_file)"
     if [ -f "$rc" ] && grep -q '# >>> AgentRT PATH bootstrap <<<' "$rc" 2>/dev/null; then
         log_info "PATH 引导: $rc 已包含 AgentRT PATH 行（幂等跳过）"
-        echo "AIRY_PATH_RC=$rc" >> "${AIRY_HOME}/config/install.env"
-        echo "AIRY_PATH_APPENDED=yes" >> "${AIRY_HOME}/config/install.env"
+        env_set "AIRY_PATH_RC=$rc"
+        env_set "AIRY_PATH_APPENDED=yes"
         return 0
     fi
     local line
@@ -875,13 +900,13 @@ path_bootstrap() {
     fi
     if { printf '\n# >>> AgentRT PATH bootstrap <<<\n%s\n# <<< AgentRT PATH bootstrap <<<\n' "$line" ; } >> "$rc" 2>/dev/null; then
         log_ok "PATH 引导: 已自动追加 ${BIN_DIR} 到 $rc（新开终端生效，或执行 source \"$rc\"）"
-        echo "AIRY_PATH_RC=$rc" >> "${AIRY_HOME}/config/install.env"
-        echo "AIRY_PATH_APPENDED=yes" >> "${AIRY_HOME}/config/install.env"
+        env_set "AIRY_PATH_RC=$rc"
+        env_set "AIRY_PATH_APPENDED=yes"
         return 0
     fi
     log_warn "PATH 引导: 无法写入 $rc（自动追加失败），请手动执行:"
     log_warn "  echo '${line}' >> \"$rc\" && source \"$rc\""
-    echo "AIRY_PATH_APPENDED=no" >> "${AIRY_HOME}/config/install.env"
+    env_set "AIRY_PATH_APPENDED=no"
     return 1
 }
 
@@ -1332,7 +1357,7 @@ EOF
     #   - PATH 检测按段遍历（对含空格/glob 字符的 BIN_DIR 健壮，此前
     #     case glob 匹配在这些路径下会误判）；
     #   - 永久生效提示按当前 shell 选择 rc 文件（bash/zsh/fish/posix）。
-    echo "AIRY_BIN_LINK=${BIN_DIR}/airymaxrt" >> "${AIRY_HOME}/config/install.env"
+    env_set "AIRY_BIN_LINK=${BIN_DIR}/airymaxrt"
     _PATH_OK=0
     _P_SEG="$PATH"
     while [ -n "$_P_SEG" ]; do
@@ -1349,11 +1374,11 @@ EOF
     done
     if [ "$_PATH_OK" = "1" ]; then
         log_ok "PATH 引导: ${BIN_DIR} 已在 PATH 中，可直接输入 airymaxrt"
-        echo "AIRY_BIN_DIR_IN_PATH=yes" >> "${AIRY_HOME}/config/install.env"
+        env_set "AIRY_BIN_DIR_IN_PATH=yes"
     else
         log_warn "PATH 引导: ${BIN_DIR} 不在 PATH 中——当前 shell 输入 airymaxrt 会报 command not found"
         path_bootstrap
-        echo "AIRY_BIN_DIR_IN_PATH=no" >> "${AIRY_HOME}/config/install.env"
+        env_set "AIRY_BIN_DIR_IN_PATH=no"
     fi
 }
 

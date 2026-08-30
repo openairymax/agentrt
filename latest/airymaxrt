@@ -402,6 +402,19 @@ syscurl() {
     fi
 }
 
+# 跨平台原地编辑（0.1.6g）：GNU sed（-i expr）与 BSD sed（-i '' expr）
+# 语法不同，直接 sed -i 在 macOS 上 "illegal option" 静默失败（profile.env
+# / install.env 键更新失效且可能产生重复行）。统一 临时文件 + mv（POSIX）。
+sed_inplace() { # <sed-expr> <file>
+    local _se="$1" _f="$2" _t="${2}.tmp.$$"
+    if sed "$_se" "$_f" > "$_t" 2>/dev/null; then
+        mv "$_t" "$_f"
+    else
+        rm -f "$_t"
+        return 1
+    fi
+}
+
 # ── 组件定位 ─────────────────────────────────────────────────────────────────
 # find_tool <env_name> <command_name> <候选路径...>
 #   优先显式环境变量，其次伞仓内构建产物，最后 PATH 中的命令。
@@ -565,7 +578,7 @@ upsert_profile_var() { # <KEY> <值>
     local key="$1" val="$2"
     mkdir -p "$AIRY_HOME/config"
     if grep -q "^${key}=" "$PROFILE_ENV" 2>/dev/null; then
-        sed -i "s|^${key}=.*|${key}=${val}|" "$PROFILE_ENV"
+        sed_inplace "s|^${key}=.*|${key}=${val}|" "$PROFILE_ENV"
     else
         printf '%s=%s\n' "$key" "$val" >>"$PROFILE_ENV"
     fi
@@ -800,9 +813,10 @@ apply_package() { # <tarball> [expect_sha]
         rm -rf "$TMPD"
         return 1
     fi
-    # 固化新版本到 install.env
+    # 固化新版本到 install.env（sed_inplace 跨平台：macOS BSD sed 直接
+    # 覆盖会失败，导致 AIRY_VERSION 键重复/不更新）
     if [ -f "$AIRY_HOME/config/install.env" ]; then
-        sed -i "s|^AIRY_VERSION=.*|AIRY_VERSION=v${new_ver}|" "$AIRY_HOME/config/install.env" 2>/dev/null || \
+        sed_inplace "s|^AIRY_VERSION=.*|AIRY_VERSION=v${new_ver}|" "$AIRY_HOME/config/install.env" || \
             printf 'AIRY_VERSION=v%s\n' "$new_ver" >> "$AIRY_HOME/config/install.env"
     fi
     rm -rf "$TMPD"
@@ -895,7 +909,7 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
         if [ -f "$inst_env" ]; then
             local rb_ver="$(basename "$rb")"
             if [ "$rb_ver" != "pre-update" ]; then
-                sed -i "s|^AIRY_VERSION=.*|AIRY_VERSION=${rb_ver}|" "$inst_env" 2>/dev/null || \
+                sed_inplace "s|^AIRY_VERSION=.*|AIRY_VERSION=${rb_ver}|" "$inst_env" || \
                     printf 'AIRY_VERSION=%s\n' "$rb_ver" >> "$inst_env"
             fi
         fi
