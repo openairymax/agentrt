@@ -100,7 +100,7 @@ if [ -n "${AIRY_VERSION:-}" ]; then
 elif [ -f "$(dirname "$0")/../VERSION" ]; then
     AIRY_VERSION="v$(cat "$(dirname "$0")/../VERSION" | tr -d '[:space:]')"
 fi
-AIRY_VERSION="${AIRY_VERSION:-v0.1.6b}"
+AIRY_VERSION="${AIRY_VERSION:-v0.1.6c}"
 AIRY_BUILD_JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 AIRY_MODE="${AIRY_MODE:-auto}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"

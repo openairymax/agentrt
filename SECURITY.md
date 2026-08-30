@@ -76,7 +76,7 @@ AgentRT 采用**安全内生设计**，将安全机制内置于系统设计的�
 ## 环境信息
 - OS: Ubuntu 22.04
 - Compiler: GCC 11.4
-- AgentRT: v0.1.6b
+- AgentRT: v0.1.6c
 
 ## 潜在影响
 [描述可能的危害]
