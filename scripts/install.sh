@@ -141,7 +141,7 @@ if [ -n "${AIRY_VERSION:-}" ]; then
 elif [ -f "$(dirname "$0")/../VERSION" ]; then
     AIRY_VERSION="v$(cat "$(dirname "$0")/../VERSION" | tr -d '[:space:]')"
 fi
-AIRY_VERSION="${AIRY_VERSION:-v0.1.6d}"
+AIRY_VERSION="${AIRY_VERSION:-v0.1.6f}"
 AIRY_BUILD_JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 AIRY_MODE="${AIRY_MODE:-auto}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
@@ -1339,18 +1339,22 @@ post_install_selfcheck() {
 }
 
 # ─── 版本信息 ──────────────────────────────────────────────────────────
+# 0.1.6f 视觉强化：banner 回归简约——单线框 + 品牌 + 版本 + 一句理念，
+# 去除冗余装饰行（此前信息堆砌且含拼写错误）。留白即秩序。
 print_banner() {
     cat <<EOF
 ${C_CYAN}
-  ┌─────────────────────────────────────────────────────┐
-  │         Airymax Agent Platform Engineering          │
-  │=====================================================│
-  │     Runtime · Frame · SpuerAgent · All-in-one       │
-  │=====================================================│
-  │ "Agents, To the open air. To OpenAirymax. To hope." │
-  └─────────────────────────────────────────────────────┘
+  ┌─ Airymax AgentRT ─────────────────────────────── ${AIRY_VERSION} ─┐
+  │  Agent Runtime Platform · Simplicity is the ultimate sophistication
+  └───────────────────────────────────────────────────────────────────┘
 ${C_NC}
 EOF
+}
+
+# 阶段导航（0.1.6f 视觉强化）：统一「序号/总数 + 名称」分隔标题，让
+# 长安装流程呈现清晰秩序感（简约、克制；POSIX 兼容）。
+stage() { # <n> <total> <title>
+    printf "${C_CYAN}\n  ── [%s/%s] %s ───────────────────────────${C_NC}\n" "$1" "$2" "$3"
 }
 
 print_summary() {
@@ -1487,6 +1491,7 @@ main() {
     fi
 
     local installed=1
+    stage 2 5 "获取运行时"
     # 发布来源解析：--from-file 离线包 > AIRY_RELEASE_URL 显式 URL >
     # 官方通道 manifest（默认，stable/beta 由 --channel 决定；--mode source 除外）。
     # manifest 实际经 contents API 拉取（install_binary 内 fetch_repo_file，
@@ -1552,6 +1557,7 @@ main() {
     # 出厂预装 maths-toolkit（数学计算后端，默认开启，可 --without-maths 跳过）
     install_maths_toolkit
 
+    stage 5 5 "校验与完成"
     finalize_install
     if [ "$installed" -eq 0 ]; then
         verify_daemons strict
