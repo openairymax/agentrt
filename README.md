@@ -136,12 +136,12 @@ self-check (x86_64 / aarch64 / riscv64) automatically:
 # Linux / macOS
 curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash
 
-# Windows PowerShell (no prebuilt Windows binaries yet — the installer
-# falls back to a source build and needs git/CMake/a compiler; if `irm`
-# returns empty on your network for the 302 asset redirect, use the
-# curl.exe variant below)
+# Windows (atoms/commons are closed-source; native install unavailable —
+# use WSL2): `wsl --install` (WSL2 + Ubuntu), then run the Linux one-liner
+# above inside WSL. No Windows prebuilt package / atoms prebuilt module is
+# published yet, so the PowerShell installer falls back to a source build
+# that cannot complete without the closed modules (known 0.1.6b limitation).
 powershell -ExecutionPolicy Bypass -Command "irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 | iex"
-powershell -ExecutionPolicy Bypass -Command "curl.exe -fsSL https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 -o $env:TEMP\airymaxrt-install.ps1; & $env:TEMP\airymaxrt-install.ps1"
 ```
 
 Common variants:

@@ -135,11 +135,12 @@ GPG 验签 + sha256 校验 + 架构自检（x86_64 / aarch64 / riscv64）：
 # Linux / macOS
 curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash
 
-# Windows PowerShell（Windows 暂未发布预编译二进制包，安装器自动转源码
-# 构建，需预装 git/CMake/编译器；irm 在部分网络对附件 302 重定向返回空，
-# 此时改用下方 curl.exe 命令）
+# Windows（atoms/commons 已闭源，原生安装不可用——推荐 WSL2）：
+#   wsl --install 安装 WSL2 + Ubuntu，在 WSL 终端执行上方 Linux 一行命令
+#   即可完整使用（含闭源模块的 Linux 完全体二进制包）。
+#   Windows 预编译包 / atoms 预编译模块暂未发布，PowerShell 安装器会回退
+#   源码构建并因缺少闭源模块失败（0.1.6b 已知限制）。
 powershell -ExecutionPolicy Bypass -Command "irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 | iex"
-powershell -ExecutionPolicy Bypass -Command "curl.exe -fsSL https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 -o $env:TEMP\airymaxrt-install.ps1; & $env:TEMP\airymaxrt-install.ps1"
 ```
 
 常用变体：
