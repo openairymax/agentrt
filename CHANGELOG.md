@@ -4,6 +4,7 @@
 
 ## 📋 目录
 
+- [v0.1.6g](#v016g---2026-08-31) ⭐ 最新 — CLI 英雄区重设计 / 安装器系统性修复 / 函数名规范
 - [v0.1.6c](#v016c---2026-08-30) ⭐ 最新 — 启动链路兜底 / 生态 SSoT 收敛 / 独立组装
 - [v0.1.4](#v014---2026-08-26) — 模型配置 v3 / 全链路稳定性 / 构建产物治理
 - [v0.1.3](#v013---2026-08-23) — 内置拼音 IME / 三端运行画像 / 双思考落地
@@ -21,6 +22,54 @@
 - [v0.0.4](#v004---生产就绪-2026-03-25)
 - [v0.0.3](#v003---开发中-2026)
 - [历史版本](#历史版本)
+
+---
+
+## [v0.1.6g] - 2026-08-31
+
+### 🎯 发布主题：CLI 英雄区重设计 / 安装器系统性修复 / 函数名规范
+
+0.1.6g 聚焦终端体验（hero/消息流）、安装更新链路稳定性与代码规范。
+
+### Changed
+
+- **CLI 英雄区 v2（推翻原设计，根治对齐与信息密度）**：
+  - 固定 60 列蓝框（原随终端宽度浮动，CJK 宽度误差/窄终端导致竖线
+    错位与折行）；终端 <66 列自动降级无框纯文本（同为 6 行，
+    CLI_HDR_LINES 不变，pin 永不偏移）；
+  - 品牌+版本合入顶框（`Airymax AgentRT · v0.1.6f`），角色图例改
+    短标签（`你 · agentrt · 思考 · 执行体`），模型行 `→` 改 `=`
+    紧凑格式，footer 精简——窄终端信息保留率显著提升（原 60 列
+    只剩一个角色）；
+  - 消息流 v2：角色头宽度 24→20（内容起始列 28→24），用户消息去掉
+    CLR_BG_GRAY 全行背景块改 `›` 前缀（与助手消息同构），turn
+    separator 破折号 12→8。
+
+### Fixed
+
+- **安装器/更新器系统性修复（树莓派 arm32 安装/更新链路）**：
+  - curl 符号崩溃全量隔离：`syscurl()` 剔除 `$AIRY_HOME/lib` 后调
+    系统 curl，覆盖完整启动器 / 一键安装器 6 处 / 轻量启动器模板
+    2 处（原 `airymaxrt update` 树莓派必崩）；
+  - 解压前清理 glob 带尾斜杠（`agentrt-*/`），杜绝误删刚下载的
+    tarball（原 `rm -rf agentrt-*` 把 `agentrt-v0.1.6f.tar.gz` 一并
+    删除致 tar "Cannot open"）；
+  - 源码构建路径 `cmake --install` 与 daemon 产物 fail-closed（原
+    `|| true` 静默吞错，残缺安装显示"安装完成"）；
+  - `env_set()` 幂等写 install.env（原 `>>` 直接追加，重装后键多行
+    膨胀）；跨平台 grep -v + mv，不依赖 sed -i 的 GNU/BSD 差异；
+  - 更新器 `sed_inplace()` 跨平台原地编辑，替换 3 处 sed -i
+    （macOS BSD sed "illegal option" 静默失败致版本键不更新）。
+
+### Quality
+
+- **函数名 ≤20 字节规范化（15 个）**：heapstore 6 个
+  （`heapstore_is_initialized`→`heapstore_ready` 等）、airy_cli 7 个
+  （`cli_live_board_active`→`cli_board_active` 等）、protocols 1 个、
+  heapstore trace 1 个；调用点/头文件/测试同步，native 构建 +
+  heapstore 7 测试通过。
+- 文件行尾规范化：本会话触碰的 CRLF 源文件随提交转 LF（gitattributes
+  *.c eol=lf 生效）。
 
 ---
 
