@@ -5,7 +5,7 @@
 
 **语言:** [English](README.md) | 简体中文
 
-[![Version](https://img.shields.io/badge/version-0.1.6b-5a6b7e)](https://atomgit.com/openairymax/agentrt)
+[![Version](https://img.shields.io/badge/version-0.1.6c-5a6b7e)](https://atomgit.com/openairymax/agentrt)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c\&logoColor=white)](https://en.cppreference.com/w/c/11)
 
@@ -190,6 +190,7 @@ cd /tmp/agentrt-build && ctest --output-on-failure
 
 ## 发布记录
 
+- **v0.1.6c** — 系统性修复启动链路：三入口（完整启动器 / bootstrap / 轻量安装器模板）幂等注入运行库路径，`airyrt update` 热替换后自愈陈旧 env.sh；生态层完成 SSoT 收敛（技能/Agent 注册表单一权威、prompts 离线评测、技能叶仓独立自测），全部 P0/P1/P2 改进落地。
 - **v0.1.6b** — 修复二进制分发的跨系统可移植性（运行库自包含、兼容旧版 Linux 发行版），并修复窄终端下的界面渲染问题。
 - **v0.1.6 / v0.1.6a** — 修复 daemon 群一键启动与更新路径。
 - **v0.1.5a** — 修复 riscv64 构建链、更新器与安装器问题。
