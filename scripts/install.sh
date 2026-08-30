@@ -160,6 +160,27 @@ AIRY_CHANNEL="${AIRY_CHANNEL:-stable}"
 AIRY_FROM_FILE="${AIRY_FROM_FILE:-}"
 case "$AIRY_CHANNEL" in stable|beta) ;; *) log_err "非法 --channel: ${AIRY_CHANNEL}（支持 stable|beta）"; exit 1 ;; esac
 
+# 0.1.6f 系统性修复：curl 符号崩溃隔离（树莓派 arm32 实测 2026-08-31）。
+# 宿主曾安装 AgentRT 时，agentrt-env.sh 会把 $AIRY_HOME/lib 注入
+# LD_LIBRARY_PATH；其中自编译 libcurl 与宿主 libssl 不匹配时直接调 curl
+# 报 "curl: symbol lookup error: undefined symbol: curl_easy_ssls_import,
+# version CURL_OPENSSL_4" 崩溃。本安装器全部网络请求统一走 syscurl：
+# 剔除 $AIRY_HOME/lib 后调系统 curl，与完整启动器（latest/airymaxrt）
+# 隔离策略同源。轻量启动器模板内嵌一份无 local 的 POSIX 同构实现。
+syscurl() {
+    local _ldp="" _seg _rest="${LD_LIBRARY_PATH:-}"
+    while [ -n "$_rest" ]; do
+        _seg="${_rest%%:*}"
+        [ "$_seg" = "${AIRY_HOME}/lib" ] || _ldp="${_ldp:+$_ldp:}$_seg"
+        [ "$_seg" = "$_rest" ] && _rest="" || _rest="${_rest#*:}"
+    done
+    if [ -n "$_ldp" ]; then
+        env LD_LIBRARY_PATH="$_ldp" curl "$@"
+    else
+        env -u LD_LIBRARY_PATH curl "$@"
+    fi
+}
+
 AIRY_SRC_DIR="${AIRY_HOME}/src/airymaxhub"
 MODULES_DIR="${AIRY_HOME}/modules"
 
@@ -337,7 +358,7 @@ fetch_repo_file() { # <repo_path> <dest>
     local api="https://api.atomgit.com/api/v5/repos/${AIRY_RELEASE_OWNER:-openairymax/agentrt}/contents/$1?ref=main"
     local tmp="${AIRY_HOME}/tmp/contents.$$"
     mkdir -p "$(dirname "$tmp")" 2>/dev/null
-    curl -fsSL --max-time 60 -o "$tmp" "$api" || { rm -f "$tmp"; return 1; }
+    syscurl -fsSL --max-time 60 -o "$tmp" "$api" || { rm -f "$tmp"; return 1; }
     if command -v python3 >/dev/null 2>&1; then
         python3 -c 'import json,sys,base64; sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin).get("content","").replace("\n","")))' < "$tmp" > "$2" || { rm -f "$tmp"; return 1; }
     else
@@ -427,8 +448,8 @@ install_binary() {
                 fetch_repo_file "$man_path.asc" "$man_asc" >/dev/null 2>&1 || true
                 ;;
             *)
-                curl -fsSL --max-time 60 -o "$man" "$url" || { log_warn "manifest 下载失败，回退源码构建"; return 1; }
-                curl -fsSL --max-time 60 -o "$man_asc" "${url}.asc" >/dev/null 2>&1 || true
+                syscurl -fsSL --max-time 60 -o "$man" "$url" || { log_warn "manifest 下载失败，回退源码构建"; return 1; }
+                syscurl -fsSL --max-time 60 -o "$man_asc" "${url}.asc" >/dev/null 2>&1 || true
                 ;;
         esac
         verify_gpg_sig "$man" "$man_asc" || { log_warn "manifest 验签失败（GPG），拒绝安装"; return 1; }
@@ -461,7 +482,7 @@ install_binary() {
     # 下载（仅远程来源）
     if [ ! -f "$tarball" ]; then
         log_info "下载完全体二进制包: ${url}"
-        if ! curl -fsSL --max-time 600 -o "${tarball}" "${url}"; then
+        if ! syscurl -fsSL --max-time 600 -o "${tarball}" "${url}"; then
             log_warn "release 下载失败，回退源码构建"
             rm -f "${tarball}"
             return 1
@@ -491,7 +512,11 @@ install_binary() {
     fi
     # 0.1.6y 修复：解压前清理 tmp 中旧 agentrt-* 残留，杜绝 find 命中旧目录
     #（历史故障：命中旧目录 → 拷贝旧 bin、版本误显示为旧版本 0.1.6c）。
-    rm -rf "${AIRY_HOME}"/tmp/agentrt-* 2>/dev/null || true
+    # 0.1.6f 修复：清理必须带尾斜杠（agentrt-*/）只匹配旧解压目录，绝不能
+    # 匹配 tarball 自身——此前 rm -rf .../tmp/agentrt-* 把刚下载的
+    # agentrt-v0.1.6f.tar.gz 一并删除，tar 解压报 "Cannot open: No such
+    # file or directory"（树莓派 arm32 安装实测 2026-08-31）。
+    rm -rf "${AIRY_HOME}"/tmp/agentrt-*/ 2>/dev/null || true
     tar -xzf "${tarball}" -C "${AIRY_HOME}/tmp" || { log_err "release 包解压失败（tar）"; rm -f "$tarball"; return 1; }
     local extracted
     extracted="$(find "${AIRY_HOME}/tmp" -maxdepth 1 -type d -name 'agentrt-*' | head -1)"
@@ -559,7 +584,7 @@ fetch_prebuilt_module() {
     if [ -d "$dest" ]; then log_ok "${name} 预编译模块已就位"; return 0; fi
     log_info "下载闭源预编译模块 ${name}…"
     local tarball="${AIRY_HOME}/tmp/${dirname}.tar.gz"
-    curl -fL ${CURL_FLAG} --max-time 600 -o "$tarball" "$url" || { log_warn "${name} 下载失败"; return 1; }
+    syscurl -fL ${CURL_FLAG} --max-time 600 -o "$tarball" "$url" || { log_warn "${name} 下载失败"; return 1; }
     mkdir -p "$dest"
     tar -xzf "$tarball" -C "$dest" || { log_warn "${name} 解压失败"; return 1; }
     log_ok "${name} 预编译模块就位: ${dest}"
@@ -1124,6 +1149,27 @@ fi
 [ -n "\$_AH" ] || _AH="\$HOME/.airymaxrt"
 AIRY_HOME="\$_AH"
 export AIRY_HOME
+# 0.1.6f 系统性修复：curl 符号崩溃隔离（与安装器 syscurl 同构，无 local，
+# POSIX 兼容）。本启动器已注入 LD_LIBRARY_PATH=\$AIRY_HOME/lib，其中自编译
+# libcurl 与宿主 libssl 不匹配时 curl 报 "symbol lookup error: undefined
+# symbol: curl_easy_ssls_import, version CURL_OPENSSL_4" 崩溃（树莓派 arm32
+# airymaxrt update 实测）。管理命令自举与 gateway ping 等网络请求统一走
+# syscurl：剔除 \$AIRY_HOME/lib 后调系统 curl。
+syscurl() {
+    _sc_ldp=""
+    _sc_rest="\${LD_LIBRARY_PATH:-}"
+    _sc_seg=""
+    while [ -n "\$_sc_rest" ]; do
+        _sc_seg="\${_sc_rest%%:*}"
+        [ "\$_sc_seg" = "\${AIRY_HOME}/lib" ] || _sc_ldp="\${_sc_ldp:+\$_sc_ldp:}\$_sc_seg"
+        [ "\$_sc_seg" = "\$_sc_rest" ] && _sc_rest="" || _sc_rest="\${_sc_rest#*:}"
+    done
+    if [ -n "\$_sc_ldp" ]; then
+        env LD_LIBRARY_PATH="\$_sc_ldp" curl "\$@"
+    else
+        env -u LD_LIBRARY_PATH curl "\$@"
+    fi
+}
 # 运行环境注入（0.1.6b 缺陷修复：社区"很多库找不到 / daemon 群起不来"）。
 # 包内 lib/ 自带全部第三方 .so，但 DT_RUNPATH 非传递性——daemon 的直接
 # 依赖可经 \$ORIGIN/../lib 找到，而 libcurl 等的传递依赖只能走系统路径；
@@ -1191,7 +1237,7 @@ case "\$1" in
         fi
         _TMP="\$AIRY_HOME/tmp/airymaxrt-full.\$\$"
         mkdir -p "\$AIRY_HOME/tmp" || exit 1
-        curl -fsSL --max-time 60 -o "\$_TMP" \
+        syscurl -fsSL --max-time 60 -o "\$_TMP" \
             "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/latest/airymaxrt?ref=main" || {
             echo "airymaxrt \$1: 完整启动器下载失败（api.atomgit.com 不可达）" >&2
             rm -f "\$_TMP"; exit 1
@@ -1225,7 +1271,7 @@ case "\$1" in
         if [ -x "\$AIRY_HOME/bin/agentrt-bootstrap.sh" ]; then
             _GW_READY=0
             if command -v curl >/dev/null 2>&1; then
-                curl -fsS --max-time 1 -X POST http://127.0.0.1:8080/ \
+                syscurl -fsS --max-time 1 -X POST http://127.0.0.1:8080/ \
                     -H 'Content-Type: application/json' \
                     -d '{"jsonrpc":"2.0","id":1,"method":"ping","params":{}}' \
                     >/dev/null 2>&1 && _GW_READY=1
@@ -1481,7 +1527,7 @@ installer_self_bootstrap() {
     [ -n "$local_sha" ] || return 0
     local api="https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main"
     local tmp remote_content remote_sha
-    tmp="$(curl -fsSL --max-time 30 "$api" 2>/dev/null)" || return 0
+    tmp="$(syscurl -fsSL --max-time 30 "$api" 2>/dev/null)" || return 0
     remote_content="$(printf '%s' "$tmp" | python3 -c 'import sys,json,base64;d=json.load(sys.stdin);sys.stdout.write(base64.b64decode(d.get("content","")).decode())' 2>/dev/null)" || return 0
     [ -n "$remote_content" ] || return 0
     remote_sha="$(printf '%s' "$remote_content" | sha256sum | awk '{print $1}')"

@@ -65,7 +65,25 @@
   `curl_easy_ssls_import`，包内旧 libcurl 无此符号 → 崩溃）。0.1.6c 仅
   "补写注入行"属打补丁；本轮根治：所有下载/更新/探测类网络操作经
   `syscurl()` 临时剔除 `$AIRY_HOME/lib` 后调用系统 libcurl，与 daemon
-  进程空间彻底隔离（实测隔离后系统 curl 正常访问 HTTP 200）。
+  进程空间彻底隔离（实测隔离后系统 curl 正常访问 HTTP 200）。覆盖三个
+  网络入口：
+  - 完整启动器 `latest/airymaxrt`（update 制品下载 / manifest 拉取 /
+    gateway ping）——0.1.6c 已隔离，本轮修复 update 流程残留的未隔离
+    curl 调用（未隔离行先执行、syscurl 行不可达，树莓派必崩）；
+  - 一键安装器 `scripts/install.sh`（manifest / tarball / 预编译模块 /
+    安装器自举共 6 处 curl）——此前未隔离，宿主曾安装过 AgentRT 时
+    安装器内 curl 同样崩溃；
+  - 轻量启动器模板（`airymaxrt update` 完整启动器自举 + gateway ping）
+    ——此前未隔离，为树莓派 `airymaxrt update` 崩溃复发根因；模板内
+    嵌 POSIX（无 local）版 syscurl，dash 实测通过。
+
+- **tar 解压失败（树莓派 arm32 安装实测 2026-08-31）**：解压前清理
+  `tmp/agentrt-*` 的通配符同时匹配刚下载的 tarball 自身
+  （`agentrt-v0.1.6f.tar.gz`），`rm -rf` 将其一并删除，随后
+  `tar -xzf` 报 "Cannot open: No such file or directory" 且清理无法
+  恢复（tarball 已丢）→ 回退源码构建又缺 cmake，安装失败。修复：
+  清理 glob 带尾斜杠 `agentrt-*/` 只匹配旧解压目录，tarball 存活；
+  已用复现场景测试通过。
 
 ### Changed
 

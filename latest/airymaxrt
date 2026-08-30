@@ -967,8 +967,6 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
     }
     local tarball="$TMPD/$(basename "${art_url%%\?*}")"
     log info "下载制品: ${art_url}"
-    curl -fsSL --max-time 600 -o "$tarball" "$art_url" || { log error "制品下载失败"; rm -rf "$TMPD"; return 1; }
-    # ^ 注：这里刻意用 syscurl 需要，见下方替换——保持补丁可读
     syscurl -fsSL --max-time 600 -o "$tarball" "$art_url" || { log error "制品下载失败"; rm -rf "$TMPD"; return 1; }
     # sha256 校验收敛到 apply_package（fail-closed：manifest 缺 sha256 拒绝）
     apply_package "$tarball" "$art_sha"
