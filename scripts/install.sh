@@ -897,17 +897,21 @@ finalize_install() {
 # 抢占生产 socket）。
 AIRY_HOME="${AIRY_HOME:-__AIRY_HOME__}"
 export AIRY_HOME
-export AIRY_RUNTIME_DIR="${AIRY_RUNTIME_DIR:-$AIRY_HOME/run}"
+# 0.1.6c 系统性修复：AIRY_HOME 为权威运行根，子目录一律强制从最终
+# AIRY_HOME 派生。父环境残留的旧 AIRY_* 值（历史安装 export/终端残留）
+# 会使 daemon 从旧目录启动、socket 探测分叉（实测复现）。多实例/--prefix
+# 经 AIRY_HOME 显式覆盖即可，子目录自动跟随。
+export AIRY_RUNTIME_DIR="$AIRY_HOME/run"
 # 运行时数据全量统一于 $AIRY_HOME/data/agentrt（2026-08-25）：日志/缓存/
 # 临时/持久化工作区均收敛其下，顶层仅保留分发物、用户配置与易失 run/。
-export AIRY_LOG_DIR="${AIRY_LOG_DIR:-$AIRY_HOME/data/agentrt/logs}"
-export AIRY_CONFIG_DIR="${AIRY_CONFIG_DIR:-$AIRY_HOME/config}"
-export AIRY_BIN_DIR="${AIRY_BIN_DIR:-$AIRY_HOME/bin}"
-export AIRY_LIB_DIR="${AIRY_LIB_DIR:-$AIRY_HOME/lib}"
-export AIRY_DATA_DIR="${AIRY_DATA_DIR:-$AIRY_HOME/data}"
-export AIRY_CACHE_DIR="${AIRY_CACHE_DIR:-$AIRY_HOME/data/agentrt/cache}"
-export AIRY_TMP_DIR="${AIRY_TMP_DIR:-$AIRY_HOME/data/agentrt/tmp}"
-export AIRY_WORKSPACE_DIR="${AIRY_WORKSPACE_DIR:-$AIRY_HOME/data/agentrt/workspaces}"
+export AIRY_LOG_DIR="$AIRY_HOME/data/agentrt/logs"
+export AIRY_CONFIG_DIR="$AIRY_HOME/config"
+export AIRY_BIN_DIR="$AIRY_HOME/bin"
+export AIRY_LIB_DIR="$AIRY_HOME/lib"
+export AIRY_DATA_DIR="$AIRY_HOME/data"
+export AIRY_CACHE_DIR="$AIRY_HOME/data/agentrt/cache"
+export AIRY_TMP_DIR="$AIRY_HOME/data/agentrt/tmp"
+export AIRY_WORKSPACE_DIR="$AIRY_HOME/data/agentrt/workspaces"
 # Python 字节码缓存收敛：editable 安装的包源码位于源码区，PYTHONPYCACHEPREFIX
 # 将所有 __pycache__ 重定向到 $AIRY_HOME/data/agentrt/cache/pycache，禁止落盘源码区。
 export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-$AIRY_HOME/data/agentrt/cache/pycache}"
