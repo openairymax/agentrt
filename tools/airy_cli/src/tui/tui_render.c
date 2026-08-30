@@ -120,12 +120,16 @@ static const char *tui_arch_name(void)
     return "x86_64";
 # endif
 #else
-# if defined(__riscv)
+# if defined(__riscv) && defined(__riscv_xlen) && __riscv_xlen == 32
+    return "riscv32";
+# elif defined(__riscv)
     return "riscv64";
 # elif defined(__aarch64__)
     return "aarch64";
 # elif defined(__arm__)
     return "armv7l";
+# elif defined(__i386__)
+    return "i686";
 # else
     return "x86_64";
 # endif
