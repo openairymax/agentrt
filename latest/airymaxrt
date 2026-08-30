@@ -299,32 +299,34 @@ boot_line() { # <消息...>
 }
 
 # ── 关键 daemon 就绪诊断（2.2 启动可靠性优化） ─────────────────────────────
-# daemon 群 socket 未全部就绪时逐项诊断：对话/工具/认知关键链路（llm/think/
-# agent/tool）未就绪必须明确报错并附日志尾部（此前 `wait_all_socks || true`
-# 静默容忍，用户进入界面后对话挂起——"界面能进、对话全挂"）；非关键链路
-# 降级为 WARN 提示（界面可用但该能力受限）。
+# daemon 群 socket 未全部就绪时汇总诊断：对话/工具/认知关键链路（llm/think/
+# agent/tool）未就绪必须明确报错（附日志尾部摘要）；非关键链路降级 WARN
+#（界面可用但该能力受限）。0.1.6y 精简：16 个未就绪时由 50+ 行收敛为
+# 汇总 4~6 行，过滤 nohup 噪音行，避免视觉轰炸。
 diag_daemons() { # 遍历剩余 WAIT_SOCKS（未就绪项）
-    local spec name sock critical=0 _lines _l
+    local spec name sock critical="" degraded=""
     for spec in "${WAIT_SOCKS[@]}"; do
         name="${spec%%|*}"; sock="${spec#*|}"
         case "$name" in
             llm_d|think_d|agent_d|tool_d)
-                log error "关键服务未就绪: $name（对话/认知/执行链路必需）"
-                log error "  日志: $AIRY_HOME/logs/${name}.out（尾部）:"
-                _lines="$(tail -n 8 "$AIRY_HOME/logs/${name}.out" 2>/dev/null | sed 's/^/  /')" || true
-                while IFS= read -r _l; do
-                    [ -n "$_l" ] && log error "$_l"
-                done <<<"$_lines"
-                critical=1
+                critical="${critical:+$critical }$name"
                 ;;
             *)
-                log warn "$name 未就绪（非关键链路，界面可用但该能力受限），日志: $AIRY_HOME/logs/${name}.out"
+                degraded="${degraded:+$degraded }$name"
                 ;;
         esac
     done
-    if [ "$critical" = "1" ]; then
-        log error "关键 daemon 未就绪，可执行 'airymaxrt doctor' 检查组件，"
-        log error "或删除 $RUNTIME_DIR 下残留 socket 后重试（详见上方日志尾部）"
+    if [ -n "$degraded" ]; then
+        log warn "能力 daemon 未就绪（界面可用，能力受限）: ${degraded}；日志: $AIRY_HOME/logs/*.out"
+    fi
+    if [ -n "$critical" ]; then
+        log error "关键 daemon 未就绪: ${critical}（对话/认知/执行链路必需）"
+        local _lines _l
+        for name in $critical; do
+            _lines="$(tail -n 3 "$AIRY_HOME/logs/${name}.out" 2>/dev/null | grep -v 'nohup: ignoring input' | tr '\n' ' ' | sed 's/  */ /g')" || true
+            [ -n "$_lines" ] && log error "  ${name}: ${_lines}"
+        done
+        log error "处理: 'airymaxrt doctor' 检查组件，或删除 $RUNTIME_DIR 残留 socket 后重试"
     fi
 }
 
@@ -378,6 +380,40 @@ case ":${LD_LIBRARY_PATH:-}:" in
     *":$AIRY_HOME/lib:"*) ;;
     *) export LD_LIBRARY_PATH="$AIRY_HOME/lib:${LD_LIBRARY_PATH:-}" ;;
 esac
+
+# ── 系统 curl 隔离调用（0.1.6f 根治 LD_LIBRARY_PATH 劫持）───────────────
+# 全局 LD_LIBRARY_PATH 注入 $AIRY_HOME/lib 让 daemon 群解析包内 .so；
+# 但同一注入会劫持系统 curl：Debian/Ubuntu 新版 curl 依赖
+# curl_easy_ssls_import 等符号，而包内旧 libcurl.so.4 无此符号 → 立即
+# 崩溃（树莓派社区用户实测 curl: undefined symbol）。下载/更新/探测
+# 类网络操作必须经 syscurl()：临时剔除 $AIRY_HOME/lib 后调用系统
+# libcurl，与 daemon 进程空间彻底隔离。
+syscurl() {
+    local ldp="" p
+    local IFS=:
+    for p in ${LD_LIBRARY_PATH:-}; do
+        [ "$p" = "$AIRY_HOME/lib" ] && continue
+        ldp="${ldp:+$ldp:}$p"
+    done
+    if [ -n "$ldp" ]; then
+        env LD_LIBRARY_PATH="$ldp" curl "$@"
+    else
+        env -u LD_LIBRARY_PATH curl "$@"
+    fi
+}
+
+# 跨平台原地编辑（0.1.6g）：GNU sed（-i expr）与 BSD sed（-i '' expr）
+# 语法不同，直接 sed -i 在 macOS 上 "illegal option" 静默失败（profile.env
+# / install.env 键更新失效且可能产生重复行）。统一 临时文件 + mv（POSIX）。
+sed_inplace() { # <sed-expr> <file>
+    local _se="$1" _f="$2" _t="${2}.tmp.$$"
+    if sed "$_se" "$_f" > "$_t" 2>/dev/null; then
+        mv "$_t" "$_f"
+    else
+        rm -f "$_t"
+        return 1
+    fi
+}
 
 # ── 组件定位 ─────────────────────────────────────────────────────────────────
 # find_tool <env_name> <command_name> <候选路径...>
@@ -450,7 +486,7 @@ wait_for_health() { # <url> <秒数>
     local url="$1" tries="$2" i
     log debug "健康检查开始: $url（最多 ${tries}s）"
     for ((i = 0; i < tries; i++)); do
-        if curl -fsS -m 1 -X POST -H 'Content-Type: application/json' \
+        if syscurl -fsS -m 1 -X POST -H 'Content-Type: application/json' \
             -d '{"jsonrpc":"2.0","method":"ping","id":1}' "$url" >/dev/null 2>&1; then
             log debug "健康检查通过: $url（第 $((i + 1)) 次尝试）"
             return 0
@@ -542,7 +578,7 @@ upsert_profile_var() { # <KEY> <值>
     local key="$1" val="$2"
     mkdir -p "$AIRY_HOME/config"
     if grep -q "^${key}=" "$PROFILE_ENV" 2>/dev/null; then
-        sed -i "s|^${key}=.*|${key}=${val}|" "$PROFILE_ENV"
+        sed_inplace "s|^${key}=.*|${key}=${val}|" "$PROFILE_ENV"
     else
         printf '%s=%s\n' "$key" "$val" >>"$PROFILE_ENV"
     fi
@@ -611,14 +647,40 @@ ver_cmp() { # <a> <b>
     (( 10#$an > 10#$bn )) && echo 1 || { (( 10#$an < 10#$bn )) && echo -1 || echo 0; }
 }
 
-# 当前平台键（manifest artifacts 键名，与打包命名对齐）：linux-x86_64 / macos-arm64
+# 当前平台键（manifest artifacts 键名，与打包命名对齐）：linux-x64 / macos-arm64
+# 制品平台命名（0.1.6e 起，用户定案）：32/64 数字形式，弃用 i686/armv7l
+# 易误导字样。与 install.sh plat_name、build.sh PLATFORM 映射同口径。
+plat_name() {
+    case "$1" in
+        x86_64)  echo "x64" ;;
+        i686)    echo "x86" ;;
+        aarch64) echo "arm64" ;;
+        armv7l)  echo "arm32" ;;
+        riscv64) echo "riscv64" ;;
+        riscv32) echo "riscv32" ;;
+        *)       echo "$1" ;;
+    esac
+}
+
+# 数字平台名 → 旧 uname 原始名（0.1.6d 及更早的 manifest 平台键）。
+# 与发布侧 publish-release.sh ALIAS 表保持同口径（SSoT）。
+plat_legacy_name() {
+    case "$1" in
+        linux-x64|macos-x64|win-x64)      echo "${1%-x64}-x86_64" ;;
+        linux-x86|win-x86)                echo "${1%-x86}-i686" ;;
+        linux-arm64|macos-arm64|win-arm64) echo "${1%-arm64}-aarch64" ;;
+        linux-arm32)                      echo "linux-armv7l" ;;
+        *)                                echo "" ;;
+    esac
+}
+
 runtime_platform() {
     local os arch
     case "$(uname -s 2>/dev/null)" in
         Darwin) os="macos"; arch="$(uname -m 2>/dev/null)" ;;   # arm64 / x86_64
         *)      os="linux"; arch="$(detect_arch)" ;;
     esac
-    echo "${os}-${arch}"
+    echo "${os}-$(plat_name "${arch}")"
 }
 
 # manifest 字段提取（python3 优先，回退 grep 顶层键）
@@ -659,7 +721,7 @@ fetch_repo_file() { # <repo_path> <dest>
     local api="https://api.atomgit.com/api/v5/repos/${AIRY_RELEASE_OWNER:-openairymax/agentrt}/contents/$1?ref=main"
     local tmp="$AIRY_HOME/tmp/contents.$$"
     mkdir -p "$(dirname "$tmp")" 2>/dev/null
-    curl -fsSL --max-time 60 -o "$tmp" "$api" || { rm -f "$tmp"; return 1; }
+    syscurl -fsSL --max-time 60 -o "$tmp" "$api" || { rm -f "$tmp"; return 1; }
     if command -v python3 >/dev/null 2>&1; then
         python3 -c 'import json,sys,base64; sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin).get("content","").replace("\n","")))' < "$tmp" > "$2" || { rm -f "$tmp"; return 1; }
     else
@@ -707,9 +769,12 @@ apply_package() { # <tarball> [expect_sha]
         log error "缺少 sha256 期望值，拒绝安装（防供应链绕过）"; rm -rf "$TMPD"; return 1
     fi
     # 架构自检（同 install.sh install_binary 口径）
-    if tar -tzf "$tarball" 2>/dev/null | grep -q "platform-${arch}"; then
+    # 0.1.6g 修复：制品标记为数字平台名（platform-x64 等），原 grep 用
+    # uname 原始名（platform-x86_64）两边对不上，自检静默失效；统一走
+    # plat_name() 同口径，异架构包（platform-arm64 等）明确拒绝。
+    if tar -tzf "$tarball" 2>/dev/null | grep -q "platform-$(plat_name "$arch")"; then
         log info "架构校验通过（${arch}）"
-    elif tar -tzf "$tarball" 2>/dev/null | grep -qE 'platform-(x86_64|aarch64|armv7l|riscv64)'; then
+    elif tar -tzf "$tarball" 2>/dev/null | grep -qE 'platform-(x64|x86|arm64|arm32|riscv64|riscv32)'; then
         log error "制品架构与当前主机（${arch}）不匹配，拒绝更新"
         rm -rf "$TMPD"; return 1
     fi
@@ -751,9 +816,10 @@ apply_package() { # <tarball> [expect_sha]
         rm -rf "$TMPD"
         return 1
     fi
-    # 固化新版本到 install.env
+    # 固化新版本到 install.env（sed_inplace 跨平台：macOS BSD sed 直接
+    # 覆盖会失败，导致 AIRY_VERSION 键重复/不更新）
     if [ -f "$AIRY_HOME/config/install.env" ]; then
-        sed -i "s|^AIRY_VERSION=.*|AIRY_VERSION=v${new_ver}|" "$AIRY_HOME/config/install.env" 2>/dev/null || \
+        sed_inplace "s|^AIRY_VERSION=.*|AIRY_VERSION=v${new_ver}|" "$AIRY_HOME/config/install.env" || \
             printf 'AIRY_VERSION=v%s\n' "$new_ver" >> "$AIRY_HOME/config/install.env"
     fi
     rm -rf "$TMPD"
@@ -795,12 +861,12 @@ apply_package() { # <tarball> [expect_sha]
 # 更新/重装后回收仍驻留内存的旧版本 daemon 群：热替换只换磁盘二进制，
 # 运行中的进程仍执行旧代码（含旧 so 映射），必须回收；下次 airymaxrt
 # 启动自然拉起新版本。pkill -f 按绝对路径匹配，避免误杀其他实例。
-# 与 install.sh EXPECTED_DAEMONS 同清单（18 daemon）。
+# 0.1.6y 自动计算：清单以 bin/*_d 推导（daemon 增删不再改脚本硬编码）。
 stop_running_daemons() {
     local found=0 d
-    for d in monit_d observe_d info_d notify_d sched_d channel_d mem_d \
-             llm_d tool_d hook_d plugin_d agent_d a2a_d market_d gateway_d \
-             think_d cupolas_d maths_d; do
+    for d in "$AIRY_HOME"/bin/*_d; do
+        [ -f "$d" ] || continue
+        d="${d##*/}"
         if [ -x "$AIRY_HOME/bin/$d" ] && pkill -f "$AIRY_HOME/bin/$d" >/dev/null 2>&1; then
             found=1
         fi
@@ -846,7 +912,7 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
         if [ -f "$inst_env" ]; then
             local rb_ver="$(basename "$rb")"
             if [ "$rb_ver" != "pre-update" ]; then
-                sed -i "s|^AIRY_VERSION=.*|AIRY_VERSION=${rb_ver}|" "$inst_env" 2>/dev/null || \
+                sed_inplace "s|^AIRY_VERSION=.*|AIRY_VERSION=${rb_ver}|" "$inst_env" || \
                     printf 'AIRY_VERSION=%s\n' "$rb_ver" >> "$inst_env"
             fi
         fi
@@ -898,10 +964,27 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
     local art_url art_sha
     art_url="$(manifest_get "$TMPD/manifest.json" "artifact:${plat}" | sed -n 1p)"
     art_sha="$(manifest_get "$TMPD/manifest.json" "artifact:${plat}" | sed -n 2p)"
-    [ -n "$art_url" ] || { log error "当前平台 ${plat} 无可用制品"; rm -rf "$TMPD"; return 1; }
+    # 0.1.6f 社区反馈：旧命名（linux-x86_64 等）fallback。0.1.6e 起制品
+    # 采用数字命名（linux-x64），但存量旧安装器/旧 manifest 可能仍用
+    # uname 原始名；发布侧 manifest 已带别名键，此处再兜底一次，保证
+    # 双向兼容（新启动器遇旧 manifest 也能更新）。
+    if [ -z "$art_url" ]; then
+        local legacy="$(plat_legacy_name "$plat")"
+        if [ -n "$legacy" ]; then
+            art_url="$(manifest_get "$TMPD/manifest.json" "artifact:${legacy}" | sed -n 1p)"
+            art_sha="$(manifest_get "$TMPD/manifest.json" "artifact:${legacy}" | sed -n 2p)"
+            [ -n "$art_url" ] && log warn "平台键 ${plat} 未命中，已用兼容命名 ${legacy}"
+        fi
+    fi
+    [ -n "$art_url" ] || {
+        log error "当前平台 ${plat} 无可用制品"
+        log error "若您安装的是旧版本（≤v0.1.6d），安装器已过旧无法自举更新；"
+        log error "请重新执行一键安装命令（见官网 install 指南）更新安装器后重试。"
+        rm -rf "$TMPD"; return 1
+    }
     local tarball="$TMPD/$(basename "${art_url%%\?*}")"
     log info "下载制品: ${art_url}"
-    curl -fsSL --max-time 600 -o "$tarball" "$art_url" || { log error "制品下载失败"; rm -rf "$TMPD"; return 1; }
+    syscurl -fsSL --max-time 600 -o "$tarball" "$art_url" || { log error "制品下载失败"; rm -rf "$TMPD"; return 1; }
     # sha256 校验收敛到 apply_package（fail-closed：manifest 缺 sha256 拒绝）
     apply_package "$tarball" "$art_sha"
     local rc=$?
@@ -1170,6 +1253,25 @@ case "$CMD" in
             esac
             log warn "  永久生效: echo 'export PATH=\"${_BD_D}:\$PATH\"' >> \"${_RC_D}\" && source \"${_RC_D}\""
             miss=1
+        fi
+        # 运行库完整性（0.1.6e 防御：旧用户热替换不完整/缺库导致 daemon 群
+        # 起不来——如 Ubuntu 24.04 缺 libssl.so.1.1）。逐个关键二进制
+        # ldd 检测 not found；缺库即提示 reinstall 干净重装。
+        _LD_MISS=""
+        for _b in "$AIRY_HOME"/bin/*_d "$AIRY_HOME"/bin/airy_cli "$AIRY_HOME"/bin/agentrt-tui; do
+            [ -x "$_b" ] || continue
+            _nf="$(ldd "$_b" 2>/dev/null | grep -F 'not found' || true)"
+            if [ -n "$_nf" ]; then
+                _LD_MISS="$_LD_MISS
+  $(basename "$_b"): $(echo "$_nf" | sed 's/.*=> not found/缺/' | tr '\n' '; ')"
+                miss=1
+            fi
+        done
+        if [ -n "$_LD_MISS" ]; then
+            log warn "运行库缺失（daemon 将无法启动）:$_LD_MISS"
+            log warn "  修复: airymaxrt reinstall（干净重装，保留 config/data）"
+        else
+            log info "运行库: 全部可解析"
         fi
         if [ "$miss" = "0" ]; then log info "doctor: 全部就绪"; else log warn "doctor: 存在缺失项"; fi
         exit 0
@@ -1563,22 +1665,20 @@ else
     # 降级），以控制低内存设备的内存占用（AIRYRT_PROFILE=minimal）。
     _launch_daemon "$(find_tool AIRY_AGENT_BIN agent_d "$AIRY_HOME/bin/agent_d" "$AIRYRT_HOME/agentrt/build/bin/agent_d" "$AIRYRT_HOME/build/bin/agent_d")" "$RUNTIME_DIR/agent.sock"
     _launch_daemon "$(find_tool AIRY_TOOL_BIN tool_d "$AIRY_HOME/bin/tool_d" "$AIRYRT_HOME/agentrt/build/bin/tool_d" "$AIRYRT_HOME/build/bin/tool_d")" "$RUNTIME_DIR/tool.sock"
-    if [ "$AIRYRT_PROFILE" != "minimal" ]; then
-        _launch_daemon "$(find_tool AIRY_HOOK_BIN hook_d "$AIRY_HOME/bin/hook_d" "$AIRYRT_HOME/agentrt/build/bin/hook_d" "$AIRYRT_HOME/build/bin/hook_d")" "$RUNTIME_DIR/hook.sock"
-        _launch_daemon "$(find_tool AIRY_PLUGIN_BIN plugin_d "$AIRY_HOME/bin/plugin_d" "$AIRYRT_HOME/agentrt/build/bin/plugin_d" "$AIRYRT_HOME/build/bin/plugin_d")" "$RUNTIME_DIR/plugin.sock"
-        _launch_daemon "$(find_tool AIRY_MONIT_BIN monit_d "$AIRY_HOME/bin/monit_d" "$AIRYRT_HOME/agentrt/build/bin/monit_d" "$AIRYRT_HOME/build/bin/monit_d")" "$RUNTIME_DIR/monit.sock"
-        _launch_daemon "$(find_tool AIRY_SCHED_BIN sched_d "$AIRY_HOME/bin/sched_d" "$AIRYRT_HOME/agentrt/build/bin/sched_d" "$AIRYRT_HOME/build/bin/sched_d")" "$RUNTIME_DIR/sched.sock"
-        _launch_daemon "$(find_tool AIRY_CHANNEL_BIN channel_d "$AIRY_HOME/bin/channel_d" "$AIRYRT_HOME/agentrt/build/bin/channel_d" "$AIRYRT_HOME/build/bin/channel_d")" "$RUNTIME_DIR/channel.sock"
-        _launch_daemon "$(find_tool AIRY_MARKET_BIN market_d "$AIRY_HOME/bin/market_d" "$AIRYRT_HOME/agentrt/build/bin/market_d" "$AIRYRT_HOME/build/bin/market_d")" "$RUNTIME_DIR/market.sock"
-        _launch_daemon "$(find_tool AIRY_CUPOLAS_BIN cupolas_d "$AIRY_HOME/bin/cupolas_d" "$AIRYRT_HOME/agentrt/build/bin/cupolas_d" "$AIRYRT_HOME/build/bin/cupolas_d")" "$RUNTIME_DIR/cupolas.sock"
-        _launch_daemon "$(find_tool AIRY_MEM_BIN mem_d "$AIRY_HOME/bin/mem_d" "$AIRYRT_HOME/agentrt/build/bin/mem_d" "$AIRYRT_HOME/build/bin/mem_d")" "$RUNTIME_DIR/mem.sock"
-        _launch_daemon "$(find_tool AIRY_A2A_BIN a2a_d "$AIRY_HOME/bin/a2a_d" "$AIRYRT_HOME/agentrt/build/bin/a2a_d" "$AIRYRT_HOME/build/bin/a2a_d")" "$RUNTIME_DIR/a2a.sock"
-        _launch_daemon "$(find_tool AIRY_INFO_BIN info_d "$AIRY_HOME/bin/info_d" "$AIRYRT_HOME/agentrt/build/bin/info_d" "$AIRYRT_HOME/build/bin/info_d")" "$RUNTIME_DIR/info.sock"
-        _launch_daemon "$(find_tool AIRY_NOTIFY_BIN notify_d "$AIRY_HOME/bin/notify_d" "$AIRYRT_HOME/agentrt/build/bin/notify_d" "$AIRYRT_HOME/build/bin/notify_d")" "$RUNTIME_DIR/notify.sock"
-        _launch_daemon "$(find_tool AIRY_OBSERVE_BIN observe_d "$AIRY_HOME/bin/observe_d" "$AIRYRT_HOME/agentrt/build/bin/observe_d" "$AIRYRT_HOME/build/bin/observe_d")" "$RUNTIME_DIR/observe.sock"
-    else
-        log info "minimal 画像：仅拉起核心 daemon（llm/think/agent/tool），其余能力 daemon 已裁剪"
-    fi
+    # 0.1.6y 自动计算：其余能力 daemon 以 bin/*_d 自动推导（后续 daemon
+    # 增删不再改脚本）。socket 名约定 = daemon 名去 _d 后缀 + .sock。
+    # minimal 画像仅保留核心执行链路（llm/think/agent/tool），其余跳过
+    #（gateway 自动降级），以控制低内存设备占用（AIRYRT_PROFILE=minimal）。
+    for _d in "$AIRY_HOME"/bin/*_d; do
+        [ -f "$_d" ] || continue
+        _b="${_d##*/}"
+        case "$_b" in
+            gateway_d|llm_d|think_d|agent_d|tool_d) continue ;;  # 独立处理
+        esac
+        [ "$AIRYRT_PROFILE" = "minimal" ] && continue
+        [ -x "$_d" ] || continue
+        _launch_daemon "$_d" "$RUNTIME_DIR/${_b%_d}.sock"
+    done
 
     # ---- gateway_d：统一协议入口（HTTP/WS/HTTP2），与 daemon 群并行拉起 ----
     # 端口自适应：默认端口不可 bind（如残留半开连接占位）时自动探测 8083+
