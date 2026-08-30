@@ -171,7 +171,7 @@ cmake --build /tmp/agentrt-build --parallel $(nproc)
 cd /tmp/agentrt-build && ctest --output-on-failure
 ```
 
-> **BAN-33：** 禁止源码树内构建。构建目录必须位于源码树之外；CMake 检测到构建目录位于源码树内时将发出 `FATAL_ERROR`。
+> **注意：** 构建必须采用源码树外（out-of-source）方式。构建目录必须位于源码树之外；CMake 检测到构建目录位于源码树内时将发出 `FATAL_ERROR`。
 
 ### 关键 CMake 选项
 
