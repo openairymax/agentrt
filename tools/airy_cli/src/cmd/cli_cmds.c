@@ -405,6 +405,102 @@ int cmd_chain(const char *arg, void *ctx)
     return 0;
 }
 
+int cmd_hall(const char *arg, void *ctx)
+{
+    (void)ctx;
+    if (!g_cli_hall_store) {
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "事件流",
+                             "事件流不可用（hall store 未创建）");
+        return 0;
+    }
+
+    const char *sub = arg;
+    while (sub && (*sub == ' ' || *sub == '\t'))
+        sub++;
+
+    /* /hall audit：审计事件流——索引 vs 磁盘全量核对（append-only +
+     * "已记录⟺可见"断言；篡改/丢失分别计 corrupted/missing） */
+    if (sub && strncmp(sub, "audit", 5) == 0) {
+        airy_hall_audit_t au;
+        __builtin_memset(&au, 0, sizeof(au));
+        airy_err_t err = airy_hall_store_audit(g_cli_hall_store, &au);
+        if (err != AIRY_SUCCESS) {
+            char line[160];
+            snprintf(line, sizeof(line), "审计失败：%s", cli_err_desc((int)err));
+            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "事件流", line);
+            return 0;
+        }
+        if (g_cli_print_mode) {
+            cli_outf("hall audit indexed=%zu verified=%zu missing=%zu corrupted=%zu\n",
+                     au.indexed, au.verified, au.missing, au.corrupted);
+        } else {
+            char line[192];
+            snprintf(line, sizeof(line),
+                     "事件流审计：索引 %zu / 已验证 %zu / 缺失 %zu / 损坏 %zu%s",
+                     au.indexed, au.verified, au.missing, au.corrupted,
+                     (au.missing == 0 && au.corrupted == 0 && au.indexed == au.verified)
+                         ? "（append-only 完整，已记录⟺可见）"
+                         : "（存在异常，见缺失/损坏计数）");
+            cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "hall", line);
+        }
+        return 0;
+    }
+
+    /* /hall replay [limit]：全局回放（按 gseq 全局因果序），默认 8 条 */
+    if (sub && strncmp(sub, "replay", 6) == 0) {
+        char **glob = NULL;
+        size_t gc = 0;
+        airy_err_t err = airy_hall_store_replay_global(g_cli_hall_store, &glob, &gc);
+        if (err != AIRY_SUCCESS) {
+            char line[160];
+            snprintf(line, sizeof(line), "回放失败：%s", cli_err_desc((int)err));
+            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "事件流", line);
+            return 0;
+        }
+        size_t limit = 8;
+        long want = sub[6] ? strtol(sub + 6, NULL, 10) : 0;
+        if (want > 0)
+            limit = (size_t)want;
+        if (limit > gc)
+            limit = gc;
+        if (g_cli_print_mode) {
+            cli_outf("hall replay total=%zu shown=%zu\n", gc, limit);
+            for (size_t i = 0; i < limit; i++)
+                cli_outf("  %s\n", cli_chain_trim(glob[i]));
+        } else {
+            char line[192];
+            snprintf(line, sizeof(line), "事件流全局回放 · 共 %zu 条（gseq 全局因果序，显示 %zu）",
+                     gc, limit);
+            cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "hall", line);
+            for (size_t i = 0; i < limit; i++) {
+                char content[CLI_CHAIN_CONTENT_CAP];
+                cli_chain_extract_content(glob[i], content, sizeof(content));
+                cli_outf("  %s[%s] %s\n", cli_c(CLR_CYAN), cli_c(CLR_RESET),
+                         cli_chain_trim(content));
+            }
+        }
+        airy_hall_store_free_strings(glob, gc);
+        return 0;
+    }
+
+    /* 无参数：任务统计 */
+    char **tasks = NULL;
+    size_t n = 0;
+    airy_err_t err = airy_hall_store_list_tasks(g_cli_hall_store, "default", &tasks, &n);
+    if (err == AIRY_SUCCESS)
+        airy_hall_store_free_strings(tasks, n);
+    if (g_cli_print_mode) {
+        cli_outf("hall tasks=%zu\n", n);
+    } else {
+        char line[192];
+        snprintf(line, sizeof(line),
+                 "事件流任务 %zu 个 · /hall audit 审计完整性 /hall replay [n] 全局回放",
+                 n);
+        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "hall", line);
+    }
+    return 0;
+}
+
 int cmd_quit(const char *arg, void *ctx)
 {
     (void)arg;

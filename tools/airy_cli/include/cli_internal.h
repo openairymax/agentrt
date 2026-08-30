@@ -257,6 +257,7 @@ int cli_think_cfg_explicit(char *t2, size_t t2c, char *t1f, size_t t1fc,
 int cmd_clear(const char *arg, void *ctx);
 int cmd_status(const char *arg, void *ctx);
 int cmd_chain(const char *arg, void *ctx);
+int cmd_hall(const char *arg, void *ctx);
 int cmd_quit(const char *arg, void *ctx);
 int cmd_tui(const char *arg, void *ctx);
 
