@@ -13,48 +13,27 @@
 
 ## Overview
 
-**AgentRT** (full name: **AirymaxAgentRT**, *AI Agent Runtime Platform Engineering*) is the runtime engineering layer of the Airymax platform — an OS-grade runtime substrate for AI Agent teams, positioned analogously to the JVM for languages and containerd for containers. Where the JVM provides a virtual machine for bytecode and containerd provides a runtime for containers, AgentRT provides the platform engineering mechanisms for orchestrating, scheduling, isolating, and observing teams of AI agents. The **0.1.1** release laid the sole foundational version (奠基版本); **0.1.2** converges it into a single source of truth (SSoT) and completes the platform essence (declarative self-healing + unified extension mechanism).
+**AgentRT** (full name: **AirymaxAgentRT**, *AI Agent Runtime Platform Engineering*) is the runtime engineering layer of the Airymax platform — an OS-grade runtime substrate for AI Agent teams, positioned analogously to Kubernetes for microservices: AgentRT standardizes multi-agent cognitive loops, memory evolution, security isolation, and protocol interoperability into a unified runtime platform, defining how AI agent teams run.
 
 This repository is a **management repo** (git superproject). It aggregates **7 leaf repositories** as git submodules and inherits the **complete git history** of the original AgentRT monorepo. The repository URL retains its historical name `git@atomgit.com:openairymax/agentrt.git` to preserve commit continuity. AgentRT exposes the OS-level mechanisms required to run agent teams at scale: micro-core primitives, cognitive loops, memory stratification, security domes, IPC protocols, gateway services, and long-running daemon processes.
 
-AgentRT is a **management repo** (git superproject) under the user-space engineering super-repo `agent-runtim` (sibling super-repos under the `airymaxhub` umbrella: kernel-space `agent-linux` plus top-level `docs`, `closed-docs`, `devtools`, `closed-dev-build`). The Airymax workspace is partitioned into 38 repositories in total: 1 umbrella repo + 2 engineering super-repos + 4 top-level repos + the management/leaf repos underneath. Each leaf repo is independently buildable and version-controlled, while the management repo pins them together via git submodules to produce a coherent, reproducible runtime platform.
+AgentRT is a **management repo** (git superproject) under the user-space engineering super-repo `agent-workload` (renamed from `agent-runtim` in v0.1.4). Sibling super-repos under the `airymaxhub` umbrella include the kernel-space `agent-linux` plus top-level repos `docs`, `closed-docs`, `tools` (renamed from `devtools` in v0.1.4), and `closed-dev-build`. Each leaf repo is independently buildable and version-controlled, while the management repo pins them together via git submodules to produce a coherent, reproducible runtime platform.
 
-### 0.1.2 Capabilities (SSoT Convergence + Platform Essence)
+## Core Capabilities
 
-The 0.1.2 release applies the **Unify Design SSoT (Single Source of Truth)** methodology to converge all 8 multi-authority conflict points (S-1~S-8) inside agentrt into one authoritative implementation each — not by cutting features, but by removing redundant authorities:
+AgentRT delivers the following capabilities to end users and agent developers:
 
-| Area | SSoT convergence |
-|------|------------------|
-| **Error codes (A-UEF)** | `airy_types.h` unified to [SC] `airymax/error.h` as the sole authority |
-| **Logging (A-ULP)** | `AIRY_LOG_*` becomes the only log macro family across the repo |
-| **Dual IPC headers (S-3)** | `are_ipc.h` and kernel `uapi/airymax/ipc.h` layout divergences merged (Layout C v4, magic `'ARE1'`) |
-| **Dual DAG engines (S-4)** | Half-finished Pregel BSP superstep path removed; `graph_engine` = execution authority, `taskflow_advanced` = scheduling authority |
-| **Event stream (S-6)** | hall_store task-file model + gseq global monotonic sequence becomes the authoritative event-stream substrate |
-| **[SC] contracts (S-8)** | commons 11 headers byte-aligned with the kernel side |
-
-Platform essence completion (analogous to Kubernetes controllers):
-
-- **Declarative self-healing (reconcile)**: cognition-layer (blueprint→GRAD→replan), execution-layer (task failure auto re-dispatch), and lifecycle-layer (agent daemon self-heal restart via `AIRY_SELF_HEAL`, with restart caps + backoff) — all driven from the CLI main loop.
-- **Unified extension mechanism**: memory provider vtable capability-seam generalized to a unified registry (`airy_ext.h`, first validated on the memory domain), the base for LLM/tool/storage/sandbox extension seams.
-
-Branded IDs (`airy_trace_id_t` / `airy_msg_id_t` opaque types) and a CLI/TUI experience overhaul complete the release:
-
-- **Cognitive Parallel Review (CPR)**: in the cognition stage (after GCCP, before planning), multiple cognitive sub-agents run in parallel threads — intent confirmation (independent task/chat/agent verdict) + problem review (ambiguity/risk/missing-info) — aggregated into a cognitive decision (confidence-weighted intent vote + risk merge) written to working memory for Phase-1 planning; degrades gracefully without blocking when the LLM is unavailable.
-- **Built-in web search / fetch tool loop**: the chat loop exposes `web_search`/`web_fetch` to the LLM (OpenAI function-calling) — CLI executes them against the real `tool_d` implementations (Bing search + URL fetch), feeds results back as `role="tool"`, and continues until no tool calls remain, then renders the final reply as markdown; tool-use cards (`⛏` + collapsed summaries) keep the screen clean.
-- **GCCP one-question-at-a-time**: after each user answer the LLM thinks over the answered content (`airy_gccp_step`) to decide convergence or a targeted follow-up, avoiding mechanical questioning (follow-up cap = question count + 4).
-- **TUI input polish (readline/Claude Code paradigm)**: word movement (Ctrl/Alt+←→, Alt+b/f), Ctrl+T transpose, kill-ring + Ctrl+Y yank, Ctrl+S forward search (symmetric to Ctrl+R), bracketed paste, SIGWINCH redraw, full raw mode (flow control cleared so Ctrl+S is never swallowed).
-
-### 0.1.1 Framework-ization (Mechanism/Policy Separation)
-
-The 0.1.1 foundation release brings **mechanism/policy framework-ization** into the cognition pipeline, closing the product loop of "understanding user intent" and "driving real agents":
-
-| Capability | Mechanism layer (agentrt) | Policy layer (product/caller) |
-|------------|---------------------------|-------------------------------|
-| **GCCP goal confirmation** | Two-phase protocol (probe/confirm) + 5-question goal model + heuristic fallback | Interaction callback (ask endpoint/start/bottleneck/audience) |
-| **Work Hall** | Task-graph registration / status board / cancel + `airy_orch_ops_t` injection | Plan→DAG adaptation + handler binding |
-| **Interactive product CLI** | `tools/airy_cli` (CMake option `BUILD_CLI`, default ON) | Product-level interaction policy |
-
-Product loop: **natural-language big-task instruction → GCCP intent confirmation → cognition planning → Plan→TaskFlow DAG adaptation → Work Hall submit/board → agent_d drives ecosystem/agents for real execution**.
+| Capability | Description |
+|------------|-------------|
+| **Chat & Task dual modes** | A chat mode for conversation and a task mode for complex execution, both driven by `airy_cli` / `agentrt-tui`; the same instruction automatically enters a plan-execute loop for large tasks |
+| **Multi-agent collaboration** | One main Agent orchestrates multiple child Agents (executors), splitting and merging complex work in parallel; agents interoperate over a standard protocol |
+| **Intelligent planning & reflection** | Interactive confirmation of ambiguous goals, plan generation as an executable task graph, and scheduled execution; execution includes self-reflection and failure re-dispatch |
+| **Persistent memory** | Built-in free memory backend (L1 session-level + L2 cross-session) with forgetting and retrieval; extensible to commercial memory providers |
+| **Built-in tool loop** | The chat loop exposes real tools such as `web_search` / `web_fetch` to the LLM (Bing search + URL fetch), feeds results back as `role="tool"`, and renders the final reply as markdown |
+| **Security dome** | Four layers of inherent security: sandbox isolation, RBAC authorization, input/output sanitization, audit logging — fail-closed by default |
+| **Unified gateway** | `gateway_d` translates HTTP, WebSocket, and stdio into a unified JSON-RPC 2.0 stream, giving external systems a single entry point into the runtime |
+| **18 runtime services** | Long-running daemons for scheduling, tool dispatch, LLM bridging, dual-think cognition, memory, monitoring, notifications, plugin management, and Agent execution — orchestrated by dependency order with self-healing |
+| **Observability** | Global event stream + task board + health monitoring; `airymaxrt monitor` provides a runtime status overview |
 
 ## Repository Structure
 
@@ -70,8 +49,8 @@ airymaxhub/                     ← Umbrella repo (git superproject root)
 │   │   ├── gateway/            ← submodule: HTTP/WS/Stdio → JSON-RPC 2.0 gateway
 │   │   ├── daemons/            ← submodule: 18 runtime daemons
 │   │   ├── contracts/          ← contract headers (symlink → atoms/contracts)
-│   │   ├── cmake/              ← build-system modules (moved from umbrella since v0.1.2, IRON-9 [IND])
-│   │   ├── scripts/            ← official installer install.sh/install.ps1 (moved from umbrella since v0.1.2)
+│   │   ├── cmake/              ← build-system modules
+│   │   ├── scripts/            ← official installer install.sh/install.ps1
 │   │   ├── CMakeLists.txt      ← top-level CMake entry point
 │   │   └── Doxyfile            ← API documentation configuration
 │   ├── sdk/                    ← SDK management repo
@@ -178,7 +157,7 @@ The installer auto-profiles the hardware (full/minimal runtime profile) and the
 git clone --recursive git@atomgit.com:openairymax/airymaxhub.git
 cd airymaxhub/agentrt
 
-# 2. Configure (out-of-source build is MANDATORY — enforced by BAN-33)
+# 2. Configure (out-of-source build is MANDATORY)
 cmake -S . -B /tmp/agentrt-build \
     -DCMAKE_BUILD_TYPE=Release \
     -DAIRY_WITH_MEMORYROVOL=ON
@@ -190,7 +169,7 @@ cmake --build /tmp/agentrt-build --parallel $(nproc)
 cd /tmp/agentrt-build && ctest --output-on-failure
 ```
 
-> **BAN-33:** In-source builds are forbidden. The build directory must reside outside the source tree; CMake will emit a `FATAL_ERROR` if it detects a build directory inside the source tree.
+> **Note:** In-source builds are forbidden. The build directory must reside outside the source tree; CMake will emit a `FATAL_ERROR` if it detects a build directory inside the source tree.
 
 ### Key CMake Options
 
@@ -201,7 +180,7 @@ cd /tmp/agentrt-build && ctest --output-on-failure
 | `AIRY_BUILD_ALL` | ON | Build all AgentRT components |
 | `AIRY_WITH_MEMORYROVOL` | OFF | Enable MemoryRovol commercial memory provider |
 | `AIRY_MEMORY_BACKEND` | `builtin` | Memory backend selection (`builtin` \| `memoryrovol`) |
-| `BUILD_CLI` | ON | Build the interactive product CLI (GCCP + Work Hall loop) |
+| `BUILD_CLI` | ON | Build the interactive product CLI |
 | `AIRY_COMPLIANCE_STRICT` | ON | Strict compliance mode (poisons unsafe functions, e.g. `strcpy`) |
 | `ENABLE_SANITIZERS` | ON | Enable ASan + LSan + UBSan |
 | `ENABLE_COVERAGE` | OFF | Enable code coverage reporting |
