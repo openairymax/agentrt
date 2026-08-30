@@ -4,7 +4,7 @@
 # 位置：agentrt 管理仓 scripts/install.ps1（v0.1.2 起自伞仓 scripts/ 迁移，
 #       构建系统与安装器属 IRON-9 [IND] 完全独立层；伞仓保留兼容重定向）。
 # 用法：
-#   powershell -ExecutionPolicy Bypass -Command "irm https://raw.atomgit.com/openairymax/agentrt/raw/main/scripts/install.ps1 | iex"
+#   powershell -ExecutionPolicy Bypass -Command "irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 | iex"
 #   powershell -ExecutionPolicy Bypass -File install.ps1 -Prefix "$HOME\.airymaxrt"
 #   powershell -ExecutionPolicy Bypass -File install.ps1 -Uninstall -Yes
 #
@@ -177,7 +177,7 @@ function Install-Binary {
         curl.exe -fsSL --max-time 30 -o $asc "$Url.asc" 2>$null
         if ((Get-Command gpg -ErrorAction SilentlyContinue)) {
             $keyf = Join-Path $AIRY_HOME "tmp\agentrt.asc"
-            curl.exe -fsSL --max-time 30 -o $keyf "https://raw.atomgit.com/openairymax/agentrt/raw/main/latest/keys/agentrt.asc" 2>$null
+            curl.exe -fsSL --max-time 30 -o $keyf "https://atomgit.com/openairymax/agentrt/raw/main/latest/keys/agentrt.asc" 2>$null
             if (-not (Test-Path $keyf) -and (Test-Path (Join-Path $AIRY_HOME "keys\agentrt.asc"))) {
                 Copy-Item (Join-Path $AIRY_HOME "keys\agentrt.asc") $keyf -Force
             }
@@ -476,7 +476,7 @@ $installed = $false
 # （默认，stable/beta 由 -Channel 决定；-Mode source 除外）
 $releaseUrl = $env:AIRY_RELEASE_URL
 if (-not $releaseUrl -and $Mode -ne "source") {
-    $releaseUrl = "https://raw.atomgit.com/openairymax/agentrt/raw/main/latest/manifest.$AIRY_CHANNEL.json"
+    $releaseUrl = "https://atomgit.com/openairymax/agentrt/raw/main/latest/manifest.$AIRY_CHANNEL.json"
 }
 if ($FromFile) { $installed = Install-Binary $FromFile }
 elseif ($Mode -eq "binary" -or ($Mode -eq "auto" -and $releaseUrl)) {
