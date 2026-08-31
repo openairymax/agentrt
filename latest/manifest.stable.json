@@ -1,57 +1,57 @@
 {
   "schema": 1,
   "channel": "stable",
-  "latest": "v0.1.6h",
-  "updated_at": "2026-08-31T11:31:37Z",
+  "latest": "v0.1.7",
+  "updated_at": "2026-08-31T15:28:41Z",
   "releases": {
-    "v0.1.6h": {
+    "v0.1.7": {
       "yanked": false,
-      "notes": "# AgentRT v0.1.6h — 全平台稳定性修复\n\n0.1.6h 聚焦跨设备（ARM 32/64 位、RISC-V、x86 32/64 位、WSL、macOS）的\n安装、更新、交互与长期运行稳定性，系统性修复社区反馈的批量问题。\n\n## 新增\n\n- **功能键支持**：CLI/TUI 全面支持 F1-F10（帮助/硬件信息/状态/记忆链/\n  任务看板/事件流/流式模式/输入法等），适配常见终端与应用键区序列。\n- **终端色深自适应**：TUI 自动检测终端色彩能力（真彩/256 色/基础色），\n  不支持的终端优雅回退，修复低配终端与远程会话下的乱色问题。\n- **网关端口自适应**：启动器、CLI、TUI 统一从运行时状态读取网关实际\n  端口，端口被占用自动漂移后各端仍能正确连接，不再互相失联。\n\n## 修复\n\n- **更新/重装覆盖不彻底**：更新前自动清理旧版本独有文件，避免新旧制品\n  混装；备份目录带时间戳，同版本重复更新不再互相覆盖；版本比较对\n  非纯数字版本段容错，杜绝\"更新了却仍显示旧版本\"。\n- **回滚版本号错误**：回滚后安装版本号剥离备份时间戳后缀，不再显示为\n  \"v0.1.6g-20260831191248\" 之类带时间戳的版本。\n- **多实例互相误杀**：更新/重装停止旧守护进程时仅终止本安装目录下的\n  同名进程，不再全局误杀其他安装实例的守护进程群（多实例隔离）。\n- **安装器自举丢失参数**：安装器自我更新后，`--prefix`/`--from-file`/\n  `--reinstall`/`--uninstall` 等命令行参数完整保留，不再静默回落到\n  默认安装位置或默认网络源。\n- **全新安装高敏能力被拒**：网关调用方（本地会话）默认获得所需管理\n  权限（任务取消/记忆删除/凭证存储/插件管理/调度管理等），开箱即用，\n  不再整批返回\"Permission denied\"。\n- **重装路径错误**：非默认安装位置执行重装时正确沿用原路径。\n- **对话无法翻页**：空输入时上下键滚动会话记录（此前被命令历史劫持，\n  有历史记录时无法翻页）；翻页与命令历史浏览逻辑分离。\n- **对话中途掉线/回复为空**：长对话流空闲时自动保活，长思考与工具执行\n  间隙连接不再被超时掐断。\n- **服务状态误报**：长任务期间守护进程健康探测不再互相阻塞，避免\n  \"服务掉线\"误报与反复重启。\n- **错误提示可读**：网络异常不再返回原始协议错误串，改为明确的中文\n  指引（如\"网关不在线，请运行 airymaxrt 启动服务\"）。\n\n## 质量\n\n- 构建产物清单与守护进程数量自动同步，杜绝发布清单失实。\n- **全量二进制按 ubuntu:20.04（glibc 2.31）基线构建**：修复 0.1.6h 早\n  期包误用新版系统构建导致的旧发行版（如 Ubuntu 20.04/22.04、Debian\n  11/12）动态库不兼容；x86_64/arm64/riscv64/i686/armv7l 五架构统一基线，\n  多发行版兼容性回归到位。\n- 核心机制（蓝图调度、双思考、GCCP、GRAD、任务大厅）经端到端专项验证，\n  全部守护进程 RPC 方法经完整回归测试。\n- 全部变更经完整编译与端到端验证后发布。",
+      "notes": "# AgentRT v0.1.7 — 终端交互重构与版本 SSoT 防漂移\n\n0.1.7 依据社区反馈系统化重构 CLI/TUI 终端交互，并清零全部构建期版本\n污染：CLI 三段式改流式直出、英雄区弃用固定滚动区、TUI markdown 渲染\n与折叠/滚动重构、首次启动向导修复、版本单一权威源全面收敛。\n\n## 变更\n\n- **CLI 三段式 → 流式直出**：弃用「预览 → 擦除 → 重绘」的 ANSI 光标\n  操作（跨终端/管道易重叠乱码），回复逐块直出即终态；工具轮中间叙述\n  不再擦除折叠，与工具卡片自然分层。\n- **CLI 英雄区改版**：弃用固定 6 行蓝框 + 滚动区固定布局，改为 3 行\n  紧凑头部（品牌/版本 + 三模型槽），随内容自然滚动——普通终端上下\n  滚动恢复如常。\n- **TUI markdown 渲染强化**：连续软换行合并为段落并自动留白；新增\n  链接下划线、删除线、分隔线、图片占位渲染；标题后留白——解决\n  \"文字挤在一起、阅读困难\"。\n- **TUI 折叠与滚动解耦**：滚动基于稳定折叠视图，不再\"一滚就展开\"\n  导致视口跳变；Alt+E 展开/折叠思考链与长回复。\n- **TUI 首启向导修复**：从步骤 4/5 返回步骤 3 恢复模型基本字段快照\n  （此前残留高级字段致渲染错乱）；数字 1-3 直达生效（此前仅提示）。\n\n## 修复\n\n- **版本号 SSoT 防漂移（构建污染清零）**：Windows 安装器兜底版本\n  v0.1.6b、README/SECURITY 徽章、Cargo.toml、CMakeLists 兜底、注释\n  0.1.6y 等全部收敛至 0.1.7；gateway_d /health 与 TUI 系统头版本注入\n  缺失修复（0.1.6h 包曾误报 0.1.6c）。\n- **TUI 系统头版本陈旧**：容器构建按版本标记重建 TUI 二进制，杜绝\n  旧版 TUI 进包（此前 /pkg 持久卷残留旧二进制被跳过重建）。\n- **i686 / armv7l 包缺失 Rust TUI**：此前两架构交叉构建 TUI 时 cc-rs\n  找不到交叉 C 编译器（工具链 bin 不在宿主 PATH），且 GNU ld 按默认\n  /usr/<triple> 路径找不到 libc 致链接失败，包内只有 C CLI 包装。现\n  在构建时注入工具链 bin 到 PATH、并以 --sysroot 指向工具链 root，\n  五架构包全部内置 agentrt-tui。\n\n## 质量\n\n- 全量变更经编译与单元测试验证：TUI 109 项测试全过，CLI 五架构统一\n  按 ubuntu:20.04（glibc 2.31）基线构建。\n- 五架构二进制（x86_64/arm64/riscv64/i686/armv7l）版本号与发布版本\n  一致。",
       "artifacts": {
         "linux-arm32": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6h/agentrt-v0.1.6h-linux-arm32.tar.gz",
-          "sha256": "62d1f8fb972df750f9b5323d9d26a44c89fce41ca7d72b1044d57f1ff40969c4",
-          "size": 34060263
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.7/agentrt-v0.1.7-linux-arm32.tar.gz",
+          "sha256": "cf229029bfeb32cf3796a7625da38c11926bc705c6537ead64e0b5f28b620aee",
+          "size": 36849113
         },
         "linux-arm64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6h/agentrt-v0.1.6h-linux-arm64.tar.gz",
-          "sha256": "246fc20e01d621121dad32cc6166bf8bf508ea4ff38e9a832c9c188df8f8b44d",
-          "size": 38877129
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.7/agentrt-v0.1.7-linux-arm64.tar.gz",
+          "sha256": "2ba657ec93d912511a46ab587c288bb36dbde59cb92f72062369d3a567b8c45a",
+          "size": 38879248
         },
         "linux-riscv64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6h/agentrt-v0.1.6h-linux-riscv64.tar.gz",
-          "sha256": "cac4307164f8da34e414201003a3e332a4e3b71327c35415a187590d873037c3",
-          "size": 41076968
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.7/agentrt-v0.1.7-linux-riscv64.tar.gz",
+          "sha256": "503ff02ca364eee378a95fa12392e51145618dc768b2d323553eed469da52b29",
+          "size": 41082259
         },
         "linux-x64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6h/agentrt-v0.1.6h-linux-x64.tar.gz",
-          "sha256": "4bc8269acb36659e15102075c55334e2514f6c8b848ba0baafe92942f552f26c",
-          "size": 40288674
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.7/agentrt-v0.1.7-linux-x64.tar.gz",
+          "sha256": "bd72e9e4783353d548d5eeafb605fa9993d1813faeacbca7aab5dc4e7bbf05c2",
+          "size": 40287598
         },
         "linux-x86": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6h/agentrt-v0.1.6h-linux-x86.tar.gz",
-          "sha256": "c6c58b256e72137c8ac331baf67a56c87e51ca37f97fc99701e71e8a974fbedb",
-          "size": 35914956
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.7/agentrt-v0.1.7-linux-x86.tar.gz",
+          "sha256": "0d03f6aac5ba35cd6fa4ac76231d86d5cfc6962d1080052e769c5eea21dd44b0",
+          "size": 39259099
         },
         "linux-armv7l": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6h/agentrt-v0.1.6h-linux-arm32.tar.gz",
-          "sha256": "62d1f8fb972df750f9b5323d9d26a44c89fce41ca7d72b1044d57f1ff40969c4",
-          "size": 34060263
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.7/agentrt-v0.1.7-linux-arm32.tar.gz",
+          "sha256": "cf229029bfeb32cf3796a7625da38c11926bc705c6537ead64e0b5f28b620aee",
+          "size": 36849113
         },
         "linux-aarch64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6h/agentrt-v0.1.6h-linux-arm64.tar.gz",
-          "sha256": "246fc20e01d621121dad32cc6166bf8bf508ea4ff38e9a832c9c188df8f8b44d",
-          "size": 38877129
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.7/agentrt-v0.1.7-linux-arm64.tar.gz",
+          "sha256": "2ba657ec93d912511a46ab587c288bb36dbde59cb92f72062369d3a567b8c45a",
+          "size": 38879248
         },
         "linux-x86_64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6h/agentrt-v0.1.6h-linux-x64.tar.gz",
-          "sha256": "4bc8269acb36659e15102075c55334e2514f6c8b848ba0baafe92942f552f26c",
-          "size": 40288674
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.7/agentrt-v0.1.7-linux-x64.tar.gz",
+          "sha256": "bd72e9e4783353d548d5eeafb605fa9993d1813faeacbca7aab5dc4e7bbf05c2",
+          "size": 40287598
         },
         "linux-i686": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.6h/agentrt-v0.1.6h-linux-x86.tar.gz",
-          "sha256": "c6c58b256e72137c8ac331baf67a56c87e51ca37f97fc99701e71e8a974fbedb",
-          "size": 35914956
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.7/agentrt-v0.1.7-linux-x86.tar.gz",
+          "sha256": "0d03f6aac5ba35cd6fa4ac76231d86d5cfc6962d1080052e769c5eea21dd44b0",
+          "size": 39259099
         }
       }
     }
