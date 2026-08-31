@@ -610,8 +610,12 @@ QpegwKdM5Y9YiANOL8FODQ==
 # 2026-08-29 修复：v0.1.5a 字母后缀曾触发 bash 算术错误
 # （"5a: value too great for base"）导致 ver_cmp 误判相等，0.1.5 用户
 # 无法自动升级到 0.1.5a。数字部分强制 10# 十进制（防前导零）。
+# 0.1.6h 修复：剥除字段首字母前缀（如双 v 产生的 "v0"），杜绝
+# "10#v0: value too great for base" 静默判等。
 field_cmp() {
     local x="$1" y="$2" xn="" yn="" xl="" yl=""
+    while [ -n "$x" ] && [[ "$x" == [a-zA-Z]* ]]; do x="${x#?}"; done
+    while [ -n "$y" ] && [[ "$y" == [a-zA-Z]* ]]; do y="${y#?}"; done
     xn="${x%%[a-zA-Z]*}"; xl="${x#$xn}"
     yn="${y%%[a-zA-Z]*}"; yl="${y#$yn}"
     xn="${xn:-0}"; yn="${yn:-0}"
@@ -643,8 +647,12 @@ ver_cmp() { # <a> <b>
     if [ -z "$apr" ] && [ -z "$bpr" ]; then echo 0; return; fi
     if [ -z "$apr" ]; then echo 1; return; fi   # 正式版 > prerelease
     if [ -z "$bpr" ]; then echo -1; return; fi
-    local an="${apr##*.}" bn="${bpr##*.}"
-    (( 10#$an > 10#$bn )) && echo 1 || { (( 10#$an < 10#$bn )) && echo -1 || echo 0; }
+    # prerelease 数字段比较（beta.1/rc.2）；无点分段（beta）视为 .0，
+    # 统一走 field_cmp（0.1.6h：原 10# 算术对非纯数字段静默判等）
+    local an bn
+    an="${apr##*.}"; [ "$an" = "$apr" ] && an="0"
+    bn="${bpr##*.}"; [ "$bn" = "$bpr" ] && bn="0"
+    echo "$(field_cmp "$an" "$bn")"
 }
 
 # 当前平台键（manifest artifacts 键名，与打包命名对齐）：linux-x64 / macos-arm64
@@ -781,10 +789,12 @@ apply_package() { # <tarball> [expect_sha]
     tar -xzf "$tarball" -C "$TMPD" || { log error "解压失败"; rm -rf "$TMPD"; return 1; }
     local extracted="$(find "$TMPD" -maxdepth 1 -type d -name 'agentrt-*' | head -1)"
     [ -n "$extracted" ] || { log error "包结构异常（缺 agentrt-* 顶层目录）"; rm -rf "$TMPD"; return 1; }
-    local new_ver="$(basename "$extracted" | sed 's/^agentrt-//')"
+    local new_ver="$(basename "$extracted" | sed -e 's/^agentrt-//' -e 's/^v//')"
     # 备份当前版本
     local cur_ver="$(sed -n 's/^AIRY_VERSION=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
-    local bkup="$AIRY_HOME/.rollback/${cur_ver:-pre-update}"
+    # 0.1.6h 修复：备份目录带时间戳——同版本重复更新会覆盖上次备份，
+    # 回滚失去意义；保留最近 3 份（尾部清理逻辑已在）。
+    local bkup="$AIRY_HOME/.rollback/${cur_ver:-pre-update}-$(date +%Y%m%d%H%M%S)"
     rm -rf "$bkup"; mkdir -p "$bkup"
     for d in bin lib include share; do
         [ -d "$AIRY_HOME/$d" ] && cp -r "$AIRY_HOME/$d" "$bkup/" 2>/dev/null || true
@@ -807,8 +817,18 @@ apply_package() { # <tarball> [expect_sha]
     fi
     # 同步签名公钥（新包自带时）
     [ -f "$extracted/keys/agentrt.asc" ] && cp -f "$extracted/keys/agentrt.asc" "$AIRY_HOME/keys/" 2>/dev/null || true
+    # 0.1.6h 修复：清理旧版本独有文件（"更新没覆盖旧制品"根因）。
+    # 热替换只 cp -f 覆盖同名文件，旧版本独有 bin/*_d 等全部残留，
+    # 启动器按 bin/*_d 自动推导会把残留旧 daemon 一并拉起。
+    for d in bin lib include share; do
+        [ -d "$AIRY_HOME/$d" ] && [ -d "$extracted/$d" ] || continue
+        for f in "$AIRY_HOME/$d"/*; do
+            [ -f "$f" ] || continue
+            [ -e "$extracted/$d/$(basename "$f")" ] || rm -f "$f"
+        done
+    done
     # 自检：关键二进制存在（防止不完整包静默替换导致 daemon 群起不来）
-    if [ ! -x "$AIRY_HOME/bin/airy_cli" ] && [ ! -x "$AIRY_HOME/bin/agentrt-bootstrap.sh" ]; then
+    if [ ! -x "$AIRY_HOME/bin/airy_cli" ] || [ ! -x "$AIRY_HOME/bin/agentrt-bootstrap.sh" ]; then
         log error "热替换自检失败（bin/ 关键组件缺失），自动回滚…"
         for d in bin lib include share; do
             [ -d "$bkup/$d" ] && cp -rf "$bkup/$d"/* "$AIRY_HOME/$d/" 2>/dev/null || true
@@ -861,14 +881,29 @@ apply_package() { # <tarball> [expect_sha]
 # 更新/重装后回收仍驻留内存的旧版本 daemon 群：热替换只换磁盘二进制，
 # 运行中的进程仍执行旧代码（含旧 so 映射），必须回收；下次 airymaxrt
 # 启动自然拉起新版本。pkill -f 按绝对路径匹配，避免误杀其他实例。
-# 0.1.6y 自动计算：清单以 bin/*_d 推导（daemon 增删不再改脚本硬编码）。
+# daemon 清单以 bin/*_d 推导（增删不再改脚本硬编码）。
+# 0.1.6h 修复：相对路径/cwd 启动的旧实例按 /proc/<pid>/exe 精确匹配
+# 本安装根二进制后 kill；不用全局 pkill -x（曾误杀其他安装实例）。
 stop_running_daemons() {
-    local found=0 d
+    local found=0 d n p exe
     for d in "$AIRY_HOME"/bin/*_d; do
         [ -f "$d" ] || continue
         d="${d##*/}"
-        if [ -x "$AIRY_HOME/bin/$d" ] && pkill -f "$AIRY_HOME/bin/$d" >/dev/null 2>&1; then
-            found=1
+        if [ -x "$AIRY_HOME/bin/$d" ]; then
+            pkill -f "$AIRY_HOME/bin/$d" >/dev/null 2>&1 && found=1
+            # 精确兜底（相对路径/独立 cwd 启动的旧实例）：仅终止二进制
+            # 实际位于本安装根的同名进程。禁止全局 pkill -x（曾误杀其他
+            # 安装实例的整群 daemon，多实例隔离破坏，2026-08-31 实测）。
+            # Linux 专用（/proc 判 exe）；macOS 无 /proc，主匹配已覆盖。
+            if [ -r /proc/self/exe ] && command -v pgrep >/dev/null 2>&1; then
+                for p in $(pgrep -x "$d" 2>/dev/null); do
+                    exe="$(readlink "/proc/$p/exe" 2>/dev/null)"
+                    [ "${exe%% *}" = "$AIRY_HOME/bin/$d" ] || continue
+                    kill "$p" 2>/dev/null && found=1
+                done
+            fi
+            # 清理残留 socket：进程已停但 socket 文件可能残留，
+            # 下次 _sock_alive 探测连接会拒绝，无需手动删（由拉起逻辑处理）
         fi
     done
     if [ "$found" = "1" ]; then
@@ -908,9 +943,11 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
         for d in bin lib include share; do
             [ -d "$rb/$d" ] && cp -rf "$rb/$d"/* "$AIRY_HOME/$d/" 2>/dev/null || true
         done
-        # 恢复版本号（备份目录名即被回滚版本的 AIRY_VERSION）
+        # 恢复版本号（备份目录名 = <版本>-<时间戳>；剥离时间戳后缀，
+        # 否则 AIRY_VERSION 被写成 v0.1.6g-20260831191248，后续版本比较错乱）
         if [ -f "$inst_env" ]; then
             local rb_ver="$(basename "$rb")"
+            rb_ver="$(printf '%s' "$rb_ver" | sed -E 's/-[0-9]{14}$//')"
             if [ "$rb_ver" != "pre-update" ]; then
                 sed_inplace "s|^AIRY_VERSION=.*|AIRY_VERSION=${rb_ver}|" "$inst_env" || \
                     printf 'AIRY_VERSION=%s\n' "$rb_ver" >> "$inst_env"
@@ -1292,6 +1329,11 @@ case "$CMD" in
         if [ -f "$inst" ]; then
             log info "委托安装器执行重装: $inst"
             shift
+            # 0.1.6h 修复：非默认位置安装的用户重装到错误路径（install.sh
+            # 强制忽略环境变量 AIRY_HOME，防残留劫持）；显式传 --prefix。
+            if [ "$AIRY_HOME" != "${HOME}/.airymaxrt" ]; then
+                exec sh "$inst" --reinstall --prefix "$AIRY_HOME" "$@"
+            fi
             exec sh "$inst" --reinstall "$@"
         else
             log warn "未找到安装器脚本: $inst（请重新运行官方 install.sh 一键安装）"
@@ -1733,6 +1775,11 @@ else
     else
         log info "gateway 复用在线实例（$GATEWAY_URL），本次会话不接管其生命周期"
     fi
+    # 0.1.6h 修复：把实际 gateway 端口固化到运行时文件 run/gateway.port。
+    # 根因：端口被占漂移到 8083+ 后，轻量启动器/TUI 仍硬编码 8080，
+    # 导致"界面能进、网关拉不到/每次启动重复拉起"；统一从该文件读取。
+    mkdir -p "$RUNTIME_DIR" 2>/dev/null || true
+    printf '%s\n' "$GATEWAY_PORT" > "$RUNTIME_DIR/gateway.port" 2>/dev/null || true
 
     # ---- 统一等待全部 daemon socket 就绪（并行探测，0.25s 粒度）----
     wait_all_socks() {
