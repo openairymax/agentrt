@@ -592,7 +592,7 @@ install_binary() {
     local extracted
     extracted="$(find "${AIRY_HOME}/tmp" -maxdepth 1 -type d -name 'agentrt-*' | head -1)"
     [ -n "$extracted" ] || { log_warn "release 包结构异常，回退源码构建"; return 1; }
-    # 0.1.6y 自动计算：daemon 清单以制品 bin/*_d 为准（后续 daemon 增删不再
+    # 0.1.7 自动计算：daemon 清单以制品 bin/*_d 为准（后续 daemon 增删不再
     # 改脚本硬编码；gateway_d 为 HTTP 服务亦属 *_d 自动纳入）。
     EXPECTED_DAEMONS="$(for _f in "${extracted}"/bin/*_d; do [ -f "$_f" ] && basename "$_f"; done)"
     # bin/ 拷贝必须 fail-closed：静默失败（磁盘/权限/残留干扰）会导致 daemon

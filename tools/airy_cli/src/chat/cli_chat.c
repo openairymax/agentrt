@@ -160,10 +160,9 @@ void cli_chat_reply(const char *input)
         llm_response_t *resp = NULL;
         int ret;
         if (stream_mode) {
-            /* 交互 TTY 流式：计量本轮直出预览的行数（折叠擦除用）与
-             * 连接/思考进度反馈，全部收敛在 cli_chat_stream_round。 */
-            int folding = !g_cli_print_mode;
-            ret = cli_chat_stream_round(g_chat_adapter, &cfg, folding, &resp);
+            /* 交互 TTY 流式：正文直出即终态（0.1.7：不再计量/擦除重绘），
+             * 连接/思考进度反馈收敛在 cli_chat_stream_round。 */
+            ret = cli_chat_stream_round(g_chat_adapter, &cfg, &resp);
         } else {
             ret = llm_svc_adapter_complete(g_chat_adapter, &cfg, &resp);
         }
@@ -190,36 +189,15 @@ void cli_chat_reply(const char *input)
         int has_tools =
             resp->choices[0].tool_calls_json && resp->choices[0].tool_calls_json[0];
         if (has_tools && !force_summary && tool_rounds < CLI_CHAT_TOOL_MAX_ROUNDS) {
-            /* 层级修复（2026-08-20）：工具轮中间叙述（"第一次搜索不太
-             * 直接…"）流式直出后与工具卡片拼接在同一行，层级混乱。
-             * 先擦除本轮流式直出的中间叙述预览，折叠为一行弱化摘要，
-             * 工具卡片从新行独立渲染——过程叙述 / 工具卡片 / 最终
-             * 结果三层清晰分隔（2.3.12 层级编排）。 */
-            if (stream_mode && g_chat_fold_phys > 0 && cli_term_is_tty()) {
-                fflush(stdout);
-                size_t up = g_chat_fold_phys;
-                if (g_chat_fold_tail_no_nl && up > 0)
-                    up -= 1;
-                /* CUU 参数 0 在 ANSI 中等于默认值 1（上移 1 行）！
-                 * up=0 时必须避免 `\033[0A`（会误删上一行内容），
-                 * 改用回车 + 清当前行。 */
-                char erase[32];
-                int en;
-                if (up > 0)
-                    en = snprintf(erase, sizeof(erase), "\033[%zuA\r\033[J", up);
-                else
-                    en = snprintf(erase, sizeof(erase), "\r\033[2K");
-                if (en > 0)
-                    fwrite(erase, 1, (size_t)en, stdout);
-                fflush(stdout);
-                g_chat_fold_phys = 0;
-                g_chat_fold_tail_no_nl = 0;
-                /* 中间叙述折叠为一行弱化摘要（保留首行 + 折叠尾） */
+            /* 工具轮中间叙述已随流式直出（0.1.7：不再擦除折叠——擦除依赖
+             * ANSI 光标上移，跨终端/管道易重叠乱码）。只需保证叙述与工具
+             * 卡片分层：叙述末尾无换行时补一个，工具卡片从新行独立渲染。 */
+            if (stream_mode && cli_term_is_tty()) {
                 const char *mid = resp->choices[0].content;
                 if (mid && mid[0]) {
-                    cli_render_role_line(CLI_ROLE_TRACE, cli_chat_think_actor(),
-                                         "分析", NULL);
-                    cli_render_collapsed(mid, 2, 1, 1);
+                    size_t mlen = strlen(mid);
+                    if (mlen > 0 && mid[mlen - 1] != '\n')
+                        cli_outc('\n');
                 }
             }
             if (cli_chat_tool_round(&buf, resp) == 0) {

@@ -94,7 +94,7 @@ void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
          * 明确告警，stdout 保持空串可解析（脚本不被打断）。 */
         if (!stream_mode)
             cli_outf("%s\n", render_content);
-        else if (final_content[0] == '\0' && g_chat_fold_phys == 0)
+        else if (final_content[0] == '\0')
             fprintf(stderr,
                     "[chat] warning: empty reply (model returned no text; "
                     "reasoning-only or provider error)\n");
@@ -102,45 +102,22 @@ void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
         cli_tui_t *r_tui = cli_tui_get_default();
         (void)r_tui;
         if (stream_mode) {
-            /* 交互 TTY 流式：擦除打字机预览，重绘最终形态。
-             * 上移行数：末尾无换行（光标在最后一行行尾）时 = phys-1，
-             * 否则 = phys；\r 回行首再 \033[J 清屏（CUU 只移行不移列，
-             * 直接清会残留列尾内容）。擦除前强制 flush：预览/进度行
-             * 全部落盘后再移动光标，避免 stdio 缓冲重排造成擦除错位。 */
-            if (g_chat_fold_phys > 0 && cli_term_is_tty()) {
-                fflush(stdout);
-                size_t up = g_chat_fold_phys;
-                if (g_chat_fold_tail_no_nl && up > 0)
-                    up -= 1;
-                /* CUU 参数 0 = 默认值 1（ANSI），up=0 时避免 `\033[0A`
-                 * 误删上一行，改用回车 + 清当前行。 */
-                char erase[32];
-                int en;
-                if (up > 0)
-                    en = snprintf(erase, sizeof(erase), "\033[%zuA\r\033[J", up);
-                else
-                    en = snprintf(erase, sizeof(erase), "\r\033[2K");
-                if (en > 0)
-                    fwrite(erase, 1, (size_t)en, stdout);
-                fflush(stdout);
-            }
-            /* 2.3.5/2.3.14：thinking 模型的思考过程以 [Dual Think] 折叠
-             * 呈现（前几行 + 折叠尾），避免碎片刷屏，又让用户看到模型
-             * 确实在思考；浏览/日志可看全量。 */
-            if (final_resp->choices && final_resp->choice_count > 0 &&
-                final_resp->choices[0].reasoning_content &&
-                final_resp->choices[0].reasoning_content[0]) {
+            /* 交互 TTY 流式（0.1.7 终态直出）：正文已随流式逐块上屏，
+             * 不再「擦除预览 + 重绘最终形态」——原方案依赖 ANSI 光标
+             * 上移计量（g_chat_fold_phys），跨终端/管道易重叠乱码。
+             * 收尾仅两件事：①空回复兜底提示；②思考链折叠附加在
+             * 回复之后（思考过程已隐藏，落定后补上，浏览/日志可见）。 */
+            if (final_content[0] == '\0') {
+                cli_render_super_agent(CLI_REPLY_EMPTY_HINT);
+            } else if (final_resp->choices && final_resp->choice_count > 0 &&
+                       final_resp->choices[0].reasoning_content &&
+                       final_resp->choices[0].reasoning_content[0]) {
+                /* 正文末尾补空行分层，思考链折叠展示 */
+                cli_outc('\n');
                 cli_render_role_line(CLI_ROLE_DUAL_THINK, cli_chat_think_actor(),
                                      "思考", NULL);
                 cli_render_collapsed(final_resp->choices[0].reasoning_content,
                                      4, CLI_REPLY_FOLD_KEEP, 1);
-            }
-            if (final_content[0] != '\0') {
-                /* 结果完整渲染，不折叠（2026-08-19：仅折叠思考链，
-                 * 结果必须完整展示；长结果靠终端滚动/TUI 视口浏览）。 */
-                cli_render_super_agent(render_content);
-            } else {
-                cli_render_super_agent(CLI_REPLY_EMPTY_HINT);
             }
         } else {
             /* TUI / 非流式交互：思考链折叠展示（进历史）；结果完整渲染
