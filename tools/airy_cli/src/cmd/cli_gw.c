@@ -43,13 +43,59 @@
 #define CLI_GW_RECV_CHUNK 8192
 #define CLI_GW_MAX_BODY (64u * 1024u * 1024u) /* 64MiB 响应上限 */
 
+/* cli_gw: 网关 RPC 客户端错误描述缓冲（cli_err_desc 优先消费，一次性） */
+char g_cli_gw_err[256] = "";
+
+/* 读取 $AIRY_HOME/run/gateway.port（完整启动器在端口漂移后固化实际端口）。
+ * 0.1.6h：gateway 被占漂移 8083+ 后，CLI 硬编码 8080 会"网关不在线"；
+ * 与 TUI/轻量启动器同源读取，根治端口漂移断连。 */
+static int cli_gw_read_runtime_port(void)
+{
+    const char *home = getenv("AIRY_HOME");
+    char path[512];
+    if (!home || !*home)
+        home = "$HOME"; /* 占位，实际下面展开 */
+    if (!home || !*home || home[0] == '$') {
+        const char *h = getenv("HOME");
+        if (!h || !*h)
+            return -1;
+        snprintf(path, sizeof(path), "%s/.airymaxrt/run/gateway.port", h);
+    } else {
+        snprintf(path, sizeof(path), "%s/run/gateway.port", home);
+    }
+    FILE *fp = fopen(path, "r");
+    if (!fp)
+        return -1;
+    char buf[32] = "";
+    if (fgets(buf, sizeof(buf), fp) == NULL) {
+        fclose(fp);
+        return -1;
+    }
+    fclose(fp);
+    /* 仅接受纯数字端口 */
+    int p = 0;
+    for (char *s = buf; *s; s++) {
+        if (*s == '\n' || *s == '\r')
+            break;
+        if (*s < '0' || *s > '9')
+            return -1;
+        p = p * 10 + (*s - '0');
+    }
+    return (p > 0 && p <= 65535) ? p : -1;
+}
+
 void cli_gw_endpoint(char *host, size_t host_len, int *port)
 {
     *port = CLI_GW_DEFAULT_PORT;
     AIRY_STRNCPY_TERM(host, CLI_GW_DEFAULT_HOST, host_len);
     const char *gw = getenv("AIRY_GATEWAY_URL");
-    if (!gw || !*gw)
+    if (!gw || !*gw) {
+        /* 0.1.6h：无显式 URL 时读取运行时实际端口（端口漂移兼容） */
+        int rp = cli_gw_read_runtime_port();
+        if (rp > 0)
+            *port = rp;
         return;
+    }
     /* 支持 http://host:port / host:port 两种形态 */
     const char *h = strstr(gw, "://");
     const char *start = h ? h + 3 : gw;
@@ -443,10 +489,15 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
     size_t rlen = 0;
     if (cli_gw_exchange(host, port, "/", body, timeout_ms, &resp, &rlen) != 0) {
         AIRY_FREE(resp);
+        /* 0.1.6h 友好化：网关不可达给出可执行提示（原仅日志 WARN） */
+        snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
+                 "网关不在线（%s:%d），请运行 airymaxrt 启动服务", host, port);
         AIRY_LOG_WARN("cli_gw: gateway unreachable at %s:%d (method=%s)", host, port, method);
         return -1;
     }
     if (!resp) {
+        snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
+                 "网关响应为空，请检查 %s 服务状态", host);
         return -1;
     }
     /* 提取 JSON-RPC result（忽略 id 字段） */
@@ -456,6 +507,21 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
         return -1;
     cJSON *err = cJSON_GetObjectItem(root, "error");
     if (err) {
+        /* 0.1.6h 友好化：解析 error 详情，避免裸 JSON-RPC 刷屏 */
+        cJSON *code = cJSON_GetObjectItem(err, "code");
+        cJSON *msg = cJSON_GetObjectItem(err, "message");
+        int c = code && cJSON_IsNumber(code) ? (int)code->valuedouble : 0;
+        const char *m = msg && cJSON_IsString(msg) ? msg->valuestring : "";
+        if (c == -32603)
+            snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
+                     "网关服务内部错误（%s），请查看 %s/logs/gateway_d.out",
+                     m[0] ? m : "Internal error", getenv("AIRY_HOME") ? getenv("AIRY_HOME") : "~/.airymaxrt");
+        else if (c == -32601)
+            snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
+                     "网关不支持该方法（%s）", method);
+        else
+            snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
+                     "网关服务异常（code=%d%s%s）", c, m[0] ? " " : "", m);
         cJSON_Delete(root);
         return -1;
     }

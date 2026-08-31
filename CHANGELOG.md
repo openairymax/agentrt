@@ -47,13 +47,13 @@
 
 ### Fixed
 
-- **安装器/更新器系统性修复（树莓派 arm32 安装/更新链路）**：
+- **安装器/更新器系统性修复（32 位 ARM 安装/更新链路）**：
   - curl 符号崩溃全量隔离：`syscurl()` 剔除 `$AIRY_HOME/lib` 后调
     系统 curl，覆盖完整启动器 / 一键安装器 6 处 / 轻量启动器模板
-    2 处（原 `airymaxrt update` 树莓派必崩）；
+    2 处（原 `airymaxrt update` 在 32 位 ARM 必崩）；
   - 解压前清理**结构性重排**：清理动作前移到下载之前执行（原在下载
     之后、解压之前，glob 一次误匹配即删除刚下载的 tarball 自身致
-    tar "Cannot open"，树莓派 arm32 安装实测）；顺序前移后任何清理
+    tar "Cannot open"，32 位 ARM 安装实测）；顺序前移后任何清理
     只能触及上一轮残留、永远无法影响本轮 tarball，辅以尾斜杠
     （`agentrt-*/`）只匹配旧解压目录，双重免疫该类故障；
   - 源码构建路径 `cmake --install` 与 daemon 产物 fail-closed（原
@@ -119,7 +119,7 @@
     （新启动器遇旧 manifest、旧安装器遇新 manifest 均能更新）；
   - "无可用制品"错误补充补救指引（提示重新执行一键安装更新安装器）。
 
-- **syscurl 隔离（根治树莓派 `curl_easy_ssls_import` 崩溃）**：airymaxrt
+- **syscurl 隔离（根治 32 位 ARM `curl_easy_ssls_import` 崩溃）**：airymaxrt
   全局注入 `$AIRY_HOME/lib` 到 LD_LIBRARY_PATH 使 daemon 群解析包内
   .so，但同一注入劫持系统 curl（Debian/Ubuntu 新版 curl 依赖
   `curl_easy_ssls_import`，包内旧 libcurl 无此符号 → 崩溃）。0.1.6c 仅
@@ -129,15 +129,15 @@
   网络入口：
   - 完整启动器 `latest/airymaxrt`（update 制品下载 / manifest 拉取 /
     gateway ping）——0.1.6c 已隔离，本轮修复 update 流程残留的未隔离
-    curl 调用（未隔离行先执行、syscurl 行不可达，树莓派必崩）；
+    curl 调用（未隔离行先执行、syscurl 行不可达，32 位 ARM 必崩）；
   - 一键安装器 `scripts/install.sh`（manifest / tarball / 预编译模块 /
     安装器自举共 6 处 curl）——此前未隔离，宿主曾安装过 AgentRT 时
     安装器内 curl 同样崩溃；
   - 轻量启动器模板（`airymaxrt update` 完整启动器自举 + gateway ping）
-    ——此前未隔离，为树莓派 `airymaxrt update` 崩溃复发根因；模板内
+    ——此前未隔离，为 32 位 ARM `airymaxrt update` 崩溃复发根因；模板内
     嵌 POSIX（无 local）版 syscurl，dash 实测通过。
 
-- **tar 解压失败（树莓派 arm32 安装实测 2026-08-31）**：解压前清理
+- **tar 解压失败（32 位 ARM 安装实测 2026-08-31）**：解压前清理
   `tmp/agentrt-*` 的通配符同时匹配刚下载的 tarball 自身
   （`agentrt-v0.1.6f.tar.gz`），`rm -rf` 将其一并删除，随后
   `tar -xzf` 报 "Cannot open: No such file or directory" 且清理无法
@@ -415,7 +415,7 @@ TUI 文字不可复制、长工具循环 60s 截断、工具上限英文占位�
 
 #### Fixed
 
-- **意图分类误路由（CLI `cli_classify.c`）**：`task_marks` 全串 `strstr` 把"请帮我分析一下…在树莓派上**运行**容器化数据库…比较…"的"运行"（场景描述）判为命令，纯咨询问题被误送任务管线（GCCP 四问 + 执行计划）。修复：新增分析/评估/比较类咨询词层（分析/比较/对比/评估/总结/讲解/探讨/研讨/剖析/评测/评价/解析/区别/差异/优缺点/利弊/优劣），未含产物变更强动词（实现/修复/开发/构建/创建/部署/重构/迁移/安装/配置/删除/更新/下载/编写/生成/集成/改造）时判 chat；场景描述动词（运行/测试/检查/启动/停止）仅无描述性语境（"上运行"/"性能测试"/"安全检查"）时计 task。回归测试 44/44 + CLI 端到端实测
+- **意图分类误路由（CLI `cli_classify.c`）**：`task_marks` 全串 `strstr` 把"请帮我分析一下…在 ARM 设备上**运行**容器化数据库…比较…"的"运行"（场景描述）判为命令，纯咨询问题被误送任务管线（GCCP 四问 + 执行计划）。修复：新增分析/评估/比较类咨询词层（分析/比较/对比/评估/总结/讲解/探讨/研讨/剖析/评测/评价/解析/区别/差异/优缺点/利弊/优劣），未含产物变更强动词（实现/修复/开发/构建/创建/部署/重构/迁移/安装/配置/删除/更新/下载/编写/生成/集成/改造）时判 chat；场景描述动词（运行/测试/检查/启动/停止）仅无描述性语境（"上运行"/"性能测试"/"安全检查"）时计 task。回归测试 44/44 + CLI 端到端实测
 - **markdown 中文粗体渲染（CLI `cli_render.c`）**：`cli_emph_has_letter` 仅认 ASCII 字母，`**容器不是虚拟机**` 等中文粗体配对失败、闭合 `**` 泄漏到终端。修复：UTF-8 多字节序列视为字母；`6*7=42` 数学式仍保持字面
 - **L2 语义缓存命中率（atoms `rs_semantic_cache.c`/`roadmap_sched.c`）**：
   - 默认 θ 700→550 permille（语义命中仅作 L3 参考提示、安全；700 时 OSS bigram 路径与短中文意图近邻几乎无法过阈）

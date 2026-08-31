@@ -145,7 +145,7 @@ if [ -n "${AIRY_VERSION:-}" ]; then
 elif [ -f "$(dirname "$0")/../VERSION" ]; then
     AIRY_VERSION="v$(cat "$(dirname "$0")/../VERSION" | tr -d '[:space:]')"
 fi
-AIRY_VERSION="${AIRY_VERSION:-v0.1.6f}"
+AIRY_VERSION="${AIRY_VERSION:-v0.1.6h}"
 AIRY_BUILD_JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 AIRY_MODE="${AIRY_MODE:-auto}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
@@ -160,7 +160,7 @@ AIRY_CHANNEL="${AIRY_CHANNEL:-stable}"
 AIRY_FROM_FILE="${AIRY_FROM_FILE:-}"
 case "$AIRY_CHANNEL" in stable|beta) ;; *) log_err "非法 --channel: ${AIRY_CHANNEL}（支持 stable|beta）"; exit 1 ;; esac
 
-# 0.1.6f 系统性修复：curl 符号崩溃隔离（树莓派 arm32 实测 2026-08-31）。
+# 0.1.6f 系统性修复：curl 符号崩溃隔离（32 位 ARM 实测 2026-08-31）。
 # 宿主曾安装 AgentRT 时，agentrt-env.sh 会把 $AIRY_HOME/lib 注入
 # LD_LIBRARY_PATH；其中自编译 libcurl 与宿主 libssl 不匹配时直接调 curl
 # 报 "curl: symbol lookup error: undefined symbol: curl_easy_ssls_import,
@@ -213,6 +213,45 @@ fi
 EXPECTED_DAEMONS="monit_d observe_d info_d notify_d sched_d channel_d mem_d
                   llm_d tool_d hook_d plugin_d agent_d a2a_d market_d gateway_d
                   think_d cupolas_d maths_d"
+
+# ─── 安装器自举（系统性解决安装器无法更新，2026-08-30） ────────────────
+# AtomGit API 不支持删除/替换 release 附件，同版本重发后一键命令仍拿旧
+# 安装器。权威源定为 agentrt 仓 main 分支 scripts/install.sh（git push
+# 即生效），本机磁盘副本（含 $AIRY_HOME/scripts/install.sh 自托管副本）
+# 每次运行比对远程 hash，不同则用远程最新版重执行。curl 管道/stdin 场景
+# （$0 非文件）跳过；AIRY_INSTALLER_BOOTSTRAPPED 守卫防递归。
+#
+# 必须位于顶层参数解析（shift 消费 $@）之前调用并转发 "$@"：否则自举
+# re-exec 后 --prefix/--from-file/--reinstall/--uninstall 等全部丢失
+# （2026-08-31 实测：--prefix 落到默认目录、--from-file 被忽略改走网络）。
+installer_self_bootstrap() {
+    [ "${AIRY_INSTALLER_BOOTSTRAPPED:-0}" = "1" ] && return 0
+    [ -f "$0" ] || return 0
+    command -v python3 >/dev/null 2>&1 || return 0
+    command -v curl >/dev/null 2>&1 || return 0
+    local local_sha
+    local_sha="$(sha256sum "$0" 2>/dev/null | awk '{print $1}')"
+    [ -n "$local_sha" ] || return 0
+    local api="https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main"
+    local tmp remote_content remote_sha
+    tmp="$(syscurl -fsSL --max-time 30 "$api" 2>/dev/null)" || return 0
+    remote_content="$(printf '%s' "$tmp" | python3 -c 'import sys,json,base64;d=json.load(sys.stdin);sys.stdout.write(base64.b64decode(d.get("content","")).decode())' 2>/dev/null)" || return 0
+    [ -n "$remote_content" ] || return 0
+    remote_sha="$(printf '%s' "$remote_content" | sha256sum | awk '{print $1}')"
+    [ -n "$remote_sha" ] || return 0
+    [ "$remote_sha" = "$local_sha" ] && return 0
+    log_info "检测到安装器新版本，切换到远程最新版执行…"
+    export AIRY_INSTALLER_BOOTSTRAPPED=1
+    local tmp_inst
+    tmp_inst="$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/airymaxrt-installer.$$")"
+    printf '%s' "$remote_content" > "$tmp_inst" || { rm -f "$tmp_inst"; return 0; }
+    chmod 755 "$tmp_inst"
+    exec "$tmp_inst" "$@"
+}
+
+# 自举必须最先执行（顶层、参数解析之前）：让 --reinstall/--uninstall/
+# 全新安装都基于最新安装器，且保留完整命令行参数。
+installer_self_bootstrap "$@"
 
 # ─── 参数解析 ────────────────────────────────────────────────────────────
 while [ $# -gt 0 ]; do
@@ -429,7 +468,7 @@ install_binary() {
         case " ${SUPPORTED_ARCHS} " in
             *" ${arch} "*) ;;
             *)
-                # 兼容性指引（2026-08-30 树莓派 32 位用户空间教训）：不支持
+                # 兼容性指引（2026-08-30 32 位 ARM 用户空间教训）：不支持
                 # 的架构不静默回退，给出明确可操作的路径；返回 1 后主流程
                 # 仍会尝试源码构建兜底。
                 log_err "检测到架构 ${arch}，不在官方预编译发布清单（${SUPPORTED_ARCHS}）内"
@@ -506,7 +545,7 @@ install_binary() {
     # ── 解压前清理（结构性修复 0.1.6g）──────────────────────────────────
     # 铁律：清理必须在"下载"之前执行。历史根因：清理曾放在下载之后、
     # 解压之前，glob 一次误匹配（无尾斜杠）即删除刚下载的 tarball 自身
-    #（树莓派 arm32 安装实测 "tar: Cannot open: No such file or directory"）。
+    #（32 位 ARM 安装实测 "tar: Cannot open: No such file or directory"）。
     # 顺序前移后，任何清理都只能触及上一轮残留，永远无法影响本轮下载
     # 的 tarball；尾斜杠（agentrt-*/）保留，只匹配旧解压目录（杜绝 find
     # 命中旧目录 → 拷贝旧 bin / 版本误显示 0.1.6c 的历史故障）。
@@ -557,7 +596,7 @@ install_binary() {
     # 改脚本硬编码；gateway_d 为 HTTP 服务亦属 *_d 自动纳入）。
     EXPECTED_DAEMONS="$(for _f in "${extracted}"/bin/*_d; do [ -f "$_f" ] && basename "$_f"; done)"
     # bin/ 拷贝必须 fail-closed：静默失败（磁盘/权限/残留干扰）会导致 daemon
-    # 未就位却显示"全部就位"（树莓派 0.1.6e 实测：18 个就位但启动时
+    # 未就位却显示"全部就位"（0.1.6e 实测：18 个就位但启动时
     # llm_d No such file）。lib/ 已有同类校验，bin/ 补齐。
     mkdir -p "${AIRY_HOME}/bin"
     if [ -n "$EXPECTED_DAEMONS" ]; then
@@ -931,7 +970,7 @@ path_bootstrap() {
 # 与 airymaxrt 启动器 assess_hardware/detect_accel/detect_arch 同口径
 # （SSoT 单一判据，见 sdk/tui/scripts/airymaxrt）：
 #   minimal：MemTotal < 2.5GiB 或 MemAvailable < 1.5GiB 或 CPU 核数 < 3
-#     （端侧/低配设备：树莓派 4B 2GB 等，启动器仅拉起 llm/think/agent/tool
+#     （端侧/低配设备：2GB 内存级别 ARM 设备等，启动器仅拉起 llm/think/agent/tool
 #     核心 daemon，其余能力 daemon 裁剪，gateway 自动降级，避免 OOM）
 #   full：资源充足（大型服务器/个人电脑）
 # 加速器探测（nvidia-smi / rocm-smi / /dev/dri）记录到画像——为本地推理
@@ -943,7 +982,7 @@ detect_arch() {
     local _m _bits
     _m="$(uname -m 2>/dev/null)"
     # 用户空间位数复判（0.1.6c 教训）：uname -m 报告内核架构，64 位内核 +
-    # 32 位用户空间（树莓派 armhf / 老 x86 系统）会误报 64 位。以
+    # 32 位用户空间（armhf / 老 x86 系统）会误报 64 位。以
     # getconf LONG_BIT（用户空间 C long 位数）为主判据，缺失时用加载器
     # 存在性兜底。三架构（x86/ARM/RISC-V）的 32/64 位全覆盖。
     _bits="$(getconf LONG_BIT 2>/dev/null)"
@@ -1194,7 +1233,7 @@ export AIRY_HOME
 # 0.1.6f 系统性修复：curl 符号崩溃隔离（与安装器 syscurl 同构，无 local，
 # POSIX 兼容）。本启动器已注入 LD_LIBRARY_PATH=\$AIRY_HOME/lib，其中自编译
 # libcurl 与宿主 libssl 不匹配时 curl 报 "symbol lookup error: undefined
-# symbol: curl_easy_ssls_import, version CURL_OPENSSL_4" 崩溃（树莓派 arm32
+# symbol: curl_easy_ssls_import, version CURL_OPENSSL_4" 崩溃（32 位 ARM
 # airymaxrt update 实测）。管理命令自举与 gateway ping 等网络请求统一走
 # syscurl：剔除 \$AIRY_HOME/lib 后调系统 curl。
 syscurl() {
@@ -1307,13 +1346,18 @@ case "\$1" in
         #（含 daemon 群拉起 + 前端选择）；无缓存则本地 bootstrap start
         #（幂等：已运行实例复用，离线可用，无需网络）。
         _FULL="\$AIRY_HOME/bin/airymaxrt-full"
+        # 0.1.6h 修复：gateway 实际端口从运行时文件读取（完整启动器在
+        # 端口漂移后固化 run/gateway.port；缺省 8080），根治"端口漂移后
+        # 硬编码 8080 探测永远判离线、TUI 连不上"
+        _GWP="\$(sed -n '1s/[^0-9]//gp' "\$AIRY_HOME/run/gateway.port" 2>/dev/null | head -1)"
+        _GWP="\${_GWP:-8080}"
         if [ -s "\$_FULL" ]; then
             exec bash "\$_FULL"
         fi
         if [ -x "\$AIRY_HOME/bin/agentrt-bootstrap.sh" ]; then
             _GW_READY=0
             if command -v curl >/dev/null 2>&1; then
-                syscurl -fsS --max-time 1 -X POST http://127.0.0.1:8080/ \
+                syscurl -fsS --max-time 1 -X POST "http://127.0.0.1:\$_GWP/" \
                     -H 'Content-Type: application/json' \
                     -d '{"jsonrpc":"2.0","id":1,"method":"ping","params":{}}' \
                     >/dev/null 2>&1 && _GW_READY=1
@@ -1328,14 +1372,15 @@ esac
 # 前端选择（与完整启动器一致）：有 TTY 且 TUI 可用 → TUI；否则 → airy_cli
 # 流式（非 TTY 环境，stdin 读指令）。修复旧版无 TTY 时透传参数给
 # agentrt-tui 报 "unexpected argument" 的问题。
+# 0.1.6h：TUI 显式传实际 gateway 端口（run/gateway.port），防端口漂移断连。
 if [ -t 0 ] && [ -t 1 ] && [ -x "\$AIRY_HOME/bin/agentrt-tui" ]; then
-    exec "\$AIRY_HOME/bin/agentrt-tui"
+    exec "\$AIRY_HOME/bin/agentrt-tui" --gateway-url "http://127.0.0.1:\${_GWP:-8080}"
 fi
 if [ -x "\$AIRY_HOME/bin/airy_cli" ]; then
     exec "\$AIRY_HOME/bin/airy_cli" -p
 fi
 if [ -x "\$AIRY_HOME/bin/agentrt-tui" ]; then
-    exec "\$AIRY_HOME/bin/agentrt-tui"
+    exec "\$AIRY_HOME/bin/agentrt-tui" --gateway-url "http://127.0.0.1:\${_GWP:-8080}"
 fi
 echo "airymaxrt: 未找到可执行前端（agentrt-tui / airy_cli 均缺失）" >&2
 exit 1
@@ -1553,40 +1598,7 @@ print_path_guidance() {
 }
 
 # ─── 主流程 ────────────────────────────────────────────────────────────
-# 安装器自举（系统性解决安装器无法更新，2026-08-30）：
-# AtomGit API 不支持删除/替换 release 附件，同版本重发后一键命令仍拿旧
-# 安装器。权威源定为 agentrt 仓 main 分支 scripts/install.sh（git push
-# 即生效），本机磁盘副本（含 $AIRY_HOME/scripts/install.sh 自托管副本）
-# 每次运行比对远程 hash，不同则用远程最新版重执行。curl 管道/stdin 场景
-# （$0 非文件）跳过；AIRY_INSTALLER_BOOTSTRAPPED 守卫防递归。
-installer_self_bootstrap() {
-    [ "${AIRY_INSTALLER_BOOTSTRAPPED:-0}" = "1" ] && return 0
-    [ -f "$0" ] || return 0
-    command -v python3 >/dev/null 2>&1 || return 0
-    command -v curl >/dev/null 2>&1 || return 0
-    local local_sha
-    local_sha="$(sha256sum "$0" 2>/dev/null | awk '{print $1}')"
-    [ -n "$local_sha" ] || return 0
-    local api="https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main"
-    local tmp remote_content remote_sha
-    tmp="$(syscurl -fsSL --max-time 30 "$api" 2>/dev/null)" || return 0
-    remote_content="$(printf '%s' "$tmp" | python3 -c 'import sys,json,base64;d=json.load(sys.stdin);sys.stdout.write(base64.b64decode(d.get("content","")).decode())' 2>/dev/null)" || return 0
-    [ -n "$remote_content" ] || return 0
-    remote_sha="$(printf '%s' "$remote_content" | sha256sum | awk '{print $1}')"
-    [ -n "$remote_sha" ] || return 0
-    [ "$remote_sha" = "$local_sha" ] && return 0
-    log_info "检测到安装器新版本，切换到远程最新版执行…"
-    export AIRY_INSTALLER_BOOTSTRAPPED=1
-    local tmp_inst
-    tmp_inst="$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/airymaxrt-installer.$$")"
-    printf '%s' "$remote_content" > "$tmp_inst" || { rm -f "$tmp_inst"; return 0; }
-    chmod 755 "$tmp_inst"
-    exec "$tmp_inst" "$@"
-}
-
 main() {
-    # 自举必须最先执行：让 --reinstall/--uninstall/全新安装都基于最新安装器
-    installer_self_bootstrap "$@"
     print_banner
     log_info "Airymax AgentRT 安装程序"
     log_info "AIRY_HOME = ${AIRY_HOME} | 模式 = ${AIRY_MODE}"

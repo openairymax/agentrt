@@ -99,7 +99,7 @@ static void test_unknown_goes_llm(void)
 static void test_analysis_and_scenario(void)
 {
     /* 分析/比较/评估类咨询（2026-08-22 回归：此前"运行"场景描述误判任务） */
-    CHECK_CHAT("请帮我分析一下：一个 8GB 内存的树莓派上运行容器化数据库与原生数据库的性能差异，从内存管理、IO、隔离开销三方面比较");
+    CHECK_CHAT("请帮我分析一下：一个 8GB 内存的 ARM 设备上运行容器化数据库与原生数据库的性能差异，从内存管理、IO、隔离开销三方面比较");
     CHECK_CHAT("分析一下 Docker 和 Podman 的优缺点");
     CHECK_CHAT("对比两个方案的利弊");
     CHECK_CHAT("评估一下这个架构的优劣");
@@ -109,7 +109,7 @@ static void test_analysis_and_scenario(void)
     CHECK_TASK("分析这个日志并修复内存泄漏");
     /* 场景描述动词（"上运行"/"性能测试"/"安全检查"）→ 非任务 */
     CHECK_CHAT("如何检查系统安全性");
-    CHECK_UNK("在树莓派上运行容器化数据库需要注意什么");
+    CHECK_UNK("在 ARM 设备上运行容器化数据库需要注意什么");
     /* 无描述语境的场景动词 → 仍是任务 */
     CHECK_TASK("运行这个脚本");
     CHECK_TASK("帮我检查一下配置文件");

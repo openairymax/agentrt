@@ -270,12 +270,12 @@ int cmd_daemons(const char *arg, void *ctx)
     }
     /* gateway TCP probe */
     {
-        const char *gw = getenv("AIRY_GATEWAY_URL");
+        /* 0.1.6h：统一经 cli_gw_endpoint 取实际端口（run/gateway.port
+         * 优先，端口漂移兼容），不再裸用 8080——完整启动器漂移到 8083+
+         * 后 /daemons 会误报 gateway offline。 */
+        char gw_host[128] = "127.0.0.1";
         int gw_port = 8080;
-        if (gw && *gw) {
-            const char *colon = strrchr(gw, ':');
-            if (colon && colon[1]) gw_port = atoi(colon + 1);
-        }
+        cli_gw_endpoint(gw_host, sizeof(gw_host), &gw_port);
         int gw_ok = 0;
 #ifdef _WIN32
         WSADATA wsa;
@@ -287,7 +287,7 @@ int cmd_daemons(const char *arg, void *ctx)
                 struct sockaddr_in sa;
                 sa.sin_family = AF_INET;
                 sa.sin_port = htons((unsigned short)gw_port);
-                sa.sin_addr.s_addr = inet_addr("127.0.0.1");
+                sa.sin_addr.s_addr = inet_addr(gw_host);
                 if (connect(s, (struct sockaddr *)&sa, sizeof(sa)) == 0) {
                     gw_ok = 1;
                 } else {
@@ -313,7 +313,7 @@ int cmd_daemons(const char *arg, void *ctx)
             struct sockaddr_in sa;
             sa.sin_family = AF_INET;
             sa.sin_port = htons((unsigned short)gw_port);
-            sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+            sa.sin_addr.s_addr = inet_addr(gw_host);
             if (connect(s, (struct sockaddr *)&sa, sizeof(sa)) == 0) {
                 gw_ok = 1;
             } else if (errno == EINPROGRESS) {
