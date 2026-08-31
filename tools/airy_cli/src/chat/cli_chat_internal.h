@@ -16,17 +16,13 @@
 
 #include "cli_internal.h"
 
-/* ---- 流式折叠状态（stream 域拥有；reply 主流程/finalize 读取） ---- */
-extern size_t g_chat_fold_phys;
-extern int g_chat_fold_tail_no_nl;
-
-/* stream 域（cli_chat_stream.c）：流式归一化 / 思考进度回调 / 模型槽缓存 */
+/* ---- stream 域（cli_chat_stream.c）：流式归一化 / 思考进度回调 / 模型槽缓存 ---- */
 void cli_stream_norm_flush_carry(void);
 void cli_chat_stream_cb(const char *chunk, void *user_data);
 void cli_chat_reasoning_cb(const char *delta, void *user_data);
 void cli_chat_reasoning_clear(void);
 int cli_chat_stream_round(llm_svc_adapter_t *adapter, const llm_request_config_t *cfg,
-                          int folding, llm_response_t **out_resp);
+                          llm_response_t **out_resp);
 const char *cli_chat_t1f_cached(void);
 cli_actor_t cli_chat_think_actor(void);
 

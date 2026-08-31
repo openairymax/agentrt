@@ -34,14 +34,9 @@ static int s_stream_first_chunk = 0;
 
 /* 交互 TTY 流式思考进度行状态（cli_chat_reasoning_cb 更新，收尾擦除）。 */
 static int s_reasoning_progress = 0;      /* 进度行当前可见 */
-
-/* 交互 TTY 流式状态（2026-08-17）：流式预览直出后记录其物理行数，
- * 完成后擦除预览并完整重绘最终形态（结果不折叠，仅思考链折叠）。
- * 仅最终轮有意义（工具轮的预览保留为过程展示，不擦除）。 */
-size_t g_chat_fold_phys = 0;
-/* 预览末尾是否无换行（光标停在最后一行行尾）：擦除时上移行数须少 1，
- * 否则会把预览起点上方那行（消息行）一并覆盖。 */
-int g_chat_fold_tail_no_nl = 0;
+/* 0.1.7 弃用三段式：流式正文直出即终态，不再「预览→擦除→重绘」。
+ * 原 g_chat_fold_phys/g_chat_fold_tail_no_nl（预览行数计量）已删除，
+ * 从根源消除 ANSI 光标上移/擦除在跨终端、跨管道下的重叠与乱码。 */
 
 static void cli_stream_norm_emit(const char *s, size_t n)
 {
@@ -219,13 +214,12 @@ cli_actor_t cli_chat_think_actor(void)
 }
 
 /* 交互 TTY 流式单轮调用（cli_chat_reply 的工具回路内使用）：
- * 计量本轮直出预览的行数（折叠擦除用），完成时返回上游 ret。 */
+ * 正文逐块直出即终态（0.1.7：不再计量预览行数 / 擦除重绘），
+ * 完成时返回上游 ret。连接反馈与思考进度行均为 \r 原地刷新，
+ * 首片正文到达即擦除，不留任何残留。 */
 int cli_chat_stream_round(llm_svc_adapter_t *adapter, const llm_request_config_t *cfg,
-                          int folding, llm_response_t **out_resp)
+                          llm_response_t **out_resp)
 {
-    cli_line_meter_t meter;
-    if (folding)
-        cli_render_meter_begin(&meter);
     /* 连接反馈：流式前显示连接状态（与正文同流 stdout），首片到达时擦除。
      * 避免连接阶段（RPC 握手 + 模型推理首 token）用户无任何反馈。 */
     s_stream_first_chunk = !g_cli_print_mode;
@@ -250,11 +244,6 @@ int cli_chat_stream_round(llm_svc_adapter_t *adapter, const llm_request_config_t
         s_stream_first_chunk = 0;
         fputs("\r\033[2K", stdout);
         fflush(stdout);
-    }
-    if (folding) {
-        g_chat_fold_phys = cli_render_meter_phys(&meter);
-        g_chat_fold_tail_no_nl = (meter.row_len > 0) ? 1 : 0;
-        cli_render_meter_end(&meter);
     }
     return ret;
 }

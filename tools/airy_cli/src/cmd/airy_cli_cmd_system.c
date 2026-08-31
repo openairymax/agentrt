@@ -72,7 +72,7 @@ const cli_daemon_desc_t CLI_DAEMONS[] = {
     {"a2a", "a2a.sock", "health_check"},
 };
 
-/* 运行时自动发现（0.1.6y）：枚举 $AIRY_HOME/bin 下所有 *_d 后缀可执行
+/* 运行时自动发现（0.1.7）：枚举 $AIRY_HOME/bin 下所有 *_d 后缀可执行
    （排除 gateway_d 与 maths_d——前者为 HTTP 服务、后者为符号计算后端
    无 socket）动态生成 daemon 表。daemon 增删后 /daemons 与 /rpc 自动
    适配，无需改硬编码表。
@@ -247,7 +247,7 @@ int cmd_daemons(const char *arg, void *ctx)
 {
     (void)arg; (void)ctx;
     int online = 0;
-    /* 0.1.6y：运行时发现 daemon 表（daemon 增删自动适配），失败回退默认表 */
+    /* 0.1.7：运行时发现 daemon 表（daemon 增删自动适配），失败回退默认表 */
     cli_daemon_desc_t dyn[32];
     size_t dcount = cli_daemons_discover(dyn, 32);
     size_t total = dcount ? dcount : CLI_DAEMONS_COUNT;

@@ -58,18 +58,17 @@ extern "C" {
  * 注入的独立编译（如 IDE 单文件编译）出现未定义宏。版本更新只改
  * VERSION 文件一处，CLI 与 TUI 自动同步。 */
 #ifndef AIRY_CLI_VERSION
-#define AIRY_CLI_VERSION "0.1.6h"
+#define AIRY_CLI_VERSION "0.1.7"
 #endif
 
 /* 思考链折叠保留行数（2026-08-19：仅折叠思考链，结果完整展示）。
  * 思考链渲染为前 N 行 + 折叠尾，避免碎片刷屏；结果不折叠。 */
 #define CLI_REPLY_FOLD_KEEP 4
 
-/* Pinned startup header height (blue frame: top edge + brand/capabilities/
- * legend/models rows + bottom edge). Shared by cli_display.c (which renders
- * it) and main.c (which pins it). 2026-08-19: the hero became a blue box so
- * the header reads as a distinct block above the dialogue. */
-#define CLI_HDR_LINES 6
+/* Startup header height (compact: brand + model slots + blank line).
+ * 0.1.7 改版：弃用固定滚动区三区布局，头部打印一次随内容滚动；
+ * 仅全屏 TUI 模式退出重建三区时仍以该行数 pin。 */
+#define CLI_HDR_LINES 3
 
 /* Max chat history messages: 30 by default (~15 rounds); AIRY_CHAT_HISTORY_ROUNDS
   * overrides it in rounds (messages = rounds*2). Capped at 60, aligned with
