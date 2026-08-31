@@ -28,7 +28,7 @@
 #   AIRY_TUI_BIN / AIRY_GATEWAY_BIN / AIRY_LLM_BIN  组件路径覆盖
 #   AIRYRT_LOG_LEVEL 日志级别（默认 info；debug 可看到完整排查信息）
 #   AIRYRT_PROFILE   运行画像：auto（按可用内存自动裁剪，默认；<2.5GiB 时
-#                     自动降为 minimal）| full（全量 17 daemon：16 socket +
+#                     自动降为 minimal）| full（全量 18 daemon：17 socket +
 #                     gateway）| minimal
 #                     （最小 daemon 集，仅 llm/think/agent/tool + gateway）。
 #                     低资源设备（如树莓派 4B 2GB）建议 minimal，可显著降低
@@ -301,7 +301,7 @@ boot_line() { # <消息...>
 # ── 关键 daemon 就绪诊断（2.2 启动可靠性优化） ─────────────────────────────
 # daemon 群 socket 未全部就绪时汇总诊断：对话/工具/认知关键链路（llm/think/
 # agent/tool）未就绪必须明确报错（附日志尾部摘要）；非关键链路降级 WARN
-#（界面可用但该能力受限）。0.1.6y 精简：16 个未就绪时由 50+ 行收敛为
+#（界面可用但该能力受限）。0.1.6h 精简：16 个未就绪时由 50+ 行收敛为
 # 汇总 4~6 行，过滤 nohup 噪音行，避免视觉轰炸。
 diag_daemons() { # 遍历剩余 WAIT_SOCKS（未就绪项）
     local spec name sock critical="" degraded=""
@@ -629,7 +629,7 @@ field_cmp() {
     echo 0
 }
 
-# 版本比较（SemVer 简化：点分字段 + -beta.N/-rc.N 后缀）：输出 -1|0|1
+# 版本比较（SemVer 简化：点分字段 + -alpha/-beta/-rc 后缀）：输出 -1|0|1
 ver_cmp() { # <a> <b>
     local a="$1" b="$2" apr="" bpr=""
     a="${a#v}"; b="${b#v}"
@@ -647,8 +647,15 @@ ver_cmp() { # <a> <b>
     if [ -z "$apr" ] && [ -z "$bpr" ]; then echo 0; return; fi
     if [ -z "$apr" ]; then echo 1; return; fi   # 正式版 > prerelease
     if [ -z "$bpr" ]; then echo -1; return; fi
-    # prerelease 数字段比较（beta.1/rc.2）；无点分段（beta）视为 .0，
-    # 统一走 field_cmp（0.1.6h：原 10# 算术对非纯数字段静默判等）
+    # 0.1.7 修复：prerelease 先按类型优先级比较（alpha < beta < rc），
+    # 类型相同再比数字段——此前只取最后一个点分段数字比较，
+    # -beta.5 与 -rc.2 会被误判 5 > 2（rc 应更新于 beta）。
+    local pa pb
+    case "$apr" in alpha*) pa=1;; beta*) pa=2;; rc*) pa=3;; *) pa=4;; esac
+    case "$bpr" in alpha*) pb=1;; beta*) pb=2;; rc*) pb=3;; *) pb=4;; esac
+    if (( pa > pb )); then echo 1; return; fi
+    if (( pa < pb )); then echo -1; return; fi
+    # 同类型：数字段比较（beta.1/rc.2）；无点分段（beta）视为 .0
     local an bn
     an="${apr##*.}"; [ "$an" = "$apr" ] && an="0"
     bn="${bpr##*.}"; [ "$bn" = "$bpr" ] && bn="0"
@@ -1685,7 +1692,7 @@ else
         log info "$bname 已拉起（PID=$!），日志: $AIRY_HOME/logs/${bname}.out"
     }
 
-    # ---- 并行拉起 16 个 socket daemon ----
+    # ---- 并行拉起 17 个 socket daemon ----
     # llm_d：核心依赖，--manager 指定模型配置（provider/endpoint 来源）
     if [ -x "$LLM_BIN" ]; then
         if _sock_alive "$RUNTIME_DIR/llm.sock"; then
@@ -1723,7 +1730,7 @@ else
     # 降级），以控制低内存设备的内存占用（AIRYRT_PROFILE=minimal）。
     _launch_daemon "$(find_tool AIRY_AGENT_BIN agent_d "$AIRY_HOME/bin/agent_d" "$AIRYRT_HOME/agentrt/build/bin/agent_d" "$AIRYRT_HOME/build/bin/agent_d")" "$RUNTIME_DIR/agent.sock"
     _launch_daemon "$(find_tool AIRY_TOOL_BIN tool_d "$AIRY_HOME/bin/tool_d" "$AIRYRT_HOME/agentrt/build/bin/tool_d" "$AIRYRT_HOME/build/bin/tool_d")" "$RUNTIME_DIR/tool.sock"
-    # 0.1.6y 自动计算：其余能力 daemon 以 bin/*_d 自动推导（后续 daemon
+    # 0.1.6h 自动计算：其余能力 daemon 以 bin/*_d 自动推导（后续 daemon
     # 增删不再改脚本）。socket 名约定 = daemon 名去 _d 后缀 + .sock。
     # minimal 画像仅保留核心执行链路（llm/think/agent/tool），其余跳过
     #（gateway 自动降级），以控制低内存设备占用（AIRYRT_PROFILE=minimal）。
