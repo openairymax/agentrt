@@ -119,11 +119,13 @@ void cli_chat_reply(const char *input)
                         g_history_reasonings[hi]);
     cli_msgbuf_push(&buf, "user", input, NULL, NULL, NULL);
 
-    /* 交互 TTY 走流式（打字机预览，完成后折叠/重绘最终形态）；
+    /* 交互 TTY 走流式（正文直出即终态，0.1.7 弃用「预览→擦除→重绘」
+     * 三段式，从根源消除 ANSI 光标操作在跨终端/跨管道下的重叠乱码）；
      * TUI、--json 与 -p 保持非流式（markdown 完整渲染进历史 / 结构化
      * 输出 / 纯 stdout 最终答案）。-p 非流式还避免工具轮之间模型的
      * 过程叙述混入 stdout——脚本模式只消费最终回答（2026-08-17）。
-     * 交互流式不再使用 spinner——打字机即进度指示。 */
+     * 流式正文自身即进度指示，交互非流式路径（TUI/JSON 以外的兜底）
+     * 仍用 spinner。 */
     cli_tui_t *tui = cli_tui_get_default();
     int tui_active = tui && cli_tui_active(tui);
     int stream_mode = !g_cli_json_mode && !g_cli_print_mode && !tui_active;

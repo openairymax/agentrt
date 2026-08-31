@@ -18,8 +18,8 @@
 #include <string.h>
 
 /* -p 模式流式渲染回调：把增量文本直写 stdout（stdout 保持纯净可管道；
- * 工具/进度 chrome 走 stderr，见 cli_trace）。交互模式仍走 spinner +
- * markdown 完整渲染，避免流式下 markdown 标记裸露。
+ * 工具/进度 chrome 走 stderr，见 cli_trace）。交互 TTY 流式同此直出
+ * （0.1.7 弃用 spinner + 三段式重绘，正文即终态）。
  *
  * 流式归一化：部分模型用 [code]/[/code] 包裹代码而非 markdown 围栏
  * ``` ```。交互模式由 cli_render_markdown 统一识别；-p 流式直出时必须
