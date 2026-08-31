@@ -10,7 +10,7 @@ file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" AIRY_VERSION_RAW LIMIT_COUNT 
 string(STRIP "${AIRY_VERSION_RAW}" AIRY_VERSION_RAW)
 string(REGEX REPLACE "([0-9.]+).*" "\\1" AIRY_VERSION_NUM "${AIRY_VERSION_RAW}")
 if(NOT AIRY_VERSION_NUM)
-    set(AIRY_VERSION_NUM "0.1.7")
+    set(AIRY_VERSION_NUM "0.1.8")
 endif()
 # 纯 C 项目（全仓无 .cpp/.cc 源文件）；仅声明 C 可避免 CXX 编译器
 # 缺失时（如 aarch64 交叉工具链仅装了 gcc 未装 g++）configure 失败。
