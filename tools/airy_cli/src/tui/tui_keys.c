@@ -236,11 +236,11 @@ int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
         return *eof ? 0 : -1;
     if (c == 0x1b) {
         char b;
-        if (!tui_wait_byte(t, &b, 50, eof))
+        if (!tui_wait_byte(t, &b, 120, eof))
             return 0x1b; /* lone ESC */
         if (b == '[') {
             char x;
-            if (!tui_wait_byte(t, &x, 50, eof))
+            if (!tui_wait_byte(t, &x, 120, eof))
                 return TUI_KEY_UNKNOWN;
             switch (x) {
             case 'A': return TUI_KEY_UP;
@@ -250,7 +250,7 @@ int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
             case 'H': return TUI_KEY_HOME;
             case 'F': return TUI_KEY_END;
             case '3': /* ESC [ 3 ~ = Delete; ESC [ 3 D / C = Alt+Left/Right */
-                if (!tui_wait_byte(t, &b, 50, eof))
+                if (!tui_wait_byte(t, &b, 120, eof))
                     return TUI_KEY_UNKNOWN;
                 if (b == '~')
                     return TUI_KEY_DEL;
@@ -260,7 +260,7 @@ int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
                     return TUI_KEY_ALT_RIGHT;
                 return TUI_KEY_UNKNOWN;
             case '5': /* ESC [ 5 D / C = Ctrl+Left/Right; ESC [ 5 ~ = PageUp */
-                if (!tui_wait_byte(t, &b, 50, eof))
+                if (!tui_wait_byte(t, &b, 120, eof))
                     return TUI_KEY_UNKNOWN;
                 if (b == 'D')
                     return TUI_KEY_CTRL_LEFT;
@@ -270,49 +270,60 @@ int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
                     return TUI_KEY_PGUP;
                 return TUI_KEY_UNKNOWN;
             case '6': /* page down: ESC [ 6 ~ */
-                if (tui_wait_byte(t, &b, 50, eof) && b == '~')
+                if (tui_wait_byte(t, &b, 120, eof) && b == '~')
                     return TUI_KEY_PGDN;
                 return TUI_KEY_UNKNOWN;
-            case '1': /* ESC[19~ = F8；ESC[14~ = F4；ESC[1;5D 等 = Ctrl/Alt+Left/Right */
+            case '1': /* ESC[11~=F1；ESC[12~=F2；ESC[13~=F3；ESC[14~=F4；
+                       * ESC[15~=F5；ESC[17~=F6；ESC[18~=F7；ESC[19~=F8 */
             {
                 char semi, mod, dir;
-                if (!tui_wait_byte(t, &semi, 50, eof))
+                if (!tui_wait_byte(t, &semi, 120, eof))
                     return TUI_KEY_UNKNOWN;
+                if (semi == '1') { /* F1 (linux console): ESC [ 1 1 ~ */
+                    if (!tui_wait_byte(t, &dir, 120, eof) || dir != '~')
+                        return TUI_KEY_UNKNOWN;
+                    return TUI_KEY_F1;
+                }
+                if (semi == '3') { /* F3 (linux console): ESC [ 1 3 ~ */
+                    if (!tui_wait_byte(t, &dir, 120, eof) || dir != '~')
+                        return TUI_KEY_UNKNOWN;
+                    return TUI_KEY_F3;
+                }
                 if (semi == '9') { /* F8: ESC [ 1 9 ~ */
-                    if (!tui_wait_byte(t, &dir, 50, eof) || dir != '~')
+                    if (!tui_wait_byte(t, &dir, 120, eof) || dir != '~')
                         return TUI_KEY_UNKNOWN;
                     return TUI_KEY_F8;
                 }
                 if (semi == '4') { /* F4 (linux console): ESC [ 1 4 ~ */
-                    if (!tui_wait_byte(t, &dir, 50, eof) || dir != '~')
+                    if (!tui_wait_byte(t, &dir, 120, eof) || dir != '~')
                         return TUI_KEY_UNKNOWN;
                     return TUI_KEY_F4;
                 }
                 if (semi == '7') { /* F6: ESC [ 1 7 ~ */
-                    if (!tui_wait_byte(t, &dir, 50, eof) || dir != '~')
+                    if (!tui_wait_byte(t, &dir, 120, eof) || dir != '~')
                         return TUI_KEY_UNKNOWN;
                     return TUI_KEY_F6;
                 }
                 if (semi == '8') { /* F7: ESC [ 1 8 ~ */
-                    if (!tui_wait_byte(t, &dir, 50, eof) || dir != '~')
+                    if (!tui_wait_byte(t, &dir, 120, eof) || dir != '~')
                         return TUI_KEY_UNKNOWN;
                     return TUI_KEY_F7;
                 }
                 if (semi == '2') { /* F2: ESC [ 1 2 ~（xterm 标准 F2 序列） */
-                    if (!tui_wait_byte(t, &dir, 50, eof) || dir != '~')
+                    if (!tui_wait_byte(t, &dir, 120, eof) || dir != '~')
                         return TUI_KEY_UNKNOWN;
                     return TUI_KEY_F2;
                 }
                 if (semi == '5') { /* F5: ESC [ 1 5 ~（xterm 标准 F5 序列） */
-                    if (!tui_wait_byte(t, &dir, 50, eof) || dir != '~')
+                    if (!tui_wait_byte(t, &dir, 120, eof) || dir != '~')
                         return TUI_KEY_UNKNOWN;
                     return TUI_KEY_F5;
                 }
                 if (semi != ';')
                     return TUI_KEY_UNKNOWN;
-                if (!tui_wait_byte(t, &mod, 50, eof))
+                if (!tui_wait_byte(t, &mod, 120, eof))
                     return TUI_KEY_UNKNOWN;
-                if (!tui_wait_byte(t, &dir, 50, eof))
+                if (!tui_wait_byte(t, &dir, 120, eof))
                     return TUI_KEY_UNKNOWN;
                 if (mod == '5' && dir == 'D')
                     return TUI_KEY_CTRL_LEFT;
@@ -325,21 +336,21 @@ int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
                 return TUI_KEY_UNKNOWN;
             }
             case '2': /* ESC[20~ = F9；ESC[21~ = F10；ESC[200~ = paste start */
-                if (!tui_wait_byte(t, &b, 50, eof))
+                if (!tui_wait_byte(t, &b, 120, eof))
                     return TUI_KEY_UNKNOWN;
                 if (b == '0') { /* F9: ESC [ 2 0 ~；paste: ESC [ 2 0 0 ~ */
-                    if (!tui_wait_byte(t, &b, 50, eof))
+                    if (!tui_wait_byte(t, &b, 120, eof))
                         return TUI_KEY_UNKNOWN;
                     if (b == '~')
                         return TUI_KEY_F9;
                     if (b != '0')
                         return TUI_KEY_UNKNOWN;
-                    if (!tui_wait_byte(t, &b, 50, eof) || b != '~')
+                    if (!tui_wait_byte(t, &b, 120, eof) || b != '~')
                         return TUI_KEY_UNKNOWN;
                     return TUI_KEY_PASTE_START;
                 }
                 if (b == '1') { /* F10: ESC [ 2 1 ~ */
-                    if (!tui_wait_byte(t, &b, 50, eof) || b != '~')
+                    if (!tui_wait_byte(t, &b, 120, eof) || b != '~')
                         return TUI_KEY_UNKNOWN;
                     return TUI_KEY_F10;
                 }
@@ -358,7 +369,7 @@ int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
         /* Application cursor mode (smkx): ESC O A/B/C/D = 方向键； */
         if (b == 'O') {
             char x;
-            if (!tui_wait_byte(t, &x, 50, eof))
+            if (!tui_wait_byte(t, &x, 120, eof))
                 return TUI_KEY_UNKNOWN;
             switch (x) {
             case 'A': return TUI_KEY_UP;
@@ -368,6 +379,8 @@ int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
             case 'Q': return TUI_KEY_F2;  /* F2（应用键区 smkx：ESC O Q） */
             case 'S': return TUI_KEY_F4;
             case 'T': return TUI_KEY_F5;  /* F5（应用键区 smkx：ESC O T） */
+            case 'P': return TUI_KEY_F1;  /* F1（macOS Terminal/部分终端 SS3） */
+            case 'R': return TUI_KEY_F3;  /* F3（macOS Terminal/部分终端 SS3） */
             default:  return TUI_KEY_UNKNOWN;
             }
         }

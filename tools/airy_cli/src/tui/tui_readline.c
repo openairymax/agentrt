@@ -267,6 +267,23 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
             fflush(stdout);
             continue;
         }
+        /* 2026-08-31：F1/F3 键码补齐后的按键反馈（此前无键码=按了无反应） */
+        if (key == TUI_KEY_F1) {
+            cli_tui_set_status(t,
+                "F1 帮助 · F2 硬件 · F5 记忆链 · F6 看板 · F7 事件流 · "
+                "F9/F10 输入法 · F8 流式 · ? 或 /help 全部命令");
+            cli_tui_redraw(t);
+            fflush(stdout);
+            continue;
+        }
+        if (key == TUI_KEY_F3) {
+            cli_tui_set_status(t,
+                "F3 状态：/status 查看 daemon 群 · /doctor 健康检查 · "
+                "/clear 清屏 · quit 退出");
+            cli_tui_redraw(t);
+            fflush(stdout);
+            continue;
+        }
         /* ---- 面板模式分派（硬件信息/任务看板/事件流/记忆链） ---- */
         if (t->mode != CLI_TUI_MODE_CHAT) {
             if (tui_panel_dispatch(t, key))

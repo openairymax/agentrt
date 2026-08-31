@@ -227,6 +227,8 @@ enum {
     TUI_KEY_F4,
     TUI_KEY_F2,
     TUI_KEY_F5,
+    TUI_KEY_F1,
+    TUI_KEY_F3,
     TUI_KEY_PASTE_START,
     TUI_KEY_UNKNOWN,
 };

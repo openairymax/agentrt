@@ -19,7 +19,12 @@ int tui_readline_arrow_keys(cli_tui_t *t, int key)
 {
     switch (key) {
     case TUI_KEY_UP:
-        if (t->input_len > 0 || t->cmd_hist.count > 0) {
+        /* 0.1.6h 修复：分支仅依输入是否为空判定。原条件
+         * `input_len > 0 || cmd_hist.count > 0` 让空输入 + 有命令历史时
+         * Up 被命令历史劫持（idx==count 时静默无动作），会话视口永远
+         * 无法滚动——社区反馈"不能上下翻动记录"。空输入应滚动会话视口；
+         * 有输入才浏览命令历史（readline 惯例）。 */
+        if (t->input_len > 0) {
             /* With typed text: browse the submitted-command history. */
             if (t->cmd_hist_idx > 0) {
                 tui_cmd_hist_save_draft(t);
@@ -36,7 +41,8 @@ int tui_readline_arrow_keys(cli_tui_t *t, int key)
         }
         break;
     case TUI_KEY_DOWN:
-        if (t->input_len > 0 || t->cmd_hist_idx < t->cmd_hist.count) {
+        /* 0.1.6h 修复：与 Up 对称，空输入滚动会话视口（见上）。 */
+        if (t->input_len > 0) {
             if (t->cmd_hist_idx < t->cmd_hist.count) {
                 t->cmd_hist_idx++;
                 if (t->cmd_hist_idx >= t->cmd_hist.count) {
