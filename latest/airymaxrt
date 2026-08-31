@@ -820,10 +820,17 @@ apply_package() { # <tarball> [expect_sha]
     # 0.1.6h 修复：清理旧版本独有文件（"更新没覆盖旧制品"根因）。
     # 热替换只 cp -f 覆盖同名文件，旧版本独有 bin/*_d 等全部残留，
     # 启动器按 bin/*_d 自动推导会把残留旧 daemon 一并拉起。
+    # 0.1.6h 补充修复：入口/环境生成文件（由安装器/更新器生成、包内
+    # 不含）必须排除清理——否则更新后 bin/airymaxrt 与 agentrt-env.sh
+    # 被误删，airymaxrt 命令直接失效（软链悬空），daemon 传递依赖
+    # 也无法解析。
     for d in bin lib include share; do
         [ -d "$AIRY_HOME/$d" ] && [ -d "$extracted/$d" ] || continue
         for f in "$AIRY_HOME/$d"/*; do
             [ -f "$f" ] || continue
+            case "$(basename "$f")" in
+                airymaxrt|airymaxrt-full|agentrt-env.sh) continue ;;
+            esac
             [ -e "$extracted/$d/$(basename "$f")" ] || rm -f "$f"
         done
     done
@@ -868,6 +875,15 @@ apply_package() { # <tarball> [expect_sha]
             log info "入口启动器已重生成（no-args 将自动拉起守护进程群）"
         else
             log warn "入口启动器重生成失败（可运行 airymaxrt start 或重装修复）"
+        fi
+    elif [ ! -x "$_entry" ] && [ -s "$bkup/bin/airymaxrt" ]; then
+        # 0.1.6h 补充修复：入口源不可用（自举源 airymaxrt-full 已被清理
+        # 逻辑误删等历史场景）时从备份恢复旧入口，保证 airymaxrt 命令
+        # 始终可用；恢复后仍可再次 update 自举完整启动器。
+        if cp -f "$bkup/bin/airymaxrt" "$_entry" 2>/dev/null && chmod 755 "$_entry"; then
+            log info "入口启动器已从备份恢复（自举源不可用）"
+        else
+            log warn "入口启动器恢复失败，请运行 install.sh --reinstall"
         fi
     fi
     # 回滚备份只保留最近 3 份（问题 11：rollback 目录无限膨胀清理）
