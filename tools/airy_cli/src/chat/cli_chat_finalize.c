@@ -23,7 +23,8 @@
 /* 最终回复渲染与历史写入（cli_chat_reply 的收尾阶段）：
  *   --json  结构化 JSON（Codex exec 约定）
  *   -p      纯文本（Claude Code -p / Codex exec 约定；流式已直出）
- *   交互    TTY 流式：擦除预览后 markdown 精修 / 长回复折叠；
+ *   交互    TTY 流式：正文已直出即终态，收尾只补思考链折叠
+ *           （0.1.7 弃用「擦除预览→重绘最终形态」三段式）；
  *           TUI/非流式：markdown 渲染 + 折叠区（浏览展开）
  * 不释放 final_resp（归调用方）。 */
 void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,

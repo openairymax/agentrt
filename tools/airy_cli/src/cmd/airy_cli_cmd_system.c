@@ -132,7 +132,7 @@ int cli_ns_resolve(const char *in, char *out, size_t out_cap)
             return 0;
         }
     }
-    /* 0.1.6y：默认表未命中时运行时发现（daemon 增删后自动可寻址） */
+    /* 0.1.6h：默认表未命中时运行时发现（daemon 增删后自动可寻址） */
     {
         cli_daemon_desc_t dyn[32];
         size_t n = cli_daemons_discover(dyn, 32);
