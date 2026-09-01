@@ -29,7 +29,7 @@
 #include "airy_rt.h"
 #include "loop.h"
 #include "roadmap_sched.h"
-#include "lang_gateway.h"
+#include "cli_gw.h"
 #include "platform.h"
 #include "cognition.h"
 #include "gccp.h"
@@ -88,12 +88,25 @@ airy_hall_store_t *g_cli_hall_store = NULL;
 
 /* 1.3 推理语言网关：全局句柄（cli_setup_runtime 创建后赋值）+ 最新一轮
  * 语言约束注入物（输入环节 process 填充，cli_chat.c 消费；每轮覆盖前释放）。 */
-airy_lang_gateway_t *g_cli_lang_gateway = NULL;
 char *g_cli_lang_sys_prompt = NULL;
-airy_lang_t g_cli_lang_output = AIRY_LANG_UNKNOWN;
+int g_cli_lang_output = 0;
 
 /* 会话开始时刻（TUI 状态栏耗时计算；交互模式才有意义）。 */
 static uint64_t g_session_start_ms;
+
+/* 1.3 推理语言 wire 值 → 展示名（lang_gateway.h 枚举：0=未知/1=中文/2=英文）。
+ * M1-1c 后 CLI 不再直连 lang_gateway 库，本地保留渲染层映射。 */
+static const char *cli_lang_name(int lang)
+{
+    switch (lang) {
+    case 1:
+        return "中文";
+    case 2:
+        return "英文";
+    default:
+        return "未知";
+    }
+}
 
 int main(int argc, char *argv[])
 {
@@ -311,32 +324,52 @@ int main(int argc, char *argv[])
 
         uint64_t turn_start = cli_now_ms();
 
-        /* 1.3 推理语言网关：输入标准化 */
-        if (rt.lang_gateway) {
-            airy_canonical_request_t *lg_req = NULL;
-            if (airy_lang_gateway_process(rt.lang_gateway, input, NULL, 0,
-                                          &lg_req) == AIRY_EOK && lg_req) {
-                AIRY_FREE(g_cli_lang_sys_prompt);
-                g_cli_lang_sys_prompt =
-                    AIRY_STRDUP(lg_req->system_prompt ? lg_req->system_prompt : "");
-                g_cli_lang_output = lg_req->routing.output_lang;
-                char lg_line[192];
-                snprintf(lg_line, sizeof(lg_line), "推理语言: %s · 输出语言: %s · %s",
-                         airy_lang_name(lg_req->routing.reasoning_lang),
-                         airy_lang_name(lg_req->routing.output_lang),
-                         lg_req->routing.decision_reason
-                             ? lg_req->routing.decision_reason
-                             : "");
-                cli_render_sub_agent_line(CLI_ROLE_TRACE, "lang", lg_line);
-                cli_trace("lang", "detected=%s reasoning=%s output=%s",
-                          airy_lang_name(lg_req->signals.detected_lang),
-                          airy_lang_name(lg_req->routing.reasoning_lang),
-                          airy_lang_name(lg_req->routing.output_lang));
-                airy_lang_gateway_free_canonical(lg_req);
+        /* 1.3 推理语言网关服务面化（M1-1c）：CLI 不持 lang_gateway 句柄，
+         * 输入标准化经 gateway → think.lang_process（think_d 承载）。
+         * 网关不可达/失败时静默降级：语言约束缺失不阻塞对话主流程。 */
+#ifdef AIRY_HAS_CJSON
+        {
+            cJSON *lp = cJSON_CreateObject();
+            cJSON *lt = cJSON_CreateString(input);
+            if (lp && lt)
+                cJSON_AddItemToObject(lp, "text", lt);
+            else
+                cJSON_Delete(lt);
+            char *lp_json = lp ? cJSON_PrintUnformatted(lp) : NULL;
+            cJSON_Delete(lp);
+            char *lp_res = NULL;
+            if (lp_json && cli_gw_call("think.lang_process", lp_json, 6000, &lp_res) == 0 &&
+                lp_res) {
+                cJSON *lr = cJSON_Parse(lp_res);
+                if (lr) {
+                    cJSON *sp = cJSON_GetObjectItem(lr, "system_prompt");
+                    cJSON *ol = cJSON_GetObjectItem(lr, "output_lang");
+                    cJSON *rl = cJSON_GetObjectItem(lr, "reasoning_lang");
+                    cJSON *dr = cJSON_GetObjectItem(lr, "decision_reason");
+                    if (cJSON_IsString(sp) && sp->valuestring) {
+                        AIRY_FREE(g_cli_lang_sys_prompt);
+                        g_cli_lang_sys_prompt = AIRY_STRDUP(sp->valuestring);
+                    }
+                    if (cJSON_IsNumber(ol))
+                        g_cli_lang_output = (int)ol->valuedouble;
+                    int r_lang = cJSON_IsNumber(rl) ? (int)rl->valuedouble : 0;
+                    char lg_line[192];
+                    snprintf(lg_line, sizeof(lg_line), "推理语言: %s · 输出语言: %s · %s",
+                             cli_lang_name(r_lang), cli_lang_name(g_cli_lang_output),
+                             cJSON_IsString(dr) && dr->valuestring ? dr->valuestring : "");
+                    cli_render_sub_agent_line(CLI_ROLE_TRACE, "lang", lg_line);
+                    cli_trace("lang", "reasoning=%s output=%s", cli_lang_name(r_lang),
+                              cli_lang_name(g_cli_lang_output));
+                    cJSON_Delete(lr);
+                }
+                AIRY_FREE(lp_res);
+            } else {
+                cli_trace("lang", "think.lang_process unavailable (gateway offline)");
+                AIRY_FREE(lp_res);
             }
-            if (airy_lang_gateway_tick(rt.lang_gateway))
-                cli_trace("lang", "periodic tokenizer recalibration triggered");
+            AIRY_FREE(lp_json);
         }
+#endif /* AIRY_HAS_CJSON */
 
         /* 4.0b Blueprint scheduling three-tier routing */
         if (cli_blueprint_fastpath(rt.rsched, input, turn_start))

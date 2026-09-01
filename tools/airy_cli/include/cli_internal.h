@@ -18,7 +18,6 @@
 #include "airy_rt.h"
 #include "loop.h"
 #include "roadmap_sched.h"
-#include "lang_gateway.h"
 #include "platform.h"
 #include "cognition.h"
 #include "gccp.h"
@@ -106,12 +105,12 @@ typedef enum { CLI_DAG_POLL_ACTIVE = 0, CLI_DAG_POLL_DONE, CLI_DAG_POLL_ERROR } 
 extern volatile sig_atomic_t g_cli_cancel;
 extern llm_svc_adapter_t *g_chat_adapter;
 
-/* 1.3 推理语言网关：全局句柄 + 最新一轮语言约束注入物。main.c 输入环节
- * 填充（process 标准化 + tick 计数），cli_chat.c 消费（System Prompt 注入
- * 与输出后处理）。g_cli_lang_sys_prompt 为 OWNER，每轮输入覆盖前释放。 */
-extern airy_lang_gateway_t *g_cli_lang_gateway;
+/* 1.3 推理语言网关服务面化（M1-1c）：CLI 不再持有 lang_gateway 句柄，
+ * 输入标准化/输出后处理经 gateway → think.lang_*（think_d 承载）；
+ * g_cli_lang_sys_prompt 为 OWNER，每轮输入覆盖前释放；g_cli_lang_output
+ * 为 wire 语言值（0=未知/1=中文/2=英文）。 */
 extern char *g_cli_lang_sys_prompt;
-extern airy_lang_t g_cli_lang_output;
+extern int g_cli_lang_output;
 
 /* 阶段 4（2026-08-15）：决策链事件流句柄（⑥单一真相源事件流底座）。
  * main.c 创建 hall_store 后赋值；CLI 决策点（GCCP 确认/蓝图命中/计划/提交）
