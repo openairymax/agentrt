@@ -62,4 +62,14 @@ if(BUILD_TESTS)
                      --root "${CMAKE_CURRENT_SOURCE_DIR}/tests/drift-root"
                      "${CMAKE_CURRENT_SOURCE_DIR}/tests/drift-undeclared.txt")
     set_tests_properties(depgraph-fixture-drift-undeclared PROPERTIES WILL_FAIL TRUE)
+    # M1-1b 链接白名单门禁（fixture：合规通过 / 故意加链 fail-closed）
+    add_test(NAME depgraph-links-ok
+             COMMAND airy_depgraph
+                     --links "${CMAKE_CURRENT_SOURCE_DIR}/tests/link-whitelist.txt"
+                     --actual "${CMAKE_CURRENT_SOURCE_DIR}/tests/links-ok.txt")
+    add_test(NAME depgraph-links-violation
+             COMMAND airy_depgraph
+                     --links "${CMAKE_CURRENT_SOURCE_DIR}/tests/link-whitelist.txt"
+                     --actual "${CMAKE_CURRENT_SOURCE_DIR}/tests/links-violation.txt")
+    set_tests_properties(depgraph-links-violation PROPERTIES WILL_FAIL TRUE)
 endif()

@@ -1,0 +1,23 @@
+# 模块链接白名单（M1-1b，2026-09-02）—— 单一权威源（SSoT）
+#
+# 语法: <目标>: <允许链接的项目内库...>    依赖以空格分隔；无依赖可省略
+# 语义:
+#   - 目标 = CMake target 名（gateway / airy_gateway_service / gateway_d ...）
+#   - 允许库 = 该项目目标允许直接链接的项目内部库（target 名）
+#   - 系统/第三方库（cjson/microhttpd/nghttp2/websockets/Threads::Threads
+#     /airy_platform_libs 聚合的 dl/pthread/m/...）不在此登记，自动忽略
+#
+# 校验: airy_depgraph --links <本文件> --actual <实际链接清单>（构建期门禁）
+#   - 实际链接的项目库必须在对应目标允许集内（链接越权即 fail-closed）
+#   - 白名单库全集之外出现项目库前缀（airy_/libairy_/coreloopthree/
+#     cognition/svc_/daemon_）即视为未登记项目库，fail-closed
+#
+# 架构约束（0.1.9 方案 §2.2）: "认知引擎只对 think_d 暴露服务面"——
+#   gateway 系目标禁链 coreloopthree/cognition。新增任何模块的链接
+#   约束只需在本文件登记；新增目标须在此登记后才可被门禁校验。
+#
+# 事实基线（2026-09-02 实测，gateway/CMakeLists.txt L172-180、
+#   daemons/gateway_d/CMakeLists.txt L110-166/L439-458）:
+gateway: svc_common airy_syscall airy_protocols airy_common airy_memory
+airy_gateway_service: svc_common airy_protocols airy_platform_libs
+gateway_d: airy_gateway_service airy_syscall airy_platform_libs

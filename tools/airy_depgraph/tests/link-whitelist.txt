@@ -1,0 +1,3 @@
+# M1-1b 链接白名单 fixture（与真实 agentrt/link-whitelist.txt 同构）
+gateway: svc_common airy_syscall airy_protocols
+agent_d: svc_common airy_taskflow airy_memory
