@@ -62,8 +62,9 @@ int web_search_tool(const char *params_json, tool_result_t *res);
 int web_fetch_tool(const char *params_json, tool_result_t *res);
 
 /* OpenAI function-calling schema（聊天工具回路）。工具行为 SSoT 在 tool_d
- * （builtin.c 真实实现）；本 schema 与 gateway_tools_schema.h 保持同构
- * （2026-08-16 对齐）。本地文件读写 + 联网检索构成超级智能体的日常能力：
+ * （builtin.c 真实实现）；本 schema 与 commons 契约层
+ * （commons/include/airy_tool_schema.h）保持同构（2026-08-16 对齐）。
+ * 本地文件读写 + 联网检索构成超级智能体的日常能力：
  * fs_read/fs_write/fs_list/fs_glob/fs_grep/fs_edit/fs_delete + web_search/web_fetch。
  * shell_run / git_* 不入聊天回路（高危，留给任务管线审批链）。 */
 const char *cli_chat_tools_json =
