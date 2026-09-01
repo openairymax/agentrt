@@ -323,24 +323,9 @@ airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_tui_t *tui,
     rt->events_ud = events_ud;
     rt->mem_ud = mem_ud;
 
-    {
-        airy_lang_gateway_config_t lg_cfg;
-        __builtin_memset(&lg_cfg, 0, sizeof(lg_cfg));
-        lg_cfg.auto_calibrate_on_create = 1;
-        airy_lang_gateway_t *lg = NULL;
-        airy_err_t lge = airy_lang_gateway_create(&lg_cfg, &lg);
-        if (lge != AIRY_EOK || !lg) {
-            AIRY_LOG_WARN("airy_cli: lang_gateway create failed (err=%d), "
-                          "language routing disabled",
-                          (int)lge);
-            lg = NULL;
-        } else {
-            AIRY_LOG_INFO("airy_cli: langgateway attached (tokenizer calibration "
-                          "on startup)");
-        }
-        rt->lang_gateway = lg;
-        g_cli_lang_gateway = lg;
-    }
+    /* M1-1c：CLI 不再进程内持有 lang_gateway（推理语言网关服务面化至
+     * think_d，经 gateway → think.lang_process 调用）。输入标准化与
+     * 输出后处理在 main.c / cli_chat_finalize.c 经 cli_gw_call 完成。 */
 
     return AIRY_EOK;
 }
@@ -367,8 +352,6 @@ void cli_teardown_runtime(cli_runtime_ctx_t *rt)
         airy_governance_destroy(rt->governance);
     if (rt->rsched)
         airy_roadmap_sched_destroy(rt->rsched);
-    if (rt->lang_gateway)
-        airy_lang_gateway_destroy(rt->lang_gateway);
     AIRY_MEMSET(rt, 0, sizeof(*rt));
 }
 

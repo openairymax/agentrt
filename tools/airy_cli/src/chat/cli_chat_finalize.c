@@ -11,6 +11,7 @@
  */
 
 #include "cli_chat_internal.h"
+#include "cli_gw.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,17 +36,50 @@ void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
                                     ? final_resp->choices[0].content
                                     : "";
 
-    /* 1.3 推理语言网关：输出后处理（语言漂移检测 + 术语一致性 + 润色）。
-     * 期望输出语言取路由决策 output_lang；仅作用于渲染与历史写入，
-     * 不修改 llm_d 原始响应（推理链条证据保留）。 */
+    /* 1.3 推理语言网关服务面化（M1-1c）：输出后处理（语言漂移检测 +
+     * 术语一致性 + 润色）经 gateway → think.lang_postprocess（think_d
+     * 承载）。期望输出语言取路由决策 output_lang（wire 值）；仅作用于
+     * 渲染与历史写入，不修改 llm_d 原始响应（推理链条证据保留）。
+     * 失败时保留原始正文，不阻断渲染。 */
     char *lg_final = NULL;
     const char *render_content = final_content;
-    if (g_cli_lang_gateway && final_content[0]) {
-        if (airy_lang_gateway_post_process(g_cli_lang_gateway, final_content,
-                                           g_cli_lang_output,
-                                           &lg_final) == AIRY_EOK &&
-            lg_final && lg_final[0])
-            render_content = lg_final;
+    if (final_content[0]) {
+#ifdef AIRY_HAS_CJSON
+        cJSON *lp = cJSON_CreateObject();
+        cJSON *lt = cJSON_CreateString(final_content);
+        if (lp && lt)
+            cJSON_AddItemToObject(lp, "text", lt);
+        else
+            cJSON_Delete(lt);
+        if (g_cli_lang_output > 0) {
+            cJSON *el = cJSON_CreateNumber(g_cli_lang_output);
+            if (lp && el)
+                cJSON_AddItemToObject(lp, "expected_lang", el);
+            else
+                cJSON_Delete(el);
+        }
+        char *lp_json = lp ? cJSON_PrintUnformatted(lp) : NULL;
+        cJSON_Delete(lp);
+        char *lp_res = NULL;
+        if (lp_json && cli_gw_call("think.lang_postprocess", lp_json, 6000, &lp_res) == 0 &&
+            lp_res) {
+            cJSON *lr = cJSON_Parse(lp_res);
+            if (lr) {
+                cJSON *tx = cJSON_GetObjectItem(lr, "text");
+                if (cJSON_IsString(tx) && tx->valuestring && tx->valuestring[0]) {
+                    AIRY_FREE(lg_final);
+                    lg_final = AIRY_STRDUP(tx->valuestring);
+                    if (lg_final)
+                        render_content = lg_final;
+                }
+                cJSON_Delete(lr);
+            }
+            AIRY_FREE(lp_res);
+        } else {
+            AIRY_FREE(lp_res);
+        }
+        AIRY_FREE(lp_json);
+#endif /* AIRY_HAS_CJSON */
     }
 
     if (g_cli_json_mode) {
