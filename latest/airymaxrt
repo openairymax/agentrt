@@ -102,6 +102,9 @@ AGENT_FILE="${AIRY_AGENT_FILE:-agents/main.agent.yaml}"
 LOG_FILE="$AIRY_HOME/logs/airymaxrt.log"
 AIRYRT_LOG_LEVEL="${AIRYRT_LOG_LEVEL:-info}"
 mkdir -p "$AIRY_HOME/logs" "$RUNTIME_DIR"
+# set -e 防护：log 文件缺失时 touch 兜底，避免首次 log 写入失败中断脚本
+#（logs 子命令在日志文件不存在时仍需正常输出错误提示）。
+touch "$LOG_FILE" 2>/dev/null || true
 
 _log_num() {
     case "$1" in
@@ -1069,6 +1072,8 @@ case "$CMD" in
         echo "                        （monitor --daemon 后台常驻 / --stop 停止）"
         echo "      airymaxrt status      查看运行时状态"
         echo "      airymaxrt doctor      组件健康检查"
+        echo "      airymaxrt logs [N]    查看最近日志（默认 airymaxrt.log 末 50 行；"
+        echo "                            logs <name> 看指定 daemon，如 logs llm_d）"
         echo "      airymaxrt update      自更新（--check 仅检查 / --channel stable|beta|rc"
         echo "                            切通道 / --rollback 回滚 / --file 离线包"
         echo "                            （离线包需 --sha256 或相邻 .sha256））"
@@ -1272,7 +1277,7 @@ case "$CMD" in
         if [ "$_core_ok" = "1" ]; then
             log info "daemon 群: 核心链路（llm/think/agent/tool）全部就绪"
         else
-            log warn "daemon 群: 核心链路未全部就绪（运行 airymaxrt 拉起，或查看 logs/ 诊断）"
+            log warn "daemon 群: 核心链路未全部就绪（运行 airymaxrt 拉起，或 airymaxrt logs 查看诊断）"
         fi
         exit 0
         ;;
@@ -1334,6 +1339,44 @@ case "$CMD" in
             log info "运行库: 全部可解析"
         fi
         if [ "$miss" = "0" ]; then log info "doctor: 全部就绪"; else log warn "doctor: 存在缺失项"; fi
+        exit 0
+        ;;
+    logs)
+        # 社区反馈：status 提示"查看 logs/ 诊断"，但无 logs 子命令，用户只能
+        # 手敲路径。logs [N] 看主日志末 N 行（默认 50）；logs <name> [N] 看指定
+        # daemon 输出（如 logs llm_d → logs/llm_d.out，自动补 .out/.log 后缀）。
+        _arg="${2:-}"
+        _n=50
+        _file="$AIRY_HOME/logs/airymaxrt.log"
+        case "$_arg" in
+            "") ;;
+            *[!0-9]*)
+                # 非纯数字 → 视为 daemon 名
+                if [ -f "$AIRY_HOME/logs/$_arg" ]; then
+                    _file="$AIRY_HOME/logs/$_arg"
+                elif [ -f "$AIRY_HOME/logs/${_arg}.out" ]; then
+                    _file="$AIRY_HOME/logs/${_arg}.out"
+                elif [ -f "$AIRY_HOME/logs/${_arg}.log" ]; then
+                    _file="$AIRY_HOME/logs/${_arg}.log"
+                else
+                    log error "未找到日志: $_arg（可用: $(ls "$AIRY_HOME/logs" 2>/dev/null | tr '\n' ' ')）"
+                    exit 1
+                fi
+                _n="${3:-50}"
+                ;;
+            *)
+                _n="$_arg"
+                ;;
+        esac
+        case "$_n" in
+            *[!0-9]*|"") _n=50 ;;
+        esac
+        if [ ! -f "$_file" ]; then
+            log error "日志文件不存在: $_file"
+            exit 1
+        fi
+        echo "── $_file（末 ${_n} 行）────────────────────────────" >&2
+        tail -n "$_n" "$_file"
         exit 0
         ;;
     uninstall)

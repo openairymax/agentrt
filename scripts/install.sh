@@ -1293,7 +1293,7 @@ if [ "\$_INPATH" != "1" ] && [ -n "\$_BINDIR" ]; then
     esac
     if ! grep -q '# >>> AgentRT PATH bootstrap <<<' "\$_RC" 2>/dev/null; then
         if [ "\$(basename "\$_RC")" = "config.fish" ]; then
-            _LINE=\$(printf 'set -gx PATH "%s" $PATH' "\$_BINDIR")
+            _LINE=\$(printf 'set -gx PATH "%s" \$PATH' "\$_BINDIR")
         else
             _LINE=\$(printf 'export PATH="%s:\$PATH"' "\$_BINDIR")
         fi
@@ -1311,7 +1311,7 @@ fi
 # 复用已缓存的完整启动器，避免频繁网络往返。start 亦自举（完整启动器负责
 # 拉起守护进程群 + 前端；缓存存在时零网络）。
 case "\$1" in
-    start|cli|profile|monitor|status|doctor|uninstall|update|reinstall)
+    start|cli|profile|monitor|status|doctor|logs|uninstall|update|reinstall)
         _FULL="\$AIRY_HOME/bin/airymaxrt-full"
         if [ "\$1" != "update" ] && [ -s "\$_FULL" ]; then
             exec bash "\$_FULL" "\$@"
@@ -1444,7 +1444,7 @@ EOF
     fi
 }
 
-# ─── 17 daemon 完整性校验 ──────────────────────────────────────────────
+# ─── 18 daemon 完整性校验 ──────────────────────────────────────────────
 # 参数 strict：二进制模式下缺 daemon 视为安装失败（exit 1），
 # 避免「残缺安装却显示成功」；源码模式保留 warn。
 verify_daemons() {
