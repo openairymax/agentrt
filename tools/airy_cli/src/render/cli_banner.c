@@ -9,7 +9,7 @@
  * （2026-08-31）：固定英雄区 + DECSTBM 滚动区让普通终端的上下滚动
  * 失效、长回复时头部被顶出/残留，交互体验割裂。现改为普通滚动 REPL：
  *
- *   ◆ Airymax AgentRT · v0.1.7
+ *   ◆ Airymax AgentRT · v<版本>
  *   A·t2=xxx  B·t1-f=xxx  C·t1-p=xxx
  *   (空行)
  *
@@ -91,7 +91,7 @@ static void cli_hero_model_seg(const char *key, const char *model, int lead_sep)
 /**
  * @brief 紧凑启动头部（3 行，普通滚动，不再 pin）。
  *
- *   ◆ Airymax AgentRT · v0.1.7
+ *   ◆ Airymax AgentRT · v<版本>
  *   A·t2=xxx  B·t1-f=xxx  C·t1-p=xxx
  *   (空行)
  *

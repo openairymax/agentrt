@@ -295,7 +295,12 @@ void cli_tui_set_header_models(cli_tui_t *t, const char *t2, const char *t1f,
         snprintf(t->hdr_t1p, sizeof(t->hdr_t1p), "%s", t1p);
 }
 
-/* 2.2.1.2/2.2.1.3：重建行渲染三区（hero/对话/输入）。详情见 cli_tui.h。 */
+/* 2.2.1.2/2.2.1.3 → 0.1.8：退出全屏/尺寸变化后重建行渲染视图。
+ * 0.1.7 已声明弃用「固定滚动区 + 底部输入条」三区布局（cli_banner.c），
+ * 但本函数此前仍 cli_term_header_pin 重设 DECSTBM——F8 进出全屏后终端
+ * 被强加固定滚动区，滚轮失效、hero 钉死，与默认 REPL 行为不一致
+ * （社区反馈「CLI 页面操作混乱」根因）。现与启动路径对齐：只重绘
+ * 头部与历史，保持普通滚动（unpin 状态）。 */
 void cli_tui_rebuild_three_zone(cli_tui_t *t)
 {
     if (!t || !cli_term_is_tty() || t->active)
@@ -305,19 +310,12 @@ void cli_tui_rebuild_three_zone(cli_tui_t *t)
     cli_print_system_header(t->hdr_t2[0] ? t->hdr_t2 : NULL,
                             t->hdr_t1f[0] ? t->hdr_t1f : NULL,
                             t->hdr_t1p[0] ? t->hdr_t1p : NULL);
-    /* P0（F8 退出全屏后英雄区混乱）：必须在重放历史之前重建 DECSTBM 滚动区
-     * 并恢复 footer 计数——unpin 已把 g_footer_lines 清零，若拖到重放之后再
-     * pin，长历史会把刚画好的 hero 滚出屏外，且 input_hop 因 footer=0 变成
-     * no-op（光标定位失效）。先 pin 后重放，hero/对话/输入三区才真正固定。 */
-    cli_term_header_pin(CLI_HDR_LINES, 2);
     for (size_t i = 0; i < g_history_count; i++) {
         if (strcmp(g_history_roles[i], "user") == 0)
             cli_render_user_message(g_history_contents[i]);
         else
             cli_render_super_agent(g_history_contents[i]);
     }
-    if (cli_term_input_on())
-        cli_term_input_hop();
     fflush(stdout);
 }
 

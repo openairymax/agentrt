@@ -160,16 +160,19 @@ set(CLI_INC_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/render
     ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/coreloopthree/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/taskflow/include
+    # 0a 地基归位：airy_rt.h 为 atoms/corekern 头，显式声明依赖（此前借道
+    # commons 的 PUBLIC include 间接获得——已摘除，此处为显式引路）
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/corekern/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/string/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/logging/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/error/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/sync/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/ipc/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/sd/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/string
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/logging
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/error
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/sync
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/ipc
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/sd
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/platform/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/ime/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/ime
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/llm_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/tool_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/common/include
