@@ -1,0 +1,3 @@
+# 违规实际链接（期望退出码 2）：gateway 故意加链 coreloopthree（禁链）
+gateway: svc_common airy_syscall coreloopthree
+agent_d: svc_common airy_taskflow

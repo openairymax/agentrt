@@ -36,6 +36,8 @@
 !tests/e2e/**
 !LICENSES/
 !LICENSES/**
+# M1-1b 模块链接白名单单一权威（airy_depgraph --links 构建期门禁消费）
+!link-whitelist.txt
 # ---------------------------------------------------------------------------
 # 管理仓必要工具（CMake/README/CHANGELOG 正式引用，须入库）：
 # - tools/codegen: syscall.xml SSoT codegen 生成器（CMake 构建与 CI 防漂移校验依赖）

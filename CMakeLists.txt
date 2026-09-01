@@ -68,6 +68,10 @@ endif()
 # 伞仓直属模块；独立 clone agentrt 仓即可完整构建）
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/airy_print.cmake)
 
+# M1-1b：模块链接白名单门禁函数（collect 阶段在 gateway 子目录配置前
+# 就绪；install_checks 阶段在 tools/airy_depgraph 配置后调用）
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/airy_linkgate.cmake)
+
 # 项目范围选项
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static libraries" OFF)
 option(WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
@@ -847,6 +851,9 @@ if(AIRY_BUILD_ALL)
     # 环检测（fail-closed）+ 依赖图报告；复用 taskflow graph_engine
     if(BUILD_COMMONS AND BUILD_ATOMS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/airy_depgraph/CMakeLists.txt")
         add_subdirectory(tools/airy_depgraph)
+        # M1-1b：airy_depgraph 配置完成后安装链接白名单门禁（gateway 系
+        # 禁链 coreloopthree/cognition，fail-closed）
+        airy_linkgate_install_checks()
     else()
         airy_print_warn("airy_depgraph module not found or disabled")
     endif()

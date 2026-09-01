@@ -342,7 +342,7 @@ static size_t dg_scan_domain_includes(dg_index_t *idx, const dg_manifest_t *mf,
 /* ------------------------------------------------------------------
  * manifest 解析（手写 tokenizer，strtok 被 poison）
  * ------------------------------------------------------------------ */
-static int dg_parse_manifest(const char *path, dg_manifest_t *mf)
+static int dg_parse_manifest(const char *path, dg_manifest_t *mf, bool allow_unknown)
 {
     FILE *fp = fopen(path, "r");
     if (!fp) {
@@ -436,6 +436,8 @@ static int dg_parse_manifest(const char *path, dg_manifest_t *mf)
         const dg_domain_t *dom = &mf->domains[i];
         for (size_t j = 0; j < dom->dep_count; j++) {
             if (dg_name_to_vertex(mf, dom->deps[j]) == SIZE_MAX) {
+                if (allow_unknown)
+                    continue; /* 链接白名单模式：库名不必是图节点 */
                 dg_eprintf("airy_depgraph: unknown dependency '%s' of '%s'\n", dom->deps[j],
                            dom->name);
                 return -1;
@@ -540,8 +542,121 @@ static void dg_dfs_cycles(graph_engine_handle_t engine, const dg_manifest_t *mf,
         dg_printf("  无\n");
 }
 
-/* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+ * 链接白名单门禁（M1-1b，2026-09-02）：
+ *   --links <whitelist> --actual <actual> 成对启用。
+ *   whitelist: "目标: 允许链接的项目内库..."（link-whitelist.txt 单一权威）
+ *   actual   : CMake 侧 get_target_property(LINK_LIBRARIES) 生成的实际链接
+ * 规则（fail-closed）：
+ *   - 实际链接库在白名单"库全集"内但不在该目标允许集 → 链接越权，fail
+ *   - 实际链接库不在库全集但以项目库前缀开头 → 未登记项目库，fail
+ *   - 系统/第三方库（cjson/microhttpd/... 或路径形式）→ 忽略
+ * ------------------------------------------------------------------ */
 
+/* 项目内部库前缀：白名单外出现即视为未登记项目库（fail-closed） */
+static bool dg_is_project_lib(const char *lib)
+{
+    static const char *const k_prefix[] = {"airy_", "libairy_", "coreloopthree",
+                                           "cognition", "svc_", "daemon_", NULL};
+    for (size_t i = 0; k_prefix[i] != NULL; i++) {
+        if (strncmp(lib, k_prefix[i], strlen(k_prefix[i])) == 0)
+            return true;
+    }
+    return false;
+}
+
+/* 库名归一化：去 -l 前缀 / 目录路径 / lib 前缀 / .so|.a|.dylib|.dll 后缀 */
+static void dg_lib_basename(const char *src, char *out, size_t outsz)
+{
+    const char *base = src;
+    if (base[0] == '-' && base[1] == 'l')
+        base += 2;
+    const char *slash = strrchr(base, '/');
+    if (slash)
+        base = slash + 1;
+    size_t len = strlen(base);
+    size_t start = 0;
+    if (len > 3 && strncmp(base, "lib", 3) == 0)
+        start = 3;
+    size_t end = len;
+    static const char *const k_suffix[] = {".so", ".a", ".dylib", ".dll", NULL};
+    for (size_t i = 0; k_suffix[i] != NULL; i++) {
+        size_t sl = strlen(k_suffix[i]);
+        if (end > start + sl && strncmp(base + end - sl, k_suffix[i], sl) == 0) {
+            end -= sl;
+            break;
+        }
+    }
+    size_t n = end - start;
+    if (n >= outsz)
+        n = outsz - 1;
+    for (size_t i = 0; i < n; i++)
+        out[i] = base[start + i];
+    out[n] = '\0';
+}
+
+/* 链接白名单校验；返回 0=通过，2=存在越权/未登记（fail-closed） */
+static int dg_check_links(const dg_manifest_t *wl, const dg_manifest_t *actual)
+{
+    /* 项目库全集 = 白名单所有目标允许库的并集 */
+    char univ[AIRY_DG_MAX_DOMAIN * AIRY_DG_MAX_DEP][64];
+    size_t ucount = 0;
+    for (size_t i = 0; i < wl->domain_count; i++) {
+        for (size_t j = 0; j < wl->domains[i].dep_count; j++) {
+            const char *lib = wl->domains[i].deps[j];
+            bool dup = false;
+            for (size_t k = 0; k < ucount; k++) {
+                if (strcmp(univ[k], lib) == 0) {
+                    dup = true;
+                    break;
+                }
+            }
+            if (!dup && ucount < AIRY_DG_MAX_DOMAIN * AIRY_DG_MAX_DEP)
+                snprintf(univ[ucount++], sizeof(univ[0]), "%s", lib);
+        }
+    }
+
+    int violations = 0;
+    for (size_t i = 0; i < actual->domain_count; i++) {
+        const dg_domain_t *tgt = &actual->domains[i];
+        size_t wl_idx = dg_name_to_vertex(wl, tgt->name);
+        if (wl_idx == SIZE_MAX)
+            continue; /* 未登记目标：CMake 侧仅对登记目标生成 actual */
+        const dg_domain_t *allowed = &wl->domains[wl_idx];
+        for (size_t j = 0; j < tgt->dep_count; j++) {
+            char lib[64];
+            dg_lib_basename(tgt->deps[j], lib, sizeof(lib));
+            if (lib[0] == '\0' || lib[0] == '$')
+                continue; /* 空项 / 生成器表达式 */
+            bool in_univ = false;
+            for (size_t k = 0; k < ucount; k++) {
+                if (strcmp(univ[k], lib) == 0) {
+                    in_univ = true;
+                    break;
+                }
+            }
+            if (in_univ) {
+                if (!dg_domain_has_dep(allowed, lib)) {
+                    dg_eprintf("airy_depgraph: link violation: '%s' links '%s' not in whitelist\n",
+                               tgt->name, lib);
+                    violations++;
+                }
+            } else if (dg_is_project_lib(lib)) {
+                dg_eprintf("airy_depgraph: link violation: '%s' links undeclared project lib '%s'\n",
+                           tgt->name, lib);
+                violations++;
+            }
+        }
+    }
+    if (violations > 0) {
+        dg_eprintf("airy_depgraph: %d link whitelist violation(s), build blocked (fail-closed)\n",
+                   violations);
+        return 2;
+    }
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
 static void dg_write_report(FILE *out, const dg_manifest_t *mf, size_t n,
                             const vertex_id_t *order, size_t order_len, size_t edges)
 {
@@ -579,6 +694,8 @@ int main(int argc, char **argv)
 {
     const char *manifest_path = NULL;
     const char *report_path = NULL;
+    const char *links_whitelist = NULL;
+    const char *links_actual = NULL;
     dg_index_t idx = {0};
 
     for (int i = 1; i < argc; i++) {
@@ -586,20 +703,33 @@ int main(int argc, char **argv)
             report_path = argv[++i];
         } else if (strcmp(argv[i], "--root") == 0 && i + 1 < argc) {
             snprintf(idx.root, sizeof(idx.root), "%s", argv[++i]);
+        } else if (strcmp(argv[i], "--links") == 0 && i + 1 < argc) {
+            links_whitelist = argv[++i];
+        } else if (strcmp(argv[i], "--actual") == 0 && i + 1 < argc) {
+            links_actual = argv[++i];
         } else if (manifest_path == NULL) {
             manifest_path = argv[i];
         } else {
-            dg_eprintf("usage: airy_depgraph [-o <report>] [--root <commons-dir>] <manifest>\n");
+            dg_eprintf("usage: airy_depgraph [-o <report>] [--root <commons-dir>]\n"
+                       "                    [--links <whitelist> --actual <actual-links>] <manifest>\n");
             return 2;
         }
     }
-    if (!manifest_path) {
-        dg_eprintf("usage: airy_depgraph [-o <report>] [--root <commons-dir>] <manifest>\n");
+    /* --links/--actual 必须成对；无 manifest 时允许仅链接白名单模式 */
+    if ((links_whitelist == NULL) != (links_actual == NULL)) {
+        dg_eprintf("airy_depgraph: --links and --actual must be used together\n");
+        return 2;
+    }
+    if (!manifest_path && !links_whitelist) {
+        dg_eprintf("usage: airy_depgraph [-o <report>] [--root <commons-dir>]\n"
+                   "                    [--links <whitelist> --actual <actual-links>] <manifest>\n");
         return 2;
     }
 
+    int exit_code = 0;
+    if (manifest_path) {
     dg_manifest_t mf = {0};
-    if (dg_parse_manifest(manifest_path, &mf) != 0)
+    if (dg_parse_manifest(manifest_path, &mf, false) != 0)
         return 2;
 
     size_t n = mf.domain_count;
@@ -650,7 +780,7 @@ int main(int argc, char **argv)
     dg_dfs_cycles(engine, &mf, n);
 
     /* include 漂移门禁（--root 提供 commons 根时启用，双向校验） */
-    int exit_code = (remain == 0) ? 0 : 1;
+    exit_code = (remain == 0) ? 0 : 1;
     if (idx.root[0] != '\0' && remain == 0) {
         dg_index_build(&idx, &mf);
         size_t total_drift = 0;
@@ -698,5 +828,21 @@ int main(int argc, char **argv)
     }
 
     graph_engine_destroy(engine);
+    } /* manifest 图校验分支结束 */
+
+    /* 链接白名单门禁（M1-1b）：越权/未登记项目库即 fail-closed */
+    if (links_whitelist) {
+        dg_manifest_t wl = {0};
+        dg_manifest_t ac = {0};
+        if (dg_parse_manifest(links_whitelist, &wl, true) != 0)
+            return 2;
+        if (dg_parse_manifest(links_actual, &ac, true) != 0)
+            return 2;
+        int link_exit = dg_check_links(&wl, &ac);
+        if (link_exit != 0)
+            return link_exit;
+        dg_printf("airy_depgraph: 链接白名单门禁: OK（目标链接均在白名单内）\n");
+    }
+
     return exit_code;
 }
