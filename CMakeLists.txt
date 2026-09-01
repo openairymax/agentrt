@@ -86,6 +86,24 @@ option(AIRY_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider"
 option(AIRY_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe functions)" ON)
 set(AIRY_MEMORY_BACKEND "builtin" CACHE STRING "Memory backend (builtin|memoryrovol)")
 
+# 版本宏 SSoT 注入（0.1.8 审计修复）：commons/include/airyrt_version.h 的
+# AIRYRT_VERSION 此前是无保护手工副本，每次发版须人肉同步 VERSION，是
+# "构建后才发现版本硬编码漂移"的系统性根因。现统一从 VERSION 文件（RAW
+# 含字母后缀，如 0.1.6a）经 add_compile_definitions 注入，覆盖本目录及全部
+# 子目录（各 daemon svc_adapter / gateway / commons）；头文件保留 #ifndef
+# 回退，供未走 CMake 的独立编译（语法检查等）兜底。与 AIRY_CLI_VERSION
+# 注入方式对齐（tools/airy_cli/CMakeLists.txt）。
+set(AIRYRT_VERSION_INJECT "${AIRY_VERSION_RAW}")
+if(NOT AIRYRT_VERSION_INJECT)
+    set(AIRYRT_VERSION_INJECT "${AIRY_VERSION_NUM}")
+endif()
+if(AIRYRT_VERSION_INJECT)
+    add_compile_definitions(AIRYRT_VERSION="${AIRYRT_VERSION_INJECT}")
+    airy_print_ok("AIRYRT_VERSION injected from VERSION SSoT: ${AIRYRT_VERSION_INJECT}")
+else()
+    airy_print_warn("VERSION 文件缺失，AIRYRT_VERSION 回退头文件缺省值")
+endif()
+
 # CTest必须在顶级启用（在任何add_subdirectory之前）
 # R-09-SEC: Strict compliance mode and tests are now independent.
 # Tests MUST run under strict compliance to catch BAN violations at compile time.
@@ -186,7 +204,7 @@ else()
 
     if(AIRY_COMPLIANCE_STRICT)
         add_compile_definitions(AIRY_COMPLIANCE_STRICT)
-        add_compile_options("-include" "${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/compliance/include/banned_functions.h")
+        add_compile_options("-include" "${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/compliance/banned_functions.h")
 
         # 注意：内存子系统实现层的 AIRY_COMPLIANCE_IMPL 豁免由各子目录的
         # CMakeLists.txt 中的 set_source_files_properties 设置，因为该属性
@@ -618,19 +636,19 @@ if(AIRY_BUILD_ALL)
     include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}/commons
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/compat/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/memory/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/string/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/logging/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/error/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/compat
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/memory
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/string
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/logging
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/error
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/platform/include
-        # P0.17 阶段 3: svc_common.h、ipc_service_bus.h 迁移至 commons/utils/ipc/include
-        # P0.17 阶段 4: daemon_bootstrap_ipc.h、ipc_bus_helper.h、ipc_backpressure.h 迁移至 commons/utils/ipc/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/ipc/include
-        # P0.17 阶段 4: daemon_bootstrap_sd.h、service_discovery.h、service_discovery_helper.h 迁移至 commons/utils/sd/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/sd/include
-        # P0.17 阶段 5: thread_pool.h 迁移至 commons/utils/sync/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/sync/include
+        # P0.17 阶段 3: svc_common.h、ipc_service_bus.h 迁移至 commons/utils/ipc
+        # P0.17 阶段 4: daemon_bootstrap_ipc.h、ipc_bus_helper.h、ipc_backpressure.h 迁移至 commons/utils/ipc
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/ipc
+        # P0.17 阶段 4: daemon_bootstrap_sd.h、service_discovery.h、service_discovery_helper.h 迁移至 commons/utils/sd
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/sd
+        # P0.17 阶段 5: thread_pool.h 迁移至 commons/utils/sync
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/sync
         # P0.17 阶段 1: airy_defaults.h 位于 commons/include
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/include
         ${CMAKE_CURRENT_SOURCE_DIR}/atoms/corekern/include
@@ -666,15 +684,15 @@ if(AIRY_BUILD_ALL)
     set(_global_inc_dirs
         commons
         commons/utils/include
-        commons/utils/compat/include
-        commons/utils/memory/include
-        commons/utils/string/include
-        commons/utils/logging/include
-        commons/utils/error/include
+        commons/utils/compat
+        commons/utils/memory
+        commons/utils/string
+        commons/utils/logging
+        commons/utils/error
         commons/platform/include
-        commons/utils/ipc/include
-        commons/utils/sd/include
-        commons/utils/sync/include
+        commons/utils/ipc
+        commons/utils/sd
+        commons/utils/sync
         commons/include
         atoms/corekern/include
         protocols/include
@@ -853,13 +871,16 @@ if(AIRY_BUILD_ALL)
         COMMENT "Build all AgentRT core components (atoms/commons/cupolas/gateway/heapstore/svc_common)"
     )
 
-    # 安装头文件
+    # 安装头文件（0.1.9 0d 扁平化后仅装公共头，排除 .c 与内部头）
     install(DIRECTORY atoms/corekern/include/ DESTINATION include/agentrt/corekern)
     install(DIRECTORY atoms/coreloopthree/include/ DESTINATION include/agentrt/coreloopthree)
     install(DIRECTORY atoms/syscall/include/ DESTINATION include/agentrt/syscall)
-    install(DIRECTORY commons/utils/memory/include/ DESTINATION include/agentrt/commons/memory)
-    install(DIRECTORY commons/utils/string/include/ DESTINATION include/agentrt/commons/string)
-    install(DIRECTORY commons/utils/logging/include/ DESTINATION include/agentrt/commons/logging)
+    install(DIRECTORY commons/utils/memory/ DESTINATION include/agentrt/commons/memory
+            FILES_MATCHING PATTERN "*.h" PATTERN "*_internal.h" EXCLUDE)
+    install(DIRECTORY commons/utils/string/ DESTINATION include/agentrt/commons/string
+            FILES_MATCHING PATTERN "*.h" PATTERN "*_internal.h" EXCLUDE)
+    install(DIRECTORY commons/utils/logging/ DESTINATION include/agentrt/commons/logging
+            FILES_MATCHING PATTERN "*.h" PATTERN "*_internal.h" EXCLUDE)
 
     airy_print_ok("AgentRT core components configuration complete")
 
