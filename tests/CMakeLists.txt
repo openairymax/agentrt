@@ -11,9 +11,9 @@
 add_executable(test_banned_functions test_banned_functions.c)
 
 target_include_directories(test_banned_functions PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/compliance/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/compliance
 )
 
 target_compile_features(test_banned_functions PRIVATE c_std_11)
@@ -30,9 +30,9 @@ airy_print_ok("  [compliance] test_banned_functions: BAN-030/155/154/073 compile
 add_executable(test_smoke test_smoke.c)
 
 target_include_directories(test_smoke PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/compliance/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/compliance
 )
 
 target_compile_features(test_smoke PRIVATE c_std_11)
@@ -49,9 +49,9 @@ airy_print_ok("  [smoke] test_smoke: compliance build environment sanity check")
 add_executable(test_utils test_utils.c)
 
 target_include_directories(test_utils PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/compliance/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/compliance
 )
 
 target_compile_features(test_utils PRIVATE c_std_11)
@@ -68,9 +68,9 @@ airy_print_ok("  [utils] test_utils: generic utility semantics unit test")
 add_executable(test_string_utils test_string_utils.c)
 
 target_include_directories(test_string_utils PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/compliance/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/memory
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/error
+    ${CMAKE_CURRENT_SOURCE_DIR}/../commons/utils/compliance
 )
 
 target_compile_features(test_string_utils PRIVATE c_std_11)

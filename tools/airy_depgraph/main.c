@@ -118,7 +118,9 @@ static bool dg_domain_has_dep(const dg_domain_t *dom, const char *dep)
  * include 漂移门禁：头文件索引（basename -> 归属子域；冲突则 skip）
  * ------------------------------------------------------------------ */
 
-/* 扫描单个目录下 *.h，owner 为该目录归属子域 */
+/* 扫描单个目录下 *.h，owner 为该目录归属子域。
+ * 0.1.9 0d 扁平化：utils/<域>/ 平铺后，公共头与内部头同目录；内部头按
+ * 约定以 _internal.h 后缀命名，不属于公共契约，跳过不参与漂移门禁。 */
 static void dg_index_scan_dir(dg_index_t *idx, const char *dir, const char *owner)
 {
     DIR *dp = opendir(dir);
@@ -128,6 +130,11 @@ static void dg_index_scan_dir(dg_index_t *idx, const char *dir, const char *owne
     while ((de = readdir(dp)) != NULL) {
         size_t n = strlen(de->d_name);
         if (n < 3 || de->d_name[n - 1] != 'h' || de->d_name[n - 2] != '.')
+            continue;
+        /* 0d: _internal.h 内部头跳过（不构成公共 API 契约） */
+        static const char k_internal_suffix[] = "_internal.h";
+        size_t isuf = sizeof(k_internal_suffix) - 1;
+        if (n >= isuf && strcmp(de->d_name + n - isuf, k_internal_suffix) == 0)
             continue;
         if (idx->header_count >= AIRY_DG_MAX_HEADERS)
             break;
@@ -143,8 +150,9 @@ static void dg_index_scan_dir(dg_index_t *idx, const char *dir, const char *owne
 /* 冲突消歧在 dg_owner_of 中按 include 搜索顺序处理（utils 子域优先于
  * 契约层；两个 utils 子域重名则无法判定，直接忽略），此处不再预标记。 */
 
-/* 依据 manifest 的节点名建立索引（utils/<域>/include、platform/include、
- * include/ + include/airymax 契约层） */
+/* 依据 manifest 的节点名建立索引（utils/<域>/、platform/include、
+ * include/ + include/airymax 契约层）
+ * 0.1.9 0d 扁平化：utils/<域>/ 平铺，公共头目录即 utils/<域> 本身 */
 static void dg_index_build(dg_index_t *idx, const dg_manifest_t *mf)
 {
     char path[AIRY_DG_BUF];
@@ -159,7 +167,7 @@ static void dg_index_build(dg_index_t *idx, const dg_manifest_t *mf)
             snprintf(path, sizeof(path), "%s/include", idx->root);
             dg_index_scan_dir(idx, path, name);
         } else {
-            snprintf(path, sizeof(path), "%s/utils/%s/include", idx->root, name);
+            snprintf(path, sizeof(path), "%s/utils/%s", idx->root, name);
             dg_index_scan_dir(idx, path, name);
         }
     }
@@ -174,7 +182,7 @@ static void dg_domain_header_dir(const dg_index_t *idx, const char *name, char *
     else if (strcmp(name, "include") == 0)
         snprintf(out, outsz, "%s/include", idx->root);
     else
-        snprintf(out, outsz, "%s/utils/%s/include", idx->root, name);
+        snprintf(out, outsz, "%s/utils/%s", idx->root, name);
 }
 
 /* 解析一个 #include 行：返回 token 写入 buf；无效返回 NULL */
@@ -319,6 +327,11 @@ static size_t dg_scan_domain_includes(dg_index_t *idx, const dg_manifest_t *mf,
     while ((de = readdir(dp)) != NULL) {
         size_t n = strlen(de->d_name);
         if (n < 3 || de->d_name[n - 1] != 'h' || de->d_name[n - 2] != '.')
+            continue;
+        /* 0d: _internal.h 内部头跳过（与 dg_index_scan_dir 同规则） */
+        static const char k_internal_suffix[] = "_internal.h";
+        size_t isuf = sizeof(k_internal_suffix) - 1;
+        if (n >= isuf && strcmp(de->d_name + n - isuf, k_internal_suffix) == 0)
             continue;
         drift += dg_scan_header_file(idx, mf, dom, dir, de->d_name, used_dep);
     }
