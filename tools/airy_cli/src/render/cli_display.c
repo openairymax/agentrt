@@ -86,37 +86,42 @@ void cli_print_result(const char *result)
 /* ---- execution plan ordering (shared by plan list and live board) ---- */
 
 /**
- * @brief Index of a node by id within a workflow (or -1 when absent).
+ * @brief Index of a node by id within a plan (or -1 when absent).
  */
-static int cli_plan_node_index(const taskflow_workflow_t *wf, const char *id)
+static int cli_plan_node_index(const airy_task_plan_t *plan, const char *id)
 {
-    for (size_t i = 0; i < wf->node_count; i++) {
-        if (strcmp(wf->nodes[i].id, id) == 0)
+    for (size_t i = 0; i < plan->task_plan_node_count; i++) {
+        const airy_task_node_t *nd = plan->task_plan_nodes ? plan->task_plan_nodes[i] : NULL;
+        if (nd && nd->task_node_id && strcmp(nd->task_node_id, id) == 0)
             return (int)i;
     }
     return -1;
 }
 
 /**
- * @brief True when every in-edge of `idx` comes from an already-ordered node.
+ * @brief True when every dependency of `idx` comes from an already-ordered node.
  *
- * Edges whose source is missing from the workflow (external dependency),
- * self-loops, or sources outside the ordering window [0, count) are treated
- * as satisfied so ordering still terminates. The window guard keeps callers
- * that sort only the first `count` nodes (e.g. live board truncation at
- * CLI_LIVE_BOARD_MAX) away from an out-of-bounds read on `ordered`.
+ * Dependencies whose source is missing from the plan (external dependency),
+ * self-loops, empty ids, or sources outside the ordering window [0, count)
+ * are treated as satisfied so ordering still terminates. The window guard
+ * keeps callers that sort only the first `count` nodes (e.g. live board
+ * truncation at CLI_LIVE_BOARD_MAX) away from an out-of-bounds read.
  */
-static int cli_plan_ready(const taskflow_workflow_t *wf, size_t idx,
+static int cli_plan_ready(const airy_task_plan_t *plan, size_t idx,
                           const unsigned char *ordered, size_t count)
 {
-    const char *target = wf->nodes[idx].id;
-    for (size_t e = 0; e < wf->edge_count; e++) {
-        const taskflow_edge_t *ed = &wf->edges[e];
-        if (strcmp(ed->target_node_id, target) != 0)
+    const airy_task_node_t *nd =
+        plan->task_plan_nodes ? plan->task_plan_nodes[idx] : NULL;
+    if (!nd || !nd->task_node_id)
+        return 1;
+    const char *target = nd->task_node_id;
+    for (size_t d = 0; nd->task_node_depends_on && d < nd->task_node_depends_count; d++) {
+        const char *src_id = nd->task_node_depends_on[d];
+        if (!src_id || src_id[0] == '\0')
             continue;
-        if (strcmp(ed->source_node_id, target) == 0)
+        if (strcmp(src_id, target) == 0)
             continue;
-        int src = cli_plan_node_index(wf, ed->source_node_id);
+        int src = cli_plan_node_index(plan, src_id);
         if (src >= 0 && (size_t)src < count && !ordered[src])
             return 0;
     }
@@ -125,16 +130,16 @@ static int cli_plan_ready(const taskflow_workflow_t *wf, size_t idx,
 
 /**
  * @brief Fill `order` with the topological order of the first `count`
- *        workflow nodes (see cli_display_internal.h for the contract).
+ *        plan nodes (see cli_display_internal.h for the contract).
  *
  * Kahn-free greedy selection identical to the original duplicated loops in
  * cli_print_plan_list()/cli_live_board_begin(); cycles fall back to natural
  * order so the render never stalls.
  */
-int cli_plan_topo_build(const taskflow_workflow_t *wf, size_t count, size_t *order,
-                            unsigned char *scratch)
+int cli_plan_topo_build(const airy_task_plan_t *plan, size_t count, size_t *order,
+                        unsigned char *scratch)
 {
-    if (!wf || !order || !scratch || count == 0 || wf->node_count == 0)
+    if (!plan || !order || !scratch || count == 0 || plan->task_plan_node_count == 0)
         return 0;
 
     size_t placed = 0;
@@ -143,7 +148,7 @@ int cli_plan_topo_build(const taskflow_workflow_t *wf, size_t count, size_t *ord
         for (size_t i = 0; i < count; i++) {
             if (scratch[i])
                 continue;
-            if (cli_plan_ready(wf, i, scratch, count)) {
+            if (cli_plan_ready(plan, i, scratch, count)) {
                 pick = i;
                 break;
             }
@@ -172,27 +177,27 @@ int cli_plan_topo_build(const taskflow_workflow_t *wf, size_t count, size_t *ord
  *       □ 2. generate code               [agent_codegen]    ← n1
  *       □ 3. verify output               [agent_verify]     ← n2
  */
-void cli_print_plan_list(const taskflow_workflow_t *wf)
+void cli_print_plan_list(const airy_task_plan_t *plan)
 {
     if (g_cli_print_mode)
         return;
-    if (!wf || wf->node_count == 0) {
+    if (!plan || plan->task_plan_node_count == 0) {
         cli_render_sub_agent_line(CLI_ROLE_ERROR, "plan",
                                   "Empty plan, nothing to execute.");
         return;
     }
 
-    const size_t n = wf->node_count;
+    const size_t n = plan->task_plan_node_count;
     const char *g = cli_gutter_pad(2);
 
     cli_outf("%s%s%s %s执行计划%s %s(%zu nodes, %zu deps)%s\n",
              g, cli_c(CLR_CYAN), CLI_ICON_DIAMOND,
              cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_DIM),
-             n, wf->edge_count, cli_c(CLR_RESET));
+             n, cli_plan_deps_count(plan), cli_c(CLR_RESET));
 
     size_t *order = (size_t *)AIRY_MALLOC(n * sizeof(size_t));
     unsigned char *scratch = (unsigned char *)AIRY_CALLOC(n, 1);
-    if (!order || !scratch || !cli_plan_topo_build(wf, n, order, scratch)) {
+    if (!order || !scratch || !cli_plan_topo_build(plan, n, order, scratch)) {
         AIRY_FREE(order);
         AIRY_FREE(scratch);
         return;
@@ -200,24 +205,28 @@ void cli_print_plan_list(const taskflow_workflow_t *wf)
 
     const char *ig = cli_gutter_pad(4);
     for (size_t r = 0; r < n; r++) {
-        const taskflow_node_t *nd = &wf->nodes[order[r]];
-        const char *handler = nd->task_handler_name ? nd->task_handler_name : "?";
-        const char *goal = nd->name[0] ? nd->name : "";
+        const airy_task_node_t *nd = plan->task_plan_nodes ? plan->task_plan_nodes[order[r]] : NULL;
+        if (!nd)
+            continue;
+        const char *nid = (nd->task_node_id && nd->task_node_id[0]) ? nd->task_node_id : "node";
+        char handler[96] = "";
+        cli_node_handler(nd, handler, sizeof(handler));
+        const char *goal = nd->task_node_goal ? nd->task_node_goal : "";
 
         cli_outf("%s%s%s%s %zu. %s%s%s  %s%s[%s]%s",
                  ig, cli_c(CLR_DIM), CLI_ICON_TODO, cli_c(CLR_RESET),
                  r + 1,
                  cli_c(CLR_RESET), goal, cli_c(CLR_DIM),
-                 cli_c(CLR_DIM), handler, cli_c(CLR_DIM), cli_c(CLR_RESET));
+                 cli_c(CLR_DIM), handler[0] ? handler : "?", cli_c(CLR_DIM), cli_c(CLR_RESET));
 
         char deps[128];
         size_t dlen = 0;
         int has_dep = 0;
-        for (size_t e = 0; e < wf->edge_count; e++) {
-            const taskflow_edge_t *ed = &wf->edges[e];
-            if (strcmp(ed->target_node_id, nd->id) != 0)
+        for (size_t d = 0; nd->task_node_depends_on && d < nd->task_node_depends_count; d++) {
+            const char *src_id = nd->task_node_depends_on[d];
+            if (!src_id || src_id[0] == '\0')
                 continue;
-            if (strcmp(ed->source_node_id, nd->id) == 0)
+            if (strcmp(src_id, nid) == 0)
                 continue;
             if (has_dep && dlen < sizeof(deps) - 2)
                 dlen += (size_t)snprintf(deps + dlen, sizeof(deps) - dlen, ", ");
@@ -228,8 +237,7 @@ void cli_print_plan_list(const taskflow_workflow_t *wf)
             }
             if (dlen < sizeof(deps) - 2)
                 dlen += (size_t)snprintf(deps + dlen, sizeof(deps) - dlen, "%s%s%s",
-                                         cli_c(CLR_CYAN), ed->source_node_id,
-                                         cli_c(CLR_DIM));
+                                         cli_c(CLR_CYAN), src_id, cli_c(CLR_DIM));
         }
         cli_outf("%s\n", has_dep ? deps : "");
     }

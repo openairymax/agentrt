@@ -13,10 +13,7 @@
 #define AIRY_CLI_EXEC_H
 
 #include "airy_rt.h"
-#include "work_hall.h"
-#include "plan_to_dag.h"
-#include "taskflow_advanced.h"
-#include "airy_cli_pipeline.h" /* cli_runtime_ctx_t */
+#include "airy_cli_pipeline.h" /* cli_runtime_ctx_t / airy_task_plan_t */
 
 #include <signal.h>
 #include <stddef.h>
@@ -28,17 +25,14 @@ extern "C" {
 /* Background wait context: the wait runs on a worker thread so the main
  * thread can poll stdin for user interruption / interjected chat. */
 typedef struct {
-    airy_work_hall_t *hall;
-    const char *sched_sock;
     const char *exec_id;
-    int sched_remote;
     airy_err_t err;
     char *result;
     volatile int done;
 } cli_task_wait_ctx_t;
 
-/* Thread worker: drives the engine to completion (local hall or remote
- * sched_d).  Set ctx->done on return. */
+/* Thread worker: drives the remote DAG (gateway → sched_d) to completion.
+ * Set ctx->done on return. */
 void *cli_task_wait_worker(void *arg);
 
 /* Poll stdin during task execution.  Returns:
@@ -48,17 +42,17 @@ void *cli_task_wait_worker(void *arg);
 int cli_task_poll_input(void);
 
 /* Record a task submission event in the decision-chain hall store. */
-void cli_chain_record_submit(const char *exec_id, const airy_task_plan_t *plan,
-                              const taskflow_workflow_t *wf);
+void cli_chain_record_submit(const char *exec_id, const airy_task_plan_t *plan);
 
-/* Render the task result (JSON parse for real success/failure, metrics,
- * validation gate annotation).  Returns 1 when the task truly succeeded
- * (caller uses this for L2 cache absorb decision). */
+/* Render the task result (JSON parse for real success/failure, metrics).
+ * Returns 1 when the task truly succeeded (caller uses this for L2 cache
+ * absorb decision). */
 int cli_task_result_render(const char *result, airy_err_t err, const char *exec_id,
-                            int canceled, airy_work_hall_t *hall, uint32_t vf_before);
+                           int canceled);
 
-/* Run one full task turn: cognition planning → DAG adaption → submit →
- * board polling → wait → result summary.  Extracted from main.c's main
+/* Run one full task turn: cognition planning → submit (gateway → sched_d,
+ * the only execution path) → board polling → wait → result summary.
+ * Extracted from main.c's main
  * loop (2026-08-27 domain split).  Returns 1 when the caller should
  * continue the loop early (planning / submission failure), 0 on normal
  * completion. */

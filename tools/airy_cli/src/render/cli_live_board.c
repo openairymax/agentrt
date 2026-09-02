@@ -132,40 +132,47 @@ static void cli_live_board_footer_line(const char *state, double progress)
     (void)fail;
 }
 
-void cli_live_board_begin(const taskflow_workflow_t *wf)
+void cli_live_board_begin(const airy_task_plan_t *plan)
 {
     AIRY_MEMSET(&g_live_board, 0, sizeof(g_live_board));
-    if (g_cli_print_mode || !wf || wf->node_count == 0)
+    if (g_cli_print_mode || !plan || plan->task_plan_node_count == 0)
         return;
     if (!cli_term_is_tty() || cli_tui_active(cli_tui_get_default())) {
         /* 退化：静态计划（原 cli_print_plan_list 语义），不开启原位重绘。 */
-        cli_print_plan_list(wf);
+        cli_print_plan_list(plan);
         return;
     }
 
-    g_live_board.n = (wf->node_count > CLI_LIVE_BOARD_MAX) ? CLI_LIVE_BOARD_MAX
-                                                           : wf->node_count;
+    g_live_board.n = (plan->task_plan_node_count > CLI_LIVE_BOARD_MAX)
+                         ? CLI_LIVE_BOARD_MAX
+                         : plan->task_plan_node_count;
     g_live_board.lines = g_live_board.n + 2;
-    g_live_board.deps = wf->edge_count;
+    g_live_board.deps = cli_plan_deps_count(plan);
 
     /* 拓扑序（与 cli_print_plan_list 共用 helper），节点行按计划顺序展示；
      * helper 内部把窗口外依赖视为已满足，截断场景无越界读。 */
     size_t *order = (size_t *)AIRY_MALLOC(g_live_board.n * sizeof(size_t));
     unsigned char *scratch = (unsigned char *)AIRY_CALLOC(g_live_board.n, 1);
     if (!order || !scratch ||
-        !cli_plan_topo_build(wf, g_live_board.n, order, scratch)) {
+        !cli_plan_topo_build(plan, g_live_board.n, order, scratch)) {
         AIRY_FREE(order);
         AIRY_FREE(scratch);
         return;
     }
 
     for (size_t r = 0; r < g_live_board.n; r++) {
-        const taskflow_node_t *nd = &wf->nodes[order[r]];
-        AIRY_STRNCPY_TERM(g_live_board.ids[r], nd->id, sizeof(g_live_board.ids[r]));
-        AIRY_STRNCPY_TERM(g_live_board.goals[r], nd->name[0] ? nd->name : "(untitled)",
-                          sizeof(g_live_board.goals[r]));
-        AIRY_STRNCPY_TERM(g_live_board.handlers[r],
-                          nd->task_handler_name ? nd->task_handler_name : "?",
+        const airy_task_node_t *nd =
+            plan->task_plan_nodes ? plan->task_plan_nodes[order[r]] : NULL;
+        const char *nid = (nd && nd->task_node_id && nd->task_node_id[0]) ? nd->task_node_id
+                                                                          : "node";
+        const char *goal = (nd && nd->task_node_goal && nd->task_node_goal[0])
+                               ? nd->task_node_goal
+                               : "(untitled)";
+        char handler[96] = "";
+        cli_node_handler(nd, handler, sizeof(handler));
+        AIRY_STRNCPY_TERM(g_live_board.ids[r], nid, sizeof(g_live_board.ids[r]));
+        AIRY_STRNCPY_TERM(g_live_board.goals[r], goal, sizeof(g_live_board.goals[r]));
+        AIRY_STRNCPY_TERM(g_live_board.handlers[r], handler[0] ? handler : "?",
                           sizeof(g_live_board.handlers[r]));
         AIRY_STRNCPY_TERM(g_live_board.states[r], "pending",
                           sizeof(g_live_board.states[r]));

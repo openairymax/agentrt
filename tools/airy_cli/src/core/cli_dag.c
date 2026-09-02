@@ -3,17 +3,18 @@
 
 /**
  * @file cli_dag.c
- * @brief airy_cli WorkHall DAG domain: submit/poll/wait for remote sched_d blueprints.
+ * @brief airy_cli 任务执行域：plan → gateway → sched_d 唯一通路的提交/轮询/等待。
  *
- * When AIRY_SCHED_SOCK is set, DAG execution goes through daemon RPC
- * (dag_submit / dag_status / dag_cancel on sched.sock) and the final state
- * aggregates each node's real output/error; otherwise it falls back to the
- * embedded work hall. Ctrl+C cancels the remote DAG.
+ * DAG 序列化直接消费 airy_task_plan_t（Unify Design SSoT：计划即任务树，
+ * 经 gateway 派发 sched.dag_submit / dag_status / dag_cancel），最终态聚合
+ * 各节点真实 output/error 供展示。Ctrl+C 取消远端 DAG。
+ * 0.1.9 M1 1c 引擎壳化：本地 hall 降级与 sched.sock 开关已退役。
  */
 
 #include "cli_internal.h"
 
 #include "cli_gw.h" /* 架构约束 2026-08-25：统一经 gateway 派发 */
+#include "id_utils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,21 +32,16 @@
 #include <cjson/cJSON.h>
 #endif
 
-/* ==================== Remote daemon mode (think_d dual-thinking / sched_d blueprint DAG)
- * ====================
+/* ==================== sched_d blueprint DAG over gateway ====================
  */
 
 /*
-  * AIRY_THINK_SOCK and AIRY_SCHED_SOCK are explicit enable switches:
-  *   - Set and non-empty -> cognition/DAG runs over daemon RPC ($AIRY_RUNTIME_DIR/think.sock, sched.sock)
-  *   - Unset / failed calls -> fall back to the embedded engine (backward compatible)
- *
-  * Protocol alignment (strictly matches the daemon's JSON-RPC 2.0 over Unix socket):
-  *   - think.process: params {"prompt":<input>}; result is a JSON string value (think_d wraps
-  *     it with cJSON_CreateString; contains plan/feedback/stats), double-parse needed
- *   - sched.dag_submit: params {"dag":{name,nodes:[{id,goal,role,depends}]}};
- *     returns {"dag_id","status"}
-  *   - sched.dag_status: params {"dag_id"}, returns a board snapshot (status/progress/node_count/nodes[])
+ * Protocol alignment (gateway 转发 sched_d 的 JSON-RPC 2.0 线格式):
+ *   - sched.dag_submit: params {"dag":{name,input,workspace_dir,
+ *     nodes:[{id,goal,role,depends}]}}; returns {"dag_id","status"}
+ *   - sched.dag_status: params {"dag_id"}, returns a board snapshot
+ *     (status/progress/node_count/nodes[])
+ *   - sched.dag_cancel: params {"dag_id"}
  */
 
 static const char *cli_handler_role(const char *handler)
@@ -57,28 +53,65 @@ static const char *cli_handler_role(const char *handler)
     return handler;
 }
 
-/* Serialize a CLI workflow into the remote DAG JSON protocol.
- *
- * task_input is the raw user task text (same value the embedded hall passes to
- * airy_work_hall_submit). It travels as a top-level "input" field; sched_d
- * falls back to it for nodes whose goal is only a plan label (goal==id), so
- * remote agents receive the actual task instead of "reactive_1_step1".
- *
- * workspace_dir is the CLI's main workspace (NULL when unset): it travels as
- * a top-level "workspace_dir" field so sched_d -> agent_d -> runner chdir
- * into the task directory before executing, keeping agent artifacts in the
- * caller's project tree instead of the daemon's cwd. */
-static char *cli_workflow_to_dag_json(const taskflow_workflow_t *wf, const char *task_input,
-                                      const char *workspace_dir)
+/* 节点 handler 归一（与 plan_to_dag 蓝图语义一致）：显式 handler_name 优先，
+ * 缺省由 agent_role 派生；无 "agent:" 前缀则补齐。buf 置空串表示无 handler。 */
+void cli_node_handler(const airy_task_node_t *nd, char *buf, size_t cap)
 {
-    if (!wf || wf->node_count == 0 || !wf->nodes)
+    if (!nd || !buf || cap == 0)
+        return;
+    buf[0] = '\0';
+    const char *src = nd->task_node_handler_name;
+    if ((!src || src[0] == '\0') && nd->task_node_agent_role &&
+        nd->task_node_agent_role[0] != '\0')
+        src = nd->task_node_agent_role;
+    if (!src || src[0] == '\0')
+        return;
+    if (strncmp(src, "agent:", 6) == 0) {
+        AIRY_STRNCPY_TERM(buf, src, cap);
+        return;
+    }
+    snprintf(buf, cap, "agent:%s", src);
+}
+
+size_t cli_plan_deps_count(const airy_task_plan_t *plan)
+{
+    if (!plan)
+        return 0;
+    size_t total = 0;
+    for (size_t i = 0; i < plan->task_plan_node_count; i++) {
+        const airy_task_node_t *nd =
+            plan->task_plan_nodes ? plan->task_plan_nodes[i] : NULL;
+        if (nd && nd->task_node_depends_count > 0 && nd->task_node_depends_on)
+            total += nd->task_node_depends_count;
+    }
+    return total;
+}
+
+/* 将 airy_task_plan_t 序列化为 sched_d 的 DAG JSON 线格式（唯一真相源）。
+ *
+ * task_input 是用户原始任务文本，作为顶层 "input" 字段传递；goal 只是计划
+ * 标签（goal==id）的节点由 sched_d 回退到 input，远端 agent 因此收到真实
+ * 任务而非 "reactive_1_step1"。workspace_dir（未设时 NULL）作为顶层字段，
+ * 令 sched_d -> agent_d -> runner 执行前 chdir 进任务目录，产物留在调用方
+ * 工程树而非 daemon 的 cwd。 */
+static char *cli_plan_to_dag_json(const airy_task_plan_t *plan, const char *task_input,
+                                  const char *workspace_dir)
+{
+    if (!plan || plan->task_plan_node_count == 0 || !plan->task_plan_nodes)
         return NULL;
+
+    char pid[64] = {0};
+    if (plan->task_plan_id && plan->task_plan_id[0])
+        AIRY_STRNCPY_TERM(pid, plan->task_plan_id, sizeof(pid));
+    else
+        airy_generate_plan_id(pid, sizeof(pid));
 
     cJSON *root = cJSON_CreateObject();
     if (!root)
         return NULL;
-    cJSON_AddStringToObject(root, "name",
-                            wf->name[0] ? wf->name : (wf->id[0] ? wf->id : "airy_cli_dag"));
+    char name[80];
+    snprintf(name, sizeof(name), "plan_%s", pid);
+    cJSON_AddStringToObject(root, "name", name);
     if (task_input && task_input[0])
         cJSON_AddStringToObject(root, "input", task_input);
     if (workspace_dir && workspace_dir[0])
@@ -89,25 +122,31 @@ static char *cli_workflow_to_dag_json(const taskflow_workflow_t *wf, const char 
         cJSON_Delete(root);
         return NULL;
     }
-    for (size_t i = 0; i < wf->node_count; i++) {
-        const taskflow_node_t *nd = &wf->nodes[i];
-        if (nd->id[0] == '\0')
+    for (size_t i = 0; i < plan->task_plan_node_count; i++) {
+        const airy_task_node_t *nd = plan->task_plan_nodes[i];
+        if (!nd)
             continue;
+        char nid[64];
+        snprintf(nid, sizeof(nid), "%s", nd->task_node_id ? nd->task_node_id : "node");
         cJSON *nj = cJSON_CreateObject();
         if (!nj)
             continue;
-        cJSON_AddStringToObject(nj, "id", nd->id);
-        const char *goal = nd->name[0] ? nd->name : nd->id;
-        if (strcmp(goal, nd->id) == 0 && task_input && task_input[0])
+        cJSON_AddStringToObject(nj, "id", nid);
+        const char *goal = nd->task_node_goal ? nd->task_node_goal : nid;
+        if (strcmp(goal, nid) == 0 && task_input && task_input[0])
             goal = task_input;
         cJSON_AddStringToObject(nj, "goal", goal);
-        cJSON_AddStringToObject(nj, "role", cli_handler_role(nd->task_handler_name));
+        char handler[96];
+        cli_node_handler(nd, handler, sizeof(handler));
+        cJSON_AddStringToObject(nj, "role", cli_handler_role(handler));
 
         cJSON *deps = cJSON_CreateArray();
-        for (size_t e = 0; e < wf->edge_count; e++) {
-            const taskflow_edge_t *de = &wf->edges[e];
-            if (strcmp(de->target_node_id, nd->id) == 0 && de->source_node_id[0] != '\0')
-                cJSON_AddItemToArray(deps, cJSON_CreateString(de->source_node_id));
+        if (deps && nd->task_node_depends_on && nd->task_node_depends_count > 0) {
+            for (size_t e = 0; e < nd->task_node_depends_count; e++) {
+                const char *dep = nd->task_node_depends_on[e];
+                if (dep && dep[0] != '\0')
+                    cJSON_AddItemToArray(deps, cJSON_CreateString(dep));
+            }
         }
         cJSON_AddItemToObject(nj, "depends", deps);
         cJSON_AddItemToArray(nodes, nj);
@@ -124,15 +163,14 @@ static char *cli_workflow_to_dag_json(const taskflow_workflow_t *wf, const char 
     return out;
 }
 
-airy_err_t cli_dag_submit_remote(const char *sched_sock, const taskflow_workflow_t *wf,
-                                        const char *task_input, const char *workspace_dir,
-                                        char **out_dag_id)
+airy_err_t cli_dag_submit_remote(const airy_task_plan_t *plan, const char *task_input,
+                                 const char *workspace_dir, char **out_dag_id)
 {
-    if (!sched_sock || !sched_sock[0] || !wf || !out_dag_id)
+    if (!plan || !out_dag_id)
         return AIRY_ERR_INVALID_PARAM;
     *out_dag_id = NULL;
 
-    char *dag_json = cli_workflow_to_dag_json(wf, task_input, workspace_dir);
+    char *dag_json = cli_plan_to_dag_json(plan, task_input, workspace_dir);
     if (!dag_json)
         return AIRY_ERR_OUT_OF_MEMORY;
 
@@ -181,11 +219,10 @@ airy_err_t cli_dag_submit_remote(const char *sched_sock, const taskflow_workflow
 
 /* Poll sched.dag_status once: parse the snapshot (progress=done nodes/node_count).
   * At the final state, aggregate node outputs/errors into a root-level output for display. */
-cli_dag_poll_rc_t cli_dag_poll_remote(const char *sched_sock, const char *dag_id,
-                                             double *out_progress, char *out_state,
-                                             size_t state_cap, char **out_result)
+cli_dag_poll_rc_t cli_dag_poll_remote(const char *dag_id, double *out_progress, char *out_state,
+                                      size_t state_cap, char **out_result)
 {
-    if (!sched_sock || !dag_id || !out_progress || !out_state || state_cap == 0)
+    if (!dag_id || !out_progress || !out_state || state_cap == 0)
         return CLI_DAG_POLL_ERROR;
     if (out_result)
         *out_result = NULL;
@@ -288,13 +325,13 @@ cli_dag_poll_rc_t cli_dag_poll_remote(const char *sched_sock, const char *dag_id
     return terminal ? CLI_DAG_POLL_DONE : CLI_DAG_POLL_ACTIVE;
 }
 
-/* Remote wait: poll dag_status until the final state (replaces airy_work_hall_wait).
-  * Ctrl+C propagates: really calls sched.dag_cancel to abort the remote DAG. */
+/* Wait dag_status until the final state. Ctrl+C propagates: really calls
+ * sched.dag_cancel to abort the remote DAG. */
 #define CLI_DAG_WAIT_MAX_POLLS 36000
 
-airy_err_t cli_dag_wait_remote(const char *sched_sock, const char *dag_id, char **out_result)
+airy_err_t cli_dag_wait_remote(const char *dag_id, char **out_result)
 {
-    if (!sched_sock || !dag_id || !out_result)
+    if (!dag_id || !out_result)
         return AIRY_ERR_INVALID_PARAM;
     *out_result = NULL;
 
@@ -320,8 +357,7 @@ airy_err_t cli_dag_wait_remote(const char *sched_sock, const char *dag_id, char 
         double prog = 0.0;
         char st[16];
         char *final_result = NULL;
-        cli_dag_poll_rc_t prc =
-            cli_dag_poll_remote(sched_sock, dag_id, &prog, st, sizeof(st), &final_result);
+        cli_dag_poll_rc_t prc = cli_dag_poll_remote(dag_id, &prog, st, sizeof(st), &final_result);
         if (prc == CLI_DAG_POLL_DONE) {
             if (final_result) {
                 *out_result = final_result;
@@ -399,9 +435,9 @@ void cli_dag_node_board_destroy(cli_dag_board_t *b)
 /* Query dag_status, diff node states against the last snapshot and print
  * every node whose state changed. Returns 0 while the DAG is still active,
  * 1 once a terminal state is observed (caller stops polling). */
-int cli_dag_node_board_tick(cli_dag_board_t *b, const char *sched_sock, const char *dag_id)
+int cli_dag_node_board_tick(cli_dag_board_t *b, const char *dag_id)
 {
-    if (!b || !sched_sock || !dag_id)
+    if (!b || !dag_id)
         return 0;
 
     cJSON *params = cJSON_CreateObject();
@@ -480,10 +516,9 @@ int cli_dag_node_board_tick(cli_dag_board_t *b, const char *sched_sock, const ch
  * dag_status and reports every node's (id, state) through cb without
  * printing anything — the live plan board renders the block itself.
  * Returns 1 once a terminal state is observed, 0 otherwise. */
-int cli_dag_board_snapshot(const char *sched_sock, const char *dag_id,
-                           void (*cb)(const char *node_id, const char *state))
+int cli_dag_board_snapshot(const char *dag_id, void (*cb)(const char *node_id, const char *state))
 {
-    if (!sched_sock || !dag_id || !cb)
+    if (!dag_id || !cb)
         return 0;
 
     cJSON *params = cJSON_CreateObject();
