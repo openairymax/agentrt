@@ -170,8 +170,7 @@ int main(int argc, char *argv[])
         cli_tui_pin_header(tui);
     }
 
-    airy_cognition_engine_t *cog = NULL;
-    airy_core_loop_t *loop = cli_setup_core_engines(m_s2, m_verify, m_expert, &cog);
+    airy_core_loop_t *loop = cli_setup_core_engines();
     if (!loop)
         return 1;
 
@@ -387,9 +386,10 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        /* === 任务回合：认知规划 → DAG 适配 → 提交 → 轮询 → 等待 → 结果汇总
-         * （airy_cli_taskflow.c；返回 1 = 规划/提交失败，提前继续下一轮） === */
-        if (cli_run_task_pipeline(&rt, cog, input, input_len, turn_start))
+        /* === 任务回合：认知规划（gateway → think_d）→ DAG 适配 → 提交 →
+         * 轮询 → 等待 → 结果汇总（airy_cli_taskflow.c；返回 1 = 规划/提交
+         * 失败，提前继续下一轮） === */
+        if (cli_run_task_pipeline(&rt, input, turn_start))
             continue;
     }
 

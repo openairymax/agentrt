@@ -48,13 +48,11 @@ typedef struct {
     const char *main_workspace_dir;
 } cli_runtime_ctx_t;
 
-/* Core engine assembly: loop create + memory engine inject + cognition
- * wiring (GCCP callback, TC3 models, GRAD feedback).  Returns NULL on
- * failure.  out_cog may be NULL if the caller does not need the cognition
- * engine handle. */
-airy_core_loop_t *cli_setup_core_engines(const char *m_s2, const char *m_verify,
-                                          const char *m_expert,
-                                          airy_cognition_engine_t **out_cog);
+/* Core loop assembly: loop create + chat memory engine attach.
+ * 0.1.9 M1-1c：CLI 退役本地 cog 装配（GCCP/TC3/GRAD 接线随 C2d-2 移除，
+ * 认知规划唯一经 gateway → think_d），loop 内引擎集由 airy_loop_create
+ * 自动装配。Returns NULL on failure. */
+airy_core_loop_t *cli_setup_core_engines(void);
 
 /* Full runtime assembly: event-stream hall_store → chat adapter → TUI panels.
  * Returns AIRY_EOK on success, error code on failure (caller must clean up). */

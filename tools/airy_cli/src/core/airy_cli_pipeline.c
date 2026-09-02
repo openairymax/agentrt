@@ -42,77 +42,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* 2.3.14 GRAD decision-chain visibility: cognition feedback → [Dual Think]
- * phase lines.  Events (grad_coordinator progress_cb): grad_s2_done /
- * grad_verify_start / grad_verify_done / grad_arbiter_start /
- * grad_arbiter_done / grad_done.
- * -p/--json suppress rendering (script structured output); TUI panel mode
- * delegates to the TUI, but events always go to hall_store chain stream. */
-static void cli_grad_feedback_cb(int level, const char *module, const char *event,
-                                 const char *data, size_t data_len, void *user_data)
-{
-    (void)level;
-    (void)module;
-    (void)user_data;
-    if (!event || strncmp(event, "grad_", 5) != 0)
-        return;
-    cli_tui_t *tui = cli_tui_get_default();
-    int tui_active = tui && cli_tui_active(tui);
-    int render = !g_cli_print_mode && !g_cli_json_mode && !tui_active;
-
-    if (render) {
-        cli_actor_t actor = CLI_ACTOR_DUAL_THINK;
-        const char *tag = "GRAD";
-        if (strcmp(event, "grad_s2_done") == 0) {
-            actor = CLI_ACTOR_DUAL_SLOW_THINK;
-            tag = "S2 骨架";
-        } else if (strcmp(event, "grad_verify_start") == 0) {
-            actor = CLI_ACTOR_DUAL_PROF_THINK;
-            tag = "四向验证";
-        } else if (strcmp(event, "grad_verify_done") == 0) {
-            actor = CLI_ACTOR_DUAL_PROF_THINK;
-            tag = "验证结果";
-        } else if (strcmp(event, "grad_arbiter_start") == 0) {
-            actor = CLI_ACTOR_DUAL_FAST_THINK;
-            tag = "上下文仲裁";
-        } else if (strcmp(event, "grad_arbiter_done") == 0) {
-            actor = CLI_ACTOR_DUAL_FAST_THINK;
-            tag = "仲裁结论";
-        } else if (strcmp(event, "grad_done") == 0) {
-            actor = CLI_ACTOR_DUAL_THINK;
-            tag = "GRAD 收敛";
-        } else {
-            return;
-        }
-
-        char line[512];
-        if (data && data_len > 0) {
-            int n = snprintf(line, sizeof(line), "%s", data);
-            if (n < 0 || (size_t)n >= sizeof(line))
-                line[sizeof(line) - 1] = '\0';
-        } else {
-            line[0] = '\0';
-        }
-        cli_spinner_pause();
-        cli_render_role_line(CLI_ROLE_DUAL_THINK, actor, tag, line);
-        cli_spinner_resume();
-    }
-
-    if (g_cli_hall_store) {
-        char ev[768];
-        if (data && data_len > 0)
-            snprintf(ev, sizeof(ev), "{\"event\":\"%s\",\"data\":%.*s}", event, (int)data_len,
-                     data);
-        else
-            snprintf(ev, sizeof(ev), "{\"event\":\"%s\"}", event);
-        airy_hall_store_write(g_cli_hall_store, "default", "grad", NULL, AIRY_HALL_CAT_CHAIN,
-                              "cognition", ev, NULL, 0);
-    }
-}
-
-airy_core_loop_t *cli_setup_core_engines(const char *m_s2, const char *m_verify,
-                                          const char *m_expert,
-                                          airy_cognition_engine_t **out_cog)
+/* 0.1.9 M1-1c：CLI 退役本地 cog 装配——认知规划唯一经 gateway → think_d
+ * （think.process），GCCP 交互/TC3 模型注入/GRAD 反馈（cli_grad_feedback_cb）
+ * 等本地认知引擎接线随 0.1.9 C2d-2 一并退役。loop 内引擎集仍由
+ * airy_loop_create 自动装配（含 mem engine/chat adapter 底座），此处仅
+ * 注入对话记忆句柄供 cli_chat.c 消费。 */
+airy_core_loop_t *cli_setup_core_engines(void)
 {
     airy_core_loop_t *loop = NULL;
     airy_err_t err = airy_loop_create(NULL, &loop);
@@ -127,29 +62,6 @@ airy_core_loop_t *cli_setup_core_engines(const char *m_s2, const char *m_verify,
         g_cli_memory_engine = mem;
         AIRY_LOG_INFO("airy_cli: chat memory engine attached");
     }
-
-    airy_cognition_engine_t *cog = NULL;
-    airy_loop_get_engines(loop, &cog, NULL);
-    if (cog) {
-        airy_cognition_set_gccp_interact(cog, cli_gccp_interact, NULL);
-        AIRY_LOG_INFO("airy_cli: GCCP interaction callback attached");
-
-        airy_cognition_set_tc3_models(cog, m_s2 && m_s2[0] ? m_s2 : NULL,
-                                      m_verify && m_verify[0] ? m_verify : NULL,
-                                      m_expert && m_expert[0] ? m_expert : NULL);
-        if ((m_s2 && m_s2[0]) || (m_verify && m_verify[0]) || (m_expert && m_expert[0])) {
-            AIRY_LOG_INFO("airy_cli: TC3 models injected (s2=%s verify=%s expert=%s)",
-                          m_s2 && m_s2[0] ? m_s2 : "(default)",
-                          m_verify && m_verify[0] ? m_verify : "(default)",
-                          m_expert && m_expert[0] ? m_expert : "(default)");
-        }
-
-        airy_cognition_set_grad_enabled(cog, 1);
-        airy_cognition_set_feedback(cog, cli_grad_feedback_cb, NULL);
-        AIRY_LOG_INFO("airy_cli: GRAD decision-chain feedback attached");
-    }
-    if (out_cog)
-        *out_cog = cog;
 
     return loop;
 }

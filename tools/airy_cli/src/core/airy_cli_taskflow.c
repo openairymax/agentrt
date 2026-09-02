@@ -5,9 +5,9 @@
  * @file airy_cli_taskflow.c
  * @brief 任务执行管线（域拆分自 main.c，2026-08-27）。
  *
- * main 循环的任务回合编排：认知规划（think_d 远程 / 内置引擎 + 并行
- * 子 agent 审查）→ 提交（gateway → sched_d，唯一执行通路）→ 任务看板
- * 轮询 → 等待（后台线程 + stdin 中断轮询）→ 结果渲染与
+ * main 循环的任务回合编排：认知规划（唯一经 gateway → think_d，无内置
+ * 引擎回退，失败即错误可见化）→ 提交（gateway → sched_d，唯一执行通路）
+ * → 任务看板轮询 → 等待（后台线程 + stdin 中断轮询）→ 结果渲染与
  * 蓝本吸收。返回 1 = 规划/提交失败需提前 continue，0 = 正常完成。
  * 声明见 airy_cli_exec.h。
  */
@@ -129,43 +129,27 @@ static void cli_roadmap_absorb_result(const char *exec_id, const char *node_id,
 }
 #endif /* AIRY_HAS_CJSON */
 
-int cli_run_task_pipeline(cli_runtime_ctx_t *rt, airy_cognition_engine_t *cog,
-                          const char *input, size_t input_len, uint64_t turn_start)
+int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t turn_start)
 {
     airy_err_t err = AIRY_EOK;
 
     g_cli_cancel = 0;
 
-    /* === 认知规划 → 提交 → 轮询 → 等待 → 结果汇总 === */
+    /* === 认知规划（唯一经 gateway → think_d）→ 提交 → 轮询 → 等待 → 结果汇总 === */
     cli_render_phase("认知规划");
     airy_task_plan_t *plan = NULL;
-    const char *think_sock = getenv("AIRY_THINK_SOCK");
-    if (think_sock && think_sock[0]) {
-        cli_spinner_start("Remote dual-thinking (think_d)");
-        err = cli_think_process_remote(think_sock, input, input_len, &plan);
-        if (err != AIRY_EOK || !plan) {
-            cli_spinner_stop(0, "remote thinking failed");
-            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_DUAL_SLOW_THINK, "深度思考",
-                                 "远程思考引擎不可用，已回退内置引擎。");
-            plan = NULL;
-        } else {
-            cli_spinner_stop(1, NULL);
-            cli_render_sub_agent_line(CLI_ROLE_TRACE, "think_d", "Remote plan generated.");
-        }
+    cli_spinner_start("Remote dual-thinking (think_d)");
+    err = cli_think_process_remote(input, &plan);
+    if (err != AIRY_EOK || !plan) {
+        cli_spinner_stop(0, "planning failed");
+        cli_trace("plan", "failed err=%d", (int)err);
+        char line[128];
+        snprintf(line, sizeof(line), "规划失败：%s", cli_err_desc((int)err));
+        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_DUAL_SLOW_THINK, "认知规划", line);
+        return 1;
     }
-    if (!plan) {
-        cli_spinner_start("Analyzing task (LLM decomposition + intent)");
-        err = airy_cognition_process(cog, input, input_len, &plan);
-        if (err != AIRY_EOK || !plan) {
-            cli_spinner_stop(0, "planning failed");
-            cli_trace("plan", "failed err=%d", (int)err);
-            char line[128];
-            snprintf(line, sizeof(line), "规划失败：%s", cli_err_desc((int)err));
-            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_DUAL_SLOW_THINK, "认知规划", line);
-            return 1;
-        }
-        cli_spinner_stop(1, NULL);
-    }
+    cli_spinner_stop(1, NULL);
+    cli_render_sub_agent_line(CLI_ROLE_TRACE, "think_d", "Remote plan generated.");
 #ifdef AIRY_HAS_CJSON
     /* 0.1.9 M3：蓝图注册回灌 sched_d（sched.absorb 模式 A），L2 语义
      * 缓存由 sched_d 唯一持有；网关不可达静默跳过。 */
