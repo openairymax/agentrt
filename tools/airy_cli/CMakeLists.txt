@@ -75,8 +75,6 @@ add_executable(airy_cli
     src/tui/cli_panel.c
     # 阶段 4（item 4）: 认知阶段并行子 agent 审查（事实/风险）
     src/cmd/cli_review.c
-    # 改进6（P3）: 执行复核管线 t2/t1-f LLM 语义委托（门禁 -> t2 -> t1-f）
-    src/cmd/cli_exec_review.c
     # S-5 编排管线：/orch 命令（orchestrator 七阶段流程编排）
     src/core/cli_orch.c
     # 架构约束（2026-08-25）：统一网关客户端（所有客户端必须经 gateway 派发）

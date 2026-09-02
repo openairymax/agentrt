@@ -9,25 +9,21 @@
  * Owns cli_runtime_ctx_t lifecycle (cli_setup_runtime / cli_teardown_runtime)
  * and the three-tier blueprint routing (L1/L2/L3) that short-circuits
  * repeated tasks before the full cognition pipeline.
+ * 0.1.9 M1-1c：本地 work_hall/reviewer/governance/validator 装配退役——
+ * CLI 任务执行唯一经 gateway → sched_d，运行时只保留事件流 hall_store、
+ * 对话 adapter 与 TUI 面板数据源。
  */
 
 #include "airy_cli_pipeline.h"
 #include "cli_internal.h"
 #include "cli_render.h"
-#include "cli_review.h"
-#include "cli_exec_review.h"
-#include "daemon_cmds.h"
 
 #include "airy_rt.h"
 #include "loop.h"
 #include "cli_gw.h"
 #include "cognition.h"
 #include "gccp.h"
-#include "work_hall.h"
 #include "hall_store.h"
-#include "governance.h"
-#include "plan_to_dag.h"
-#include "taskflow_advanced.h"
 #include "llm_svc_adapter.h"
 #include "logger.h"
 #include "logging.h"
@@ -165,117 +161,38 @@ airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_tui_t *tui,
         return AIRY_EINVAL;
     AIRY_MEMSET(rt, 0, sizeof(*rt));
 
-    airy_err_t err = AIRY_EOK;
+    /* 0.1.9 M1-1c：CLI 本地 work_hall/reviewer/governance 已退役——任务
+     * 执行唯一经 gateway → sched_d（C2'），/status 与 TUI board 查询面
+     * 迁 sched.dag_list（C2c）。此处仅装配 chat adapter、事件流
+     * hall_store（/chain 决策链与 TUI 事件流面板）与任务工作目录。 */
 
-    airy_artifact_validator_t *cli_validator = NULL;
-    {
-        const char *rules_json = getenv("AIRY_VALIDATOR_RULES");
-        if (!rules_json || !rules_json[0])
-            rules_json = "{\"exit_code\":0}";
-        airy_err_t vrc = airy_artifact_validator_from_json(&cli_validator, rules_json);
-        if (vrc != AIRY_SUCCESS) {
-            AIRY_LOG_WARN("airy_cli: output_validator create failed (err=%d), gate disabled",
-                          (int)vrc);
-            cli_validator = NULL;
-        }
-    }
-    rt->validator = cli_validator;
-    airy_work_hall_config_t wh_cfg;
-    __builtin_memset(&wh_cfg, 0, sizeof(wh_cfg));
-    wh_cfg.progress_cb = cli_progress_cb;
-    /* 0.1.9 M3（roadmap CLI 切断）：不注入 roadmap_sched——蓝图调度由
-     * sched_d 唯一持有，CLI 经 sched.plan/absorb RPC 交互；work_hall
-     * 执行反馈经 cli_roadmap_absorb_result RPC 回灌，不再本地双写
-     * l2_semantic_cache.json。 */
-    wh_cfg.output_validator = cli_validator;
-    wh_cfg.reviewer = cli_exec_review_create();
-    rt->reviewer = wh_cfg.reviewer;
-    if (wh_cfg.reviewer)
-        AIRY_LOG_INFO("airy_cli: execution review pipeline attached (gate -> t2 -> t1-f)");
-
+    /* 决策链事件流底座（/chain、事件流面板与决策点事件写入共用） */
     airy_hall_store_t *hall_store = airy_hall_store_create(NULL);
     if (!hall_store)
         AIRY_LOG_WARN("airy_cli: hall store create failed, full visibility disabled");
     g_cli_hall_store = hall_store;
     rt->hall_store = hall_store;
-    wh_cfg.hall_store = hall_store;
-    {
-        const char *e_rd = getenv("AIRY_WORK_HALL_REDISPATCH_MAX");
-        const char *e_rd_delay = getenv("AIRY_WORK_HALL_REDISPATCH_DELAY_MS");
-        if (e_rd && e_rd[0] && strtol(e_rd, NULL, 10) > 0) {
-            wh_cfg.redispatch_max = (int32_t)strtol(e_rd, NULL, 10);
-            if (e_rd_delay && e_rd_delay[0])
-                wh_cfg.redispatch_delay_ms = (uint32_t)strtoul(e_rd_delay, NULL, 10);
-            AIRY_LOG_INFO("airy_cli: execution reconcile attached "
-                          "(redispatch_max=%d, delay_ms=%u)",
-                          wh_cfg.redispatch_max, wh_cfg.redispatch_delay_ms);
-        }
-    }
+
+    /* 任务工作目录（提交 DAG 时经 gateway 传 sched_d，产物留在调用方工程树） */
     {
         const char *ws_main = getenv("AIRY_WORKSPACE_MAIN_DIR");
         static char ws_main_buf[1024];
+        const char *ws_dir = NULL;
         if (ws_main && ws_main[0]) {
-            wh_cfg.main_workspace_dir = ws_main;
+            ws_dir = ws_main;
         } else {
 #if AIRY_PLATFORM_POSIX
             if (getcwd(ws_main_buf, sizeof(ws_main_buf)))
-                wh_cfg.main_workspace_dir = ws_main_buf;
+                ws_dir = ws_main_buf;
 #else
             if (_getcwd(ws_main_buf, (int)sizeof(ws_main_buf)))
-                wh_cfg.main_workspace_dir = ws_main_buf;
+                ws_dir = ws_main_buf;
 #endif
         }
-        if (wh_cfg.main_workspace_dir)
-            AIRY_LOG_INFO("airy_cli: main workspace = %s", wh_cfg.main_workspace_dir);
-        rt->main_workspace_dir = wh_cfg.main_workspace_dir;
+        if (ws_dir && ws_dir[0])
+            AIRY_LOG_INFO("airy_cli: main workspace = %s", ws_dir);
+        rt->main_workspace_dir = ws_dir;
     }
-    airy_governance_t *governance = NULL;
-    {
-        const char *e_budget = getenv("AIRY_GOV_TOKEN_BUDGET");
-        const char *e_slots = getenv("AIRY_GOV_SLOTS");
-        if ((e_budget && e_budget[0] && strtoull(e_budget, NULL, 10) > 0) ||
-            (e_slots && e_slots[0] && strtoul(e_slots, NULL, 10) > 0)) {
-            airy_governance_config_t gcfg;
-            __builtin_memset(&gcfg, 0, sizeof(gcfg));
-            gcfg.token_budget = e_budget ? strtoull(e_budget, NULL, 10) : 0;
-            gcfg.concurrency_slots = e_slots ? (uint32_t)strtoul(e_slots, NULL, 10) : 0;
-            {
-                const char *e_max = getenv("AIRY_GOV_MAX_CONCURRENT");
-                const char *e_dl = getenv("AIRY_GOV_DEADLINE_MS");
-                if (e_max && e_max[0])
-                    gcfg.max_concurrent = (uint32_t)strtoul(e_max, NULL, 10);
-                if (e_dl && e_dl[0])
-                    gcfg.default_deadline_ms = strtoull(e_dl, NULL, 10);
-            }
-            governance = airy_governance_create(&gcfg);
-            if (governance) {
-                wh_cfg.governance = governance;
-                const char *e_per_node = getenv("AIRY_GOV_TOKEN_PER_NODE");
-                wh_cfg.token_per_node =
-                    (e_per_node && e_per_node[0]) ? strtoull(e_per_node, NULL, 10) : 0;
-                AIRY_LOG_INFO("airy_cli: unified governance attached "
-                              "(token_budget=%llu, slots=%u, max_concurrent=%u, "
-                              "token_per_node=%llu)",
-                              (unsigned long long)gcfg.token_budget, gcfg.concurrency_slots,
-                              gcfg.max_concurrent, (unsigned long long)wh_cfg.token_per_node);
-            } else {
-                AIRY_LOG_WARN("airy_cli: governance create failed, "
-                              "unified governance disabled");
-            }
-        }
-    }
-    rt->governance = governance;
-    airy_work_hall_t *hall = NULL;
-    err = airy_work_hall_create(&wh_cfg, loop, &hall);
-    if (err != AIRY_EOK || !hall) {
-        AIRY_LOG_ERROR("airy_cli: work hall create failed (err=%d)", (int)err);
-        if (wh_cfg.reviewer)
-            airy_execution_review_destroy(wh_cfg.reviewer);
-        rt->reviewer = NULL;
-        return AIRY_ERR_GENERIC_FAIL;
-    }
-    airy_work_hall_bind_ops(hall);
-    rt->hall = hall;
 
     llm_svc_adapter_config_t chat_cfg;
     __builtin_memset(&chat_cfg, 0, sizeof(chat_cfg));
@@ -329,16 +246,8 @@ void cli_teardown_runtime(cli_runtime_ctx_t *rt)
         cli_panel_board_destroy(rt->board_ud);
     if (rt->mem_ud)
         cli_panel_mem_destroy(rt->mem_ud);
-    if (rt->reviewer)
-        airy_execution_review_destroy(rt->reviewer);
-    if (rt->hall)
-        airy_work_hall_destroy(rt->hall);
-    if (rt->validator)
-        airy_artifact_validator_destroy(rt->validator);
     if (rt->hall_store)
         airy_hall_store_destroy(rt->hall_store);
-    if (rt->governance)
-        airy_governance_destroy(rt->governance);
     AIRY_MEMSET(rt, 0, sizeof(*rt));
 }
 
