@@ -202,6 +202,19 @@ cli_dag_poll_rc_t cli_dag_poll_remote(const char *dag_id, double *out_progress,
                                       char *out_state, size_t state_cap, char **out_result);
 airy_err_t cli_dag_wait_remote(const char *dag_id, char **out_result);
 
+/* sched_d 远程 DAG 摘要条目（sched.dag_list 消费，/status 与 TUI board
+ * 查询面共用；C1 新增的轻量看板枚举，0.1.9 M1-1c 查询面迁移）。 */
+typedef struct {
+    char dag_id[64];
+    char name[96];
+    char status[16];
+    size_t node_count;
+    size_t done;
+} cli_dag_item_t;
+
+airy_err_t cli_dag_list_remote(cli_dag_item_t *items, size_t cap, size_t *out_count);
+airy_err_t cli_dag_cancel_remote(const char *dag_id);
+
 /* Node-level progress board for remote DAGs (opaque; cli_dag.c). */
 typedef struct cli_dag_board_s cli_dag_board_t;
 cli_dag_board_t *cli_dag_node_board_create(void);
@@ -272,8 +285,9 @@ int cli_chain_str_field(const char *json, const char *key, char *out, size_t cap
 uint32_t cli_chain_extract_seq(const char *json);
 void cli_chain_label(int cat, const char *content, char *out, size_t cap);
 
-/* 阶段 4 面板数据源（cli_panel.c 实现；main.c 绑定到 TUI） */
-void cli_panel_board_create(airy_work_hall_t *hall, void **out_ud);
+/* 阶段 4 面板数据源（cli_panel.c 实现；main.c 绑定到 TUI）。0.1.9 M1-1c：
+ * board 面板数据源迁 sched.dag_list 远程查询（不再接收本地 work_hall）。 */
+void cli_panel_board_create(void **out_ud);
 void cli_panel_board_destroy(void *ud);
 void cli_panel_events_create(airy_hall_store_t *hs, void **out_ud);
 void cli_panel_events_destroy(void *ud);
