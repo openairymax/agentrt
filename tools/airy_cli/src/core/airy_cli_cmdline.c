@@ -43,7 +43,7 @@ const cli_command_t CLI_COMMANDS[] = {
     {"/alerts", "查看监控告警", CLI_CAT_SYSTEM, 0, cmd_alerts},
     {"/tasks", "调度状态与检查点", CLI_CAT_SYSTEM, 0, cmd_tasks},
     {"/info", "系统信息", CLI_CAT_SYSTEM, 0, cmd_info},
-    {"/notify", "发布通知：/notify <channel> <msg>", CLI_CAT_SECURITY, 1, cmd_notify},
+    {"/notify", "发布通知：/notify <topic> <msg>", CLI_CAT_SECURITY, 1, cmd_notify},
     {"/vault", "凭据保险库：/vault list", CLI_CAT_SECURITY, 1, cmd_vault},
     {"/perm", "权限裁决：/perm <agent> <action> <resource>", CLI_CAT_SECURITY, 1, cmd_perm},
     {"/sanitize", "输入净化：/sanitize <input>", CLI_CAT_SESSION, 1, cmd_sanitize},
