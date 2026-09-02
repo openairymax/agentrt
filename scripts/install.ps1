@@ -76,11 +76,12 @@ $AIRY_SRC_DIR = Join-Path $AIRY_HOME "src\airymaxhub"
 $MODULES_DIR  = Join-Path $AIRY_HOME "modules"
 $BIN_DIR      = if ($BinDir) { $BinDir } elseif ($env:AIRY_BIN_DIR) { $env:AIRY_BIN_DIR } else { Join-Path $HOME ".local\bin" }
 
-# 与 install.sh 的 daemon 清单保持一致（含 think_d/cupolas_d/maths_d；
-# 0.1.9 M4：plugin_d 并入 tool_d，observe_d / info_d 并入 monit_d）
-$EXPECTED_DAEMONS = @("monit_d","notify_d","sched_d","channel_d","mem_d",
-                      "llm_d","tool_d","hook_d","agent_d","a2a_d","market_d","gateway_d",
-                      "think_d","cupolas_d","maths_d")
+# daemon 清单单一真相源：以制品 bin/*_d.exe 推导（与 install.sh
+# daemon_list 同源策略；daemon 增删不再改脚本硬编码，0.1.9 M4-S4 收敛）
+function Get-ExpectedDaemons {
+    Get-ChildItem (Join-Path $AIRY_HOME "bin\*_d.exe") -ErrorAction SilentlyContinue |
+        ForEach-Object { $_.BaseName }
+}
 
 function Require-Cmd {
     param([string]$Name)
@@ -113,8 +114,8 @@ function Init-Home {
 }
 
 function Stop-Daemons {
-    # 与 18 daemon 清单一致，避免卸载/停止残留进程
-    foreach ($name in $EXPECTED_DAEMONS) {
+    # daemon 清单动态推导（bin\*_d.exe），避免卸载/停止残留进程
+    foreach ($name in (Get-ExpectedDaemons)) {
         Get-Process -Name $name -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     }
     Start-Sleep -Seconds 1
@@ -465,8 +466,17 @@ function Finalize-Install {
 # ─── 完整性校验 ──────────────────────────────────────────────────────────
 function Verify-Daemons {
     param([switch]$Strict)
+    $list = @(Get-ExpectedDaemons)
+    if ($list.Count -eq 0) {
+        if ($Strict) {
+            Write-Err "daemon 校验失败：bin\*_d.exe 不存在（制品不完整）"
+            exit 1
+        }
+        Write-Warn "daemon 校验未全通过：bin\*_d.exe 不存在"
+        return
+    }
     $missing = @()
-    foreach ($d in $EXPECTED_DAEMONS) {
+    foreach ($d in $list) {
         if (-not (Test-Path (Join-Path $AIRY_HOME "bin\$d.exe"))) { $missing += $d }
     }
     if ($missing.Count -gt 0) {
@@ -476,7 +486,7 @@ function Verify-Daemons {
         }
         Write-Warn "daemon 校验未全通过，缺失: $($missing -join ' ')"
     } else {
-        Write-OK "$($EXPECTED_DAEMONS.Count) 个 daemon 全部就位"
+        Write-OK "$($list.Count) 个 daemon 全部就位"
     }
 }
 

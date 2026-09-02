@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 # SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 # ============================================================================
-# agentrt-e2e-regression.sh — 17 daemon 全 RPC 方法端到端回归测试
+# agentrt-e2e-regression.sh — 全 daemon 命名空间 RPC 方法端到端回归测试
 #
 # 经 gateway JSON-RPC（默认 http://127.0.0.1:8080）逐一调用全部命名空间方法，
 # 断言成功响应特征或预期错误码，输出 PASS/FAIL/SKIP 汇总。
