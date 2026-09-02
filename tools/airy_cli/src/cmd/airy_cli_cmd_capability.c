@@ -43,23 +43,23 @@ int cmd_notify(const char *arg, void *ctx)
     (void)ctx;
     if (!arg || arg[0] == '\0') {
         cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
-                              "/notify <channel> <message>");
+                              "/notify <topic> <message>");
         return 0;
     }
     const char *space = strchr(arg, ' ');
     if (!space) {
         cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
-                              "/notify <channel> <message>");
+                              "/notify <topic> <message>");
         return 0;
     }
-    char channel[128];
-    size_t clen = (size_t)(space - arg);
-    if (clen >= sizeof(channel)) clen = sizeof(channel) - 1;
-    __builtin_memcpy(channel, arg, clen);
-    channel[clen] = '\0';
+    char topic[128];
+    size_t tlen = (size_t)(space - arg);
+    if (tlen >= sizeof(topic)) tlen = sizeof(topic) - 1;
+    __builtin_memcpy(topic, arg, tlen);
+    topic[tlen] = '\0';
     const char *msg = space + 1;
     char params[2048];
-    snprintf(params, sizeof(params), "{\"channel\":\"%s\",\"message\":\"%s\"}", channel, msg);
+    snprintf(params, sizeof(params), "{\"topic\":\"%s\",\"message\":\"%s\"}", topic, msg);
     cli_rpc_print("notify", "publish", params);
     return 0;
 }

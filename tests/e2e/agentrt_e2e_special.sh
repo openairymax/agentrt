@@ -132,9 +132,9 @@ log "[S5] 任务大厅（work_hall 提交/看板/等待）"
 rpc sched.checkpoint_save '{}' "任务大厅：checkpoint_save（大厅状态快照）"
 rpc monit.get_stats '{}' "任务大厅：monit.get_stats（大厅资源监控）"
 rpc info.get_stats '{}' "任务大厅：info.get_stats"
-rpc notify.subscribe "{\"channel\":\"hall_${TS}\",\"client_id\":\"sp_${TS}\"}" "任务大厅：notify.subscribe（任务完成通知订阅）"
-rpc notify.publish "{\"channel\":\"hall_${TS}\",\"message\":\"task done\"}" "任务大厅：notify.publish（任务完成事件发布）"
-rpc notify.unsubscribe "{\"channel\":\"hall_${TS}\",\"client_id\":\"sp_${TS}\"}" "任务大厅：notify.unsubscribe（成对清理）"
+rpc notify.subscribe "{\"topic\":\"hall_${TS}\",\"client_id\":\"sp_${TS}\"}" "任务大厅：notify.subscribe（任务完成通知订阅）"
+rpc notify.publish "{\"topic\":\"hall_${TS}\",\"message\":\"task done\"}" "任务大厅：notify.publish（任务完成事件发布）"
+rpc notify.unsubscribe "{\"topic\":\"hall_${TS}\",\"client_id\":\"sp_${TS}\"}" "任务大厅：notify.unsubscribe（成对清理）"
 
 # ── 汇总 ─────────────────────────────────────────────────────────────────
 log ""
