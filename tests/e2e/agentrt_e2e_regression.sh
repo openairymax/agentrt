@@ -126,8 +126,8 @@ rpc hook.register "{\"name\":\"$HOOK_N\",\"type\":\"pre_exec\",\"impl\":\"shell\
 rpc hook.unregister "{\"name\":\"$HOOK_N\"}" "hook.unregister($HOOK_N, 成对清理)"
 rpc_match hook.trigger '{"type":"pre_exec"}' '"decision"' "hook.trigger(空注册表, continue)"
 
-# ── plugin_d ───────────────────────────────────────────────────────────────
-log "[plugin_d]"
+# ── plugin（0.1.9 M4：plugin.* 经 gateway 转发 tool_d 的 plugin_* 方法）───
+log "[plugin→tool_d]"
 rpc_err plugin.get_metadata '{"name":"nope"}' -32601 "plugin.get_metadata(不存在, 错误路径)"
 rpc plugin.get_state '{"name":"nope"}' "plugin.get_state(任意 name 返回状态)"
 rpc_err plugin.get_stats '{"name":"nope"}' -32601 "plugin.get_stats(不存在, 错误路径)"

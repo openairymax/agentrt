@@ -57,7 +57,6 @@ const cli_daemon_desc_t CLI_DAEMONS[] = {
     {"agent", "agent.sock", "health_check"},
     {"tool", "tool.sock", "health_check"},
     {"hook", "hook.sock", "health_check"},
-    {"plugin", "plugin.sock", "health_check"},
     {"think", "think.sock", "health_check"},
     {"monit", "monit.sock", "health_check"},
     {"sched", "sched.sock", "health_check"},
@@ -157,7 +156,7 @@ const char *cli_ns_sock(const char *ns)
         {"agent", "127.0.0.1:8086"},    {"a2a", "127.0.0.1:8087"},
         {"info", "127.0.0.1:8088"},     {"cupolas", "127.0.0.1:8089"},
         {"think", "127.0.0.1:8090"},    {"observe", "127.0.0.1:8091"},
-        {"plugin", "127.0.0.1:8092"},   {"hook", "127.0.0.1:8093"},
+        {"hook", "127.0.0.1:8093"},
         {"channel", "127.0.0.1:8094"},  {"monit", "127.0.0.1:9090"},
     };
     for (size_t i = 0; i < sizeof(WIN_NS_TCP) / sizeof(WIN_NS_TCP[0]); i++) {
