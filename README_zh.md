@@ -70,7 +70,7 @@ AgentRT 面向终端用户与智能体开发者提供以下能力：
 | **内置工具回路** | 聊天回路向 LLM 暴露 `web_search` / `web_fetch` 等真实工具（Bing 搜索 + URL 抓取），以 `role="tool"` 回填并 markdown 渲染最终回复 |
 | **安全穹顶** | 四层内生安全：沙箱隔离、RBAC 授权、输入输出净化、审计日志，默认 fail-closed |
 | **统一网关** | `gateway_d` 将 HTTP、WebSocket、stdio 统一翻译为 JSON-RPC 2.0 流，外部系统经单一入口接入运行时 |
-| **18 个运行时服务** | 调度、工具分发、LLM 桥接、双思考、记忆、监控、通知、插件管理、Agent 执行等长期驻留守护进程，按依赖顺序编排启动并自愈 |
+| **15 个运行时服务** | 调度、工具分发、LLM 桥接、双思考、记忆、监控、通知、工具/插件执行、Agent 执行等长期驻留守护进程，按依赖顺序编排启动并自愈 |
 | **可观测** | 全局事件流 + 任务看板 + 健康监控，`airymaxrt monitor` 提供运行状态总览 |
 
 ## 仓库结构
@@ -85,7 +85,7 @@ airymaxhub/                     ← 伞仓（git superproject 根）
 │   │   ├── heapstore/          ← submodule：堆式存储
 │   │   ├── protocols/          ← submodule：AgentsIPC & A2A/A2T 协议栈
 │   │   ├── gateway/            ← submodule：HTTP/WS/Stdio → JSON-RPC 2.0 网关
-│   │   ├── daemons/            ← submodule：18 个运行时守护进程
+│   │   ├── daemons/            ← submodule：15 个运行时守护进程
 │   │   ├── cmake/              ← 构建系统模块
 │   │   ├── scripts/            ← 官方安装器 install.sh/install.ps1
 │   │   ├── CMakeLists.txt      ← 顶层 CMake 入口
@@ -110,7 +110,7 @@ airymaxhub/                     ← 伞仓（git superproject 根）
 | **heapstore** | `git@atomgit.com:openairymax/heapstore.git` | 堆式运行时数据持久化（A 类）                                                                                                            |
 | **protocols** | `git@atomgit.com:openairymax/protocols.git` | AgentsIPC（128 字节消息头）& A2A/A2T 协议栈                                                                                           |
 | **gateway**   | `git@atomgit.com:openairymax/gateway.git`   | HTTP/WS/Stdio → JSON-RPC 2.0 网关守护进程（`gateway_d`）                                                                          |
-| **daemons**   | `git@atomgit.com:openairymax/daemons.git`   | 18 个运行时守护进程：`gateway_d`、`llm_d`、`tool_d`、`sched_d`、`market_d`、`monit_d`、`channel_d`、`info_d`、`notify_d`、`observe_d`、`hook_d`、`plugin_d`、`mem_d`、`agent_d`、`a2a_d`、`think_d`、`cupolas_d`、`maths_d` |
+| **daemons**   | `git@atomgit.com:openairymax/daemons.git`   | 15 个运行时守护进程：`gateway_d`、`llm_d`、`tool_d`、`sched_d`、`market_d`、`monit_d`、`channel_d`、`notify_d`、`hook_d`、`mem_d`、`agent_d`、`a2a_d`、`think_d`、`cupolas_d`、`maths_d`（0.1.9 M4：plugin/info/observe 整编并入 tool_d/monit_d） |
 
 > **分类说明：** A = 基础/原子层（被上层依赖）；B = 行为/安全层；— = 服务/组合层。
 

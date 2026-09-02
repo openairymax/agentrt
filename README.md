@@ -32,7 +32,7 @@ AgentRT delivers the following capabilities to end users and agent developers:
 | **Built-in tool loop** | The chat loop exposes real tools such as `web_search` / `web_fetch` to the LLM (Bing search + URL fetch), feeds results back as `role="tool"`, and renders the final reply as markdown |
 | **Security dome** | Four layers of inherent security: sandbox isolation, RBAC authorization, input/output sanitization, audit logging — fail-closed by default |
 | **Unified gateway** | `gateway_d` translates HTTP, WebSocket, and stdio into a unified JSON-RPC 2.0 stream, giving external systems a single entry point into the runtime |
-| **18 runtime services** | Long-running daemons for scheduling, tool dispatch, LLM bridging, dual-think cognition, memory, monitoring, notifications, plugin management, and Agent execution — orchestrated by dependency order with self-healing |
+| **15 runtime services** | Long-running daemons for scheduling, tool dispatch, LLM bridging, dual-think cognition, memory, monitoring, notifications, tool/plugin execution, and Agent execution — orchestrated by dependency order with self-healing |
 | **Observability** | Global event stream + task board + health monitoring; `airymaxrt monitor` provides a runtime status overview |
 
 ## Repository Structure
@@ -47,7 +47,7 @@ airymaxhub/                     ← Umbrella repo (git superproject root)
 │   │   ├── heapstore/          ← submodule: heap-backed storage (A-class)
 │   │   ├── protocols/          ← submodule: AgentsIPC & A2A/A2T protocol stack
 │   │   ├── gateway/            ← submodule: HTTP/WS/Stdio → JSON-RPC 2.0 gateway
-│   │   ├── daemons/            ← submodule: 18 runtime daemons
+│   │   ├── daemons/            ← submodule: 15 runtime daemons
 │   │   ├── contracts/          ← contract headers (symlink → atoms/contracts)
 │   │   ├── cmake/              ← build-system modules
 │   │   ├── scripts/            ← official installer install.sh/install.ps1
@@ -73,7 +73,7 @@ airymaxhub/                     ← Umbrella repo (git superproject root)
 | **heapstore** | `git@atomgit.com:openairymax/heapstore.git` | A | Heap-backed runtime data persistence |
 | **protocols** | `git@atomgit.com:openairymax/protocols.git` | — | AgentsIPC (128-byte message header) & A2A/A2T protocol stack |
 | **gateway** | `git@atomgit.com:openairymax/gateway.git` | — | HTTP/WS/Stdio → JSON-RPC 2.0 gateway daemon (`gateway_d`) |
-| **daemons** | `git@atomgit.com:openairymax/daemons.git` | — | 18 runtime daemons: `gateway_d`, `llm_d`, `tool_d`, `sched_d`, `market_d`, `monit_d`, `channel_d`, `info_d`, `notify_d`, `observe_d`, `hook_d`, `plugin_d`, `mem_d`, `agent_d`, `a2a_d`, `think_d`, `cupolas_d`, `maths_d` |
+| **daemons** | `git@atomgit.com:openairymax/daemons.git` | — | 15 runtime daemons: `gateway_d`, `llm_d`, `tool_d`, `sched_d`, `market_d`, `monit_d`, `channel_d`, `notify_d`, `hook_d`, `mem_d`, `agent_d`, `a2a_d`, `think_d`, `cupolas_d`, `maths_d` (0.1.9 M4: plugin/info/observe consolidated into tool_d/monit_d) |
 
 > **Class legend:** A = foundational/atomic (depended upon by upper layers); B = behavioral/safety; — = service/composition layer.
 
@@ -83,7 +83,7 @@ AgentRT follows a cyclic layered architecture. Each layer depends only on the la
 
 ```
 ⬇️  SDK Layer          — Python / Go / Rust / TypeScript SDKs                       (sdk/ repo)
-⇅   Service Layer      — 18 daemon services                                          (daemons/)
+⇅   Service Layer      — 15 daemon services                                          (daemons/)
 ⇅   Protocol Layer     — AgentsIPC & A2A/A2T protocol stack                          (protocols/)
 ⇅   Gateway Layer      — HTTP / WS / Stdio → JSON-RPC 2.0 gateway daemon             (gateway/)
 ⇅   Storage Layer      — Heap-backed runtime data persistence                        (heapstore/)

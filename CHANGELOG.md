@@ -4,6 +4,7 @@
 
 ## 📋 目录
 
+- [Unreleased](#unreleased) — daemon 整编 18→15 / namespace 独占门禁 / 链接白名单 15 节点
 - [v0.1.8](#v018---2026-09-01) ⭐ 最新 — 向导首配 model.yaml 修复 / TUI 交互细节修复
 - [v0.1.7](#v017---2026-08-31) — CLI/TUI 交互重构 / 版本 SSoT 防漂移
 - [v0.1.6g](#v016g---2026-08-31) — CLI 英雄区重设计 / 安装器系统性修复 / 函数名规范
@@ -24,6 +25,31 @@
 - [v0.0.4](#v004---生产就绪-2026-03-25)
 - [v0.0.3](#v003---开发中-2026)
 - [历史版本](#历史版本)
+
+---
+
+## [Unreleased]
+
+### 里程碑 0.1.9 M4：daemon 整编与边界深化
+
+#### Changed
+
+- **daemon 整编 18→15**：plugin_d → tool_d（插件 dlopen 执行域随迁，plugin_* 方法在 tool 命名空间登记）；observe_d / info_d → monit_d（双 Prometheus /metrics 收敛，observe_* / info_* 方法在 monit 命名空间登记）。旧命名空间经 gateway cap registry 保留转发契约。
+- **notify_d channel → topic 语义澄清**：订阅键从 channel 改为 topic，与 channel_d 数据面通道划清界限（JSON-RPC 参数/响应/事件帧/list 输出/X-Topic 头全链路改名，clean-break 无兼容层）。
+- **daemon 清单单一来源**：install.sh / install.ps1 删除手工 EXPECTED_DAEMONS，收敛为制品 bin/*_d 推导（与 airymaxrt 启动器同源）。
+- **namespace 独占门禁**：gateway cap registry 新增 GW_NS_OWNER 归属表（15 daemon 契约表 + M4 整编映射），gw_cap_ns_validate() 启动期 fail-closed 校验，namespace 归属冲突拒启。
+- **链接白名单 15 节点登记**：link-whitelist.txt 从 gateway 系 3 目标扩展为全部 15 daemon，airy_depgraph 构建期门禁覆盖全部 daemon 目标（跨界禁链 fail-closed）。
+- **airymaxrt 运行画像**：aux daemon 补齐逻辑收敛为 bin/*_d 推导（清除整编后残留），full 档 15 daemon / minimal 档 5 进程（gateway + llm/think/agent/tool）。
+- **bootstrap 分层 18→15**：5 层 DAG 移除整编 daemon，dry-run 验证 15 daemon 启动计划。
+
+#### Removed
+
+- market_d 零调用注册/安装死层（agent_registry / agent_registry_core / skill_registry / installer 及配套死层自测），净删约 1700 行；启用 test_market.c 补齐生产 API 内存域单测。
+- daemon_startup.h 旧 12 daemon 编排头（全仓零消费者，与真实分层漂移）。
+
+#### Added
+
+- test_market.c 生产 API 单测（生命周期/注册更新/搜索/更新检查/limit 截断）。
 
 ---
 
