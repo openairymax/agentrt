@@ -65,7 +65,7 @@
 #
 # 安装完成后：固化 install.env（含 AIRY_BIN_LINK）、生成 agentrt-env.sh、
 # 软链 airymaxrt 启动器到 PATH（任意路径输入 airymaxrt 即启动），
-# 校验 18 个 daemon 全部就位。
+# 校验 bin/*_d 全部就位（daemon 清单动态推导）。
 #
 # 卸载：sh install.sh --uninstall 或 airymaxrt uninstall（停止 daemon +
 #       删除 $AIRY_HOME + 移除 PATH 软链；--keep-data 保留记忆数据）。
@@ -208,12 +208,15 @@ if [ ! -d "${AIRY_SRC_APP}/agentrt" ]; then
     AIRY_SRC_APP="${AIRY_SRC_DIR}"
 fi
 
-# daemon 完整清单（安装后逐一校验，含 think_d/cupolas_d/maths_d；
-# 与 agentrt-bootstrap.sh 的分层清单保持一致。0.1.9 M4：plugin_d 并入 tool_d，
-# observe_d / info_d 并入 monit_d）
-EXPECTED_DAEMONS="monit_d notify_d sched_d channel_d mem_d
-                  llm_d tool_d hook_d agent_d a2a_d market_d gateway_d
-                  think_d cupolas_d maths_d"
+# daemon 清单单一真相源：以制品 bin/*_d 推导（二进制包与源码构建共用
+# 同一口径；daemon 增删不再改脚本硬编码，0.1.9 M4-S4 收敛）。
+daemon_list() {
+    local bin="${1:-${AIRY_HOME}/bin}" d
+    [ -d "$bin" ] || return 0
+    for d in "${bin}"/*_d; do
+        [ -f "$d" ] && basename "$d"
+    done
+}
 
 # ─── 安装器自举（系统性解决安装器无法更新，2026-08-30） ────────────────
 # AtomGit API 不支持删除/替换 release 附件，同版本重发后一键命令仍拿旧
@@ -327,7 +330,7 @@ init_home() {
 stop_daemons() {
     local bin="$1" found=0 d
     [ -d "$bin" ] || return 1
-    for d in ${EXPECTED_DAEMONS}; do
+    for d in $(daemon_list "$bin"); do
         if [ -x "${bin}/${d}" ] && pkill -f "${bin}/${d}" >/dev/null 2>&1; then
             found=1
         fi
@@ -594,8 +597,9 @@ install_binary() {
     extracted="$(find "${AIRY_HOME}/tmp" -maxdepth 1 -type d -name 'agentrt-*' | head -1)"
     [ -n "$extracted" ] || { log_warn "release 包结构异常，回退源码构建"; return 1; }
     # 0.1.7 自动计算：daemon 清单以制品 bin/*_d 为准（后续 daemon 增删不再
-    # 改脚本硬编码；gateway_d 为 HTTP 服务亦属 *_d 自动纳入）。
-    EXPECTED_DAEMONS="$(for _f in "${extracted}"/bin/*_d; do [ -f "$_f" ] && basename "$_f"; done)"
+    # 改脚本硬编码；gateway_d 为 HTTP 服务亦属 *_d 自动纳入）。0.1.9 M4-S4
+    # 与源码构建收敛为同一 daemon_list 推导。
+    EXPECTED_DAEMONS="$(daemon_list "${extracted}/bin")"
     # bin/ 拷贝必须 fail-closed：静默失败（磁盘/权限/残留干扰）会导致 daemon
     # 未就位却显示"全部就位"（0.1.6e 实测：18 个就位但启动时
     # llm_d No such file）。lib/ 已有同类校验，bin/ 补齐。
@@ -734,7 +738,7 @@ build_and_install() {
     # 与 install_binary 同口径校验：daemon 二进制必须就位（否则后续
     # verify_daemons 必然失败，提前报错给用户明确根因）。
     local _d2 _binok=1
-    for _d2 in ${EXPECTED_DAEMONS:-}; do
+    for _d2 in $(daemon_list); do
         [ -x "${AIRY_HOME}/bin/${_d2}" ] || { _binok=0; log_err "构建产物缺失 daemon: ${_d2}"; break; }
     done
     [ "$_binok" = "1" ] || { log_err "源码构建安装不完整，请检查磁盘空间与权限后重试"; exit 1; }
@@ -1445,12 +1449,22 @@ EOF
     fi
 }
 
-# ─── 18 daemon 完整性校验 ──────────────────────────────────────────────
+# ─── daemon 完整性校验 ─────────────────────────────────────────────────
 # 参数 strict：二进制模式下缺 daemon 视为安装失败（exit 1），
 # 避免「残缺安装却显示成功」；源码模式保留 warn。
 verify_daemons() {
-    local missing="" strict="$1"
-    for d in ${EXPECTED_DAEMONS}; do
+    local missing="" strict="$1" dl d n=0
+    dl="$(daemon_list)"
+    if [ -z "$dl" ]; then
+        if [ "$strict" = "strict" ]; then
+            log_err "daemon 校验失败：${AIRY_HOME}/bin 下无 *_d 二进制（制品不完整）"
+            exit 1
+        fi
+        log_warn "daemon 校验未全通过：${AIRY_HOME}/bin 下无 *_d 二进制"
+        return 1
+    fi
+    for d in ${dl}; do
+        n=$((n + 1))
         [ -x "${AIRY_HOME}/bin/${d}" ] || missing="${missing} ${d}"
     done
     if [ -n "$missing" ]; then
@@ -1460,7 +1474,7 @@ verify_daemons() {
         fi
         log_warn "daemon 校验未全通过，缺失:${missing}（可能为二进制包未含全部组件）"
     else
-        log_ok "$(printf '%s' $EXPECTED_DAEMONS | wc -w | tr -d ' ') 个 daemon 全部就位"
+        log_ok "${n} 个 daemon 全部就位"
     fi
 }
 
