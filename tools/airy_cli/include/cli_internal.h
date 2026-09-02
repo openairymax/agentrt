@@ -187,8 +187,7 @@ void cli_msgbuf_push(cli_chat_msgbuf_t *b, const char *role, const char *content
                      const char *reasoning_content);
 int cli_chat_tool_round(cli_chat_msgbuf_t *b, const llm_response_t *resp);
 
-airy_err_t cli_think_process_remote(const char *think_sock, const char *input, size_t input_len,
-                                    airy_task_plan_t **out_plan);
+airy_err_t cli_think_process_remote(const char *input, airy_task_plan_t **out_plan);
 
 /* 任务执行唯一通路：plan → gateway → sched_d（0.1.9 M1 1c 引擎壳化，
  * 本地 hall 降级与 sched.sock 开关已退役，失败即错误可见化）。 */

@@ -5,13 +5,13 @@
  * @file cli_think.c
  * @brief airy_cli dual-thinking domain: remote plan parsing via think_d.
  *
- * When AIRY_THINK_SOCK is set, cognition planning goes through daemon RPC
- * (process method on think.sock, 120s timeout); the response is parsed
- * twice and the plan segment is restored to airy_task_plan_t. GCCP
- * two-pass interaction (P-A): when think_d returns gccp_need_interaction=1,
- * the question set is rendered to the user via cli_gccp_interact and the
- * collected answers are re-sent as gccp_answers (second pass). On failure
- * no data is fabricated; the caller falls back to the embedded engine.
+ * Cognition planning goes through gateway → think_d (think.process, 120s
+ * timeout); the response is parsed and the plan segment is restored to
+ * airy_task_plan_t. GCCP two-pass interaction (P-A): when think_d returns
+ * gccp_need_interaction=1, the question set is rendered to the user via
+ * cli_gccp_interact and the collected answers are re-sent as gccp_answers
+ * (second pass). On failure no data is fabricated; the caller surfaces the
+ * error visibly (0.1.9 M1-1c: no embedded-engine fallback).
  */
 
 #include "cli_internal.h"
@@ -34,11 +34,10 @@
 #include <cjson/cJSON.h>
 #endif
 
-/* 单轮 think.process RPC：携带 prompt 与可选 gccp_answers 调用 think_d，
- * 返回解析后的内层 JSON 根（OWNER，调用方 cJSON_Delete）。
+/* 单轮 think.process RPC：携带 prompt 与可选 gccp_answers 经 gateway 调用
+ * think_d，返回解析后的内层 JSON 根（OWNER，调用方 cJSON_Delete）。
  * 失败返回 NULL，err_out（可选）带回错误码。 */
-static cJSON *cli_think_rpc_round(const char *think_sock, const char *prompt,
-                                  const char *gccp_answers, int *err_out)
+static cJSON *cli_think_rpc_round(const char *prompt, const char *gccp_answers, int *err_out)
 {
     if (err_out)
         *err_out = AIRY_SUCCESS;
@@ -78,7 +77,6 @@ static cJSON *cli_think_rpc_round(const char *think_sock, const char *prompt,
 
     /* 架构约束（2026-08-25）：统一经 gateway 派发（think.process →
      * gateway → SYS_SVC_CALL → think_d），禁止直连 think.sock。 */
-    (void)think_sock;
     char *rpc_result = NULL;
     int rc = cli_gw_call("think.process", params_json, 120000, &rpc_result);
     AIRY_FREE(params_json);
@@ -302,23 +300,21 @@ fail:
     return AIRY_ERR_OUT_OF_MEMORY;
 }
 
-/* Remote dual-thinking via AIRY_THINK_SOCK: daemon_rpc_call(think.sock, "process", ..., 120s).
+/* Remote dual-thinking via gateway → think_d (think.process, 120s timeout).
  * GCCP 两段式交互（P-A）：第一段无 gccp_answers，think_d 判定指令不完整时返回
  * gccp_need_interaction=1 + gccp_questions；本函数转成 airy_gccp_probe_t 交给
  * cli_gccp_interact 逐问收集答案，第二段携带 gccp_answers 重发，引擎完成目标
- * 确认进入后续 Phase。两次挂起（第二段仍要求交互）视为失败，调用方回退内置
- * 引擎。失败不伪造数据。 */
-airy_err_t cli_think_process_remote(const char *think_sock, const char *input,
-                                    size_t input_len, airy_task_plan_t **out_plan)
+ * 确认进入后续 Phase。两次挂起（第二段仍要求交互）视为失败，调用方错误可见化
+ * 输出。失败不伪造数据。 */
+airy_err_t cli_think_process_remote(const char *input, airy_task_plan_t **out_plan)
 {
-    (void)input_len;
-    if (!think_sock || !think_sock[0] || !input || !out_plan)
+    if (!input || !out_plan)
         return AIRY_ERR_INVALID_PARAM;
     *out_plan = NULL;
 
     /* 第一段：无 gccp_answers。 */
     int rerr = AIRY_SUCCESS;
-    cJSON *inner = cli_think_rpc_round(think_sock, input, NULL, &rerr);
+    cJSON *inner = cli_think_rpc_round(input, NULL, &rerr);
     if (!inner)
         return (airy_err_t)rerr;
 
@@ -349,12 +345,12 @@ airy_err_t cli_think_process_remote(const char *think_sock, const char *input,
         airy_gccp_probe_free(probe);
 
         rerr = AIRY_SUCCESS;
-        inner = cli_think_rpc_round(think_sock, input, answers, &rerr);
+        inner = cli_think_rpc_round(input, answers, &rerr);
         AIRY_FREE(answers);
         if (!inner)
             return (airy_err_t)rerr;
 
-        /* 二次挂起（远端仍要求交互）：放弃远端，回退内置引擎。 */
+        /* 二次挂起（远端仍要求交互）：放弃处理，错误由调用方可见化。 */
         cJSON *again = cJSON_GetObjectItem(inner, "gccp_need_interaction");
         if (again && cJSON_IsTrue(again)) {
             cJSON_Delete(inner);

@@ -50,14 +50,14 @@ void cli_chain_record_submit(const char *exec_id, const airy_task_plan_t *plan);
 int cli_task_result_render(const char *result, airy_err_t err, const char *exec_id,
                            int canceled);
 
-/* Run one full task turn: cognition planning → submit (gateway → sched_d,
- * the only execution path) → board polling → wait → result summary.
+/* Run one full task turn: cognition planning (gateway → think_d, the only
+ * planning path) → submit (gateway → sched_d, the only execution path) →
+ * board polling → wait → result summary.
  * Extracted from main.c's main
  * loop (2026-08-27 domain split).  Returns 1 when the caller should
  * continue the loop early (planning / submission failure), 0 on normal
  * completion. */
-int cli_run_task_pipeline(cli_runtime_ctx_t *rt, airy_cognition_engine_t *cog,
-                          const char *input, size_t input_len, uint64_t turn_start);
+int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t turn_start);
 
 #ifdef __cplusplus
 }
