@@ -5,9 +5,9 @@
  * @file cli_panel.c
  * @brief TUI 面板数据源（阶段 4）：任务看板 + 事件流。
  *
- * 通过 cli_tui.h 的面板回调（count/line）为 TUI 提供两类数据视图：
- *   - 任务看板（BOARD）：work_hall 当前全部执行实例（id/状态/进度），
- *     count() 每次调用重新拉取 → TUI 200ms 轮询即得实时刷新。
+ * 通过 cli_tui.h 的面板回调（count/line）为 TUI 提供三类数据视图：
+ *   - 任务看板（BOARD）：sched.dag_list 远程枚举（经 gateway，秒级节流），
+ *     count() 节流刷新缓存 → TUI 轮询即得实时任务视图。
  *   - 事件流（EVENTS）：hall_store 全局事件按 gseq 因果序合并（跨任务/
  *     类别），Up/Down 滚动即回放；复用 cli_cmds.c 的事件解析 helpers。
  *
@@ -25,13 +25,16 @@
 #include <time.h>
 
 /* ================================================================
- * 任务看板面板
+ * 任务看板面板（0.1.9 M1-1c：数据源迁 sched.dag_list 远程查询，
+ * 与 cmd_status 同源；本地 work_hall 实例表无写入方，C2d 退役）
  * ================================================================ */
 
+#define CLI_BOARD_MAX 32
+
 typedef struct {
-    airy_work_hall_t *hall;
-    airy_work_hall_entry_t **entries;
+    cli_dag_item_t items[CLI_BOARD_MAX];
     size_t count;
+    time_t last_fetch; /* 秒级节流：TUI 200ms 轮询不打爆 gateway */
 } cli_board_panel_t;
 
 static const char *cli_panel_state_icon(const char *state)
@@ -40,7 +43,8 @@ static const char *cli_panel_state_icon(const char *state)
         return CLI_ICON_BULLET;
     if (strcmp(state, "completed") == 0)
         return CLI_ICON_CHECK;
-    if (strcmp(state, "running") == 0 || strcmp(state, "pending") == 0)
+    if (strcmp(state, "active") == 0 || strcmp(state, "running") == 0 ||
+        strcmp(state, "pending") == 0)
         return CLI_ICON_DIAMOND;
     if (strcmp(state, "scheduled") == 0)
         return CLI_ICON_CLOCK;
@@ -59,8 +63,8 @@ static const char *cli_panel_state_color(const char *state)
         return cli_c(CLR_GREEN);
     if (strcmp(state, "failed") == 0 || strcmp(state, "canceled") == 0)
         return cli_c(CLR_RED);
-    if (strcmp(state, "running") == 0 || strcmp(state, "pending") == 0 ||
-        strcmp(state, "scheduled") == 0)
+    if (strcmp(state, "active") == 0 || strcmp(state, "running") == 0 ||
+        strcmp(state, "pending") == 0 || strcmp(state, "scheduled") == 0)
         return cli_c(CLR_YELLOW);
     return "";
 }
@@ -83,61 +87,64 @@ static void cli_panel_bar(char *out, size_t cap, double prog)
     out[i] = '\0';
 }
 
-void cli_panel_board_create(airy_work_hall_t *hall, void **out_ud)
+void cli_panel_board_create(void **out_ud)
 {
     *out_ud = NULL;
     cli_board_panel_t *p = (cli_board_panel_t *)AIRY_CALLOC(1, sizeof(*p));
     if (!p)
         return;
-    p->hall = hall;
     *out_ud = p;
 }
 
 void cli_panel_board_destroy(void *ud)
 {
-    cli_board_panel_t *p = (cli_board_panel_t *)ud;
-    if (!p)
+    AIRY_FREE(ud);
+}
+
+/* 拉取 sched_d 当前 DAG 摘要（秒级节流），结果缓存在 p->items */
+static void cli_panel_board_fetch(cli_board_panel_t *p)
+{
+    p->count = 0;
+    size_t n = 0;
+    if (cli_dag_list_remote(p->items, CLI_BOARD_MAX, &n) != AIRY_EOK)
         return;
-    if (p->entries)
-        airy_work_hall_list_free(p->entries, p->count);
-    AIRY_FREE(p);
+    p->count = n;
 }
 
 size_t cli_panel_board_count(void *ud)
 {
     cli_board_panel_t *p = (cli_board_panel_t *)ud;
-    if (!p || !p->hall)
+    if (!p)
         return 0;
-    /* 每次调用重新拉取：TUI 200ms 轮询即实时刷新 */
-    if (p->entries)
-        airy_work_hall_list_free(p->entries, p->count);
-    p->entries = NULL;
-    p->count = 0;
-    if (airy_work_hall_list(p->hall, &p->entries, &p->count) != AIRY_SUCCESS)
-        return 0;
+    time_t now = time(NULL);
+    if (now != p->last_fetch) { /* 秒级节流刷新（gateway 不可达时退化为上次快照） */
+        p->last_fetch = now;
+        cli_panel_board_fetch(p);
+    }
     return p->count;
 }
 
 int cli_panel_board_line(void *ud, size_t idx, char *out, size_t cap)
 {
     cli_board_panel_t *p = (cli_board_panel_t *)ud;
-    if (!p || idx >= p->count || !p->entries)
+    if (!p || idx >= p->count)
         return 0;
-    airy_work_hall_entry_t *e = p->entries[idx];
+    cli_dag_item_t *it = &p->items[idx];
+    double prog = it->node_count > 0 ? (double)it->done / (double)it->node_count : 0.0;
     char bar[12];
-    cli_panel_bar(bar, sizeof(bar), e->progress);
+    cli_panel_bar(bar, sizeof(bar), prog);
     snprintf(out, cap, "%s  %s%-28s%s  %s%-10s%s  %s %3d%%",
-             cli_panel_state_icon(e->state),
-             cli_c(CLR_CYAN), e->execution_id,
+             cli_panel_state_icon(it->status),
+             cli_c(CLR_CYAN), it->dag_id,
              cli_c(CLR_RESET),
-             cli_panel_state_color(e->state), e->state,
-             cli_c(CLR_RESET), bar, (int)(e->progress * 100));
+             cli_panel_state_color(it->status), it->status,
+             cli_c(CLR_RESET), bar, (int)(prog * 100));
     return 1;
 }
 
 /* 任务看板可操作动作（2026-08-19）：DETAIL 查看选中任务详情 /
- * CANCEL 请求取消选中任务。动作期间重新拉取列表解析 sel（事件处理时
- * 引擎刚重绘过，entries 缓存有效，但拉取最新状态更稳）。 */
+ * CANCEL 请求取消选中任务（经 gateway → sched.dag_cancel，0.1.9 M1-1c）。
+ * 动作期间以面板缓存解析 sel（count 每次刷新前已同步快照）。 */
 /* P3-3：钳制追加（snprintf 返回"应写长度"，盲累加会越过容量下溢越界写） */
 static size_t panel_append(char *out, size_t cap, size_t o, const char *fmt, ...)
 {
@@ -158,43 +165,32 @@ static size_t panel_append(char *out, size_t cap, size_t o, const char *fmt, ...
 int cli_panel_board_action(void *ud, int action, size_t sel, char *out, size_t cap)
 {
     cli_board_panel_t *p = (cli_board_panel_t *)ud;
-    if (!p || !p->hall || !out || cap == 0)
+    if (!p || !out || cap == 0)
         return 0;
     out[0] = '\0';
-
-    airy_work_hall_entry_t **entries = NULL;
-    size_t n = 0;
-    if (airy_work_hall_list(p->hall, &entries, &n) != AIRY_SUCCESS)
+    if (sel >= p->count)
         return 0;
-    int ok = 0;
+    cli_dag_item_t *it = &p->items[sel];
+    double prog = it->node_count > 0 ? (double)it->done / (double)it->node_count : 0.0;
 
-    if (sel < n) {
-        airy_work_hall_entry_t *e = entries[sel];
-        if (action == CLI_TUI_ACT_DETAIL) {
-            size_t o = 0;
-            o = panel_append(out, cap, o, "◆ 执行 ID  %s\n", e->execution_id);
-            o = panel_append(out, cap, o, "  工作流    %s\n",
-                             e->workflow_name[0] ? e->workflow_name : e->workflow_id);
-            o = panel_append(out, cap, o, "  状态      %s %.0f%%\n", e->state,
-                             e->progress * 100.0);
-            o = panel_append(out, cap, o, "  复核      %s\n",
-                             e->review_verdict[0] ? e->review_verdict : "-");
-            o = panel_append(out, cap, o, "  输入      %.*s\n",
-                             (int)(e->input_json ? strlen(e->input_json) : 0),
-                             e->input_json ? e->input_json : "");
-            ok = 1;
-        } else if (action == CLI_TUI_ACT_CANCEL) {
-            airy_err_t err = airy_work_hall_cancel(p->hall, e->execution_id);
-            if (err == AIRY_SUCCESS)
-                snprintf(out, cap, "已请求取消 %s", e->execution_id);
-            else
-                snprintf(out, cap, "取消失败 %s（%s）", e->execution_id,
-                         cli_err_desc((int)err));
-            ok = 1;
-        }
+    if (action == CLI_TUI_ACT_DETAIL) {
+        size_t o = 0;
+        o = panel_append(out, cap, o, "◆ 任务 ID  %s\n", it->dag_id);
+        o = panel_append(out, cap, o, "  名称      %s\n", it->name[0] ? it->name : "-");
+        o = panel_append(out, cap, o, "  状态      %s\n", it->status);
+        o = panel_append(out, cap, o, "  进度      %zu/%zu 节点（%.0f%%）\n", it->done,
+                         it->node_count, prog * 100.0);
+        return 1;
     }
-    airy_work_hall_list_free(entries, n);
-    return ok;
+    if (action == CLI_TUI_ACT_CANCEL) {
+        airy_err_t err = cli_dag_cancel_remote(it->dag_id);
+        if (err == AIRY_EOK)
+            snprintf(out, cap, "已请求取消 %s", it->dag_id);
+        else
+            snprintf(out, cap, "取消失败 %s（%s）", it->dag_id, cli_err_desc((int)err));
+        return 1;
+    }
+    return 0;
 }
 
 /* ================================================================

@@ -72,48 +72,46 @@ int cmd_clear(const char *arg, void *ctx)
 int cmd_status(const char *arg, void *ctx)
 {
     (void)arg;
-    cli_cmd_ctx_t *c = (cli_cmd_ctx_t *)ctx;
-    if (!c || !c->hall) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "状态",
-                             "任务大厅不可用");
-        return 0;
-    }
-
-    airy_work_hall_entry_t **entries = NULL;
+    (void)ctx;
+    /* 0.1.9 M1-1c 查询面迁移：/status 改经 gateway → sched.dag_list 展示
+     * sched_d 权威执行实例（本地 work_hall 已无写入方，C2d 退役实例本体）。 */
+    cli_dag_item_t items[32];
     size_t count = 0;
-    airy_err_t err = airy_work_hall_list(c->hall, &entries, &count);
-    if (err != AIRY_SUCCESS) {
+    airy_err_t err = cli_dag_list_remote(items, 32, &count);
+    if (err != AIRY_EOK) {
         char line[128];
-        snprintf(line, sizeof(line), "任务大厅查询失败：%s", cli_err_desc((int)err));
+        snprintf(line, sizeof(line), "任务列表查询失败：%s", cli_err_desc((int)err));
         cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "状态", line);
         return 0;
     }
 
     if (count == 0) {
         if (g_cli_print_mode) {
-            cli_outf("hall idle\n");
+            cli_outf("sched idle\n");
         } else {
             cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "status",
-                                 "任务大厅空闲，尚无执行实例");
+                                 "调度器空闲，无活动任务");
         }
         return 0;
     }
 
     char line[160];
-    snprintf(line, sizeof(line), "任务大厅 · %zu 个执行实例", count);
+    snprintf(line, sizeof(line), "sched_d · %zu 个任务", count);
     if (g_cli_print_mode) {
-        cli_outf("hall instances=%zu\n", count);
+        cli_outf("sched dags=%zu\n", count);
     } else {
         cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "status", line);
     }
     for (size_t i = 0; i < count; i++) {
-        airy_work_hall_entry_t *e = entries[i];
+        cli_dag_item_t *it = &items[i];
+        double prog = (it->node_count > 0)
+                          ? ((double)it->done / (double)it->node_count)
+                          : 0.0;
         if (g_cli_print_mode)
-            cli_outf("  %s %s %.0f%%\n", e->execution_id, e->state, e->progress * 100.0);
+            cli_outf("  %s %s %.0f%%\n", it->dag_id, it->status, prog * 100.0);
         else
-            cli_render_task_line("hall", e->execution_id, e->state, e->progress);
+            cli_render_task_line("sched_d", it->dag_id, it->status, prog);
     }
-    airy_work_hall_list_free(entries, count);
     return 0;
 }
 

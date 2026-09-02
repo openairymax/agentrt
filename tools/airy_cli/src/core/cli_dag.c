@@ -325,6 +325,89 @@ cli_dag_poll_rc_t cli_dag_poll_remote(const char *dag_id, double *out_progress, 
     return terminal ? CLI_DAG_POLL_DONE : CLI_DAG_POLL_ACTIVE;
 }
 
+/* Enumerate remote DAGs over the gateway (sched.dag_list). 0.1.9 M1-1c:
+ * CLI /status 与 TUI board 查询面迁到 sched_d 权威 DAG 表（本地 work_hall
+ * 实例表已无写入方，展示迁远程后本地 hall 仅剩生命周期，C2d 退役）。
+ * items 由调用方提供容量 cap，实际条数写回 *out_count（超出截断）。 */
+airy_err_t cli_dag_list_remote(cli_dag_item_t *items, size_t cap, size_t *out_count)
+{
+    if (!items || cap == 0 || !out_count)
+        return AIRY_ERR_INVALID_PARAM;
+    *out_count = 0;
+
+    char *rpc_result = NULL;
+    int rc = cli_gw_call("sched.dag_list", "{}", 10000, &rpc_result);
+    if (rc != AIRY_SUCCESS || !rpc_result) {
+        AIRY_FREE(rpc_result);
+        return (airy_err_t)rc;
+    }
+
+    cJSON *root = cJSON_Parse(rpc_result);
+    AIRY_FREE(rpc_result);
+    if (!root)
+        return AIRY_ERR_PARSE_ERROR;
+
+    cJSON *dags = cJSON_GetObjectItem(root, "dags");
+    int n = (dags && cJSON_IsArray(dags)) ? cJSON_GetArraySize(dags) : 0;
+    if (n > (int)cap)
+        n = (int)cap;
+    for (int i = 0; i < n; i++) {
+        cJSON *dj = cJSON_GetArrayItem(dags, i);
+        if (!dj)
+            continue;
+        cli_dag_item_t *it = &items[*out_count];
+        AIRY_STRNCPY_TERM(it->dag_id,
+                          cJSON_IsString(cJSON_GetObjectItem(dj, "dag_id"))
+                              ? cJSON_GetObjectItem(dj, "dag_id")->valuestring
+                              : "",
+                          sizeof(it->dag_id));
+        AIRY_STRNCPY_TERM(it->name,
+                          cJSON_IsString(cJSON_GetObjectItem(dj, "name"))
+                              ? cJSON_GetObjectItem(dj, "name")->valuestring
+                              : "",
+                          sizeof(it->name));
+        AIRY_STRNCPY_TERM(it->status,
+                          cJSON_IsString(cJSON_GetObjectItem(dj, "status"))
+                              ? cJSON_GetObjectItem(dj, "status")->valuestring
+                              : "",
+                          sizeof(it->status));
+        cJSON *nc = cJSON_GetObjectItem(dj, "node_count");
+        cJSON *pg = cJSON_GetObjectItem(dj, "progress");
+        it->node_count = (cJSON_IsNumber(nc) && nc->valuedouble > 0)
+                             ? (size_t)nc->valuedouble
+                             : 0;
+        it->done = (cJSON_IsNumber(pg) && pg->valuedouble > 0) ? (size_t)pg->valuedouble : 0;
+        (*out_count)++;
+    }
+
+    cJSON_Delete(root);
+    return AIRY_EOK;
+}
+
+/* Cancel a remote DAG over the gateway (shared by Ctrl+C wait abort and the
+ * TUI task-board cancel action). 架构约束（2026-08-25）：统一经 gateway 派发
+ * （sched.dag_cancel → gateway → SYS_SVC_CALL → sched_d），禁止直连。 */
+airy_err_t cli_dag_cancel_remote(const char *dag_id)
+{
+    if (!dag_id || !dag_id[0])
+        return AIRY_ERR_INVALID_PARAM;
+
+    cJSON *cparams = cJSON_CreateObject();
+    if (!cparams)
+        return AIRY_ERR_OUT_OF_MEMORY;
+    cJSON_AddStringToObject(cparams, "dag_id", dag_id);
+    char *cparams_json = cJSON_PrintUnformatted(cparams);
+    cJSON_Delete(cparams);
+    if (!cparams_json)
+        return AIRY_ERR_OUT_OF_MEMORY;
+
+    char *cres = NULL;
+    int rc = cli_gw_call("sched.dag_cancel", cparams_json, 5000, &cres);
+    AIRY_FREE(cparams_json);
+    AIRY_FREE(cres);
+    return rc == AIRY_SUCCESS ? AIRY_EOK : (airy_err_t)rc;
+}
+
 /* Wait dag_status until the final state. Ctrl+C propagates: really calls
  * sched.dag_cancel to abort the remote DAG. */
 #define CLI_DAG_WAIT_MAX_POLLS 36000
@@ -337,20 +420,7 @@ airy_err_t cli_dag_wait_remote(const char *dag_id, char **out_result)
 
     for (int poll = 0; poll < CLI_DAG_WAIT_MAX_POLLS; poll++) {
         if (g_cli_cancel) {
-
-            cJSON *cparams = cJSON_CreateObject();
-            if (cparams) {
-                cJSON_AddStringToObject(cparams, "dag_id", dag_id);
-                char *cparams_json = cJSON_PrintUnformatted(cparams);
-                cJSON_Delete(cparams);
-                if (cparams_json) {
-                    char *cres = NULL;
-                    /* 架构约束（2026-08-25）：统一经 gateway 派发（sched.dag_cancel） */
-                    (void)cli_gw_call("sched.dag_cancel", cparams_json, 5000, &cres);
-                    AIRY_FREE(cparams_json);
-                    AIRY_FREE(cres);
-                }
-            }
+            (void)cli_dag_cancel_remote(dag_id);
             return AIRY_ERR_CANCELED;
         }
 

@@ -290,7 +290,7 @@ airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_tui_t *tui,
     void *events_ud = NULL;
     void *mem_ud = NULL;
     if (tui) {
-        cli_panel_board_create(hall, &board_ud);
+        cli_panel_board_create(&board_ud);
         cli_panel_events_create(hall_store, &events_ud);
         cli_panel_mem_create(&mem_ud);
         if (board_ud) {
