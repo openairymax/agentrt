@@ -14,11 +14,120 @@
 
 #include "cli_internal.h"
 #include "cli_review.h"
+#include "cli_gw.h"
 #include "airy_cli_exec.h"
+
+#ifdef AIRY_HAS_CJSON
+#include <cjson/cJSON.h>
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* 0.1.9 M3（roadmap CLI 切断）：蓝图注册/执行结果回灌改经 gateway →
+ * sched_d sched.absorb RPC（L2 语义缓存由 sched_d 唯一持有）。网关
+ * 不可达时静默跳过（与 roadmap_sched create 失败同款降级）。 */
+#define CLI_ROADMAP_ABSORB_TIMEOUT_MS 6000
+
+#ifdef AIRY_HAS_CJSON
+/* 序列化 airy_task_plan_t → JSON（字段对齐 sched_d roadmap_plan_parse） */
+static char *cli_plan_to_json(const airy_task_plan_t *plan)
+{
+    if (!plan)
+        return NULL;
+    cJSON *root = cJSON_CreateObject();
+    if (!root)
+        return NULL;
+    if (plan->task_plan_id && plan->task_plan_id[0])
+        cJSON_AddStringToObject(root, "task_plan_id", plan->task_plan_id);
+    cJSON *nodes = cJSON_CreateArray();
+    for (size_t i = 0; i < plan->task_plan_node_count; i++) {
+        const airy_task_node_t *nd = plan->task_plan_nodes ? plan->task_plan_nodes[i] : NULL;
+        if (!nd)
+            continue;
+        cJSON *nj = cJSON_CreateObject();
+        if (nd->task_node_id)
+            cJSON_AddStringToObject(nj, "id", nd->task_node_id);
+        if (nd->task_node_goal)
+            cJSON_AddStringToObject(nj, "goal", nd->task_node_goal);
+        if (nd->task_node_handler_name)
+            cJSON_AddStringToObject(nj, "handler", nd->task_node_handler_name);
+        if (nd->task_node_agent_role)
+            cJSON_AddStringToObject(nj, "role", nd->task_node_agent_role);
+        if (nd->task_node_depends_count > 0 && nd->task_node_depends_on) {
+            cJSON *deps = cJSON_CreateArray();
+            for (size_t d = 0; d < nd->task_node_depends_count; d++)
+                if (nd->task_node_depends_on[d])
+                    cJSON_AddItemToArray(deps, cJSON_CreateString(nd->task_node_depends_on[d]));
+            cJSON_AddItemToObject(nj, "depends", deps);
+        }
+        cJSON_AddItemToArray(nodes, nj);
+    }
+    cJSON_AddItemToObject(root, "nodes", nodes);
+    if (plan->task_plan_entry_count > 0 && plan->task_plan_entry_points) {
+        cJSON *entries = cJSON_CreateArray();
+        for (size_t i = 0; i < plan->task_plan_entry_count; i++)
+            if (plan->task_plan_entry_points[i])
+                cJSON_AddItemToArray(entries, cJSON_CreateString(plan->task_plan_entry_points[i]));
+        cJSON_AddItemToObject(root, "entry_points", entries);
+    }
+    char *out = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    return out;
+}
+
+/* 蓝图注册吸收：sched.absorb 模式 A（plan 对象 JSON） */
+static void cli_roadmap_absorb_plan(const airy_task_plan_t *plan)
+{
+    if (!plan)
+        return;
+    char *plan_json = cli_plan_to_json(plan);
+    if (!plan_json)
+        return;
+    cJSON *params = cJSON_CreateObject();
+    cJSON *pv = cJSON_Parse(plan_json);
+    if (params && pv)
+        cJSON_AddItemToObject(params, "plan", pv);
+    else
+        cJSON_Delete(pv);
+    char *pj = params ? cJSON_PrintUnformatted(params) : NULL;
+    cJSON_Delete(params);
+    char *resp = NULL;
+    if (pj)
+        (void)cli_gw_call("sched.absorb", pj, CLI_ROADMAP_ABSORB_TIMEOUT_MS, &resp);
+    AIRY_FREE(pj);
+    AIRY_FREE(resp);
+    AIRY_FREE(plan_json);
+}
+
+/* 执行结果回灌：sched.absorb 模式 B（exec_id + node_id + output_json +
+ * result/verify），is_user_intent 固定置真（CLI 用户回合）。 */
+static void cli_roadmap_absorb_result(const char *exec_id, const char *node_id,
+                                      const char *output_json, int result, int verify)
+{
+    if (!node_id || !node_id[0])
+        return;
+    cJSON *params = cJSON_CreateObject();
+    if (!params)
+        return;
+    if (exec_id && exec_id[0])
+        cJSON_AddStringToObject(params, "exec_id", exec_id);
+    cJSON_AddStringToObject(params, "node_id", node_id);
+    if (output_json && output_json[0])
+        cJSON_AddStringToObject(params, "output_json", output_json);
+    cJSON_AddNumberToObject(params, "result", result);
+    cJSON_AddNumberToObject(params, "verify", verify);
+    cJSON_AddTrueToObject(params, "is_user_intent");
+    char *pj = cJSON_PrintUnformatted(params);
+    cJSON_Delete(params);
+    char *resp = NULL;
+    if (pj)
+        (void)cli_gw_call("sched.absorb", pj, CLI_ROADMAP_ABSORB_TIMEOUT_MS, &resp);
+    AIRY_FREE(pj);
+    AIRY_FREE(resp);
+}
+#endif /* AIRY_HAS_CJSON */
 
 int cli_run_task_pipeline(cli_runtime_ctx_t *rt, airy_cognition_engine_t *cog,
                           const char *input, size_t input_len, uint64_t turn_start)
@@ -57,8 +166,11 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, airy_cognition_engine_t *cog,
         }
         cli_spinner_stop(1, NULL);
     }
-    if (rt->rsched)
-        airy_roadmap_sched_absorb(rt->rsched, plan, NULL, NULL);
+#ifdef AIRY_HAS_CJSON
+    /* 0.1.9 M3：蓝图注册回灌 sched_d（sched.absorb 模式 A），L2 语义
+     * 缓存由 sched_d 唯一持有；网关不可达静默跳过。 */
+    cli_roadmap_absorb_plan(plan);
+#endif
     cli_trace("plan", "plan_id=%s nodes=%zu entry=%zu",
               plan->task_plan_id ? plan->task_plan_id : "?",
               plan->task_plan_node_count, plan->task_plan_entry_count);
@@ -349,26 +461,16 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, airy_cognition_engine_t *cog,
     }
     int task_succeeded =
         cli_task_result_render(result, err, exec_id, g_cli_cancel, rt->hall, vf_before);
-    if (rt->rsched && !g_cli_cancel && err == AIRY_EOK && result && input[0]) {
-        airy_rs_absorb_meta_t rmeta;
-        __builtin_memset(&rmeta, 0, sizeof(rmeta));
-        rmeta.node_id = input;
-        rmeta.output_json = result;
-        rmeta.is_user_intent = true;
-        {
-            const char *rv = rt->hall ? airy_work_hall_entry_verdict(rt->hall, exec_id) : "";
-            int review_rejected =
-                (strcmp(rv, "DRIFT") == 0 || strcmp(rv, "REJECT") == 0);
-            if (task_succeeded && !review_rejected) {
-                rmeta.result = AIRY_RS_RESULT_SUCCESS;
-                rmeta.verify = AIRY_RS_VERIFY_PASS;
-            } else {
-                rmeta.result = AIRY_RS_RESULT_NORMAL_FAIL;
-                rmeta.verify = AIRY_RS_VERIFY_FAIL;
-            }
-        }
-        airy_roadmap_sched_absorb(rt->rsched, NULL, exec_id, &rmeta);
+#ifdef AIRY_HAS_CJSON
+    if (!g_cli_cancel && err == AIRY_EOK && result && input[0]) {
+        const char *rv = rt->hall ? airy_work_hall_entry_verdict(rt->hall, exec_id) : "";
+        int review_rejected = (strcmp(rv, "DRIFT") == 0 || strcmp(rv, "REJECT") == 0);
+        int rs_result = (task_succeeded && !review_rejected) ? 0 : 1; /* SUCCESS / NORMAL_FAIL */
+        int rs_verify = (task_succeeded && !review_rejected) ? 0 : 1; /* PASS / FAIL */
+        /* 0.1.9 M3：执行结果回灌 sched_d（sched.absorb 模式 B） */
+        cli_roadmap_absorb_result(exec_id, input, result, rs_result, rs_verify);
     }
+#endif
     {
         char metrics[192];
         uint64_t toks = 0;

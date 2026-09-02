@@ -6,13 +6,16 @@
  * @brief Runtime context assembly/teardown and blueprint fastpath.
  *
  * cli_runtime_ctx_t aggregates every long-lived component the CLI main loop
- * needs (roadmap scheduler, work hall, hall store, governance, panels,
- * reviewer).  cli_setup_runtime builds them in dependency order;
+ * needs (work hall, hall store, governance, panels, reviewer).
+ * cli_setup_runtime builds them in dependency order;
  * cli_teardown_runtime releases them in reverse.
  *
  * cli_blueprint_fastpath implements the three-tier blueprint routing
  * (L1 state-machine / L2 semantic-cache / L3 miss) that short-circuits
  * the full cognition pipeline when a repeated or similar task is detected.
+ * 0.1.9 M3（roadmap CLI 切断）：CLI 不再进程内持有 roadmap 调度器实例，
+ * 三级路由经 gateway → sched_d RPC（sched.plan）完成，L2 语义缓存由
+ * sched_d 唯一持有（消除双进程双写同一缓存文件的 SSoT 违例）。
  */
 
 #ifndef AIRY_CLI_PIPELINE_H
@@ -25,7 +28,6 @@
 #include "work_hall.h"
 #include "hall_store.h"
 #include "governance.h"
-#include "roadmap_sched.h"
 #include "cli_tui.h"
 
 #include <stddef.h>
@@ -39,7 +41,6 @@ extern "C" {
  * cli_setup_runtime fills it; cli_teardown_runtime releases it.
  * main() owns the struct on its stack and passes it by pointer. */
 typedef struct {
-    airy_roadmap_sched_t *rsched;
     airy_work_hall_t *hall;
     airy_hall_store_t *hall_store;
     void *board_ud;
@@ -59,7 +60,7 @@ airy_core_loop_t *cli_setup_core_engines(const char *m_s2, const char *m_verify,
                                           const char *m_expert,
                                           airy_cognition_engine_t **out_cog);
 
-/* Full runtime assembly: rsched → validator → reviewer → hall_store →
+/* Full runtime assembly: validator → reviewer → hall_store →
  * governance → work_hall → chat adapter → TUI panels.
  * Returns AIRY_EOK on success, error code on failure (caller must clean up). */
 airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_tui_t *tui,
@@ -71,10 +72,11 @@ void cli_teardown_runtime(cli_runtime_ctx_t *rt);
 
 /* Blueprint three-tier fastpath: L1 (zero-token state-machine hit),
  * L2 (low-token semantic-cache hit), L3 miss (semantic hint).
+ * 0.1.9 M3：路由判定经 gateway → sched_d sched.plan RPC；网关/调度器
+ * 不可达时静默按 L3 miss 处理（与 lang_process 同款降级）。
  * Returns 1 when the fastpath handled the input (caller should continue
  * the main loop), 0 when the full pipeline must run. */
-int cli_blueprint_fastpath(airy_roadmap_sched_t *rsched, const char *input,
-                            uint64_t turn_start);
+int cli_blueprint_fastpath(const char *input, uint64_t turn_start);
 
 #ifdef __cplusplus
 }

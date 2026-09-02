@@ -20,7 +20,7 @@
 
 #include "airy_rt.h"
 #include "loop.h"
-#include "roadmap_sched.h"
+#include "cli_gw.h"
 #include "cognition.h"
 #include "gccp.h"
 #include "work_hall.h"
@@ -33,6 +33,10 @@
 #include "logging.h"
 #include "airy_memory.h"
 #include "string_compat.h"
+
+/* 0.1.9 M3（roadmap CLI 切断）：sched.plan/absorb RPC 超时（ms）。
+ * 网关/调度器不可达时静默按 L3 miss 降级，不阻塞对话主流程。 */
+#define CLI_ROADMAP_RPC_TIMEOUT_MS 6000
 
 #ifdef AIRY_HAS_CJSON
 #include <cjson/cJSON.h>
@@ -163,24 +167,6 @@ airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_tui_t *tui,
 
     airy_err_t err = AIRY_EOK;
 
-    airy_rs_config_t rs_cfg;
-    __builtin_memset(&rs_cfg, 0, sizeof(rs_cfg));
-    {
-        static char rs_persist_path[512];
-        snprintf(rs_persist_path, sizeof(rs_persist_path),
-                 "%s/agentrt/roadmap/l2_semantic_cache.json", airy_data_dir());
-        rs_cfg.l2_persist_path = rs_persist_path;
-    }
-    airy_roadmap_sched_t *rsched = NULL;
-    err = airy_roadmap_sched_create(&rs_cfg, &rsched);
-    if (err != AIRY_EOK || !rsched) {
-        AIRY_LOG_WARN("airy_cli: roadmap_sched create failed (err=%d), "
-                      "execution feed-back disabled",
-                      (int)err);
-        rsched = NULL;
-    }
-    rt->rsched = rsched;
-
     airy_artifact_validator_t *cli_validator = NULL;
     {
         const char *rules_json = getenv("AIRY_VALIDATOR_RULES");
@@ -197,7 +183,10 @@ airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_tui_t *tui,
     airy_work_hall_config_t wh_cfg;
     __builtin_memset(&wh_cfg, 0, sizeof(wh_cfg));
     wh_cfg.progress_cb = cli_progress_cb;
-    wh_cfg.roadmap_sched = rsched;
+    /* 0.1.9 M3（roadmap CLI 切断）：不注入 roadmap_sched——蓝图调度由
+     * sched_d 唯一持有，CLI 经 sched.plan/absorb RPC 交互；work_hall
+     * 执行反馈经 cli_roadmap_absorb_result RPC 回灌，不再本地双写
+     * l2_semantic_cache.json。 */
     wh_cfg.output_validator = cli_validator;
     wh_cfg.reviewer = cli_exec_review_create();
     rt->reviewer = wh_cfg.reviewer;
@@ -350,20 +339,47 @@ void cli_teardown_runtime(cli_runtime_ctx_t *rt)
         airy_hall_store_destroy(rt->hall_store);
     if (rt->governance)
         airy_governance_destroy(rt->governance);
-    if (rt->rsched)
-        airy_roadmap_sched_destroy(rt->rsched);
     AIRY_MEMSET(rt, 0, sizeof(*rt));
 }
 
-int cli_blueprint_fastpath(airy_roadmap_sched_t *rsched, const char *input,
-                            uint64_t turn_start)
+int cli_blueprint_fastpath(const char *input, uint64_t turn_start)
 {
-    if (!rsched)
+    if (!input || !input[0])
         return 0;
     char *rs_out = NULL;
-    airy_rs_dispatch_t rs_disp = AIRY_RS_DISPATCH_MISS_L3;
-    airy_err_t rs_err = airy_roadmap_sched_process(rsched, input, &rs_out, &rs_disp);
-    if (rs_err == AIRY_EOK && rs_disp == AIRY_RS_DISPATCH_HIT_L1) {
+    char tier[8] = "l3";
+
+#ifdef AIRY_HAS_CJSON
+    /* 0.1.9 M3（roadmap CLI 切断）：三级路由判定经 gateway → sched_d
+     * sched.plan RPC，L2 语义缓存由 sched_d 唯一持有；网关不可达时
+     * 静默按 L3 miss 降级（与 think.lang_process 同款降级策略）。 */
+    cJSON *prm = cJSON_CreateObject();
+    cJSON *pit = cJSON_CreateString(input);
+    if (prm && pit)
+        cJSON_AddItemToObject(prm, "input", pit);
+    else
+        cJSON_Delete(pit);
+    char *prm_json = prm ? cJSON_PrintUnformatted(prm) : NULL;
+    cJSON_Delete(prm);
+    char *resp = NULL;
+    if (prm_json && cli_gw_call("sched.plan", prm_json, CLI_ROADMAP_RPC_TIMEOUT_MS,
+                                &resp) == 0 && resp) {
+        cJSON *jr = cJSON_Parse(resp);
+        if (jr) {
+            cJSON *dt = cJSON_GetObjectItem(jr, "dispatch");
+            cJSON *rr = cJSON_GetObjectItem(jr, "result");
+            if (cJSON_IsString(dt) && dt->valuestring && dt->valuestring[0])
+                AIRY_STRNCPY_TERM(tier, dt->valuestring, sizeof(tier));
+            if (cJSON_IsString(rr) && rr->valuestring && rr->valuestring[0])
+                rs_out = AIRY_STRDUP(rr->valuestring);
+            cJSON_Delete(jr);
+        }
+        AIRY_FREE(resp);
+    }
+    AIRY_FREE(prm_json);
+#endif
+
+    if (strcmp(tier, "l1") == 0) {
 #ifdef AIRY_HAS_CJSON
         char next_buf[128] = "";
         if (rs_out) {
@@ -420,7 +436,7 @@ int cli_blueprint_fastpath(airy_roadmap_sched_t *rsched, const char *input,
             cli_render_turn_separator(cli_now_ms() - turn_start, NULL);
         return 1;
     }
-    if (rs_err == AIRY_EOK && rs_disp == AIRY_RS_DISPATCH_HIT_L2) {
+    if (strcmp(tier, "l2") == 0) {
 #ifdef AIRY_HAS_CJSON
         char *sugg = NULL;
         if (rs_out) {
