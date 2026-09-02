@@ -5,9 +5,9 @@
  * @file airy_cli_exec.c
  * @brief Task execution helpers extracted from main.c.
  *
- * Background wait worker, stdin polling during execution, decision-chain
- * submission recording, and task result rendering (JSON success/failure
- * determination + validation gate annotation).
+ * Background wait worker (gateway → sched_d, the only execution path), stdin
+ * polling during execution, decision-chain submission recording, and task
+ * result rendering (JSON success/failure determination).
  */
 
 #include "airy_cli_exec.h"
@@ -16,10 +16,7 @@
 #include "cli_exec_review.h"
 
 #include "airy_rt.h"
-#include "work_hall.h"
 #include "hall_store.h"
-#include "plan_to_dag.h"
-#include "taskflow_advanced.h"
 #include "logger.h"
 #include "airy_memory.h"
 #include "string_compat.h"
@@ -45,12 +42,7 @@ void *cli_task_wait_worker(void *arg)
     cli_task_wait_ctx_t *c = (cli_task_wait_ctx_t *)arg;
     if (!c)
         return NULL;
-    if (c->sched_remote) {
-        c->err = cli_dag_wait_remote(c->sched_sock, c->exec_id, &c->result);
-    } else {
-        c->err = airy_work_hall_wait(c->hall, c->exec_id, 0, &c->result);
-        airy_work_hall_set_blueprint(c->hall, NULL);
-    }
+    c->err = cli_dag_wait_remote(c->exec_id, &c->result);
     c->done = 1;
     return NULL;
 }
@@ -114,8 +106,7 @@ int cli_task_poll_input(void)
 #endif
 }
 
-void cli_chain_record_submit(const char *exec_id, const airy_task_plan_t *plan,
-                              const taskflow_workflow_t *wf)
+void cli_chain_record_submit(const char *exec_id, const airy_task_plan_t *plan)
 {
     if (!g_cli_hall_store || !exec_id || !exec_id[0])
         return;
@@ -123,13 +114,12 @@ void cli_chain_record_submit(const char *exec_id, const airy_task_plan_t *plan,
     snprintf(ev, sizeof(ev),
              "{\"dag_id\":\"%s\",\"plan_id\":\"%s\",\"nodes\":%zu,\"edges\":%zu}",
              exec_id, (plan && plan->task_plan_id) ? plan->task_plan_id : "",
-             wf ? wf->node_count : 0, wf ? wf->edge_count : 0);
+             plan ? plan->task_plan_node_count : (size_t)0, cli_plan_deps_count(plan));
     airy_hall_store_write(g_cli_hall_store, "default", exec_id, NULL, AIRY_HALL_CAT_COMMAND,
                           "cognition", ev, NULL, 0);
 }
 
-int cli_task_result_render(const char *result, airy_err_t err, const char *exec_id,
-                            int canceled, airy_work_hall_t *hall, uint32_t vf_before)
+int cli_task_result_render(const char *result, airy_err_t err, const char *exec_id, int canceled)
 {
     int task_succeeded = (err == AIRY_EOK && result) ? 1 : 0;
     if (task_succeeded && result) {
@@ -215,13 +205,6 @@ int cli_task_result_render(const char *result, airy_err_t err, const char *exec_
             snprintf(line, sizeof(line), "任务执行无结果：%s", cli_err_desc((int)err));
             cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "执行结果", line);
         }
-    }
-    if (!canceled) {
-        uint32_t vf_after = 0;
-        airy_work_hall_verify_stats(hall, NULL, &vf_after, NULL);
-        if (vf_after > vf_before)
-            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_DUAL_PROF_THINK, "校验",
-                                 "Artifact validation failed - replan or retry the task.");
     }
     return task_succeeded;
 }

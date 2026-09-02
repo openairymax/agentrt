@@ -6,8 +6,8 @@
  * @brief 任务执行管线（域拆分自 main.c，2026-08-27）。
  *
  * main 循环的任务回合编排：认知规划（think_d 远程 / 内置引擎 + 并行
- * 子 agent 审查）→ DAG 适配 → 提交（远程 sched_d / 本地工作大厅）→
- * 任务看板轮询 → 等待（后台线程 + stdin 中断轮询）→ 结果渲染与
+ * 子 agent 审查）→ 提交（gateway → sched_d，唯一执行通路）→ 任务看板
+ * 轮询 → 等待（后台线程 + stdin 中断轮询）→ 结果渲染与
  * 蓝本吸收。返回 1 = 规划/提交失败需提前 continue，0 = 正常完成。
  * 声明见 airy_cli_exec.h。
  */
@@ -205,74 +205,39 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, airy_cognition_engine_t *cog,
         }
     }
 
-    taskflow_workflow_t *wf = NULL;
-    err = airy_plan_to_workflow(plan, &wf);
-    if (err != AIRY_EOK || !wf) {
-        char line[128];
-        snprintf(line, sizeof(line), "工作流适配失败：%s", cli_err_desc((int)err));
-        cli_render_sub_agent_line(CLI_ROLE_ERROR, "DAG", line);
-        airy_task_plan_free(plan);
-        return 1;
-    }
     {
         char hdrs[256] = "";
         size_t ho = 0;
-        for (size_t ni = 0; ni < wf->node_count && ho < sizeof(hdrs) - 2; ni++) {
+        for (size_t ni = 0; ni < plan->task_plan_node_count && ho < sizeof(hdrs) - 2; ni++) {
+            char handler[96] = "";
+            cli_node_handler(plan->task_plan_nodes ? plan->task_plan_nodes[ni] : NULL,
+                             handler, sizeof(handler));
             ho += (size_t)snprintf(hdrs + ho, sizeof(hdrs) - ho, "%s%s",
-                                   ni > 0 ? "," : "",
-                                   wf->nodes[ni].task_handler_name
-                                       ? wf->nodes[ni].task_handler_name
-                                       : "?");
+                                   ni > 0 ? "," : "", handler[0] ? handler : "?");
         }
-        cli_trace("dag", "id=%s nodes=%zu edges=%zu [%s]", wf->id,
-                  wf->node_count, wf->edge_count, hdrs);
+        cli_trace("dag", "plan=%s nodes=%zu deps=%zu [%s]",
+                  plan->task_plan_id ? plan->task_plan_id : "?",
+                  plan->task_plan_node_count, cli_plan_deps_count(plan), hdrs);
     }
 
-    cli_live_board_begin(wf);
+    /* 提交唯一通路：plan → gateway → sched_d；失败即错误可见化，不做本地降级 */
+    cli_live_board_begin(plan);
     char *exec_id = NULL;
-    const char *sched_sock = getenv("AIRY_SCHED_SOCK");
-    int sched_remote = (sched_sock && sched_sock[0]) ? 1 : 0;
-    if (!sched_remote)
-        airy_work_hall_set_blueprint(rt->hall, plan);
-    if (sched_remote) {
-        err = cli_dag_submit_remote(sched_sock, wf, input, rt->main_workspace_dir, &exec_id);
-        if (err != AIRY_EOK || !exec_id) {
-            char line[128];
-            snprintf(line, sizeof(line), "远程提交失败（%s），已回退本地执行。",
-                     cli_err_desc((int)err));
-            cli_render_sub_agent_line(CLI_ROLE_ERROR, "sched_d", line);
-            AIRY_FREE(exec_id);
-            exec_id = NULL;
-            sched_remote = 0;
-        } else {
-            cli_trace("submit", "%s dag=%s", CLI_ICON_DIAMOND, exec_id);
-            cli_chain_record_submit(exec_id, plan, wf);
-        }
+    err = cli_dag_submit_remote(plan, input, rt->main_workspace_dir, &exec_id);
+    if (err != AIRY_EOK || !exec_id) {
+        char line[128];
+        snprintf(line, sizeof(line), "任务提交失败：%s", cli_err_desc((int)err));
+        cli_render_sub_agent_line(CLI_ROLE_ERROR, "sched_d", line);
+        AIRY_FREE(exec_id);
+        airy_task_plan_free(plan);
+        return 1;
     }
-    if (!sched_remote) {
-        err = airy_work_hall_submit(rt->hall, wf, input, &exec_id);
-        if (err != AIRY_EOK || !exec_id) {
-            char line[128];
-            snprintf(line, sizeof(line), "任务提交失败：%s", cli_err_desc((int)err));
-            cli_render_sub_agent_line(CLI_ROLE_ERROR, "hall", line);
-            airy_work_hall_set_blueprint(rt->hall, NULL);
-            airy_workflow_free(wf);
-            airy_task_plan_free(plan);
-            return 1;
-        }
-        cli_trace("submit", "%s exec=%s", CLI_ICON_DIAMOND, exec_id);
-        cli_chain_record_submit(exec_id, plan, wf);
-    }
+    cli_trace("submit", "%s dag=%s", CLI_ICON_DIAMOND, exec_id);
+    cli_chain_record_submit(exec_id, plan);
 
     /* 4.4 Board polling */
-    {
-        char run_title[128];
-        snprintf(run_title, sizeof(run_title), "Running (%s)",
-                 sched_remote ? "sched_d" : "hall");
-        cli_spinner_start(run_title);
-    }
-    cli_dag_board_t *node_board =
-        sched_remote ? cli_dag_node_board_create() : NULL;
+    cli_spinner_start("Running (sched_d)");
+    cli_dag_board_t *node_board = cli_dag_node_board_create();
     int board_polls = 0;
     int stale_polls = 0;
     int done = 0;
@@ -304,61 +269,37 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, airy_cognition_engine_t *cog,
         }
         char cur_state[16];
         double cur_progress = -1.0;
-        if (sched_remote) {
-            char *final_result = NULL;
-            cli_dag_poll_rc_t prc =
-                cli_dag_poll_remote(sched_sock, exec_id, &cur_progress, cur_state,
-                                    sizeof(cur_state), &final_result);
-            AIRY_FREE(final_result);
-            if (prc == CLI_DAG_POLL_ERROR) {
-                cli_spinner_stop(0, "status query failed");
-                spin_running = 0;
-                cli_render_sub_agent_line(CLI_ROLE_ERROR, "sched_d",
-                                          "Status query failed.");
-                break;
+        char *final_result = NULL;
+        cli_dag_poll_rc_t prc = cli_dag_poll_remote(exec_id, &cur_progress, cur_state,
+                                                    sizeof(cur_state), &final_result);
+        AIRY_FREE(final_result);
+        if (prc == CLI_DAG_POLL_ERROR) {
+            cli_spinner_stop(0, "status query failed");
+            spin_running = 0;
+            cli_render_sub_agent_line(CLI_ROLE_ERROR, "sched_d", "Status query failed.");
+            break;
+        }
+        if (node_board) {
+            cli_spinner_pause();
+            if (cli_board_active())
+                cli_dag_board_snapshot(exec_id, cli_live_board_set_node);
+            else {
+                int nb_terminal = cli_dag_node_board_tick(node_board, exec_id);
+                if (nb_terminal)
+                    cli_dag_node_board_destroy(node_board), node_board = NULL;
             }
-            if (node_board) {
-                cli_spinner_pause();
-                if (cli_board_active())
-                    cli_dag_board_snapshot(sched_sock, exec_id, cli_live_board_set_node);
-                else {
-                    int nb_terminal =
-                        cli_dag_node_board_tick(node_board, sched_sock, exec_id);
-                    if (nb_terminal)
-                        cli_dag_node_board_destroy(node_board), node_board = NULL;
-                }
-                cli_spinner_resume();
-            }
-            if (prc == CLI_DAG_POLL_DONE) {
-                run_failed = (strcmp(cur_state, "failed") == 0 ||
-                              strcmp(cur_state, "canceled") == 0);
-                cli_spinner_pause();
-                if (!cli_live_board_refresh(cur_state, cur_progress))
-                    cli_board_line("sched_d", exec_id, cur_state, cur_progress);
-                cli_spinner_stop(!run_failed, NULL);
-                spin_running = 0;
-                done = 1;
-                break;
-            }
-        } else {
-            airy_work_hall_entry_t *entry = NULL;
-            airy_err_t st_err = airy_work_hall_status(rt->hall, exec_id, &entry);
-            if (st_err != AIRY_EOK || !entry) {
-                cli_spinner_stop(0, "status query failed");
-                spin_running = 0;
-                cli_render_sub_agent_line(CLI_ROLE_ERROR, "hall",
-                                          "Status query failed.");
-                break;
-            }
-            snprintf(cur_state, sizeof(cur_state), "%s", entry->state);
-            cur_progress = entry->progress;
-            done =
-                (strcmp(entry->state, "completed") == 0 ||
-                 strcmp(entry->state, "failed") == 0 || strcmp(entry->state, "canceled") == 0);
+            cli_spinner_resume();
+        }
+        if (prc == CLI_DAG_POLL_DONE) {
             run_failed =
-                (strcmp(entry->state, "failed") == 0 ||
-                 strcmp(entry->state, "canceled") == 0);
-            airy_work_hall_entry_free(entry);
+                (strcmp(cur_state, "failed") == 0 || strcmp(cur_state, "canceled") == 0);
+            cli_spinner_pause();
+            if (!cli_live_board_refresh(cur_state, cur_progress))
+                cli_board_line("sched_d", exec_id, cur_state, cur_progress);
+            cli_spinner_stop(!run_failed, NULL);
+            spin_running = 0;
+            done = 1;
+            break;
         }
         int state_changed = (strcmp(cur_state, last_state) != 0);
         double prog_changed =
@@ -366,16 +307,14 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, airy_cognition_engine_t *cog,
         if (state_changed || prog_changed) {
             cli_spinner_pause();
             if (!cli_live_board_refresh(cur_state, cur_progress))
-                cli_board_line(sched_remote ? "sched_d" : "hall", exec_id, cur_state,
-                               cur_progress);
+                cli_board_line("sched_d", exec_id, cur_state, cur_progress);
             cli_spinner_resume();
             snprintf(last_state, sizeof(last_state), "%s", cur_state);
             last_progress = cur_progress;
             char sbar[16];
             cli_compact_bar(sbar, sizeof(sbar), cur_progress, 8);
-            cli_trace("status", "%s %s state=%s %s %3.0f%%",
-                      cli_icon_for_state(cur_state), sched_remote ? "sched_d" : "hall",
-                      cur_state, sbar, cur_progress * 100.0);
+            cli_trace("status", "%s sched_d state=%s %s %3.0f%%",
+                      cli_icon_for_state(cur_state), cur_state, sbar, cur_progress * 100.0);
         }
         if (done) {
             cli_spinner_stop(!run_failed, NULL);
@@ -399,24 +338,18 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, airy_cognition_engine_t *cog,
         if (board_polls > 0 && stale_polls >= 10) {
             cli_spinner_pause();
             cli_live_board_extra();
-            cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_THINK,
-                                 sched_remote ? "sched_d" : "hall",
+            cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_THINK, "sched_d",
                                  "still running, waiting for completion ...");
             cli_spinner_resume();
         }
     }
 
-    uint32_t vf_before = 0;
-    airy_work_hall_verify_stats(rt->hall, NULL, &vf_before, NULL);
     char *result = NULL;
     cli_trace("wait", "%s exec=%s awaiting completion (polls=%d)", CLI_ICON_DIAMOND, exec_id,
               board_polls);
     cli_task_wait_ctx_t wctx;
     __builtin_memset(&wctx, 0, sizeof(wctx));
-    wctx.hall = rt->hall;
-    wctx.sched_sock = sched_remote ? sched_sock : NULL;
     wctx.exec_id = exec_id;
-    wctx.sched_remote = sched_remote;
     airy_thread_t wthr = AIRY_INVALID_THREAD;
     int wait_threaded =
         (airy_platform_thread_create(&wthr, cli_task_wait_worker, &wctx) == 0);
@@ -434,17 +367,13 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, airy_cognition_engine_t *cog,
         airy_platform_thread_join(wthr, NULL);
         err = wctx.err;
         result = wctx.result;
-    } else if (sched_remote) {
-        err = cli_dag_wait_remote(sched_sock, exec_id, &result);
     } else {
-        err = airy_work_hall_wait(rt->hall, exec_id, 0, &result);
-        airy_work_hall_set_blueprint(rt->hall, NULL);
+        err = cli_dag_wait_remote(exec_id, &result);
     }
     cli_trace("wait", "%s done err=%d has_result=%d", CLI_ICON_DONE, (int)err,
               result ? 1 : 0);
     if (spin_running && cli_board_active() && !g_cli_cancel) {
-        if (sched_remote)
-            cli_dag_board_snapshot(sched_sock, exec_id, cli_live_board_set_node);
+        cli_dag_board_snapshot(exec_id, cli_live_board_set_node);
         cli_spinner_pause();
         cli_live_board_refresh((err == AIRY_EOK && result) ? "completed" : "failed",
                                1.0);
@@ -459,16 +388,12 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, airy_cognition_engine_t *cog,
             cli_spinner_stop(0, "no result");
         spin_running = 0;
     }
-    int task_succeeded =
-        cli_task_result_render(result, err, exec_id, g_cli_cancel, rt->hall, vf_before);
+    int task_succeeded = cli_task_result_render(result, err, exec_id, g_cli_cancel);
 #ifdef AIRY_HAS_CJSON
     if (!g_cli_cancel && err == AIRY_EOK && result && input[0]) {
-        const char *rv = rt->hall ? airy_work_hall_entry_verdict(rt->hall, exec_id) : "";
-        int review_rejected = (strcmp(rv, "DRIFT") == 0 || strcmp(rv, "REJECT") == 0);
-        int rs_result = (task_succeeded && !review_rejected) ? 0 : 1; /* SUCCESS / NORMAL_FAIL */
-        int rs_verify = (task_succeeded && !review_rejected) ? 0 : 1; /* PASS / FAIL */
+        int rs = task_succeeded ? 0 : 1; /* SUCCESS / NORMAL_FAIL（校验门随 hall 退役） */
         /* 0.1.9 M3：执行结果回灌 sched_d（sched.absorb 模式 B） */
-        cli_roadmap_absorb_result(exec_id, input, result, rs_result, rs_verify);
+        cli_roadmap_absorb_result(exec_id, input, result, rs, rs);
     }
 #endif
     {
@@ -479,10 +404,11 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, airy_cognition_engine_t *cog,
         if (toks > 0 || cost > 0.0)
             snprintf(metrics, sizeof(metrics),
                      "nodes=%zu deps=%zu · Tokens: %llu · Cost: $%.6f",
-                     wf->node_count, wf->edge_count, (unsigned long long)toks, cost);
+                     plan->task_plan_node_count, cli_plan_deps_count(plan),
+                     (unsigned long long)toks, cost);
         else
             snprintf(metrics, sizeof(metrics), "nodes=%zu deps=%zu",
-                     wf->node_count, wf->edge_count);
+                     plan->task_plan_node_count, cli_plan_deps_count(plan));
         cli_render_turn_separator(cli_now_ms() - turn_start, metrics);
     }
 
@@ -490,7 +416,6 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, airy_cognition_engine_t *cog,
         AIRY_FREE(result);
     if (exec_id)
         AIRY_FREE(exec_id);
-    airy_workflow_free(wf);
     airy_task_plan_free(plan);
     return 0;
 }

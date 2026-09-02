@@ -20,7 +20,7 @@
 #ifndef AIRY_CLI_DISPLAY_INTERNAL_H
 #define AIRY_CLI_DISPLAY_INTERNAL_H
 
-#include "taskflow_advanced.h"
+#include "cognition.h"
 
 #include <stddef.h>
 
@@ -30,7 +30,7 @@ extern "C" {
 
 /**
  * @brief Fill `order` with the topological order of the first `count`
- *        workflow nodes (dependencies first, cycles/missing sources fall
+ *        plan nodes (dependencies first, cycles/missing sources fall
  *        back to natural order).
  *
  * cli_print_plan_list() 与 cli_live_board_begin() 共用同一排序结果，
@@ -40,8 +40,8 @@ extern "C" {
  * Returns 1 on success, 0 when the caller should skip rendering entirely
  * (OOM already released the scratch).
  */
-int cli_plan_topo_build(const taskflow_workflow_t *wf, size_t count, size_t *order,
-                            unsigned char *scratch);
+int cli_plan_topo_build(const airy_task_plan_t *plan, size_t count, size_t *order,
+                        unsigned char *scratch);
 
 /**
  * @brief Width-aware, UTF-8-safe truncation of `s` into buf (cap bytes) so

@@ -194,28 +194,33 @@ int cli_chat_tool_round(cli_chat_msgbuf_t *b, const llm_response_t *resp);
 airy_err_t cli_think_process_remote(const char *think_sock, const char *input, size_t input_len,
                                     airy_task_plan_t **out_plan);
 
-airy_err_t cli_dag_submit_remote(const char *sched_sock, const taskflow_workflow_t *wf,
-                                 const char *task_input, const char *workspace_dir,
-                                 char **out_dag_id);
-cli_dag_poll_rc_t cli_dag_poll_remote(const char *sched_sock, const char *dag_id,
-                                      double *out_progress, char *out_state, size_t state_cap,
-                                      char **out_result);
-airy_err_t cli_dag_wait_remote(const char *sched_sock, const char *dag_id, char **out_result);
+/* 任务执行唯一通路：plan → gateway → sched_d（0.1.9 M1 1c 引擎壳化，
+ * 本地 hall 降级与 sched.sock 开关已退役，失败即错误可见化）。 */
+airy_err_t cli_dag_submit_remote(const airy_task_plan_t *plan, const char *task_input,
+                                 const char *workspace_dir, char **out_dag_id);
+cli_dag_poll_rc_t cli_dag_poll_remote(const char *dag_id, double *out_progress,
+                                      char *out_state, size_t state_cap, char **out_result);
+airy_err_t cli_dag_wait_remote(const char *dag_id, char **out_result);
 
 /* Node-level progress board for remote DAGs (opaque; cli_dag.c). */
 typedef struct cli_dag_board_s cli_dag_board_t;
 cli_dag_board_t *cli_dag_node_board_create(void);
 void cli_dag_node_board_destroy(cli_dag_board_t *board);
-int cli_dag_node_board_tick(cli_dag_board_t *board, const char *sched_sock,
-                            const char *dag_id);
+int cli_dag_node_board_tick(cli_dag_board_t *board, const char *dag_id);
 /* Remote DAG per-node state snapshot: reports (node_id, state) via cb without
  * printing (feeds the live plan board). Returns 1 on terminal state. */
-int cli_dag_board_snapshot(const char *sched_sock, const char *dag_id,
+int cli_dag_board_snapshot(const char *dag_id,
                            void (*cb)(const char *node_id, const char *state));
+
+/* plan→DAG 归一 helper（cli_dag.c，语义唯一真相源）：节点 handler 归一
+ * （显式名优先，缺省由 agent_role 派生 "agent:<role>"）与依赖边计数，
+ * 远程序列化与展示域（计划列表 / live board）共用。 */
+void cli_node_handler(const airy_task_node_t *nd, char *buf, size_t cap);
+size_t cli_plan_deps_count(const airy_task_plan_t *plan);
 
 void cli_print_system_header(const char *t2, const char *t1f, const char *t1p);
 void cli_print_result(const char *result);
-void cli_print_plan_list(const taskflow_workflow_t *wf);
+void cli_print_plan_list(const airy_task_plan_t *plan);
 void cli_progress_cb(const char *execution_id, const char *node_id, taskflow_state_t state,
                      double progress, void *user_data);
 void cli_board_line(const char *tag, const char *id, const char *state, double progress);
@@ -229,7 +234,7 @@ void cli_board_line(const char *tag, const char *id, const char *state, double p
  *   refresh  —— 轮询循环调用：有变化则原位重绘，返回 1；退化为 0（调用方
  *               回退 cli_board_line）
  *   done     —— 结束看板会话（插入对话等场景主动退场） */
-void cli_live_board_begin(const taskflow_workflow_t *wf);
+void cli_live_board_begin(const airy_task_plan_t *plan);
 void cli_live_board_set_node(const char *node_id, const char *state);
 int cli_live_board_refresh(const char *agg_state, double agg_progress);
 int cli_board_active(void);
