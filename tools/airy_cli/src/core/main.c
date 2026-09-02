@@ -28,7 +28,6 @@
 
 #include "airy_rt.h"
 #include "loop.h"
-#include "roadmap_sched.h"
 #include "cli_gw.h"
 #include "platform.h"
 #include "cognition.h"
@@ -371,8 +370,9 @@ int main(int argc, char *argv[])
         }
 #endif /* AIRY_HAS_CJSON */
 
-        /* 4.0b Blueprint scheduling three-tier routing */
-        if (cli_blueprint_fastpath(rt.rsched, input, turn_start))
+        /* 4.0b Blueprint scheduling three-tier routing（0.1.9 M3：经
+         * gateway → sched_d sched.plan RPC，CLI 不再持有本地 roadmap） */
+        if (cli_blueprint_fastpath(input, turn_start))
             continue;
 
         int is_task = cli_classify_input(input);
