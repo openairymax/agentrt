@@ -3,18 +3,19 @@
 
 /**
  * @file cli_orch.c
- * @brief /orch 流程编排命令（S-5 编排管线用户入口，2026-08-24）
+ * @brief /orch 流程编排命令（M3，0.1.9 §4.2-1）
  *
- * 将 orchestrator（七阶段流程编排器）接入 airy_cli 作为用户入口：
- * 分解→规划→生成→批判→验证→审计→对齐。llm_d 在线时各阶段经
- * daemon_rpc 直连 $AIRY_HOME/run/llm.sock 真实执行；离线时走认知引擎
- * /降级链（与 orchestrator 内部设计一致，不依赖外部状态）。
+ * 架构约束（2026-08-25）：CLI 不直连 orchestrator 实现，统一经 gateway
+ * 派发 think.orchestrate RPC（think_d 承载七阶段编排：分解→规划→生成→
+ * 批判→验证→审计→对齐）。本文件仅做 JSON-RPC 转发与结果渲染。
  */
 
 #include "cli_internal.h"
+#include "cli_gw.h"
 
 #include "airy_memory.h"
-#include "orchestrator.h"
+
+#include <cjson/cJSON.h>
 
 #include <stdio.h>
 
@@ -30,37 +31,46 @@ int cmd_orch(const char *arg, void *ctx)
     cli_outf("  %s[编排]%s 启动七阶段管线（分解→规划→生成→批判→验证→审计→对齐）…\n",
              CLR_CYAN, CLR_RESET);
 
-    orch_config_t cfg;
-    orch_config_get_defaults(&cfg);
-    orchestrator_t *orch = orchestrator_create(&cfg);
-    if (!orch) {
-        cli_outf("  %s[编排]%s 创建编排器失败\n", CLR_RED, CLR_RESET);
+    cJSON *params = cJSON_CreateObject();
+    if (!params)
+        return 1;
+    cJSON_AddStringToObject(params, "input", arg);
+    char *ps = cJSON_PrintUnformatted(params);
+    cJSON_Delete(params);
+    if (!ps)
+        return 1;
+
+    char *result = NULL;
+    int rc = cli_gw_call("think.orchestrate", ps, 120000, &result);
+    AIRY_FREE(ps);
+    if (rc != 0 || !result) {
+        cli_outf("  %s[编排]%s gateway 不可达或 RPC 失败（rc=%d）\n", CLR_RED, CLR_RESET, rc);
+        AIRY_FREE(result);
         return 1;
     }
 
-    orch_result_t *results = NULL;
-    size_t count = 0;
-    int rc = orchestrator_execute(orch, arg, &results, &count);
-    if (rc != 0) {
-        cli_outf("  %s[编排]%s 管线中止（rc=%d）\n", CLR_RED, CLR_RESET, rc);
+    cJSON *root = cJSON_Parse(result);
+    AIRY_FREE(result);
+    if (!root) {
+        cli_outf("  %s[编排]%s 响应解析失败\n", CLR_RED, CLR_RESET);
+        return 1;
     }
 
-    for (size_t i = 0; i < count && results; i++) {
-        const char *state = results[i].status == ORCH_TASK_COMPLETED
-                                ? "完成"
-                                : results[i].status == ORCH_TASK_FAILED
-                                      ? "失败"
-                                      : results[i].status == ORCH_TASK_TIMEOUT ? "超时"
-                                                                               : "未完成";
+    cJSON *phases = cJSON_GetObjectItem(root, "phases");
+    size_t count = cJSON_GetArraySize(phases);
+    for (size_t i = 0; i < count; i++) {
+        cJSON *ph = cJSON_GetArrayItem(phases, (int)i);
+        const char *phase = cJSON_GetStringValue(cJSON_GetObjectItem(ph, "phase"));
+        const char *status = cJSON_GetStringValue(cJSON_GetObjectItem(ph, "status"));
+        const char *output = cJSON_GetStringValue(cJSON_GetObjectItem(ph, "output"));
+        const char *state = status ? status : "unknown";
         cli_outf("  ── 阶段 %zu/%zu [%s]\n", i + 1, count, state);
-        if (results[i].output && results[i].output[0])
-            cli_outf("     %.240s\n", results[i].output);
-        orchestrator_result_free(&results[i]);
+        if (phase)
+            cli_outf("     %s\n", phase);
+        if (output && output[0])
+            cli_outf("     %.240s\n", output);
     }
-    if (results)
-        AIRY_FREE(results);
 
-    orchestrator_destroy(orch);
-    orchestrator_global_cleanup();
+    cJSON_Delete(root);
     return 0;
 }
