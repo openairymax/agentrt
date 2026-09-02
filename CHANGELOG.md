@@ -4,8 +4,8 @@
 
 ## 📋 目录
 
-- [Unreleased](#unreleased) — daemon 整编 18→15 / namespace 独占门禁 / 链接白名单 15 节点
-- [v0.1.8](#v018---2026-09-01) ⭐ 最新 — 向导首配 model.yaml 修复 / TUI 交互细节修复
+- [v0.1.9](#v019---2026-09-03) ⭐ 最新 — 架构改进：地基归位 / gateway 纯化 / cupolas PDP 化 / daemon 整编 18→15 / TUI 强化
+- [v0.1.8](#v018---2026-09-01) — 向导首配 model.yaml 修复 / TUI 交互细节修复
 - [v0.1.7](#v017---2026-08-31) — CLI/TUI 交互重构 / 版本 SSoT 防漂移
 - [v0.1.6g](#v016g---2026-08-31) — CLI 英雄区重设计 / 安装器系统性修复 / 函数名规范
 - [v0.1.6c](#v016c---2026-08-30) — 启动链路兜底 / 生态 SSoT 收敛 / 独立组装
@@ -28,28 +28,51 @@
 
 ---
 
-## [Unreleased]
+## [v0.1.9] - 2026-09-03
 
-### 里程碑 0.1.9 M4：daemon 整编与边界深化
+### 🎯 发布主题：架构改进 0.1.9 —— 地基归位 / gateway 纯化 / cupolas PDP 化 / daemon 整编 18→15 / TUI 强化
 
-#### Changed
+0.1.9 按架构改进方案执行六大里程碑（M0 地基归位 → M1 gateway 纯化 →
+M2 cupolas PDP 化 → M3 机制框架强化 → M4 daemon 整编 18→15 → M5 TUI
+强化）。总目标：commons 依赖方向归位、daemon 世界服务面纯化、机制与
+策略裁决清晰化、"除了核心，一切都是服务"的模块化形态、以及渲染仪表盘
+TUI 的稳定性与可观测性强化。
 
-- **daemon 整编 18→15**：plugin_d → tool_d（插件 dlopen 执行域随迁，plugin_* 方法在 tool 命名空间登记）；observe_d / info_d → monit_d（双 Prometheus /metrics 收敛，observe_* / info_* 方法在 monit 命名空间登记）。旧命名空间经 gateway cap registry 保留转发契约。
-- **notify_d channel → topic 语义澄清**：订阅键从 channel 改为 topic，与 channel_d 数据面通道划清界限（JSON-RPC 参数/响应/事件帧/list 输出/X-Topic 头全链路改名，clean-break 无兼容层）。
-- **daemon 清单单一来源**：install.sh / install.ps1 删除手工 EXPECTED_DAEMONS，收敛为制品 bin/*_d 推导（与 airymaxrt 启动器同源）。
-- **namespace 独占门禁**：gateway cap registry 新增 GW_NS_OWNER 归属表（15 daemon 契约表 + M4 整编映射），gw_cap_ns_validate() 启动期 fail-closed 校验，namespace 归属冲突拒启。
-- **链接白名单 15 节点登记**：link-whitelist.txt 从 gateway 系 3 目标扩展为全部 15 daemon，airy_depgraph 构建期门禁覆盖全部 daemon 目标（跨界禁链 fail-closed）。
-- **airymaxrt 运行画像**：aux daemon 补齐逻辑收敛为 bin/*_d 推导（清除整编后残留），full 档 15 daemon / minimal 档 5 进程（gateway + llm/think/agent/tool）。
-- **bootstrap 分层 18→15**：5 层 DAG 移除整编 daemon，dry-run 验证 15 daemon 启动计划。
+### Changed
 
-#### Removed
+- **M4 daemon 整编 18→15**：plugin_d → tool_d（插件 dlopen 执行域随迁，plugin_* 方法在 tool 命名空间登记）；observe_d / info_d → monit_d（双 Prometheus /metrics 收敛，observe_* / info_* 方法在 monit 命名空间登记）。旧命名空间经 gateway cap registry 保留转发契约。
+- **M4 notify_d channel → topic 语义澄清**：订阅键从 channel 改为 topic，与 channel_d 数据面通道划清界限（JSON-RPC 参数/响应/事件帧/list 输出/X-Topic 头全链路改名，clean-break 无兼容层）。
+- **M4 daemon 清单单一来源**：install.sh / install.ps1 删除手工 EXPECTED_DAEMONS，收敛为制品 bin/*_d 推导（与 airymaxrt 启动器同源）。
+- **M4 namespace 独占门禁**：gateway cap registry 新增 GW_NS_OWNER 归属表（15 daemon 契约表 + M4 整编映射），gw_cap_ns_validate() 启动期 fail-closed 校验，namespace 归属冲突拒启。
+- **M4 链接白名单 15 节点登记**：link-whitelist.txt 从 gateway 系 3 目标扩展为全部 15 daemon，airy_depgraph 构建期门禁覆盖全部 daemon 目标（跨界禁链 fail-closed）。
+- **M4 airymaxrt 运行画像**：aux daemon 补齐逻辑收敛为 bin/*_d 推导（清除整编后残留），full 档 15 daemon / minimal 档 5 进程（gateway + llm/think/agent/tool）。
+- **M4 bootstrap 分层 18→15**：5 层 DAG 移除整编 daemon，dry-run 验证 15 daemon 启动计划。
+- **M0 commons 地基归位**：commons 摘除 → atoms 反向依赖（PUBLIC include 改 INTERFACE target 获取，依赖方向彻底归位）；error.h 体系确认收敛（契约分层，零重复定义）；IRON-6 模式推广——daemons/common 死拷贝清理（circuit_breaker 776 行死拷贝删除、input_validator 同名去重、validator_cjson 更名）、A 类遗留裁决、禁新增双写头。
+- **M0 utils 扁平化**：目录 = 内聚模块、文件 = 原子功能，utils 内遗留 ime/tools 残留目录平铺收口，仅剩 13 个 data/ 数据目录。
+- **M1 gateway 纯化**：业务逻辑迁出（会话表/编排/工具目录 → agent_d/tool_d），P9 源码归一——biz 处理器并入 gateway 库目录，gateway_d 收敛为聚合壳，SSE 纯翻译；认知服务面链接白名单门禁（link-whitelist.txt）；CLI 直连切断（lang_gateway/taskflow/execution_review）。
+- **M3 机制框架强化**：hook 接口拆库（airy_coreloop_hooks，hook_d 不再链认知引擎）；roadmap_sched.h ABI 冻结退出公共安装面；机制/策略总裁决表落地——lang_gateway / orchestrator 留内核 + 服务面化，roadmap 物理迁出随 work_hall ops 批次。
+- **M5 W4 面板数据源统一**：事件流面板真实消费 gateway hall.watch SSE 推送（(ts_utc,seq) 稳定序合并 + file_id 去重 + 1024 上限），RPC pull 降为 1s 兜底。
 
-- market_d 零调用注册/安装死层（agent_registry / agent_registry_core / skill_registry / installer 及配套死层自测），净删约 1700 行；启用 test_market.c 补齐生产 API 内存域单测。
-- daemon_startup.h 旧 12 daemon 编排头（全仓零消费者，与真实分层漂移）。
+### Added
 
-#### Added
-
+- **M1 agent.run_stream 流式事件帧协议 v1**：run_start/plan/tool_start/tool_end/token_delta/message/run_end/error 帧；agent_d 引擎带 sink 推送，gateway `POST /api/v1/agent/run/stream` SSE 纯翻译；SDK 协议常量自 airy_run_stream.h 生成（SSoT）。
+- **M2 cupolas PDP 化**：动态策略引擎单点收权（PDP），各 daemon 本地 PEP 缓存 + epoch 主动失效广播，策略全部 runtime 生效 < 1s、可回滚；首批 12 非 PDP daemon 本地 dome 收权。
+- **M5 W1 TUI run_stream 对接**：对话流切事件帧协议——token 打字机、工具调用行（tool_id 回填）、思考链标记、结构化错误帧三区渲染；GradConfirm 执行轮走事件流。
+- **M5 W2 向导数据驱动**：FieldSpec/StepSpec 注册表为步骤/字段/校验/提示文案单一来源，渲染/按键/校验/写回一律按 FieldKey 取值；CJK 编辑往返、Esc 快照往返 e2e 回归。
+- **M5 W3 主题 token 化**：语义 token（primary/accent/success/warning/danger/border/faint）+ TrueColor/256/16 三档色深快照测试（H7 防复发）+ WCAG AA 对比度门禁。
+- **M5 W5 AIRY_HOME 一致性测试**：paths.rs 三级回退（$AIRY_HOME → $HOME/.airymaxrt → 相对）全组合 + 空值穿透 + `.airymaxrt` 裸字面量 grep 门禁（H10 防复发）。
+- **M5 W6 构建期禁链门禁**：build.rs ALLOWED_STATIC_LIBS 白名单 fail-closed，禁链任何 daemon 内部库与 ASan 插桩库。
+- **M5 W7 IME 回归**：CJK 输入法组合期 7 用例（切换/输入/选字/退格/Esc/Enter/空格）。
+- **M5 W8 大历史虚拟渲染**：ChatView 行高缓存 + 前缀和 + 视口相交块只物化 + 流式尾段 O(1)；MemoryView 分组懒加载 + 80 条/页翻页；虚拟窗口与全量切片等价性门禁。
+- **M0 utils 扁平化门禁**：header-duplication-check 并入 CI quality-gate。
 - test_market.c 生产 API 单测（生命周期/注册更新/搜索/更新检查/limit 截断）。
+
+### Removed
+
+- market_d 零调用注册/安装死层（agent_registry / agent_registry_core / skill_registry / installer 及配套死层自测），净删约 1700 行。
+- daemon_startup.h 旧 12 daemon 编排头（全仓零消费者，与真实分层漂移）。
+- M4 退役三 daemon 全部署面收口：dev compose / supervisord / systemd / helm / CI 探测脚本中 info_d、observe_d、plugin_d 服务与 program 条目全部移除；启动器 ensure_aux_daemons 退役行删除；tool_d 权限默认标识自 plugin_d 收口为 tool_d。
+- CLI gateway 侧遗留死代码（client get_logs/get_memory_stats/get_plugins 与 LogEntry，gateway 无对应路由）。
 
 ---
 
