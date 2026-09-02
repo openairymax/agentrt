@@ -1,5 +1,6 @@
 # airy_cli — AgentRT 交互式产品入口
-# 依赖 coreloopthree（GCCP / 工作大厅 / DAG 适配层）
+# 依赖 coreloopthree（loop 引擎底座 / 计划类型 / 通信适配）；0.1.9 M1-1c
+# 后 CLI 不再进程内持本地 work_hall/cog，任务全量经 gateway → daemon 派发。
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -86,6 +87,10 @@ add_executable(airy_cli
 # --start-group/--end-group 是 GNU ld 专有选项：macOS ld64 与 MSVC 不识别，
 # 这两平台直接链接即可（LTO 符号可见性由顶层 -ffat-lto-objects 保证）。
 # m（libm）仅在非 MSVC 平台存在；uuid 按下方 WIN32/UNIX 平台分支处理。
+# 0.1.9 C2e（M1-1c 后链接收敛，2026-09-02 实测）：airy_cognition /
+# airy_taskflow / svc_common 已无符号引用（本地 cog 装配与本地 DAG 适配
+# 退役，全量经 gateway 派发），从链接集移除；chat 经 llm/tool service
+# 客户端（llm_response_*/tool_approval_*），二者保留。
 if(TARGET airy_llm_service AND TARGET airy_tool_service)
     if(UNIX AND NOT APPLE)
         target_link_libraries(airy_cli PRIVATE
@@ -93,13 +98,10 @@ if(TARGET airy_llm_service AND TARGET airy_tool_service)
             airy_coreloopthree
             airy_llm_service
             airy_tool_service
-            airy_cognition
             airy_core
             airy_memory
             airy_atoms
             airy_common
-            airy_taskflow
-            svc_common
             "-Wl,--end-group"
         )
     else()
@@ -107,13 +109,10 @@ if(TARGET airy_llm_service AND TARGET airy_tool_service)
             airy_coreloopthree
             airy_llm_service
             airy_tool_service
-            airy_cognition
             airy_core
             airy_memory
             airy_atoms
             airy_common
-            airy_taskflow
-            svc_common
         )
     endif()
     target_link_libraries(airy_cli PRIVATE Threads::Threads)
@@ -124,11 +123,8 @@ else()
     target_link_libraries(airy_cli PRIVATE
         airy_coreloopthree
         airy_atoms
-        airy_cognition
         airy_core
         airy_memory
-        airy_taskflow
-        svc_common
     )
 endif()
 

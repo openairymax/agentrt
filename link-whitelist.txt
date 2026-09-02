@@ -43,3 +43,8 @@ a2a_d: airy_platform_libs airy_common airy_a2a_service airy_protocols
 think_d: airy_platform_libs airy_common airy_think_service airy_coreloopthree airy_cognition airy_llm_service airy_tool_service
 cupolas_d: airy_platform_libs airy_common airy_cupolas_service
 maths_d: airy_platform_libs airy_common svc_common
+# 工具节点：airy_cli（M1-1c 引擎壳化 + C2e 链接收敛，2026-09-02 实测）。
+# CLI 是 gateway 纯客户端：任务执行/查询/规划全量经 gateway 派发，不再
+# 进程内持本地 cog/DAG 适配——airy_cognition / airy_taskflow / svc_common
+# 已无符号引用（chat 经 llm/tool service 客户端 llm_response_*/tool_approval_*）。
+airy_cli: airy_coreloopthree airy_llm_service airy_tool_service airy_core airy_memory airy_atoms airy_common
