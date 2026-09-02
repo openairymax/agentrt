@@ -300,11 +300,12 @@ fi
 rpc_match a2a.unregister_agent "{\"agent_id\":\"$AA\"}" '"unregistered"' "a2a.unregister_agent($AA, 成对清理)"
 [ "$SKIP_EXTERNAL" = 0 ] && rpc_match a2a.send_message "{\"target_agent_id\":\"$AA\",\"role\":\"user\",\"content\":\"hi\"}" '"responses"' "a2a.send_message(离线目标, ack 语义)"
 
-# ── info_d ─────────────────────────────────────────────────────────────────
-log "[info_d]"
+# ── monit_d:info（0.1.9 M4：原 info_d 并入 monit_d，外部 cap key 不变） ──
+log "[monit_d:info]"
 rpc_match info.system '{}' '"system"|"platform"' "info.system"
 rpc info.history '{}' "info.history"
 rpc info.health '{}' "info.health"
+rpc info.hardware '{}' "info.hardware"
 rpc info.health_check '{}' "info.health_check"
 rpc info.get_stats '{}' "info.get_stats"
 
@@ -319,8 +320,8 @@ rpc_match notify.subscribe "{\"channel\":\"$NC\",\"client_id\":\"client_${TS}\"}
 rpc_match notify.publish "{\"message\":\"e2e\",\"channel\":\"$NC\"}" '"queued"' "notify.publish($NC)"
 rpc_match notify.unsubscribe "{\"channel\":\"$NC\",\"client_id\":\"client_${TS}\"}" '"unsubscribed"' "notify.unsubscribe($NC, 成对清理)"
 
-# ── observe_d ──────────────────────────────────────────────────────────────
-log "[observe_d]"
+# ── monit_d:observe（0.1.9 M4：原 observe_d 并入 monit_d，外部 cap key 不变） ──
+log "[monit_d:observe]"
 rpc observe.get_stats '{}' "observe.get_stats"
 rpc observe.health_check '{}' "observe.health_check"
 rpc_match observe.query_metrics '{}' '"metrics"' "observe.query_metrics"
