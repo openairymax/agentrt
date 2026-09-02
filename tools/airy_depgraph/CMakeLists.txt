@@ -8,6 +8,11 @@
 
 add_executable(airy_depgraph
     main.c
+    depgraph_core.c
+    depgraph_manifest.c
+    depgraph_drift.c
+    depgraph_graph.c
+    depgraph_links.c
 )
 
 target_compile_features(airy_depgraph PRIVATE c_std_99)
