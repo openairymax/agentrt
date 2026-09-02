@@ -5,10 +5,10 @@
  * @file main.c
  * @brief airy_cli - AgentRT interactive product entry.
  *
- * Full closed-loop demo (productized form): natural-language task
- * instruction -> GCCP intent confirmation (reasoning + four questions) ->
- * cognition pipeline planning (Phase 0-1) -> Plan -> TaskFlow DAG adaption
- * -> work-hall submit/board/wait -> agent_d drives real execution.
+ * Full closed-loop product flow: natural-language instruction -> GCCP intent
+ * confirmation (reasoning + four questions) -> cognition pipeline planning
+ * (think_d over gateway) -> Plan -> DAG adaption -> gateway → sched_d submit/
+ * board/wait -> agent_d drives real execution.
  *
  * Mechanism/strategy separation: the CLI is the product layer (interaction
  * strategy), agentrt is the mechanism layer.  Degrades gracefully when the
@@ -32,11 +32,8 @@
 #include "platform.h"
 #include "cognition.h"
 #include "gccp.h"
-#include "work_hall.h"
 #include "hall_store.h"
-#include "governance.h"
 #include "plan_to_dag.h"
-#include "taskflow_advanced.h"
 #include "llm_svc_adapter.h"
 #include "logger.h"
 #include "logging.h"
@@ -193,7 +190,7 @@ int main(int argc, char *argv[])
     char input[8192];
     int quit_flag = 0;
     int switch_tui_flag = 0;
-    cli_cmd_ctx_t cmd_ctx = {.hall = rt.hall, .quit = &quit_flag, .switch_tui = &switch_tui_flag};
+    cli_cmd_ctx_t cmd_ctx = {.quit = &quit_flag, .switch_tui = &switch_tui_flag};
     int print_consumed = 0;
 
     {
@@ -214,8 +211,6 @@ int main(int argc, char *argv[])
                      (mdl && mdl[0]) ? mdl : "default");
             cli_tui_set_status(tui, st);
         }
-        (void)airy_work_hall_redispatch_once(rt.hall);
-        (void)airy_work_hall_ttl_purge(rt.hall);
         (void)cli_daemon_lifecycle_reconcile_once();
         size_t input_len = 0;
         if (g_cli_print_mode) {

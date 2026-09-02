@@ -20,11 +20,8 @@
 #include "platform.h"
 #include "cognition.h"
 #include "gccp.h"
-#include "work_hall.h"
 #include "hall_store.h"
-#include "governance.h"
 #include "plan_to_dag.h"
-#include "taskflow_advanced.h"
 #include "llm_svc_adapter.h"
 #include "logger.h"
 #include "logging.h"
@@ -91,7 +88,6 @@ typedef struct {
 } cli_command_t;
 
 typedef struct {
-    airy_work_hall_t *hall;
     int *quit;
     /* 2026-08-17：/tui 切换请求——退出 CLI 主循环后 exec agentrt-tui
      * （进程替换，无嵌套进程；仅 CLI 全屏 TUI 页面被激活时可用）。 */
@@ -234,8 +230,6 @@ size_t cli_plan_deps_count(const airy_task_plan_t *plan);
 void cli_print_system_header(const char *t2, const char *t1f, const char *t1p);
 void cli_print_result(const char *result);
 void cli_print_plan_list(const airy_task_plan_t *plan);
-void cli_progress_cb(const char *execution_id, const char *node_id, taskflow_state_t state,
-                     double progress, void *user_data);
 void cli_board_line(const char *tag, const char *id, const char *state, double progress);
 
 /* Live plan board (structured task progress + icon choreography, 2026-08-19):

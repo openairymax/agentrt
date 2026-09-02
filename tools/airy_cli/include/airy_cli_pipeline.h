@@ -6,9 +6,8 @@
  * @brief Runtime context assembly/teardown and blueprint fastpath.
  *
  * cli_runtime_ctx_t aggregates every long-lived component the CLI main loop
- * needs (work hall, hall store, governance, panels, reviewer).
- * cli_setup_runtime builds them in dependency order;
- * cli_teardown_runtime releases them in reverse.
+ * needs (event-stream hall store, TUI panel data sources, task workspace).
+ * cli_setup_runtime builds them; cli_teardown_runtime releases them.
  *
  * cli_blueprint_fastpath implements the three-tier blueprint routing
  * (L1 state-machine / L2 semantic-cache / L3 miss) that short-circuits
@@ -25,9 +24,7 @@
 #include "loop.h"
 #include "platform.h"
 #include "cognition.h"
-#include "work_hall.h"
 #include "hall_store.h"
-#include "governance.h"
 #include "cli_tui.h"
 
 #include <stddef.h>
@@ -39,16 +36,15 @@ extern "C" {
 
 /* Runtime context: every long-lived component the CLI main loop needs.
  * cli_setup_runtime fills it; cli_teardown_runtime releases it.
- * main() owns the struct on its stack and passes it by pointer. */
+ * main() owns the struct on its stack and passes it by pointer.
+ * 0.1.9 M1-1c：本地 work_hall/reviewer/governance/validator 已退役——
+ * 任务执行唯一经 gateway → sched_d，查询面（/status、TUI board）迁
+ * sched.dag_list；此处仅保留事件流 hall_store、面板 ud 与任务目录。 */
 typedef struct {
-    airy_work_hall_t *hall;
     airy_hall_store_t *hall_store;
     void *board_ud;
     void *events_ud;
     void *mem_ud;
-    airy_artifact_validator_t *validator;
-    airy_governance_t *governance;
-    void *reviewer;
     const char *main_workspace_dir;
 } cli_runtime_ctx_t;
 
@@ -60,8 +56,7 @@ airy_core_loop_t *cli_setup_core_engines(const char *m_s2, const char *m_verify,
                                           const char *m_expert,
                                           airy_cognition_engine_t **out_cog);
 
-/* Full runtime assembly: validator → reviewer → hall_store →
- * governance → work_hall → chat adapter → TUI panels.
+/* Full runtime assembly: event-stream hall_store → chat adapter → TUI panels.
  * Returns AIRY_EOK on success, error code on failure (caller must clean up). */
 airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_tui_t *tui,
                               cli_runtime_ctx_t *rt);
