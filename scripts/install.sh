@@ -208,10 +208,10 @@ if [ ! -d "${AIRY_SRC_APP}/agentrt" ]; then
     AIRY_SRC_APP="${AIRY_SRC_DIR}"
 fi
 
-# 18 个 daemon 完整清单（安装后逐一校验，含 think_d/cupolas_d/maths_d；
-# 与 agentrt-bootstrap.sh 的分层清单保持一致）
+# daemon 完整清单（安装后逐一校验，含 think_d/cupolas_d/maths_d；
+# 与 agentrt-bootstrap.sh 的分层清单保持一致。0.1.9 M4：plugin_d 并入 tool_d）
 EXPECTED_DAEMONS="monit_d observe_d info_d notify_d sched_d channel_d mem_d
-                  llm_d tool_d hook_d plugin_d agent_d a2a_d market_d gateway_d
+                  llm_d tool_d hook_d agent_d a2a_d market_d gateway_d
                   think_d cupolas_d maths_d"
 
 # ─── 安装器自举（系统性解决安装器无法更新，2026-08-30） ────────────────
