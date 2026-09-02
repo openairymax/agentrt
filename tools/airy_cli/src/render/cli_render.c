@@ -169,8 +169,17 @@ void cli_outf(const char *fmt, ...)
 
 /* ---- error description ---- */
 
+/* cli_gw.c 写入的网关友好错误缓冲：命中时一次性优先消费（见 cli_gw_call 失败路径）。 */
+extern char g_cli_gw_err[256];
+
 const char *cli_err_desc(int err)
 {
+    if (g_cli_gw_err[0] != '\0') {
+        static char gw_desc[256];
+        snprintf(gw_desc, sizeof(gw_desc), "%s", g_cli_gw_err);
+        g_cli_gw_err[0] = '\0'; /* 一次性 */
+        return gw_desc;
+    }
     switch (err) {
     case AIRY_ERR_TIMEOUT:          return "请求超时，请检查网络或服务状态";
     case AIRY_ERR_NOT_FOUND:        return "目标不存在或未找到";
