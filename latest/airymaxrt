@@ -28,7 +28,7 @@
 #   AIRY_TUI_BIN / AIRY_GATEWAY_BIN / AIRY_LLM_BIN  组件路径覆盖
 #   AIRYRT_LOG_LEVEL 日志级别（默认 info；debug 可看到完整排查信息）
 #   AIRYRT_PROFILE   运行画像：auto（按可用内存自动裁剪，默认；<2.5GiB 时
-#                     自动降为 minimal）| full（全量 18 daemon：17 socket +
+#                     自动降为 minimal）| full（全量 15 daemon：14 socket +
 #                     gateway）| minimal
 #                     （最小 daemon 集，仅 llm/think/agent/tool + gateway）。
 #                     低资源设备（如树莓派 4B 2GB）建议 minimal，可显著降低
@@ -549,22 +549,23 @@ _ensure_daemon() {
     log info "补齐 daemon: $bname（PID=$!），日志: $AIRY_HOME/logs/${bname}.out"
 }
 
-# full 画像的 12 个能力 daemon（minimal 裁剪项）：硬件增强后自动恢复。
-# 顺序与正常启动路径一致（hook→plugin→monit→sched→channel→market→
-# cupolas→mem→a2a→info→notify→observe）。
+# 补齐 minimal 裁掉的 aux daemon（monitor 硬件增强 / profile full 恢复用）。
+# 与正常启动路径同源（bin/*_d 推导，0.1.6h 自动化）：daemon 增删不再改
+# 脚本；核心执行链路（llm/think/agent/tool + gateway）独立处理不在此补齐。
+# 0.1.9 M4 整编后 aux 集 = 全量 15 - 核心 5 = 10（monit/sched/channel/
+# market/cupolas/mem/a2a/notify/hook/maths；plugin/info/observe 已并入
+# tool_d/monit_d，不再有独立二进制）。
 ensure_aux_daemons() {
-    _ensure_daemon "$(find_tool AIRY_HOOK_BIN hook_d "$AIRY_HOME/bin/hook_d" "$AIRYRT_HOME/agentrt/build/bin/hook_d" "$AIRYRT_HOME/build/bin/hook_d")" "$RUNTIME_DIR/hook.sock"
-    _ensure_daemon "$(find_tool AIRY_PLUGIN_BIN plugin_d "$AIRY_HOME/bin/plugin_d" "$AIRYRT_HOME/agentrt/build/bin/plugin_d" "$AIRYRT_HOME/build/bin/plugin_d")" "$RUNTIME_DIR/plugin.sock"
-    _ensure_daemon "$(find_tool AIRY_MONIT_BIN monit_d "$AIRY_HOME/bin/monit_d" "$AIRYRT_HOME/agentrt/build/bin/monit_d" "$AIRYRT_HOME/build/bin/monit_d")" "$RUNTIME_DIR/monit.sock"
-    _ensure_daemon "$(find_tool AIRY_SCHED_BIN sched_d "$AIRY_HOME/bin/sched_d" "$AIRYRT_HOME/agentrt/build/bin/sched_d" "$AIRYRT_HOME/build/bin/sched_d")" "$RUNTIME_DIR/sched.sock"
-    _ensure_daemon "$(find_tool AIRY_CHANNEL_BIN channel_d "$AIRY_HOME/bin/channel_d" "$AIRYRT_HOME/agentrt/build/bin/channel_d" "$AIRYRT_HOME/build/bin/channel_d")" "$RUNTIME_DIR/channel.sock"
-    _ensure_daemon "$(find_tool AIRY_MARKET_BIN market_d "$AIRY_HOME/bin/market_d" "$AIRYRT_HOME/agentrt/build/bin/market_d" "$AIRYRT_HOME/build/bin/market_d")" "$RUNTIME_DIR/market.sock"
-    _ensure_daemon "$(find_tool AIRY_CUPOLAS_BIN cupolas_d "$AIRY_HOME/bin/cupolas_d" "$AIRYRT_HOME/agentrt/build/bin/cupolas_d" "$AIRYRT_HOME/build/bin/cupolas_d")" "$RUNTIME_DIR/cupolas.sock"
-    _ensure_daemon "$(find_tool AIRY_MEM_BIN mem_d "$AIRY_HOME/bin/mem_d" "$AIRYRT_HOME/agentrt/build/bin/mem_d" "$AIRYRT_HOME/build/bin/mem_d")" "$RUNTIME_DIR/mem.sock"
-    _ensure_daemon "$(find_tool AIRY_A2A_BIN a2a_d "$AIRY_HOME/bin/a2a_d" "$AIRYRT_HOME/agentrt/build/bin/a2a_d" "$AIRYRT_HOME/build/bin/a2a_d")" "$RUNTIME_DIR/a2a.sock"
-    _ensure_daemon "$(find_tool AIRY_INFO_BIN info_d "$AIRY_HOME/bin/info_d" "$AIRYRT_HOME/agentrt/build/bin/info_d" "$AIRYRT_HOME/build/bin/info_d")" "$RUNTIME_DIR/info.sock"
-    _ensure_daemon "$(find_tool AIRY_NOTIFY_BIN notify_d "$AIRY_HOME/bin/notify_d" "$AIRYRT_HOME/agentrt/build/bin/notify_d" "$AIRYRT_HOME/build/bin/notify_d")" "$RUNTIME_DIR/notify.sock"
-    _ensure_daemon "$(find_tool AIRY_OBSERVE_BIN observe_d "$AIRY_HOME/bin/observe_d" "$AIRYRT_HOME/agentrt/build/bin/observe_d" "$AIRYRT_HOME/build/bin/observe_d")" "$RUNTIME_DIR/observe.sock"
+    local _d _b
+    for _d in "$AIRY_HOME"/bin/*_d; do
+        [ -f "$_d" ] || continue
+        _b="${_d##*/}"
+        case "$_b" in
+            gateway_d|llm_d|think_d|agent_d|tool_d) continue ;;  # 核心链路独立处理
+        esac
+        [ -x "$_d" ] || continue
+        _ensure_daemon "$_d" "$RUNTIME_DIR/${_b%_d}.sock"
+    done
 }
 
 # 画像状态持久化（profile 子命令/monitor 使用）

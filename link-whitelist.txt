@@ -16,8 +16,30 @@
 #   gateway 系目标禁链 coreloopthree/cognition。新增任何模块的链接
 #   约束只需在本文件登记；新增目标须在此登记后才可被门禁校验。
 #
+# 架构约束（0.1.9 方案 §5.1）: "跨界调用必须走总线"——daemon 之间禁止
+#   进程内符号引用。15 daemon 节点全部在此登记（允许集 = 自身服务库 +
+#   公共底座），未来任何未登记的跨 daemon/模块链接即构建期 fail-closed。
+#   注记：tool_d/sched_d/think_d 链 airy_llm_service/airy_tool_service 系
+#   执行体集中化历史形态（llm/tool 执行引擎库在进程内复用），登记为
+#   事实基线；后续 M 阶段重构为总线调用后可收紧该允许集。
+#
 # 事实基线（2026-09-02 实测，gateway/CMakeLists.txt L172-180、
 #   daemons/gateway_d/CMakeLists.txt L110-166/L439-458）:
 gateway: svc_common airy_syscall airy_protocols airy_common airy_memory
 airy_gateway_service: svc_common airy_protocols airy_platform_libs
 gateway_d: airy_gateway_service airy_syscall airy_platform_libs
+# daemon 节点（0.1.9 §5.1，2026-09-02 configure 期 linkgate/*.links.txt 实测）
+llm_d: airy_platform_libs airy_llm_service
+tool_d: airy_platform_libs airy_common airy_tool_service airy_coreloopthree airy_cognition airy_core airy_memory airy_atoms airy_llm_service
+monit_d: airy_platform_libs airy_monit_service
+sched_d: airy_platform_libs airy_common svc_common airy_coreloopthree airy_cognition airy_core airy_memory airy_atoms airy_llm_service airy_tool_service
+market_d: airy_platform_libs airy_market_service
+channel_d: airy_platform_libs airy_common svc_common
+notify_d: airy_platform_libs airy_common svc_common
+hook_d: airy_platform_libs airy_coreloop_hooks svc_common cupolas
+mem_d: airy_platform_libs airy_common airy_mem_service
+agent_d: airy_platform_libs airy_common airy_agent_service
+a2a_d: airy_platform_libs airy_common airy_a2a_service airy_protocols
+think_d: airy_platform_libs airy_common airy_think_service airy_coreloopthree airy_cognition airy_llm_service airy_tool_service
+cupolas_d: airy_platform_libs airy_common airy_cupolas_service
+maths_d: airy_platform_libs airy_common svc_common
