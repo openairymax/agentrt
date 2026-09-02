@@ -225,6 +225,18 @@ rpc cupolas.audit_flush '{}' "cupolas.audit_flush"
 rpc cupolas.health_check '{}' "cupolas.health_check"
 rpc cupolas.get_stats '{}' "cupolas.get_stats"
 
+# M2-S2/S3（0.1.9 §3.2 PDP）：policy.* 两段式生效——load 暂存不生效、
+# activate 提交运行集（epoch+1 + 广播），deny-wins 裁决翻转可经
+# cupolas.check_permission 观测；写操作需 cap:cupolas.admin 授权。
+POLY="e2e_pol_${TS}"
+rpc_match policy.status '{}' '"rule_count"' "policy.status(基线)"
+rpc_match policy.load "{\"json\":\"{\\\"rules\\\":[{\\\"id\\\":\\\"${POLY}\\\",\\\"effect\\\":\\\"deny\\\",\\\"resource\\\":\\\"fs:///tmp/${POLY}\\\"}]}\"}" '"staged":true' "policy.load(${POLY} 暂存 deny 规则)"
+rpc_match policy.status '{}' '"staged_rule_count":1' "policy.status(load 后已暂存未生效)"
+rpc_match policy.activate '{}' '"rule_count":1' "policy.activate(${POLY} 提交运行集)"
+rpc_match cupolas.check_permission "{\"agent_id\":\"pol-e2e\",\"action\":\"read\",\"resource\":\"fs:///tmp/${POLY}\"}" '"allowed":false' "check_permission(PDP deny 生效)"
+rpc_match policy.load "{\"json\":\"{\\\"rules\\\":[]}\"}" '"staged":true' "policy.load(暂存空集)"
+rpc_match policy.activate '{}' '"rule_count":0' "policy.activate(清空动态策略, 回退基础)"
+
 # 接线断言：vault / net / entitlements 三个安全子模块（cupolas_d 17 方法）
 CRED="e2e_cred_${TS}"
 rpc_match cupolas.vault_store "{\"cred_id\":\"$CRED\",\"type\":1,\"data\":\"736b2d74657374\",\"agent_id\":\"agent-e2e\"}" '"stored"' "cupolas.vault_store($CRED)"
