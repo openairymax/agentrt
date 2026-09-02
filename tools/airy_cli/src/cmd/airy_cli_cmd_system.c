@@ -65,9 +65,7 @@ const cli_daemon_desc_t CLI_DAEMONS[] = {
     {"llm", "llm.sock", "health_check"},
     {"cupolas", "cupolas.sock", "health_check"},
     {"mem", "mem.sock", "health_check"},
-    {"info", "info.sock", "health_check"},
     {"notify", "notify.sock", "health_check"},
-    {"observe", "observe.sock", "health_check"},
     {"a2a", "a2a.sock", "health_check"},
 };
 
@@ -154,8 +152,7 @@ const char *cli_ns_sock(const char *ns)
         {"market", "127.0.0.1:8082"},   {"sched", "127.0.0.1:8083"},
         {"notify", "127.0.0.1:8084"},   {"mem", "127.0.0.1:8085"},
         {"agent", "127.0.0.1:8086"},    {"a2a", "127.0.0.1:8087"},
-        {"info", "127.0.0.1:8088"},     {"cupolas", "127.0.0.1:8089"},
-        {"think", "127.0.0.1:8090"},    {"observe", "127.0.0.1:8091"},
+        {"cupolas", "127.0.0.1:8089"},  {"think", "127.0.0.1:8090"},
         {"hook", "127.0.0.1:8093"},
         {"channel", "127.0.0.1:8094"},  {"monit", "127.0.0.1:9090"},
     };

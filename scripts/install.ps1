@@ -77,8 +77,8 @@ $MODULES_DIR  = Join-Path $AIRY_HOME "modules"
 $BIN_DIR      = if ($BinDir) { $BinDir } elseif ($env:AIRY_BIN_DIR) { $env:AIRY_BIN_DIR } else { Join-Path $HOME ".local\bin" }
 
 # 与 install.sh 的 daemon 清单保持一致（含 think_d/cupolas_d/maths_d；
-# 0.1.9 M4：plugin_d 并入 tool_d）
-$EXPECTED_DAEMONS = @("monit_d","observe_d","info_d","notify_d","sched_d","channel_d","mem_d",
+# 0.1.9 M4：plugin_d 并入 tool_d，observe_d / info_d 并入 monit_d）
+$EXPECTED_DAEMONS = @("monit_d","notify_d","sched_d","channel_d","mem_d",
                       "llm_d","tool_d","hook_d","agent_d","a2a_d","market_d","gateway_d",
                       "think_d","cupolas_d","maths_d")
 
