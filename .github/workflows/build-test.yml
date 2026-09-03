@@ -73,26 +73,39 @@ jobs:
 
       # 覆盖率门禁：低于阈值（COVERAGE_THRESHOLD）即失败，
       # 防止发行版功能回归（50-engineering-standards / TEST-03）。
+      # lcov 2.0 (ubuntu-24.04) 会把 capture 阶段的未命中 --exclude 模式
+      # 直接判为硬错误，且对空 tracefile 只给 rc=0；改为 raw 全量采集，
+      # 再用 lcov --remove 过滤，日志 tail 恒输出以便诊断。
       - name: Collect coverage (lcov)
         run: |
           set +e
           lcov --capture --directory ${{ env.BUILD_DIR }} \
-            --output-file ${{ env.BUILD_DIR }}/coverage.info \
-            --rc lcov_branch_coverage=1 \
-            --exclude "*/tests/*" --exclude "*/build/*" \
-            --exclude "/usr/*" > /tmp/lcov-cap.log 2>&1
+            --output-file ${{ env.BUILD_DIR }}/coverage.raw.info \
+            --rc lcov_branch_coverage=1 > /tmp/lcov-cap.log 2>&1
           rc=$?
           if [ $rc -ne 0 ]; then
             echo "::error::lcov capture FAILED rc=$rc"
-            tail -n 30 /tmp/lcov-cap.log | sed 's/^/::error::  /'
+            tail -n 40 /tmp/lcov-cap.log | sed 's/^/::error::  /'
             exit $rc
           fi
+          tail -n 6 /tmp/lcov-cap.log
+          lcov --remove ${{ env.BUILD_DIR }}/coverage.raw.info \
+            --output-file ${{ env.BUILD_DIR }}/coverage.info \
+            --ignore-errors unused,mismatch \
+            "*/tests/*" "*/build/*" "/usr/*" > /tmp/lcov-rm.log 2>&1
+          echo "::group::lcov remove log"
+          tail -n 20 /tmp/lcov-rm.log
+          echo "::endgroup::"
           lcov --summary ${{ env.BUILD_DIR }}/coverage.info --rc lcov_branch_coverage=1 > /tmp/lcov-sum.log 2>&1 || true
-          cat /tmp/lcov-sum.log | tail -5
+          tail -n 12 /tmp/lcov-sum.log
 
       - name: Enforce coverage threshold
         run: |
           LINE_PCT=$(lcov --summary ${{ env.BUILD_DIR }}/coverage.info --rc lcov_branch_coverage=1 2>&1 | grep -oP 'lines\.\.\.\.\d+\.\d+' | grep -oP '\d+\.\d+')
+          if [ -z "$LINE_PCT" ]; then
+            echo "::error::coverage.info empty or unparsable - gate cannot run"
+            exit 1
+          fi
           echo "Line coverage: ${LINE_PCT}% (threshold: ${{ env.COVERAGE_THRESHOLD }}%)"
           if awk "BEGIN{exit !(${LINE_PCT} >= ${{ env.COVERAGE_THRESHOLD }})}"; then
             echo "[OK] Coverage meets threshold"
@@ -133,7 +146,9 @@ jobs:
           # 与 release.yml 对齐：keg-only openssl 头文件、Apple Silicon 下裸库名
           # （-lmicrohttpd 等）需显式 -I/-L，否则 build-test 与 release 环境漂移，
           # 门禁绿但发布红（release.yml 实证）
-          export CFLAGS="-I$(brew --prefix openssl)/include"
+          # arm64 Homebrew 头文件在 $(brew --prefix)/include，clang 不自动搜索：
+          # 缺该 -I 时 yaml.h/microhttpd.h 等非 keg-only 头同样报 file not found。
+          export CFLAGS="-I$(brew --prefix)/include -I$(brew --prefix openssl)/include"
           export LDFLAGS="-L$(brew --prefix)/lib -L$(brew --prefix openssl)/lib"
           cmake -S . -B ${{ env.BUILD_DIR }} \
             -DCMAKE_BUILD_TYPE=Debug \
