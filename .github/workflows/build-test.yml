@@ -61,7 +61,15 @@ jobs:
 
       - name: Run tests (ctest)
         run: |
-          ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure -j"$(nproc)"
+          set +e
+          ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure -j"$(nproc)" > /tmp/ctest.log 2>&1
+          rc=$?
+          if [ $rc -ne 0 ]; then
+            echo "::error::ctest FAILED rc=$rc"
+            awk '/The following tests FAILED:/,/Errors while running CTest/' /tmp/ctest.log | sed 's/^/::error::  /' | head -40
+            grep -E '^\s*[0-9]+/[0-9]+ Testing|FAILED|Failed' /tmp/ctest.log | sed 's/^/::error::  /' | head -40
+            exit $rc
+          fi
 
       # 覆盖率门禁：低于阈值（COVERAGE_THRESHOLD）即失败，
       # 防止发行版功能回归（50-engineering-standards / TEST-03）。
@@ -128,7 +136,16 @@ jobs:
 
       - name: Build
         run: |
-          cmake --build ${{ env.BUILD_DIR }} --parallel "$(sysctl -n hw.ncpu)"
+          # clang 编译失败详情经 ::error:: 上报为 annotation（匿名 API 可读）
+          set +e
+          cmake --build "${{ env.BUILD_DIR }}" --parallel "$(sysctl -n hw.ncpu)" > /tmp/macos-build.log 2>&1
+          rc=$?
+          if [ $rc -ne 0 ]; then
+            echo "::error::macOS Build FAILED rc=$rc"
+            grep -E ': error:|fatal error:|Error [0-9]|undefined symbol|ld: ' /tmp/macos-build.log | sort -u | head -40 | sed 's/^/::error::  /'
+            tail -n 30 /tmp/macos-build.log | sed 's/^/::error::  /'
+            exit $rc
+          fi
 
       - name: Run tests (ctest)
         run: |
@@ -168,8 +185,22 @@ jobs:
             -DBUILD_TESTS=ON -DAIRY_BUILD_ALL=ON -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
+        shell: pwsh
         run: |
-          cmake --build ${{ env.BUILD_DIR }} --config Release --parallel
+          # MSVC 编译失败时把错误以 ::error:: 上报为 annotation（匿名 API 可读）；
+          # 与 release.yml windows job 同款合并消息模式
+          $buildLog = Join-Path $env:RUNNER_TEMP "build.log"
+          cmake --build "${{ env.BUILD_DIR }}" --config Release --parallel 2>&1 | Tee-Object -FilePath $buildLog
+          if ($LASTEXITCODE -ne 0) {
+            $lines = Get-Content $buildLog
+            $errs = $lines | Where-Object { $_ -match ': error |error C[0-9]+|fatal error|error LNK[0-9]+' }
+            $tail = if ($errs) { $errs | Select-Object -Last 40 } else { $lines | Select-Object -Last 60 }
+            $msg = ("MSVC build failed (exit {0})`n{1}" -f $LASTEXITCODE, ($tail -join "`n"))
+            if ($msg.Length -gt 30000) { $msg = $msg.Substring($msg.Length - 30000) }
+            $msg = $msg.Replace('%', '%25').Replace("`r", '').Replace("`n", '%0A')
+            Write-Output "::error::$msg"
+            exit $LASTEXITCODE
+          }
 
       - name: Run tests (ctest)
         run: |
