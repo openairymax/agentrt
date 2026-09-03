@@ -38,8 +38,24 @@ else
 fi
 
 # 1) 叶子子模块（agentrt 直接子模块，SHA 由 agentrt 树 gitlink 钉定）
-git submodule update --init --recursive
-rc=$?
+#
+# 竞态容错：agentrt main 推上 GitHub 的瞬间，sync-mirror workflow 才刚开始
+# 从 atomgit 镜像叶子仓（agentrt 排在叶子之后同步，见 sync-mirror.sh 注释）。
+# 若本步先于镜像完成执行，gitlink 钉定的叶子 SHA 尚不在 GitHub（"remote
+# error: ... not found"），submodule update 立即失败（exit 128，19:05 run
+# 实证：build-test/codegen 三作业同一秒全挂）。叶子仓往往在数分钟内补齐，
+# 故对失败做有限重试（每次重跑幂等），而非一次失败即红。
+init_rc=1
+for attempt in 1 2 3 4 5 6; do
+  git submodule update --init --recursive
+  init_rc=$?
+  if [ "$init_rc" -eq 0 ]; then
+    break
+  fi
+  echo "warn: submodule update failed (rc=$init_rc), retry $attempt/6 in 30s"
+  sleep 30
+done
+rc=$init_rc
 
 # 2) sibling 数据（仅当参数含 tools 时按需补齐，即 release 链）
 want_layout=false
