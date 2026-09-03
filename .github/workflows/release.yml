@@ -345,9 +345,9 @@ jobs:
             # C2220 的前一行即被升级的 warning（含真实告警码），一并纳入
             $errIdx = 0..($lines.Count - 1) | Where-Object { $lines[$_] -match ': error |error C[0-9]+|fatal error|error LNK[0-9]+' }
             $errs = foreach ($i in $errIdx) { $lines[[Math]::Max(0, $i - 1)..$i] }
-            $tail = if ($errs) { $errs | Select-Object -Last 40 } else { $lines | Select-Object -Last 60 }
+            $tail = if ($errs) { $errs | Select-Object -Last 60 } else { $lines | Select-Object -Last 60 }
             $msg = ("MSVC build failed (exit {0})`n{1}" -f $LASTEXITCODE, ($tail -join "`n"))
-            if ($msg.Length -gt 30000) { $msg = $msg.Substring($msg.Length - 30000) }
+            if ($msg.Length -gt 60000) { $msg = $msg.Substring($msg.Length - 60000) }
             $msg = $msg.Replace('%', '%25').Replace("`r", '').Replace("`n", '%0A')
             Write-Output "::error::$msg"
             exit $LASTEXITCODE
