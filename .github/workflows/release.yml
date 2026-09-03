@@ -105,7 +105,7 @@ jobs:
       # libssl.so.1.1 崩溃（apt 预编译库链接 1.1.1 双 OpenSSL ABI）。
       - name: Build self-compiled deps (curl/lws/openssl SSoT)
         run: |
-          bash tools/scripts/ci/release/lib-builddeps.sh
+          bash _tools/scripts/ci/release/lib-builddeps.sh
 
       - name: Configure
         run: |
@@ -130,12 +130,12 @@ jobs:
       # 必须在此显式部署，否则二进制安装后 daemon 无法一键启动编排。
       - name: Deploy bootstrap script
         run: |
-          if [ -f "tools/scripts/ops/bin/agentrt-bootstrap.sh" ]; then
-            cp -f "tools/scripts/ops/bin/agentrt-bootstrap.sh" "${{ env.STAGE_DIR }}/bin/agentrt-bootstrap.sh"
+          if [ -f "_tools/scripts/ops/bin/agentrt-bootstrap.sh" ]; then
+            cp -f "_tools/scripts/ops/bin/agentrt-bootstrap.sh" "${{ env.STAGE_DIR }}/bin/agentrt-bootstrap.sh"
             chmod 755 "${{ env.STAGE_DIR }}/bin/agentrt-bootstrap.sh"
           fi
 
-      # 完全体包完整性（对齐 tools/scripts/ci/release/package-full-release.sh 的
+      # 完全体包完整性（对齐 _tools/scripts/ci/release/package-full-release.sh 的
       # build_full_package 内容，单一清单防漂移）：
       #   bin/agentrt-tui（Rust TUI）+ lib/（Python 运行时依赖）
       # CARGO_TARGET_DIR 指向 RUNNER_TEMP，禁止在源码树落盘（铁律 4.7）。
@@ -170,8 +170,8 @@ jobs:
           cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/"
           cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
           touch "${PKG_DIR}/platform-x86_64"
           ARTIFACT="agentrt-${VERSION}-linux-x64"
@@ -219,7 +219,9 @@ jobs:
           # 不经 pkg-config 的 TU 需要显式 -I/-L（CFLAGS/LDFLAGS 是
           # CMAKE_C_FLAGS / CMAKE_EXE_LINKER_FLAGS 的环境初值，全 target 生效）
           export CFLAGS="-I$(brew --prefix openssl)/include"
-          export LDFLAGS="-L$(brew --prefix openssl)/lib"
+          # Apple Silicon 默认不搜 /opt/homebrew/lib：gateway_d 链接
+          # -lmicrohttpd 等裸库名需 -L$(brew --prefix)/lib（实证 run #2）。
+          export LDFLAGS="-L$(brew --prefix)/lib -L$(brew --prefix openssl)/lib"
           cmake -S . -B ${{ env.BUILD_DIR }} \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTS=OFF \
@@ -237,8 +239,8 @@ jobs:
 
       - name: Deploy bootstrap script
         run: |
-          if [ -f "tools/scripts/ops/bin/agentrt-bootstrap.sh" ]; then
-            cp -f "tools/scripts/ops/bin/agentrt-bootstrap.sh" "${{ env.STAGE_DIR }}/bin/agentrt-bootstrap.sh"
+          if [ -f "_tools/scripts/ops/bin/agentrt-bootstrap.sh" ]; then
+            cp -f "_tools/scripts/ops/bin/agentrt-bootstrap.sh" "${{ env.STAGE_DIR }}/bin/agentrt-bootstrap.sh"
             chmod 755 "${{ env.STAGE_DIR }}/bin/agentrt-bootstrap.sh"
           fi
 
@@ -266,8 +268,8 @@ jobs:
           cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/"
           cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
           touch "${PKG_DIR}/platform-aarch64"
           ARTIFACT="agentrt-${VERSION}-macos-arm64"
@@ -358,14 +360,14 @@ jobs:
           New-Item -ItemType Directory -Path "$pkgDir\config" -Force | Out-Null
           New-Item -ItemType Directory -Path "$pkgDir\modules" -Force | Out-Null
           Copy-Item -Path "${{ env.STAGE_DIR }}\*" -Destination "$pkgDir\" -Recurse -Force
-          foreach ($cfg in @("agent-workload\ecosystem\manager\configs\agentrt.yaml","agent-workload\ecosystem\manager\model\model.yaml","tools\scripts\ops\templates\secrets.env.example","tools\scripts\ops\templates\permission_rules.yaml")) {
+          foreach ($cfg in @("agent-workload\ecosystem\manager\configs\agentrt.yaml","agent-workload\ecosystem\manager\model\model.yaml","_tools\scripts\ops\templates\secrets.env.example","_tools\scripts\ops\templates\permission_rules.yaml")) {
             if (Test-Path $cfg) { Copy-Item -Path $cfg -Destination "$pkgDir\config\" -Force }
           }
           if (Test-Path "agent-workload\ecosystem\markets\tools\maths-toolkit") {
             Copy-Item -Path "agent-workload\ecosystem\markets\tools\maths-toolkit" -Destination "$pkgDir\modules\" -Recurse -Force
           }
-          if (Test-Path "tools\scripts\ops\bin\agentrt-bootstrap.sh") {
-            Copy-Item -Path "tools\scripts\ops\bin\agentrt-bootstrap.sh" -Destination "$pkgDir\bin\" -Force
+          if (Test-Path "_tools\scripts\ops\bin\agentrt-bootstrap.sh") {
+            Copy-Item -Path "_tools\scripts\ops\bin\agentrt-bootstrap.sh" -Destination "$pkgDir\bin\" -Force
           }
           New-Item -ItemType File -Path "$pkgDir\platform-x64" -Force | Out-Null
           $artifact = "agentrt-$VERSION-windows-x64"
@@ -421,7 +423,7 @@ jobs:
             # 0.1.6f SSoT：cmake/cJSON/OpenSSL/libcurl/libwebsockets 自编译
             # 收敛到 lib-builddeps.sh（与本地 build.sh / build-linux 同源，
             # 幂等 + 离线 deps 缓存优先）。统一 libssl.so.3 链路。
-            bash /src/tools/scripts/ci/release/lib-builddeps.sh
+            bash /src/_tools/scripts/ci/release/lib-builddeps.sh
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
             export PATH="$HOME/.cargo/bin:$PATH"
             export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
@@ -433,7 +435,7 @@ jobs:
             cmake --install "$BUILD_DIR"
             # Rust TUI（agentrt-tui），失败降级不阻断。riscv64 链接陷阱：
             # GNU ld 2.34 无法合并 RISC-V attributes（libc build script 即
-            # 失败）；与本地 tools/scripts/ci/release/build.sh 同源修复——
+            # 失败）；与本地 _tools/scripts/ci/release/build.sh 同源修复——
             # rust-lld 复制为 ld.lld，gcc driver 保留库路径，-fuse-ld=lld
             # 仅换链接器。
             export PATH="$HOME/.cargo/bin:$PATH"
@@ -463,10 +465,10 @@ jobs:
           cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/" 2>/dev/null || true
           cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
-          cp -f tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
           touch "${PKG_DIR}/platform-riscv64"
           ARTIFACT="agentrt-${VERSION}-linux-riscv64"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
@@ -519,7 +521,7 @@ jobs:
             # 0.1.6f SSoT：cmake/cJSON/OpenSSL/libcurl/libwebsockets 自编译
             # 收敛到 lib-builddeps.sh（与本地 build.sh / build-linux 同源，
             # 幂等 + 离线 deps 缓存优先）。统一 libssl.so.3 链路。
-            bash /src/tools/scripts/ci/release/lib-builddeps.sh
+            bash /src/_tools/scripts/ci/release/lib-builddeps.sh
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
             export PATH="$HOME/.cargo/bin:$PATH"
             export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
@@ -552,10 +554,10 @@ jobs:
           cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/" 2>/dev/null || true
           cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
-          cp -f tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
           touch "${PKG_DIR}/platform-aarch64"
           ARTIFACT="agentrt-${VERSION}-linux-arm64"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
@@ -578,7 +580,7 @@ jobs:
   # armv7l 维持 ubuntu:20.04（有 linux/arm/v7 清单）。
   # TUI 在 32 位 qemu 模拟下 rustc 极慢且易超时，本作业降级跳过
   # （C/C++ 核心编译门禁仍完整），agentrt-tui 32 位制品由本地构建台
-  # build.sh i686|armv7l 交叉产物覆盖（tools/scripts/ci/release/build.sh）。
+  # build.sh i686|armv7l 交叉产物覆盖（_tools/scripts/ci/release/build.sh）。
   build-linux-32bit:
     runs-on: ubuntu-latest
     strategy:
@@ -629,7 +631,7 @@ jobs:
             # 0.1.6f SSoT：cmake/cJSON/OpenSSL/libcurl/libwebsockets 自编译
             # 收敛到 lib-builddeps.sh（与本地 build.sh / 其他 Linux job
             # 同源，幂等 + 离线 deps 缓存优先）。统一 libssl.so.3 链路。
-            bash /src/tools/scripts/ci/release/lib-builddeps.sh
+            bash /src/_tools/scripts/ci/release/lib-builddeps.sh
             export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
             cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release \
               -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF -DAIRY_BUILD_ALL=ON \
@@ -655,10 +657,10 @@ jobs:
           cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/" 2>/dev/null || true
           cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
-          cp -f tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
           touch "${PKG_DIR}/${{ matrix.tag }}"
           ARTIFACT="agentrt-${VERSION}-${{ matrix.artifact }}"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
@@ -677,7 +679,7 @@ jobs:
   # GitHub Release 为镜像。双轨签名防供应链：
   #   cosign sign-blob 每个 tarball（*.sig）；GPG 签名 manifest.*.json（*.asc）。
   # 需在仓库 secrets 配置：GPG_PRIVATE_KEY/GPG_PASSPHRASE/COSIGN_PRIVATE_KEY/
-  # COSIGN_PASSWORD/ATOMGIT_TOKEN（见 tools/scripts/ci/release/init-signing-keys.sh）。
+  # COSIGN_PASSWORD/ATOMGIT_TOKEN（见 _tools/scripts/ci/release/init-signing-keys.sh）。
   release:
     needs: [build-linux, build-macos, build-windows, build-riscv64, build-arm64, build-linux-32bit]
     runs-on: ubuntu-latest
@@ -734,7 +736,7 @@ jobs:
         env:
           RELEASE_NOTES_FILE: dist/notes.txt
         run: |
-          bash ./tools/scripts/ci/release/publish-release.sh "${{ env.VERSION }}" "$PWD/dist"
+          bash ./_tools/scripts/ci/release/publish-release.sh "${{ env.VERSION }}" "$PWD/dist"
 
       - name: Create GitHub Release (mirror)
         uses: softprops/action-gh-release@v2

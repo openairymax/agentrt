@@ -71,8 +71,10 @@ clone_sibling() {
 }
 
 if [ "$want_layout" = true ]; then
-  echo "layout: cloning release sibling repos (tools/sdk/ecosystem)"
-  clone_sibling tools tools
+  echo "layout: cloning release sibling repos (_tools/sdk/ecosystem)"
+  # 注意：tools 克隆到 _tools/ —— agentrt 自带顶层 tools/（codegen 等），
+  # 若同名会跳过克隆导致 release 脚本缺失（linux job 实证）。
+  clone_sibling tools _tools
   mkdir -p agent-workload
   clone_sibling sdk agent-workload/sdk
   clone_sibling ecosystem agent-workload/ecosystem
