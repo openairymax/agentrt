@@ -334,14 +334,18 @@ jobs:
       - name: Build
         shell: pwsh
         run: |
-          # MSVC 编译失败时把 stderr 尾部以 ::error:: 上报为 annotation：
-          # 日志下载需 admin，annotation 匿名 API 可读。注意 GH 单步 annotation
-          # 上限 ~10 条，逐行 ::error:: 会被截断——合并为单条多行消息。
+          # MSVC 编译失败时把错误以 ::error:: 上报为 annotation（日志下载需
+          # admin，annotation 匿名 API 可读）。警告洪流会淹没真实错误且 GH
+          # annotation 有长度限制：优先筛出 error C*/LNK*/fatal 行，无错误行
+          # 时才回退到日志尾部。合并为单条多行消息。
           $buildLog = Join-Path $env:RUNNER_TEMP "build.log"
           cmake --build ${{ env.BUILD_DIR }} --config Release --parallel 2>&1 | Tee-Object -FilePath $buildLog
           if ($LASTEXITCODE -ne 0) {
-            $tail = Get-Content $buildLog -Tail 120 | Out-String
-            $msg = ("MSVC build failed (exit {0})`n{1}" -f $LASTEXITCODE, $tail)
+            $lines = Get-Content $buildLog
+            $errs = $lines | Where-Object { $_ -match ': error |error C[0-9]+|fatal error|error LNK[0-9]+|: error:' }
+            $tail = if ($errs) { $errs | Select-Object -Last 40 } else { $lines | Select-Object -Last 60 }
+            $msg = ("MSVC build failed (exit {0})`n{1}" -f $LASTEXITCODE, ($tail -join "`n"))
+            if ($msg.Length -gt 30000) { $msg = $msg.Substring($msg.Length - 30000) }
             $msg = $msg.Replace('%', '%25').Replace("`r", '').Replace("`n", '%0A')
             Write-Output "::error::$msg"
             exit $LASTEXITCODE
