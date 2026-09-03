@@ -31,8 +31,8 @@ jobs:
     runs-on: ubuntu-latest
     container: ubuntu:20.04
     env:
-      # BAN-33：agentrt 即源码根，构建目录必须在源码树外（runner.temp）
-      BUILD_DIR: ${{ runner.temp }}/build
+      # BAN-33：agentrt 即源码根，构建目录必须在源码树外（工作区上级目录）
+      BUILD_DIR: ../build
       STAGE_DIR: stage
     steps:
       # ubuntu:20.04 基础镜像无 git：actions/checkout 会回退到 REST tarball
@@ -191,8 +191,8 @@ jobs:
   build-macos:
     runs-on: macos-latest
     env:
-      # BAN-33：构建目录在源码树外
-      BUILD_DIR: ${{ runner.temp }}/build
+      # BAN-33：构建目录位于源码树外（工作区上级目录）
+      BUILD_DIR: ../build
       STAGE_DIR: stage
     steps:
       - name: Checkout
@@ -289,8 +289,8 @@ jobs:
   build-windows:
     runs-on: windows-latest
     env:
-      # BAN-33：构建目录在源码树外
-      BUILD_DIR: ${{ runner.temp }}/build
+      # BAN-33：构建目录位于源码树外（工作区上级目录）
+      BUILD_DIR: ../build
       STAGE_DIR: stage
     steps:
       - name: Checkout

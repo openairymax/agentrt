@@ -18,8 +18,8 @@ jobs:
   linux-build-test-coverage:
     runs-on: ubuntu-latest
     env:
-      # BAN-33：agentrt 即源码根，构建目录必须在源码树外（runner.temp）
-      BUILD_DIR: ${{ runner.temp }}/build
+      # BAN-33：agentrt 即源码根，构建目录必须在源码树外（工作区上级目录）
+      BUILD_DIR: ../build
       COVERAGE_THRESHOLD: 55
     steps:
       - name: Checkout
@@ -89,8 +89,8 @@ jobs:
   macos-build:
     runs-on: macos-latest
     env:
-      # BAN-33：构建目录在源码树外
-      BUILD_DIR: ${{ runner.temp }}/build
+      # BAN-33：构建目录位于源码树外（工作区上级目录）
+      BUILD_DIR: ../build
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -133,8 +133,8 @@ jobs:
   windows-build:
     runs-on: windows-latest
     env:
-      # BAN-33：构建目录在源码树外
-      BUILD_DIR: ${{ runner.temp }}/build
+      # BAN-33：构建目录位于源码树外（工作区上级目录）
+      BUILD_DIR: ../build
     steps:
       - name: Checkout
         uses: actions/checkout@v4
