@@ -106,7 +106,7 @@ jobs:
       - name: Install build dependencies (Homebrew)
         run: |
           brew install cmake ninja pkgconf sqlite cjson libyaml curl openssl zlib zstd \
-            libmicrohttpd libwebsockets libevent
+            libmicrohttpd libwebsockets libevent nghttp2
 
       # openssl / zlib / sqlite 为 keg-only，需显式导出 pkg-config 路径供 find_package 使用
       - name: Configure (clang, BUILD_TESTS=ON)
@@ -115,6 +115,11 @@ jobs:
           # 否则 find_package(CURL) 与 pkg_check_modules(libcurl) 均落空，
           # AIRY_HAS_CURL=FALSE 导致 macOS 构建静默剔除 HTTP/联网功能
           export PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig:$(brew --prefix zlib)/lib/pkgconfig:$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix curl)/lib/pkgconfig"
+          # 与 release.yml 对齐：keg-only openssl 头文件、Apple Silicon 下裸库名
+          # （-lmicrohttpd 等）需显式 -I/-L，否则 build-test 与 release 环境漂移，
+          # 门禁绿但发布红（release.yml 实证）
+          export CFLAGS="-I$(brew --prefix openssl)/include"
+          export LDFLAGS="-L$(brew --prefix)/lib -L$(brew --prefix openssl)/lib"
           cmake -S . -B ${{ env.BUILD_DIR }} \
             -DCMAKE_BUILD_TYPE=Debug \
             -DBUILD_TESTS=ON \
