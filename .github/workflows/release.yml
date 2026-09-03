@@ -451,7 +451,13 @@ jobs:
             # 收敛到 lib-builddeps.sh（与本地 build.sh / build-linux 同源，
             # 幂等 + 离线 deps 缓存优先）。统一 libssl.so.3 链路。
             bash /src/_tools/scripts/ci/release/lib-builddeps.sh
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+            # Rust 工具链仅供 agentrt-tui 构建；TUI 不在发布必检
+            # REQUIRED_BIN 之列。qemu 模拟下 rustup-init 偶发网络/执行
+            # 失败（run #14 arm64 rc=127），此处重试 3 次后仍失败则告警
+            # 降级，不阻塞 C/C++ 六架构门禁。
+            if ! (curl --proto '=https' --tlsv1.2 -sSf --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal); then
+              echo "warn: rustup 安装失败，agentrt-tui 将缺失（非必检组件，降级继续）"
+            fi
             export PATH="$HOME/.cargo/bin:$PATH"
             export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
             cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release \
@@ -553,7 +559,13 @@ jobs:
             # 收敛到 lib-builddeps.sh（与本地 build.sh / build-linux 同源，
             # 幂等 + 离线 deps 缓存优先）。统一 libssl.so.3 链路。
             bash /src/_tools/scripts/ci/release/lib-builddeps.sh
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+            # Rust 工具链仅供 agentrt-tui 构建；TUI 不在发布必检
+            # REQUIRED_BIN 之列。qemu 模拟下 rustup-init 偶发网络/执行
+            # 失败（run #14 arm64 rc=127），此处重试 3 次后仍失败则告警
+            # 降级，不阻塞 C/C++ 六架构门禁。
+            if ! (curl --proto '=https' --tlsv1.2 -sSf --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal); then
+              echo "warn: rustup 安装失败，agentrt-tui 将缺失（非必检组件，降级继续）"
+            fi
             export PATH="$HOME/.cargo/bin:$PATH"
             export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
             cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release \
