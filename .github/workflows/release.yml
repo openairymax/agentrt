@@ -431,7 +431,7 @@ jobs:
             # 以 ::error:: 上报失败命令与日志尾部（annotation 匿名 API 可读）。
             set -euo pipefail
             exec > >(tee /src/container-riscv64.log) 2>&1
-            trap '"'"'echo "::error::[riscv64] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; tail -n 15 /src/container-riscv64.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
+            trap '"'"'echo "::error::[riscv64] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-riscv64.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
             apt-get install -y -qq \
@@ -533,7 +533,7 @@ jobs:
             # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）
             set -euo pipefail
             exec > >(tee /src/container-arm64.log) 2>&1
-            trap '"'"'echo "::error::[arm64] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; tail -n 15 /src/container-arm64.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
+            trap '"'"'echo "::error::[arm64] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-arm64.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
             apt-get install -y -qq \
@@ -656,7 +656,7 @@ jobs:
             # GitHub API 匿名可读，无需 admin 下载日志即可定位失败。
             set -euo pipefail
             exec > >(tee /src/container-${{ matrix.name }}.log) 2>&1
-            trap '"'"'echo "::error::[${{ matrix.name }}] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; tail -n 15 /src/container-${{ matrix.name }}.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
+            trap '"'"'echo "::error::[${{ matrix.name }}] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-${{ matrix.name }}.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
             apt-get install -y -qq \
