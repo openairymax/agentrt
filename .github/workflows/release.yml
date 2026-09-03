@@ -412,6 +412,11 @@ jobs:
   # 与 x86_64/arm64 统一 glibc 2.31 基线）。
   build-riscv64:
     runs-on: ubuntu-latest
+    # 并行发布决策（2026-09-04）：QEMU 交叉编译在托管 runner 上持续撞 6h
+    # 单 job 硬上限（R15 5h52m+ 仍 in_progress，被强制终止），无法作为
+    # v0.1.9 门禁。改 continue-on-error：仍尝试产出 riscv64 制品，但不再
+    # 阻断发布；riscv64 完整制品改由本地/自托管构建补发（见 release.needs）。
+    continue-on-error: true
     env:
       BUILD_DIR: build
       STAGE_DIR: stage
@@ -752,7 +757,10 @@ jobs:
   release:
     # build-windows 暂从 needs 摘除（MSVC 移植进行中，见 build-windows
     # continue-on-error 注释）；Windows 二进制修好后补发。
-    needs: [build-linux, build-macos, build-riscv64, build-arm64, build-linux-32bit]
+    # build-riscv64 亦摘除（QEMU 在托管 runner 撞 6h 上限，见该 job
+    # continue-on-error 注释）；riscv64 制品本地/自托管补发。
+    # 门禁 = 已实证全绿的 Linux x86_64 / macOS arm64 / Linux arm64 / Linux i686。
+    needs: [build-linux, build-macos, build-arm64, build-linux-32bit]
     runs-on: ubuntu-latest
     # tag 推送或手动 dispatch（手动时版本来自 inputs.version）皆可触发
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
