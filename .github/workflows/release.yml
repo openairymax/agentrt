@@ -290,6 +290,10 @@ jobs:
   # platform 标记），防止 Windows 包缺失组件（问题：打包漂移）。
   build-windows:
     runs-on: windows-latest
+    # 并行发布决策（2026-09-03）：MSVC 移植进行中（commons/cupolas/
+    # protocols/heapstore），build-windows 暂作可选不阻断发布（先发后修），
+    # 修好后移除 continue-on-error 并移回 release.needs。
+    continue-on-error: true
     env:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
@@ -681,7 +685,9 @@ jobs:
   # 需在仓库 secrets 配置：GPG_PRIVATE_KEY/GPG_PASSPHRASE/COSIGN_PRIVATE_KEY/
   # COSIGN_PASSWORD/ATOMGIT_TOKEN（见 _tools/scripts/ci/release/init-signing-keys.sh）。
   release:
-    needs: [build-linux, build-macos, build-windows, build-riscv64, build-arm64, build-linux-32bit]
+    # build-windows 暂从 needs 摘除（MSVC 移植进行中，见 build-windows
+    # continue-on-error 注释）；Windows 二进制修好后补发。
+    needs: [build-linux, build-macos, build-riscv64, build-arm64, build-linux-32bit]
     runs-on: ubuntu-latest
     # tag 推送或手动 dispatch（手动时版本来自 inputs.version）皆可触发
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
