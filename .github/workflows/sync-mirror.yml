@@ -1,0 +1,46 @@
+name: Sync to GitHub & Gitee
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# GH_TOKEN：GitHub PAT（openairymax org 建仓/推送权限）——PAT 推送的
+# tag 可触发 release.yml（GITHUB_TOKEN 推送不会）。
+# GT_TOKEN：Gitee 访问令牌（org 建仓 + 推送）。
+# ATOMGIT_TOKEN（可选）：atomgit 访问令牌，用于读取私有子仓（atoms）
+# 的 mirror clone；缺省匿名克隆仅覆盖公开子仓。
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      # 关键修复：不检出子模块。旧版 submodules:true 需要从 GitHub 拉
+      # 子模块镜像仓，而这些仓正是本工作流负责创建/更新的——循环依赖
+      # 导致 checkout 即失败（run #82，9 秒），tag 永远到不了 GitHub。
+      # 子模块数据源改为 atomgit（SSoT），见 .github/scripts/sync-mirror.sh。
+      # persist-credentials:false：checkout 默认向工作树注入 GITHUB_TOKEN
+      # extraHeader，宿主仓 push 时该 header 会压过推送 URL 内嵌的 GH_TOKEN，
+      # 使 agentrt 以 github-actions[bot] 身份被 403 拒推（伞仓时代 run #89：
+      # "Permission to openairymax/airymaxhub.git denied to
+      # github-actions[bot]"——根因同构）。叶子仓 remote 系脚本新建、无此注入，
+      # 故同 URL 格式能以 spharx01 推送成功——只有宿主仓中招。
+      # 本步之后所有网络操作都走 URL 内嵌 PAT / 匿名 HTTPS，不需要
+      # checkout 保留凭据。
+      - name: Checkout (no submodules)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          persist-credentials: false
+
+      - name: Sync agentrt + leaf submodules to mirrors
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GT_TOKEN: ${{ secrets.GT_TOKEN }}
+          ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
+        # gh CLI 自动读取 GH_TOKEN 环境变量认证，无需 gh auth login
+        # （login 在令牌无效时会直接中断整个 step，掩盖真实错误）。
+        # agentrt 为 workflow 宿主仓：本工作流把 agentrt + 7 个叶子子模块
+        # （atoms/commons/cupolas/daemons/gateway/heapstore/protocols）从
+        # atomgit(SSoT) 同步到 GitHub / Gitee 镜像。
+        run: bash .github/scripts/sync-mirror.sh

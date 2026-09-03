@@ -1,0 +1,33 @@
+name: Codegen SSoT drift check
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  syscall-codegen-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      # agentrt 为 workflow 宿主仓：仅需初始化其 7 个叶子子模块（SHA 由
+      # agentrt 树 gitlink 钉定）。atoms 为 GitHub 私有仓，init 脚本经
+      # GH_TOKEN（org PAT）写入 ~/.netrc 认证，不改写 URL。
+      - name: Init submodules (agentrt leaves)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh
+
+      # P2-3: syscall.xml（SSoT）与生成产物 syscall_ids.h / syscall_table_gen.h
+      # 一致性校验。生成器仅依赖 python3 标准库，无需编译环境即可运行。
+      # 任一生成产物与 SSoT 漂移即返回非零，阻止合入。
+      - name: Verify syscall.xml SSoT drift (agentrt userland syscall)
+        run: |
+          python3 tools/codegen/syscall_gen.py \
+            --input atoms/syscall/include/syscall.xml \
+            --output-dir atoms/syscall/include \
+            --check
