@@ -342,7 +342,9 @@ jobs:
           cmake --build ${{ env.BUILD_DIR }} --config Release --parallel 2>&1 | Tee-Object -FilePath $buildLog
           if ($LASTEXITCODE -ne 0) {
             $lines = Get-Content $buildLog
-            $errs = $lines | Where-Object { $_ -match ': error |error C[0-9]+|fatal error|error LNK[0-9]+|: error:' }
+            # C2220 的前一行即被升级的 warning（含真实告警码），一并纳入
+            $errIdx = 0..($lines.Count - 1) | Where-Object { $lines[$_] -match ': error |error C[0-9]+|fatal error|error LNK[0-9]+' }
+            $errs = foreach ($i in $errIdx) { $lines[[Math]::Max(0, $i - 1)..$i] }
             $tail = if ($errs) { $errs | Select-Object -Last 40 } else { $lines | Select-Object -Last 60 }
             $msg = ("MSVC build failed (exit {0})`n{1}" -f $LASTEXITCODE, ($tail -join "`n"))
             if ($msg.Length -gt 30000) { $msg = $msg.Substring($msg.Length - 30000) }
