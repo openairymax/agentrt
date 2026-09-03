@@ -335,11 +335,15 @@ jobs:
         shell: pwsh
         run: |
           # MSVC 编译失败时把 stderr 尾部以 ::error:: 上报为 annotation：
-          # 日志下载需 admin，annotation 匿名 API 可读，供迭代定位编译错误。
+          # 日志下载需 admin，annotation 匿名 API 可读。注意 GH 单步 annotation
+          # 上限 ~10 条，逐行 ::error:: 会被截断——合并为单条多行消息。
           $buildLog = Join-Path $env:RUNNER_TEMP "build.log"
           cmake --build ${{ env.BUILD_DIR }} --config Release --parallel 2>&1 | Tee-Object -FilePath $buildLog
           if ($LASTEXITCODE -ne 0) {
-            Get-Content $buildLog -Tail 60 | ForEach-Object { Write-Output "::error::$_" }
+            $tail = Get-Content $buildLog -Tail 120 | Out-String
+            $msg = ("MSVC build failed (exit {0})`n{1}" -f $LASTEXITCODE, $tail)
+            $msg = $msg.Replace('%', '%25').Replace("`r", '').Replace("`n", '%0A')
+            Write-Output "::error::$msg"
             exit $LASTEXITCODE
           }
 
