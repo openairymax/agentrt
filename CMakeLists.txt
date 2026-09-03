@@ -16,6 +16,16 @@ endif()
 # 缺失时（如 aarch64 交叉工具链仅装了 gcc 未装 g++）configure 失败。
 project(AgentRT VERSION ${AIRY_VERSION_NUM} LANGUAGES C)
 
+# macOS 链接：coreloopthree 以 weak 引用 MemoryRovol 闭源符号
+# （memoryrovol_provider / rs_semantic_cache）。ELF 下未定义弱符号自动
+# 置 NULL 可链接；Mach-O 默认 -undefined error 会报 "Undefined symbols
+# for architecture arm64"（release run #4 实证）。加 dynamic_lookup 允许
+# 弱导入运行期解析（调用侧以 NULL 判空，安全降级为 builtin）。
+if(APPLE)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-undefined,dynamic_lookup")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-undefined,dynamic_lookup")
+endif()
+
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR
         "AgentRT in-source builds are not allowed! (BAN-33)\n"
