@@ -31,7 +31,8 @@ jobs:
     runs-on: ubuntu-latest
     container: ubuntu:20.04
     env:
-      BUILD_DIR: build
+      # BAN-33：agentrt 即源码根，构建目录必须在源码树外（runner.temp）
+      BUILD_DIR: ${{ runner.temp }}/build
       STAGE_DIR: stage
     steps:
       # ubuntu:20.04 基础镜像无 git：actions/checkout 会回退到 REST tarball
@@ -190,7 +191,8 @@ jobs:
   build-macos:
     runs-on: macos-latest
     env:
-      BUILD_DIR: build
+      # BAN-33：构建目录在源码树外
+      BUILD_DIR: ${{ runner.temp }}/build
       STAGE_DIR: stage
     steps:
       - name: Checkout
@@ -287,7 +289,8 @@ jobs:
   build-windows:
     runs-on: windows-latest
     env:
-      BUILD_DIR: build
+      # BAN-33：构建目录在源码树外
+      BUILD_DIR: ${{ runner.temp }}/build
       STAGE_DIR: stage
     steps:
       - name: Checkout
@@ -406,6 +409,7 @@ jobs:
       - name: Build in riscv64 container
         run: |
           docker run --rm --platform linux/riscv64 \
+            -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage \
             -v "$PWD":/src -w /src ubuntu:20.04 bash -c '
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
@@ -503,6 +507,7 @@ jobs:
       - name: Build in arm64 container
         run: |
           docker run --rm --platform linux/arm64 \
+            -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage \
             -v "$PWD":/src -w /src ubuntu:20.04 bash -c '
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
@@ -612,6 +617,7 @@ jobs:
       - name: Build in ${{ matrix.name }} container
         run: |
           docker run --rm --platform ${{ matrix.platform }} \
+            -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage \
             -v "$PWD":/src -w /src ${{ matrix.image }} bash -c '
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
