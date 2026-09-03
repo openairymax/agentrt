@@ -389,6 +389,17 @@ else()
     set(AIRY_HAS_CJSON FALSE CACHE BOOL "cJSON available")
     airy_print_warn("cJSON not found, JSON features disabled")
 endif()
+# cJSON 头目录统一纳入全 target 可见 include 路径：find_package/pkg 检测
+# 各自写入不同前缀变量（cJSON_*/CJSON_*），且安装目录不在系统默认搜索
+# 路径（macOS Homebrew /opt/homebrew 等）时，直接 #include <cjson/cJSON.h>
+# 的下游 TU（如 atoms/coreloopthree cognition）会 "file not found"。此处
+# 等价于系统默认路径的聚合面，Linux（/usr/include/cjson）下为空无副作用。
+if(cJSON_INCLUDE_DIRS)
+    include_directories(${cJSON_INCLUDE_DIRS})
+endif()
+if(CJSON_INCLUDE_DIRS)
+    include_directories(${CJSON_INCLUDE_DIRS})
+endif()
 
 # --- libyaml ---
 find_package(YAML QUIET)
