@@ -417,6 +417,10 @@ jobs:
           docker run --rm --platform linux/riscv64 \
             -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage \
             -v "$PWD":/src -w /src ubuntu:20.04 bash -c '
+            # v0.1.9 教训：此前无 set -e，cmake 自编译失败后外层脚本继续执行，
+            # docker run 以 0 退出、stage/ 为空 → 上传 3KB 损坏制品。fail-closed：
+            # 任一中间步骤失败立即中止本作业，杜绝假绿。
+            set -euo pipefail
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
             apt-get install -y -qq \
@@ -515,6 +519,8 @@ jobs:
           docker run --rm --platform linux/arm64 \
             -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage \
             -v "$PWD":/src -w /src ubuntu:20.04 bash -c '
+            # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）
+            set -euo pipefail
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
             apt-get install -y -qq \
@@ -625,6 +631,8 @@ jobs:
           docker run --rm --platform ${{ matrix.platform }} \
             -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage \
             -v "$PWD":/src -w /src ${{ matrix.image }} bash -c '
+            # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）
+            set -euo pipefail
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
             apt-get install -y -qq \
