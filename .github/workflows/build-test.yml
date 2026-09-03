@@ -1,0 +1,208 @@
+name: Build / Test / Coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ==================== Linux 全量构建 + 测试 + 覆盖率门禁 ====================
+  linux-build-test-coverage:
+    runs-on: ubuntu-latest
+    env:
+      BUILD_DIR: build
+      COVERAGE_THRESHOLD: 55
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      # 子模块问题修复：submodules:true 全量递归会拉 agent-linux/kernel
+      # （~2.5GB）且闭源子模块在 GitHub 不存在，checkout 必然失败。
+      # agentrt 为 workflow 宿主仓：cmake -S . 即构建本仓（7 叶子在根初始化）。
+      - name: Init submodules (agent-workload)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh agent-workload
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build lcov \
+            libsqlite3-dev libcjson-dev libyaml-dev libcurl4-openssl-dev \
+            libssl-dev zlib1g-dev libzstd-dev \
+            libmicrohttpd-dev libwebsockets-dev libevent-dev \
+            python3 python3-pip
+
+      - name: Configure (ENABLE_COVERAGE=ON, BUILD_TESTS=ON)
+        run: |
+          cmake -S . -B ${{ env.BUILD_DIR }} \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTS=ON \
+            -DENABLE_COVERAGE=ON \
+            -DAIRY_BUILD_ALL=ON \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Build
+        run: |
+          cmake --build ${{ env.BUILD_DIR }} --parallel "$(nproc)"
+
+      - name: Run tests (ctest)
+        run: |
+          ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure -j"$(nproc)"
+
+      # 覆盖率门禁：低于阈值（COVERAGE_THRESHOLD）即失败，
+      # 防止发行版功能回归（50-engineering-standards / TEST-03）。
+      - name: Collect coverage (lcov)
+        run: |
+          lcov --capture --directory ${{ env.BUILD_DIR }} \
+            --output-file ${{ env.BUILD_DIR }}/coverage.info \
+            --rc lcov_branch_coverage=1 \
+            --exclude "*/tests/*" --exclude "*/build/*" \
+            --exclude "*/agentrt/commons/third_party/*" \
+            --exclude "/usr/*"
+          lcov --summary ${{ env.BUILD_DIR }}/coverage.info --rc lcov_branch_coverage=1
+
+      - name: Enforce coverage threshold
+        run: |
+          LINE_PCT=$(lcov --summary ${{ env.BUILD_DIR }}/coverage.info --rc lcov_branch_coverage=1 2>&1 | grep -oP 'lines\.\.\.\.\d+\.\d+' | grep -oP '\d+\.\d+')
+          echo "Line coverage: ${LINE_PCT}% (threshold: ${{ env.COVERAGE_THRESHOLD }}%)"
+          if awk "BEGIN{exit !(${LINE_PCT} >= ${{ env.COVERAGE_THRESHOLD }})}"; then
+            echo "[OK] Coverage meets threshold"
+          else
+            echo "[FAIL] Coverage below threshold" && exit 1
+          fi
+
+  # ==================== macOS 跨平台构建门禁 ====================
+  macos-build:
+    runs-on: macos-latest
+    env:
+      BUILD_DIR: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Init submodules (agent-workload)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh agent-workload
+
+      - name: Install build dependencies (Homebrew)
+        run: |
+          brew install cmake ninja pkgconf sqlite cjson libyaml curl openssl zlib zstd \
+            libmicrohttpd libwebsockets libevent
+
+      # openssl / zlib / sqlite 为 keg-only，需显式导出 pkg-config 路径供 find_package 使用
+      - name: Configure (clang, BUILD_TESTS=ON)
+        run: |
+          # curl 与 openssl/zlib/sqlite 同为 brew keg-only，须显式导出 pkg-config 路径，
+          # 否则 find_package(CURL) 与 pkg_check_modules(libcurl) 均落空，
+          # AIRY_HAS_CURL=FALSE 导致 macOS 构建静默剔除 HTTP/联网功能
+          export PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig:$(brew --prefix zlib)/lib/pkgconfig:$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix curl)/lib/pkgconfig"
+          cmake -S . -B ${{ env.BUILD_DIR }} \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTS=ON \
+            -DAIRY_BUILD_ALL=ON \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Build
+        run: |
+          cmake --build ${{ env.BUILD_DIR }} --parallel "$(sysctl -n hw.ncpu)"
+
+      - name: Run tests (ctest)
+        run: |
+          ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure -j"$(sysctl -n hw.ncpu)"
+
+  # ==================== Windows 跨平台构建门禁 ====================
+  windows-build:
+    runs-on: windows-latest
+    env:
+      BUILD_DIR: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Init submodules (agent-workload)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh agent-workload
+
+      - name: Install dependencies (vcpkg)
+        shell: pwsh
+        run: |
+          # vcpkg 包名：curl（port 名为 curl 而非 libcurl）；
+          # GNU libmicrohttpd 与 libwebsockets 的 port 名带 lib- 前缀，
+          # 旧写法 microhttpd/websockets/libcurl 会直接 vcpkg install 失败（Windows 构建阻塞）
+          vcpkg install sqlite3 cjson libyaml curl openssl zlib libmicrohttpd libwebsockets libevent --triplet x64-windows
+
+      - name: Configure (MSVC)
+        shell: pwsh
+        run: |
+          cmake -S . -B ${{ env.BUILD_DIR }} `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DBUILD_TESTS=ON -DAIRY_BUILD_ALL=ON -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cmake --build ${{ env.BUILD_DIR }} --config Release --parallel
+
+      - name: Run tests (ctest)
+        run: |
+          ctest --test-dir ${{ env.BUILD_DIR }} -C Release --output-on-failure
+
+  # ==================== MemoryRovol 独立构建门禁（OSS + PRO） ====================
+  # 禁用：memoryrovol 为闭源仓（.gitmodules update=none，GitHub 不存在，
+  # 仅 atomgit 私有可达），GitHub Actions 无法检出源码；旧路径
+  # products/memoryrovol 亦为拆分前布局（现 agent-workload/products/）。
+  # 该门禁由本地构建台执行（tools/scripts/ci 体系），不在 GitHub 镜像侧运行。
+  memoryrovol-build:
+    if: false
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        mode: [oss, pro]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake lcov libsqlite3-dev libcjson-dev libyaml-dev \
+            libcurl4-openssl-dev libssl-dev zlib1g-dev libzstd-dev
+
+      - name: Configure (${{ matrix.mode }})
+        run: |
+          if [ "${{ matrix.mode }}" = "oss" ]; then
+            CMAKE_EXTRA="-DMEMORYROVOL_OSS=ON"
+          fi
+          cmake -S agent-workload/products/memoryrovol -B build \
+            -DBUILD_TESTS=ON -DWARNINGS_AS_ERRORS=ON ${CMAKE_EXTRA}
+
+      - name: Build
+        run: |
+          cmake --build build --parallel "$(nproc)"
+
+      - name: Run tests (ctest)
+        run: |
+          ctest --test-dir build --output-on-failure

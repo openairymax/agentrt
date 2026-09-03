@@ -1,0 +1,773 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 0.1.5)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+# 版本号 SSoT：tag 推送 → github.ref_name（如 v0.1.5）；workflow_dispatch →
+# inputs.version 合成 v 前缀。全流程统一引用 env.VERSION，修复：
+#   - 问题 4：workflow_dispatch 手动触发时 github.ref_name 为分支名而非 tag
+#   - 问题 7：手动发布无需先打 tag，版本由输入唯一决定
+env:
+  VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', github.event.inputs.version) }}
+
+jobs:
+  # Linux x86_64：container ubuntu:20.04 保证 glibc 2.31 基线（覆盖
+  # Ubuntu 20.04+/Debian 11+/Pi OS Bullseye+）。注意：GitHub Actions 容器
+  # 作业仅支持 Linux runner，macOS/Windows 必须拆分为独立作业（问题：
+  # matrix 作业级 container 在 macos/windows runner 上报
+  # "Container operation is only supported on Linux"）。
+  build-linux:
+    runs-on: ubuntu-latest
+    container: ubuntu:20.04
+    env:
+      BUILD_DIR: build
+      STAGE_DIR: stage
+    steps:
+      # ubuntu:20.04 基础镜像无 git：actions/checkout 会回退到 REST tarball
+      # 下载（工作区无 .git），导致后续 git submodule 报
+      # "fatal: not a git repository"（v0.1.9 Release run 实证）。
+      # 必须在 Checkout 之前于容器内装 git + CA 证书。
+      # 容器步骤以 root 运行而挂载工作区属 uid 1001，submodule init 报
+      # "detected dubious ownership"（v0.1.9 Release run 二次实证）；
+      # 写系统级 safe.directory（/etc/gitconfig）， HOME 无关。
+      - name: Prepare container (git for checkout)
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends git ca-certificates
+          git config --system --add safe.directory '*'
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      # 20.04 基线依赖准备：
+      #   - apt: 构建工具 + 系统库（libcurl/libwebsockets/microhttpd 等）
+      #   - pip: cmake ≥3.20（20.04 自带 3.16 不满足项目最低要求）
+      #   - 源码: cJSON 1.7.18（20.04 的 1.7.10 缺 cJSON_GetNumberValue）
+      #   - 源码: OpenSSL 3.0.17（20.04 的 libssl 1.1.1 头文件触发 AIRY
+      #     poison 编译失败，且 EOL 不再维护）
+      - name: Install build dependencies
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential make perl curl git ca-certificates \
+            python3 python3-pip python3-venv \
+            libsqlite3-dev libyaml-dev libcurl4-openssl-dev \
+            libssl-dev zlib1g-dev libzstd-dev \
+            libmicrohttpd-dev libwebsockets-dev libevent-dev \
+            libnghttp2-dev
+          pip3 install --no-cache-dir "cmake==3.29.6" ninja
+          # Rust 工具链（agentrt-tui 完全体包组件）
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+          curl -fsSL -o /tmp/cjson.tar.gz \
+            https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.18.tar.gz
+          tar -xzf /tmp/cjson.tar.gz -C /tmp
+          cmake -S /tmp/cJSON-1.7.18 -B /tmp/cjson-build \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DENABLE_CJSON_TEST=OFF -DBUILD_SHARED_LIBS=ON
+          cmake --build /tmp/cjson-build --parallel
+          cmake --install /tmp/cjson-build
+          curl -fsSL -o /tmp/openssl.tar.gz \
+            https://github.com/openssl/openssl/releases/download/openssl-3.0.17/openssl-3.0.17.tar.gz
+          tar -xzf /tmp/openssl.tar.gz -C /tmp
+          (cd /tmp/openssl-3.0.17 && ./config --prefix=/usr/local \
+            --openssldir=/usr/local/ssl shared && \
+            make -j"$(nproc)" build_sw && make install_sw)
+
+      # 定向子模块检出（agent-workload 构建源 + tools 脚本）：不用
+      # submodules:true —— 全量递归会拉 agent-linux/kernel（~2.5GB，构建
+      # 用不到），且闭源子模块在 GitHub 不存在会使 checkout 整体失败。
+      # 依赖上一步 apt 安装的 git，故置于依赖准备之后。
+      - name: Init submodules (agent-workload, tools)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh agent-workload tools
+
+      # 0.1.6f：依赖自编译统一收敛到 lib-builddeps.sh（SSoT，与本地
+      # build.sh 同源）——自编译 OpenSSL 3.0.17 + libcurl 8.5.0 +
+      # libwebsockets 4.3.3，统一 libssl.so.3 链路，根治宿主缺
+      # libssl.so.1.1 崩溃（apt 预编译库链接 1.1.1 双 OpenSSL ABI）。
+      - name: Build self-compiled deps (curl/lws/openssl SSoT)
+        run: |
+          bash tools/scripts/ci/release/lib-builddeps.sh
+
+      - name: Configure
+        run: |
+          cmake -S . -B ${{ env.BUILD_DIR }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTS=OFF \
+            -DENABLE_SANITIZERS=OFF \
+            -DAIRY_BUILD_ALL=ON \
+            -DOPENSSL_ROOT_DIR=/usr/local -DCMAKE_PREFIX_PATH=/usr/local \
+            -DCMAKE_INSTALL_PREFIX="${{ env.STAGE_DIR }}"
+
+      - name: Build
+        run: |
+          cmake --build ${{ env.BUILD_DIR }} --config Release --parallel
+
+      - name: Install (aggregate bin/)
+        run: |
+          cmake --install ${{ env.BUILD_DIR }} --config Release
+
+      # install.sh 二进制模式依赖 bin/agentrt-bootstrap.sh（daemon 编排脚本），
+      # 但其位于 tools 子仓（原 devtools，非 agentrt 树），cmake --install 不会带入，
+      # 必须在此显式部署，否则二进制安装后 daemon 无法一键启动编排。
+      - name: Deploy bootstrap script
+        run: |
+          if [ -f "tools/scripts/ops/bin/agentrt-bootstrap.sh" ]; then
+            cp -f "tools/scripts/ops/bin/agentrt-bootstrap.sh" "${{ env.STAGE_DIR }}/bin/agentrt-bootstrap.sh"
+            chmod 755 "${{ env.STAGE_DIR }}/bin/agentrt-bootstrap.sh"
+          fi
+
+      # 完全体包完整性（对齐 tools/scripts/ci/release/package-full-release.sh 的
+      # build_full_package 内容，单一清单防漂移）：
+      #   bin/agentrt-tui（Rust TUI）+ lib/（Python 运行时依赖）
+      # CARGO_TARGET_DIR 指向 RUNNER_TEMP，禁止在源码树落盘（铁律 4.7）。
+      # TUI 构建失败仅告警降级，不阻断发布（闭源/工具链缺省容错同哲学）。
+      # build-linux 用 container ubuntu:20.04，run 默认 shell 为 dash：
+      # `source` 非 POSIX 内建会静默失败导致 cargo 丢失（exit 127），
+      # 统一改 PATH 注入；构建命令加 if ! 守卫兑现降级契约。
+      - name: Build TUI + copy Python runtime
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/tui-target"
+          if ! (cd agent-workload/sdk/tui && cargo build --release); then
+            echo "warn: linux TUI 构建失败（降级）"
+          fi
+          cp -f "$CARGO_TARGET_DIR/release/agentrt-tui" "${{ env.STAGE_DIR }}/bin/" 2>/dev/null || echo "warn: TUI 构建产物缺失（降级）"
+          mkdir -p "${{ env.STAGE_DIR }}/lib"
+          for p in agent-workload/ecosystem/agents/airymax_agents \
+                   agent-workload/ecosystem/agents/airymax_agents_rs \
+                   agent-workload/ecosystem/agents/orchestration \
+                   agent-workload/sdk/sdk-python/agentrt; do
+            [ -d "$p" ] && cp -r "$p" "${{ env.STAGE_DIR }}/lib/" || true
+          done
+
+      # 打包：包内建 agentrt-<version> 顶层目录。install.sh 二进制模式按
+      # agentrt-* 目录名匹配解压位置，无顶层目录时二进制安装 100% 失败。
+      # 同步产出 *.sha256（install.sh/airymaxrt --file 离线校验所需）。
+      - name: Package (tar.gz)
+        run: |
+          VERSION="${{ env.VERSION }}"; VERSION_NUM="${VERSION#v}"
+          PKG_DIR="pkg/agentrt-${VERSION_NUM}"
+          mkdir -p "${PKG_DIR}/config" "${PKG_DIR}/modules"
+          cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/"
+          cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
+          touch "${PKG_DIR}/platform-x86_64"
+          ARTIFACT="agentrt-${VERSION}-linux-x64"
+          tar -czf "${ARTIFACT}.tar.gz" -C pkg .
+          sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
+          echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.artifact_name }}
+          path: ${{ env.artifact_name }}.*
+          if-no-files-found: error
+
+  # macOS arm64：原生 runner（无 container——容器作业仅支持 Linux）。
+  # openssl/zlib/sqlite/curl 为 keg-only，需显式导出 pkg-config 路径。
+  build-macos:
+    runs-on: macos-latest
+    env:
+      BUILD_DIR: build
+      STAGE_DIR: stage
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Init submodules (agent-workload, tools)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh agent-workload tools
+
+      - name: Install build dependencies
+        run: |
+          brew install cmake ninja pkgconf sqlite cjson libyaml curl openssl zlib zstd \
+            libmicrohttpd libwebsockets libevent nghttp2
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+
+      - name: Configure
+        run: |
+          export PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig:$(brew --prefix zlib)/lib/pkgconfig:$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix curl)/lib/pkgconfig"
+          # brew openssl 为 keg-only：libwebsockets.h 直接 #include <openssl/ssl.h>
+          # 不经 pkg-config 的 TU 需要显式 -I/-L（CFLAGS/LDFLAGS 是
+          # CMAKE_C_FLAGS / CMAKE_EXE_LINKER_FLAGS 的环境初值，全 target 生效）
+          export CFLAGS="-I$(brew --prefix openssl)/include"
+          export LDFLAGS="-L$(brew --prefix openssl)/lib"
+          cmake -S . -B ${{ env.BUILD_DIR }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTS=OFF \
+            -DENABLE_SANITIZERS=OFF \
+            -DAIRY_BUILD_ALL=ON \
+            -DCMAKE_INSTALL_PREFIX="${{ env.STAGE_DIR }}"
+
+      - name: Build
+        run: |
+          cmake --build ${{ env.BUILD_DIR }} --config Release --parallel
+
+      - name: Install (aggregate bin/)
+        run: |
+          cmake --install ${{ env.BUILD_DIR }} --config Release
+
+      - name: Deploy bootstrap script
+        run: |
+          if [ -f "tools/scripts/ops/bin/agentrt-bootstrap.sh" ]; then
+            cp -f "tools/scripts/ops/bin/agentrt-bootstrap.sh" "${{ env.STAGE_DIR }}/bin/agentrt-bootstrap.sh"
+            chmod 755 "${{ env.STAGE_DIR }}/bin/agentrt-bootstrap.sh"
+          fi
+
+      - name: Build TUI + copy Python runtime
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/tui-target"
+          if ! (cd agent-workload/sdk/tui && cargo build --release); then
+            echo "warn: macos TUI 构建失败（降级）"
+          fi
+          cp -f "$CARGO_TARGET_DIR/release/agentrt-tui" "${{ env.STAGE_DIR }}/bin/" 2>/dev/null || echo "warn: TUI 构建产物缺失（降级）"
+          mkdir -p "${{ env.STAGE_DIR }}/lib"
+          for p in agent-workload/ecosystem/agents/airymax_agents \
+                   agent-workload/ecosystem/agents/airymax_agents_rs \
+                   agent-workload/ecosystem/agents/orchestration \
+                   agent-workload/sdk/sdk-python/agentrt; do
+            [ -d "$p" ] && cp -r "$p" "${{ env.STAGE_DIR }}/lib/" || true
+          done
+
+      - name: Package (tar.gz)
+        run: |
+          VERSION="${{ env.VERSION }}"; VERSION_NUM="${VERSION#v}"
+          PKG_DIR="pkg/agentrt-${VERSION_NUM}"
+          mkdir -p "${PKG_DIR}/config" "${PKG_DIR}/modules"
+          cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/"
+          cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
+          touch "${PKG_DIR}/platform-aarch64"
+          ARTIFACT="agentrt-${VERSION}-macos-arm64"
+          tar -czf "${ARTIFACT}.tar.gz" -C pkg .
+          sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
+          echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.artifact_name }}
+          path: ${{ env.artifact_name }}.*
+          if-no-files-found: error
+
+  # Windows x64：原生 runner（无 container）。vcpkg 已预装于
+  # windows-latest（$env:VCPKG_INSTALLATION_ROOT）。zip 包必须与 tar.gz 包
+  # 保持完全体一致（config 模板 + permission_rules + maths-toolkit +
+  # platform 标记），防止 Windows 包缺失组件（问题：打包漂移）。
+  build-windows:
+    runs-on: windows-latest
+    env:
+      BUILD_DIR: build
+      STAGE_DIR: stage
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Init submodules (agent-workload, tools)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh agent-workload tools
+
+      - name: Install build dependencies
+        shell: pwsh
+        run: |
+          # vcpkg 包名：curl（非 libcurl）、libmicrohttpd/libwebsockets（带 lib- 前缀）
+          vcpkg install sqlite3 cjson libyaml curl openssl zlib libmicrohttpd libwebsockets libevent nghttp2 --triplet x64-windows
+          # Rust 工具链（agentrt-tui 完全体包组件）
+          Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile "$env:TEMP\rustup-init.exe"
+          & "$env:TEMP\rustup-init.exe" -y --profile minimal --default-toolchain stable
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          cmake -S . -B ${{ env.BUILD_DIR }} `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DBUILD_TESTS=OFF `
+            -DENABLE_SANITIZERS=OFF `
+            -DAIRY_BUILD_ALL=ON `
+            -DCMAKE_INSTALL_PREFIX="${{ env.STAGE_DIR }}"
+
+      - name: Build
+        run: |
+          cmake --build ${{ env.BUILD_DIR }} --config Release --parallel
+
+      - name: Install (aggregate bin/)
+        run: |
+          cmake --install ${{ env.BUILD_DIR }} --config Release
+
+      - name: Build TUI + copy Python runtime
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+          $env:CARGO_TARGET_DIR = "$env:RUNNER_TEMP\tui-target"
+          Push-Location "agent-workload/sdk/tui"
+          & cargo build --release
+          Pop-Location
+          if (Test-Path "$env:CARGO_TARGET_DIR\release\agentrt-tui.exe") {
+            Copy-Item "$env:CARGO_TARGET_DIR\release\agentrt-tui.exe" "${{ env.STAGE_DIR }}\bin\" -Force
+          } else { Write-Host "warn: TUI 构建产物缺失（降级）" }
+          New-Item -ItemType Directory -Path "${{ env.STAGE_DIR }}\lib" -Force | Out-Null
+          foreach ($p in @("agent-workload/ecosystem/agents/airymax_agents","agent-workload/ecosystem/agents/airymax_agents_rs","agent-workload/ecosystem/agents/orchestration","agent-workload/sdk/sdk-python/agentrt")) {
+            if (Test-Path $p) { Copy-Item -Path $p -Destination "${{ env.STAGE_DIR }}\lib\" -Recurse -Force }
+          }
+
+      # zip 包与 tar.gz 完全体一致（install.ps1 二进制模式依赖 config 模板）。
+      - name: Package (zip)
+        shell: pwsh
+        run: |
+          $VERSION = "${{ env.VERSION }}"; $VERSION_NUM = $VERSION.TrimStart('v')
+          $pkgDir = "pkg\agentrt-$VERSION_NUM"
+          New-Item -ItemType Directory -Path "$pkgDir\config" -Force | Out-Null
+          New-Item -ItemType Directory -Path "$pkgDir\modules" -Force | Out-Null
+          Copy-Item -Path "${{ env.STAGE_DIR }}\*" -Destination "$pkgDir\" -Recurse -Force
+          foreach ($cfg in @("agent-workload\ecosystem\manager\configs\agentrt.yaml","agent-workload\ecosystem\manager\model\model.yaml","tools\scripts\ops\templates\secrets.env.example","tools\scripts\ops\templates\permission_rules.yaml")) {
+            if (Test-Path $cfg) { Copy-Item -Path $cfg -Destination "$pkgDir\config\" -Force }
+          }
+          if (Test-Path "agent-workload\ecosystem\markets\tools\maths-toolkit") {
+            Copy-Item -Path "agent-workload\ecosystem\markets\tools\maths-toolkit" -Destination "$pkgDir\modules\" -Recurse -Force
+          }
+          if (Test-Path "tools\scripts\ops\bin\agentrt-bootstrap.sh") {
+            Copy-Item -Path "tools\scripts\ops\bin\agentrt-bootstrap.sh" -Destination "$pkgDir\bin\" -Force
+          }
+          New-Item -ItemType File -Path "$pkgDir\platform-x64" -Force | Out-Null
+          $artifact = "agentrt-$VERSION-windows-x64"
+          Compress-Archive -Path "pkg\*" -DestinationPath "$artifact.zip"
+          # 校验和（Windows 无 sha256sum，用 Get-FileHash）
+          (Get-FileHash -Algorithm SHA256 "$artifact.zip").Hash.ToLower() + "  $artifact.zip" | Out-File -FilePath "$artifact.zip.sha256"
+          "artifact_name=$artifact" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.artifact_name }}
+          path: ${{ env.artifact_name }}.*
+          if-no-files-found: error
+
+  # RISC-V (linux-riscv64)：标准 runner 无 riscv64 第三方库（libcurl 等），
+  # 经 Docker buildx + qemu 多架构容器构建（ubuntu:20.04 riscv64 镜像，
+  # 与 x86_64/arm64 统一 glibc 2.31 基线）。
+  build-riscv64:
+    runs-on: ubuntu-latest
+    env:
+      BUILD_DIR: build
+      STAGE_DIR: stage
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      # 宿主机完成定向检出后再 docker run（-v "$PWD":/src 挂载需含
+      # agent-workload/ 与 tools/）
+      - name: Init submodules (agent-workload, tools)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh agent-workload tools
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build in riscv64 container
+        run: |
+          docker run --rm --platform linux/riscv64 \
+            -v "$PWD":/src -w /src ubuntu:20.04 bash -c '
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -qq
+            apt-get install -y -qq \
+              build-essential make perl curl python3 python3-pip \
+              libsqlite3-dev libyaml-dev libcurl4-openssl-dev \
+              libssl-dev zlib1g-dev libzstd-dev libmicrohttpd-dev \
+              libwebsockets-dev libevent-dev libnghttp2-dev
+            # 0.1.6f SSoT：cmake/cJSON/OpenSSL/libcurl/libwebsockets 自编译
+            # 收敛到 lib-builddeps.sh（与本地 build.sh / build-linux 同源，
+            # 幂等 + 离线 deps 缓存优先）。统一 libssl.so.3 链路。
+            bash /src/tools/scripts/ci/release/lib-builddeps.sh
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+            export PATH="$HOME/.cargo/bin:$PATH"
+            export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+            cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release \
+              -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF -DAIRY_BUILD_ALL=ON \
+              -DOPENSSL_ROOT_DIR=/usr/local -DCMAKE_PREFIX_PATH=/usr/local \
+              -DCMAKE_INSTALL_PREFIX="$PWD/$STAGE_DIR"
+            cmake --build "$BUILD_DIR" -j"$(nproc)"
+            cmake --install "$BUILD_DIR"
+            # Rust TUI（agentrt-tui），失败降级不阻断。riscv64 链接陷阱：
+            # GNU ld 2.34 无法合并 RISC-V attributes（libc build script 即
+            # 失败）；与本地 tools/scripts/ci/release/build.sh 同源修复——
+            # rust-lld 复制为 ld.lld，gcc driver 保留库路径，-fuse-ld=lld
+            # 仅换链接器。
+            export PATH="$HOME/.cargo/bin:$PATH"
+            export CARGO_TARGET_DIR=/tmp/tui-target
+            RUST_LLD="$(find "$HOME/.rustup" -name rust-lld -path '*riscv64*' 2>/dev/null | head -1)"
+            if [ -n "$RUST_LLD" ]; then cp -f "$RUST_LLD" /usr/local/bin/ld.lld; chmod +x /usr/local/bin/ld.lld; fi
+            if ! (cd agent-workload/sdk/tui && RUSTFLAGS="-C link-arg=-fuse-ld=lld" cargo build --release); then
+              echo "warn: riscv64 TUI 构建失败（降级）"
+            else
+              cp -f /tmp/tui-target/release/agentrt-tui "$STAGE_DIR/bin/" 2>/dev/null || true
+            fi
+            # Python 运行时依赖
+            mkdir -p "$STAGE_DIR/lib"
+            for p in agent-workload/ecosystem/agents/airymax_agents \
+                     agent-workload/ecosystem/agents/airymax_agents_rs \
+                     agent-workload/ecosystem/agents/orchestration \
+                     agent-workload/sdk/sdk-python/agentrt; do
+              [ -d "$p" ] && cp -r "$p" "$STAGE_DIR/lib/" || true
+            done
+            '
+
+      - name: Package (tar.gz)
+        run: |
+          VERSION="${{ env.VERSION }}"; VERSION_NUM="${VERSION#v}"
+          PKG_DIR="pkg/agentrt-${VERSION_NUM}"
+          mkdir -p "${PKG_DIR}/config" "${PKG_DIR}/modules"
+          cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/" 2>/dev/null || true
+          cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
+          cp -f tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
+          touch "${PKG_DIR}/platform-riscv64"
+          ARTIFACT="agentrt-${VERSION}-linux-riscv64"
+          tar -czf "${ARTIFACT}.tar.gz" -C pkg .
+          sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
+          echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentrt-${{ env.VERSION }}-linux-riscv64
+          path: agentrt-${{ env.VERSION }}-linux-riscv64.tar.gz*
+          if-no-files-found: error
+
+  # ARM64 (linux-aarch64)：与 riscv64 同方案，经 Docker buildx + qemu 多架构
+  # 容器构建（ubuntu:20.04 arm64 镜像，统一 glibc 2.31 基线，覆盖 32/64 位 ARM 等设备）。
+  build-arm64:
+    runs-on: ubuntu-latest
+    env:
+      BUILD_DIR: build
+      STAGE_DIR: stage
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      # 宿主机完成定向检出后再 docker run（-v "$PWD":/src 挂载需含
+      # agent-workload/ 与 tools/）
+      - name: Init submodules (agent-workload, tools)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh agent-workload tools
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build in arm64 container
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v "$PWD":/src -w /src ubuntu:20.04 bash -c '
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -qq
+            apt-get install -y -qq \
+              build-essential make perl curl python3 python3-pip \
+              libsqlite3-dev libyaml-dev libcurl4-openssl-dev \
+              libssl-dev zlib1g-dev libzstd-dev libmicrohttpd-dev \
+              libwebsockets-dev libevent-dev libnghttp2-dev
+            # 0.1.6f SSoT：cmake/cJSON/OpenSSL/libcurl/libwebsockets 自编译
+            # 收敛到 lib-builddeps.sh（与本地 build.sh / build-linux 同源，
+            # 幂等 + 离线 deps 缓存优先）。统一 libssl.so.3 链路。
+            bash /src/tools/scripts/ci/release/lib-builddeps.sh
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+            export PATH="$HOME/.cargo/bin:$PATH"
+            export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+            cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release \
+              -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF -DAIRY_BUILD_ALL=ON \
+              -DOPENSSL_ROOT_DIR=/usr/local -DCMAKE_PREFIX_PATH=/usr/local \
+              -DCMAKE_INSTALL_PREFIX="$PWD/$STAGE_DIR"
+            cmake --build "$BUILD_DIR" -j"$(nproc)"
+            cmake --install "$BUILD_DIR"
+            # Rust TUI（agentrt-tui），失败降级不阻断
+            export PATH="$HOME/.cargo/bin:$PATH"
+            export CARGO_TARGET_DIR=/tmp/tui-target
+            (cd agent-workload/sdk/tui && cargo build --release) || echo "warn: arm64 TUI 构建失败（降级）"
+            cp -f /tmp/tui-target/release/agentrt-tui "$STAGE_DIR/bin/" 2>/dev/null || true
+            # Python 运行时依赖
+            mkdir -p "$STAGE_DIR/lib"
+            for p in agent-workload/ecosystem/agents/airymax_agents \
+                     agent-workload/ecosystem/agents/airymax_agents_rs \
+                     agent-workload/ecosystem/agents/orchestration \
+                     agent-workload/sdk/sdk-python/agentrt; do
+              [ -d "$p" ] && cp -r "$p" "$STAGE_DIR/lib/" || true
+            done
+            '
+
+      - name: Package (tar.gz)
+        run: |
+          VERSION="${{ env.VERSION }}"; VERSION_NUM="${VERSION#v}"
+          PKG_DIR="pkg/agentrt-${VERSION_NUM}"
+          mkdir -p "${PKG_DIR}/config" "${PKG_DIR}/modules"
+          cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/" 2>/dev/null || true
+          cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
+          cp -f tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
+          touch "${PKG_DIR}/platform-aarch64"
+          ARTIFACT="agentrt-${VERSION}-linux-arm64"
+          tar -czf "${ARTIFACT}.tar.gz" -C pkg .
+          sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
+          echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentrt-${{ env.VERSION }}-linux-arm64
+          path: agentrt-${{ env.VERSION }}-linux-arm64.tar.gz*
+          if-no-files-found: error
+
+  # 32 位 Linux（i686 / armv7l）：六架构兼容决策（2026-08-30）补全 32 位
+  # 构建门禁。经 Docker buildx + qemu 多架构容器构建，统一 glibc 2.31
+  # 基线；覆盖老 x86 与 32 位 ARM 用户空间——64 位内核 + 32 位用户态场景。
+  # 镜像按架构分选：ubuntu:20.04 官方镜像无 linux/386 清单（v0.1.9
+  # Release run 实证 "no matching manifest for linux/386"），i686 改用
+  # debian:bullseye（glibc 2.31 与 focal 同基线，有 i386 清单）；
+  # armv7l 维持 ubuntu:20.04（有 linux/arm/v7 清单）。
+  # TUI 在 32 位 qemu 模拟下 rustc 极慢且易超时，本作业降级跳过
+  # （C/C++ 核心编译门禁仍完整），agentrt-tui 32 位制品由本地构建台
+  # build.sh i686|armv7l 交叉产物覆盖（tools/scripts/ci/release/build.sh）。
+  build-linux-32bit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: i686
+            platform: linux/386
+            image: debian:bullseye
+            tag: platform-i686
+            artifact: linux-x86
+          - name: armv7l
+            platform: linux/arm/v7
+            image: ubuntu:20.04
+            tag: platform-armv7l
+            artifact: linux-arm32
+    env:
+      BUILD_DIR: build
+      STAGE_DIR: stage
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      # 宿主机完成定向检出后再 docker run（-v "$PWD":/src 挂载需含
+      # agent-workload/ 与 tools/）
+      - name: Init submodules (agent-workload, tools)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh agent-workload tools
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build in ${{ matrix.name }} container
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} \
+            -v "$PWD":/src -w /src ${{ matrix.image }} bash -c '
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -qq
+            apt-get install -y -qq \
+              build-essential make perl curl python3 python3-pip python3-venv \
+              libsqlite3-dev libyaml-dev libcurl4-openssl-dev \
+              libssl-dev zlib1g-dev libzstd-dev libmicrohttpd-dev \
+              libwebsockets-dev libevent-dev libnghttp2-dev
+            # 0.1.6f SSoT：cmake/cJSON/OpenSSL/libcurl/libwebsockets 自编译
+            # 收敛到 lib-builddeps.sh（与本地 build.sh / 其他 Linux job
+            # 同源，幂等 + 离线 deps 缓存优先）。统一 libssl.so.3 链路。
+            bash /src/tools/scripts/ci/release/lib-builddeps.sh
+            export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+            cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release \
+              -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF -DAIRY_BUILD_ALL=ON \
+              -DOPENSSL_ROOT_DIR=/usr/local -DCMAKE_PREFIX_PATH=/usr/local \
+              -DCMAKE_INSTALL_PREFIX="$PWD/$STAGE_DIR"
+            cmake --build "$BUILD_DIR" -j"$(nproc)"
+            cmake --install "$BUILD_DIR"
+            echo "warn: ${{ matrix.name }} TUI 交叉构建在 qemu 模拟下跳过（由本地构建台产物覆盖）"
+            mkdir -p "$STAGE_DIR/lib"
+            for p in agent-workload/ecosystem/agents/airymax_agents \
+                     agent-workload/ecosystem/agents/airymax_agents_rs \
+                     agent-workload/ecosystem/agents/orchestration \
+                     agent-workload/sdk/sdk-python/agentrt; do
+              [ -d "$p" ] && cp -r "$p" "$STAGE_DIR/lib/" || true
+            done
+            '
+
+      - name: Package (tar.gz)
+        run: |
+          VERSION="${{ env.VERSION }}"; VERSION_NUM="${VERSION#v}"
+          PKG_DIR="pkg/agentrt-${VERSION_NUM}"
+          mkdir -p "${PKG_DIR}/config" "${PKG_DIR}/modules"
+          cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/" 2>/dev/null || true
+          cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
+          cp -f tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
+          touch "${PKG_DIR}/${{ matrix.tag }}"
+          ARTIFACT="agentrt-${VERSION}-${{ matrix.artifact }}"
+          tar -czf "${ARTIFACT}.tar.gz" -C pkg .
+          sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
+          echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentrt-${{ env.VERSION }}-${{ matrix.artifact }}
+          path: agentrt-${{ env.VERSION }}-${{ matrix.artifact }}.tar.gz*
+          if-no-files-found: error
+
+  # 汇聚六平台制品 → 签名（cosign + GPG）→ manifest 生成 → 发布
+  # 官方制品仓库：atomgit.com/openairymax/agentrt（publish-release.sh 上传）；
+  # GitHub Release 为镜像。双轨签名防供应链：
+  #   cosign sign-blob 每个 tarball（*.sig）；GPG 签名 manifest.*.json（*.asc）。
+  # 需在仓库 secrets 配置：GPG_PRIVATE_KEY/GPG_PASSPHRASE/COSIGN_PRIVATE_KEY/
+  # COSIGN_PASSWORD/ATOMGIT_TOKEN（见 tools/scripts/ci/release/init-signing-keys.sh）。
+  release:
+    needs: [build-linux, build-macos, build-windows, build-riscv64, build-arm64, build-linux-32bit]
+    runs-on: ubuntu-latest
+    # tag 推送或手动 dispatch（手动时版本来自 inputs.version）皆可触发
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+    env:
+      COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+      COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
+      ATOMGIT_REPO: openairymax/agentrt
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      # 关键修复：release job 此前完全不初始化子模块 → tools/ 为空 →
+      # publish-release.sh 不存在，发布必然失败。agent-workload 供安装器
+      # 源（agentrt/scripts/install.{sh,ps1}）与更新器源（sdk/tui/scripts/
+      # airymaxrt），tools 供发布脚本本体。
+      - name: Init submodules (agent-workload, tools)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh agent-workload tools
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3.6.0
+
+      - name: Generate release notes
+        run: |
+          VERSION="${{ env.VERSION }}"
+          PREV="$(git describe --tags --abbrev=0 "${VERSION}^" 2>/dev/null || echo '')"
+          if [ -n "$PREV" ]; then
+            git log --oneline --no-merges "${PREV}..${VERSION}" | head -60
+          else
+            git log --oneline --no-merges -20
+          fi > dist/notes.txt
+          echo "变更摘要已生成: $(wc -l < dist/notes.txt) 行"
+
+      # 签名 + manifest 生成 + GPG 签名 + atomgit Release 上传 + latest/ 入口更新。
+      # 未配置 ATOMGIT_TOKEN 时自动跳过上传，产物保留在 dist/（GitHub 镜像照常）。
+      - name: Sign, generate manifest, publish to atomgit
+        env:
+          RELEASE_NOTES_FILE: dist/notes.txt
+        run: |
+          bash ./tools/scripts/ci/release/publish-release.sh "${{ env.VERSION }}" "$PWD/dist"
+
+      - name: Create GitHub Release (mirror)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: AgentRT ${{ env.VERSION }}
+          body: |
+            ## AgentRT ${{ env.VERSION }}
+
+            AI Agent Runtime Platform Engineering — 服务器就绪的 Agent 运行时底座。
+
+            ### 官方制品（atomgit）
+
+            https://atomgit.com/openairymax/agentrt/releases/download/${{ env.VERSION }}/
+
+            ### 安装
+
+            下载对应平台包并解压（或直接走安装器二进制模式，自动 GPG 验签 + sha256 校验）：
+
+            ```sh
+            # 以 Linux x64 为例；macOS → agentrt-<版本>-macos-arm64，Windows → .zip
+            AIRY_RELEASE_URL="https://atomgit.com/openairymax/agentrt/releases/download/${{ env.VERSION }}/agentrt-${{ env.VERSION }}-linux-x64.tar.gz" ./install.sh
+            ```
+
+            默认通道安装（安装器随 release 附件分发，匿名直连，一行完成
+            GPG 验签 + sha256 校验）：
+
+            ```sh
+            curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/${{ env.VERSION }}/install.sh" | bash -s -- --channel stable
+            ```
+
+            ### 更新
+
+            ```sh
+            airymaxrt update --check    # 检查更新
+            airymaxrt update            # 升级到最新
+            ```
+
+            或直接解压 tarball 后：
+            - `bin/agentrt-bootstrap.sh start` 一键启动 15 个 daemon
+            - `bin/airy_cli` 进入 CLI 交互界面（或 `airymaxrt`）
+          files: dist/*
