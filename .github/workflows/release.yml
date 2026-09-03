@@ -218,7 +218,9 @@ jobs:
           # brew openssl 为 keg-only：libwebsockets.h 直接 #include <openssl/ssl.h>
           # 不经 pkg-config 的 TU 需要显式 -I/-L（CFLAGS/LDFLAGS 是
           # CMAKE_C_FLAGS / CMAKE_EXE_LINKER_FLAGS 的环境初值，全 target 生效）
-          export CFLAGS="-I$(brew --prefix openssl)/include"
+          # arm64 Homebrew 头文件在 $(brew --prefix)/include，clang 不自动搜索，
+          # 一并 -I（对齐 build-test.yml）。
+          export CFLAGS="-I$(brew --prefix)/include -I$(brew --prefix openssl)/include"
           # Apple Silicon 默认不搜 /opt/homebrew/lib：gateway_d 链接
           # -lmicrohttpd 等裸库名需 -L$(brew --prefix)/lib（实证 run #2）。
           export LDFLAGS="-L$(brew --prefix)/lib -L$(brew --prefix openssl)/lib"
