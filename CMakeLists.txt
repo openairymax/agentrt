@@ -293,9 +293,18 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
         # 这样链接器扫描静态库时可用传统符号表解析，避免 LTO 符号摘要导致的
         # undefined reference 错误（LTO + ASan 组合下尤其常见）。
         # 代价：对象文件体积约增加 2x，但保留了 LTO 跨模块优化能力。
-        add_compile_options(-O3 -flto -ffat-lto-objects)
+        # 注意：Apple clang（macOS）不支持 -ffat-lto-objects（v0.1.9
+        # Release run 实证 "unsupported option"），故探测后启用；探测失败
+        # 回退纯 -O3 无 LTO，不影响正确性。
+        include(CheckCCompilerFlag)
+        check_c_compiler_flag("-flto -ffat-lto-objects" AIRY_HAVE_FAT_LTO_OBJECTS)
+        if(AIRY_HAVE_FAT_LTO_OBJECTS)
+            add_compile_options(-O3 -flto -ffat-lto-objects)
+            add_link_options(-flto -ffat-lto-objects)
+        else()
+            add_compile_options(-O3)
+        endif()
         add_compile_definitions(NDEBUG)
-        add_link_options(-flto -ffat-lto-objects)
         # 发行制品体积控制：链接期 strip 符号表与残留 debug 段。
         # Sanitizer 构建保留符号（ASan 符号化依赖），仅纯 Release 剥离。
         if(NOT ENABLE_SANITIZERS)
