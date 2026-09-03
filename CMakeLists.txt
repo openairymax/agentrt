@@ -399,6 +399,19 @@ if(NOT YAML_FOUND AND PkgConfig_FOUND)
     pkg_check_modules(YAML QUIET libyaml)
 endif()
 if(YAML_FOUND)
+    # 下游一律以裸 ${YAML_LIBRARIES}（"yaml"→-lyaml）链接；keg-only 安装
+    # （Homebrew libyaml）只把目录给到 pkg-config，-L 到不了链接行，
+    # macOS 报 "ld: library 'yaml' not found"。提升为绝对路径后所有
+    # 消费点（commons/cupolas/daemons）无需 -L 即可链接。
+    if(NOT IS_ABSOLUTE "${YAML_LIBRARIES}")
+        find_library(YAML_ABSOLUTE_LIBRARY
+                     NAMES yaml yaml-0.1
+                     HINTS ${YAML_LIBRARY_DIRS}
+                     PATH_SUFFIXES lib)
+        if(YAML_ABSOLUTE_LIBRARY)
+            set(YAML_LIBRARIES "${YAML_ABSOLUTE_LIBRARY}")
+        endif()
+    endif()
     set(AIRY_HAS_YAML TRUE CACHE BOOL "libyaml available")
     airy_print_ok("libyaml found: ${YAML_LIBRARIES}")
 else()
