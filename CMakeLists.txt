@@ -495,19 +495,30 @@ endif()
 # 若在子模块探测则首次 configure 时 AIRY_HAS_HTTP2 恒为 FALSE，HTTP/2
 # 首次构建被静默禁用、二次 configure 才生效。根级先行探测保证首次即正确
 # （gateway/ 子模块保留同逻辑，CACHE 已设时幂等）。
-find_library(_NGHTTP2_LIBRARY NAMES nghttp2)
-if(NOT _NGHTTP2_LIBRARY)
-    find_file(_NGHTTP2_LIBRARY
-        NAMES libnghttp2.so.14 libnghttp2.so.19 libnghttp2.so
-        PATHS /usr/lib/x86_64-linux-gnu /usr/lib /usr/local/lib
-    )
-endif()
-if(_NGHTTP2_LIBRARY)
-    set(AIRY_HAS_HTTP2 TRUE CACHE BOOL "nghttp2 available")
-    airy_print_ok("nghttp2 found: ${_NGHTTP2_LIBRARY} (HTTP/2 gateway enabled)")
+#
+# WIN32 在本权威写入点强制关闭：http2 家族实现是 POSIX-only
+# （pthread 事件循环 + fcntl F_GETFL/O_NONBLOCK + poll/nfds_t），
+# gateway_lib_obj 未接 winpthreads，MSVC 编译必报 C2065。子模块侧
+# 后续无 FORCE 的 CACHE 写覆盖不了此处已定的值，故门控必须落在根级。
+# Windows 原生线程模型移植完成后再恢复（fc527de 同裁决）。
+if(WIN32)
+    set(AIRY_HAS_HTTP2 FALSE CACHE BOOL "nghttp2 available" FORCE)
+    airy_print_warn("HTTP/2 gateway disabled on Windows (POSIX-only implementation)")
 else()
-    set(AIRY_HAS_HTTP2 FALSE CACHE BOOL "nghttp2 available")
-    airy_print_warn("nghttp2 not found, HTTP/2 gateway disabled")
+    find_library(_NGHTTP2_LIBRARY NAMES nghttp2)
+    if(NOT _NGHTTP2_LIBRARY)
+        find_file(_NGHTTP2_LIBRARY
+            NAMES libnghttp2.so.14 libnghttp2.so.19 libnghttp2.so
+            PATHS /usr/lib/x86_64-linux-gnu /usr/lib /usr/local/lib
+        )
+    endif()
+    if(_NGHTTP2_LIBRARY)
+        set(AIRY_HAS_HTTP2 TRUE CACHE BOOL "nghttp2 available")
+        airy_print_ok("nghttp2 found: ${_NGHTTP2_LIBRARY} (HTTP/2 gateway enabled)")
+    else()
+        set(AIRY_HAS_HTTP2 FALSE CACHE BOOL "nghttp2 available")
+        airy_print_warn("nghttp2 not found, HTTP/2 gateway disabled")
+    endif()
 endif()
 
 # --- GTest ---
