@@ -625,11 +625,20 @@ jobs:
             image: debian:bullseye
             tag: platform-i686
             artifact: linux-x86
+            # 门禁架构：i686 已修复（openssl linux-generic32），阻断发布
+            experimental: false
           - name: armv7l
             platform: linux/arm/v7
             image: ubuntu:20.04
             tag: platform-armv7l
             artifact: linux-arm32
+            # 先发后修（2026-09-03，同 Windows 决策）：armv7l qemu 的 cmake
+            # 供给仍在收敛（Kitware APT armhf 验证中），暂不阻断 v0.1.9 发布，
+            # linux-arm32 制品随后补发；修好后置回 experimental: false。
+            experimental: true
+    # continue-on-error：experimental=true 的矩阵项失败不使整个 job 失败，
+    # release.needs 仍列本 job，其余架构产物照常汇聚发布。
+    continue-on-error: ${{ matrix.experimental }}
     env:
       BUILD_DIR: build
       STAGE_DIR: stage
