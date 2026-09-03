@@ -5,7 +5,7 @@
 
 **Language:** English | [简体中文](README_zh.md)
 
-[![Version](https://img.shields.io/badge/version-0.1.8-5a6b7e)](https://atomgit.com/openairymax/agentrt)
+[![Version](https://img.shields.io/badge/version-0.1.9-5a6b7e)](https://atomgit.com/openairymax/agentrt)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
 
@@ -17,7 +17,7 @@
 
 This repository is a **management repo** (git superproject). It aggregates **7 leaf repositories** as git submodules and inherits the **complete git history** of the original AgentRT monorepo. The repository URL retains its historical name `git@atomgit.com:openairymax/agentrt.git` to preserve commit continuity. AgentRT exposes the OS-level mechanisms required to run agent teams at scale: micro-core primitives, cognitive loops, memory stratification, security domes, IPC protocols, gateway services, and long-running daemon processes.
 
-AgentRT is a **management repo** (git superproject) under the user-space engineering super-repo `agent-workload` (renamed from `agent-runtim` in v0.1.4). Sibling super-repos under the `airymaxhub` umbrella include the kernel-space `agent-linux` plus top-level repos `docs`, `closed-docs`, `tools` (renamed from `devtools` in v0.1.4), and `closed-dev-build`. Each leaf repo is independently buildable and version-controlled, while the management repo pins them together via git submodules to produce a coherent, reproducible runtime platform.
+AgentRT is a **management repo** (git superproject) under the user-space engineering super-repo `agent-workload` (renamed from `agent-runtim` in v0.1.4). Sibling repos under the `airymaxhub` umbrella include the kernel-space `agent-linux` plus toolchain and documentation repos; all user-space runtime source code lives under `agent-workload`. Each leaf repo is independently buildable and version-controlled, while the management repo pins them together via git submodules to produce a coherent, reproducible runtime platform.
 
 ## Core Capabilities
 
@@ -46,34 +46,33 @@ airymaxhub/                     ← Umbrella repo (git superproject root)
 │   │   ├── cupolas/            ← submodule: safety dome (B-class)
 │   │   ├── heapstore/          ← submodule: heap-backed storage (A-class)
 │   │   ├── protocols/          ← submodule: AgentsIPC & A2A/A2T protocol stack
-│   │   ├── gateway/            ← submodule: HTTP/WS/Stdio → JSON-RPC 2.0 gateway
-│   │   ├── daemons/            ← submodule: 15 runtime daemons
-│   │   ├── contracts/          ← contract headers (symlink → atoms/contracts)
+│   │   ├── gateway/            ← submodule: HTTP/WS/SSE/MCP/A2A/OpenAI → JSON-RPC 2.0 gateway
+│   │   ├── daemons/            ← submodule: 15 runtime daemons + daemon framework
 │   │   ├── cmake/              ← build-system modules
 │   │   ├── scripts/            ← official installer install.sh/install.ps1
+│   │   ├── tests/              ← smoke & toolchain self-tests
+│   │   ├── tools/              ← internal tools & quality gates (airy_cli / airy_depgraph, …)
 │   │   ├── CMakeLists.txt      ← top-level CMake entry point
+│   │   ├── VERSION             ← version single source of truth (SSoT)
 │   │   └── Doxyfile            ← API documentation configuration
-│   ├── sdk/                    ← SDK management repo
+│   ├── sdk/                    ← SDK management repo (cli/tui/sdk-rust/sdk-python/sdk-go/sdk-typescript)
 │   ├── ecosystem/              ← Ecosystem management repo
 │   └── products/               ← Products management repo
 ├── agent-linux/                ← kernel-space engineering super-repo (formerly agentrt-linux, renamed v0.1.3)
-├── tools/                      ← Development tools (renamed from devtools in v0.1.4)
-├── docs/                       ← Open documentation
-├── closed-docs/                ← Internal documentation
-└── devbuild-closed/           ← Internal build/deploy (formerly closed-dev-build / build-closed)
+└── tools/                      ← CI / quality gates / release toolchain repo (renamed from devtools in v0.1.4)
 ```
 
 ## Leaf Repositories
 
 | Module | Repository URL | Class | Description |
 |--------|---------------|-------|-------------|
-| **atoms** | `git@atomgit.com:openairymax/atoms.git` | A | Micro-core primitives: `corekern`, `coreloopthree`, `syscall`, `taskflow`, `memory` (5 modules, frameworks removed since 0.1.5a) |
-| **commons** | `git@atomgit.com:openairymax/commons.git` | A | Shared foundation library: 24+ util modules (logging, sync, memory, string, ipc, etc.) |
-| **cupolas** | `git@atomgit.com:openairymax/cupolas.git` | B | Safety dome: 4-layer inherent security (sandbox, RBAC, sanitization, audit) |
+| **atoms** | `git@atomgit.com:openairymax/atoms.git` | A | Micro-core system layer: `corekern`, `coreloopthree`, `syscall`, `taskflow`, `memory` (5 modules) |
+| **commons** | `git@atomgit.com:openairymax/commons.git` | A | Shared foundation library: authoritative type/error contracts + 32 cohesive util modules |
+| **cupolas** | `git@atomgit.com:openairymax/cupolas.git` | B | Safety dome: 4-layer inherent security + policy decision point (PDP) / local enforcement points (PEPs) |
 | **heapstore** | `git@atomgit.com:openairymax/heapstore.git` | A | Heap-backed runtime data persistence |
 | **protocols** | `git@atomgit.com:openairymax/protocols.git` | — | AgentsIPC (128-byte message header) & A2A/A2T protocol stack |
-| **gateway** | `git@atomgit.com:openairymax/gateway.git` | — | HTTP/WS/Stdio → JSON-RPC 2.0 gateway daemon (`gateway_d`) |
-| **daemons** | `git@atomgit.com:openairymax/daemons.git` | — | 15 runtime daemons: `gateway_d`, `llm_d`, `tool_d`, `sched_d`, `market_d`, `monit_d`, `channel_d`, `notify_d`, `hook_d`, `mem_d`, `agent_d`, `a2a_d`, `think_d`, `cupolas_d`, `maths_d` (0.1.9 M4: plugin/info/observe consolidated into tool_d/monit_d) |
+| **gateway** | `git@atomgit.com:openairymax/gateway.git` | — | HTTP/WS/SSE/MCP/A2A/OpenAI → JSON-RPC 2.0 gateway — the sole process boundary (`gateway_d`) |
+| **daemons** | `git@atomgit.com:openairymax/daemons.git` | — | 15 runtime daemons: `gateway_d`, `agent_d`, `llm_d`, `tool_d`, `sched_d`, `think_d`, `mem_d`, `market_d`, `monit_d`, `notify_d`, `channel_d`, `a2a_d`, `cupolas_d`, `maths_d`, `hook_d` (steady state since 0.1.9: plugin execution folded into `tool_d`, observability unified in `monit_d`) |
 
 > **Class legend:** A = foundational/atomic (depended upon by upper layers); B = behavioral/safety; — = service/composition layer.
 
@@ -82,27 +81,27 @@ airymaxhub/                     ← Umbrella repo (git superproject root)
 AgentRT follows a cyclic layered architecture. Each layer depends only on the layers below it; the Support Layer provides the unified foundation that the SDK Layer ultimately binds back to, closing the loop.
 
 ```
-⬇️  SDK Layer          — Python / Go / Rust / TypeScript SDKs                       (sdk/ repo)
-⇅   Service Layer      — 15 daemon services                                          (daemons/)
+⬇️  SDK Layer          — Rust CLI/TUI + Python / Go / Rust / TypeScript SDKs          (sdk/ repo)
+⇅   Service Layer      — 15 daemon services (runtime orchestration)                   (daemons/)
 ⇅   Protocol Layer     — AgentsIPC & A2A/A2T protocol stack                          (protocols/)
-⇅   Gateway Layer      — HTTP / WS / Stdio → JSON-RPC 2.0 gateway daemon             (gateway/)
+⇅   Gateway Layer      — HTTP / WS / SSE / MCP / A2A / OpenAI → JSON-RPC 2.0         (gateway/)
 ⇅   Storage Layer      — Heap-backed runtime data persistence                        (heapstore/)
-⇅   Security Layer     — 4-layer inherent safety dome                                (cupolas/)
+⇅   Security Layer     — 4-layer inherent safety dome (PDP / PEPs)                   (cupolas/)
 ⇅   Kernel Layer       — 5 atomic microkernel modules                                (atoms/)
-⇅   Support Layer      — Unified foundation library (24+ util modules)               (commons/)
+⇅   Support Layer      — Unified foundation library (32 cohesive util modules)       (commons/)
 ⬆️  SDK Layer          — (cyclic) SDKs bind back to foundation & expose to consumers  (sdk/ repo)
 ```
 
 **Layer responsibilities:**
 
-- **SDK Layer** — Language bindings (Python/Go/Rust/TypeScript) that expose AgentRT APIs to agent developers. Sits at the top of the stack and closes the cycle by depending on the Support Layer foundation.
-- **Service Layer** — 18 long-running daemon processes that implement runtime orchestration: scheduling, tool dispatch, LLM bridging, dual-think cognition, memory, multi-agent collaboration, monitoring, notifications, and plugin management.
+- **SDK Layer** — Rust CLI/TUI and multi-language SDKs (Python/Go/Rust/TypeScript) that expose AgentRT APIs to agent developers. Sits at the top of the stack and closes the cycle by depending on the Support Layer foundation.
+- **Service Layer** — 15 long-running daemon processes (steady state) that implement runtime orchestration: scheduling, tool dispatch & plugin execution, LLM bridging, dual-think cognition, memory, multi-agent collaboration (A2A), monitoring & alerting, and event notification — started by dependency order with self-healing.
 - **Protocol Layer** — AgentsIPC (fixed 128-byte message header) for in-process and cross-process messaging, plus A2A (agent-to-agent) and A2T (agent-to-tool) protocol stacks.
-- **Gateway Layer** — `gateway_d` translates HTTP, WebSocket, and stdio transports into a unified JSON-RPC 2.0 stream, providing the external entry point into the runtime.
+- **Gateway Layer** — `gateway_d` translates HTTP, WebSocket, SSE, MCP, A2A, and OpenAI transports into a unified JSON-RPC 2.0 stream — the sole process boundary into the runtime (protocol translation only, no business logic).
 - **Storage Layer** — `heapstore` provides heap-backed persistence for runtime state, agent memory, and transient data.
-- **Security Layer** — `cupolas` enforces 4-layer inherent security: sandbox isolation, RBAC authorization, input/output sanitization, and audit logging.
-- **Kernel Layer** — `atoms` contains the 5 atomic microkernel modules (`corekern`, `coreloopthree`, `syscall`, `taskflow`, `memory`) that provide scheduling, cognitive loops, and memory primitives.
-- **Support Layer** — `commons` provides the 24+ shared utility modules (logging, synchronization, memory, string handling, IPC helpers) that every other layer builds upon.
+- **Security Layer** — `cupolas` enforces 4-layer inherent security (sandbox isolation, RBAC authorization, input/output sanitization, audit logging); its policy decision point (PDP) loads/distributes/rolls back policies, applied locally by each daemon via policy enforcement points (PEPs) within seconds.
+- **Kernel Layer** — `atoms` contains the 5 atomic microkernel modules (`corekern`, `coreloopthree`, `syscall`, `taskflow`, `memory`) providing scheduling, the three-layer cognitive-loop mechanism, and memory primitives.
+- **Support Layer** — `commons` provides the 32 cohesive utility modules (logging, synchronization, memory, string handling, IPC helpers) that every other layer builds upon.
 
 ## Quick Install (End Users)
 
@@ -188,10 +187,10 @@ cd /tmp/agentrt-build && ctest --output-on-failure
 
 ## Branch Strategy
 
-- **This management repo**: `main` branch only — stable, release-tagged.
-- **Leaf repositories**: `feature/official-hubs-01` — active development branch tracked by each submodule.
+- **This management repo (agentrt)**: `main` is the active development branch — stable, release-tagged.
+- **Leaf repositories**: `develop/hubs-01` is the standard development branch; `main` is a release snapshot (synced from `develop/hubs-01` once per release, not for day-to-day work).
 
-Submodule pins in `.gitmodules` reference `feature/official-hubs-01` for all 7 leaf repos. The management repo's `main` branch records the exact commit each submodule should resolve to, ensuring reproducible builds for every Airymax release (0.1.1 foundation and 0.1.2 onwards).
+Aggregation uses gitlinks (commit-hash pins), independent of branch names: this repo's `main` records the exact commit each leaf repo should resolve to, ensuring reproducible builds for every Airymax release. On each release the leaf snapshots are synced and the gitlink pins are bumped level by level.
 
 ## License
 
