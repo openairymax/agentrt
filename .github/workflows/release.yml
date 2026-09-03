@@ -419,8 +419,11 @@ jobs:
             -v "$PWD":/src -w /src ubuntu:20.04 bash -c '
             # v0.1.9 教训：此前无 set -e，cmake 自编译失败后外层脚本继续执行，
             # docker run 以 0 退出、stage/ 为空 → 上传 3KB 损坏制品。fail-closed：
-            # 任一中间步骤失败立即中止本作业，杜绝假绿。
+            # 任一中间步骤失败立即中止本作业，杜绝假绿。诊断：tee + ERR trap
+            # 以 ::error:: 上报失败命令与日志尾部（annotation 匿名 API 可读）。
             set -euo pipefail
+            exec > >(tee /src/container-riscv64.log) 2>&1
+            trap '"'"'echo "::error::[riscv64] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; tail -n 15 /src/container-riscv64.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
             apt-get install -y -qq \
@@ -521,6 +524,8 @@ jobs:
             -v "$PWD":/src -w /src ubuntu:20.04 bash -c '
             # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）
             set -euo pipefail
+            exec > >(tee /src/container-arm64.log) 2>&1
+            trap '"'"'echo "::error::[arm64] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; tail -n 15 /src/container-arm64.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
             apt-get install -y -qq \
@@ -594,6 +599,9 @@ jobs:
   build-linux-32bit:
     runs-on: ubuntu-latest
     strategy:
+      # 矩阵项相互独立：任一失败不再取消另一架构（v0.1.9 run #7 实证：
+      # i686 失败导致 armv7l 被 fail-fast 取消，白白丢失一次构建信号）。
+      fail-fast: false
       matrix:
         include:
           - name: i686
@@ -609,6 +617,9 @@ jobs:
     env:
       BUILD_DIR: build
       STAGE_DIR: stage
+      # 32 位用户态地址空间受限：自编译 deps（lib-builddeps.sh）与 cmake
+      # 构建统一小并行（AIRY_JOBS），避免 -j$(nproc) 大并行 OOM/失败。
+      AIRY_JOBS: 2
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -629,10 +640,15 @@ jobs:
       - name: Build in ${{ matrix.name }} container
         run: |
           docker run --rm --platform ${{ matrix.platform }} \
-            -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage \
+            -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage -e AIRY_JOBS \
             -v "$PWD":/src -w /src ${{ matrix.image }} bash -c '
-            # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）
+            # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）。
+            # 诊断通道：stdout 全程 tee 到 /src/container-*.log（宿主工作区），
+            # ERR trap 把失败命令与日志尾部以 ::error:: 上报——annotation 经
+            # GitHub API 匿名可读，无需 admin 下载日志即可定位失败。
             set -euo pipefail
+            exec > >(tee /src/container-${{ matrix.name }}.log) 2>&1
+            trap '"'"'echo "::error::[${{ matrix.name }}] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; tail -n 15 /src/container-${{ matrix.name }}.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
             apt-get install -y -qq \
@@ -649,7 +665,7 @@ jobs:
               -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF -DAIRY_BUILD_ALL=ON \
               -DOPENSSL_ROOT_DIR=/usr/local -DCMAKE_PREFIX_PATH=/usr/local \
               -DCMAKE_INSTALL_PREFIX="$PWD/$STAGE_DIR"
-            cmake --build "$BUILD_DIR" -j"$(nproc)"
+            cmake --build "$BUILD_DIR" -j"${AIRY_JOBS:-$(nproc)}"
             cmake --install "$BUILD_DIR"
             echo "warn: ${{ matrix.name }} TUI 交叉构建在 qemu 模拟下跳过（由本地构建台产物覆盖）"
             mkdir -p "$STAGE_DIR/lib"
