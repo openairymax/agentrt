@@ -741,6 +741,10 @@ jobs:
       - name: Sign, generate manifest, publish to atomgit
         env:
           RELEASE_NOTES_FILE: dist/notes.txt
+          # agentrt 宿主下安装器 SSoT 位于本仓 scripts/（旧伞仓布局为
+          # agent-workload/agentrt/scripts/），发布脚本默认路径需覆盖。
+          AIRY_INSTALLER_SRC: ${{ github.workspace }}/scripts/install.sh
+          AIRY_INSTALLER_PS1_SRC: ${{ github.workspace }}/scripts/install.ps1
         run: |
           bash ./_tools/scripts/ci/release/publish-release.sh "${{ env.VERSION }}" "$PWD/dist"
 
