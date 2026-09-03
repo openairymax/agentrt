@@ -332,8 +332,16 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="${{ env.STAGE_DIR }}"
 
       - name: Build
+        shell: pwsh
         run: |
-          cmake --build ${{ env.BUILD_DIR }} --config Release --parallel
+          # MSVC 编译失败时把 stderr 尾部以 ::error:: 上报为 annotation：
+          # 日志下载需 admin，annotation 匿名 API 可读，供迭代定位编译错误。
+          $buildLog = Join-Path $env:RUNNER_TEMP "build.log"
+          cmake --build ${{ env.BUILD_DIR }} --config Release --parallel 2>&1 | Tee-Object -FilePath $buildLog
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content $buildLog -Tail 60 | ForEach-Object { Write-Output "::error::$_" }
+            exit $LASTEXITCODE
+          }
 
       - name: Install (aggregate bin/)
         run: |
