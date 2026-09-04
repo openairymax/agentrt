@@ -806,6 +806,34 @@ if(AIRY_BUILD_ALL)
         set(AIRY_HAS_LIBWEBSOCKETS TRUE CACHE BOOL "libwebsockets available for agentrt")
     endif()
 
+    # ============================================================
+    # 模块选项设置（含平台支持矩阵默认值）
+    # 默认值按平台能力对齐；显式 -DBUILD_*=... 传参仍可覆盖，为
+    # Windows 移植预留显式 opt-in 开发路径（不 FORCE、不吞用户意图）。
+    # ============================================================
+    option(BUILD_ATOMS "Build atoms module (core kernel components)" ON)
+    option(BUILD_COMMONS "Build commons module (common utilities)" ON)
+    option(BUILD_CUPOLAS "Build cupolas module (security framework)" ON)
+    # Windows 支持矩阵（2026-09-04 决策）：daemons 子系统（svc/ipc/
+    # discovery/各 *_d 服务）现为 POSIX 绑定——DIR/strings.h/sys/socket/
+    # unistd 直引（MSVC 实证 C1083/C2065 大面积失败），Windows 侧默认
+    # 不构建；全量 Windows 移植随 0.1.12/13 GitHub 三平台打包里程碑落地。
+    # CLI（airy_cli）依赖 daemon 控制平面（svc_common/gateway RPC），
+    # daemons 缺席时一并退出默认矩阵。
+    if(WIN32)
+        set(AIRY_DAEMON_DEFAULT OFF)
+        set(AIRY_CLI_DEFAULT OFF)
+        airy_print_warn("Support matrix: daemons/CLI excluded on Windows (POSIX-bound, port milestone 0.1.12/13)")
+    else()
+        set(AIRY_DAEMON_DEFAULT ON)
+        set(AIRY_CLI_DEFAULT ON)
+    endif()
+    option(BUILD_DAEMON "Build daemon modules (system services)" ${AIRY_DAEMON_DEFAULT})
+    option(BUILD_GATEWAY "Build gateway module (API gateway)" ON)
+    option(BUILD_HEAPSTORE "Build heapstore module (persistent storage)" ON)
+    option(BUILD_CLI "Build interactive CLI product (GCCP + WorkHall)" ${AIRY_CLI_DEFAULT})
+    option(BUILD_TOOLKIT "Build toolkit modules (language SDKs)" OFF)
+
     # 子模块启用状态汇总
     airy_print_info("[MODULE] Submodule build status:")
     airy_print_info("[MODULE]   atoms:    ${BUILD_ATOMS}")
@@ -842,16 +870,6 @@ if(AIRY_BUILD_ALL)
         endif()
         add_compile_options(/FI"${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows_preinclude.h")
     endif()
-
-    # 模块选项设置
-    option(BUILD_ATOMS "Build atoms module (core kernel components)" ON)
-    option(BUILD_COMMONS "Build commons module (common utilities)" ON)
-    option(BUILD_CUPOLAS "Build cupolas module (security framework)" ON)
-    option(BUILD_DAEMON "Build daemon modules (system services)" ON)
-    option(BUILD_GATEWAY "Build gateway module (API gateway)" ON)
-    option(BUILD_HEAPSTORE "Build heapstore module (persistent storage)" ON)
-    option(BUILD_CLI "Build interactive CLI product (GCCP + WorkHall)" ON)
-    option(BUILD_TOOLKIT "Build toolkit modules (language SDKs)" OFF)
 
     # 包含子目录（构建顺序：commons 优先于 atoms）
     if(BUILD_COMMONS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/commons/CMakeLists.txt")
