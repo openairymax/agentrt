@@ -78,10 +78,14 @@ jobs:
       # 未命中 exclude 又判硬错误、空 tracefile 却 rc=0；gcovr 对单个
       # gcov 文件错误鲁棒。Cobertura XML 的 lines-covered/lines-valid
       # 作为行覆盖率唯一口径（exclude tests/build/usr 源码）。
+      # --gcov-ignore-errors=no_working_dir_found：树外构建（BUILD_DIR=../build）
+      # 中个别测试 .gcda 源路径带前缀解析不到（coreloopthree tests 实证，
+      # rc=64）；tests 覆盖率本就排除，忽略该错误不参与统计。
       - name: Collect coverage (gcovr)
         run: |
           set +e
           gcovr --root . --object-directory ${{ env.BUILD_DIR }} \
+            --gcov-ignore-errors=no_working_dir_found \
             --exclude '.*/(tests|build)/.*' \
             --exclude '.*/agentrt/commons/third_party/.*' \
             --exclude '/usr/.*' \
