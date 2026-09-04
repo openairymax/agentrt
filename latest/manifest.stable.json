@@ -1,57 +1,52 @@
 {
   "schema": 1,
   "channel": "stable",
-  "latest": "v0.1.8",
-  "updated_at": "2026-08-31T23:35:27Z",
+  "latest": "v0.1.9",
+  "updated_at": "2026-09-04T01:15:42Z",
   "releases": {
-    "v0.1.8": {
+    "v0.1.9": {
       "yanked": false,
-      "notes": "# AgentRT v0.1.8 — 向导首配 model.yaml 修复与 TUI 交互细节修复\n\n0.1.8 基于 0.1.7 发布后的社区与内部质量审计，修复 TUI 首启向导主路径缺陷与多项交互细节。\n\n## 修复\n\n- **向导首配 model.yaml 生成损坏（P0）**：`build_minimal_yaml` 在循环内重复写 `- name:` 行，首次配置生成 N 个碎片模型项，`read_model_yaml` 取 `rows.first()` 读到空 context_window——上下文窗口/最大输出/工具轮数等高级选项配置静默丢失、模型配置错乱（社区\"向导配置乱码\"真实根因之一）。\n- **向导步骤 4 高级选项在 finish 时被默认值覆盖**：离开步骤 4 前快照 `adv_fields`，`adv_values()` 优先读快照（此前进入步骤 5 后 cfg_fields 被双思考字段覆盖，编辑静默回落默认值）；从步骤 5 返回步骤 4 恢复快照保留编辑。\n- **busy 期间审批键吞字/污染**：a/y/n/d/A 仅当存在待审批请求且无修饰键时生效（此前无条件拦截，正输入的中文字符被吞）。\n- **busy 期间带修饰键字符被吞**：Alt/Ctrl 组合键统一放行，输入中文拼音候选不受影响。\n- **busy 期间无法滚动/展开**：Up/Down/PageUp/PageDown 滚动与 Alt+E 展开在 LLM 生成期间可用。\n- **快捷键提示误导**：底部提示改为 `Enter 发送 · Alt+Enter 换行 · Alt+↑/↓ 历史`（此前误写 ↑/↓）。\n\n## 质量\n\n- TUI 110 项测试全过（含新增向导步骤 4 编辑保留回归测试）。\n- 版本号统一升 0.1.8（VERSION SSoT、Cargo.toml、CMakeLists 兜底、install.sh/ps1、README/SECURITY 徽章、Doxyfile、TUI 顶栏、bootstrap），五架构包内 TUI 版本号一致。",
+      "notes": "649ddc48 release: drop riscv64 gate so v0.1.9 can publish\ne6cad286 agentrt: bump gateway and daemons for macos/ctest gate fixes\n82b9fd0c ci: broaden macos include paths and make linux coverage gate diagnosable\n0fc91158 ci: drop stale lcov exclude pattern that aborts lcov 2.0 capture\ne17375ec agentrt: bump atoms and daemons for test isolation and macos test deps\ndfdfb8cc ci: surface lcov capture failure detail in coverage gate\n89f5e3cb agentrt: bump daemons for gateway platform-thread fix\nbdd45102 ci: widen windows msbuild error capture in release\na3cbd25e ci: retry submodule init on leaf-mirror race\n5895d707 agentrt: bump atoms and daemons for tmp-dir test fixes\n5054919e agentrt: bump daemons and commons for MSVC/macOS round 3\n667215e2 agentrt: bump leaves for MSVC round 2 and enrich error annotations\neb2e7ab1 ci: surface build-test failures as workflow annotations\nad8adf12 ci: make qemu rustup install non-blocking in release builds\nf277545e agentrt: bump commons and cupolas for MSVC port fixes\nc5e43d12 ci: make armv7l matrix entry non-blocking (ship-first-fix-later)\n83b71891 ci: filter windows build errors out of the warning flood\na5fbb506 agentrt: bump commons to MSVC atomic pragma guards\n8301229d ci: drain tee buffer before reading failure log tail\n49c8e5ce ci: surface windows build errors as annotations\nf17e0796 ci: sync macos build-test env with release workflow\ne71ae26a ci: de-risk and self-diagnose qemu container builds\nb087e822 ci: fail fast in qemu container builds\n5e4e00fe ci: point release installer sources to agentrt scripts/ (host layout)\n3136d2ff cmake: allow weak undefined MemoryRovol refs on macOS link\n0c46e587 ci: make windows optional in release while MSVC port in progress\n0920dc24 ci: fix release sibling-tools name clash and macOS lib path\nefc08741 agentrt: bump atoms/commons for MSVC windows build fixes\n168d2365 ci: use static ../build for out-of-tree build dir\n05061d9c ci: move agentrt-hosted build dirs out of the source tree\n86ae4cb9 ci: host workflows in agentrt, leave umbrella as pure container\ne3aead5a agentrt: bump daemons for explicit_bzero in-TU fallback (第九轮)\n168e76f8 agentrt: bump commons for explicit_bzero fallback (第七轮)\n66640bf9 cmake: expose cJSON include dirs to all targets\n14439da3 agentrt: bump commons/atoms/cupolas for macOS/Windows 第六轮修复\nd7f3cabb cmake: link keg-only libyaml via absolute path\ndbb027f0 build: bump commons/daemons 修复 macOS 类型相撞与 Windows strndup\n7956d0d1 commons: 同步 macOS poison 修复子模块指针\na491b8d5 agentrt: 根级 nghttp2 探测在 WIN32 强制关闭 HTTP/2\n5fbe699d commons/gateway: 同步第二轮发布构建修复子模块指针\n775dd6ab agentrt: 同步 macOS/Linux 构建修复至子模块指针\nf28b568e cmake: probe -ffat-lto-objects before enabling Release LTO\n8740332f protocols: bump pin to restore core/ framework sources\n2030ba4f docs: bump commons pin for README title fix\naee30712 docs: align README with agentrt 0.1.9 architecture\nacd22cfc agentrt: bump atoms to reconciled release-snapshot tip\n7ff080eb agentrt: bump cupolas/daemons/gateway to function-name shortening\n92f8a42c agentrt: sync installer, cli and doxygen version fallbacks to 0.1.9\nc8691900 agentrt: bump version to 0.1.9 and finalize release changelog\naf215aec agentrt: bump daemons for the tool_d identity cleanup\nb181ba3a agentrt: bump commons to utils/ime flatten commit\n10ea3057 agentrt: bump daemons, protocols to M4 15-daemon doc commits\n363e032a tree: bump daemons for daemon-table doc calibration\n8b853db6 tree: bump daemons for M0-L5 install surface closure\nf9222497 tree: bump atoms/daemons for M3 roadmap ABI closure\n86abf232 tree: bump cupolas/daemons for M2-S5 daemon dome handover\nf0ce7c36 tree: bump gateway/daemons for M2-S4 epoch active invalidation\n60f5581d e2e: exercise policy.* lifecycle through the gateway\nae15f7f5 tree: bump cupolas/daemons for M2-S2 PDP decision surface\n0b394875 agentrt: bump daemons for PEP baseline benchmark",
       "artifacts": {
-        "linux-arm32": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.8/agentrt-v0.1.8-linux-arm32.tar.gz",
-          "sha256": "da11c8e3819aef459305aa410987c329d2fa1e009ca6b597d92f2fd51251a099",
-          "size": 36847332
-        },
         "linux-arm64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.8/agentrt-v0.1.8-linux-arm64.tar.gz",
-          "sha256": "453f3efd180f0a52dddd2eed8230ffb37921a231043737410c6eed741f608da9",
-          "size": 38877141
-        },
-        "linux-riscv64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.8/agentrt-v0.1.8-linux-riscv64.tar.gz",
-          "sha256": "1b741f0ee1b225be5d81dc33f1af111af1e42833692deb704f369a042a58b1c7",
-          "size": 41074330
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.9/agentrt-v0.1.9-linux-arm64.tar.gz",
+          "sha256": "10a6c87894942c35745ba3e9ca545370269bc26cbdb5f98468ecbaf783b3c12e",
+          "size": 21028481
         },
         "linux-x64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.8/agentrt-v0.1.8-linux-x64.tar.gz",
-          "sha256": "8897aa81dcd535121d1f562ebfd1caedc465652208438ea909bdd1e1258a8c58",
-          "size": 40291651
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.9/agentrt-v0.1.9-linux-x64.tar.gz",
+          "sha256": "8cfa44905f098e15d069da5f0a5a86159f66ae30d3e0ee82b8faa94af59fc52b",
+          "size": 21221852
         },
         "linux-x86": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.8/agentrt-v0.1.8-linux-x86.tar.gz",
-          "sha256": "b3eb24b45035c547a146c7738cdd2b9219c7bed599fea6ef375f316a4a81d569",
-          "size": 39254490
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.9/agentrt-v0.1.9-linux-x86.tar.gz",
+          "sha256": "6b1f301aa50b81bff55e9a19b2d4f680568e599cb9786288d9be5f094859b4c4",
+          "size": 18650866
         },
-        "linux-armv7l": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.8/agentrt-v0.1.8-linux-arm32.tar.gz",
-          "sha256": "da11c8e3819aef459305aa410987c329d2fa1e009ca6b597d92f2fd51251a099",
-          "size": 36847332
+        "macos-arm64": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.9/agentrt-v0.1.9-macos-arm64.tar.gz",
+          "sha256": "4c602724eb964d2c79abffd137c8281317692145b9e615db3baa4803e8e32db2",
+          "size": 4664234
         },
         "linux-aarch64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.8/agentrt-v0.1.8-linux-arm64.tar.gz",
-          "sha256": "453f3efd180f0a52dddd2eed8230ffb37921a231043737410c6eed741f608da9",
-          "size": 38877141
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.9/agentrt-v0.1.9-linux-arm64.tar.gz",
+          "sha256": "10a6c87894942c35745ba3e9ca545370269bc26cbdb5f98468ecbaf783b3c12e",
+          "size": 21028481
         },
         "linux-x86_64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.8/agentrt-v0.1.8-linux-x64.tar.gz",
-          "sha256": "8897aa81dcd535121d1f562ebfd1caedc465652208438ea909bdd1e1258a8c58",
-          "size": 40291651
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.9/agentrt-v0.1.9-linux-x64.tar.gz",
+          "sha256": "8cfa44905f098e15d069da5f0a5a86159f66ae30d3e0ee82b8faa94af59fc52b",
+          "size": 21221852
         },
         "linux-i686": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.8/agentrt-v0.1.8-linux-x86.tar.gz",
-          "sha256": "b3eb24b45035c547a146c7738cdd2b9219c7bed599fea6ef375f316a4a81d569",
-          "size": 39254490
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.9/agentrt-v0.1.9-linux-x86.tar.gz",
+          "sha256": "6b1f301aa50b81bff55e9a19b2d4f680568e599cb9786288d9be5f094859b4c4",
+          "size": 18650866
+        },
+        "macos-aarch64": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.9/agentrt-v0.1.9-macos-arm64.tar.gz",
+          "sha256": "4c602724eb964d2c79abffd137c8281317692145b9e615db3baa4803e8e32db2",
+          "size": 4664234
         }
       }
     }
