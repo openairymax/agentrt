@@ -202,34 +202,47 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: bash .github/scripts/ci-debug-dump.sh "macos build" "/tmp/macos-build.log"
 
-      - name: Run tests (ctest)
+      - name: Run tests (ctest, auto-retry once)
         run: |
           # --timeout 240：单测超时护栏——macOS ctest 曾长期挂死无结论
-          #（2026-09-04 实证，>25min 仍 in_progress）。失败测试名上报
-          # annotation，供匿名 API 排障。
+          #（2026-09-04 实证，>25min 仍 in_progress）。
+          # 瞬态 flaky（corekern_deep 2026-09-05 实证：macOS runner 慢负载下
+          # 定时敏感单测首轮偶发红、同环境 rerun-failed 即全过）经一次自动
+          # 重试吸收；真实回归 rerun 仍失败 → fail-closed（exit rc2）。门禁
+          # 口径：首轮失败但 rerun-failed 全过视为 flaky 放行，明细留档。
           set +e
           ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure -j"$(sysctl -n hw.ncpu)" \
             --timeout 240 > /tmp/macos-ctest.log 2>&1
           rc=$?
-          if [ $rc -ne 0 ]; then
-            echo "::error::macOS ctest FAILED rc=$rc"
-            grep -E 'Test #|Passed|Failed|\*\*\*|Timeout|Subprocess aborted' /tmp/macos-ctest.log \
-              | sed 's/^/::error::  /' | head -50
-            tail -n 30 /tmp/macos-ctest.log | sed 's/^/::error::  /'
-            exit $rc
+          if [ $rc -eq 0 ]; then
+            exit 0
           fi
+          echo "::error::macOS ctest FAILED rc=$rc (attempt 1)，自动 rerun-failed…"
+          grep -E 'The following tests FAILED:|Test #|Passed|Failed|\*\*\*|Timeout|Subprocess aborted' \
+            /tmp/macos-ctest.log | sed 's/^/::error::  /' | head -50
+          tail -n 20 /tmp/macos-ctest.log | sed 's/^/::error::  /'
+          ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure --rerun-failed \
+            --timeout 240 > /tmp/macos-rerun.log 2>&1
+          rc2=$?
+          if [ $rc2 -eq 0 ]; then
+            echo "::warning::macOS ctest attempt1 失败但 rerun-failed 全过（flaky），门禁放行"
+            exit 0
+          fi
+          echo "::error::macOS ctest rerun FAILED rc=$rc2"
+          tail -n 40 /tmp/macos-rerun.log | sed 's/^/::error::  /'
+          exit $rc2
 
-      # 失败后 rerun 仅失败测试（串行）以拿到逐测试失败详情，整段落
-      # ci-debug issue（公共 issue 匿名 API 可读，供排障拉取）
-      - name: Rerun failed tests & dump to ci-debug issue
+      # 失败（含 rerun 仍失败）即把首轮与 rerun 日志落 ci-debug issue（公共
+      # issue 匿名 API 可读，供排障拉取）；flaky 放行的场景不在此触发
+      - name: Dump ctest logs to ci-debug issue
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          set +e
-          ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure --rerun-failed \
-            --timeout 240 > /tmp/macos-rerun.log 2>&1
-          bash .github/scripts/ci-debug-dump.sh "macos ctest rerun" "/tmp/macos-rerun.log"
+          bash .github/scripts/ci-debug-dump.sh "macos ctest" "/tmp/macos-ctest.log"
+          if [ -f /tmp/macos-rerun.log ]; then
+            bash .github/scripts/ci-debug-dump.sh "macos ctest rerun" "/tmp/macos-rerun.log"
+          fi
 
   # ==================== Windows 跨平台构建门禁 ====================
   windows-build:
