@@ -73,19 +73,19 @@ jobs:
 
       # 覆盖率门禁：低于阈值（COVERAGE_THRESHOLD）即失败，
       # 防止发行版功能回归（50-engineering-standards / TEST-03）。
-      # lcov 2.0 (ubuntu-24.04) 会把 capture 阶段的未命中 --exclude 模式
-      # 直接判为硬错误，且对空 tracefile 只给 rc=0；改为 raw 全量采集，
-      # 再用 lcov --remove 过滤，日志 tail 恒输出以便诊断。
+      # lcov 2.0 (ubuntu-24.04)：capture 阶段未命中 --exclude 直接判硬错误、
+      # 空 tracefile 只给 rc=0、--rc lcov_branch_coverage 弃用（分支覆盖在
+      # 2.0 已默认开启，传该 rc 走弃用映射反而在 gcc 13 中间格式下崩溃
+      # rc=1 无输出）。raw 全量采集 + lcov --remove 过滤；失败恒打尾日志。
       - name: Collect coverage (lcov)
         run: |
           set +e
           lcov --capture --directory ${{ env.BUILD_DIR }} \
-            --output-file ${{ env.BUILD_DIR }}/coverage.raw.info \
-            --rc lcov_branch_coverage=1 > /tmp/lcov-cap.log 2>&1
+            --output-file ${{ env.BUILD_DIR }}/coverage.raw.info > /tmp/lcov-cap.log 2>&1
           rc=$?
           if [ $rc -ne 0 ]; then
             echo "::error::lcov capture FAILED rc=$rc"
-            tail -n 40 /tmp/lcov-cap.log | sed 's/^/::error::  /'
+            tail -n 120 /tmp/lcov-cap.log | sed 's/^/::error::  /'
             exit $rc
           fi
           tail -n 6 /tmp/lcov-cap.log
@@ -96,12 +96,12 @@ jobs:
           echo "::group::lcov remove log"
           tail -n 20 /tmp/lcov-rm.log
           echo "::endgroup::"
-          lcov --summary ${{ env.BUILD_DIR }}/coverage.info --rc lcov_branch_coverage=1 > /tmp/lcov-sum.log 2>&1 || true
+          lcov --summary ${{ env.BUILD_DIR }}/coverage.info > /tmp/lcov-sum.log 2>&1 || true
           tail -n 12 /tmp/lcov-sum.log
 
       - name: Enforce coverage threshold
         run: |
-          LINE_PCT=$(lcov --summary ${{ env.BUILD_DIR }}/coverage.info --rc lcov_branch_coverage=1 2>&1 | grep -oP 'lines\.\.\.\.\d+\.\d+' | grep -oP '\d+\.\d+')
+          LINE_PCT=$(lcov --summary ${{ env.BUILD_DIR }}/coverage.info 2>&1 | grep -oP 'lines\.\.\.\.\d+\.\d+' | grep -oP '\d+\.\d+')
           if [ -z "$LINE_PCT" ]; then
             echo "::error::coverage.info empty or unparsable - gate cannot run"
             exit 1
