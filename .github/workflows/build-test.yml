@@ -17,6 +17,8 @@ jobs:
   # ==================== Linux 全量构建 + 测试 + 覆盖率门禁 ====================
   linux-build-test-coverage:
     runs-on: ubuntu-latest
+    # 超时护栏（2026-09-04）：构建+ctest+覆盖率合计上限，防挂死无结论
+    timeout-minutes: 150
     env:
       # BAN-33：agentrt 即源码根，构建目录必须在源码树外（工作区上级目录）
       BUILD_DIR: ../build
@@ -62,7 +64,8 @@ jobs:
       - name: Run tests (ctest)
         run: |
           set +e
-          ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure -j"$(nproc)" > /tmp/ctest.log 2>&1
+          ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure -j"$(nproc)" \
+            --timeout 240 > /tmp/ctest.log 2>&1
           rc=$?
           if [ $rc -ne 0 ]; then
             echo "::error::ctest FAILED rc=$rc"
@@ -86,8 +89,10 @@ jobs:
       #（lines-valid=0，2026-09-04 实证），root=父目录后 agentrt/<src> 命中。
       # --gcov-ignore-parse-errors=negative_hits：gcc gcov 已知 bug 产生
       # "branch taken -1"（gcc.gnu.org/68080），按 gcovr 官方建议 warn 忽略。
-      # --merge-mode-functions=merge：LTO/内联克隆致同名函数多行出现
-      #（ws_gateway_create 246/323 实证），strict 模式抛 AssertionError rc=64。
+      # --merge-mode-functions=merge-use-line-0：LTO/内联克隆致同名函数多行出现
+      #（ws_gateway_create 246/323 实证），strict 抛 AssertionError；gcovr 7.0
+      # 合法取值 strict/merge-use-line-{0,min,max}/separate（无 merge），
+      # merge-use-line-0 将多行同名函数并入 file 级条目。
       - name: Collect coverage (gcovr)
         run: |
           set +e
@@ -95,7 +100,7 @@ jobs:
             --object-directory ${{ env.BUILD_DIR }} \
             --gcov-ignore-errors=no_working_dir_found \
             --gcov-ignore-parse-errors=negative_hits.warn_once_per_file \
-            --merge-mode-functions=merge \
+            --merge-mode-functions=merge-use-line-0 \
             --exclude '.*/(tests|build)/.*' \
             --exclude '.*/agentrt/commons/third_party/.*' \
             --exclude '/usr/.*' \
@@ -130,6 +135,9 @@ jobs:
   # ==================== macOS 跨平台构建门禁 ====================
   macos-build:
     runs-on: macos-latest
+    # 超时护栏（2026-09-04 系统性加固）：此前无 timeout，任一测试挂死会让
+    # job 挂到 GitHub 默认 6h 上限，整轮门禁长期 in_progress、无结论。
+    timeout-minutes: 90
     env:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
@@ -185,11 +193,26 @@ jobs:
 
       - name: Run tests (ctest)
         run: |
-          ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure -j"$(sysctl -n hw.ncpu)"
+          # --timeout 240：单测超时护栏——macOS ctest 曾长期挂死无结论
+          #（2026-09-04 实证，>25min 仍 in_progress）。失败测试名上报
+          # annotation，供匿名 API 排障。
+          set +e
+          ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure -j"$(sysctl -n hw.ncpu)" \
+            --timeout 240 > /tmp/macos-ctest.log 2>&1
+          rc=$?
+          if [ $rc -ne 0 ]; then
+            echo "::error::macOS ctest FAILED rc=$rc"
+            grep -E 'Test #|Passed|Failed|\*\*\*|Timeout|Subprocess aborted' /tmp/macos-ctest.log \
+              | sed 's/^/::error::  /' | head -50
+            tail -n 30 /tmp/macos-ctest.log | sed 's/^/::error::  /'
+            exit $rc
+          fi
 
   # ==================== Windows 跨平台构建门禁 ====================
   windows-build:
     runs-on: windows-latest
+    # 超时护栏（2026-09-04）：同 macOS，防 ctest/构建挂死到 6h
+    timeout-minutes: 90
     env:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
@@ -242,7 +265,7 @@ jobs:
 
       - name: Run tests (ctest)
         run: |
-          ctest --test-dir ${{ env.BUILD_DIR }} -C Release --output-on-failure
+          ctest --test-dir ${{ env.BUILD_DIR }} -C Release --output-on-failure --timeout 240
 
   # ==================== MemoryRovol 独立构建门禁（OSS + PRO） ====================
   # 禁用：memoryrovol 为闭源仓（.gitmodules update=none，GitHub 不存在，
