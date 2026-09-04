@@ -173,7 +173,10 @@ jobs:
           cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
-          touch "${PKG_DIR}/platform-x86_64"
+          # 0.1.6e 起制品标记统一为数字平台名（platform-x64…），更新器/安装器
+          # 经 plat_name() 同口径校验；勿回退 uname 原始名（platform-x86_64 会
+          # 触发"制品架构与主机不匹配"拒绝，v0.1.9 打包回归实证）。
+          touch "${PKG_DIR}/platform-x64"
           ARTIFACT="agentrt-${VERSION}-linux-x64"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
           sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
@@ -273,7 +276,7 @@ jobs:
           cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
-          touch "${PKG_DIR}/platform-aarch64"
+          touch "${PKG_DIR}/platform-arm64"
           ARTIFACT="agentrt-${VERSION}-macos-arm64"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
           sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
@@ -619,7 +622,7 @@ jobs:
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
           cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
-          touch "${PKG_DIR}/platform-aarch64"
+          touch "${PKG_DIR}/platform-arm64"
           ARTIFACT="agentrt-${VERSION}-linux-arm64"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
           sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
@@ -653,14 +656,15 @@ jobs:
           - name: i686
             platform: linux/386
             image: debian:bullseye
-            tag: platform-i686
+            # 0.1.6e 起包内架构标记用数字平台名（platform-<plat>，见 Package 步骤）
+            plat: x86
             artifact: linux-x86
             # 门禁架构：i686 已修复（openssl linux-generic32），阻断发布
             experimental: false
           - name: armv7l
             platform: linux/arm/v7
             image: ubuntu:20.04
-            tag: platform-armv7l
+            plat: arm32
             artifact: linux-arm32
             # 先发后修（2026-09-03，同 Windows 决策）：armv7l qemu 的 cmake
             # 供给仍在收敛（Kitware APT armhf 验证中），暂不阻断 v0.1.9 发布，
@@ -744,7 +748,8 @@ jobs:
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
           cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
-          touch "${PKG_DIR}/${{ matrix.tag }}"
+          # 0.1.6e 起制品标记统一为数字平台名；更新器/安装器 plat_name() 校验
+          touch "${PKG_DIR}/platform-${{ matrix.plat }}"
           ARTIFACT="agentrt-${VERSION}-${{ matrix.artifact }}"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
           sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
