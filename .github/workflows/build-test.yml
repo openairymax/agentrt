@@ -81,10 +81,14 @@ jobs:
       # --gcov-ignore-errors=no_working_dir_found：树外构建（BUILD_DIR=../build）
       # 中个别测试 .gcda 源路径带前缀解析不到（coreloopthree tests 实证，
       # rc=64）；tests 覆盖率本就排除，忽略该错误不参与统计。
+      # --root 取工作区父目录：树外构建的 .gcda 记录源路径带 agentrt/ 前缀
+      #（gcc 工作目录为 checkout 父级），root=. 时 gcovr 对全部源解析失败
+      #（lines-valid=0，2026-09-04 实证），root=父目录后 agentrt/<src> 命中。
       - name: Collect coverage (gcovr)
         run: |
           set +e
-          gcovr --root . --object-directory ${{ env.BUILD_DIR }} \
+          gcovr --root "$(realpath "${{ github.workspace }}/..")" \
+            --object-directory ${{ env.BUILD_DIR }} \
             --gcov-ignore-errors=no_working_dir_found \
             --exclude '.*/(tests|build)/.*' \
             --exclude '.*/agentrt/commons/third_party/.*' \
