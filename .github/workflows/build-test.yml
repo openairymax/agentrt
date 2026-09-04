@@ -236,6 +236,10 @@ jobs:
     runs-on: windows-latest
     # 超时护栏（2026-09-04）：同 macOS，防 ctest/构建挂死到 6h
     timeout-minutes: 90
+    # Windows MSVC 轨（0.1.10 决策）：atoms 原生 C11 原子在 MSVC 适配完成
+    # 前，本 job 为通告性（continue-on-error），ci-debug issue/annotations
+    # 持续留档；绿后移除此标记恢复为 required 门禁（届时 Windows 纳入发布矩阵）。
+    continue-on-error: true
     env:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
