@@ -93,26 +93,25 @@ jobs:
             exit $rc
           fi
           tail -n 8 /tmp/gcovr.log
-          python3 -c "
-import xml.etree.ElementTree as ET
-t = ET.parse('${{ env.BUILD_DIR }}/coverage.xml')
-c = t.getroot()
-print('gcovr summary: lines-valid=%s lines-covered=%s line-rate=%s' % (c.get('lines-valid'), c.get('lines-covered'), c.get('line-rate')))
-"
+          echo "gcovr summary: $(grep -oE 'lines-(valid|covered)="[0-9]+"' ${{ env.BUILD_DIR }}/coverage.xml | tr '\n' ' ')"
 
       - name: Enforce coverage threshold
+        env:
+          XML: ${{ env.BUILD_DIR }}/coverage.xml
+          THR: ${{ env.COVERAGE_THRESHOLD }}
         run: |
-          python3 - "${{ env.BUILD_DIR }}/coverage.xml" "${{ env.COVERAGE_THRESHOLD }}" <<'PYEOF'
-import sys
-import xml.etree.ElementTree as ET
-path, thr = sys.argv[1], float(sys.argv[2])
-c = ET.parse(path).getroot()
-valid = int(c.get('lines-valid') or 0)
-covered = int(c.get('lines-covered') or 0)
-pct = (100.0 * covered / valid) if valid else 0.0
-print(f"Line coverage: {pct:.2f}% (threshold: {thr:.0f}%)")
-sys.exit(0 if pct >= thr else 1)
-PYEOF
+          VALID=$(grep -oE 'lines-valid="[0-9]+"' "$XML" | grep -oE '[0-9]+')
+          COVERED=$(grep -oE 'lines-covered="[0-9]+"' "$XML" | grep -oE '[0-9]+')
+          if [ -z "$VALID" ] || [ "$VALID" = "0" ]; then
+            echo "::error::coverage.xml has no lines-valid (empty data) - gate cannot run"
+            exit 1
+          fi
+          if awk -v c="$COVERED" -v v="$VALID" -v t="$THR" 'BEGIN { pct = 100.0 * c / v; printf "Line coverage: %.2f%% (threshold: %.0f%%)\n", pct, t; exit !(pct >= t) }'; then
+            echo "[OK] Coverage meets threshold"
+          else
+            echo "[FAIL] Coverage below threshold"
+            exit 1
+          fi
 
   # ==================== macOS 跨平台构建门禁 ====================
   macos-build:
