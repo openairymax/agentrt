@@ -614,6 +614,35 @@ endif()
 if(AIRY_HAS_LIBEVENT)
     target_compile_definitions(airy_compile_defs INTERFACE AIRY_HAS_LIBEVENT)
 endif()
+# 检测到的依赖标志同时全局下发（add_compile_definitions），保证未链接
+# airy_compile_defs 的目标与 MSVC /FI 强制预包含（windows_preinclude.h）
+# 的宏视图一致：否则 windows_preinclude.h 的 cJSON 兜底桩在 AIRY_HAS_CJSON
+# 未达时先定义 struct cJSON+旧 API，随后真 <cjson/cJSON.h> 即 C2011
+# 重定义（cupolas 测试 Windows build 实证）。检测点仍单一（上方 find_*）。
+if(AIRY_HAS_SQLITE3)
+    add_compile_definitions(AIRY_HAS_SQLITE3)
+endif()
+if(AIRY_HAS_CJSON)
+    add_compile_definitions(AIRY_HAS_CJSON)
+endif()
+if(AIRY_HAS_YAML)
+    add_compile_definitions(AIRY_HAS_YAML)
+endif()
+if(AIRY_HAS_OPENSSL)
+    add_compile_definitions(AIRY_HAS_OPENSSL)
+endif()
+if(AIRY_HAS_CURL)
+    add_compile_definitions(AIRY_HAS_CURL)
+endif()
+if(AIRY_HAS_MICROHTTPD)
+    add_compile_definitions(AIRY_HAS_MICROHTTPD)
+endif()
+if(AIRY_HAS_LIBWEBSOCKETS)
+    add_compile_definitions(AIRY_HAS_LIBWEBSOCKETS)
+endif()
+if(AIRY_HAS_LIBEVENT)
+    add_compile_definitions(AIRY_HAS_LIBEVENT)
+endif()
 
 # ============================================================
 # 跨平台系统库统一管理（BAN-15: 禁止硬编码平台库）
