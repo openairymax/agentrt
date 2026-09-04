@@ -39,8 +39,8 @@ if gh issue list --repo "$REPO" --label "$LABEL" --state open \
     done < /tmp/ci-debug-open.txt
 fi
 
-# 提炼日志：优先从 "The following tests FAILED" 段起取；否则取文件尾部。
-# 压缩到 ~40KB，确保进得去 issue body。
+# 提炼日志：取文件尾部整段（output-on-failure 的失败详情在 FAILED 汇总
+# 之前，不能只从标记处起取）。压缩到 ~55KB 进 issue body。
 python3 - "$LOGFILE" > /tmp/ci-debug-body.txt <<'PY' || true
 import sys
 fn = sys.argv[1]
@@ -48,20 +48,14 @@ try:
     txt = open(fn, encoding="utf-8", errors="replace").read()
 except Exception:
     sys.exit(0)
-marker = "The following tests FAILED"
-i = txt.find(marker)
-if i >= 0:
-    body = txt[i:]
-else:
-    body = txt
 # 去掉 CR、折叠超长行后截尾
-body = body.replace("\r", "")
-lines = body.splitlines(keepends=True)
+txt = txt.replace("\r", "")
+lines = txt.splitlines(keepends=True)
 out = []
 for ln in lines:
-    out.append(ln if len(ln) <= 400 else ln[:400] + "…\n")
+    out.append(ln if len(ln) <= 400 else ln[:400] + "\n")
 body = "".join(out)
-print(body[-40000:])
+print(body[-55000:])
 PY
 
 # 标签可能不存在：gh issue create 引用不存在标签会失败，先兜底创建
