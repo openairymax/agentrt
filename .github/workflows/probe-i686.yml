@@ -1,0 +1,42 @@
+name: Probe i686 bullseye apt
+# 临时排障 job：仅当 push commit 标题含 [probe-i686] 时运行。
+# 用 docker linux/386 + debian:bullseye 复现 release 32bit leg 的
+# apt 安装问题，把完整依赖冲突细节以 ::error:: 打到 check-run
+# annotations（匿名 API 可读），供快速迭代修复。定稿后本文件删除。
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    if: contains(github.event.head_commit.message, '[probe-i686]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Probe apt recipe in i386 bullseye
+        run: |
+          docker run --rm --platform linux/386 debian:bullseye bash -c '
+          set -uo pipefail
+          printf "%s\n" "deb http://archive.debian.org/debian bullseye main" "deb http://archive.debian.org/debian bullseye-updates main" > /etc/apt/sources.list
+          printf "%s\n" "Acquire::Check-Valid-Until \"false\";" > /etc/apt/apt.conf.d/99archived
+          apt-get update -qq
+          echo "== base versions =="
+          dpkg-query -W -f="${Package} ${Version}\n" 2>/dev/null | grep -E "^(libc6|libc6-dev|libssl|openssl|gcc-10|libgcc-10-dev)" || true
+          echo "== apt-cache policy =="
+          for p in libc6 libc6-dev libssl-dev libssl1.1; do echo "-- $p --"; apt-cache policy "$p" 2>/dev/null | head -6; done
+          echo "== install attempt =="
+          { apt-get install -y -qq --allow-downgrades build-essential make perl curl python3 python3-pip python3-venv libsqlite3-dev libyaml-dev libcurl4-openssl-dev libssl-dev zlib1g-dev libzstd-dev libmicrohttpd-dev libwebsockets-dev libevent-dev libnghttp2-dev; } > /tmp/apt.log 2>&1
+          rc=$?
+          echo "== install rc=$rc =="
+          grep -n -A 60 -E "unmet dependencies|held broken|Unable to correct" /tmp/apt.log | head -140
+          tail -25 /tmp/apt.log
+          exit 0
+          ' 2>&1 | tee /tmp/probe.log
+          rc=${PIPESTATUS[0]}
+          echo "::error::probe docker rc=$rc"
+          # 将日志转 ::error:: 进 annotation（匿名 API 可读，无 admin 也能取）
+          sed 's/^/::error::  /' /tmp/probe.log | head -200
+          exit 0
