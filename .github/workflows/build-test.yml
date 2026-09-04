@@ -219,11 +219,17 @@ jobs:
             exit $rc
           fi
 
-      - name: Dump ctest log to ci-debug issue
+      # 失败后 rerun 仅失败测试（串行）以拿到逐测试失败详情，整段落
+      # ci-debug issue（公共 issue 匿名 API 可读，供排障拉取）
+      - name: Rerun failed tests & dump to ci-debug issue
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: bash .github/scripts/ci-debug-dump.sh "macos ctest" "/tmp/macos-ctest.log"
+        run: |
+          set +e
+          ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure --rerun-failed \
+            --timeout 240 > /tmp/macos-rerun.log 2>&1
+          bash .github/scripts/ci-debug-dump.sh "macos ctest rerun" "/tmp/macos-rerun.log"
 
   # ==================== Windows 跨平台构建门禁 ====================
   windows-build:
@@ -295,12 +301,16 @@ jobs:
           ctest --test-dir ${{ env.BUILD_DIR }} -C Release --output-on-failure --timeout 240 2>&1 | Tee-Object -FilePath $ctestLog
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Dump ctest log to ci-debug issue
+      # 失败后 rerun 仅失败测试以拿到逐测试失败详情，整段落 ci-debug issue
+      - name: Rerun failed tests & dump to ci-debug issue
         if: failure()
-        shell: bash
+        shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: bash .github/scripts/ci-debug-dump.sh "windows ctest" "$RUNNER_TEMP/ctest.log"
+        run: |
+          $rerunLog = Join-Path $env:RUNNER_TEMP "ctest-rerun.log"
+          ctest --test-dir ${{ env.BUILD_DIR }} -C Release --output-on-failure --rerun-failed --timeout 240 2>&1 | Tee-Object -FilePath $rerunLog
+          bash .github/scripts/ci-debug-dump.sh "windows ctest rerun" $rerunLog
 
   # ==================== MemoryRovol 独立构建门禁（OSS + PRO） ====================
   # 禁用：memoryrovol 为闭源仓（.gitmodules update=none，GitHub 不存在，
