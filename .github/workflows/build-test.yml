@@ -84,12 +84,15 @@ jobs:
       # --root 取工作区父目录：树外构建的 .gcda 记录源路径带 agentrt/ 前缀
       #（gcc 工作目录为 checkout 父级），root=. 时 gcovr 对全部源解析失败
       #（lines-valid=0，2026-09-04 实证），root=父目录后 agentrt/<src> 命中。
+      # --gcov-ignore-parse-errors=negative_hits：gcc gcov 已知 bug 产生
+      # "branch taken -1"（gcc.gnu.org/68080），按 gcovr 官方建议 warn 忽略。
       - name: Collect coverage (gcovr)
         run: |
           set +e
           gcovr --root "$(realpath "${{ github.workspace }}/..")" \
             --object-directory ${{ env.BUILD_DIR }} \
             --gcov-ignore-errors=no_working_dir_found \
+            --gcov-ignore-parse-errors=negative_hits.warn_once_per_file \
             --exclude '.*/(tests|build)/.*' \
             --exclude '.*/agentrt/commons/third_party/.*' \
             --exclude '/usr/.*' \
