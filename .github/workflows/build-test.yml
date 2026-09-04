@@ -86,6 +86,8 @@ jobs:
       #（lines-valid=0，2026-09-04 实证），root=父目录后 agentrt/<src> 命中。
       # --gcov-ignore-parse-errors=negative_hits：gcc gcov 已知 bug 产生
       # "branch taken -1"（gcc.gnu.org/68080），按 gcovr 官方建议 warn 忽略。
+      # --merge-mode-functions=merge：LTO/内联克隆致同名函数多行出现
+      #（ws_gateway_create 246/323 实证），strict 模式抛 AssertionError rc=64。
       - name: Collect coverage (gcovr)
         run: |
           set +e
@@ -93,6 +95,7 @@ jobs:
             --object-directory ${{ env.BUILD_DIR }} \
             --gcov-ignore-errors=no_working_dir_found \
             --gcov-ignore-parse-errors=negative_hits.warn_once_per_file \
+            --merge-mode-functions=merge \
             --exclude '.*/(tests|build)/.*' \
             --exclude '.*/agentrt/commons/third_party/.*' \
             --exclude '/usr/.*' \
