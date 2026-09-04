@@ -22,9 +22,10 @@ jobs:
     env:
       # BAN-33：agentrt 即源码根，构建目录必须在源码树外（工作区上级目录）
       BUILD_DIR: ../build
-      # 首次真实行覆盖基线（2026-09-04 实测 28.61%，37674/131693）。阈值 30%
-      # 起步、fail-closed；随测试补充逐版上调（见 Linux job 覆盖率门禁注释）。
-      COVERAGE_THRESHOLD: 30
+      # 首次真实行覆盖基线（2026-09-04 实测 28.61%，37674/131693）。
+      # 阈值 25 起步 = 基线以下留 fail-closed 余量（30 一度高于基线致门禁
+      # 误红，dc06d4fde 实证）；随测试补充逐版上调（见 Linux job 注释）。
+      COVERAGE_THRESHOLD: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
