@@ -289,6 +289,102 @@ jobs:
           path: ${{ env.artifact_name }}.*
           if-no-files-found: error
 
+  # macOS x64 (Intel)：macos-13 原生 runner（0.1.10 并行发布决策：macOS
+  # 三平台补全。build-macos 跑 macos-latest=arm64，Intel 存量社区用户需
+  # x64 包，故新增本 leg）。打包步骤与 arm64 同构，仅 platform 标记与
+  # 制品名不同。Intel runner 的 brew prefix 为 /usr/local，Configure 步骤
+  # 一律 $(brew --prefix) 动态解析，无需区分 prefix。
+  build-macos-x64:
+    runs-on: macos-13
+    env:
+      # BAN-33：构建目录位于源码树外（工作区上级目录）
+      BUILD_DIR: ../build
+      STAGE_DIR: stage
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Init submodules (agent-workload, tools)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh agent-workload tools
+
+      - name: Install build dependencies
+        run: |
+          brew install cmake ninja pkgconf sqlite cjson libyaml curl openssl zlib zstd \
+            libmicrohttpd libwebsockets libevent nghttp2
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+
+      - name: Configure
+        run: |
+          export PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig:$(brew --prefix zlib)/lib/pkgconfig:$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix curl)/lib/pkgconfig"
+          export CFLAGS="-I$(brew --prefix)/include -I$(brew --prefix openssl)/include"
+          export LDFLAGS="-L$(brew --prefix)/lib -L$(brew --prefix openssl)/lib"
+          cmake -S . -B ${{ env.BUILD_DIR }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTS=OFF \
+            -DENABLE_SANITIZERS=OFF \
+            -DAIRY_BUILD_ALL=ON \
+            -DCMAKE_INSTALL_PREFIX="${{ env.STAGE_DIR }}"
+
+      - name: Build
+        run: |
+          cmake --build ${{ env.BUILD_DIR }} --config Release --parallel
+
+      - name: Install (aggregate bin/)
+        run: |
+          cmake --install ${{ env.BUILD_DIR }} --config Release
+
+      - name: Deploy bootstrap script
+        run: |
+          if [ -f "_tools/scripts/ops/bin/agentrt-bootstrap.sh" ]; then
+            cp -f "_tools/scripts/ops/bin/agentrt-bootstrap.sh" "${{ env.STAGE_DIR }}/bin/agentrt-bootstrap.sh"
+            chmod 755 "${{ env.STAGE_DIR }}/bin/agentrt-bootstrap.sh"
+          fi
+
+      - name: Build TUI + copy Python runtime
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/tui-target"
+          if ! (cd agent-workload/sdk/tui && cargo build --release); then
+            echo "warn: macos-x64 TUI 构建失败（降级）"
+          fi
+          cp -f "$CARGO_TARGET_DIR/release/agentrt-tui" "${{ env.STAGE_DIR }}/bin/" 2>/dev/null || echo "warn: TUI 构建产物缺失（降级）"
+          mkdir -p "${{ env.STAGE_DIR }}/lib"
+          for p in agent-workload/ecosystem/agents/airymax_agents \
+                   agent-workload/ecosystem/agents/airymax_agents_rs \
+                   agent-workload/ecosystem/agents/orchestration \
+                   agent-workload/sdk/sdk-python/agentrt; do
+            [ -d "$p" ] && cp -r "$p" "${{ env.STAGE_DIR }}/lib/" || true
+          done
+
+      - name: Package (tar.gz)
+        run: |
+          VERSION="${{ env.VERSION }}"; VERSION_NUM="${VERSION#v}"
+          PKG_DIR="pkg/agentrt-${VERSION_NUM}"
+          mkdir -p "${PKG_DIR}/config" "${PKG_DIR}/modules"
+          cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/"
+          cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
+          touch "${PKG_DIR}/platform-x64"
+          ARTIFACT="agentrt-${VERSION}-macos-x64"
+          tar -czf "${ARTIFACT}.tar.gz" -C pkg .
+          sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
+          echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.artifact_name }}
+          path: ${{ env.artifact_name }}.*
+          if-no-files-found: error
+
   # Windows x64：原生 runner（无 container）。vcpkg 已预装于
   # windows-latest（$env:VCPKG_INSTALLATION_ROOT）。zip 包必须与 tar.gz 包
   # 保持完全体一致（config 模板 + permission_rules + maths-toolkit +
@@ -771,8 +867,8 @@ jobs:
   release:
     # build-windows / build-riscv64 已按 dispatch-only 门控（见各自 if），
     # 不在 needs；门禁 = 已实证全绿的 Linux x86_64 / macOS arm64 /
-    # Linux arm64 / Linux i686 四平台。
-    needs: [build-linux, build-macos, build-arm64, build-linux-32bit]
+    # macOS x64 / Linux arm64 / Linux i686 五平台。
+    needs: [build-linux, build-macos, build-macos-x64, build-arm64, build-linux-32bit]
     runs-on: ubuntu-latest
     # tag 推送或手动 dispatch（手动时版本来自 inputs.version）皆可触发
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
