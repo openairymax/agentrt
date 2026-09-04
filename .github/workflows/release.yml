@@ -805,15 +805,17 @@ jobs:
             exec > >(tee /src/container-${{ matrix.name }}.log) 2>&1
             trap '"'"'echo "::error::[${{ matrix.name }}] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-${{ matrix.name }}.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
             export DEBIAN_FRONTEND=noninteractive
-            # debian:bullseye EOL（2024-08）归档迁移：deb.debian.org 对
-            # bullseye(-security) 已返 404（2026-09-05 v0.1.10 Release i686
-            # 实证 rc=100），必须切 archive.debian.org；归档源 Release 文件
-            # 过期，需关 Check-Valid-Until。ubuntu:20.04 不受影响（仍在线）。
+            # debian:bullseye 已全面 EOL（标准 2024-08 / LTS 2026-08-31）：
+            # deb.debian.org 已删 bullseye(-security)（404 实证 rc=100），
+            # 且 archive.debian.org/debian-security 无 bullseye 套件
+            #（实测仅至 stretch）。归档主源 bullseye/bullseye-updates 已含
+            # 最终 point release（安全修复全部折叠进 main），仅用这两套。
+            # ubuntu:20.04 不受影响（仍在线）。
             # 注意：本段位于外层 bash -c 单引号串内，只允许双引号。
             if grep -q "^ID=debian$" /etc/os-release 2>/dev/null; then
               printf "%s\n" \
                 "deb http://archive.debian.org/debian bullseye main" \
-                "deb http://archive.debian.org/debian-security bullseye-security main" \
+                "deb http://archive.debian.org/debian bullseye-updates main" \
                 > /etc/apt/sources.list
               printf "%s\n" "Acquire::Check-Valid-Until \"false\";" \
                 > /etc/apt/apt.conf.d/99archived
