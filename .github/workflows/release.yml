@@ -821,7 +821,11 @@ jobs:
                 > /etc/apt/apt.conf.d/99archived
             fi
             apt-get update -qq
-            apt-get install -y -qq \
+            # docker hub debian:bullseye 浮动 tag 在 LTS 期（~2024-09 起）持续
+            # 重建，base 内含 LTS 版本包；归档主源仅到最终 point release
+            #（11.11），直接安装报 "held broken packages"。--allow-downgrades
+            # 允许 apt 把 base 漂移包对齐（降级）到归档可用版本，消除死锁。
+            apt-get install -y -qq --allow-downgrades \
               build-essential make perl curl python3 python3-pip python3-venv \
               libsqlite3-dev libyaml-dev libcurl4-openssl-dev \
               libssl-dev zlib1g-dev libzstd-dev libmicrohttpd-dev \
