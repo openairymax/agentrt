@@ -194,6 +194,14 @@ jobs:
             exit $rc
           fi
 
+      # 失败即把完整日志落 ci-debug issue（公共 issue 匿名 API 可读，供排障拉取；
+      # annotation 每 job 仅保留 ≤10 条，无法承载完整失败明细）
+      - name: Dump build log to ci-debug issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/ci-debug-dump.sh "macos build" "/tmp/macos-build.log"
+
       - name: Run tests (ctest)
         run: |
           # --timeout 240：单测超时护栏——macOS ctest 曾长期挂死无结论
@@ -210,6 +218,12 @@ jobs:
             tail -n 30 /tmp/macos-ctest.log | sed 's/^/::error::  /'
             exit $rc
           fi
+
+      - name: Dump ctest log to ci-debug issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/ci-debug-dump.sh "macos ctest" "/tmp/macos-ctest.log"
 
   # ==================== Windows 跨平台构建门禁 ====================
   windows-build:
@@ -266,9 +280,27 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      # 失败即把完整编译日志落 ci-debug issue（公共 issue 匿名 API 可读）
+      - name: Dump build log to ci-debug issue
+        if: failure()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/ci-debug-dump.sh "windows build" "$RUNNER_TEMP/build.log"
+
       - name: Run tests (ctest)
+        shell: pwsh
         run: |
-          ctest --test-dir ${{ env.BUILD_DIR }} -C Release --output-on-failure --timeout 240
+          $ctestLog = Join-Path $env:RUNNER_TEMP "ctest.log"
+          ctest --test-dir ${{ env.BUILD_DIR }} -C Release --output-on-failure --timeout 240 2>&1 | Tee-Object -FilePath $ctestLog
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Dump ctest log to ci-debug issue
+        if: failure()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/ci-debug-dump.sh "windows ctest" "$RUNNER_TEMP/ctest.log"
 
   # ==================== MemoryRovol 独立构建门禁（OSS + PRO） ====================
   # 禁用：memoryrovol 为闭源仓（.gitmodules update=none，GitHub 不存在，
