@@ -92,13 +92,27 @@ def req(method, url, payload=None):
         return e.code, e.read().decode()[:500]
 
 
-# 2) 关闭历史 open 的 ci-debug issue（保持至多一个 open）
+# 2) issue 卫生：同一 run 内不同失败步骤各自留档（不再互相覆盖——
+#    0.1.10 前 windows build 错误曾被子步骤 ctest rerun 顶掉，无法取证）；
+#    关闭更早 run 的旧 issue。同 run 同步骤重复调用 → 追加 comment。
 q = urllib.parse.quote(f"repo:{repo} is:issue state:open label:{label}")
 _, data = req("GET", f"https://api.github.com/search/issues?q={q}&per_page=50")
+run_tag = f"run {run_id}"
+dup = None
 for item in (data or {}).get("items", []):
+    if run_tag in item["title"]:
+        if suffix in item["title"]:
+            dup = item
+        continue  # 同一 run 的其他失败步骤：保留独立 issue
     req("PATCH", f"{api}/issues/{item['number']}",
         {"state": "closed", "state_reason": "not_planned",
-         "body": (item.get("body") or "") + f"\n\nsuperseded by run {run_id}"})
+         "body": (item.get("body") or "") + f"\n\nsuperseded by {run_tag}"})
+
+if dup is not None:
+    req("POST", f"{api}/issues/{dup['number']}/comments",
+        {"body": f"**{suffix} 再次失败（重跑/重复上报）**\n\n{body}"})
+    print(f"ci-debug-dump: comment -> {dup['html_url']}")
+    sys.exit(0)
 
 # 3) 创建新 issue
 title = f"ci-debug {suffix} (run {run_id})"
