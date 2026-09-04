@@ -1,9 +1,19 @@
-name: Codegen SSoT drift check
+name: SSoT & codegen drift checks
+
+# 0.2.0 CI 收敛（2026-09-04）：原 codegen-check.yml + ssot-validate.yml 两条
+# "校验类"流水线合并为一条（agentrt workflow 数 5→4）。触发器语义保持：
+#   - codegen 漂移检查：push/PR 常开（纯 python3，无编译依赖，开销小）；
+#   - ssot registry 校验：仅 workflow_dispatch 手动（较重——clone 伞仓
+#     只读数据源 + 初始化嵌套子模块），不随 push/PR 自动跑。
+
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   syscall-codegen-check:
@@ -31,3 +41,43 @@ jobs:
             --input atoms/syscall/include/syscall.xml \
             --output-dir atoms/syscall/include \
             --check
+
+  # 用户态 SSoT 技术点权威源门禁（0.1.6 P2-3）：docs/AirymaxRT/.../
+  # 09-ssot-registry.md §1.7 登记的 agentrt 技术点（TP-012~016）权威源
+  # 与物理宿主路径必须全部存在，登记了不存在的路径即 CI 失败（漂移门禁）。
+  #
+  # 宿主迁移（2026-09 架构裁决）：workflow 下沉到 agentrt 发布平面；伞仓
+  # airymaxhub 恢复纯容器、不再承载流水线。但 SSoT registry 与校验脚本本体
+  # 位于伞仓数据（docs / tools / agent-workload），故本 job 以 airymaxhub 的
+  # GitHub 镜像为只读数据源克隆到临时区、初始化其子模块后运行 validate-ssot.py。
+  ssot-registry-validate:
+    # 原 ssot-validate.yml 为独立 workflow_dispatch 流水线；合并后保持
+    # 同样语义，避免对 agentrt push/PR 造成额外自动负载。
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (agentrt host, minimal)
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      # 以伞仓 GitHub 镜像为数据源（registry=docs、脚本=tools、宿主=agent-workload）。
+      # 私有嵌套子模块（agentrt/atoms 等）经 GH_TOKEN（org PAT）~/.netrc 认证。
+      - name: Clone umbrella dataset (docs, tools, agent-workload)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          if [ -n "${GH_TOKEN:-}" ]; then
+            printf 'machine github.com\nlogin x-access-token\npassword %s\n' \
+              "$GH_TOKEN" > "$HOME/.netrc"
+            chmod 600 "$HOME/.netrc"
+          fi
+          git clone -q --depth 1 \
+            https://github.com/openairymax/airymaxhub.git "$RUNNER_TEMP/airymaxhub"
+          git -C "$RUNNER_TEMP/airymaxhub" submodule update --init --recursive -- \
+            docs tools agent-workload
+
+      - name: Run validate-ssot (umbrella SSoT registry)
+        run: |
+          python3 "$RUNNER_TEMP/airymaxhub/tools/scripts/ci/verify/validate-ssot.py" "$RUNNER_TEMP/airymaxhub"

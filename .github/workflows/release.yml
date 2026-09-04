@@ -291,6 +291,10 @@ jobs:
   # 保持完全体一致（config 模板 + permission_rules + maths-toolkit +
   # platform 标记），防止 Windows 包缺失组件（问题：打包漂移）。
   build-windows:
+    # CI 收敛（2026-09-04）：Windows 编译验证归 build-test.yml（GitHub 测试
+    # 场）；tag 自动发布不再携带 windows 构建（MSVC 移植未完成）。手动
+    # workflow_dispatch 仍可尝试产出 windows 二进制。
+    if: github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     # 并行发布决策（2026-09-03）：MSVC 移植进行中（commons/cupolas/
     # protocols/heapstore），build-windows 暂作可选不阻断发布（先发后修），
@@ -411,6 +415,11 @@ jobs:
   # 经 Docker buildx + qemu 多架构容器构建（ubuntu:20.04 riscv64 镜像，
   # 与 x86_64/arm64 统一 glibc 2.31 基线）。
   build-riscv64:
+    # CI 收敛（2026-09-04）：QEMU riscv64 在托管 runner 上 6h 内无法完成
+    #（R15 5h52m+ / R16 均被强杀），tag 自动发布不再触发，避免 workflow
+    # 僵尸挂起数小时；仅 workflow_dispatch 显式请求时尝试。riscv64 完整
+    # 制品由本地构建台 build.sh 交叉补发（与 release.needs 摘除同一决策）。
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # 并行发布决策（2026-09-04）：QEMU 交叉编译在托管 runner 上持续撞 6h
     # 单 job 硬上限（R15 5h52m+ 仍 in_progress，被强制终止），无法作为
@@ -748,31 +757,22 @@ jobs:
           path: agentrt-${{ env.VERSION }}-${{ matrix.artifact }}.tar.gz*
           if-no-files-found: error
 
-  # 汇聚六平台制品 → 签名（cosign + GPG）→ manifest 生成 → 发布
-  # 官方制品仓库：atomgit.com/openairymax/agentrt（publish-release.sh 上传）；
-  # GitHub Release 为镜像。双轨签名防供应链：
-  #   cosign sign-blob 每个 tarball（*.sig）；GPG 签名 manifest.*.json（*.asc）。
-  # 需在仓库 secrets 配置：GPG_PRIVATE_KEY/GPG_PASSPHRASE/COSIGN_PRIVATE_KEY/
-  # COSIGN_PASSWORD/ATOMGIT_TOKEN（见 _tools/scripts/ci/release/init-signing-keys.sh）。
+  # 汇聚门禁平台制品 → 聚合为 release-dist 附件，供 MCP/本地发布（发布已
+  # 移出 GitHub runner）。cosign+GPG+manifest+atomgit 上传统一由
+  # _tools/scripts/ci/release/publish-release.sh 在本地执行（私钥位于
+  # ~/.airymaxrt-signing/，ATOMGIT_TOKEN 直连）。根因（v0.1.9 R16 实证）：
+  # runner(美东) → atomgit/OBS 上传 ~20MB 需 ~15min，撞 PUT --max-time 900
+  # 被掐断而发布失败；且 runner 需常驻 5 类发布 secret、失败日志 403 难排障。
   release:
-    # build-windows 暂从 needs 摘除（MSVC 移植进行中，见 build-windows
-    # continue-on-error 注释）；Windows 二进制修好后补发。
-    # build-riscv64 亦摘除（QEMU 在托管 runner 撞 6h 上限，见该 job
-    # continue-on-error 注释）；riscv64 制品本地/自托管补发。
-    # 门禁 = 已实证全绿的 Linux x86_64 / macOS arm64 / Linux arm64 / Linux i686。
+    # build-windows / build-riscv64 已按 dispatch-only 门控（见各自 if），
+    # 不在 needs；门禁 = 已实证全绿的 Linux x86_64 / macOS arm64 /
+    # Linux arm64 / Linux i686 四平台。
     needs: [build-linux, build-macos, build-arm64, build-linux-32bit]
     runs-on: ubuntu-latest
     # tag 推送或手动 dispatch（手动时版本来自 inputs.version）皆可触发
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     permissions:
-      contents: write
-    env:
-      COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
-      COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
-      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
-      ATOMGIT_REPO: openairymax/agentrt
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -795,9 +795,6 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v3.6.0
-
       - name: Generate release notes
         run: |
           VERSION="${{ env.VERSION }}"
@@ -809,56 +806,29 @@ jobs:
           fi > dist/notes.txt
           echo "变更摘要已生成: $(wc -l < dist/notes.txt) 行"
 
-      # 签名 + manifest 生成 + GPG 签名 + atomgit Release 上传 + latest/ 入口更新。
-      # 未配置 ATOMGIT_TOKEN 时自动跳过上传，产物保留在 dist/（GitHub 镜像照常）。
-      - name: Sign, generate manifest, publish to atomgit
-        env:
-          RELEASE_NOTES_FILE: dist/notes.txt
-          # agentrt 宿主下安装器 SSoT 位于本仓 scripts/（旧伞仓布局为
-          # agent-workload/agentrt/scripts/），发布脚本默认路径需覆盖。
-          AIRY_INSTALLER_SRC: ${{ github.workspace }}/scripts/install.sh
-          AIRY_INSTALLER_PS1_SRC: ${{ github.workspace }}/scripts/install.ps1
+      # 发布交接（发布已移出 runner）：校验 dist 后聚合上传为单一附件。
+      # 本地发布命令（MCP/维护者）：
+      #   download agentrt-<ver>-release-dist → sha256sum -c → 
+      #   _tools/scripts/ci/release/publish-release.sh "<ver>" <dist_dir>
+      - name: Aggregate dist for atomgit publish (hand-off)
         run: |
-          bash ./_tools/scripts/ci/release/publish-release.sh "${{ env.VERSION }}" "$PWD/dist"
+          ls -la dist/
+          test -n "$(ls dist/*.tar.gz 2>/dev/null)" || {
+            echo "::error::dist 无 tar.gz 制品，无法发布交接"; exit 1
+          }
+          test -n "$(ls dist/*.tar.gz.sha256 2>/dev/null)" || {
+            echo "::error::dist 缺 sha256 校验件"; exit 1
+          }
+          # 安装器 SSoT 随附，便于本地发布直接使用（对齐
+          # publish-release.sh 的 AIRY_INSTALLER_SRC 默认值）
+          cp -f scripts/install.sh dist/ 2>/dev/null || true
+          cp -f scripts/install.ps1 dist/ 2>/dev/null || true
+          echo "发布交接包就绪: $(ls dist | wc -l) 个文件"
 
-      - name: Create GitHub Release (mirror)
-        uses: softprops/action-gh-release@v2
+      - name: Upload release-dist (for local/MCP atomgit publish)
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ env.VERSION }}
-          name: AgentRT ${{ env.VERSION }}
-          body: |
-            ## AgentRT ${{ env.VERSION }}
-
-            AI Agent Runtime Platform Engineering — 服务器就绪的 Agent 运行时底座。
-
-            ### 官方制品（atomgit）
-
-            https://atomgit.com/openairymax/agentrt/releases/download/${{ env.VERSION }}/
-
-            ### 安装
-
-            下载对应平台包并解压（或直接走安装器二进制模式，自动 GPG 验签 + sha256 校验）：
-
-            ```sh
-            # 以 Linux x64 为例；macOS → agentrt-<版本>-macos-arm64，Windows → .zip
-            AIRY_RELEASE_URL="https://atomgit.com/openairymax/agentrt/releases/download/${{ env.VERSION }}/agentrt-${{ env.VERSION }}-linux-x64.tar.gz" ./install.sh
-            ```
-
-            默认通道安装（安装器随 release 附件分发，匿名直连，一行完成
-            GPG 验签 + sha256 校验）：
-
-            ```sh
-            curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/${{ env.VERSION }}/install.sh" | bash -s -- --channel stable
-            ```
-
-            ### 更新
-
-            ```sh
-            airymaxrt update --check    # 检查更新
-            airymaxrt update            # 升级到最新
-            ```
-
-            或直接解压 tarball 后：
-            - `bin/agentrt-bootstrap.sh start` 一键启动 15 个 daemon
-            - `bin/airy_cli` 进入 CLI 交互界面（或 `airymaxrt`）
-          files: dist/*
+          name: agentrt-${{ env.VERSION }}-release-dist
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 90
