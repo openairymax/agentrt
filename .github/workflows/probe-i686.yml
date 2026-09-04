@@ -23,20 +23,27 @@ jobs:
           printf "%s\n" "deb http://archive.debian.org/debian bullseye main" "deb http://archive.debian.org/debian bullseye-updates main" > /etc/apt/sources.list
           printf "%s\n" "Acquire::Check-Valid-Until \"false\";" > /etc/apt/apt.conf.d/99archived
           apt-get update -qq
-          echo "== base versions =="
-          dpkg-query -W -f="${Package} ${Version}\n" 2>/dev/null | grep -E "^(libc6|libc6-dev|libssl|openssl|gcc-10|libgcc-10-dev)" || true
-          echo "== apt-cache policy =="
-          for p in libc6 libc6-dev libssl-dev libssl1.1; do echo "-- $p --"; apt-cache policy "$p" 2>/dev/null | head -6; done
-          echo "== install attempt =="
-          { apt-get install -y -qq --allow-downgrades build-essential make perl curl python3 python3-pip python3-venv libsqlite3-dev libyaml-dev libcurl4-openssl-dev libssl-dev zlib1g-dev libzstd-dev libmicrohttpd-dev libwebsockets-dev libevent-dev libnghttp2-dev; } > /tmp/apt.log 2>&1
-          rc=$?
-          echo "== install rc=$rc =="
-          grep -n -A 60 -E "unmet dependencies|held broken|Unable to correct" /tmp/apt.log | head -140
-          tail -25 /tmp/apt.log
+          {
+            echo "== base versions =="
+            dpkg-query -W -f="${Package} ${Version}\n" 2>/dev/null | grep -E "^(libc6|libc6-dev|libssl|openssl|libgcc-10-dev|gcc-10)" || true
+            echo "== apt-cache policy =="
+            for p in libc6 libc6-dev libssl-dev libssl1.1 libc-bin; do echo "-- $p --"; apt-cache policy "$p" 2>/dev/null | head -8; done
+            echo "== install attempt =="
+            apt-get install -y -qq --allow-downgrades build-essential make perl curl python3 python3-pip python3-venv libsqlite3-dev libyaml-dev libcurl4-openssl-dev libssl-dev zlib1g-dev libzstd-dev libmicrohttpd-dev libwebsockets-dev libevent-dev libnghttp2-dev 2>&1
+            echo "== INSTALL_RC=$? =="
+          } > /tmp/probe.log 2>&1 || true
+          cat /tmp/probe.log
           exit 0
-          ' 2>&1 | tee /tmp/probe.log
-          rc=${PIPESTATUS[0]}
-          echo "::error::probe docker rc=$rc"
-          # 将日志转 ::error:: 进 annotation（匿名 API 可读，无 admin 也能取）
-          sed 's/^/::error::  /' /tmp/probe.log | head -200
-          exit 0
+          ' 2>&1 | tee /tmp/probe-full.log
+          # 单条大 ::error::（换行 %0A 编码）→ annotation 单条可长文读取
+          python3 - <<'PY'
+          log = open('/tmp/probe-full.log', encoding='utf-8', errors='replace').read()
+          lines = log.splitlines()
+          keep = [l for l in lines if any(k in l for k in ('==', 'libc6', 'libssl', 'libc-bin', 'gcc', 'openssl', 'Candidate', 'Installed', 'unmet', 'Depends', 'held broken', 'Unable', 'E:', 'INSTALL_RC', 'Setting up', 'dpkg:', 'The following'))]
+          msg = '\n'.join(keep[-180:])
+          if len(msg) > 55000:
+              msg = msg[-55000:]
+          msg = msg.replace('%', '%25').replace('\r', '').replace('\n', '%0A')
+          print(f'::error::[probe-i686]{msg}')
+          PY
+          exit 1
