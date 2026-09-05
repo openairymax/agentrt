@@ -645,11 +645,13 @@ jobs:
           path: agentrt-${{ env.VERSION }}-linux-riscv-64.tar.gz*
           if-no-files-found: error
 
-  # ARM-64 (linux-arm-64)：与 linux-riscv-64 同方案，经 Docker buildx + qemu
-  # 多架构容器构建（ubuntu:20.04 arm64 镜像，统一 glibc 2.31 基线，覆盖
-  # arm-64 / arm-32 设备）。
+  # ARM-64 (linux-arm-64)：0.1.11 E1-B——原生 arm64 hosted runner
+  # （ubuntu-24.04-arm，公开仓库免费）执行，容器内 ubuntu:20.04 arm64
+  # 镜像在原生 arm64 上**零 QEMU 模拟**，glibc 2.31 基线不变（覆盖 arm-64 /
+  # arm-32 设备）。实测 qemu 腿 88min → 预期 ~15min（2026-09-05，qemu
+  # 全模拟 + 每轮自编 deps 主导耗时）。
   build-linux-arm-64:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     env:
       BUILD_DIR: build
       STAGE_DIR: stage
@@ -667,8 +669,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: bash .github/scripts/init-submodules.sh agent-workload tools
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      # 原生 arm64 runner：无需 Set up QEMU / buildx（x86_64 时代残留）。
+      # docker run --platform linux/arm64 在 arm64 宿主上原生执行。
 
       - name: Build in arm-64 container
         run: |
