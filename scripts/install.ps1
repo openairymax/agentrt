@@ -222,10 +222,26 @@ function Install-Binary {
         } elseif (-not (Test-Path $asc)) {
             Write-Warn "manifest 签名缺失且无 gpg 环境（降级：仅 HTTPS + sha256）"
         }
-        $plat = "windows-" + $env:PROCESSOR_ARCHITECTURE.ToLower()
-        if ($plat -eq "windows-amd64") { $plat = "windows-x64" }
+        # 平台命名规范（0.1.10 起）：OS-架构族-位宽（windows-x86-64 等）。
+        # PROCESSOR_ARCHITECTURE（AMD64/ARM64/x86）→ 平台后缀映射。
+        $plat = switch ($env:PROCESSOR_ARCHITECTURE) {
+            'AMD64' { 'windows-x86-64' }
+            'ARM64' { 'windows-arm-64' }
+            'x86'   { 'windows-x86-32' }
+            default { $null }
+        }
+        if (-not $plat) {
+            Write-Warn "不支持的处理器架构 $($env:PROCESSOR_ARCHITECTURE)，回退源码构建"; return $false
+        }
         $json = Get-Content $man -Raw | ConvertFrom-Json
         $art = $json.releases.($json.latest).artifacts.$plat
+        # 旧两代 manifest 键兜底（windows-x64 / win-x86-64 / win-x64）
+        if (-not $art) {
+            foreach ($alt in @('windows-x64', 'win-x86-64', 'win-x64')) {
+                $art = $json.releases.($json.latest).artifacts.$alt
+                if ($art) { Write-Warn "平台键 $plat 未命中，使用兼容键 $alt"; break }
+            }
+        }
         if (-not $art -or -not $art.url) { Write-Warn "manifest 无 $plat 制品，回退源码构建"; return $false }
         $Url = $art.url
         $expectSha = [string]$art.sha256
