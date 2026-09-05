@@ -34,9 +34,16 @@ jobs:
       # 误红，dc06d4fde 实证）；随测试补充逐版上调（见 Linux job 注释）。
       COVERAGE_THRESHOLD: 25
     steps:
-      # M3 方案 B（0.1.12）：Checkout + 定向子模块检出收敛为 lf-init-deps
-      # 复合 action（同源模板，防 build-test/release 双实现漂移——P3）。
-      - name: Checkout and init submodules
+      # M3 方案 B（0.1.12）：定向子模块检出收敛为 lf-init-deps 复合 action
+      # （同源模板，防 build-test/release 双实现漂移——P3）。checkout 必
+      # 须是独立远程 action 首步（build-test #103 实证：本地 composite 在
+      # job 初始化阶段解析、早于任何 step，无法在内部自举 checkout）。
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+      - name: Init submodules (targeted)
         uses: ./.github/actions/lf-init-deps
         with:
           groups: agent-workload
@@ -153,7 +160,14 @@ jobs:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
     steps:
-      - name: Checkout and init submodules
+      # 同 linux job：checkout 独立远程首步 + lf-init-deps 定向检出
+      # （#103 实证：本地 composite 无法在内部自举 checkout）。
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+      - name: Init submodules (targeted)
         uses: ./.github/actions/lf-init-deps
         with:
           groups: agent-workload
@@ -265,7 +279,14 @@ jobs:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
     steps:
-      - name: Checkout and init submodules
+      # 同 linux job：checkout 独立远程首步 + lf-init-deps 定向检出
+      # （#103 实证：本地 composite 无法在内部自举 checkout）。
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+      - name: Init submodules (targeted)
         uses: ./.github/actions/lf-init-deps
         with:
           groups: agent-workload
