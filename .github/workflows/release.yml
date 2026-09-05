@@ -871,15 +871,16 @@ jobs:
   #   - continue-on-error: true：失败不使 run 失败（发布门禁不依赖本腿）
   #   - release.needs 不含本 job：release 聚合不等本腿；若本腿先完成，
   #     Download all artifacts 会并入其制品，否则该制品缺省随后补发
-  #   - 修好 cmake armhf 供给后置回门禁（experimental: false + 移入 needs）
-  # 构建走 QEMU linux/arm/v7 + ubuntu:20.04（glibc 2.31 基线，arm-32 设备
-  # 用户空间）。AIRY_JOBS=2 限并行防 32 位 OOM。
-  # E1 待办（2026-09-05）：arm64 工具链镜像已公开并接入 arm-64 腿；本腿在
-  # ghcr.io/openairymax/agentrt-qemu-toolchain:arm32-<tag> 构建成功后同样
-  # 切换（删容器内 apt+lib-builddeps，digest 钉版引用）。arm32 镜像构建走
-  # build-toolchain-images.yml（platforms=arm64,arm32）。
+  #   - 置回门禁须连续绿实证（G3）：experimental: false + 移入 needs
+  # E1 收口（2026-09-05）：切原生 arm64 runner（ubuntu-24.04-arm）+
+  # 预构建 armhf 工具链镜像（digest 钉版，apt+lib-builddeps 已固化）。
+  # linux/arm/v7 在 aarch64 宿主上经内核 CONFIG_COMPAT 原生执行（零
+  # QEMU，Cobalt 100 实证）；glibc 2.31 基线不变。容器内架构判定禁用
+  # uname（compat 下返回 aarch64，OpenSSL run 11 陷阱，tools 18f6bb3
+  # 已修），镜像内 deps 目标已按编译器判定固化。AIRY_JOBS=2 限并行
+  # 防 32 位链接期地址空间不足（QEMU 时代教训沿用，首切原生保守值）。
   build-linux-arm-32:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     continue-on-error: true
     env:
       BUILD_DIR: build
@@ -899,14 +900,19 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: bash .github/scripts/init-submodules.sh agent-workload tools
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      # 原生 arm64 runner + AArch32 compat：无需 Set up QEMU。
+      # docker run --platform linux/arm/v7 原生执行（无 binfmt 模拟）。
 
       - name: Build in arm-32 container
         run: |
+          # E1 收口（2026-09-05）：预构建 armhf 工具链镜像（GHCR 公开，
+          # digest 钉版）。apt 依赖 + lib-builddeps 自编译产物已固化进
+          # 镜像（Dockerfile 与 release 腿同源，glibc 2.31 基线不变）。
           docker run --rm --platform linux/arm/v7 \
             -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage -e AIRY_JOBS \
-            -v "$PWD":/src -w /src ubuntu:20.04 bash -c '
+            -v "$PWD":/src -w /src \
+            ghcr.io/openairymax/agentrt-qemu-toolchain:arm32-20260905-1@sha256:942cebb41936c7ebe015a06cabe91805fa7a59b80bb25ce834a35b13721d18d0 \
+            bash -c '
             # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）。
             # 诊断通道：stdout 全程 tee 到 /src/container-*.log（宿主工作区），
             # ERR trap 把失败命令与日志尾部以 ::error:: 上报——annotation 经
@@ -914,17 +920,6 @@ jobs:
             set -euo pipefail
             exec > >(tee /src/container-arm-32.log) 2>&1
             trap '"'"'echo "::error::[arm-32] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-arm-32.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
-            export DEBIAN_FRONTEND=noninteractive
-            apt-get update -qq
-            apt-get install -y -qq \
-              build-essential make perl curl python3 python3-pip python3-venv \
-              libsqlite3-dev libyaml-dev libcurl4-openssl-dev \
-              libssl-dev zlib1g-dev libzstd-dev libmicrohttpd-dev \
-              libwebsockets-dev libevent-dev libnghttp2-dev
-            # 0.1.6f SSoT：cmake/cJSON/OpenSSL/libcurl/libwebsockets 自编译
-            # 收敛到 lib-builddeps.sh（与本地 build.sh / 其他 Linux job
-            # 同源，幂等 + 离线 deps 缓存优先）。统一 libssl.so.3 链路。
-            bash /src/_tools/scripts/ci/release/lib-builddeps.sh
             export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
             cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release \
               -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF -DAIRY_BUILD_ALL=ON \
@@ -932,7 +927,7 @@ jobs:
               -DCMAKE_INSTALL_PREFIX="$PWD/$STAGE_DIR"
             cmake --build "$BUILD_DIR" -j"${AIRY_JOBS:-$(nproc)}"
             cmake --install "$BUILD_DIR"
-            echo "warn: arm-32 TUI 交叉构建在 qemu 模拟下跳过（由本地构建台产物覆盖）"
+            echo "warn: arm-32 TUI 暂缺（U10 归 0.1.12：rustup 由 uname 选 rustup-init，compat 下误取 aarch64 工具链，需 TARGETARCH 显式指定 armv7-unknown-linux-gnueabihf）"
             mkdir -p "$STAGE_DIR/lib"
             for p in agent-workload/ecosystem/agents/airymax_agents \
                      agent-workload/ecosystem/agents/airymax_agents_rs \
