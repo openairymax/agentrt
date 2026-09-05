@@ -145,7 +145,10 @@ if [ -n "${AIRY_VERSION:-}" ]; then
 elif [ -f "$(dirname "$0")/../VERSION" ]; then
     AIRY_VERSION="v$(cat "$(dirname "$0")/../VERSION" | tr -d '[:space:]')"
 fi
-AIRY_VERSION="${AIRY_VERSION:-v0.1.9}"
+# 版本默认占位（仅 curl 管道/裸脚本且最终解析全部失败时兜底；banner 已不再
+# 展示该值——真实版本一律以 manifest/包内 VERSION/制品名为准，杜绝漂移误导。
+# 保持与当前最新发布一致，随发布节奏更新）。
+AIRY_VERSION="${AIRY_VERSION:-v0.1.10}"
 AIRY_BUILD_JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 AIRY_MODE="${AIRY_MODE:-auto}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
@@ -463,9 +466,25 @@ PYEOF
 }
 
 install_binary() {
-    local url="$1" arch expect_sha="" legacy="" tarball=""
+    # 返回码语义（系统性收敛，2026-09-05）：
+    #   0  = 成功
+    #   1  = 官方确无本平台制品 / 架构不受支持 → 调用方按"无官方制品"提示，
+    #        显式要求源码构建时才降级（auto 不再静默源码）
+    #   2  = 确定性故障（下载 / sha256 / 解压 / 制品不完整 / 结构异常）→
+    #        调用方必须失败退出并给出可诊断指引，绝不静默降级源码构建
+    # 历史教训：auto 静默源码构建把网络/校验故障误当"需源码"，社区用户被
+    # 拖入克隆伞仓 + 全量 cmake，体验崩溃（0.1.10 安装事故）。fail-closed。
+    local url="$1" arch plat expect_sha="" legacy="" tarball="" local_src=0
     arch="$(detect_arch)"
-    log_info "硬件架构: ${arch}（预编译支持: ${SUPPORTED_ARCHS}）"
+    # 运行平台显示（OS-架构族-位宽，与发布命名一致，0.1.11 消息结构优化）：
+    # 平台名 + 架构名并排呈现，不再堆叠预编译支持清单——社区用户反馈
+    # "看到 x86_64 和一串架构仍不知即将安装哪个平台制品"。
+    if [ "$(uname -s 2>/dev/null)" = "Darwin" ]; then
+        plat="macos-$(plat_name "$(uname -m 2>/dev/null)")"
+    else
+        plat="linux-$(plat_name "${arch}")"
+    fi
+    log_info "运行平台: ${plat}（架构 ${arch}）"
     # 离线包（--from-file）放行任意架构（本地构建包不受官方发布清单限制）；
     # 在线安装严格按官方发布清单校验。
     if [ -z "${AIRY_FROM_FILE:-}" ]; then
@@ -495,26 +514,23 @@ install_binary() {
     #          b) 本地 tarball（--from-file / AIRY_FROM_FILE）→ 直用；
     #          c) 远程 tarball URL（{arch} 占位符）→ 下载，相邻 .sha256 自动校验
     if [ "${url##*.}" = "json" ]; then
-        local man="${AIRY_HOME}/tmp/manifest.json" man_asc="${AIRY_HOME}/tmp/manifest.json.asc" plat
+        local man="${AIRY_HOME}/tmp/manifest.json" man_asc="${AIRY_HOME}/tmp/manifest.json.asc"
         # 官方仓 manifest 经 contents API 拉取（raw 域对 JSON 返回 HTML，
         # 见 fetch_repo_file）；外部自定义 URL 保持直连。
         case "$url" in
             *openairymax/agentrt*)
                 local man_path="latest/${url##*/}"
-                fetch_repo_file "$man_path" "$man" || { log_warn "manifest 下载失败，回退源码构建"; return 1; }
+                fetch_repo_file "$man_path" "$man" || { log_err "官方 manifest 下载失败（网络/服务异常），请稍候重试"; return 2; }
                 fetch_repo_file "$man_path.asc" "$man_asc" >/dev/null 2>&1 || true
                 ;;
             *)
-                syscurl -fsSL --max-time 60 -o "$man" "$url" || { log_warn "manifest 下载失败，回退源码构建"; return 1; }
+                syscurl -fsSL --max-time 60 -o "$man" "$url" || { log_err "manifest 下载失败（网络/服务异常），请稍候重试"; return 2; }
                 syscurl -fsSL --max-time 60 -o "$man_asc" "${url}.asc" >/dev/null 2>&1 || true
                 ;;
         esac
-        verify_gpg_sig "$man" "$man_asc" || { log_warn "manifest 验签失败（GPG），拒绝安装"; return 1; }
+        verify_gpg_sig "$man" "$man_asc" || { log_err "manifest 验签失败（GPG），拒绝安装——请确认网络环境未被劫持后重试"; return 2; }
         [ -s "$man_asc" ] && log_ok "manifest 验签通过（GPG）"
-        plat="linux-$(plat_name "${arch}")"
-        if [ "$(uname -s 2>/dev/null)" = "Darwin" ]; then
-            plat="macos-$(plat_name "$(uname -m 2>/dev/null)")"
-        fi
+        # plat 已在函数入口统一计算（macOS 走 uname -m，其余走 detect_arch）
         url="$(parse_manifest "$man" "$plat" url)"
         expect_sha="$(parse_manifest "$man" "$plat" sha256)"
         # 平台键兼容（三代 manifest）：本版主键 = OS-架构族-位宽（如
@@ -530,10 +546,26 @@ install_binary() {
             done
         fi
         [ -n "$url" ] || { log_warn "manifest 无 ${plat} 制品，回退源码构建"; return 1; }
-        log_info "通道 ${AIRY_CHANNEL} 最新制品（${plat}）: $(basename "${url%%\?*}")"
+        # 目标版本从制品文件名提取（agentrt-v<ver>-<os>-<arch>.tar.gz），
+        # 明确展示"即将安装的版本"；URL/文件名由随后的下载行呈现，避免
+        # 平台名在相邻两行重复堆叠造成迷惑（0.1.11 社区反馈消息结构优化）。
+        # OS 前缀逐个匹配（BSD sed 不支持 \| 交替，须循环兼容 macOS）。
+        local _fname _fver _os
+        _fname="$(basename "${url%%\?*}")"
+        _fver=""
+        for _os in linux macos win; do
+            _fver="$(printf '%s' "$_fname" | sed -n "s/^agentrt-v\\(.*\\)-${_os}-.*/\\1/p")"
+            [ -n "$_fver" ] && break
+        done
+        if [ -n "$_fver" ]; then
+            log_info "目标版本: v${_fver}（通道 ${AIRY_CHANNEL}）"
+        else
+            log_info "目标制品: ${_fname}（通道 ${AIRY_CHANNEL}）"
+        fi
     elif [ -f "$url" ]; then
         log_info "使用本地离线包: $url"
         tarball="$url"
+        local_src=1
     else
         # URL {arch} 占位符替换（POSIX sed，兼容 sh）
         url="$(printf '%s' "$url" | sed "s/{arch}/${arch}/g")"
@@ -558,31 +590,67 @@ install_binary() {
     # 命中旧目录 → 拷贝旧 bin / 版本误显示 0.1.6c 的历史故障）。
     rm -rf "${AIRY_HOME}"/tmp/agentrt-*/ 2>/dev/null || true
 
-    # 下载（仅远程来源；同制品残留允许复用，0 字节截断残留则重下）
-    if [ -f "$tarball" ] && [ ! -s "$tarball" ]; then
-        rm -f "$tarball"
-    fi
-    if [ ! -f "$tarball" ]; then
-        log_info "下载完全体二进制包: ${url}"
-        if ! syscurl -fsSL --max-time 600 -o "${tarball}" "${url}"; then
-            log_warn "release 下载失败，回退源码构建"
-            rm -f "${tarball}"
-            return 1
-        fi
-    fi
-    # sha256 校验（manifest 期望值，或相邻 .sha256 文件）
+    # sha256 期望值：manifest 已解析（expect_sha）；离线/直链场景回退相邻
+    # .sha256 文件（install.sh --from-file 手动下载核对）。
     if [ -z "$expect_sha" ] && [ -f "${tarball}.sha256" ]; then
         expect_sha="$(cut -d' ' -f1 "${tarball}.sha256" 2>/dev/null)"
     fi
-    if [ -n "$expect_sha" ]; then
-        if printf '%s  %s\n' "$expect_sha" "$tarball" | sha256sum -c - >/dev/null 2>&1; then
-            log_ok "sha256 校验通过"
-        else
-            log_err "sha256 校验失败，拒绝安装"
-            rm -f "$tarball"
-            return 1
+    # 下载（仅远程来源）。0.1.10 事故修复（2026-09-05）：同 tag 修复重传后，
+    # tmp 残留的旧版同名 tar.gz 会被"已存在即复用"逻辑直接采用，与新 manifest
+    # 期望 sha256 不符 → 校验失败。系统性收敛：任何缓存文件在期望 sha256
+    # 已知时必须先校验自身，不匹配立即删除重下——缓存永远不得越过校验门禁。
+    _retry_download=0
+    while :; do
+        if [ ! -f "$tarball" ]; then
+            # 本地离线包不存在即失败（不尝试把文件路径当 URL 下载）
+            if [ "$local_src" = "1" ]; then
+                log_err "离线包不存在或已被移除: ${tarball}，请重新指定 --from-file 路径"
+                return 2
+            fi
+            log_info "下载完全体二进制包: ${url}"
+            if ! syscurl -fsSL --max-time 600 -o "${tarball}" "${url}"; then
+                rm -f "${tarball}"
+                if [ "$_retry_download" -lt 1 ]; then
+                    log_warn "release 下载失败，重试一次（网络抖动兜底）…"
+                    _retry_download=$((_retry_download+1)); continue
+                fi
+                log_err "release 下载失败（已重试）。请检查网络后重新运行："
+                log_err "  curl -fsSL \"https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh\" | bash"
+                return 2
+            fi
         fi
+        # 缓存自检（期望 sha256 已知）：本地缓存不符期望 → 删后重下。
+        # 这覆盖同 tag 修复重传 / 上次下载残留 / CDN 缓存陈旧三类场景。
+        if [ -n "$expect_sha" ]; then
+            if ! printf '%s  %s\n' "$expect_sha" "$tarball" | sha256sum -c - >/dev/null 2>&1; then
+                # 本地离线包：无网络缓存可重下，不删除用户文件，直接 fail-closed
+                if [ "$local_src" = "1" ]; then
+                    log_err "sha256 校验失败：离线包与校验值不一致，拒绝安装"
+                    log_err "  - 请重新下载安装包，或核对离线包与其 .sha256 是否匹配。"
+                    return 2
+                fi
+                rm -f "$tarball"
+                if [ "$_retry_download" -lt 2 ]; then
+                    log_warn "本地缓存与官方校验值不符（可能是修复重传或残留旧包），重新下载…"
+                    _retry_download=$((_retry_download+1)); continue
+                fi
+                log_err "sha256 校验失败：下载内容与官方 manifest 不一致，拒绝安装"
+                log_err "  - 已自动重试仍失败，多为 CDN 缓存陈旧或网络中间层篡改。"
+                log_err "  - 请稍候重试；或 --from-file 使用手动下载并核对 sha256 的离线包。"
+                return 2
+            fi
+        fi
+        break
+    done
+    # 校验通过的正向确认（仅当存在期望值时；离线/直链无期望 sha 时不虚报）。
+    # 与 [FAIL] sha256 校验失败 对称，用户可明确看到门禁已过。
+    if [ -n "$expect_sha" ]; then
+        log_ok "sha256 校验通过"
     fi
+    # 记录已安装制品 sha256（固化到 install.env）。update 侧"同版本修复重发
+    # 检测"的依据（0.1.11）：官方同 tag 修复重发时版本号不变而 sha 变化，
+    # 仅比版本会误报"已是最新"，导致修复补丁收不到。以实际校验通过的文件为准。
+    AIRY_ARTIFACT_SHA256="$(sha256sum "$tarball" 2>/dev/null | awk '{print $1}')"
     # 包内架构自校验：tarball 根含 platform-* 标识文件时交叉校验，防止
     # 下载到异架构包后静默安装（跨架构 daemon 启动即崩溃）。三代标记
     # 兼容：本版生成 platform-<架构族-位宽>（如 platform-x86-64），旧
@@ -596,15 +664,15 @@ install_binary() {
         done
         if [ -z "$_arch_ok" ]; then
             log_err "二进制包架构与当前主机（${arch}）不匹配（标记 ${_marker}），拒绝安装"
-            rm -f "${tarball}"
-            return 1
+            [ "$local_src" = "1" ] || rm -f "${tarball}"
+            return 2
         fi
         log_ok "二进制包架构校验通过（${arch}）"
     fi
-    tar -xzf "${tarball}" -C "${AIRY_HOME}/tmp" || { log_err "release 包解压失败（tar）"; rm -f "$tarball"; return 1; }
+    tar -xzf "${tarball}" -C "${AIRY_HOME}/tmp" || { log_err "release 包解压失败（tar），制品可能损坏"; [ "$local_src" = "1" ] || rm -f "$tarball"; return 2; }
     local extracted
     extracted="$(find "${AIRY_HOME}/tmp" -maxdepth 1 -type d -name 'agentrt-*' | head -1)"
-    [ -n "$extracted" ] || { log_warn "release 包结构异常，回退源码构建"; return 1; }
+    [ -n "$extracted" ] || { log_err "release 包结构异常（缺 agentrt-* 顶层目录），制品不完整"; return 2; }
     # 0.1.7 自动计算：daemon 清单以制品 bin/*_d 为准（后续 daemon 增删不再
     # 改脚本硬编码；gateway_d 为 HTTP 服务亦属 *_d 自动纳入）。0.1.9 M4-S4
     # 与源码构建收敛为同一 daemon_list 推导。
@@ -619,10 +687,10 @@ install_binary() {
         for _d2 in ${EXPECTED_DAEMONS}; do
             [ -x "${AIRY_HOME}/bin/${_d2}" ] || { _binok=0; log_err "bin/ 部署失败，缺失: ${_d2}（检查磁盘/权限）"; break; }
         done
-        [ "$_binok" = "1" ] || return 1
+        [ "$_binok" = "1" ] || return 2
     else
         log_err "release 包缺失 daemon 二进制（bin/*_d 为空，制品不完整）"
-        return 1
+        return 2
     fi
     # lib/（.so 自包含）部署 + 校验：0.1.5a 旧包曾缺 libcjson.so.1 导致
     # daemon/airy_cli 启动即失败（社区反馈）。包内 lib/ 含 .so 时必须
@@ -632,7 +700,7 @@ install_binary() {
         cp -f "${extracted}"/lib/* "${AIRY_HOME}/lib/" 2>/dev/null
         if ! ls "${AIRY_HOME}"/lib/*.so* >/dev/null 2>&1; then
             log_err "lib/ 部署失败（.so 未就位），二进制将无法启动"
-            return 1
+            return 2
         fi
     fi
     cp -rf "${extracted}"/include/* "${AIRY_HOME}/include/" 2>/dev/null || true
@@ -664,11 +732,15 @@ install_binary() {
 # ─── 闭源预编译模块下载（模式 B） ───────────────────────────────────────
 fetch_prebuilt_module() {
     # fetch_prebuilt_module <name> <url> <解压后目录名>
-    local name="$1" url="$2" dirname="$3" dest="${MODULES_DIR}/${dirname}"
+    # 命名注意：解压目录变量用 mod_dir，勿用 dirname —— 遮蔽系统 dirname
+    # 命令且在 set -u 下 local 同语句跨赋值引用易触发 "unbound variable"
+    #（dash/bash 行为差异，2026-09-05 安装事故）。赋值拆行，避免同语句依赖。
+    local name="$1" url="$2" mod_dir="$3" dest tarball
+    dest="${MODULES_DIR}/${mod_dir}"
+    tarball="${AIRY_HOME}/tmp/${mod_dir}.tar.gz"
     [ -n "$url" ] || { log_warn "未配置 ${name} 预编译包 URL，跳过"; return 1; }
     if [ -d "$dest" ]; then log_ok "${name} 预编译模块已就位"; return 0; fi
     log_info "下载闭源预编译模块 ${name}…"
-    local tarball="${AIRY_HOME}/tmp/${dirname}.tar.gz"
     syscurl -fL ${CURL_FLAG} --max-time 600 -o "$tarball" "$url" || { log_warn "${name} 下载失败"; return 1; }
     mkdir -p "$dest"
     tar -xzf "$tarball" -C "$dest" || { log_warn "${name} 解压失败"; return 1; }
@@ -1178,6 +1250,8 @@ finalize_install() {
         echo "# AgentRT 安装信息（由 install.sh 生成，勿手改）"
         echo "AIRY_HOME=${AIRY_HOME}"
         echo "AIRY_VERSION=${AIRY_VERSION}"
+        # 已安装制品 sha256（update 同版本修复重发检测依据；源码构建/旧安装留空）
+        echo "AIRY_ARTIFACT_SHA256=${AIRY_ARTIFACT_SHA256:-}"
         echo "AIRY_CHANNEL=${AIRY_CHANNEL}"
         echo "AIRY_BIN_LINK=${BIN_DIR}/airymaxrt"
         echo "INSTALLED_AT=$(date -Is 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S%z')"
@@ -1546,11 +1620,16 @@ post_install_selfcheck() {
 # 0.1.6f 视觉强化：banner 回归简约——单线框 + 品牌 + 版本 + 一句理念，
 # 去除冗余装饰行（此前信息堆砌且含拼写错误）。留白即秩序。
 print_banner() {
+    # 0.1.11 视觉修复（2026-09-05）：横幅不再内嵌 AIRY_VERSION——curl 管道
+    # 无 VERSION 文件时回退默认值（v0.1.9），与真实安装版本漂移造成"安装
+    # 了 0.1.10 却显示 0.1.9"的误导；版本改由 [2/5] 阶段解析 manifest 后
+    # 明确展示（目标版本以官方 manifest 为准，杜绝写死漂移）。同时固定等宽
+    # 框线（此前版本号长度变化导致右边界错位）。
     cat <<EOF
 ${C_CYAN}
-  ┌─ Airymax AgentRT ─────────────────────────────── ${AIRY_VERSION} ─┐
-  │  Agent Runtime Platform · Simplicity is the ultimate sophistication
-  └───────────────────────────────────────────────────────────────────┘
+  ┌─────────────────────────────────────────────┐
+  │  Airymax AgentRT · Agent Runtime Platform   │
+  └─────────────────────────────────────────────┘
 ${C_NC}
 EOF
 }
@@ -1661,25 +1740,46 @@ main() {
         stop_daemons "$AIRY_HOME/bin"
     fi
 
-    local installed=1
+    local installed=1 _bin_rc=0
     stage 2 5 "获取运行时"
     # 发布来源解析：--from-file 离线包 > AIRY_RELEASE_URL 显式 URL >
     # 官方通道 manifest（默认，stable/beta 由 --channel 决定；--mode source 除外）。
     # manifest 实际经 contents API 拉取（install_binary 内 fetch_repo_file，
     # raw 域对 JSON 返回 HTML 不可用）；此 URL 仅作 .json 路由判定与
-    # 文件名提取。失败自动降级源码构建。
+    # 文件名提取。源码降级仅限"官方确无本平台制品"（install_binary rc=1），
+    # 且 mode 为 auto/hybrid；确定性故障（rc=2）一律失败退出并给指引，
+    # 杜绝把网络/校验故障静默拖入源码构建（0.1.10 安装事故教训，2026-09-05）。
     local release_url="${AIRY_RELEASE_URL:-}"
     if [ -z "$release_url" ] && [ "${AIRY_MODE:-auto}" != "source" ]; then
         release_url="https://atomgit.com/openairymax/agentrt/latest/manifest.${AIRY_CHANNEL}.json"
     fi
     if [ -n "$AIRY_FROM_FILE" ]; then
-        install_binary "$AIRY_FROM_FILE" && installed=0
+        install_binary "$AIRY_FROM_FILE"; _bin_rc=$?
+        [ "$_bin_rc" = "0" ] && installed=0
     elif [ "$AIRY_MODE" = "binary" ] || { [ "$AIRY_MODE" = "auto" ] && [ -n "$release_url" ]; }; then
-        install_binary "$release_url" && installed=0
+        install_binary "$release_url"; _bin_rc=$?
+        [ "$_bin_rc" = "0" ] && installed=0
+    fi
+
+    # rc=2（确定性故障）→ 直接失败，绝不静默源码构建
+    if [ "$_bin_rc" = "2" ]; then
+        log_err "二进制安装失败（详见上方错误）。已停止，未进入源码构建。"
+        exit 1
+    fi
+    # rc=1（官方确无本平台制品）→ 仅 auto/hybrid 允许源码兜底；binary 直接失败
+    if [ "$_bin_rc" = "1" ] && [ "$AIRY_MODE" = "binary" ]; then
+        log_err "官方未发布当前平台的预编译制品，且你指定 --mode binary（禁止源码构建）。"
+        log_err "可改 --mode auto 或 hybrid 自动源码构建，或 AIRY_MODE=source 显式源码构建。"
+        exit 1
     fi
 
     if [ "$installed" -ne 0 ]; then
-        log_info "进入源码构建模式（${AIRY_MODE}）"
+        # 走到这里 = 无官方制品（rc=1）的 auto/hybrid 源码兜底，或显式 source/hybrid
+        if [ "$AIRY_MODE" = "auto" ]; then
+            log_warn "当前平台暂无官方预编译制品（${AIRY_MODE}），转为源码构建…"
+        else
+            log_info "进入源码构建模式（${AIRY_MODE}）"
+        fi
         # 工具链仅在源码构建路径要求（二进制模式无需 git/cmake/gcc）
         check_toolchain
         prepare_source
