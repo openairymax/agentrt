@@ -15,7 +15,12 @@ inputs:
     required: false
     default: 'agent-workload'
   gh_token:
-    description: 'GitHub token（composite action 不能直接引用 secrets 上下文，须由调用方 with: gh_token: ${{ secrets.GH_TOKEN }} 显式传入）'
+    description: >-
+      GitHub token。composite action manifest 加载期对全部字符串字段做模板
+      求值且无 secrets 上下文——description/run 中出现 secrets 表达式字面量
+      会直接 "Unrecognized named-value" 硬失败（build-test #106/#108 实证）。
+      调用方以 with.gh_token 传入仓库 secret GH_TOKEN，action 内部经
+      inputs.gh_token 消费。
     required: true
 runs:
   using: composite

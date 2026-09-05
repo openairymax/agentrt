@@ -6,7 +6,10 @@ description: |
   artifact_name 对调用方 job 可见（composite action 与 job 同进程语义）。
 inputs:
   version:
-    description: '发布版本号（含 v 前缀，调用方传 ${{ env.VERSION }}）'
+    description: >-
+      发布版本号（含 v 前缀）。注意：manifest 加载期 env 上下文不可用，
+      description 不得出现 env 表达式字面量（与 lf-init-deps #106/#108
+      同因）；调用方传 env.VERSION 的求值结果。
     required: true
   platform-tag:
     description: '平台标记后缀（x86-64 / arm-64 / riscv-64…；与安装器/更新器 plat_name() 同口径校验）'
