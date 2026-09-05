@@ -3,7 +3,7 @@
 
 DOXYFILE_ENCODING      = UTF-8
 PROJECT_NAME           = "AgentRT"
-PROJECT_NUMBER         = "0.1.9"
+PROJECT_NUMBER         = "0.1.11"
 PROJECT_BRIEF          = "AI Agent Runtime Platform Engineering — Multi-Agent Framework with MemoryRovol"
 PROJECT_LOGO           =
 OUTPUT_DIRECTORY       = docs/api/doxygen_html
