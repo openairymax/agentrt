@@ -8,6 +8,12 @@
 #
 # 此测试为自包含测试，不链接外部库（避免 ASan 符号依赖）。
 
+# GCC/Clang 告警旗标：MSVC 不识别 -W* 语法（D8021，windows-build #101
+# 实证），与根 CMakeLists if(MSVC)/else() 惯例对齐
+if(NOT MSVC)
+    set(AIRY_COMPLIANCE_TEST_WARN -Wall -Wextra -Wpedantic -Wno-type-limits)
+endif()
+
 add_executable(test_banned_functions test_banned_functions.c)
 
 target_include_directories(test_banned_functions PRIVATE
@@ -19,7 +25,7 @@ target_include_directories(test_banned_functions PRIVATE
 target_compile_features(test_banned_functions PRIVATE c_std_11)
 target_compile_definitions(test_banned_functions PRIVATE AIRY_COMPLIANCE_STRICT)
 target_compile_options(test_banned_functions PRIVATE
-    -Wall -Wextra -Wpedantic -Wno-type-limits
+    ${AIRY_COMPLIANCE_TEST_WARN}
 )
 
 add_test(NAME test_banned_functions COMMAND test_banned_functions)
@@ -38,7 +44,7 @@ target_include_directories(test_smoke PRIVATE
 target_compile_features(test_smoke PRIVATE c_std_11)
 target_compile_definitions(test_smoke PRIVATE AIRY_COMPLIANCE_STRICT)
 target_compile_options(test_smoke PRIVATE
-    -Wall -Wextra -Wpedantic -Wno-type-limits
+    ${AIRY_COMPLIANCE_TEST_WARN}
 )
 
 add_test(NAME test_smoke COMMAND test_smoke)
@@ -57,7 +63,7 @@ target_include_directories(test_utils PRIVATE
 target_compile_features(test_utils PRIVATE c_std_11)
 target_compile_definitions(test_utils PRIVATE AIRY_COMPLIANCE_STRICT)
 target_compile_options(test_utils PRIVATE
-    -Wall -Wextra -Wpedantic -Wno-type-limits
+    ${AIRY_COMPLIANCE_TEST_WARN}
 )
 
 add_test(NAME test_utils COMMAND test_utils)
@@ -76,7 +82,7 @@ target_include_directories(test_string_utils PRIVATE
 target_compile_features(test_string_utils PRIVATE c_std_11)
 target_compile_definitions(test_string_utils PRIVATE AIRY_COMPLIANCE_STRICT)
 target_compile_options(test_string_utils PRIVATE
-    -Wall -Wextra -Wpedantic -Wno-type-limits
+    ${AIRY_COMPLIANCE_TEST_WARN}
 )
 
 add_test(NAME test_string_utils COMMAND test_string_utils)
