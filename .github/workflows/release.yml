@@ -185,7 +185,9 @@ jobs:
           # 0.1.11 完全体包完整性（v0.1.10 社区事故修复）：容器内收集运行时
           # .so（自编译 deps 链 /usr/local/lib：cjson/ssl/curl/websockets 等），
           # fail-closed 校验缺一即中止，杜绝残缺包上传（lib-package.sh SSoT）。
-          ldconfig
+          # ldconfig 刷新 /etc/ld.so.cache：自建镜像容器（arm-64 E1）以非 root
+          # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
+          ldconfig 2>/dev/null || true
           source _tools/scripts/ci/release/lib-package.sh
           pkg_runtime_libs "${PKG_DIR}"
           touch "${PKG_DIR}/lib/.collected"
@@ -679,7 +681,9 @@ jobs:
           # 0.1.11 完全体包完整性（v0.1.10 社区事故修复）：容器内收集运行时
           # .so（自编译 deps 链 /usr/local/lib：cjson/ssl/curl/websockets 等），
           # fail-closed 校验缺一即中止，杜绝残缺包上传（lib-package.sh SSoT）。
-          ldconfig
+          # ldconfig 刷新 /etc/ld.so.cache：自建镜像容器（arm-64 E1）以非 root
+          # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
+          ldconfig 2>/dev/null || true
           source _tools/scripts/ci/release/lib-package.sh
           pkg_runtime_libs "${PKG_DIR}"
           touch "${PKG_DIR}/lib/.collected"
@@ -786,7 +790,9 @@ jobs:
           # 0.1.11 完全体包完整性（v0.1.10 社区事故修复）：容器内收集运行时
           # .so（自编译 deps 链 /usr/local/lib：cjson/ssl/curl/websockets 等），
           # fail-closed 校验缺一即中止，杜绝残缺包上传（lib-package.sh SSoT）。
-          ldconfig
+          # ldconfig 刷新 /etc/ld.so.cache：自建镜像容器（arm-64 E1）以非 root
+          # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
+          ldconfig 2>/dev/null || true
           source _tools/scripts/ci/release/lib-package.sh
           pkg_runtime_libs "${PKG_DIR}"
           touch "${PKG_DIR}/lib/.collected"
@@ -929,7 +935,9 @@ jobs:
           # 0.1.11 完全体包完整性（v0.1.10 社区事故修复）：容器内收集运行时
           # .so（自编译 deps 链 /usr/local/lib：cjson/ssl/curl/websockets 等），
           # fail-closed 校验缺一即中止，杜绝残缺包上传（lib-package.sh SSoT）。
-          ldconfig
+          # ldconfig 刷新 /etc/ld.so.cache：自建镜像容器（arm-64 E1）以非 root
+          # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
+          ldconfig 2>/dev/null || true
           source _tools/scripts/ci/release/lib-package.sh
           pkg_runtime_libs "${PKG_DIR}"
           touch "${PKG_DIR}/lib/.collected"
@@ -1040,7 +1048,9 @@ jobs:
           # 0.1.11 完全体包完整性（v0.1.10 社区事故修复）：容器内收集运行时
           # .so（自编译 deps 链 /usr/local/lib：cjson/ssl/curl/websockets 等），
           # fail-closed 校验缺一即中止，杜绝残缺包上传（lib-package.sh SSoT）。
-          ldconfig
+          # ldconfig 刷新 /etc/ld.so.cache：自建镜像容器（arm-64 E1）以非 root
+          # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
+          ldconfig 2>/dev/null || true
           source _tools/scripts/ci/release/lib-package.sh
           pkg_runtime_libs "${PKG_DIR}"
           touch "${PKG_DIR}/lib/.collected"
