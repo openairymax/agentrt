@@ -3,6 +3,13 @@ name: Build / Test / Coverage
 on:
   push:
     branches: [main]
+    # E5 触发面瘦身（0.1.11）：纯文档/说明变更跳过重型门禁，避免无效
+    # runner 队列占用。安全边界：只忽略 md/docs，workflow 与一切源码变更
+    # 仍全量验证；PR 保持全量（评审面不因触发优化而缩水）。
+    paths-ignore:
+      - '*.md'
+      - '**/*.md'
+      - 'docs/**'
   pull_request:
   workflow_dispatch:
 
@@ -137,6 +144,13 @@ jobs:
 
   # ==================== macOS 跨平台构建门禁 ====================
   macos-build:
+    # E3 hosted runner 争抢治理（0.1.11）：macos-latest 腿跨 workflow（本 job
+    # 与 release.yml macos 腿）共享 ci-macos-runner-bus，串行不抢占，避免
+    # 多 workflow 齐发把 mac 配额打满排队；cancel-in-progress:false=公平等待
+    #（不杀测试中的 job）。
+    concurrency:
+      group: ci-macos-runner-bus
+      cancel-in-progress: false
     runs-on: macos-latest
     # 超时护栏（2026-09-04 系统性加固）：此前无 timeout，任一测试挂死会让
     # job 挂到 GitHub 默认 6h 上限，整轮门禁长期 in_progress、无结论。
@@ -246,6 +260,11 @@ jobs:
 
   # ==================== Windows 跨平台构建门禁 ====================
   windows-build:
+    # E3 hosted runner 争抢治理（0.1.11）：windows 腿与 release.yml windows
+    # leg 共享 ci-windows-runner-bus，串行防 MSVC 构建双重占满 windows 配额。
+    concurrency:
+      group: ci-windows-runner-bus
+      cancel-in-progress: false
     runs-on: windows-latest
     # 超时护栏（2026-09-04）：同 macOS，防 ctest/构建挂死到 6h
     timeout-minutes: 90
@@ -256,6 +275,10 @@ jobs:
     env:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
+      # E4 原生腿依赖缓存（0.1.11）：vcpkg 二进制缓存（classic 模式同样生效）。
+      # 命中缓存直接复用已编译 port；未命中项照常编译并写回，绝对安全。
+      # 路径用前向斜杠（Windows 解析兼容），缓存目录独立于 runner 默认缓存。
+      VCPKG_BINARY_SOURCES: "clear;files,${{ runner.temp }}/vcpkg-cache,readwrite"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -267,6 +290,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: bash .github/scripts/init-submodules.sh agent-workload
+
+      # E4：vcpkg 二进制缓存恢复（须在 install 之前；key 随 workflow 内容变化
+      # 自动失效并回退前缀 key；加性缓存由 vcpkg 自身保证正确性）
+      - name: Restore vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/vcpkg-cache
+          key: vcpkg-cache-${{ runner.os }}-${{ hashFiles('.github/workflows/build-test.yml') }}
+          restore-keys: |
+            vcpkg-cache-${{ runner.os }}-
 
       - name: Install dependencies (vcpkg)
         shell: pwsh
