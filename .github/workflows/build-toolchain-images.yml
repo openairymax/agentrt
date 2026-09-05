@@ -102,7 +102,8 @@ jobs:
             case "$p" in
               arm64) dk="linux/arm64" ;;
               arm32) dk="linux/arm/v7" ;;
-              *) echo "::error::未知平台 $p（arm64|arm32）"; exit 1 ;;
+              amd64) dk="linux/amd64" ;;
+              *) echo "::error::未知平台 $p（arm64|arm32|amd64）"; exit 1 ;;
             esac
             echo "==> build $p ($dk) → ${GHCR}:${p}-${IMAGE_TAG}"
             docker buildx build --push --platform "$dk" \
