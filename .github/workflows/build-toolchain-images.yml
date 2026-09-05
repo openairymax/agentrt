@@ -7,8 +7,13 @@ name: Build QEMU Toolchain Images
 #   - workflow_dispatch（手动）：platforms/image_tag 由输入指定；
 #     image_tag 留空 = auto-<run_number>（一次性 tag，与钉版 tag 并存）。
 #   - push 到 main 且改动 .github/docker/** 或本 workflow：platforms 固定
-#     arm64,arm32，tag 用 auto-<run_number>——自动重建不覆盖已有钉版 tag，
-#     release.yml 仍引用钉版 tag（确认新镜像后把具体 tag/digest 同步过去）。
+#     arm64,arm32,amd64，tag 用 auto-<run_number>——自动重建不覆盖已有钉版
+#     tag，release.yml 仍引用钉版 tag（确认新镜像后把具体 tag/digest 同步过去）。
+#
+# amd64（0.1.11 P1 流水线提速）：E1 模式推广。release.yml build-linux-x86-64
+# 腿实测 10.3min 中 338s（55%）耗在每轮容器内从零自编译 deps（Install
+# build dependencies 166s + lib-builddeps.sh 172s，与 qemu 腿同病）；切预
+# 构建镜像后仅剩项目编译 ~88s + TUI + 打包（arm-64 腿同模式实证 1.6min）。
 #
 # 镜像 tag 钉版语义：lib-builddeps.sh / Dockerfile 变更后需重建并 bump 引用，
 # 禁止浮动 tag 被 release.yml 引用。
@@ -51,7 +56,7 @@ jobs:
         run: bash .github/scripts/init-submodules.sh tools
 
       # 参数解析：手动指定 image_tag → 用之；push/留空 → auto-<run_number>。
-      # 推送触发时 platforms 固定 arm64,arm32（无 inputs），自动覆盖新增平台。
+      # push 触发时 platforms 固定 arm64,arm32,amd64，自动覆盖新增平台。
       - name: Resolve build params
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.image_tag }}" ]; then
@@ -62,7 +67,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "PLATFORMS=${{ inputs.platforms }}" >> "$GITHUB_ENV"
           else
-            echo "PLATFORMS=arm64,arm32" >> "$GITHUB_ENV"
+            echo "PLATFORMS=arm64,arm32,amd64" >> "$GITHUB_ENV"
           fi
 
       - name: Prepare minimal build context
