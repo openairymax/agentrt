@@ -5,7 +5,7 @@
 
 **Language:** English | [简体中文](README_zh.md)
 
-[![Version](https://img.shields.io/badge/version-0.1.9-5a6b7e)](https://atomgit.com/openairymax/agentrt)
+[![Version](https://img.shields.io/badge/version-0.1.11-5a6b7e)](https://atomgit.com/openairymax/agentrt)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
 
@@ -105,36 +105,51 @@ AgentRT follows a cyclic layered architecture. Each layer depends only on the la
 
 ## Quick Install (End Users)
 
-One-line install for end users — no compilation required. The installer always
-picks the **latest release** (`releases/download/latest/`), so the command never
-needs a version bump, and runs GPG verification + sha256 checksum + architecture
-self-check (x86_64 / aarch64 / riscv64) automatically:
+One-line install for end users — no compilation required. The command always
+fetches the latest installer from the **main branch** (no release lag) and
+runs GPG verification + sha256 checksum + architecture self-check
+automatically:
 
 ```bash
-# Linux / macOS
-curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash
-
-# Windows (atoms/commons are closed-source; native install unavailable —
-# use WSL2): `wsl --install` (WSL2 + Ubuntu), then run the Linux one-liner
-# above inside WSL. No Windows prebuilt package / atoms prebuilt module is
-# published yet, so the PowerShell installer falls back to a source build
-# that cannot complete without the closed modules (known 0.1.6b limitation).
-powershell -ExecutionPolicy Bypass -Command "irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 | iex"
+# Linux / macOS (native packages published: linux-x86-64 / linux-arm-64 /
+# linux-arm-32 / linux-x86-32, macOS arm-64 / x86-64)
+curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh | bash
 ```
 
-Common variants:
+> If GitHub is unreachable, use the atomgit channel (identical content,
+> requires curl + python3):
+>
+> ```bash
+> curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
+>   | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
+>   | bash
+> ```
+
+Common variants — append flags after `| bash -s --`:
 
 ```bash
 # Custom prefix (default: $HOME/.airymaxrt)
-curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | \
-   bash -s -- --prefix "$HOME/.airymaxrt"
+curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh \
+  | bash -s -- --prefix "$HOME/.airymaxrt"
 
 # Beta channel (more aggressive updates)
-curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash -s -- --channel beta
+curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh \
+  | bash -s -- --channel beta
 
 # Uninstall (--keep-data preserves memory data)
-curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh \
+  | bash -s -- --uninstall
 ```
+
+> **Updating a custom-prefix install?** The installer persists the install
+> root to `<root>/config/install.env`. Afterwards `airymaxrt update`,
+> launcher updates, and `--reinstall` all act on the **original install
+> path** — no need to repeat `--prefix`. With multiple installs on one
+> machine, `which airymaxrt` shows which copy PATH points to.
+
+> **Windows**: native packages are being built by the GitHub Actions
+> packaging pipeline (0.1.12). Meanwhile use WSL2: `wsl --install`
+> (WSL2 + Ubuntu), then run the Linux one-liner above inside WSL.
 
 After install, `airymaxrt` is on PATH and `airymaxrt start` launches the runtime.
 The installer auto-profiles the hardware (full/minimal runtime profile) and the
