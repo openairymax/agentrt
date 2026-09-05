@@ -69,15 +69,21 @@ clone_sibling() {
     echo "layout: $dir already present"
     return 0
   fi
-  if git clone -q --depth 1 "https://github.com/openairymax/${name}.git" "$dir" 2>/dev/null; then
-    echo "layout: cloned github.com/openairymax/${name}.git -> $dir"
+  # 0.1.11 完全体组件回归修复：sdk 仓的 tui/sdk-python 等为嵌套子模块
+  #（../tui.git 相对 URL），浅克隆不带 --recurse-submodules 时这些目录为空，
+  # cargo build 报 "could not find Cargo.toml"、Python 运行时缺失（v0.1.10
+  # 实证：agentrt-tui 缺失 + lib/ 无 sdk-python）。--shallow-submodules 保持
+  # 各嵌套子模块浅拉，避免全量历史。
+  if git clone -q --depth 1 --recurse-submodules --shallow-submodules \
+      "https://github.com/openairymax/${name}.git" "$dir" 2>/dev/null; then
+    echo "layout: cloned github.com/openairymax/${name}.git (recursive) -> $dir"
     return 0
   fi
   rm -rf "$dir"
   if [ -n "${GH_TOKEN:-}" ]; then
-    if git clone -q --depth 1 \
+    if git clone -q --depth 1 --recurse-submodules --shallow-submodules \
         "https://x-access-token:${GH_TOKEN}@github.com/openairymax/${name}.git" "$dir" 2>/dev/null; then
-      echo "layout: cloned (token) github.com/openairymax/${name}.git -> $dir"
+      echo "layout: cloned (token, recursive) github.com/openairymax/${name}.git -> $dir"
       return 0
     fi
     rm -rf "$dir"
