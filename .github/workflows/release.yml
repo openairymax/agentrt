@@ -182,6 +182,15 @@ jobs:
           cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
+          # 0.1.11 完全体包完整性（v0.1.10 社区事故修复）：容器内收集运行时
+          # .so（自编译 deps 链 /usr/local/lib：cjson/ssl/curl/websockets 等），
+          # fail-closed 校验缺一即中止，杜绝残缺包上传（lib-package.sh SSoT）。
+          ldconfig
+          source _tools/scripts/ci/release/lib-package.sh
+          pkg_runtime_libs "${PKG_DIR}"
+          touch "${PKG_DIR}/lib/.collected"
+          pkg_verify_deps "${PKG_DIR}"
+          rm -f "${PKG_DIR}/lib/.collected"
           # 平台命名规范（0.1.10 起）：OS-架构族-位宽，如 linux-x86-64。
           # 包标记 platform-<后缀>（x86-64 等）与更新器/安装器 plat_name()
           # 同口径校验；勿回退 uname 原始名（platform-x86_64 会触发
@@ -663,6 +672,15 @@ jobs:
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
           cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
+          # 0.1.11 完全体包完整性（v0.1.10 社区事故修复）：容器内收集运行时
+          # .so（自编译 deps 链 /usr/local/lib：cjson/ssl/curl/websockets 等），
+          # fail-closed 校验缺一即中止，杜绝残缺包上传（lib-package.sh SSoT）。
+          ldconfig
+          source _tools/scripts/ci/release/lib-package.sh
+          pkg_runtime_libs "${PKG_DIR}"
+          touch "${PKG_DIR}/lib/.collected"
+          pkg_verify_deps "${PKG_DIR}"
+          rm -f "${PKG_DIR}/lib/.collected"
           touch "${PKG_DIR}/platform-riscv-64"
           ARTIFACT="agentrt-${VERSION}-linux-riscv-64"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
@@ -761,6 +779,15 @@ jobs:
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
           cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
+          # 0.1.11 完全体包完整性（v0.1.10 社区事故修复）：容器内收集运行时
+          # .so（自编译 deps 链 /usr/local/lib：cjson/ssl/curl/websockets 等），
+          # fail-closed 校验缺一即中止，杜绝残缺包上传（lib-package.sh SSoT）。
+          ldconfig
+          source _tools/scripts/ci/release/lib-package.sh
+          pkg_runtime_libs "${PKG_DIR}"
+          touch "${PKG_DIR}/lib/.collected"
+          pkg_verify_deps "${PKG_DIR}"
+          rm -f "${PKG_DIR}/lib/.collected"
           touch "${PKG_DIR}/platform-arm-64"
           ARTIFACT="agentrt-${VERSION}-linux-arm-64"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
@@ -895,7 +922,15 @@ jobs:
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
           cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
-          # 0.1.6e 起制品标记统一为数字平台名；更新器/安装器 plat_name() 校验
+          # 0.1.11 完全体包完整性（v0.1.10 社区事故修复）：容器内收集运行时
+          # .so（自编译 deps 链 /usr/local/lib：cjson/ssl/curl/websockets 等），
+          # fail-closed 校验缺一即中止，杜绝残缺包上传（lib-package.sh SSoT）。
+          ldconfig
+          source _tools/scripts/ci/release/lib-package.sh
+          pkg_runtime_libs "${PKG_DIR}"
+          touch "${PKG_DIR}/lib/.collected"
+          pkg_verify_deps "${PKG_DIR}"
+          rm -f "${PKG_DIR}/lib/.collected"
           touch "${PKG_DIR}/platform-x86-32"
           ARTIFACT="agentrt-${VERSION}-linux-x86-32"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
@@ -998,6 +1033,15 @@ jobs:
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
           cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
+          # 0.1.11 完全体包完整性（v0.1.10 社区事故修复）：容器内收集运行时
+          # .so（自编译 deps 链 /usr/local/lib：cjson/ssl/curl/websockets 等），
+          # fail-closed 校验缺一即中止，杜绝残缺包上传（lib-package.sh SSoT）。
+          ldconfig
+          source _tools/scripts/ci/release/lib-package.sh
+          pkg_runtime_libs "${PKG_DIR}"
+          touch "${PKG_DIR}/lib/.collected"
+          pkg_verify_deps "${PKG_DIR}"
+          rm -f "${PKG_DIR}/lib/.collected"
           touch "${PKG_DIR}/platform-arm-32"
           ARTIFACT="agentrt-${VERSION}-linux-arm-32"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
