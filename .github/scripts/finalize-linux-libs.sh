@@ -42,6 +42,14 @@ export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
 . "$TOOLS/scripts/ci/release/lib-package.sh"
 
 pkg_runtime_libs "$OUT"
+# fail-closed：收集后 lib/ 必须存在运行时库（本仓 daemon 全动态链接）。
+# 0.1.11-rc.2 实证：file(1) 在工具链镜像中缺失时，收集/校验的 ELF 守卫
+# 曾整体空转——0 个 .so 仍假阳性 "collected + verified" 出包，自编译
+# OpenSSL 3.x/cjson 未入包致目标机无法运行。此断言把同类回归转硬失败。
+if [ -z "$(ls -A "$OUT/lib" 2>/dev/null | grep -v '^\.' || true)" ]; then
+    echo "[finalize] lib/ 无运行时库：收集空转（ELF 判定或 ldd 异常），中止" >&2
+    exit 1
+fi
 touch "$OUT/lib/.collected"
 pkg_verify_deps "$OUT"
 rm -f "$OUT/lib/.collected"
