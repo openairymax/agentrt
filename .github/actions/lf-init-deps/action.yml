@@ -1,0 +1,27 @@
+name: 'lf-init-deps'
+description: |
+  M3 方案 B（0.1.12）复合 action：Checkout（浅克隆、不递归子模块）+
+  init-submodules.sh 定向子模块检出。收敛 release.yml / build-test.yml
+  十余处同源模板；历史教训（submodules:true 全量递归会拉 agent-linux
+  /kernel 等无关大仓）由固定参数固化。
+inputs:
+  groups:
+    description: '定向检出组（空格分隔）：release 腿 "agent-workload tools"；build-test 腿 "agent-workload"'
+    required: false
+    default: 'agent-workload'
+  gh_token:
+    description: 'GitHub token（composite action 不能直接引用 secrets 上下文，须由调用方 with: gh_token: ${{ secrets.GH_TOKEN }} 显式传入）'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: false
+        fetch-depth: 1
+    - name: Init submodules (targeted)
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.gh_token }}
+      run: bash .github/scripts/init-submodules.sh ${{ inputs.groups }}
