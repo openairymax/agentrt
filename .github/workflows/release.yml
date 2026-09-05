@@ -188,7 +188,7 @@ jobs:
           # ldconfig 刷新 /etc/ld.so.cache：自建镜像容器（arm-64 E1）以非 root
           # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
           ldconfig 2>/dev/null || true
-          source _tools/scripts/ci/release/lib-package.sh
+          . _tools/scripts/ci/release/lib-package.sh
           pkg_runtime_libs "${PKG_DIR}"
           touch "${PKG_DIR}/lib/.collected"
           pkg_verify_deps "${PKG_DIR}"
@@ -684,7 +684,7 @@ jobs:
           # ldconfig 刷新 /etc/ld.so.cache：自建镜像容器（arm-64 E1）以非 root
           # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
           ldconfig 2>/dev/null || true
-          source _tools/scripts/ci/release/lib-package.sh
+          . _tools/scripts/ci/release/lib-package.sh
           pkg_runtime_libs "${PKG_DIR}"
           touch "${PKG_DIR}/lib/.collected"
           pkg_verify_deps "${PKG_DIR}"
@@ -793,7 +793,7 @@ jobs:
           # ldconfig 刷新 /etc/ld.so.cache：自建镜像容器（arm-64 E1）以非 root
           # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
           ldconfig 2>/dev/null || true
-          source _tools/scripts/ci/release/lib-package.sh
+          . _tools/scripts/ci/release/lib-package.sh
           pkg_runtime_libs "${PKG_DIR}"
           touch "${PKG_DIR}/lib/.collected"
           pkg_verify_deps "${PKG_DIR}"
@@ -938,7 +938,7 @@ jobs:
           # ldconfig 刷新 /etc/ld.so.cache：自建镜像容器（arm-64 E1）以非 root
           # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
           ldconfig 2>/dev/null || true
-          source _tools/scripts/ci/release/lib-package.sh
+          . _tools/scripts/ci/release/lib-package.sh
           pkg_runtime_libs "${PKG_DIR}"
           touch "${PKG_DIR}/lib/.collected"
           pkg_verify_deps "${PKG_DIR}"
@@ -1051,7 +1051,7 @@ jobs:
           # ldconfig 刷新 /etc/ld.so.cache：自建镜像容器（arm-64 E1）以非 root
           # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
           ldconfig 2>/dev/null || true
-          source _tools/scripts/ci/release/lib-package.sh
+          . _tools/scripts/ci/release/lib-package.sh
           pkg_runtime_libs "${PKG_DIR}"
           touch "${PKG_DIR}/lib/.collected"
           pkg_verify_deps "${PKG_DIR}"
