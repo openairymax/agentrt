@@ -2,6 +2,15 @@ name: Sync to GitHub & Gitee
 on:
   push:
     branches: [main]
+    # 0.1.11 A4：tag 也要触发同步——agentrt 侧 tag（SSoT）需及时到达
+    # GitHub，release.yml（v*）才得以自动触发全链发布。根因（v0.1.10
+    # 实证）：此前只监听 main，tag force-move 后 GH tag 缺失，只能手工
+    # REST DELETE+POST 补建。
+    tags: ['v*']
+  # 0.1.11 A4：atomgit 侧 webhook（推送事件）→ GitHub repository_dispatch
+  # 作为主/备 tag 同步通道（UI 配置；GH 侧 PAT 推送可再触发本工作流）。
+  repository_dispatch:
+    types: [sync-mirror]
   workflow_dispatch:
 
 # GH_TOKEN：GitHub PAT（openairymax org 建仓/推送权限）——PAT 推送的
