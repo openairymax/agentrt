@@ -202,6 +202,12 @@ jobs:
   # macOS arm-64：原生 runner（无 container——容器作业仅支持 Linux）。
   # openssl/zlib/sqlite/curl 为 keg-only，需显式导出 pkg-config 路径。
   build-macos-arm-64:
+    # E3 hosted runner 争抢治理（0.1.11）：mac 原生腿跨 workflow 共享
+    # ci-macos-runner-bus（与 build-test macos-build 同组），串行不抢占，
+    # 防 release/build-test 齐发把 mac 配额打满排队（cancel=false 公平等待）。
+    concurrency:
+      group: ci-macos-runner-bus
+      cancel-in-progress: false
     runs-on: macos-latest
     env:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
@@ -308,6 +314,12 @@ jobs:
   # 远排队不分配 runner）。Intel runner 的 brew prefix 为 /usr/local，
   # Configure 步骤一律 $(brew --prefix) 动态解析，无需区分 prefix。
   build-macos-x86-64:
+    # E3：macos-15-intel 为稀缺 runner 型（macos-13 退役后官方替代），与
+    # macos-latest 腿同走 ci-macos-runner-bus 公平串行，避免 release 与
+    # build-test 同时跑把 intel mac 配额排队拖长（0.1.10 曾 80min 排队实证）。
+    concurrency:
+      group: ci-macos-runner-bus
+      cancel-in-progress: false
     runs-on: macos-15-intel
     env:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
@@ -407,6 +419,11 @@ jobs:
     # 场）；tag 自动发布不再携带 windows 构建（MSVC 移植未完成）。手动
     # workflow_dispatch 仍可尝试产出 windows 二进制。
     if: github.event_name == 'workflow_dispatch'
+    # E3：与 build-test windows-build 共享 ci-windows-runner-bus，防 MSVC 腿
+    # 双 workflow 并跑占满 windows hosted 配额。
+    concurrency:
+      group: ci-windows-runner-bus
+      cancel-in-progress: false
     runs-on: windows-latest
     # 并行发布决策（2026-09-03）：MSVC 移植进行中（commons/cupolas/
     # protocols/heapstore），build-windows-x86-64 暂作可选不阻断发布
@@ -416,6 +433,8 @@ jobs:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
       STAGE_DIR: stage
+      # E4：vcpkg 二进制缓存（前向斜杠，Windows 兼容解析）
+      VCPKG_BINARY_SOURCES: "clear;files,${{ runner.temp }}/vcpkg-cache,readwrite"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -428,6 +447,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: bash .github/scripts/init-submodules.sh agent-workload tools
+
+      # E4：vcpkg 二进制缓存恢复（restore 于 install 之前；key 随本 workflow
+      # 内容失效并回退前缀 key；vcpkg classic 模式加性缓存天然正确）
+      - name: Restore vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/vcpkg-cache
+          key: vcpkg-cache-${{ runner.os }}-release-${{ hashFiles('.github/workflows/release.yml') }}
+          restore-keys: |
+            vcpkg-cache-${{ runner.os }}-
 
       - name: Install build dependencies
         shell: pwsh
