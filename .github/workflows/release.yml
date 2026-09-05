@@ -179,20 +179,9 @@ jobs:
           cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
-          # 0.1.11 完全体包完整性（v0.1.10 社区事故修复）：容器内收集运行时
-          # .so（自编译 deps 链 /usr/local/lib：cjson/ssl/curl/websockets 等），
-          # fail-closed 校验缺一即中止，杜绝残缺包上传（lib-package.sh SSoT）。
-          # ldconfig 刷新 /etc/ld.so.cache：自建镜像容器（arm-64 E1）以非 root
-          # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
-          ldconfig 2>/dev/null || true
-          . _tools/scripts/ci/release/lib-package.sh
-          # 自编译 deps 装 /usr/local/lib；容器（arm-64 工具链镜像非 root）的
-          # ld.so.cache 不含该路径时 ldd 报 not found，显式注入保证收集/校验
-          export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
-          pkg_runtime_libs "${PKG_DIR}"
-          touch "${PKG_DIR}/lib/.collected"
-          pkg_verify_deps "${PKG_DIR}"
-          rm -f "${PKG_DIR}/lib/.collected"
+          # 完全体 finalize：运行时 .so 收集 + fail-closed 校验（共享 bash 脚本；
+          # container job run 默认 dash 无法解析 lib-package.sh bash 函数库）
+          bash .github/scripts/finalize-linux-libs.sh "${PKG_DIR}" _tools
           # 平台命名规范（0.1.10 起）：OS-架构族-位宽，如 linux-x86-64。
           # 包标记 platform-<后缀>（x86-64 等）与更新器/安装器 plat_name()
           # 同口径校验；勿回退 uname 原始名（platform-x86_64 会触发
@@ -660,6 +649,9 @@ jobs:
                      agent-workload/sdk/sdk-python/agentrt; do
               [ -d "$p" ] && cp -r "$p" "$STAGE_DIR/lib/" || true
             done
+            # 完全体 finalize：容器内收集运行时 .so + fail-closed 校验（host
+            # 无 /usr/local 自编译库，收集必 not found；.collected 不入包）
+            bash /src/.github/scripts/finalize-linux-libs.sh "$STAGE_DIR" /src/_tools
             '
 
       - name: Package (tar.gz)
@@ -674,20 +666,8 @@ jobs:
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
           cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
-          # 0.1.11 完全体包完整性（v0.1.10 社区事故修复）：容器内收集运行时
-          # .so（自编译 deps 链 /usr/local/lib：cjson/ssl/curl/websockets 等），
-          # fail-closed 校验缺一即中止，杜绝残缺包上传（lib-package.sh SSoT）。
-          # ldconfig 刷新 /etc/ld.so.cache：自建镜像容器（arm-64 E1）以非 root
-          # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
-          ldconfig 2>/dev/null || true
-          . _tools/scripts/ci/release/lib-package.sh
-          # 自编译 deps 装 /usr/local/lib；容器（arm-64 工具链镜像非 root）的
-          # ld.so.cache 不含该路径时 ldd 报 not found，显式注入保证收集/校验
-          export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
-          pkg_runtime_libs "${PKG_DIR}"
-          touch "${PKG_DIR}/lib/.collected"
-          pkg_verify_deps "${PKG_DIR}"
-          rm -f "${PKG_DIR}/lib/.collected"
+          # 运行时 .so 收集/校验已在构建容器内由 finalize-linux-libs.sh 完成
+          #（host 无容器 /usr/local 自编译库，ldd 收集必 not found）
           touch "${PKG_DIR}/platform-riscv-64"
           ARTIFACT="agentrt-${VERSION}-linux-riscv-64"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
@@ -774,6 +754,9 @@ jobs:
                      agent-workload/sdk/sdk-python/agentrt; do
               [ -d "$p" ] && cp -r "$p" "$STAGE_DIR/lib/" || true
             done
+            # 完全体 finalize：容器内收集运行时 .so + fail-closed 校验（host
+            # 无 /usr/local 自编译库，收集必 not found；.collected 不入包）
+            bash /src/.github/scripts/finalize-linux-libs.sh "$STAGE_DIR" /src/_tools
             '
 
       - name: Package (tar.gz)
@@ -788,20 +771,8 @@ jobs:
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
           cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
-          # 0.1.11 完全体包完整性（v0.1.10 社区事故修复）：容器内收集运行时
-          # .so（自编译 deps 链 /usr/local/lib：cjson/ssl/curl/websockets 等），
-          # fail-closed 校验缺一即中止，杜绝残缺包上传（lib-package.sh SSoT）。
-          # ldconfig 刷新 /etc/ld.so.cache：自建镜像容器（arm-64 E1）以非 root
-          # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
-          ldconfig 2>/dev/null || true
-          . _tools/scripts/ci/release/lib-package.sh
-          # 自编译 deps 装 /usr/local/lib；容器（arm-64 工具链镜像非 root）的
-          # ld.so.cache 不含该路径时 ldd 报 not found，显式注入保证收集/校验
-          export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
-          pkg_runtime_libs "${PKG_DIR}"
-          touch "${PKG_DIR}/lib/.collected"
-          pkg_verify_deps "${PKG_DIR}"
-          rm -f "${PKG_DIR}/lib/.collected"
+          # 运行时 .so 收集/校验已在构建容器内由 finalize-linux-libs.sh 完成
+          #（host 无容器 /usr/local 自编译库，ldd 收集必 not found）
           touch "${PKG_DIR}/platform-arm-64"
           ARTIFACT="agentrt-${VERSION}-linux-arm-64"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
@@ -922,6 +893,9 @@ jobs:
                      agent-workload/sdk/sdk-python/agentrt; do
               [ -d "$p" ] && cp -r "$p" "$STAGE_DIR/lib/" || true
             done
+            # 完全体 finalize：容器内收集运行时 .so + fail-closed 校验（host
+            # 无 /usr/local 自编译库，收集必 not found；.collected 不入包）
+            bash /src/.github/scripts/finalize-linux-libs.sh "$STAGE_DIR" /src/_tools
             '
 
       - name: Package (tar.gz)
@@ -936,20 +910,8 @@ jobs:
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
           cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
-          # 0.1.11 完全体包完整性（v0.1.10 社区事故修复）：容器内收集运行时
-          # .so（自编译 deps 链 /usr/local/lib：cjson/ssl/curl/websockets 等），
-          # fail-closed 校验缺一即中止，杜绝残缺包上传（lib-package.sh SSoT）。
-          # ldconfig 刷新 /etc/ld.so.cache：自建镜像容器（arm-64 E1）以非 root
-          # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
-          ldconfig 2>/dev/null || true
-          . _tools/scripts/ci/release/lib-package.sh
-          # 自编译 deps 装 /usr/local/lib；容器（arm-64 工具链镜像非 root）的
-          # ld.so.cache 不含该路径时 ldd 报 not found，显式注入保证收集/校验
-          export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
-          pkg_runtime_libs "${PKG_DIR}"
-          touch "${PKG_DIR}/lib/.collected"
-          pkg_verify_deps "${PKG_DIR}"
-          rm -f "${PKG_DIR}/lib/.collected"
+          # 运行时 .so 收集/校验已在构建容器内由 finalize-linux-libs.sh 完成
+          #（host 无容器 /usr/local 自编译库，ldd 收集必 not found）
           touch "${PKG_DIR}/platform-x86-32"
           ARTIFACT="agentrt-${VERSION}-linux-x86-32"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
@@ -1038,6 +1000,9 @@ jobs:
                      agent-workload/sdk/sdk-python/agentrt; do
               [ -d "$p" ] && cp -r "$p" "$STAGE_DIR/lib/" || true
             done
+            # 完全体 finalize：容器内收集运行时 .so + fail-closed 校验（host
+            # 无 /usr/local 自编译库，收集必 not found；.collected 不入包）
+            bash /src/.github/scripts/finalize-linux-libs.sh "$STAGE_DIR" /src/_tools
             '
 
       - name: Package (tar.gz)
@@ -1052,20 +1017,8 @@ jobs:
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
           cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
-          # 0.1.11 完全体包完整性（v0.1.10 社区事故修复）：容器内收集运行时
-          # .so（自编译 deps 链 /usr/local/lib：cjson/ssl/curl/websockets 等），
-          # fail-closed 校验缺一即中止，杜绝残缺包上传（lib-package.sh SSoT）。
-          # ldconfig 刷新 /etc/ld.so.cache：自建镜像容器（arm-64 E1）以非 root
-          # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
-          ldconfig 2>/dev/null || true
-          . _tools/scripts/ci/release/lib-package.sh
-          # 自编译 deps 装 /usr/local/lib；容器（arm-64 工具链镜像非 root）的
-          # ld.so.cache 不含该路径时 ldd 报 not found，显式注入保证收集/校验
-          export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
-          pkg_runtime_libs "${PKG_DIR}"
-          touch "${PKG_DIR}/lib/.collected"
-          pkg_verify_deps "${PKG_DIR}"
-          rm -f "${PKG_DIR}/lib/.collected"
+          # 运行时 .so 收集/校验已在构建容器内由 finalize-linux-libs.sh 完成
+          #（host 无容器 /usr/local 自编译库，ldd 收集必 not found）
           touch "${PKG_DIR}/platform-arm-32"
           ARTIFACT="agentrt-${VERSION}-linux-arm-32"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
