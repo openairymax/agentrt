@@ -1034,6 +1034,10 @@ jobs:
       GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
       ATOMGIT_REPO: openairymax/agentrt
+      # 同 tag 重发/修复（C4）：OBS 预签名 PUT 按文件名覆盖，设置
+      # AIRY_FORCE_UPLOAD=1 使发布永远覆盖远端同名附件，杜绝"跳过上传但
+      # manifest 已按新 sha 重生成"的不一致（v0.1.10 同版本修复重发实证）。
+      AIRY_FORCE_UPLOAD: '1'
       # runner 布局与本地伞仓不同（agentrt 即工作树根，scripts/ 在根下），
       # 显式指定安装器 SSoT；AIRY_LAUNCHER_SRC 默认已指向
       # agent-workload/sdk/tui/scripts/airymaxrt（init-submodules 补齐）。
