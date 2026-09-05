@@ -186,6 +186,9 @@ jobs:
           # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
           ldconfig 2>/dev/null || true
           . _tools/scripts/ci/release/lib-package.sh
+          # 自编译 deps 装 /usr/local/lib；容器（arm-64 工具链镜像非 root）的
+          # ld.so.cache 不含该路径时 ldd 报 not found，显式注入保证收集/校验
+          export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
           pkg_runtime_libs "${PKG_DIR}"
           touch "${PKG_DIR}/lib/.collected"
           pkg_verify_deps "${PKG_DIR}"
@@ -678,6 +681,9 @@ jobs:
           # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
           ldconfig 2>/dev/null || true
           . _tools/scripts/ci/release/lib-package.sh
+          # 自编译 deps 装 /usr/local/lib；容器（arm-64 工具链镜像非 root）的
+          # ld.so.cache 不含该路径时 ldd 报 not found，显式注入保证收集/校验
+          export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
           pkg_runtime_libs "${PKG_DIR}"
           touch "${PKG_DIR}/lib/.collected"
           pkg_verify_deps "${PKG_DIR}"
@@ -789,6 +795,9 @@ jobs:
           # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
           ldconfig 2>/dev/null || true
           . _tools/scripts/ci/release/lib-package.sh
+          # 自编译 deps 装 /usr/local/lib；容器（arm-64 工具链镜像非 root）的
+          # ld.so.cache 不含该路径时 ldd 报 not found，显式注入保证收集/校验
+          export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
           pkg_runtime_libs "${PKG_DIR}"
           touch "${PKG_DIR}/lib/.collected"
           pkg_verify_deps "${PKG_DIR}"
@@ -934,6 +943,9 @@ jobs:
           # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
           ldconfig 2>/dev/null || true
           . _tools/scripts/ci/release/lib-package.sh
+          # 自编译 deps 装 /usr/local/lib；容器（arm-64 工具链镜像非 root）的
+          # ld.so.cache 不含该路径时 ldd 报 not found，显式注入保证收集/校验
+          export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
           pkg_runtime_libs "${PKG_DIR}"
           touch "${PKG_DIR}/lib/.collected"
           pkg_verify_deps "${PKG_DIR}"
@@ -1047,6 +1059,9 @@ jobs:
           # 运行无写 /etc 权限，镜像构建期已 ldconfig，此处容错即可。
           ldconfig 2>/dev/null || true
           . _tools/scripts/ci/release/lib-package.sh
+          # 自编译 deps 装 /usr/local/lib；容器（arm-64 工具链镜像非 root）的
+          # ld.so.cache 不含该路径时 ldd 报 not found，显式注入保证收集/校验
+          export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
           pkg_runtime_libs "${PKG_DIR}"
           touch "${PKG_DIR}/lib/.collected"
           pkg_verify_deps "${PKG_DIR}"
