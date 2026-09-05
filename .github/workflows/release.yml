@@ -292,13 +292,16 @@ jobs:
           path: ${{ env.artifact_name }}.*
           if-no-files-found: error
 
-  # macOS x86-64 (Intel)：macos-13 原生 runner（0.1.10 并行发布决策：macOS
-  # 三平台补全。build-macos-arm-64 跑 macos-latest=arm64，Intel 存量社区
-  # 用户需 x86-64 包，故新增本 leg）。打包步骤与 arm-64 同构，仅 platform
-  # 标记与制品名不同。Intel runner 的 brew prefix 为 /usr/local，Configure
-  # 步骤一律 $(brew --prefix) 动态解析，无需区分 prefix。
+  # macOS x86-64 (Intel)：macos-15-intel 原生 runner（0.1.10 并行发布决策：
+  # macOS 三平台补全。build-macos-arm-64 跑 macos-latest=arm64，Intel 存量
+  # 社区用户需 x86-64 包，故新增本 leg）。打包步骤与 arm-64 同构，仅
+  # platform 标记与制品名不同。
+  # runner 注意：macos-13 已于 2025-12-04 被 GitHub 退役（macos-15-intel
+  # 为官方替代，支持至 2027-08；0.1.10 Release 实证 macos-13 标签 job 永
+  # 远排队不分配 runner）。Intel runner 的 brew prefix 为 /usr/local，
+  # Configure 步骤一律 $(brew --prefix) 动态解析，无需区分 prefix。
   build-macos-x86-64:
-    runs-on: macos-13
+    runs-on: macos-15-intel
     env:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
