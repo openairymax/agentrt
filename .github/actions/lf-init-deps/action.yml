@@ -1,9 +1,14 @@
 name: 'lf-init-deps'
 description: |
-  M3 方案 B（0.1.12）复合 action：Checkout（浅克隆、不递归子模块）+
-  init-submodules.sh 定向子模块检出。收敛 release.yml / build-test.yml
-  十余处同源模板；历史教训（submodules:true 全量递归会拉 agent-linux
-  /kernel 等无关大仓）由固定参数固化。
+  M3 方案 B（0.1.12）复合 action：init-submodules.sh 定向子模块检出。
+  收敛 release.yml / build-test.yml 十余处同源模板；历史教训
+  （submodules:true 全量递归会拉 agent-linux/kernel 等无关大仓）由固定
+  参数固化。
+
+  结构约束（build-test #103 实证）：本地 composite action 在 job 初始
+  化阶段解析，早于任何 step 执行，无法在内部 checkout 为自己供料——
+  调用方必须先执行 actions/checkout（远程 action 由 runner 预取，不受
+  此限），再调用本 action。
 inputs:
   groups:
     description: '定向检出组（空格分隔）：release 腿 "agent-workload tools"；build-test 腿 "agent-workload"'
@@ -15,11 +20,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        submodules: false
-        fetch-depth: 1
     - name: Init submodules (targeted)
       shell: bash
       env:
