@@ -1,52 +1,87 @@
 {
   "schema": 1,
   "channel": "stable",
-  "latest": "v0.1.9",
-  "updated_at": "2026-09-04T03:50:26Z",
+  "latest": "v0.1.10",
+  "updated_at": "2026-09-05T04:17:17Z",
   "releases": {
-    "v0.1.9": {
+    "v0.1.10": {
       "yanked": false,
-      "notes": "649ddc48 release: drop riscv64 gate so v0.1.9 can publish\ne6cad286 agentrt: bump gateway and daemons for macos/ctest gate fixes\n82b9fd0c ci: broaden macos include paths and make linux coverage gate diagnosable\n0fc91158 ci: drop stale lcov exclude pattern that aborts lcov 2.0 capture\ne17375ec agentrt: bump atoms and daemons for test isolation and macos test deps\ndfdfb8cc ci: surface lcov capture failure detail in coverage gate\n89f5e3cb agentrt: bump daemons for gateway platform-thread fix\nbdd45102 ci: widen windows msbuild error capture in release\na3cbd25e ci: retry submodule init on leaf-mirror race\n5895d707 agentrt: bump atoms and daemons for tmp-dir test fixes\n5054919e agentrt: bump daemons and commons for MSVC/macOS round 3\n667215e2 agentrt: bump leaves for MSVC round 2 and enrich error annotations\neb2e7ab1 ci: surface build-test failures as workflow annotations\nad8adf12 ci: make qemu rustup install non-blocking in release builds\nf277545e agentrt: bump commons and cupolas for MSVC port fixes\nc5e43d12 ci: make armv7l matrix entry non-blocking (ship-first-fix-later)\n83b71891 ci: filter windows build errors out of the warning flood\na5fbb506 agentrt: bump commons to MSVC atomic pragma guards\n8301229d ci: drain tee buffer before reading failure log tail\n49c8e5ce ci: surface windows build errors as annotations\nf17e0796 ci: sync macos build-test env with release workflow\ne71ae26a ci: de-risk and self-diagnose qemu container builds\nb087e822 ci: fail fast in qemu container builds\n5e4e00fe ci: point release installer sources to agentrt scripts/ (host layout)\n3136d2ff cmake: allow weak undefined MemoryRovol refs on macOS link\n0c46e587 ci: make windows optional in release while MSVC port in progress\n0920dc24 ci: fix release sibling-tools name clash and macOS lib path\nefc08741 agentrt: bump atoms/commons for MSVC windows build fixes\n168d2365 ci: use static ../build for out-of-tree build dir\n05061d9c ci: move agentrt-hosted build dirs out of the source tree\n86ae4cb9 ci: host workflows in agentrt, leave umbrella as pure container\ne3aead5a agentrt: bump daemons for explicit_bzero in-TU fallback (第九轮)\n168e76f8 agentrt: bump commons for explicit_bzero fallback (第七轮)\n66640bf9 cmake: expose cJSON include dirs to all targets\n14439da3 agentrt: bump commons/atoms/cupolas for macOS/Windows 第六轮修复\nd7f3cabb cmake: link keg-only libyaml via absolute path\ndbb027f0 build: bump commons/daemons 修复 macOS 类型相撞与 Windows strndup\n7956d0d1 commons: 同步 macOS poison 修复子模块指针\na491b8d5 agentrt: 根级 nghttp2 探测在 WIN32 强制关闭 HTTP/2\n5fbe699d commons/gateway: 同步第二轮发布构建修复子模块指针\n775dd6ab agentrt: 同步 macOS/Linux 构建修复至子模块指针\nf28b568e cmake: probe -ffat-lto-objects before enabling Release LTO\n8740332f protocols: bump pin to restore core/ framework sources\n2030ba4f docs: bump commons pin for README title fix\naee30712 docs: align README with agentrt 0.1.9 architecture\nacd22cfc agentrt: bump atoms to reconciled release-snapshot tip\n7ff080eb agentrt: bump cupolas/daemons/gateway to function-name shortening\n92f8a42c agentrt: sync installer, cli and doxygen version fallbacks to 0.1.9\nc8691900 agentrt: bump version to 0.1.9 and finalize release changelog\naf215aec agentrt: bump daemons for the tool_d identity cleanup\nb181ba3a agentrt: bump commons to utils/ime flatten commit\n10ea3057 agentrt: bump daemons, protocols to M4 15-daemon doc commits\n363e032a tree: bump daemons for daemon-table doc calibration\n8b853db6 tree: bump daemons for M0-L5 install surface closure\nf9222497 tree: bump atoms/daemons for M3 roadmap ABI closure\n86abf232 tree: bump cupolas/daemons for M2-S5 daemon dome handover\nf0ce7c36 tree: bump gateway/daemons for M2-S4 epoch active invalidation\n60f5581d e2e: exercise policy.* lifecycle through the gateway\nae15f7f5 tree: bump cupolas/daemons for M2-S2 PDP decision surface\n0b394875 agentrt: bump daemons for PEP baseline benchmark",
+      "notes": "",
       "artifacts": {
+        "linux-arm-64": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.10/agentrt-v0.1.10-linux-arm-64.tar.gz",
+          "sha256": "02062c8680fec98804296b2889a9eddeee45af1acbf7cc3ef3fc7ed675cb0424",
+          "size": 21030552
+        },
+        "linux-x86-32": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.10/agentrt-v0.1.10-linux-x86-32.tar.gz",
+          "sha256": "9945843d4080d2073347bbc010543f5c605884773fbd430c55de83d8674bc273",
+          "size": 18657400
+        },
+        "linux-x86-64": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.10/agentrt-v0.1.10-linux-x86-64.tar.gz",
+          "sha256": "b4b5c22377d2cb9b0170701cfb3184f63879037f6b21922ed52c239012d83a38",
+          "size": 21219967
+        },
+        "macos-arm-64": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.10/agentrt-v0.1.10-macos-arm-64.tar.gz",
+          "sha256": "79ff448e31b07953b0723772d987a00b11e021ec47e0a12aa74940b58a76b52d",
+          "size": 4665198
+        },
+        "macos-x86-64": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.10/agentrt-v0.1.10-macos-x86-64.tar.gz",
+          "sha256": "26cf109599cc9e711d5530e57ea4f94586497cef6402561320717da8faec8270",
+          "size": 4671853
+        },
         "linux-arm64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.9/agentrt-v0.1.9-linux-arm64.tar.gz",
-          "sha256": "5ec28b5ec783a6a075b961e9a002ae861515e8ab9fed2c27c783b7581dc9c15c",
-          "size": 21025360
-        },
-        "linux-x64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.9/agentrt-v0.1.9-linux-x64.tar.gz",
-          "sha256": "f2997719849394e3a7aea84a4bdf3f0de0c5b241539ccb34dbbeb8b017e2f365",
-          "size": 21210726
-        },
-        "linux-x86": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.9/agentrt-v0.1.9-linux-x86.tar.gz",
-          "sha256": "aee88b6ed30a02ec1c52076bfc5cc3ce7d697d9df903bbd8d26c3986db319e08",
-          "size": 18652711
-        },
-        "macos-arm64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.9/agentrt-v0.1.9-macos-arm64.tar.gz",
-          "sha256": "c9ade983d57bfca7d0fc927de016fc40c85ce26cd95386ec3de97fa4c2cc490b",
-          "size": 4670442
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.10/agentrt-v0.1.10-linux-arm-64.tar.gz",
+          "sha256": "02062c8680fec98804296b2889a9eddeee45af1acbf7cc3ef3fc7ed675cb0424",
+          "size": 21030552
         },
         "linux-aarch64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.9/agentrt-v0.1.9-linux-arm64.tar.gz",
-          "sha256": "5ec28b5ec783a6a075b961e9a002ae861515e8ab9fed2c27c783b7581dc9c15c",
-          "size": 21025360
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.10/agentrt-v0.1.10-linux-arm-64.tar.gz",
+          "sha256": "02062c8680fec98804296b2889a9eddeee45af1acbf7cc3ef3fc7ed675cb0424",
+          "size": 21030552
         },
-        "linux-x86_64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.9/agentrt-v0.1.9-linux-x64.tar.gz",
-          "sha256": "f2997719849394e3a7aea84a4bdf3f0de0c5b241539ccb34dbbeb8b017e2f365",
-          "size": 21210726
+        "linux-x86": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.10/agentrt-v0.1.10-linux-x86-32.tar.gz",
+          "sha256": "9945843d4080d2073347bbc010543f5c605884773fbd430c55de83d8674bc273",
+          "size": 18657400
         },
         "linux-i686": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.9/agentrt-v0.1.9-linux-x86.tar.gz",
-          "sha256": "aee88b6ed30a02ec1c52076bfc5cc3ce7d697d9df903bbd8d26c3986db319e08",
-          "size": 18652711
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.10/agentrt-v0.1.10-linux-x86-32.tar.gz",
+          "sha256": "9945843d4080d2073347bbc010543f5c605884773fbd430c55de83d8674bc273",
+          "size": 18657400
+        },
+        "linux-x64": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.10/agentrt-v0.1.10-linux-x86-64.tar.gz",
+          "sha256": "b4b5c22377d2cb9b0170701cfb3184f63879037f6b21922ed52c239012d83a38",
+          "size": 21219967
+        },
+        "linux-x86_64": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.10/agentrt-v0.1.10-linux-x86-64.tar.gz",
+          "sha256": "b4b5c22377d2cb9b0170701cfb3184f63879037f6b21922ed52c239012d83a38",
+          "size": 21219967
+        },
+        "macos-arm64": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.10/agentrt-v0.1.10-macos-arm-64.tar.gz",
+          "sha256": "79ff448e31b07953b0723772d987a00b11e021ec47e0a12aa74940b58a76b52d",
+          "size": 4665198
         },
         "macos-aarch64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.9/agentrt-v0.1.9-macos-arm64.tar.gz",
-          "sha256": "c9ade983d57bfca7d0fc927de016fc40c85ce26cd95386ec3de97fa4c2cc490b",
-          "size": 4670442
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.10/agentrt-v0.1.10-macos-arm-64.tar.gz",
+          "sha256": "79ff448e31b07953b0723772d987a00b11e021ec47e0a12aa74940b58a76b52d",
+          "size": 4665198
+        },
+        "macos-x64": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.10/agentrt-v0.1.10-macos-x86-64.tar.gz",
+          "sha256": "26cf109599cc9e711d5530e57ea4f94586497cef6402561320717da8faec8270",
+          "size": 4671853
+        },
+        "macos-x86_64": {
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.10/agentrt-v0.1.10-macos-x86-64.tar.gz",
+          "sha256": "26cf109599cc9e711d5530e57ea4f94586497cef6402561320717da8faec8270",
+          "size": 4671853
         }
       }
     }
