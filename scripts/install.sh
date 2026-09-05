@@ -512,19 +512,22 @@ install_binary() {
         verify_gpg_sig "$man" "$man_asc" || { log_warn "manifest 验签失败（GPG），拒绝安装"; return 1; }
         [ -s "$man_asc" ] && log_ok "manifest 验签通过（GPG）"
         plat="linux-$(plat_name "${arch}")"
-        [ "$(uname -s 2>/dev/null)" = "Darwin" ] && plat="macos-$(uname -m 2>/dev/null)"
+        if [ "$(uname -s 2>/dev/null)" = "Darwin" ]; then
+            plat="macos-$(plat_name "$(uname -m 2>/dev/null)")"
+        fi
         url="$(parse_manifest "$man" "$plat" url)"
         expect_sha="$(parse_manifest "$man" "$plat" sha256)"
-        # 0.1.6f 社区反馈：旧 manifest（≤0.1.6d 命名 linux-x86_64 等）或
-        # 新 manifest（linux-x64 数字命名）双向兼容——主键未命中时按别名表
-        # 反查，杜绝"无可用制品"假阴性。
+        # 平台键兼容（三代 manifest）：本版主键 = OS-架构族-位宽（如
+        # linux-x86-64）；旧两代（gen2：linux-x64 等 / gen1：linux-x86_64
+        # 等）未命中时按 plat_legacy_name 候选依序反查，杜绝"无可用制品"
+        # 假阴性（0.1.6f 社区反馈同源）。
         if [ -z "$url" ]; then
-            legacy="$(plat_legacy_name "$plat")"
-            if [ -n "$legacy" ]; then
+            for legacy in $(plat_legacy_name "$plat"); do
+                [ -n "$legacy" ] || continue
                 url="$(parse_manifest "$man" "$legacy" url)"
                 expect_sha="$(parse_manifest "$man" "$legacy" sha256)"
-                [ -n "$url" ] && log_info "平台键 ${plat} 未命中，已用兼容命名 ${legacy}"
-            fi
+                [ -n "$url" ] && { log_info "平台键 ${plat} 未命中，已用兼容命名 ${legacy}"; break; }
+            done
         fi
         [ -n "$url" ] || { log_warn "manifest 无 ${plat} 制品，回退源码构建"; return 1; }
         log_info "通道 ${AIRY_CHANNEL} 最新制品（${plat}）: $(basename "${url%%\?*}")"
@@ -580,17 +583,23 @@ install_binary() {
             return 1
         fi
     fi
-    # 包内架构自校验：tarball 根含 platform-<plat> 标识文件时交叉校验，
-    # 防止下载到异架构包后静默安装（跨架构 daemon 启动即崩溃）。
-    # 0.1.6g 修复：制品标记自 0.1.6e 起改用数字平台名（platform-x64 等），
-    # 原 grep 仍用 uname 原始名（platform-x86_64），两边对不上导致自检
-    # 静默失效（既不放行也不拒绝）；统一走 plat_name() 同口径。
-    if tar -tzf "${tarball}" 2>/dev/null | grep -q "platform-$(plat_name "${arch}")"; then
+    # 包内架构自校验：tarball 根含 platform-* 标识文件时交叉校验，防止
+    # 下载到异架构包后静默安装（跨架构 daemon 启动即崩溃）。三代标记
+    # 兼容：本版生成 platform-<架构族-位宽>（如 platform-x86-64），旧
+    # gen2/gen1 标记（platform-x64 / platform-x86_64 等）同放行；异架构
+    # 标记（如 x86-64 主机遇 platform-arm-64）明确拒绝。
+    _marker="$(tar -tzf "${tarball}" 2>/dev/null | grep -oE 'platform-[A-Za-z0-9_-]+' | head -1 || true)"
+    if [ -n "$_marker" ]; then
+        _arch_ok=""
+        for _p in $(plat_markers "${arch}"); do
+            [ "$_marker" = "$_p" ] && { _arch_ok=1; break; }
+        done
+        if [ -z "$_arch_ok" ]; then
+            log_err "二进制包架构与当前主机（${arch}）不匹配（标记 ${_marker}），拒绝安装"
+            rm -f "${tarball}"
+            return 1
+        fi
         log_ok "二进制包架构校验通过（${arch}）"
-    elif tar -tzf "${tarball}" 2>/dev/null | grep -qE 'platform-(x64|x86|arm64|arm32|riscv64|riscv32)'; then
-        log_err "二进制包架构与当前主机（${arch}）不匹配，拒绝安装"
-        rm -f "${tarball}"
-        return 1
     fi
     tar -xzf "${tarball}" -C "${AIRY_HOME}/tmp" || { log_err "release 包解压失败（tar）"; rm -f "$tarball"; return 1; }
     local extracted
@@ -1020,38 +1029,58 @@ detect_arch() {
     esac
 }
 # 预编译包支持的架构清单（binary 模式校验；其余架构回退源码构建）
-# 与 CI release.yml build-riscv64 job（agentrt-<v>-linux-riscv64.tar.gz）
+# 与 CI release.yml build-linux-riscv-64 job（agentrt-<v>-linux-riscv-64.tar.gz）
 # 及 sdk/tui/scripts/airymaxrt detect_arch 同口径。
-# 六架构全覆盖（2026-08-30 决策：硬件使用最大化）：x86（x86_64/i686）、
-# ARM（aarch64/armv7l）、RISC-V（riscv64/riscv32）的 32 与 64 位全兼容；
+# 六架构全覆盖（2026-08-30 决策：硬件使用最大化）：x86（x86-64/x86-32）、
+# ARM（arm-64/arm-32）、RISC-V（riscv-64/riscv-32）的 32 与 64 位全兼容；
 # detect_arch 以用户空间位数复判，杜绝 64 位内核 + 32 位用户空间误装。
 SUPPORTED_ARCHS="x86_64 aarch64 riscv64 i686 armv7l riscv32"
 
-# 制品平台命名（0.1.6e 起，用户定案）：32/64 数字形式，弃用 i686/armv7l
-# 易误导字样。技术架构名（detect_arch 输出）→ 制品平台后缀：
-#   x86_64→x64  i686→x86  aarch64→arm64  armv7l→arm32  riscv64→riscv64  riscv32→riscv32
+# 制品平台命名规范（0.1.10 起，用户定案）：OS-架构族-位宽，弃用
+# i686/armv7l/x64/arm64 等架构行话。技术架构名（detect_arch 输出，
+# uname -m 事实）→ 制品平台后缀（架构族-位宽）：
+#   x86_64→x86-64  i686→x86-32  aarch64→arm-64  armv7l→arm-32
+#   riscv64→riscv-64  riscv32→riscv-32
+# 全键 = OS 前缀 + 后缀（linux-x86-64 / macos-arm-64 / win-x86-64…）。
 # 与 build.sh PLATFORM 映射、latest/airymaxrt runtime_platform 同口径。
 plat_name() {
     case "$1" in
-        x86_64)  echo "x64" ;;
-        i686)    echo "x86" ;;
-        aarch64) echo "arm64" ;;
-        armv7l)  echo "arm32" ;;
-        riscv64) echo "riscv64" ;;
-        riscv32) echo "riscv32" ;;
+        x86_64)  echo "x86-64" ;;
+        i686)    echo "x86-32" ;;
+        aarch64) echo "arm-64" ;;
+        armv7l)  echo "arm-32" ;;
+        riscv64) echo "riscv-64" ;;
+        riscv32) echo "riscv-32" ;;
         *)       echo "$1" ;;
     esac
 }
-# 数字平台名 → 旧 uname 原始名（0.1.6d 及更早的 manifest 平台键）。
-# 与 publish-release.sh ALIAS 表、latest/airymaxrt plat_legacy_name 同口径
-# （SSoT），仅用于 manifest 主键未命中时的兼容反查。
+# 平台键兼容反查（三代 manifest）：本版主键 = OS-架构族-位宽（gen3）；
+# 旧两代依次回退：gen2（0.1.6e~0.1.10：linux-x64/x86/arm64/arm32…）→
+# gen1（≤0.1.6d：uname 原始名 linux-x86_64/i686/aarch64/armv7l…）。
+# 逐行输出候选，调用方依序尝试 parse_manifest。与 publish-release.sh
+# ALIAS 表、latest/airymaxrt plat_legacy_name 同口径（SSoT）。
 plat_legacy_name() {
     case "$1" in
-        linux-x64|macos-x64|win-x64)       echo "${1%-x64}-x86_64" ;;
-        linux-x86|win-x86)                 echo "${1%-x86}-i686" ;;
-        linux-arm64|macos-arm64|win-arm64) echo "${1%-arm64}-aarch64" ;;
-        linux-arm32)                       echo "linux-armv7l" ;;
-        *)                                 echo "" ;;
+        linux-x86-64|macos-x86-64|win-x86-64) printf '%s\n' "${1%-x86-64}-x64" "${1%-x86-64}-x86_64" ;;
+        linux-x86-32|macos-x86-32|win-x86-32) printf '%s\n' "${1%-x86-32}-x86" "${1%-x86-32}-i686" ;;
+        linux-arm-64|macos-arm-64|win-arm-64) printf '%s\n' "${1%-arm-64}-arm64" "${1%-arm-64}-aarch64" ;;
+        linux-arm-32|macos-arm-32|win-arm-32) printf '%s\n' "${1%-arm-32}-arm32" "${1%-arm-32}-armv7l" ;;
+        linux-riscv-64|win-riscv-64)          echo "${1%-riscv-64}-riscv64" ;;
+        linux-riscv-32|win-riscv-32)          echo "${1%-riscv-32}-riscv32" ;;
+        *)                                    echo "" ;;
+    esac
+}
+# 某技术架构允许的包内 platform-* 标记（三代全兼容：新安装器安装存量
+# gen2/gen1 离线包不误拒；异架构标记仍明确拒绝）。与 CI 打包标记同口径。
+plat_markers() {
+    case "$1" in
+        x86_64)  printf 'platform-x86-64 platform-x64 platform-x86_64 platform-amd64' ;;
+        i686)    printf 'platform-x86-32 platform-x86 platform-i686 platform-i386' ;;
+        aarch64) printf 'platform-arm-64 platform-arm64 platform-aarch64' ;;
+        armv7l)  printf 'platform-arm-32 platform-arm32 platform-armv7l' ;;
+        riscv64) printf 'platform-riscv-64 platform-riscv64' ;;
+        riscv32) printf 'platform-riscv-32 platform-riscv32' ;;
+        *)       echo "" ;;
     esac
 }
 

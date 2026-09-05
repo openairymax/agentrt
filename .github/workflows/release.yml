@@ -22,12 +22,14 @@ env:
   VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', github.event.inputs.version) }}
 
 jobs:
-  # Linux x86_64：container ubuntu:20.04 保证 glibc 2.31 基线（覆盖
-  # Ubuntu 20.04+/Debian 11+/Pi OS Bullseye+）。注意：GitHub Actions 容器
-  # 作业仅支持 Linux runner，macOS/Windows 必须拆分为独立作业（问题：
+  # Linux x86-64：container ubuntu:20.04 保证 glibc 2.31 基线（覆盖
+  # Ubuntu 20.04+/Debian 11+/Pi OS Bullseye+）。平台命名规范（0.1.10 起）：
+  # OS-架构族-位宽（linux-x86-64 / linux-arm-64 …），下同；旧两代平台名由
+  # manifest 别名覆盖（见 publish-release.sh ALIAS）。注意：GitHub Actions
+  # 容器作业仅支持 Linux runner，macOS/Windows 必须拆分为独立作业（问题：
   # matrix 作业级 container 在 macos/windows runner 上报
   # "Container operation is only supported on Linux"）。
-  build-linux:
+  build-linux-x86-64:
     runs-on: ubuntu-latest
     container: ubuntu:20.04
     env:
@@ -140,7 +142,7 @@ jobs:
       #   bin/agentrt-tui（Rust TUI）+ lib/（Python 运行时依赖）
       # CARGO_TARGET_DIR 指向 RUNNER_TEMP，禁止在源码树落盘（铁律 4.7）。
       # TUI 构建失败仅告警降级，不阻断发布（闭源/工具链缺省容错同哲学）。
-      # build-linux 用 container ubuntu:20.04，run 默认 shell 为 dash：
+      # build-linux-x86-64 用 container ubuntu:20.04，run 默认 shell 为 dash：
       # `source` 非 POSIX 内建会静默失败导致 cargo 丢失（exit 127），
       # 统一改 PATH 注入；构建命令加 if ! 守卫兑现降级契约。
       - name: Build TUI + copy Python runtime
@@ -173,11 +175,12 @@ jobs:
           cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
-          # 0.1.6e 起制品标记统一为数字平台名（platform-x64…），更新器/安装器
-          # 经 plat_name() 同口径校验；勿回退 uname 原始名（platform-x86_64 会
-          # 触发"制品架构与主机不匹配"拒绝，v0.1.9 打包回归实证）。
-          touch "${PKG_DIR}/platform-x64"
-          ARTIFACT="agentrt-${VERSION}-linux-x64"
+          # 平台命名规范（0.1.10 起）：OS-架构族-位宽，如 linux-x86-64。
+          # 包标记 platform-<后缀>（x86-64 等）与更新器/安装器 plat_name()
+          # 同口径校验；勿回退 uname 原始名（platform-x86_64 会触发
+          # "制品架构与主机不匹配"拒绝，v0.1.9 打包回归实证）。
+          touch "${PKG_DIR}/platform-x86-64"
+          ARTIFACT="agentrt-${VERSION}-linux-x86-64"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
           sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
           echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
@@ -189,9 +192,9 @@ jobs:
           path: ${{ env.artifact_name }}.*
           if-no-files-found: error
 
-  # macOS arm64：原生 runner（无 container——容器作业仅支持 Linux）。
+  # macOS arm-64：原生 runner（无 container——容器作业仅支持 Linux）。
   # openssl/zlib/sqlite/curl 为 keg-only，需显式导出 pkg-config 路径。
-  build-macos:
+  build-macos-arm-64:
     runs-on: macos-latest
     env:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
@@ -276,8 +279,8 @@ jobs:
           cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
-          touch "${PKG_DIR}/platform-arm64"
-          ARTIFACT="agentrt-${VERSION}-macos-arm64"
+          touch "${PKG_DIR}/platform-arm-64"
+          ARTIFACT="agentrt-${VERSION}-macos-arm-64"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
           sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
           echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
@@ -289,12 +292,12 @@ jobs:
           path: ${{ env.artifact_name }}.*
           if-no-files-found: error
 
-  # macOS x64 (Intel)：macos-13 原生 runner（0.1.10 并行发布决策：macOS
-  # 三平台补全。build-macos 跑 macos-latest=arm64，Intel 存量社区用户需
-  # x64 包，故新增本 leg）。打包步骤与 arm64 同构，仅 platform 标记与
-  # 制品名不同。Intel runner 的 brew prefix 为 /usr/local，Configure 步骤
-  # 一律 $(brew --prefix) 动态解析，无需区分 prefix。
-  build-macos-x64:
+  # macOS x86-64 (Intel)：macos-13 原生 runner（0.1.10 并行发布决策：macOS
+  # 三平台补全。build-macos-arm-64 跑 macos-latest=arm64，Intel 存量社区
+  # 用户需 x86-64 包，故新增本 leg）。打包步骤与 arm-64 同构，仅 platform
+  # 标记与制品名不同。Intel runner 的 brew prefix 为 /usr/local，Configure
+  # 步骤一律 $(brew --prefix) 动态解析，无需区分 prefix。
+  build-macos-x86-64:
     runs-on: macos-13
     env:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
@@ -350,7 +353,7 @@ jobs:
           export PATH="$HOME/.cargo/bin:$PATH"
           export CARGO_TARGET_DIR="$RUNNER_TEMP/tui-target"
           if ! (cd agent-workload/sdk/tui && cargo build --release); then
-            echo "warn: macos-x64 TUI 构建失败（降级）"
+            echo "warn: macos-x86-64 TUI 构建失败（降级）"
           fi
           cp -f "$CARGO_TARGET_DIR/release/agentrt-tui" "${{ env.STAGE_DIR }}/bin/" 2>/dev/null || echo "warn: TUI 构建产物缺失（降级）"
           mkdir -p "${{ env.STAGE_DIR }}/lib"
@@ -372,8 +375,8 @@ jobs:
           cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
-          touch "${PKG_DIR}/platform-x64"
-          ARTIFACT="agentrt-${VERSION}-macos-x64"
+          touch "${PKG_DIR}/platform-x86-64"
+          ARTIFACT="agentrt-${VERSION}-macos-x86-64"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
           sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
           echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
@@ -389,15 +392,15 @@ jobs:
   # windows-latest（$env:VCPKG_INSTALLATION_ROOT）。zip 包必须与 tar.gz 包
   # 保持完全体一致（config 模板 + permission_rules + maths-toolkit +
   # platform 标记），防止 Windows 包缺失组件（问题：打包漂移）。
-  build-windows:
+  build-windows-x86-64:
     # CI 收敛（2026-09-04）：Windows 编译验证归 build-test.yml（GitHub 测试
     # 场）；tag 自动发布不再携带 windows 构建（MSVC 移植未完成）。手动
     # workflow_dispatch 仍可尝试产出 windows 二进制。
     if: github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     # 并行发布决策（2026-09-03）：MSVC 移植进行中（commons/cupolas/
-    # protocols/heapstore），build-windows 暂作可选不阻断发布（先发后修），
-    # 修好后移除 continue-on-error 并移回 release.needs。
+    # protocols/heapstore），build-windows-x86-64 暂作可选不阻断发布
+    #（先发后修），修好后移除 continue-on-error 并移回 release.needs。
     continue-on-error: true
     env:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
@@ -496,8 +499,8 @@ jobs:
           if (Test-Path "_tools\scripts\ops\bin\agentrt-bootstrap.sh") {
             Copy-Item -Path "_tools\scripts\ops\bin\agentrt-bootstrap.sh" -Destination "$pkgDir\bin\" -Force
           }
-          New-Item -ItemType File -Path "$pkgDir\platform-x64" -Force | Out-Null
-          $artifact = "agentrt-$VERSION-windows-x64"
+          New-Item -ItemType File -Path "$pkgDir\platform-x86-64" -Force | Out-Null
+          $artifact = "agentrt-$VERSION-windows-x86-64"
           Compress-Archive -Path "pkg\*" -DestinationPath "$artifact.zip"
           # 校验和（Windows 无 sha256sum，用 Get-FileHash）
           (Get-FileHash -Algorithm SHA256 "$artifact.zip").Hash.ToLower() + "  $artifact.zip" | Out-File -FilePath "$artifact.zip.sha256"
@@ -512,18 +515,18 @@ jobs:
 
   # RISC-V (linux-riscv64)：标准 runner 无 riscv64 第三方库（libcurl 等），
   # 经 Docker buildx + qemu 多架构容器构建（ubuntu:20.04 riscv64 镜像，
-  # 与 x86_64/arm64 统一 glibc 2.31 基线）。
-  build-riscv64:
+  # 与 x86-64/arm-64 统一 glibc 2.31 基线）。
+  build-linux-riscv-64:
     # CI 收敛（2026-09-04）：QEMU riscv64 在托管 runner 上 6h 内无法完成
     #（R15 5h52m+ / R16 均被强杀），tag 自动发布不再触发，避免 workflow
-    # 僵尸挂起数小时；仅 workflow_dispatch 显式请求时尝试。riscv64 完整
-    # 制品由本地构建台 build.sh 交叉补发（与 release.needs 摘除同一决策）。
+    # 僵尸挂起数小时；仅 workflow_dispatch 显式请求时尝试。linux-riscv-64
+    # 完整制品由本地构建台 build.sh 交叉补发（与 release.needs 摘除同一决策）。
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # 并行发布决策（2026-09-04）：QEMU 交叉编译在托管 runner 上持续撞 6h
     # 单 job 硬上限（R15 5h52m+ 仍 in_progress，被强制终止），无法作为
-    # v0.1.9 门禁。改 continue-on-error：仍尝试产出 riscv64 制品，但不再
-    # 阻断发布；riscv64 完整制品改由本地/自托管构建补发（见 release.needs）。
+    # v0.1.9 门禁。改 continue-on-error：仍尝试产出 riscv-64 制品，但不再
+    # 阻断发布；linux-riscv-64 完整制品改由本地/自托管构建补发（见 release.needs）。
     continue-on-error: true
     env:
       BUILD_DIR: build
@@ -565,7 +568,7 @@ jobs:
               libssl-dev zlib1g-dev libzstd-dev libmicrohttpd-dev \
               libwebsockets-dev libevent-dev libnghttp2-dev
             # 0.1.6f SSoT：cmake/cJSON/OpenSSL/libcurl/libwebsockets 自编译
-            # 收敛到 lib-builddeps.sh（与本地 build.sh / build-linux 同源，
+            # 收敛到 lib-builddeps.sh（与本地 build.sh / build-linux-x86-64 同源，
             # 幂等 + 离线 deps 缓存优先）。统一 libssl.so.3 链路。
             bash /src/_tools/scripts/ci/release/lib-builddeps.sh
             # Rust 工具链仅供 agentrt-tui 构建；TUI 不在发布必检
@@ -619,8 +622,8 @@ jobs:
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
           cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
-          touch "${PKG_DIR}/platform-riscv64"
-          ARTIFACT="agentrt-${VERSION}-linux-riscv64"
+          touch "${PKG_DIR}/platform-riscv-64"
+          ARTIFACT="agentrt-${VERSION}-linux-riscv-64"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
           sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
           echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
@@ -628,13 +631,14 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: agentrt-${{ env.VERSION }}-linux-riscv64
-          path: agentrt-${{ env.VERSION }}-linux-riscv64.tar.gz*
+          name: agentrt-${{ env.VERSION }}-linux-riscv-64
+          path: agentrt-${{ env.VERSION }}-linux-riscv-64.tar.gz*
           if-no-files-found: error
 
-  # ARM64 (linux-aarch64)：与 riscv64 同方案，经 Docker buildx + qemu 多架构
-  # 容器构建（ubuntu:20.04 arm64 镜像，统一 glibc 2.31 基线，覆盖 32/64 位 ARM 等设备）。
-  build-arm64:
+  # ARM-64 (linux-arm-64)：与 linux-riscv-64 同方案，经 Docker buildx + qemu
+  # 多架构容器构建（ubuntu:20.04 arm64 镜像，统一 glibc 2.31 基线，覆盖
+  # arm-64 / arm-32 设备）。
+  build-linux-arm-64:
     runs-on: ubuntu-latest
     env:
       BUILD_DIR: build
@@ -656,15 +660,15 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Build in arm64 container
+      - name: Build in arm-64 container
         run: |
           docker run --rm --platform linux/arm64 \
             -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage \
             -v "$PWD":/src -w /src ubuntu:20.04 bash -c '
             # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）
             set -euo pipefail
-            exec > >(tee /src/container-arm64.log) 2>&1
-            trap '"'"'echo "::error::[arm64] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-arm64.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
+            exec > >(tee /src/container-arm-64.log) 2>&1
+            trap '"'"'echo "::error::[arm-64] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-arm-64.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
             apt-get install -y -qq \
@@ -673,7 +677,7 @@ jobs:
               libssl-dev zlib1g-dev libzstd-dev libmicrohttpd-dev \
               libwebsockets-dev libevent-dev libnghttp2-dev
             # 0.1.6f SSoT：cmake/cJSON/OpenSSL/libcurl/libwebsockets 自编译
-            # 收敛到 lib-builddeps.sh（与本地 build.sh / build-linux 同源，
+            # 收敛到 lib-builddeps.sh（与本地 build.sh / build-linux-x86-64 同源，
             # 幂等 + 离线 deps 缓存优先）。统一 libssl.so.3 链路。
             bash /src/_tools/scripts/ci/release/lib-builddeps.sh
             # Rust 工具链仅供 agentrt-tui 构建；TUI 不在发布必检
@@ -718,8 +722,8 @@ jobs:
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
           cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
-          touch "${PKG_DIR}/platform-arm64"
-          ARTIFACT="agentrt-${VERSION}-linux-arm64"
+          touch "${PKG_DIR}/platform-arm-64"
+          ARTIFACT="agentrt-${VERSION}-linux-arm-64"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
           sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
           echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
@@ -727,49 +731,49 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: agentrt-${{ env.VERSION }}-linux-arm64
-          path: agentrt-${{ env.VERSION }}-linux-arm64.tar.gz*
+          name: agentrt-${{ env.VERSION }}-linux-arm-64
+          path: agentrt-${{ env.VERSION }}-linux-arm-64.tar.gz*
           if-no-files-found: error
 
-  # 32 位 Linux（i686 / armv7l）：六架构兼容决策（2026-08-30）补全 32 位
-  # 构建门禁。经 Docker buildx + qemu 多架构容器构建，统一 glibc 2.31
+  # 32 位 Linux（x86-32 / arm-32）：六架构兼容决策（2026-08-30）补全 32
+  # 位构建门禁。经 Docker buildx + qemu 多架构容器构建，统一 glibc 2.31
   # 基线；覆盖老 x86 与 32 位 ARM 用户空间——64 位内核 + 32 位用户态场景。
   # 镜像按架构分选：ubuntu:20.04 官方镜像无 linux/386 清单（v0.1.9
-  # Release run 实证 "no matching manifest for linux/386"），i686 改用
+  # Release run 实证 "no matching manifest for linux/386"），x86-32 改用
   # debian:bullseye-20240812-slim（glibc 2.31 与 focal 同基线，有 i386
   # 清单）。bullseye 已全面 EOL（标准 2024-08 / LTS 2026-08-31），浮动
   # debian:bullseye 的 LTS 重建与 archive 仅折叠 LTS 运行时（-dev 不随更）
   # 形成不可解依赖（0.1.10 Release 实证），故：镜像钉版至 LTS 前日期 +
   # apt 源改 snapshot.debian.org 同时间戳（2024-08-12），运行时与 -dev
-  # 版本一致，可复现（对齐 0.2.0 方案 C1）。armv7l 维持 ubuntu:20.04。
+  # 版本一致，可复现（对齐 0.2.0 方案 C1）。arm-32 维持 ubuntu:20.04。
   # TUI 在 32 位 qemu 模拟下 rustc 极慢且易超时，本作业降级跳过
   # （C/C++ 核心编译门禁仍完整），agentrt-tui 32 位制品由本地构建台
-  # build.sh i686|armv7l 交叉产物覆盖（_tools/scripts/ci/release/build.sh）。
-  build-linux-32bit:
+  # build.sh 交叉产物覆盖（tools/scripts/ci/release/build.sh）。
+  build-linux-32:
     runs-on: ubuntu-latest
     strategy:
       # 矩阵项相互独立：任一失败不再取消另一架构（v0.1.9 run #7 实证：
-      # i686 失败导致 armv7l 被 fail-fast 取消，白白丢失一次构建信号）。
+      # x86-32 失败导致 arm-32 被 fail-fast 取消，白白丢失一次构建信号）。
       fail-fast: false
       matrix:
         include:
-          - name: i686
+          - name: x86-32
             platform: linux/386
             # 钉版至 LTS 前日期（2024-08-12），base 与 snapshot 源版本一致
             image: debian:bullseye-20240812-slim
-            # 0.1.6e 起包内架构标记用数字平台名（platform-<plat>，见 Package 步骤）
-            plat: x86
-            artifact: linux-x86
-            # 门禁架构：i686 已修复（openssl linux-generic32），阻断发布
+            # 平台命名规范：包内架构标记用 platform-<plat>（见 Package 步骤）
+            plat: x86-32
+            artifact: linux-x86-32
+            # 门禁架构：x86-32 已修复（openssl linux-generic32），阻断发布
             experimental: false
-          - name: armv7l
+          - name: arm-32
             platform: linux/arm/v7
             image: ubuntu:20.04
-            plat: arm32
-            artifact: linux-arm32
-            # 先发后修（2026-09-03，同 Windows 决策）：armv7l qemu 的 cmake
-            # 供给仍在收敛（Kitware APT armhf 验证中），暂不阻断 v0.1.9 发布，
-            # linux-arm32 制品随后补发；修好后置回 experimental: false。
+            plat: arm-32
+            artifact: linux-arm-32
+            # 先发后修（2026-09-03，同 Windows 决策）：arm-32 qemu 的 cmake
+            # 供给仍在收敛（Kitware APT armhf 验证中），暂不阻断发布，
+            # linux-arm-32 制品随后补发；修好后置回 experimental: false。
             experimental: true
     # continue-on-error：experimental=true 的矩阵项失败不使整个 job 失败，
     # release.needs 仍列本 job，其余架构产物照常汇聚发布。
@@ -891,10 +895,10 @@ jobs:
   # runner(美东) → atomgit/OBS 上传 ~20MB 需 ~15min，撞 PUT --max-time 900
   # 被掐断而发布失败；且 runner 需常驻 5 类发布 secret、失败日志 403 难排障。
   release:
-    # build-windows / build-riscv64 已按 dispatch-only 门控（见各自 if），
-    # 不在 needs；门禁 = 已实证全绿的 Linux x86_64 / macOS arm64 /
-    # macOS x64 / Linux arm64 / Linux i686 五平台。
-    needs: [build-linux, build-macos, build-macos-x64, build-arm64, build-linux-32bit]
+    # build-windows-x86-64 / build-linux-riscv-64 已按 dispatch-only 门控
+    #（见各自 if），不在 needs；门禁 = 已实证全绿的 Linux x86-64 / macOS
+    # arm-64 / macOS x86-64 / Linux arm-64 / Linux 32（x86-32）五平台。
+    needs: [build-linux-x86-64, build-macos-arm-64, build-macos-x86-64, build-linux-arm-64, build-linux-32]
     runs-on: ubuntu-latest
     # tag 推送或手动 dispatch（手动时版本来自 inputs.version）皆可触发
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
