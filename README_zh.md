@@ -4,7 +4,7 @@
 
 **语言:** [English](README.md) | 简体中文
 
-[![Version](https://img.shields.io/badge/version-0.1.9-5a6b7e)](https://atomgit.com/openairymax/agentrt)
+[![Version](https://img.shields.io/badge/version-0.1.11-5a6b7e)](https://atomgit.com/openairymax/agentrt)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c\&logoColor=white)](https://en.cppreference.com/w/c/11)
 
@@ -24,43 +24,46 @@ AgentRT 是 `airymaxhub` 伞仓下用户态工程大管理仓 `agent-workload` �
 
 终端用户一行安装，无需编译。命令始终拉取 agentrt 仓 **main 分支**的最新
 安装器（git push 即时生效，不存在发版滞后），自动完成 GPG 验签 +
-sha256 校验 + 架构自检（linux-x86-64 / linux-arm-64 / riscv-64 …）：
+sha256 校验 + 架构自检：
 
 ```bash
-# Linux / macOS（需要 curl + python3）
-curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
-  | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
-  | bash
+# Linux / macOS（已发布原生包：linux-x86-64 / linux-arm-64 / linux-arm-32 /
+# linux-x86-32、macOS arm-64 / x86-64）
+curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh | bash
 ```
 
-> **为什么不推荐 `releases/download/latest/install.sh`？**
-> release 附件只在发版时上传，同版本修复重发不会刷新它；且经 `curl | bash`
-> 管道执行时安装器无法自举到最新版（$0 非文件），可能看到旧版横幅或旧行为。
-> 上面命令始终取 main 分支最新安装器，行为最可预期。下载为文件后再
-> `bash install.sh` 运行时，安装器会自动自举到 main 最新版。
+> 无法访问 GitHub 时改用 atomgit 通道（内容相同，需 curl + python3）：
+>
+> ```bash
+> curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
+>   | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
+>   | bash
+> ```
 
-常用变体（把参数追加在 `| bash -s --` 之后）：
+常用变体——把参数追加在 `| bash -s --` 之后即可：
 
 ```bash
 # 自定义安装路径（默认 $HOME/.airymaxrt）
-curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
-  | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
+curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh \
   | bash -s -- --prefix "$HOME/.airymaxrt"
 
 # 测试通道（更激进更新）
-curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
-  | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
+curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh \
   | bash -s -- --channel beta
 
 # 卸载（--keep-data 保留记忆数据）
-curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
-  | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
+curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh \
   | bash -s -- --uninstall
 ```
 
-> Windows：atoms/commons 已闭源，原生安装不可用——推荐 WSL2（在 WSL 终端
-> 执行上方 Linux 命令）。install.ps1 附件随 release 更新，如需最新安装器请
-> 使用 Linux/macOS 命令。
+> **自定义路径用户如何更新？** 安装器会把安装根固化到
+> `<安装根>/config/install.env`。此后 `airymaxrt update`、启动器更新和
+> `--reinstall` 全部自动作用于**原安装路径**，无需重复传 `--prefix`。
+> 若机器上装过多份，用 `which airymaxrt` 确认 PATH 指向的是要更新的那份。
+
+> **Windows**：原生安装包正在 GitHub Actions 打包管线（0.1.12）施工中，
+> 当前推荐 WSL2：`wsl --install`（WSL2 + Ubuntu）后，在 WSL 终端执行上方
+> Linux 命令。
 
 安装完成后 `airymaxrt` 即入 PATH，`airymaxrt start` 拉起运行时。安装器
 自动按硬件裁剪运行画像（full/minimal），`airymaxrt monitor` 常驻检测外设
