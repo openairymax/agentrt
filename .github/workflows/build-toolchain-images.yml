@@ -2,20 +2,33 @@ name: Build QEMU Toolchain Images
 
 # 0.1.11 E1：预构建 qemu 工具链镜像并推 GHCR，供 release.yml qemu 腿
 # docker run 复用（省每轮 lib-builddeps 源码重编，arm-64 88min→~20min）。
-# 手动触发（workflow_dispatch）；lib-builddeps.sh 变更后需重建并 bump 镜像 tag，
-# 再同步 release.yml 中引用的镜像 tag（钉版，禁止浮动）。
+#
+# 触发（0.1.11 自动触发规则，2026-09-05）：
+#   - workflow_dispatch（手动）：platforms/image_tag 由输入指定；
+#     image_tag 留空 = auto-<run_number>（一次性 tag，与钉版 tag 并存）。
+#   - push 到 main 且改动 .github/docker/** 或本 workflow：platforms 固定
+#     arm64,arm32，tag 用 auto-<run_number>——自动重建不覆盖已有钉版 tag，
+#     release.yml 仍引用钉版 tag（确认新镜像后把具体 tag/digest 同步过去）。
+#
+# 镜像 tag 钉版语义：lib-builddeps.sh / Dockerfile 变更后需重建并 bump 引用，
+# 禁止浮动 tag 被 release.yml 引用。
 
 on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: '镜像 tag（钉版，如 20260905-1）'
-        required: true
-        default: '20260905-1'
+        description: '镜像 tag（钉版如 20260905-1；留空=auto-<run_number>）'
+        required: false
+        default: ''
       platforms:
-        description: '构建平台（逗号分隔：arm64,arm32；x8632 待 debian 版）'
+        description: '构建平台（逗号分隔：arm64,arm32）'
         required: true
-        default: 'arm64'
+        default: 'arm64,arm32'
+  push:
+    branches: [main]
+    paths:
+      - '.github/docker/**'
+      - '.github/workflows/build-toolchain-images.yml'
 
 permissions:
   contents: read
@@ -36,6 +49,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: bash .github/scripts/init-submodules.sh tools
+
+      # 参数解析：手动指定 image_tag → 用之；push/留空 → auto-<run_number>。
+      # 推送触发时 platforms 固定 arm64,arm32（无 inputs），自动覆盖新增平台。
+      - name: Resolve build params
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.image_tag }}" ]; then
+            echo "IMAGE_TAG=${{ inputs.image_tag }}" >> "$GITHUB_ENV"
+          else
+            echo "IMAGE_TAG=auto-${{ github.run_number }}" >> "$GITHUB_ENV"
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "PLATFORMS=${{ inputs.platforms }}" >> "$GITHUB_ENV"
+          else
+            echo "PLATFORMS=arm64,arm32" >> "$GITHUB_ENV"
+          fi
 
       - name: Prepare minimal build context
         run: |
@@ -62,10 +90,10 @@ jobs:
       - name: Build & push toolchain images
         env:
           GHCR: ghcr.io/openairymax/agentrt-qemu-toolchain
-          IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
           set -euo pipefail
-          for p in $(echo "${{ inputs.platforms }}" | tr ',' ' '); do
+          echo "==> platforms=${PLATFORMS} image_tag=${IMAGE_TAG}"
+          for p in $(echo "$PLATFORMS" | tr ',' ' '); do
             case "$p" in
               arm64) dk="linux/arm64" ;;
               arm32) dk="linux/arm/v7" ;;
