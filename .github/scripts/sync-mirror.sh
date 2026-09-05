@@ -257,6 +257,15 @@ sync_root() {
       '+refs/tags/*:refs/tags/*' 2>&1)"; then
     echo "::error::agentrt: atomgit tags fetch failed: $(printf '%s' "$err" | redact | tr '\n' ' ' | tail -c 300)"
   fi
+  # main 本地引用也须自 SSoT 补全（sync-mirror #112 实证）：tag push 触发
+  # 的运行 checkout 处于 detached 状态，本地无 refs/heads/main，下方
+  # 'refs/heads/main:refs/heads/main' 推送直接 "src refspec does not
+  # match any" 失败。自 atomgit 取 main 后 push 语义不变：GitHub 侧
+  # main 与 SSoT 分叉时仍被非 force push 大声拒绝（镜像 = SSoT 一致）。
+  if ! err="$(timeout 300 git -C "$GITHUB_WORKSPACE" fetch -q "$(src_url "$ROOT_REPO")" \
+      '+refs/heads/main:refs/heads/main' 2>&1)"; then
+    echo "::error::agentrt: atomgit main fetch failed: $(printf '%s' "$err" | redact | tr '\n' ' ' | tail -c 300)"
+  fi
   local pair label url
   for pair in \
     "github|https://x-access-token:${GH_TOKEN}@github.com/${GH_ORG}/${ROOT_REPO}.git" \
