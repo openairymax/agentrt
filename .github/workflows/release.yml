@@ -703,24 +703,20 @@ jobs:
 
       - name: Build in arm-64 container
         run: |
+          # E1 收口（2026-09-05）：预构建工具链镜像（GHCR 公开，digest 钉版）。
+          # apt 依赖 + lib-builddeps 自编译产物已固化进镜像（Dockerfile 与
+          # release 腿同源，glibc 2.31 基线不变），本腿只做项目构建/打包——
+          # 省去每轮 apt + 源码重编 deps（原生 arm64 下进一步压缩墙钟）。
           docker run --rm --platform linux/arm64 \
             -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage \
-            -v "$PWD":/src -w /src ubuntu:20.04 bash -c '
+            -v "$PWD":/src -w /src \
+            ghcr.io/openairymax/agentrt-qemu-toolchain:arm64-20260905-1@sha256:b3224d8642c678b5d190c6654082a0892929c255a225734fa0dc1f9a60585ead \
+            bash -c '
             # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）
             set -euo pipefail
             exec > >(tee /src/container-arm-64.log) 2>&1
             trap '"'"'echo "::error::[arm-64] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-arm-64.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
             export DEBIAN_FRONTEND=noninteractive
-            apt-get update -qq
-            apt-get install -y -qq \
-              build-essential make perl curl python3 python3-pip \
-              libsqlite3-dev libyaml-dev libcurl4-openssl-dev \
-              libssl-dev zlib1g-dev libzstd-dev libmicrohttpd-dev \
-              libwebsockets-dev libevent-dev libnghttp2-dev
-            # 0.1.6f SSoT：cmake/cJSON/OpenSSL/libcurl/libwebsockets 自编译
-            # 收敛到 lib-builddeps.sh（与本地 build.sh / build-linux-x86-64 同源，
-            # 幂等 + 离线 deps 缓存优先）。统一 libssl.so.3 链路。
-            bash /src/_tools/scripts/ci/release/lib-builddeps.sh
             # Rust 工具链仅供 agentrt-tui 构建；TUI 不在发布必检
             # REQUIRED_BIN 之列。qemu 模拟下 rustup-init 偶发网络/执行
             # 失败（run #14 arm64 rc=127），此处重试 3 次后仍失败则告警
@@ -920,6 +916,10 @@ jobs:
   #   - 修好 cmake armhf 供给后置回门禁（experimental: false + 移入 needs）
   # 构建走 QEMU linux/arm/v7 + ubuntu:20.04（glibc 2.31 基线，arm-32 设备
   # 用户空间）。AIRY_JOBS=2 限并行防 32 位 OOM。
+  # E1 待办（2026-09-05）：arm64 工具链镜像已公开并接入 arm-64 腿；本腿在
+  # ghcr.io/openairymax/agentrt-qemu-toolchain:arm32-<tag> 构建成功后同样
+  # 切换（删容器内 apt+lib-builddeps，digest 钉版引用）。arm32 镜像构建走
+  # build-toolchain-images.yml（platforms=arm64,arm32）。
   build-linux-arm-32:
     runs-on: ubuntu-latest
     continue-on-error: true
