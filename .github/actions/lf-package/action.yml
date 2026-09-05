@@ -32,7 +32,7 @@ runs:
         VERSION="${{ inputs.version }}"; VERSION_NUM="${VERSION#v}"
         PKG_DIR="pkg/agentrt-${VERSION_NUM}"
         mkdir -p "${PKG_DIR}/config" "${PKG_DIR}/modules"
-        cp -rf "${{ inputs.staging }}"/. "${PKG_DIR}/" 2>/dev/null || true
+        cp -rf "${{ inputs.staging }}"/. "${PKG_DIR}/"
         cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
         cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
         cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true

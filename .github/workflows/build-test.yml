@@ -34,19 +34,13 @@ jobs:
       # 误红，dc06d4fde 实证）；随测试补充逐版上调（见 Linux job 注释）。
       COVERAGE_THRESHOLD: 25
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      # M3 方案 B（0.1.12）：Checkout + 定向子模块检出收敛为 lf-init-deps
+      # 复合 action（同源模板，防 build-test/release 双实现漂移——P3）。
+      - name: Checkout and init submodules
+        uses: ./.github/actions/lf-init-deps
         with:
-          submodules: false
-          fetch-depth: 1
-
-      # 子模块问题修复：submodules:true 全量递归会拉 agent-linux/kernel
-      # （~2.5GB）且闭源子模块在 GitHub 不存在，checkout 必然失败。
-      # agentrt 为 workflow 宿主仓：cmake -S . 即构建本仓（7 叶子在根初始化）。
-      - name: Init submodules (agent-workload)
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: bash .github/scripts/init-submodules.sh agent-workload
+          groups: agent-workload
+          gh_token: ${{ secrets.GH_TOKEN }}
 
       - name: Install build dependencies
         run: |
@@ -159,16 +153,11 @@ jobs:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout and init submodules
+        uses: ./.github/actions/lf-init-deps
         with:
-          submodules: false
-          fetch-depth: 1
-
-      - name: Init submodules (agent-workload)
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: bash .github/scripts/init-submodules.sh agent-workload
+          groups: agent-workload
+          gh_token: ${{ secrets.GH_TOKEN }}
 
       - name: Install build dependencies (Homebrew)
         run: |
@@ -276,16 +265,11 @@ jobs:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout and init submodules
+        uses: ./.github/actions/lf-init-deps
         with:
-          submodules: false
-          fetch-depth: 1
-
-      - name: Init submodules (agent-workload)
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: bash .github/scripts/init-submodules.sh agent-workload
+          groups: agent-workload
+          gh_token: ${{ secrets.GH_TOKEN }}
 
       # E4：vcpkg 二进制缓存恢复（须在 install 之前；key 随 workflow 内容变化
       # 自动失效并回退前缀 key；加性缓存由 vcpkg 自身保证正确性）
