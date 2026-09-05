@@ -16,13 +16,22 @@
 #     # 自定义路径：同上管道，末尾改为 `bash -s -- --prefix "$HOME/.airymaxrt"`
 #   bash install.sh --reinstall                       # 强制重装（清缓存+停旧 daemon）
 #   bash install.sh --uninstall                       # 一键卸载
-# 三命令快速参考（安装完成后日常运维）：
-#   安装   curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash
+# 三命令快速参考（安装完成后日常运维）。
+# 安装命令首选下方"一键安装（最新版）"：安装器权威源是 agentrt 仓 main 分支
+# scripts/install.sh（git push 即生效）。release 附件（releases/download/
+# latest/install.sh）只在发版时更新，同版本重发会滞后——且经 curl 管道执行
+# 时无法自举（$0 非文件），故不作为推荐入口，见"兼容入口"。
+#   一键安装（最新版，推荐）:
+#     curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
+#       | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
+#       | bash
 #   更新   airymaxrt update           （--check 仅检查 / --channel stable|beta / --rollback 回滚）
 #   重装   bash install.sh --reinstall
-# 兼容入口（release 附件，latest 指向最新 release；同版本重发可能滞后，
-# 但磁盘副本运行时会自动自举到 git main 最新版，见 installer_self_bootstrap）：
+# 兼容入口（release 附件，latest 指向最新 release；仅在最近发版后短暂可用，
+# 同版本修复重发不更新该附件）：
 #   curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash
+#     # 磁盘副本（下载为文件后 bash install.sh）运行时会自动自举到 git main
+#     # 最新版（见 installer_self_bootstrap）；curl 直接管道则不会。
 #
 # 安装策略（三模式，按可达性自动降级）：
 #   模式 A 二进制：AIRY_RELEASE_URL 指向完全体 tarball（含闭源模块预编译产物），
@@ -614,8 +623,8 @@ install_binary() {
                     log_warn "release 下载失败，重试一次（网络抖动兜底）…"
                     _retry_download=$((_retry_download+1)); continue
                 fi
-                log_err "release 下载失败（已重试）。请检查网络后重新运行："
-                log_err "  curl -fsSL \"https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh\" | bash"
+                log_err "release 下载失败（已重试）。请检查网络后重新运行一键安装："
+                log_err "  curl -fsSL \"https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main\" | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)[\"content\"]))' | bash"
                 return 2
             fi
         fi
