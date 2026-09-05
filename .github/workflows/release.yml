@@ -433,8 +433,6 @@ jobs:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
       STAGE_DIR: stage
-      # E4：vcpkg 二进制缓存（前向斜杠，Windows 兼容解析）
-      VCPKG_BINARY_SOURCES: "clear;files,${{ runner.temp }}/vcpkg-cache,readwrite"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -460,6 +458,10 @@ jobs:
 
       - name: Install build dependencies
         shell: pwsh
+        # E4：vcpkg 二进制缓存。runner.temp 只能在 step 级 env 解析（job 级 env
+        # 无 runner context，GitHub 判整个 workflow 无效——0.1.11 实证）。
+        env:
+          VCPKG_BINARY_SOURCES: "clear;files,${{ runner.temp }}/vcpkg-cache,readwrite"
         run: |
           # vcpkg 包名：curl（非 libcurl）、libmicrohttpd/libwebsockets（带 lib- 前缀）
           vcpkg install sqlite3 cjson libyaml curl openssl zlib libmicrohttpd libwebsockets libevent nghttp2 --triplet x64-windows
