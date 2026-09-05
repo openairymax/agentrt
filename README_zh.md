@@ -22,32 +22,45 @@ AgentRT 是 `airymaxhub` 伞仓下用户态工程大管理仓 `agent-workload` �
 
 ### 一键安装（终端用户）
 
-终端用户一行安装，无需编译。安装器始终选择**最新 release**
-（`releases/download/latest/`），命令永不因版本升级而变动；自动完成
-GPG 验签 + sha256 校验 + 架构自检（x86\_64 / aarch64 / riscv64）：
+终端用户一行安装，无需编译。命令始终拉取 agentrt 仓 **main 分支**的最新
+安装器（git push 即时生效，不存在发版滞后），自动完成 GPG 验签 +
+sha256 校验 + 架构自检（linux-x86-64 / linux-arm-64 / riscv-64 …）：
 
 ```bash
-# Linux / macOS
-curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash
-
-# Windows（atoms/commons 已闭源，原生安装不可用——推荐 WSL2）：
-# wsl --install 安装 WSL2 + Ubuntu，在 WSL 终端执行上方 Linux 一行命令
-powershell -ExecutionPolicy Bypass -Command "irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 | iex"
+# Linux / macOS（需要 curl + python3）
+curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
+  | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
+  | bash
 ```
 
-常用变体：
+> **为什么不推荐 `releases/download/latest/install.sh`？**
+> release 附件只在发版时上传，同版本修复重发不会刷新它；且经 `curl | bash`
+> 管道执行时安装器无法自举到最新版（$0 非文件），可能看到旧版横幅或旧行为。
+> 上面命令始终取 main 分支最新安装器，行为最可预期。下载为文件后再
+> `bash install.sh` 运行时，安装器会自动自举到 main 最新版。
+
+常用变体（把参数追加在 `| bash -s --` 之后）：
 
 ```bash
 # 自定义安装路径（默认 $HOME/.airymaxrt）
-curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | \
-   bash -s -- --prefix "$HOME/.airymaxrt"
+curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
+  | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
+  | bash -s -- --prefix "$HOME/.airymaxrt"
 
 # 测试通道（更激进更新）
-curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash -s -- --channel beta
+curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
+  | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
+  | bash -s -- --channel beta
 
 # 卸载（--keep-data 保留记忆数据）
-curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh" | bash -s -- --uninstall
+curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
+  | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
+  | bash -s -- --uninstall
 ```
+
+> Windows：atoms/commons 已闭源，原生安装不可用——推荐 WSL2（在 WSL 终端
+> 执行上方 Linux 命令）。install.ps1 附件随 release 更新，如需最新安装器请
+> 使用 Linux/macOS 命令。
 
 安装完成后 `airymaxrt` 即入 PATH，`airymaxrt start` 拉起运行时。安装器
 自动按硬件裁剪运行画像（full/minimal），`airymaxrt monitor` 常驻检测外设
