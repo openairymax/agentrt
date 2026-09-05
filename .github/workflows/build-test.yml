@@ -275,10 +275,6 @@ jobs:
     env:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
-      # E4 原生腿依赖缓存（0.1.11）：vcpkg 二进制缓存（classic 模式同样生效）。
-      # 命中缓存直接复用已编译 port；未命中项照常编译并写回，绝对安全。
-      # 路径用前向斜杠（Windows 解析兼容），缓存目录独立于 runner 默认缓存。
-      VCPKG_BINARY_SOURCES: "clear;files,${{ runner.temp }}/vcpkg-cache,readwrite"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -303,6 +299,11 @@ jobs:
 
       - name: Install dependencies (vcpkg)
         shell: pwsh
+        # E4：vcpkg 二进制缓存。runner.temp 只能在 step 级 env 解析（job 级 env
+        # 无 runner context，GitHub 判整个 workflow 无效——0.1.11 实证）。
+        # 命中缓存复用已编译 port；未命中照常编译写回（classic 加性缓存安全）。
+        env:
+          VCPKG_BINARY_SOURCES: "clear;files,${{ runner.temp }}/vcpkg-cache,readwrite"
         run: |
           # vcpkg 包名：curl（port 名为 curl 而非 libcurl）；
           # GNU libmicrohttpd 与 libwebsockets 的 port 名带 lib- 前缀，
