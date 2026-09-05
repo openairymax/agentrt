@@ -26,7 +26,7 @@ on:
         required: false
         default: ''
       platforms:
-        description: '构建平台（逗号分隔：arm64,arm32）'
+        description: '构建平台（逗号分隔：arm64,arm32,amd64）'
         required: true
         default: 'arm64,arm32'
   push:
@@ -40,8 +40,29 @@ permissions:
   packages: write
 
 jobs:
+  # matrix 三腿并行（0.2.x I0 先导，2026-09-05）：arm64/arm32 切 GitHub
+  # 官方原生 ARM64 runner（ubuntu-24.04-arm，public repo 免费 4 vCPU，
+  # 2025-08 GA）。arm64 目标本机构建；arm32（linux/arm/v7）依赖 aarch64
+  # 内核原生执行 AArch32 用户态（CONFIG_COMPAT），不装 QEMU；amd64 维持
+  # ubuntu-latest 本机构建。riscv64 无原生 hosted runner，仍走 QEMU，故
+  # 仓库名/镜像名中 qemu 字样暂保留（0.3.x 评估）。
   build-push:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: arm64
+            runner: ubuntu-24.04-arm
+            docker_platform: linux/arm64
+          - platform: arm32
+            runner: ubuntu-24.04-arm
+            docker_platform: linux/arm/v7
+          - platform: amd64
+            runner: ubuntu-latest
+            docker_platform: linux/amd64
+    # dispatch 时只跑请求的平台（inputs.platforms 逗号分隔）；push 触发全矩阵
+    if: github.event_name == 'push' || contains(format('{0},', inputs.platforms), format('{0},', matrix.platform))
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,19 +76,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: bash .github/scripts/init-submodules.sh tools
 
-      # 参数解析：手动指定 image_tag → 用之；push/留空 → auto-<run_number>。
-      # push 触发时 platforms 固定 arm64,arm32,amd64，自动覆盖新增平台。
-      - name: Resolve build params
+      # 镜像 tag：手动指定 → 用之（钉版）；push/留空 → auto-<run_number>。
+      - name: Resolve image tag
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.image_tag }}" ]; then
             echo "IMAGE_TAG=${{ inputs.image_tag }}" >> "$GITHUB_ENV"
           else
             echo "IMAGE_TAG=auto-${{ github.run_number }}" >> "$GITHUB_ENV"
-          fi
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "PLATFORMS=${{ inputs.platforms }}" >> "$GITHUB_ENV"
-          else
-            echo "PLATFORMS=arm64,arm32,amd64" >> "$GITHUB_ENV"
           fi
 
       - name: Prepare minimal build context
@@ -79,9 +94,6 @@ jobs:
           find ctx -name '*.sh' -exec chmod +x {} \;
           echo "context files: $(find ctx -type f | wc -l)"
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -92,23 +104,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GH_TOKEN }}
 
-      - name: Build & push toolchain images
+      - name: Build & push toolchain image
         env:
           GHCR: ghcr.io/openairymax/agentrt-qemu-toolchain
+          PLATFORM: ${{ matrix.platform }}
+          DK: ${{ matrix.docker_platform }}
         run: |
           set -euo pipefail
-          echo "==> platforms=${PLATFORMS} image_tag=${IMAGE_TAG}"
-          for p in $(echo "$PLATFORMS" | tr ',' ' '); do
-            case "$p" in
-              arm64) dk="linux/arm64" ;;
-              arm32) dk="linux/arm/v7" ;;
-              amd64) dk="linux/amd64" ;;
-              *) echo "::error::未知平台 $p（arm64|arm32|amd64）"; exit 1 ;;
-            esac
-            echo "==> build $p ($dk) → ${GHCR}:${p}-${IMAGE_TAG}"
-            docker buildx build --push --platform "$dk" \
-              --progress=plain \
-              -f .github/docker/qemu-toolchain/ubuntu.Dockerfile \
-              -t "${GHCR}:${p}-${IMAGE_TAG}" \
-              ctx
-          done
+          echo "==> build ${PLATFORM} (${DK}) → ${GHCR}:${PLATFORM}-${IMAGE_TAG}"
+          docker buildx build --push --platform "$DK" \
+            --progress=plain \
+            -f .github/docker/qemu-toolchain/ubuntu.Dockerfile \
+            -t "${GHCR}:${PLATFORM}-${IMAGE_TAG}" \
+            ctx
