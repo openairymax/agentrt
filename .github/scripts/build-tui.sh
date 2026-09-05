@@ -30,6 +30,19 @@ fi
 export AGENTRT_TUI_RUN_STREAM_H="$(pwd)/commons/include/airy_run_stream.h"
 
 export PATH="${HOME}/.cargo/bin:${PATH}"
+
+# cargo 缺失兜底（SSoT，0.1.11 P1）：x86-64 腿切换预构建工具链镜像后不再有
+# 独立 rustup 安装 step，各腿（host/容器）统一在此兜底；失败降级契约同上。
+if ! command -v cargo >/dev/null 2>&1; then
+    echo "[tui] cargo 不在 PATH，安装 rustup（minimal）..."
+    if ! curl --proto '=https' --tlsv1.2 -sSf --retry 3 \
+         https://sh.rustup.rs | sh -s -- -y --profile minimal; then
+        echo "warn: rustup 安装失败，agentrt-tui 跳过（降级，不阻断发布）"
+        exit 0
+    fi
+    export PATH="${HOME}/.cargo/bin:${PATH}"
+fi
+
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${RUNNER_TEMP:-/tmp}/tui-target}"
 
 if ! (cd "$SRC" && cargo build --release); then
