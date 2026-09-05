@@ -38,132 +38,70 @@ jobs:
   # "Container operation is only supported on Linux"）。
   build-linux-x86-64:
     runs-on: ubuntu-latest
-    container: ubuntu:20.04
     env:
-      # BAN-33：agentrt 即源码根，构建目录必须在源码树外（工作区上级目录）
-      BUILD_DIR: ../build
+      # E1 收口推广（0.1.11 P1）：x86-64 腿切预构建工具链镜像，与 arm-64
+      # 腿同模式——host 只做检出/打包，项目构建全在镜像容器内完成。
+      # 切换前实测 10.3min，其中 338s（55%）耗在每轮容器内从零准备依赖
+      # （Install build dependencies 166s + lib-builddeps.sh 172s），项目
+      # 本体编译仅 ~88s；镜像化后预期 ~4min（arm-64 腿同模式实证 1.6min）。
+      # 镜像由 build-toolchain-images.yml 构建并 digest 钉版（Dockerfile
+      # 与本腿原依赖准备同源，glibc 2.31 基线不变）；lib-builddeps.sh /
+      # Dockerfile 变更后需重建镜像并 bump 此处引用（禁浮动 tag）。
+      BUILD_DIR: build
       STAGE_DIR: stage
     steps:
-      # ubuntu:20.04 基础镜像无 git：actions/checkout 会回退到 REST tarball
-      # 下载（工作区无 .git），导致后续 git submodule 报
-      # "fatal: not a git repository"（v0.1.9 Release run 实证）。
-      # 必须在 Checkout 之前于容器内装 git + CA 证书。
-      # 容器步骤以 root 运行而挂载工作区属 uid 1001，submodule init 报
-      # "detected dubious ownership"（v0.1.9 Release run 二次实证）；
-      # 写系统级 safe.directory（/etc/gitconfig）， HOME 无关。
-      - name: Prepare container (git for checkout)
-        run: |
-          apt-get update -qq
-          apt-get install -y -qq --no-install-recommends git ca-certificates
-          git config --system --add safe.directory '*'
-
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: false
           fetch-depth: 1
 
-      # 20.04 基线依赖准备：
-      #   - apt: 构建工具 + 系统库（libcurl/libwebsockets/microhttpd 等）
-      #   - pip: cmake ≥3.20（20.04 自带 3.16 不满足项目最低要求）
-      #   - 源码: cJSON 1.7.18（20.04 的 1.7.10 缺 cJSON_GetNumberValue）
-      #   - 源码: OpenSSL 3.0.17（20.04 的 libssl 1.1.1 头文件触发 AIRY
-      #     poison 编译失败，且 EOL 不再维护）
-      - name: Install build dependencies
-        run: |
-          export DEBIAN_FRONTEND=noninteractive
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            build-essential make perl curl git ca-certificates \
-            python3 python3-pip python3-venv \
-            libsqlite3-dev libyaml-dev libcurl4-openssl-dev \
-            libssl-dev zlib1g-dev libzstd-dev \
-            libmicrohttpd-dev libwebsockets-dev libevent-dev \
-            libnghttp2-dev
-          pip3 install --no-cache-dir "cmake==3.29.6" ninja
-          # Rust 工具链（agentrt-tui 完全体包组件）
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
-          curl -fsSL -o /tmp/cjson.tar.gz \
-            https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.18.tar.gz
-          tar -xzf /tmp/cjson.tar.gz -C /tmp
-          cmake -S /tmp/cJSON-1.7.18 -B /tmp/cjson-build \
-            -DCMAKE_INSTALL_PREFIX=/usr/local \
-            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-            -DENABLE_CJSON_TEST=OFF -DBUILD_SHARED_LIBS=ON
-          cmake --build /tmp/cjson-build --parallel
-          cmake --install /tmp/cjson-build
-          curl -fsSL -o /tmp/openssl.tar.gz \
-            https://github.com/openssl/openssl/releases/download/openssl-3.0.17/openssl-3.0.17.tar.gz
-          tar -xzf /tmp/openssl.tar.gz -C /tmp
-          (cd /tmp/openssl-3.0.17 && ./config --prefix=/usr/local \
-            --openssldir=/usr/local/ssl shared && \
-            make -j"$(nproc)" build_sw && make install_sw)
-
       # 定向子模块检出（agent-workload 构建源 + tools 脚本）：不用
       # submodules:true —— 全量递归会拉 agent-linux/kernel（~2.5GB，构建
       # 用不到），且闭源子模块在 GitHub 不存在会使 checkout 整体失败。
-      # 依赖上一步 apt 安装的 git，故置于依赖准备之后。
       - name: Init submodules (agent-workload, tools)
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: bash .github/scripts/init-submodules.sh agent-workload tools
 
-      # 0.1.6f：依赖自编译统一收敛到 lib-builddeps.sh（SSoT，与本地
-      # build.sh 同源）——自编译 OpenSSL 3.0.17 + libcurl 8.5.0 +
-      # libwebsockets 4.3.3，统一 libssl.so.3 链路，根治宿主缺
-      # libssl.so.1.1 崩溃（apt 预编译库链接 1.1.1 双 OpenSSL ABI）。
-      - name: Build self-compiled deps (curl/lws/openssl SSoT)
+      # 容器内完成 Configure→Build→Install→TUI→finalize 全链。
+      # BUILD_DIR 在容器内覆盖为 /tmp/airy-build（BAN-33：构建目录必须在
+      # 源码树外；host 侧 BUILD_DIR 仅保持变量形态，实际不使用）。
+      # 完全体 finalize 在容器内执行：host 无 /usr/local 自编译库，host 侧
+      # ldd 收集必 not found（对齐 arm-64 腿；.collected 不入包）。
+      - name: Build in x86-64 container
         run: |
-          bash _tools/scripts/ci/release/lib-builddeps.sh
-
-      - name: Configure
-        run: |
-          cmake -S . -B ${{ env.BUILD_DIR }} \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTS=OFF \
-            -DENABLE_SANITIZERS=OFF \
-            -DAIRY_BUILD_ALL=ON \
-            -DOPENSSL_ROOT_DIR=/usr/local -DCMAKE_PREFIX_PATH=/usr/local \
-            -DCMAKE_INSTALL_PREFIX="${{ env.STAGE_DIR }}"
-
-      - name: Build
-        run: |
-          cmake --build ${{ env.BUILD_DIR }} --config Release --parallel
-
-      - name: Install (aggregate bin/)
-        run: |
-          cmake --install ${{ env.BUILD_DIR }} --config Release
-
-      # install.sh 二进制模式依赖 bin/agentrt-bootstrap.sh（daemon 编排脚本），
-      # 但其位于 tools 子仓（原 devtools，非 agentrt 树），cmake --install 不会带入，
-      # 必须在此显式部署，否则二进制安装后 daemon 无法一键启动编排。
-      - name: Deploy bootstrap script
-        run: |
-          if [ -f "_tools/scripts/ops/bin/agentrt-bootstrap.sh" ]; then
-            cp -f "_tools/scripts/ops/bin/agentrt-bootstrap.sh" "${{ env.STAGE_DIR }}/bin/agentrt-bootstrap.sh"
-            chmod 755 "${{ env.STAGE_DIR }}/bin/agentrt-bootstrap.sh"
-          fi
-
-      # 完全体包完整性（对齐 _tools/scripts/ci/release/package-full-release.sh 的
-      # build_full_package 内容，单一清单防漂移）：
-      #   bin/agentrt-tui（Rust TUI）+ lib/（Python 运行时依赖）
-      # CARGO_TARGET_DIR 指向 RUNNER_TEMP，禁止在源码树落盘（铁律 4.7）。
-      # TUI 构建失败仅告警降级，不阻断发布（闭源/工具链缺省容错同哲学）。
-      # build-linux-x86-64 用 container ubuntu:20.04，run 默认 shell 为 dash：
-      # `source` 非 POSIX 内建会静默失败导致 cargo 丢失（exit 127），
-      # 统一改 PATH 注入；构建命令加 if ! 守卫兑现降级契约。
-      - name: Build TUI + copy Python runtime
-        run: |
-          # TUI 构建收敛共享脚本（airymax header 注入 + cargo + 部署，见
-          # .github/scripts/build-tui.sh；v0.1.10 run_stream header 缺失回归）
-          bash .github/scripts/build-tui.sh agent-workload/sdk/tui "${{ env.STAGE_DIR }}/bin"
-          mkdir -p "${{ env.STAGE_DIR }}/lib"
-          for p in agent-workload/ecosystem/agents/airymax_agents \
-                   agent-workload/ecosystem/agents/airymax_agents_rs \
-                   agent-workload/ecosystem/agents/orchestration \
-                   agent-workload/sdk/sdk-python/agentrt; do
-            [ -d "$p" ] && cp -r "$p" "${{ env.STAGE_DIR }}/lib/" || true
-          done
+          docker run --rm --platform linux/amd64 \
+            -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage \
+            -v "$PWD":/src -w /src \
+            ghcr.io/openairymax/agentrt-qemu-toolchain:amd64-20260905-1@sha256:c260fc5c48c66b6ba7082d488a8da9502b80f63ef494abc7288a1ad003550ff6 \
+            bash -c '
+            # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）
+            set -euo pipefail
+            exec > >(tee /src/container-x86-64.log) 2>&1
+            trap '"'"'echo "::error::[x86-64] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-x86-64.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
+            export DEBIAN_FRONTEND=noninteractive
+            export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+            cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release \
+              -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF -DAIRY_BUILD_ALL=ON \
+              -DOPENSSL_ROOT_DIR=/usr/local -DCMAKE_PREFIX_PATH=/usr/local \
+              -DCMAKE_INSTALL_PREFIX="$PWD/$STAGE_DIR"
+            cmake --build "$BUILD_DIR" -j"$(nproc)"
+            cmake --install "$BUILD_DIR"
+            # Rust TUI（SSoT：build-tui.sh 收敛 header 注入 + cargo 缺失兜底
+            # + 失败降级不阻断；CARGO_TARGET_DIR 指向容器 /tmp，禁止落源码树）
+            bash /src/.github/scripts/build-tui.sh agent-workload/sdk/tui "$STAGE_DIR/bin"
+            # Python 运行时依赖（完全体包 lib/）
+            mkdir -p "$STAGE_DIR/lib"
+            for p in agent-workload/ecosystem/agents/airymax_agents \
+                     agent-workload/ecosystem/agents/airymax_agents_rs \
+                     agent-workload/ecosystem/agents/orchestration \
+                     agent-workload/sdk/sdk-python/agentrt; do
+              [ -d "$p" ] && cp -r "$p" "$STAGE_DIR/lib/" || true
+            done
+            # 完全体 finalize：容器内收集运行时 .so + fail-closed 校验
+            bash /src/.github/scripts/finalize-linux-libs.sh "$STAGE_DIR" /src/_tools
+            '
 
       # 打包：包内建 agentrt-<version> 顶层目录。install.sh 二进制模式按
       # agentrt-* 目录名匹配解压位置，无顶层目录时二进制安装 100% 失败。
@@ -179,9 +117,11 @@ jobs:
           cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
           cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
-          # 完全体 finalize：运行时 .so 收集 + fail-closed 校验（共享 bash 脚本；
-          # container job run 默认 dash 无法解析 lib-package.sh bash 函数库）
-          bash .github/scripts/finalize-linux-libs.sh "${PKG_DIR}" _tools
+          # install.sh 二进制模式依赖 bin/agentrt-bootstrap.sh（daemon 编排
+          # 脚本，位于 tools 子仓，cmake --install 不会带入），host 侧显式部署
+          cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
+          # 运行时 .so 收集/校验已在构建容器内由 finalize-linux-libs.sh 完成
+          #（host 无容器 /usr/local 自编译库，ldd 收集必 not found）
           # 平台命名规范（0.1.10 起）：OS-架构族-位宽，如 linux-x86-64。
           # 包标记 platform-<后缀>（x86-64 等）与更新器/安装器 plat_name()
           # 同口径校验；勿回退 uname 原始名（platform-x86_64 会触发
