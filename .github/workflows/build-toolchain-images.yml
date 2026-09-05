@@ -7,13 +7,19 @@ name: Build QEMU Toolchain Images
 #   - workflow_dispatch（手动）：platforms/image_tag 由输入指定；
 #     image_tag 留空 = auto-<run_number>（一次性 tag，与钉版 tag 并存）。
 #   - push 到 main 且改动 .github/docker/** 或本 workflow：platforms 固定
-#     arm64,arm32,amd64，tag 用 auto-<run_number>——自动重建不覆盖已有钉版
-#     tag，release.yml 仍引用钉版 tag（确认新镜像后把具体 tag/digest 同步过去）。
+#     arm64,arm32,amd64,i386，tag 用 auto-<run_number>——自动重建不覆盖已有
+#     钉版 tag，release.yml 仍引用钉版 tag（确认新镜像后把具体 tag/digest
+#     同步过去）。
 #
 # amd64（0.1.11 P1 流水线提速）：E1 模式推广。release.yml build-linux-x86-64
 # 腿实测 10.3min 中 338s（55%）耗在每轮容器内从零自编译 deps（Install
 # build dependencies 166s + lib-builddeps.sh 172s，与 qemu 腿同病）；切预
 # 构建镜像后仅剩项目编译 ~88s + TUI + 打包（arm-64 腿同模式实证 1.6min）。
+#
+# i386（0.1.12 I1 流水线提速）：x86-32 腿同模式收口。linux/386 容器在
+# x86_64 hosted runner 上经内核 IA32 兼容（CONFIG_IA32_EMULATION）原生
+# 执行，零 QEMU——基座用 debian:bullseye-20240812-slim（ubuntu:20.04 无
+# i386 清单，v0.1.9 实证），snapshot apt 源配方见 debian-i386.Dockerfile。
 #
 # 镜像 tag 钉版语义：lib-builddeps.sh / Dockerfile 变更后需重建并 bump 引用，
 # 禁止浮动 tag 被 release.yml 引用。
@@ -26,7 +32,7 @@ on:
         required: false
         default: ''
       platforms:
-        description: '构建平台（逗号分隔：arm64,arm32,amd64）'
+        description: '构建平台（逗号分隔：arm64,arm32,amd64,i386）'
         required: true
         default: 'arm64,arm32'
   push:
@@ -40,12 +46,15 @@ permissions:
   packages: write
 
 jobs:
-  # matrix 三腿并行（0.2.x I0 先导，2026-09-05）：arm64/arm32 切 GitHub
-  # 官方原生 ARM64 runner（ubuntu-24.04-arm，public repo 免费 4 vCPU，
-  # 2025-08 GA）。arm64 目标本机构建；arm32（linux/arm/v7）依赖 aarch64
-  # 内核原生执行 AArch32 用户态（CONFIG_COMPAT），不装 QEMU；amd64 维持
-  # ubuntu-latest 本机构建。riscv64 无原生 hosted runner，仍走 QEMU，故
-  # 仓库名/镜像名中 qemu 字样暂保留（0.3.x 评估）。
+  # matrix 四腿并行（0.2.x I0 先导 + 0.1.12 I1，2026-09-06）：arm64/arm32
+  # 切 GitHub 官方原生 ARM64 runner（ubuntu-24.04-arm，public repo 免费
+  # 4 vCPU，2025-08 GA）。arm64 目标本机构建；arm32（linux/arm/v7）依赖
+  # aarch64 内核原生执行 AArch32 用户态（CONFIG_COMPAT），不装 QEMU；
+  # amd64/i386 维持 ubuntu-latest 本机构建——linux/386 经 x86_64 内核
+  # IA32 兼容（CONFIG_IA32_EMULATION）原生执行，同样零 QEMU。i386 基座
+  # 用 debian-i386.Dockerfile（ubuntu:20.04 无 i386 清单）。riscv64 无
+  # 原生 hosted runner，仍走 QEMU，故仓库名/镜像名中 qemu 字样暂保留
+  #（0.3.x 评估）。
   build-push:
     strategy:
       fail-fast: false
@@ -54,12 +63,19 @@ jobs:
           - platform: arm64
             runner: ubuntu-24.04-arm
             docker_platform: linux/arm64
+            dockerfile: ubuntu.Dockerfile
           - platform: arm32
             runner: ubuntu-24.04-arm
             docker_platform: linux/arm/v7
+            dockerfile: ubuntu.Dockerfile
           - platform: amd64
             runner: ubuntu-latest
             docker_platform: linux/amd64
+            dockerfile: ubuntu.Dockerfile
+          - platform: i386
+            runner: ubuntu-latest
+            docker_platform: linux/386
+            dockerfile: debian-i386.Dockerfile
     # dispatch 平台过滤不能用 job 级 if（matrix context 在 job if 中不可
     # 用，workflow 解析直接失败，run 10 实证）；改为首 step 计算 filter，
     # 各 step 按其输出短路——未选中平台零副作用快速退出。
@@ -134,6 +150,6 @@ jobs:
           echo "==> build ${PLATFORM} (${DK}) → ${GHCR}:${PLATFORM}-${IMAGE_TAG}"
           docker buildx build --push --platform "$DK" \
             --progress=plain \
-            -f .github/docker/qemu-toolchain/ubuntu.Dockerfile \
+            -f ".github/docker/qemu-toolchain/${{ matrix.dockerfile }}" \
             -t "${GHCR}:${PLATFORM}-${IMAGE_TAG}" \
             ctx
