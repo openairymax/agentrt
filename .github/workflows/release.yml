@@ -14,6 +14,13 @@ on:
 permissions:
   contents: write
 
+# E2（0.1.11）：同 tag 并发单飞——force-move/重跑同 tag 时自动取消旧 run，
+# 避免同名 tag 双矩阵占 runner（不同 tag 互不阻塞）。v0.1.10 实测同一 tag
+# 短时多 run 会重复占用 qemu/mac runner 加剧排队。
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 # 版本号 SSoT：tag 推送 → github.ref_name（如 v0.1.5）；workflow_dispatch →
 # inputs.version 合成 v 前缀。全流程统一引用 env.VERSION，修复：
 #   - 问题 4：workflow_dispatch 手动触发时 github.ref_name 为分支名而非 tag
