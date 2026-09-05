@@ -1070,11 +1070,14 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends gnupg
+          # cosign 钉版 v2.6.5（与本机发布台一致，SSoT）：latest（≥2.7）已
+          # 强制 --new-bundle-format，废弃 --output-signature 导致
+          # "must specify --bundle" 发布失败（v0.1.10 同版本重发实证）。
           curl -fsSLo /tmp/cosign \
-            https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
+            https://github.com/sigstore/cosign/releases/download/v2.6.5/cosign-linux-amd64
           chmod +x /tmp/cosign
           sudo mv /tmp/cosign /usr/local/bin/cosign
-          cosign version
+          cosign version | grep -i gitversion
 
       - name: Download release-dist
         uses: actions/download-artifact@v4
