@@ -323,11 +323,15 @@ jobs:
   # 远排队不分配 runner）。Intel runner 的 brew prefix 为 /usr/local，
   # Configure 步骤一律 $(brew --prefix) 动态解析，无需区分 prefix。
   build-macos-x86-64:
-    # E3：macos-15-intel 为稀缺 runner 型（macos-13 退役后官方替代），与
-    # macos-latest 腿同走 ci-macos-runner-bus 公平串行，避免 release 与
-    # build-test 同时跑把 intel mac 配额排队拖长（0.1.10 曾 80min 排队实证）。
+    # E3 修正（0.1.11，2026-09-05 实证）：macos-15-intel 与 macos-latest 分属
+    # 不同物理 runner 池，无配额争抢。原与 build-macos-arm-64 共挤
+    # ci-macos-runner-bus 触发 GitHub job 级 concurrency 同组互顶（后到 job
+    # 取消先到 pending），dispatch run 实证 macos-x86-64 0 秒 cancelled。
+    # 现用独立 intel 组（仅同一 run 内自洽），不复用 arm/latest 队列。
+    # build-test macos-build（macos-latest）与 build-macos-arm-64 仍共享
+    # ci-macos-runner-bus。
     concurrency:
-      group: ci-macos-runner-bus
+      group: ci-macos-intel-runner-bus
       cancel-in-progress: false
     runs-on: macos-15-intel
     env:
