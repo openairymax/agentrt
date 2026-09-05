@@ -891,12 +891,14 @@ jobs:
           path: agentrt-${{ env.VERSION }}-${{ matrix.artifact }}.tar.gz*
           if-no-files-found: error
 
-  # 汇聚门禁平台制品 → 聚合为 release-dist 附件，供 MCP/本地发布（发布已
-  # 移出 GitHub runner）。cosign+GPG+manifest+atomgit 上传统一由
-  # _tools/scripts/ci/release/publish-release.sh 在本地执行（私钥位于
-  # ~/.airymaxrt-signing/，ATOMGIT_TOKEN 直连）。根因（v0.1.9 R16 实证）：
-  # runner(美东) → atomgit/OBS 上传 ~20MB 需 ~15min，撞 PUT --max-time 900
-  # 被掐断而发布失败；且 runner 需常驻 5 类发布 secret、失败日志 403 难排障。
+  # 汇聚门禁平台制品 → 聚合为 release-dist 附件：既作为下方 publish job 的
+  # 发布源，也作为审计/紧急 fallback 归档留存（release 附件 90 天）。
+  # cosign+GPG+manifest+atomgit 上传统一由 _tools/scripts/ci/release/
+  # publish-release.sh 执行。0.1.11（D0/D1/D2）：发布全链迁入下方 publish
+  # job，签名私钥存 release Environment secrets，需维护者人工 Approve 后才
+  # 执行签名上传；本机发布路径降级为紧急 fallback。历史根因（v0.1.9 R16
+  # 实证：runner 美东→atomgit/OBS 上传 ~20MB 需 ~15min 撞 900s 超时被掐断）
+  # 已由脚本 --max-time 3600 + 3 并发 + 上传完整性校验根治。
   release:
     # build-windows-x86-64 / build-linux-riscv-64 已按 dispatch-only 门控
     #（见各自 if），不在 needs；门禁 = 已实证全绿的 Linux x86-64 / macOS
@@ -959,10 +961,79 @@ jobs:
           cp -f scripts/install.ps1 dist/ 2>/dev/null || true
           echo "发布交接包就绪: $(ls dist | wc -l) 个文件"
 
-      - name: Upload release-dist (for local/MCP atomgit publish)
+      - name: Upload release-dist (for audit / emergency fallback)
         uses: actions/upload-artifact@v4
         with:
           name: agentrt-${{ env.VERSION }}-release-dist
           path: dist/*
           if-no-files-found: error
           retention-days: 90
+
+  # 发布全链（0.1.11 D0/D1/D2）：cosign 签名制品 + GPG 签名 manifest +
+  # manifest 生成（含 gen1~gen3 平台别名）+ 上传 atomgit release +
+  # push latest/ 固定入口，全部在本 job 内完成，零本机操作。
+  # 密钥与令牌来自受保护 Environment 'release' secrets（仅 refs/tags/v*
+  # 可引用；需维护者 Approve 后本 job 才执行，审批即发布安全阀）。
+  # 紧急 fallback：下载 release-dist 附件后本地执行
+  #   _tools/scripts/ci/release/publish-release.sh <ver> <dist_dir>
+  # （本机保留 A1 所述私钥副本）。
+  publish:
+    needs: [release]
+    if: success() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+    env:
+      COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+      COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
+      ATOMGIT_REPO: openairymax/agentrt
+      # runner 布局与本地伞仓不同（agentrt 即工作树根，scripts/ 在根下），
+      # 显式指定安装器 SSoT；AIRY_LAUNCHER_SRC 默认已指向
+      # agent-workload/sdk/tui/scripts/airymaxrt（init-submodules 补齐）。
+      AIRY_INSTALLER_SRC: ${{ github.workspace }}/scripts/install.sh
+      AIRY_INSTALLER_PS1_SRC: ${{ github.workspace }}/scripts/install.ps1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      # _tools（发布脚本）+ agent-workload/sdk（更新器 airymaxrt 源）由
+      # init-submodules.sh 补齐（tools 克隆到 _tools/，与本地伞仓 tools/ 区别）。
+      - name: Init submodules (tools, sdk)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh tools
+
+      - name: Install gpg + cosign
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends gnupg
+          curl -fsSLo /tmp/cosign \
+            https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
+          chmod +x /tmp/cosign
+          sudo mv /tmp/cosign /usr/local/bin/cosign
+          cosign version
+
+      - name: Download release-dist
+        uses: actions/download-artifact@v4
+        with:
+          name: agentrt-${{ env.VERSION }}-release-dist
+          path: dist
+
+      - name: Publish to atomgit (sign + manifest + upload + latest/)
+        run: |
+          test -n "$(ls dist/agentrt-${{ env.VERSION }}-*.tar.gz 2>/dev/null)" || {
+            echo "::error::release-dist 无 tar.gz 制品，中止发布"; exit 1
+          }
+          # 发布前对聚合制品做一遍 sha256 复核（发布预检仍在脚本内再次执行）
+          for f in dist/agentrt-${{ env.VERSION }}-*.tar.gz.sha256; do
+            (cd dist && sha256sum -c "$(basename "$f")") || { echo "::error::sha256 复核失败: $f"; exit 1; }
+          done
+          bash _tools/scripts/ci/release/publish-release.sh "${{ env.VERSION }}" dist
+
