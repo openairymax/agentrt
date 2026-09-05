@@ -157,7 +157,7 @@ fi
 # 版本默认占位（仅 curl 管道/裸脚本且最终解析全部失败时兜底；banner 已不再
 # 展示该值——真实版本一律以 manifest/包内 VERSION/制品名为准，杜绝漂移误导。
 # 保持与当前最新发布一致，随发布节奏更新）。
-AIRY_VERSION="${AIRY_VERSION:-v0.1.10}"
+AIRY_VERSION="${AIRY_VERSION:-v0.1.11}"
 AIRY_BUILD_JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 AIRY_MODE="${AIRY_MODE:-auto}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
