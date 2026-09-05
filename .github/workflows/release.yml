@@ -747,9 +747,10 @@ jobs:
           path: agentrt-${{ env.VERSION }}-linux-arm-64.tar.gz*
           if-no-files-found: error
 
-  # 32 位 Linux（x86-32 / arm-32）：六架构兼容决策（2026-08-30）补全 32
-  # 位构建门禁。经 Docker buildx + qemu 多架构容器构建，统一 glibc 2.31
-  # 基线；覆盖老 x86 与 32 位 ARM 用户空间——64 位内核 + 32 位用户态场景。
+  # 32 位 Linux（x86-32 gate / arm-32 experimental 独立腿）：六架构兼容
+  # 决策（2026-08-30）补全 32 位构建门禁。经 Docker buildx + qemu 多架构
+  # 容器构建，统一 glibc 2.31 基线；覆盖老 x86 与 32 位 ARM 用户空间——
+  # 64 位内核 + 32 位用户态场景。
   # 镜像按架构分选：ubuntu:20.04 官方镜像无 linux/386 清单（v0.1.9
   # Release run 实证 "no matching manifest for linux/386"），x86-32 改用
   # debian:bullseye-20240812-slim（glibc 2.31 与 focal 同基线，有 i386
@@ -761,35 +762,16 @@ jobs:
   # TUI 在 32 位 qemu 模拟下 rustc 极慢且易超时，本作业降级跳过
   # （C/C++ 核心编译门禁仍完整），agentrt-tui 32 位制品由本地构建台
   # build.sh 交叉产物覆盖（tools/scripts/ci/release/build.sh）。
+  # 矩阵解耦（0.1.11 E6，2026-09-05）：arm-32 experimental 不再与本矩阵
+  # 同组。此前 release.needs 依赖整个矩阵，arm-32 单腿 QEMU 50min+ 未完，
+  # release/publish（含审批）就始终不出现（v0.1.10 同版本重发 run 实证，
+  # 用户问"还在进度中？为什么这么慢"）。拆分后本 job 仅 x86-32 一项
+  #（已实证门禁架构），arm-32 独立为下方 build-linux-arm-32 job（experimental，
+  # 不阻塞 release）；arm-32 若先于 release 完成则其制品被 Download all
+  # artifacts 并入发布，否则缺省补发（先发后修契约不变）。
   build-linux-32:
     runs-on: ubuntu-latest
-    strategy:
-      # 矩阵项相互独立：任一失败不再取消另一架构（v0.1.9 run #7 实证：
-      # x86-32 失败导致 arm-32 被 fail-fast 取消，白白丢失一次构建信号）。
-      fail-fast: false
-      matrix:
-        include:
-          - name: x86-32
-            platform: linux/386
-            # 钉版至 LTS 前日期（2024-08-12），base 与 snapshot 源版本一致
-            image: debian:bullseye-20240812-slim
-            # 平台命名规范：包内架构标记用 platform-<plat>（见 Package 步骤）
-            plat: x86-32
-            artifact: linux-x86-32
-            # 门禁架构：x86-32 已修复（openssl linux-generic32），阻断发布
-            experimental: false
-          - name: arm-32
-            platform: linux/arm/v7
-            image: ubuntu:20.04
-            plat: arm-32
-            artifact: linux-arm-32
-            # 先发后修（2026-09-03，同 Windows 决策）：arm-32 qemu 的 cmake
-            # 供给仍在收敛（Kitware APT armhf 验证中），暂不阻断发布，
-            # linux-arm-32 制品随后补发；修好后置回 experimental: false。
-            experimental: true
-    # continue-on-error：experimental=true 的矩阵项失败不使整个 job 失败，
-    # release.needs 仍列本 job，其余架构产物照常汇聚发布。
-    continue-on-error: ${{ matrix.experimental }}
+    continue-on-error: false
     env:
       BUILD_DIR: build
       STAGE_DIR: stage
@@ -813,18 +795,18 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Build in ${{ matrix.name }} container
+      - name: Build in x86-32 container
         run: |
-          docker run --rm --platform ${{ matrix.platform }} \
+          docker run --rm --platform linux/386 \
             -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage -e AIRY_JOBS \
-            -v "$PWD":/src -w /src ${{ matrix.image }} bash -c '
+            -v "$PWD":/src -w /src debian:bullseye-20240812-slim bash -c '
             # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）。
             # 诊断通道：stdout 全程 tee 到 /src/container-*.log（宿主工作区），
             # ERR trap 把失败命令与日志尾部以 ::error:: 上报——annotation 经
             # GitHub API 匿名可读，无需 admin 下载日志即可定位失败。
             set -euo pipefail
-            exec > >(tee /src/container-${{ matrix.name }}.log) 2>&1
-            trap '"'"'echo "::error::[${{ matrix.name }}] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-${{ matrix.name }}.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
+            exec > >(tee /src/container-x86-32.log) 2>&1
+            trap '"'"'echo "::error::[x86-32] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-x86-32.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
             export DEBIAN_FRONTEND=noninteractive
             # debian:bullseye 已全面 EOL（标准 2024-08 / LTS 2026-08-31）。
             # 0.1.10 实证链：deb.debian.org 已删 bullseye(-security)（404
@@ -864,7 +846,7 @@ jobs:
               -DCMAKE_INSTALL_PREFIX="$PWD/$STAGE_DIR"
             cmake --build "$BUILD_DIR" -j"${AIRY_JOBS:-$(nproc)}"
             cmake --install "$BUILD_DIR"
-            echo "warn: ${{ matrix.name }} TUI 交叉构建在 qemu 模拟下跳过（由本地构建台产物覆盖）"
+            echo "warn: x86-32 TUI 交叉构建在 qemu 模拟下跳过（由本地构建台产物覆盖）"
             mkdir -p "$STAGE_DIR/lib"
             for p in agent-workload/ecosystem/agents/airymax_agents \
                      agent-workload/ecosystem/agents/airymax_agents_rs \
@@ -887,8 +869,8 @@ jobs:
           cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
           cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
           # 0.1.6e 起制品标记统一为数字平台名；更新器/安装器 plat_name() 校验
-          touch "${PKG_DIR}/platform-${{ matrix.plat }}"
-          ARTIFACT="agentrt-${VERSION}-${{ matrix.artifact }}"
+          touch "${PKG_DIR}/platform-x86-32"
+          ARTIFACT="agentrt-${VERSION}-linux-x86-32"
           tar -czf "${ARTIFACT}.tar.gz" -C pkg .
           sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
           echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
@@ -896,8 +878,106 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: agentrt-${{ env.VERSION }}-${{ matrix.artifact }}
-          path: agentrt-${{ env.VERSION }}-${{ matrix.artifact }}.tar.gz*
+          name: agentrt-${{ env.VERSION }}-linux-x86-32
+          path: agentrt-${{ env.VERSION }}-linux-x86-32.tar.gz*
+          if-no-files-found: error
+
+  # arm-32 (linux-arm-32) experimental 独立腿：0.1.11 E6 矩阵解耦产物。
+  # 与 x86-32 解耦原因见 build-linux-32 头注（QEMU 单腿 50min+ 曾整体阻塞
+  # release/publish 审批）。本 job 继续先发后修契约（2026-09-03 决策）：
+  #   - continue-on-error: true：失败不使 run 失败（发布门禁不依赖本腿）
+  #   - release.needs 不含本 job：release 聚合不等本腿；若本腿先完成，
+  #     Download all artifacts 会并入其制品，否则该制品缺省随后补发
+  #   - 修好 cmake armhf 供给后置回门禁（experimental: false + 移入 needs）
+  # 构建走 QEMU linux/arm/v7 + ubuntu:20.04（glibc 2.31 基线，arm-32 设备
+  # 用户空间）。AIRY_JOBS=2 限并行防 32 位 OOM。
+  build-linux-arm-32:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      BUILD_DIR: build
+      STAGE_DIR: stage
+      AIRY_JOBS: 2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      # 宿主机完成定向检出后再 docker run（-v "$PWD":/src 挂载需含
+      # agent-workload/ 与 tools/）
+      - name: Init submodules (agent-workload, tools)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh agent-workload tools
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build in arm-32 container
+        run: |
+          docker run --rm --platform linux/arm/v7 \
+            -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage -e AIRY_JOBS \
+            -v "$PWD":/src -w /src ubuntu:20.04 bash -c '
+            # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）。
+            # 诊断通道：stdout 全程 tee 到 /src/container-*.log（宿主工作区），
+            # ERR trap 把失败命令与日志尾部以 ::error:: 上报——annotation 经
+            # GitHub API 匿名可读，无需 admin 下载日志即可定位失败。
+            set -euo pipefail
+            exec > >(tee /src/container-arm-32.log) 2>&1
+            trap '"'"'echo "::error::[arm-32] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-arm-32.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -qq
+            apt-get install -y -qq \
+              build-essential make perl curl python3 python3-pip python3-venv \
+              libsqlite3-dev libyaml-dev libcurl4-openssl-dev \
+              libssl-dev zlib1g-dev libzstd-dev libmicrohttpd-dev \
+              libwebsockets-dev libevent-dev libnghttp2-dev
+            # 0.1.6f SSoT：cmake/cJSON/OpenSSL/libcurl/libwebsockets 自编译
+            # 收敛到 lib-builddeps.sh（与本地 build.sh / 其他 Linux job
+            # 同源，幂等 + 离线 deps 缓存优先）。统一 libssl.so.3 链路。
+            bash /src/_tools/scripts/ci/release/lib-builddeps.sh
+            export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+            cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release \
+              -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF -DAIRY_BUILD_ALL=ON \
+              -DOPENSSL_ROOT_DIR=/usr/local -DCMAKE_PREFIX_PATH=/usr/local \
+              -DCMAKE_INSTALL_PREFIX="$PWD/$STAGE_DIR"
+            cmake --build "$BUILD_DIR" -j"${AIRY_JOBS:-$(nproc)}"
+            cmake --install "$BUILD_DIR"
+            echo "warn: arm-32 TUI 交叉构建在 qemu 模拟下跳过（由本地构建台产物覆盖）"
+            mkdir -p "$STAGE_DIR/lib"
+            for p in agent-workload/ecosystem/agents/airymax_agents \
+                     agent-workload/ecosystem/agents/airymax_agents_rs \
+                     agent-workload/ecosystem/agents/orchestration \
+                     agent-workload/sdk/sdk-python/agentrt; do
+              [ -d "$p" ] && cp -r "$p" "$STAGE_DIR/lib/" || true
+            done
+            '
+
+      - name: Package (tar.gz)
+        run: |
+          VERSION="${{ env.VERSION }}"; VERSION_NUM="${VERSION#v}"
+          PKG_DIR="pkg/agentrt-${VERSION_NUM}"
+          mkdir -p "${PKG_DIR}/config" "${PKG_DIR}/modules"
+          cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/" 2>/dev/null || true
+          cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+          cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
+          cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
+          touch "${PKG_DIR}/platform-arm-32"
+          ARTIFACT="agentrt-${VERSION}-linux-arm-32"
+          tar -czf "${ARTIFACT}.tar.gz" -C pkg .
+          sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
+          echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentrt-${{ env.VERSION }}-linux-arm-32
+          path: agentrt-${{ env.VERSION }}-linux-arm-32.tar.gz*
           if-no-files-found: error
 
   # 汇聚门禁平台制品 → 聚合为 release-dist 附件：既作为下方 publish job 的
@@ -910,8 +990,11 @@ jobs:
   # 已由脚本 --max-time 3600 + 3 并发 + 上传完整性校验根治。
   release:
     # build-windows-x86-64 / build-linux-riscv-64 已按 dispatch-only 门控
-    #（见各自 if），不在 needs；门禁 = 已实证全绿的 Linux x86-64 / macOS
-    # arm-64 / macOS x86-64 / Linux arm-64 / Linux 32（x86-32）五平台。
+    #（见各自 if），不在 needs；arm-32 为 experimental 独立腿（0.1.11 E6
+    # 矩阵解耦，见 build-linux-arm-32 job），亦不在 needs——不阻塞 release，
+    # 其制品若先完成由 Download all artifacts 并入，否则随后补发。门禁 =
+    # 已实证全绿的 Linux x86-64 / macOS arm-64 / macOS x86-64 / Linux
+    # arm-64 / Linux 32（x86-32）五平台。
     needs: [build-linux-x86-64, build-macos-arm-64, build-macos-x86-64, build-linux-arm-64, build-linux-32]
     runs-on: ubuntu-latest
     # tag 推送或手动 dispatch（手动时版本来自 inputs.version）皆可触发
