@@ -736,8 +736,12 @@ jobs:
   # 基线；覆盖老 x86 与 32 位 ARM 用户空间——64 位内核 + 32 位用户态场景。
   # 镜像按架构分选：ubuntu:20.04 官方镜像无 linux/386 清单（v0.1.9
   # Release run 实证 "no matching manifest for linux/386"），i686 改用
-  # debian:bullseye（glibc 2.31 与 focal 同基线，有 i386 清单）；
-  # armv7l 维持 ubuntu:20.04（有 linux/arm/v7 清单）。
+  # debian:bullseye-20240812-slim（glibc 2.31 与 focal 同基线，有 i386
+  # 清单）。bullseye 已全面 EOL（标准 2024-08 / LTS 2026-08-31），浮动
+  # debian:bullseye 的 LTS 重建与 archive 仅折叠 LTS 运行时（-dev 不随更）
+  # 形成不可解依赖（0.1.10 Release 实证），故：镜像钉版至 LTS 前日期 +
+  # apt 源改 snapshot.debian.org 同时间戳（2024-08-12），运行时与 -dev
+  # 版本一致，可复现（对齐 0.2.0 方案 C1）。armv7l 维持 ubuntu:20.04。
   # TUI 在 32 位 qemu 模拟下 rustc 极慢且易超时，本作业降级跳过
   # （C/C++ 核心编译门禁仍完整），agentrt-tui 32 位制品由本地构建台
   # build.sh i686|armv7l 交叉产物覆盖（_tools/scripts/ci/release/build.sh）。
@@ -751,7 +755,8 @@ jobs:
         include:
           - name: i686
             platform: linux/386
-            image: debian:bullseye
+            # 钉版至 LTS 前日期（2024-08-12），base 与 snapshot 源版本一致
+            image: debian:bullseye-20240812-slim
             # 0.1.6e 起包内架构标记用数字平台名（platform-<plat>，见 Package 步骤）
             plat: x86
             artifact: linux-x86
@@ -805,27 +810,29 @@ jobs:
             exec > >(tee /src/container-${{ matrix.name }}.log) 2>&1
             trap '"'"'echo "::error::[${{ matrix.name }}] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-${{ matrix.name }}.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
             export DEBIAN_FRONTEND=noninteractive
-            # debian:bullseye 已全面 EOL（标准 2024-08 / LTS 2026-08-31）：
-            # deb.debian.org 已删 bullseye(-security)（404 实证 rc=100），
-            # 且 archive.debian.org/debian-security 无 bullseye 套件
-            #（实测仅至 stretch）。归档主源 bullseye/bullseye-updates 已含
-            # 最终 point release（安全修复全部折叠进 main），仅用这两套。
-            # ubuntu:20.04 不受影响（仍在线）。
+            # debian:bullseye 已全面 EOL（标准 2024-08 / LTS 2026-08-31）。
+            # 0.1.10 实证链：deb.debian.org 已删 bullseye(-security)（404
+            # rc=100）→ archive.debian.org/debian-security 无 bullseye 套件
+            #（仅至 stretch）→ 浮动 debian:bullseye 在 LTS 期持续重建，base
+            # 含 LTS 版运行时包而归档 main 的 -dev 不随更，报 "held broken
+            # packages" 死锁，--allow-downgrades 无法解（probe-i686 实证）。
+            # 最终配方（probe-i686-pinned-snapshot 实证 INSTALL_RC=0）：
+            #   镜像钉版 debian:bullseye-20240812-slim（LTS 前日期，glibc
+            #   2.31 与 focal 同基线）+ apt 源指向 snapshot.debian.org
+            #   同时间戳 20240812T000000Z —— base 与源版本一致，运行时与
+            #   -dev 同步，可复现（对齐 0.2.0 方案 C1）。ubuntu:20.04 的
+            #   armv7l 不受影响（仍在线），条件块按 ID=debian 判定。
             # 注意：本段位于外层 bash -c 单引号串内，只允许双引号。
             if grep -q "^ID=debian$" /etc/os-release 2>/dev/null; then
               printf "%s\n" \
-                "deb http://archive.debian.org/debian bullseye main" \
-                "deb http://archive.debian.org/debian bullseye-updates main" \
+                "deb http://snapshot.debian.org/archive/debian/20240812T000000Z/ bullseye main" \
+                "deb http://snapshot.debian.org/archive/debian-security/20240812T000000Z/ bullseye-security main" \
                 > /etc/apt/sources.list
               printf "%s\n" "Acquire::Check-Valid-Until \"false\";" \
                 > /etc/apt/apt.conf.d/99archived
             fi
             apt-get update -qq
-            # docker hub debian:bullseye 浮动 tag 在 LTS 期（~2024-09 起）持续
-            # 重建，base 内含 LTS 版本包；归档主源仅到最终 point release
-            #（11.11），直接安装报 "held broken packages"。--allow-downgrades
-            # 允许 apt 把 base 漂移包对齐（降级）到归档可用版本，消除死锁。
-            apt-get install -y -qq --allow-downgrades \
+            apt-get install -y -qq \
               build-essential make perl curl python3 python3-pip python3-venv \
               libsqlite3-dev libyaml-dev libcurl4-openssl-dev \
               libssl-dev zlib1g-dev libzstd-dev libmicrohttpd-dev \
