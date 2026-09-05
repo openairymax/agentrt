@@ -736,9 +736,14 @@ jobs:
   # 构建本身即宿主 32 位兼容性 fail-fast（无 IA32/COMPAT 则 docker run
   # 直接 exec format error）。容器内架构判定禁用 uname（32 位容器返回
   # 内核架构，U10 陷阱），统一 dpkg --print-architecture fail-fast。
-  # TUI 交叉构建上移宿主（U10：容器内 rustup 不可行 + 32 位 rustc
-  # 地址空间受限）：x86-32 用宿主 gcc -m32（gcc-multilib），arm-32 用
-  # 宿主 arm-linux-gnueabihf-gcc。TUI 非必检组件，失败降级不阻断。
+  # TUI 交叉构建移入 64 位钉版容器（U10/P20，rc1 run 45 实证修正）：
+  # 宿主交叉两处硬伤——① rustc 不拆分 linker argv，LINKER="gcc -m32"
+  # 报 linker not found；② 宿主（24.04）交叉产物绑宿主 glibc 2.39，破
+  # 坏 bullseye 2.31 基线（arm-32 被容器内 finalize fail-closed 拦截、
+  # x86-32 降级致包缺 TUI）。amd64/arm64 工具链镜像基线 ubuntu 20.04
+  # （glibc 2.31）：容器内 gcc-multilib/cross-gcc 的 32 位 glibc 即
+  # 2.31，64 位 rustup + 32 位 target 交叉产物天然对齐基线；i386 容器
+  # 内 rustup 不可行（U10）。失败降级不阻断（finalize 有 glibc 闸）。
   # 矩阵解耦（0.1.11 E6，2026-09-05）：arm-32 experimental 不再与本矩阵
   # 同组。此前 release.needs 依赖整个矩阵，arm-32 单腿 QEMU 50min+ 未完，
   # release/publish（含审批）就始终不出现（v0.1.10 同版本重发 run 实证，
@@ -769,29 +774,36 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: bash .github/scripts/init-submodules.sh agent-workload tools
 
-      # 0.1.12 I1/U10（2026-09-06）：x86-32 TUI 上移宿主交叉构建。
-      # i386 容器内 rustup 不可行（U10）：uname 返回内核架构 x86_64，
-      # rustup-init 误选 64 位工具链，且 386 用户态无 /lib64 loader，
-      # x86_64 rustc 根本无法 exec；32 位 rustc 又受地址空间限制。
-      # 宿主 x86_64 rustc 交叉 i686 target 稳定且快；gcc-multilib
-      # 提供 -m32 链接环境（crt1.o 等 32 位启动文件）。失败降级不阻断。
-      - name: Build TUI (x86-32 cross on host)
+      # 0.1.12 P20（2026-09-06）：x86-32 TUI 改 amd64 钉版容器内交叉。
+      # i386 容器内 rustup 不可行（U10）；宿主交叉两处硬伤（rc1 run 45
+      # 实证）：rustc 不拆分 linker argv、产物绑宿主 glibc 2.39。amd64
+      # 工具链镜像基线 ubuntu 20.04（glibc 2.31）：容器内 gcc-multilib
+      # 的 32 位 glibc 即 2.31，x86_64 rustup + i686 target 交叉产物
+      # 天然对齐基线。链接：rustc 不拆分 linker argv，LINKER 用裸 gcc
+      # + RUSTFLAGS -C link-arg=-m32（gcc 驱动位置无关接受 -m32）。
+      # 失败降级不阻断（finalize 有 glibc 闸）。
+      - name: Build TUI (i686 cross in amd64 container)
         run: |
-          set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq gcc-multilib
-          curl --proto '=https' --tlsv1.2 -sSf --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal
-          export PATH="$HOME/.cargo/bin:$PATH"
-          rustup target add i686-unknown-linux-gnu
-          # 链接需 -m32（32 位 crt/start files，gcc-multilib 提供）
-          export CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER="gcc -m32"
-          # build.rs 需 airy_run_stream.h（v0.1.10 回归：伞仓相对路径失效）
-          export AGENTRT_TUI_RUN_STREAM_H="$PWD/commons/include/airy_run_stream.h"
-          export CARGO_TARGET_DIR=/tmp/tui-target
-          (cd agent-workload/sdk/tui && cargo build --release --target i686-unknown-linux-gnu) \
-            || echo "warn: x86-32 TUI 交叉构建失败（非必检组件，降级继续）"
-          mkdir -p stage/bin
-          cp -f /tmp/tui-target/i686-unknown-linux-gnu/release/agentrt-tui stage/bin/ 2>/dev/null || true
+          docker run --rm --platform linux/amd64 \
+            -v "$PWD":/src -w /src \
+            ghcr.io/openairymax/agentrt-qemu-toolchain:amd64-20260905-1@sha256:c260fc5c48c66b6ba7082d488a8da9502b80f63ef494abc7288a1ad003550ff6 \
+            bash -c '
+            set -euo pipefail
+            apt-get update -qq && apt-get install -y -qq --no-install-recommends gcc-multilib
+            curl --proto =https --tlsv1.2 -sSf --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal
+            export PATH="$HOME/.cargo/bin:$PATH"
+            rustup target add i686-unknown-linux-gnu
+            # 链接需 -m32（32 位 crt/start files，gcc-multilib 提供）
+            export CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER=gcc
+            export RUSTFLAGS="-C link-arg=-m32"
+            # build.rs 需 airy_run_stream.h（v0.1.10 回归：伞仓相对路径失效）
+            export AGENTRT_TUI_RUN_STREAM_H=/src/commons/include/airy_run_stream.h
+            export CARGO_TARGET_DIR=/tmp/tui-target
+            (cd /src/agent-workload/sdk/tui && cargo build --release --target i686-unknown-linux-gnu) \
+              || echo "warn: x86-32 TUI 交叉构建失败（非必检组件，降级继续）"
+            mkdir -p /src/stage/bin
+            cp -f /tmp/tui-target/i686-unknown-linux-gnu/release/agentrt-tui /src/stage/bin/ 2>/dev/null || true
+            '
 
       - name: Build in x86-32 container
         run: |
@@ -905,28 +917,34 @@ jobs:
       # 原生 arm64 runner + AArch32 compat：无需 Set up QEMU。
       # docker run --platform linux/arm/v7 原生执行（无 binfmt 模拟）。
 
-      # 0.1.12 U10 收口（2026-09-06）：arm-32 TUI 上移宿主交叉构建。
-      # arm/v7 容器内 rustup 不可行（U10）：compat 下 uname 返回内核
-      # 架构 aarch64，rustup-init 误选 aarch64 工具链，其 aarch64 ELF
-      # 在 32 位用户态缺 arm64 loader 无法执行；32 位 rustc 又受地址
-      # 空间限制。aarch64 宿主交叉 armv7 target 稳定且快
-      # （gcc-arm-linux-gnueabihf 提供链接环境）。失败降级不阻断。
-      - name: Build TUI (armv7 cross on host)
+      # 0.1.12 P20（2026-09-06）：arm-32 TUI 改 arm64 钉版容器内交叉。
+      # arm/v7 容器内 rustup 不可行（U10）；宿主（24.04）交叉产物绑
+      # glibc 2.39，被 bullseye 2.31 容器内 finalize glibc 闸
+      # fail-closed 拦截（rc1 run 45 实证）。arm64 工具链镜像基线
+      # ubuntu 20.04（glibc 2.31）：容器内 gcc-arm-linux-gnueabihf 的
+      # cross glibc 即 2.31，aarch64 rustup + armv7 target 交叉产物
+      # 天然对齐基线（cross linker 无空格，LINKER 直接可用）。
+      # 失败降级不阻断（finalize 有 glibc 闸）。
+      - name: Build TUI (armv7 cross in arm64 container)
         run: |
-          set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq gcc-arm-linux-gnueabihf
-          curl --proto '=https' --tlsv1.2 -sSf --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal
-          export PATH="$HOME/.cargo/bin:$PATH"
-          rustup target add armv7-unknown-linux-gnueabihf
-          export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc
-          # build.rs 需 airy_run_stream.h（v0.1.10 回归：伞仓相对路径失效）
-          export AGENTRT_TUI_RUN_STREAM_H="$PWD/commons/include/airy_run_stream.h"
-          export CARGO_TARGET_DIR=/tmp/tui-target-arm32
-          (cd agent-workload/sdk/tui && cargo build --release --target armv7-unknown-linux-gnueabihf) \
-            || echo "warn: armv7 TUI 交叉构建失败（非必检组件，降级继续）"
-          mkdir -p stage/bin
-          cp -f /tmp/tui-target-arm32/armv7-unknown-linux-gnueabihf/release/agentrt-tui stage/bin/ 2>/dev/null || true
+          docker run --rm --platform linux/arm64 \
+            -v "$PWD":/src -w /src \
+            ghcr.io/openairymax/agentrt-qemu-toolchain:arm64-20260905-1@sha256:b3224d8642c678b5d190c6654082a0892929c255a225734fa0dc1f9a60585ead \
+            bash -c '
+            set -euo pipefail
+            apt-get update -qq && apt-get install -y -qq --no-install-recommends gcc-arm-linux-gnueabihf
+            curl --proto =https --tlsv1.2 -sSf --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal
+            export PATH="$HOME/.cargo/bin:$PATH"
+            rustup target add armv7-unknown-linux-gnueabihf
+            export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc
+            # build.rs 需 airy_run_stream.h（v0.1.10 回归：伞仓相对路径失效）
+            export AGENTRT_TUI_RUN_STREAM_H=/src/commons/include/airy_run_stream.h
+            export CARGO_TARGET_DIR=/tmp/tui-target-arm32
+            (cd /src/agent-workload/sdk/tui && cargo build --release --target armv7-unknown-linux-gnueabihf) \
+              || echo "warn: armv7 TUI 交叉构建失败（非必检组件，降级继续）"
+            mkdir -p /src/stage/bin
+            cp -f /tmp/tui-target-arm32/armv7-unknown-linux-gnueabihf/release/agentrt-tui /src/stage/bin/ 2>/dev/null || true
+            '
 
       - name: Build in arm-32 container
         run: |
