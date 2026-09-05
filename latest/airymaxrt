@@ -882,12 +882,6 @@ apply_package() { # <tarball> [expect_sha]
     if [ -f "$AIRY_HOME/config/install.env" ]; then
         sed_inplace "s|^AIRY_VERSION=.*|AIRY_VERSION=v${new_ver}|" "$AIRY_HOME/config/install.env" || \
             printf 'AIRY_VERSION=v%s\n' "$new_ver" >> "$AIRY_HOME/config/install.env"
-        # 固化本次制品 sha256（与 install.sh install.env 记录口径一致）。
-        # 同版本修复重发检测（0.1.11）：应用后必须刷新，否则反复触发"内容
-        # 更新"；应用失败走上面 return 不会执行到此（热替换自检 fail-closed）。
-        sed_inplace "s|^AIRY_ARTIFACT_SHA256=.*|AIRY_ARTIFACT_SHA256=${expect_sha}|" \
-            "$AIRY_HOME/config/install.env" || \
-            printf 'AIRY_ARTIFACT_SHA256=%s\n' "$expect_sha" >> "$AIRY_HOME/config/install.env"
     fi
     rm -rf "$TMPD"
     # 0.1.6c 系统性修复：热替换后自愈 agentrt-env.sh。老用户（0.1.5a 及
@@ -1008,9 +1002,6 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
                 sed_inplace "s|^AIRY_VERSION=.*|AIRY_VERSION=${rb_ver}|" "$inst_env" || \
                     printf 'AIRY_VERSION=%s\n' "$rb_ver" >> "$inst_env"
             fi
-            # 回滚后本地文件 sha 未知，清空制品 sha 记录（避免同版本修复重发
-            # 检测基于过期值误判；置空 = 关闭检测，语义与旧安装器一致）
-            sed_inplace "s|^AIRY_ARTIFACT_SHA256=.*|AIRY_ARTIFACT_SHA256=|" "$inst_env" 2>/dev/null || true
         fi
         log ok "回滚完成（重新运行 airymaxrt 生效）"
         return 0
@@ -1048,12 +1039,14 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
     local latest="$(manifest_get "$TMPD/manifest.json" latest)"
     [ -n "$latest" ] || { log error "manifest 解析失败"; rm -rf "$TMPD"; return 1; }
     local cmp="$(ver_cmp "${cur_ver:-0.0.0}" "$latest")"
-    # 本地版本高于官方最新（如本地装了 preview/内部版）→ 无需处理
-    if [ "$cmp" = "1" ]; then
-        log info "已是最新: ${cur_ver:-<未安装>}（官方最新 ${latest}）"
-        rm -rf "$TMPD"; return 0
+    if [ "$cmp" = "0" ] || [ "$cmp" = "1" ]; then
+        log info "已是最新: ${cur_ver:-<未安装>}（最新 ${latest}）"
+        rm -rf "$TMPD"
+        return 0
     fi
-    # 当前平台制品（"同版本修复重发"检测同样需要 manifest sha256）
+    log info "发现新版本: ${cur_ver:-<未安装>} → ${latest}（${CHANNEL}）"
+    [ "$CHECK" = "1" ] && { log info "仅检查模式：更新可用"; rm -rf "$TMPD"; return 0; }
+    # 当前平台制品
     local plat="$(runtime_platform)"
     local art_url art_sha
     art_url="$(manifest_get "$TMPD/manifest.json" "artifact:${plat}" | sed -n 1p)"
@@ -1069,37 +1062,6 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
             art_sha="$(manifest_get "$TMPD/manifest.json" "artifact:${legacy}" | sed -n 2p)"
             [ -n "$art_url" ] && { log warn "平台键 ${plat} 未命中，已用兼容命名 ${legacy}"; break; }
         done
-    fi
-    # 同版本修复重发检测（0.1.11）：官方同版本修复重传（如 v0.1.10 事故后
-    # 同 tag 重发修复包）版本号不变、sha256 变化——仅比版本会误报"已是最新"，
-    # 修复补丁收不到。以 install.env 固化的已装制品 sha 与 manifest sha 比对，
-    # 不一致视为"内容更新"，照常下载替换。无固化记录（源码构建/旧安装器）
-    # 时无法检测，维持"已是最新"语义。
-    local content_update=0
-    local local_sha=""
-    if [ "$cmp" = "0" ]; then
-        local_sha="$(sed -n 's/^AIRY_ARTIFACT_SHA256=//p' "$inst_env" 2>/dev/null | head -1)"
-        if [ -n "$local_sha" ] && [ -n "$art_sha" ] && [ "$local_sha" != "$art_sha" ]; then
-            content_update=1
-            log warn "检测到官方已重发 ${cur_ver} 修复包（sha256 与本地不一致），将重新获取…"
-        fi
-    fi
-    if [ "$cmp" = "0" ] && [ "$content_update" = "0" ]; then
-        log info "已是最新: ${cur_ver:-<未安装>}（官方最新 ${latest}）"
-        rm -rf "$TMPD"; return 0
-    fi
-    if [ "$cmp" = "-1" ]; then
-        log info "发现新版本: ${cur_ver:-<未安装>} → ${latest}（${CHANNEL}）"
-    else
-        log info "正在同步官方修复包（${cur_ver} 内容更新）…"
-    fi
-    if [ "$CHECK" = "1" ]; then
-        if [ "$content_update" = "1" ]; then
-            log info "仅检查模式：官方已重发 ${cur_ver} 修复包，执行 airymaxrt update 同步"
-        else
-            log info "仅检查模式：发现新版本 ${latest}，执行 airymaxrt update 升级"
-        fi
-        rm -rf "$TMPD"; return 0
     fi
     [ -n "$art_url" ] || {
         log error "当前平台 ${plat} 无可用制品"
