@@ -931,6 +931,49 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # 0.1.10a 修复（生产实证，2026-09-05）：包内只含 gen3 标记（如
+      # platform-x86-64）导致 ≤v0.1.9 更新器拒绝升级——旧更新器以精确文件名
+      # 匹配（platform-x64 等，且其 "不匹配" 正则会把 platform-x86-64 子串
+      # 误判为异架构）。此处单点 SSoT：为每个平台包补全 gen1~gen3 三代全量
+      # platform-* 标记文件并重算 sha256，任何一代更新器/安装器均可匹配。
+      # 口径与 sdk/tui/scripts/airymaxrt 及 agentrt/scripts/install.sh 的
+      # plat_markers 同源（本处按架构词 x86-64/x86-32/arm-64/arm-32/...）。
+      - name: Augment package arch markers (gen1~gen3)
+        run: |
+          set -euo pipefail
+          VERSION="${{ env.VERSION }}"
+          markers_of() {
+            case "$1" in
+              x86-64)   echo "platform-x86-64 platform-x64 platform-x86_64 platform-amd64" ;;
+              x86-32)   echo "platform-x86-32 platform-x86 platform-i686 platform-i386" ;;
+              arm-64)   echo "platform-arm-64 platform-arm64 platform-aarch64" ;;
+              arm-32)   echo "platform-arm-32 platform-arm32 platform-armv7l" ;;
+              riscv-64) echo "platform-riscv-64 platform-riscv64" ;;
+              riscv-32) echo "platform-riscv-32 platform-riscv32" ;;
+              *) echo "" ;;
+            esac
+          }
+          cd dist
+          for t in agentrt-${VERSION}-*.tar.gz; do
+            [ -e "$t" ] || continue
+            plat="${t#agentrt-${VERSION}-}"; plat="${plat%.tar.gz}"
+            arch="${plat#*-}"   # linux-x86-64 → x86-64（marker 只编码架构）
+            ms="$(markers_of "$arch")"
+            if [ -z "$ms" ]; then
+              echo "::warning::跳过未知平台 ${plat} 的标记补全"
+              continue
+            fi
+            tmpd="$(mktemp -d)"
+            tar -xzf "$t" -C "$tmpd"
+            # 各腿以 tar -C pkg . 打包 → 标记位于归档根
+            for m in $ms; do [ -e "$tmpd/$m" ] || touch "$tmpd/$m"; done
+            tar -czf "$t" -C "$tmpd" .
+            rm -rf "$tmpd"
+            sha256sum "$t" > "$t.sha256"
+            echo "augment markers ${plat}: ${ms}"
+          done
+          echo "标记补全完成: $(ls agentrt-${VERSION}-*.tar.gz | wc -l) 个包"
+
       - name: Generate release notes
         run: |
           VERSION="${{ env.VERSION }}"
