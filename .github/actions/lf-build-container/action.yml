@@ -1,0 +1,43 @@
+name: 'lf-build-container'
+description: |
+  M3 方案 B（0.1.12）复合 action：digest 钉版容器构建统一模板——
+  docker run + set -euo pipefail + 全程 tee 日志 + ERR trap ::error::
+  annotation（经 GitHub API 匿名可读，无需 admin 下载日志即可定位失败）。
+  消灭 4 Linux 容器腿的 shell 引号陷阱重复（外层单引号串内只允许双
+  引号的既有约定不变，见 v0.1.9/v0.1.10 相关回归记录）。
+inputs:
+  image:
+    description: '镜像引用，必须 digest 钉版（ghcr.io/...:tag@sha256:...；禁浮动 tag）'
+    required: true
+  platform:
+    description: 'docker --platform（如 linux/arm64 / linux/386 / linux/arm/v7）'
+    required: true
+  leg:
+    description: '腿标签（annotation 前缀与日志名：arm-64、x86-32…；仅限 shell 安全字符）'
+    required: true
+  envs:
+    description: '附加 docker -e 串（惯例：-e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage -e AIRY_JOBS）'
+    required: false
+    default: ''
+  script:
+    description: '容器内脚本体（不含统一头：set -e/tee/trap 由本 action 注入；外层单引号内只允许双引号）'
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Build in container
+      shell: bash
+      run: |
+        docker run --rm --platform ${{ inputs.platform }} \
+          ${{ inputs.envs }} \
+          -v "$PWD":/src -w /src \
+          ${{ inputs.image }} \
+          bash -c '
+          # 统一头（v0.1.9 教训：无 set -e 时静默失败产出空 stage，见
+          # riscv64 job；诊断通道：stdout 全程 tee 到宿主工作区日志，
+          # ERR trap 把失败命令与日志尾部以 ::error:: 上报）。
+          set -euo pipefail
+          exec > >(tee /src/container-${{ inputs.leg }}.log) 2>&1
+          trap '"'"'echo "::error::[${{ inputs.leg }}] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-${{ inputs.leg }}.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
+          ${{ inputs.script }}
+          '

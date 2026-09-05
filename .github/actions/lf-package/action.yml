@@ -1,0 +1,61 @@
+name: 'lf-package'
+description: |
+  M3 方案 B（0.1.12）复合 action：tar.gz 打包统一模板——staging 拷贝 +
+  config/modules 汇聚 + platform 标记 + sha256 + upload-artifact。
+  收敛 7 处 tar.gz 打包腿（windows zip 腿不适用）。GITHUB_ENV 的
+  artifact_name 对调用方 job 可见（composite action 与 job 同进程语义）。
+inputs:
+  version:
+    description: '发布版本号（含 v 前缀，调用方传 ${{ env.VERSION }}）'
+    required: true
+  platform-tag:
+    description: '平台标记后缀（x86-64 / arm-64 / riscv-64…；与安装器/更新器 plat_name() 同口径校验）'
+    required: true
+  artifact-suffix:
+    description: '制品名后缀（linux-x86-64 / macos-arm-64…；命名规范 0.1.10 起：OS-架构族-位宽）'
+    required: true
+  staging:
+    description: 'staging 目录（相对仓库根）'
+    required: false
+    default: 'stage'
+  with-bootstrap:
+    description: '是否部署 bin/agentrt-bootstrap.sh（Linux 腿 true；macOS 原生腿 false）'
+    required: false
+    default: 'true'
+runs:
+  using: composite
+  steps:
+    - name: Package (tar.gz)
+      shell: bash
+      run: |
+        set -euo pipefail
+        VERSION="${{ inputs.version }}"; VERSION_NUM="${VERSION#v}"
+        PKG_DIR="pkg/agentrt-${VERSION_NUM}"
+        mkdir -p "${PKG_DIR}/config" "${PKG_DIR}/modules"
+        cp -rf "${{ inputs.staging }}"/. "${PKG_DIR}/" 2>/dev/null || true
+        cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+        cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+        cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
+        cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+        cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
+        if [ "${{ inputs.with-bootstrap }}" = "true" ]; then
+          # install.sh 二进制模式依赖 bin/agentrt-bootstrap.sh（daemon 编排
+          # 脚本，位于 tools 子仓，cmake --install 不会带入），host 侧显式部署
+          cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
+        fi
+        # 运行时 .so 收集/校验已在构建容器内由 finalize-linux-libs.sh 完成
+        #（host 无容器 /usr/local 自编译库，ldd 收集必 not found）
+        # 平台标记勿回退 uname 原始名（platform-x86_64 会触发更新器
+        # "制品架构与主机不匹配"拒绝，v0.1.9 打包回归实证）。
+        touch "${PKG_DIR}/platform-${{ inputs.platform-tag }}"
+        ARTIFACT="agentrt-${VERSION}-${{ inputs.artifact-suffix }}"
+        tar -czf "${ARTIFACT}.tar.gz" -C pkg .
+        sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
+        echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.artifact_name }}
+        path: ${{ env.artifact_name }}.*
+        if-no-files-found: error
