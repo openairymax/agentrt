@@ -28,7 +28,7 @@
 #   AIRY_TUI_BIN / AIRY_GATEWAY_BIN / AIRY_LLM_BIN  组件路径覆盖
 #   AIRYRT_LOG_LEVEL 日志级别（默认 info；debug 可看到完整排查信息）
 #   AIRYRT_PROFILE   运行画像：auto（按可用内存自动裁剪，默认；<2.5GiB 时
-#                     自动降为 minimal）| full（全量 15 daemon：14 socket +
+#                     自动降为 minimal）| full（全量 18 daemon：17 socket +
 #                     gateway）| minimal
 #                     （最小 daemon 集，仅 llm/think/agent/tool + gateway）。
 #                     低资源设备（如树莓派 4B 2GB）建议 minimal，可显著降低
@@ -549,23 +549,21 @@ _ensure_daemon() {
     log info "补齐 daemon: $bname（PID=$!），日志: $AIRY_HOME/logs/${bname}.out"
 }
 
-# 补齐 minimal 裁掉的 aux daemon（monitor 硬件增强 / profile full 恢复用）。
-# 与正常启动路径同源（bin/*_d 推导，0.1.6h 自动化）：daemon 增删不再改
-# 脚本；核心执行链路（llm/think/agent/tool + gateway）独立处理不在此补齐。
-# 0.1.9 M4 整编后 aux 集 = 全量 15 - 核心 5 = 10（monit/sched/channel/
-# market/cupolas/mem/a2a/notify/hook/maths；plugin/info/observe 已并入
-# tool_d/monit_d，不再有独立二进制）。
+# full 画像的 9 个能力 daemon（minimal 裁剪项）：硬件增强后自动恢复。
+# 0.1.9 M4 daemon 整编：plugin_d → tool_d、info_d/observe_d → monit_d，
+# 对应补齐项随退役移除（tool.sock/monit.sock 已承接其能力面）。
+# 顺序与正常启动路径一致（hook→monit→sched→channel→market→
+# cupolas→mem→a2a→notify）。
 ensure_aux_daemons() {
-    local _d _b
-    for _d in "$AIRY_HOME"/bin/*_d; do
-        [ -f "$_d" ] || continue
-        _b="${_d##*/}"
-        case "$_b" in
-            gateway_d|llm_d|think_d|agent_d|tool_d) continue ;;  # 核心链路独立处理
-        esac
-        [ -x "$_d" ] || continue
-        _ensure_daemon "$_d" "$RUNTIME_DIR/${_b%_d}.sock"
-    done
+    _ensure_daemon "$(find_tool AIRY_HOOK_BIN hook_d "$AIRY_HOME/bin/hook_d" "$AIRYRT_HOME/agentrt/build/bin/hook_d" "$AIRYRT_HOME/build/bin/hook_d")" "$RUNTIME_DIR/hook.sock"
+    _ensure_daemon "$(find_tool AIRY_MONIT_BIN monit_d "$AIRY_HOME/bin/monit_d" "$AIRYRT_HOME/agentrt/build/bin/monit_d" "$AIRYRT_HOME/build/bin/monit_d")" "$RUNTIME_DIR/monit.sock"
+    _ensure_daemon "$(find_tool AIRY_SCHED_BIN sched_d "$AIRY_HOME/bin/sched_d" "$AIRYRT_HOME/agentrt/build/bin/sched_d" "$AIRYRT_HOME/build/bin/sched_d")" "$RUNTIME_DIR/sched.sock"
+    _ensure_daemon "$(find_tool AIRY_CHANNEL_BIN channel_d "$AIRY_HOME/bin/channel_d" "$AIRYRT_HOME/agentrt/build/bin/channel_d" "$AIRYRT_HOME/build/bin/channel_d")" "$RUNTIME_DIR/channel.sock"
+    _ensure_daemon "$(find_tool AIRY_MARKET_BIN market_d "$AIRY_HOME/bin/market_d" "$AIRYRT_HOME/agentrt/build/bin/market_d" "$AIRYRT_HOME/build/bin/market_d")" "$RUNTIME_DIR/market.sock"
+    _ensure_daemon "$(find_tool AIRY_CUPOLAS_BIN cupolas_d "$AIRY_HOME/bin/cupolas_d" "$AIRYRT_HOME/agentrt/build/bin/cupolas_d" "$AIRYRT_HOME/build/bin/cupolas_d")" "$RUNTIME_DIR/cupolas.sock"
+    _ensure_daemon "$(find_tool AIRY_MEM_BIN mem_d "$AIRY_HOME/bin/mem_d" "$AIRYRT_HOME/agentrt/build/bin/mem_d" "$AIRYRT_HOME/build/bin/mem_d")" "$RUNTIME_DIR/mem.sock"
+    _ensure_daemon "$(find_tool AIRY_A2A_BIN a2a_d "$AIRY_HOME/bin/a2a_d" "$AIRYRT_HOME/agentrt/build/bin/a2a_d" "$AIRYRT_HOME/build/bin/a2a_d")" "$RUNTIME_DIR/a2a.sock"
+    _ensure_daemon "$(find_tool AIRY_NOTIFY_BIN notify_d "$AIRY_HOME/bin/notify_d" "$AIRYRT_HOME/agentrt/build/bin/notify_d" "$AIRYRT_HOME/build/bin/notify_d")" "$RUNTIME_DIR/notify.sock"
 }
 
 # 画像状态持久化（profile 子命令/monitor 使用）
@@ -666,30 +664,49 @@ ver_cmp() { # <a> <b>
     echo "$(field_cmp "$an" "$bn")"
 }
 
-# 当前平台键（manifest artifacts 键名，与打包命名对齐）：linux-x64 / macos-arm64
-# 制品平台命名（0.1.6e 起，用户定案）：32/64 数字形式，弃用 i686/armv7l
-# 易误导字样。与 install.sh plat_name、build.sh PLATFORM 映射同口径。
+# 当前平台键（manifest artifacts 键名，与打包命名对齐）：linux-x86-64 /
+# macos-arm-64 等。制品平台命名规范（0.1.10 起，用户定案）：
+# OS-架构族-位宽，弃用 i686/armv7l/x64/arm64 等架构行话。与 install.sh
+# plat_name、build.sh PLATFORM 映射同口径。
 plat_name() {
     case "$1" in
-        x86_64)  echo "x64" ;;
-        i686)    echo "x86" ;;
-        aarch64) echo "arm64" ;;
-        armv7l)  echo "arm32" ;;
-        riscv64) echo "riscv64" ;;
-        riscv32) echo "riscv32" ;;
+        x86_64)  echo "x86-64" ;;
+        i686)    echo "x86-32" ;;
+        aarch64) echo "arm-64" ;;
+        armv7l)  echo "arm-32" ;;
+        riscv64) echo "riscv-64" ;;
+        riscv32) echo "riscv-32" ;;
         *)       echo "$1" ;;
     esac
 }
 
-# 数字平台名 → 旧 uname 原始名（0.1.6d 及更早的 manifest 平台键）。
-# 与发布侧 publish-release.sh ALIAS 表保持同口径（SSoT）。
+# 平台键兼容反查（三代 manifest）：本版主键 = OS-架构族-位宽（gen3）；
+# 旧两代依次回退：gen2（0.1.6e~0.1.10：linux-x64/x86/arm64/arm32…）→
+# gen1（≤0.1.6d：uname 原始名 linux-x86_64/i686/aarch64/armv7l…）。
+# 与发布侧 publish-release.sh ALIAS 表同口径（SSoT）。
 plat_legacy_name() {
     case "$1" in
-        linux-x64|macos-x64|win-x64)      echo "${1%-x64}-x86_64" ;;
-        linux-x86|win-x86)                echo "${1%-x86}-i686" ;;
-        linux-arm64|macos-arm64|win-arm64) echo "${1%-arm64}-aarch64" ;;
-        linux-arm32)                      echo "linux-armv7l" ;;
-        *)                                echo "" ;;
+        linux-x86-64|macos-x86-64|win-x86-64) printf '%s\n' "${1%-x86-64}-x64" "${1%-x86-64}-x86_64" ;;
+        linux-x86-32|macos-x86-32|win-x86-32) printf '%s\n' "${1%-x86-32}-x86" "${1%-x86-32}-i686" ;;
+        linux-arm-64|macos-arm-64|win-arm-64) printf '%s\n' "${1%-arm-64}-arm64" "${1%-arm-64}-aarch64" ;;
+        linux-arm-32|macos-arm-32|win-arm-32) printf '%s\n' "${1%-arm-32}-arm32" "${1%-arm-32}-armv7l" ;;
+        linux-riscv-64|win-riscv-64)          echo "${1%-riscv-64}-riscv64" ;;
+        linux-riscv-32|win-riscv-32)          echo "${1%-riscv-32}-riscv32" ;;
+        *)                                    echo "" ;;
+    esac
+}
+
+# 某技术架构允许的包内 platform-* 标记（三代全兼容：新更新器处理存量
+# gen2/gen1 离线包不误拒）。与 install.sh plat_markers、CI 打包标记同口径。
+plat_markers() {
+    case "$1" in
+        x86_64)  printf 'platform-x86-64 platform-x64 platform-x86_64 platform-amd64' ;;
+        i686)    printf 'platform-x86-32 platform-x86 platform-i686 platform-i386' ;;
+        aarch64) printf 'platform-arm-64 platform-arm64 platform-aarch64' ;;
+        armv7l)  printf 'platform-arm-32 platform-arm32 platform-armv7l' ;;
+        riscv64) printf 'platform-riscv-64 platform-riscv64' ;;
+        riscv32) printf 'platform-riscv-32 platform-riscv32' ;;
+        *)       echo "" ;;
     esac
 }
 
@@ -787,15 +804,21 @@ apply_package() { # <tarball> [expect_sha]
     else
         log error "缺少 sha256 期望值，拒绝安装（防供应链绕过）"; rm -rf "$TMPD"; return 1
     fi
-    # 架构自检（同 install.sh install_binary 口径）
-    # 0.1.6g 修复：制品标记为数字平台名（platform-x64 等），原 grep 用
-    # uname 原始名（platform-x86_64）两边对不上，自检静默失效；统一走
-    # plat_name() 同口径，异架构包（platform-arm64 等）明确拒绝。
-    if tar -tzf "$tarball" 2>/dev/null | grep -q "platform-$(plat_name "$arch")"; then
+    # 架构自检（同 install.sh install_binary 口径）：三代 platform-* 标记
+    # 兼容——本版标记 platform-<架构族-位宽>（如 platform-x86-64），存量
+    # gen2/gen1 标记（platform-x64 / platform-x86_64 等）同放行；异架构
+    # 标记明确拒绝。
+    _am_marker="$(tar -tzf "$tarball" 2>/dev/null | grep -oE 'platform-[A-Za-z0-9_-]+' | head -1 || true)"
+    if [ -n "$_am_marker" ]; then
+        _am_ok=""
+        for _am_p in $(plat_markers "$arch"); do
+            [ "$_am_marker" = "$_am_p" ] && { _am_ok=1; break; }
+        done
+        if [ -z "$_am_ok" ]; then
+            log error "制品架构与当前主机（${arch}）不匹配（标记 ${_am_marker}），拒绝更新"
+            rm -rf "$TMPD"; return 1
+        fi
         log info "架构校验通过（${arch}）"
-    elif tar -tzf "$tarball" 2>/dev/null | grep -qE 'platform-(x64|x86|arm64|arm32|riscv64|riscv32)'; then
-        log error "制品架构与当前主机（${arch}）不匹配，拒绝更新"
-        rm -rf "$TMPD"; return 1
     fi
     tar -xzf "$tarball" -C "$TMPD" || { log error "解压失败"; rm -rf "$TMPD"; return 1; }
     local extracted="$(find "$TMPD" -maxdepth 1 -type d -name 'agentrt-*' | head -1)"
@@ -1028,17 +1051,17 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
     local art_url art_sha
     art_url="$(manifest_get "$TMPD/manifest.json" "artifact:${plat}" | sed -n 1p)"
     art_sha="$(manifest_get "$TMPD/manifest.json" "artifact:${plat}" | sed -n 2p)"
-    # 0.1.6f 社区反馈：旧命名（linux-x86_64 等）fallback。0.1.6e 起制品
-    # 采用数字命名（linux-x64），但存量旧安装器/旧 manifest 可能仍用
-    # uname 原始名；发布侧 manifest 已带别名键，此处再兜底一次，保证
-    # 双向兼容（新启动器遇旧 manifest 也能更新）。
+    # 平台键兼容（三代 manifest）：本版主键 = OS-架构族-位宽（如
+    # linux-x86-64）；旧两代（gen2：linux-x64 等 / gen1：linux-x86_64 等）
+    # 未命中时按 plat_legacy_name 候选依序反查（发布侧 manifest 亦含全部
+    # 别名键，此处兜底旧 manifest）。
     if [ -z "$art_url" ]; then
-        local legacy="$(plat_legacy_name "$plat")"
-        if [ -n "$legacy" ]; then
+        for legacy in $(plat_legacy_name "$plat"); do
+            [ -n "$legacy" ] || continue
             art_url="$(manifest_get "$TMPD/manifest.json" "artifact:${legacy}" | sed -n 1p)"
             art_sha="$(manifest_get "$TMPD/manifest.json" "artifact:${legacy}" | sed -n 2p)"
-            [ -n "$art_url" ] && log warn "平台键 ${plat} 未命中，已用兼容命名 ${legacy}"
-        fi
+            [ -n "$art_url" ] && { log warn "平台键 ${plat} 未命中，已用兼容命名 ${legacy}"; break; }
+        done
     fi
     [ -n "$art_url" ] || {
         log error "当前平台 ${plat} 无可用制品"
@@ -1278,7 +1301,7 @@ case "$CMD" in
         if [ "$_core_ok" = "1" ]; then
             log info "daemon 群: 核心链路（llm/think/agent/tool）全部就绪"
         else
-            log warn "daemon 群: 核心链路未全部就绪（运行 airymaxrt 拉起，或 airymaxrt logs 查看诊断）"
+            log warn "daemon 群: 核心链路未全部就绪（运行 airymaxrt 拉起，或查看 logs/ 诊断）"
         fi
         exit 0
         ;;
