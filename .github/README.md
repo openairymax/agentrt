@@ -81,6 +81,23 @@ sibling clone 凭据统一走 `GH_TOKEN`。
 （force 与 SSoT 一致，不透传 atomgit 平台内部 ref）；子模块树以各仓 `HEAD:.gitmodules`
 BFS 解析；缺仓自动创建（atoms 私有）；每仓错误隔离、末尾汇总。
 
+### 发布 tag 与重复 Release run（H3/P19 SOP，2026-09-06 更正根因）
+
+**根因更正**：publish-release.sh 并不回推 git tag；重复 run 的链条是——
+atomgit Release API 建 release 时若 tag 尚不存在，服务端自动补建 tag（rc 资产内
+`<tag>.tar/.zip` 源归档即服务端自动产物为证）→ sync-mirror 全量 tag 镜像推至
+GitHub → tag push 再触发 `release.yml` 全链（rc.2 重复 run 33988925887 实证）。
+
+**正式发布无重复的实证**：tag 先双端（atomgit+GitHub）打齐 → atomgit 建 release
+复用既有 tag、GitHub 已有同 sha tag → sync 幂等 no-op（正式 v0.1.12 无 echo run）。
+
+**SOP**：
+1. 任何 rc/正式发布前**先双端打 tag**（atomgit + GitHub 指向同一 commit）再放行
+   release 流程；
+2. 若走 workflow_dispatch（main）且 publish 建了缺失 tag，随之出现的 echo Release
+   run 按需取消（AIRY_FORCE_UPLOAD=1 保证即使并发重发产物亦一致，无害）；
+3. sync-mirror 的 `--force` tag 推送保证两镜像终态与 SSoT 一致，无需人工干预。
+
 ## Secrets
 
 | Secret | 用途 | 使用方 |
