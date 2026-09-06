@@ -47,6 +47,15 @@
 typedef SSIZE_T ssize_t;
 #endif
 
+/* pid_t：POSIX 进程 ID 类型。UCRT 无此类型（#124 实证 agent_d
+ * service_spawn.c 在 Windows 分支使用 pid_t → C2081/C2059）。Windows
+ * 侧子进程句柄为 HANDLE，pid_t 在此仅作"-1 = 无子进程"哨兵（POSIX
+ * 成员域在 service.h 已按 AIRY_PLATFORM_POSIX 守卫），int 语义足够。 */
+#ifndef AIRY_MSVC_PID_T_DEFINED
+#define AIRY_MSVC_PID_T_DEFINED
+typedef int pid_t;
+#endif
+
 #ifndef AIRY_UNUSED
 #define AIRY_UNUSED  __pragma(warning(suppress:4100))
 #endif
