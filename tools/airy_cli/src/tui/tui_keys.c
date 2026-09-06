@@ -102,8 +102,10 @@ static void tui_win_enqueue_key(WORD vk, WCHAR wc, DWORD ctl)
         return;
     }
     if (alt && (vk == 'B' || vk == 'F')) {
-        /* Alt+B / Alt+F：词左/右移（xterm 的 ESC b / ESC f） */
-        const char *ab = (vk == 'B') ? "\x1bb" : "\x1bf";
+        /* Alt+B / Alt+F：词左/右移（xterm 的 ESC b / ESC f）。
+         * 注意 "\x1b" 须与 "b"/"f" 分字面量，否则 "\x1bb" 的十六进制转义
+         * 吞掉 b 变成单字符 0x1bb（C7744 越界，#112 实证） */
+        const char *ab = (vk == 'B') ? "\x1b" "b" : "\x1b" "f";
         tui_win_flush_buf(ab, 2);
         return;
     }

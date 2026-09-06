@@ -65,6 +65,21 @@ typedef SSIZE_T ssize_t;
 #define _STRINGS_H
 #endif
 
+/* POSIX S_IS* 宏族：MSVC sys/stat.h 只提供 _S_IFMT/_S_IFDIR 等常量，
+ * 不定义 S_ISDIR/S_ISREG 函数宏（#112 实证：gateway_hall_store.obj /
+ * tool_d plugin_discovery.obj 把 S_ISDIR(mode) 当隐式函数调用 → LNK2001）。
+ * 宏体在调用点展开，此时源文件已包含 <sys/stat.h>（_S_IFMT 已定义）。
+ * #ifndef 守卫：兼容未来任何提供 S_IS* 的头文件。 */
+#ifndef S_ISDIR
+#define S_ISDIR(m)  (((m) & _S_IFMT) == _S_IFDIR)
+#endif
+#ifndef S_ISREG
+#define S_ISREG(m)  (((m) & _S_IFMT) == _S_IFREG)
+#endif
+#ifndef S_ISCHR
+#define S_ISCHR(m)  (((m) & _S_IFMT) == _S_IFCHR)
+#endif
+
 #define __ATOMIC_RELAXED    0
 #define __ATOMIC_CONSUME    1
 #define __ATOMIC_ACQUIRE    2
@@ -106,6 +121,7 @@ typedef SSIZE_T ssize_t;
 #define __builtin_expect(x, y)  (x)
 #define __builtin_prefetch(x, ...)  ((void)(x))
 #define __builtin_offsetof(type, member)  offsetof(type, member)
+#define __builtin_snprintf  snprintf
 
 /* MSVC 等效的位操作内建函数 */
 static inline int airy_msvc_ctz(unsigned int x) {

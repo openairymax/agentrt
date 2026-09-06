@@ -12,6 +12,12 @@
 
 #include "cli_tui_internal.h"
 
+/* Windows 无 dirent.h/sys/stat.h 的 S_IS* 宏：airy_dirent.h（FindFirstFileA
+ * 实现）与 stat.h 在 _WIN32 下补齐（#112 实证 tui_complete.c C2065/C2079/
+ * C2224：DIR/struct stat/_S_IFDIR 均未声明） */
+#include "airy_dirent.h"
+#include <sys/stat.h>
+
 /* 用候选文本替换输入缓冲区中的 token（tok_start..tok_start+tok_len），
  * 光标落在替换文本末尾。 */
 static void tui_tab_replace(cli_tui_t *t, size_t tok_start, size_t tok_len,
