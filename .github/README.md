@@ -29,25 +29,67 @@ heapstore / protocols）作为 git 子模块，对外提供微内核原语、认
 ```
 .github/
 ├── README.md          # 本文件
+├── actions/           # 复合 action（复用模板，防 build-test/release 双实现漂移）
+│   ├── lf-init-deps/        # 定向子模块检出（agentrt 7 叶子，release 额外 + sibling 数据）
+│   ├── lf-build-container/  # Linux 容器腿统一构建模板（digest 钉版镜像 + 日志 annotation）
+│   └── lf-package/          # tar.gz 打包统一模板（staging + sha256 + upload-artifact）
+├── docker/
+│   └── qemu-toolchain/      # 交叉编译工具链镜像（固化 apt+自编译 deps，提速 qemu 腿）
+│       ├── ubuntu.Dockerfile      # arm64 / arm32 / amd64 容器腿用
+│       └── debian-i386.Dockerfile # linux-x86-32 腿用
 ├── scripts/
-│   ├── init-submodules.sh   # CI 依赖布局：7 叶子子模块 + release 期 sibling 数据
-│   └── sync-mirror.sh       # agentrt + 7 叶子 → GitHub / Gitee 镜像同步
+│   ├── init-submodules.sh       # CI 依赖布局：7 叶子子模块 + release 期 sibling 数据
+│   ├── sync-mirror.sh           # agentrt + 7 叶子 → GitHub / Gitee 镜像同步
+│   ├── setup-release-environment.sh  # release environment + branch/tag policy 幂等配置（H3）
+│   ├── ci-debug-dump.sh         # 失败步骤完整日志直传 ci-debug issue（排障拉取）
+│   ├── build-tui.sh             # Rust TUI（agentrt-tui）构建
+│   └── finalize-linux-libs.sh   # Linux 打包前运行库自包含收尾
 └── workflows/
-    ├── build-test.yml       # 构建 / 测试 / 覆盖率门禁（Linux / macOS / Windows）
-    ├── codegen-check.yml    # syscall.xml SSoT 漂移校验（codegen 产物一致性）
-    ├── release.yml          # 六平台发布（cosign + GPG 签名，atomgit 官方 + GitHub 镜像）
-    ├── ssot-validate.yml    # 用户态 SSoT 技术点权威源门禁（TP-012~016，dispatch 按需）
-    └── sync-mirror.yml      # atomgit(SSoT) → GitHub / Gitee 镜像同步触发器
+    ├── build-test.yml           # 构建 / 测试门禁（Linux 覆盖率 / macOS / Windows）
+    ├── build-toolchain-images.yml  # 交叉工具链 GHCR 镜像构建推送（qemu 腿基础设施）
+    ├── codegen-check.yml        # syscall.xml SSoT 漂移校验
+    ├── release.yml              # 跨平台发布（8 构建腿 + release + publish）
+    ├── smoke-selftest.yml       # macOS runtime smoke 脚本自检载体（G4 调试期，绿后拆除）
+    └── sync-mirror.yml          # atomgit(SSoT) → GitHub / Gitee 镜像同步触发器
 ```
+
+### 为什么是"四层结构"——看似复杂，实际是三类历史教训的收敛
+
+流水线体量的来源不是"三条平台线各写一份"，而是把**每个平台腿的公共
+步骤抽成一份模板**（复合 action / 脚本 / 镜像），四层各有单一职责：
+
+1. **workflows**（编排层）只做"触发 × 跑哪些 job"。两个主 workflow：
+   `build-test.yml` = 三平台高频门禁（Linux 覆盖率 / macOS / Windows 三个
+   job），`release.yml` = 发布时的一次性跨平台构建 + 汇聚 publish（26 资产
+   一次落库，manifest.latest 单点）。
+2. **actions/**（复用层）：历史教训是同一段 shell 在 release.yml 和
+   build-test.yml 各写一份，改一侧另一侧漂移 → 构建红。`lf-*` 把
+   checkout/子模块、容器腿构建、tar.gz 打包收敛成单一权威模板（P3 收口）。
+3. **docker/**（提速层）：qemu 交叉腿（arm64/arm32/i386）最初每轮在容器
+   内从源码重编全部依赖（arm-64 实测 88 min），把环境固化进 GHCR 镜像后
+   环境准备归零（0.1.11 E1 / 0.1.12 I1 实证）。
+4. **scripts/**（细节层）：workflow YAML 难以承载的幂等配置（H3 release
+   environment）、失败日志直传 issue（ci-debug-dump）、子模块布局等长逻辑。
+
+**"为什么不拆 Windows / Linux / macOS 三条流水线"（0.1.13 结构定案）**：
+拆线表面更清晰，实则每个平台要各自维护"触发条件 + 产物名 + 上传逻辑 +
+环境变量 + Secrets"，与现在唯一的区别是把**已收敛的公共部分再拆散成三份
+漂移源**。发布是跨平台原子事件（26 资产同一次落库 / tag 单点 / Environment
+审批不下沉），拆成三条后 release 原子性要靠三线对齐，代价更高。当前形态 =
+**一条发布流水线（release.yml）+ 三条门禁（build-test.yml 的 linux/macos/
+windows job）+ 一套复用件（lf-* / 镜像 / 脚本）**，即"逻辑上三平台、物理
+上一份"。release.yml 若超 800 行且编排复杂度继续增长，再评估 workflow_call
+拆腿（Environment 审批必须留在主文件）。
 
 ## 工作流
 
 | workflow | 触发 | 说明 |
 |----------|------|------|
-| `build-test.yml` | `push main` / `pull_request` / `workflow_dispatch` | Debug 全量构建 + `ctest` + `lcov` 覆盖率门禁 55%（Linux container 20.04 / macOS Homebrew / Windows vcpkg） |
+| `build-test.yml` | `push main` / `pull_request` / `workflow_dispatch` | 三平台高频门禁：Linux（Debug + ctest + gcovr 覆盖率阈值）/ macOS（Homebrew）/ Windows（vcpkg + MSVC，`continue-on-error` 通告性，G1 全绿后升硬门禁） |
+| `build-toolchain-images.yml` | `push main`（Dockerfile/相关变更）/ `workflow_dispatch` | 交叉工具链镜像（arm64/arm32/i386 容器腿）构建并推送 GHCR，digest 钉版供 release 腿引用 |
 | `codegen-check.yml` | `push main` / `pull_request` / `workflow_dispatch` | `syscall_gen.py --check` 校验 `syscall.xml` 与生成产物漂移 |
-| `release.yml` | `tag v*` 推送 / `workflow_dispatch`（输入 version） | 六平台（linux-x64 / macos-arm64 / windows-x64 / riscv64 / arm64 / 32bit matrix）制品 → cosign + GPG 签名 → `publish-release.sh` 上传 atomgit 官方制品仓 + GitHub Release 镜像 |
-| `ssot-validate.yml` | `workflow_dispatch`（按需） | 伞级 SSoT 权威源门禁：以 `airymaxhub`（GitHub 镜像）为数据源克隆到临时区后运行 `validate-ssot.py`，校验 docs 登记的技术点物理宿主路径存在 |
+| `release.yml` | `tag v*` 推送 / `workflow_dispatch`（输入 version） | 跨平台构建腿（linux-x64 / linux-arm64 / linux-arm32 / linux-riscv64 / linux-x86-32 / macos-arm64 / macos-x86-64 / windows-x64）→ cosign + GPG 签名 → 汇聚 publish（26 资产一次落库 + manifest.latest）atomgit 官方 + GitHub Release 镜像；windows 腿当前 canary（publish REQUIRED_BIN 预检过 = 升 gate 判据） |
+| `smoke-selftest.yml` | `workflow_dispatch`（仅调试期） | macOS runtime smoke 脚本（smoke-macos-runtime.sh）自检载体——假产物跑全部分支，验证脚本逻辑后再放行真实 release 腿（G4，绿后拆除） |
 | `sync-mirror.yml` | `push main` / `workflow_dispatch` | `sync-mirror.sh`：agentrt + 7 叶子从 atomgit(SSoT) 同步至 GitHub / Gitee（缺仓自动创建，atoms 私有，错误隔离汇总） |
 
 ## 布局与子模块
