@@ -177,8 +177,14 @@ void cli_chat_reply(const char *input)
             const char *err_desc = cli_chat_err_desc((int)ret);
             if (ret == 0 && (!resp || resp->choice_count == 0))
                 err_desc = "模型未返回文本（可能仅生成了思考内容）";
-            char line[256];
-            snprintf(line, sizeof(line), "回复失败：%s", err_desc);
+            /* P24（0.1.12）：llm_d 参数校验失败时回传具体原因（如 messages
+             * 为空数组），随错误行透传，取代裸 JSON-RPC 错误显示。 */
+            char line[384];
+            const char *llm_err = llm_svc_adapter_last_error(g_chat_adapter);
+            if (llm_err && llm_err[0])
+                snprintf(line, sizeof(line), "回复失败：%s（%s）", err_desc, llm_err);
+            else
+                snprintf(line, sizeof(line), "回复失败：%s", err_desc);
             cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "对话", line);
             cli_msgbuf_free(&buf);
             return;
