@@ -105,27 +105,29 @@ AgentRT follows a cyclic layered architecture. Each layer depends only on the la
 
 ## Quick Install (End Users)
 
-One-line install for end users — no compilation required. The command always
-fetches the latest installer from the **main branch** (no release lag) and
-runs GPG verification + sha256 checksum + architecture self-check
-automatically:
+One-line install for end users — no compilation required. The installer is
+fetched live from the **main branch** (no release lag) and runs GPG
+verification + sha256 checksum + architecture self-check automatically:
 
 ```bash
-# Linux / macOS (native packages published: linux-x86-64 / linux-arm-64 /
-# linux-arm-32 / linux-x86-32, macOS arm-64 / x86-64)
 curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh | bash
 ```
 
-> If GitHub is unreachable, use the atomgit channel (identical content,
-> requires curl + python3):
->
-> ```bash
-> curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
->   | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
->   | bash
-> ```
+Native packages published: **Linux** linux-x86-64 / arm-64 / arm-32 / x86-32;
+**macOS** arm-64 / x86-64 (since v0.1.11).
 
-Common variants — append flags after `| bash -s --`:
+<details>
+<summary>Can't reach GitHub? Use the atomgit channel (identical content)</summary>
+
+```bash
+curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
+  | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
+  | bash
+```
+
+</details>
+
+Need a custom prefix / beta channel / uninstall? Append flags after `| bash -s --`:
 
 ```bash
 # Custom prefix (default: $HOME/.airymaxrt)
@@ -144,12 +146,15 @@ curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/in
 > **Updating a custom-prefix install?** The installer persists the install
 > root to `<root>/config/install.env`. Afterwards `airymaxrt update`,
 > launcher updates, and `--reinstall` all act on the **original install
-> path** — no need to repeat `--prefix`. With multiple installs on one
-> machine, `which airymaxrt` shows which copy PATH points to.
+> path** (install.env is read, never falling back to the default) — no need
+> to repeat `--prefix`. With multiple installs on one machine, `which
+> airymaxrt` shows which copy PATH points to.
 
-> **Windows**: native packages are being built by the GitHub Actions
-> packaging pipeline (0.1.12). Meanwhile use WSL2: `wsl --install`
-> (WSL2 + Ubuntu), then run the Linux one-liner above inside WSL.
+> **Windows / macOS users**: macOS arm-64 / x86-64 native packages have been
+> published by the GitHub Actions pipeline since v0.1.11 — use the Linux/macOS
+> one-liner above directly. The Windows x86-64 native package is being finalized
+> by the GitHub Actions packaging pipeline (0.1.12); until it ships, use WSL2:
+> `wsl --install` (WSL2 + Ubuntu), then run the Linux one-liner above inside WSL.
 
 After install, `airymaxrt` is on PATH and `airymaxrt start` launches the runtime.
 The installer auto-profiles the hardware (full/minimal runtime profile) and the
