@@ -379,6 +379,9 @@ jobs:
 
       - name: Configure
         shell: pwsh
+        # G1 stage-1（0.1.13）：本 canary 显式 opt-in daemons(15)/CLI，把
+        # MSVC 编译+链接错误列表作为 Windows 完整产品移植的 triage 数据集
+        #（错误 → 修复 → 提交，随 release dispatch 回归）；默认矩阵不变。
         run: |
           cmake -S . -B ${{ env.BUILD_DIR }} `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
@@ -386,6 +389,7 @@ jobs:
             -DBUILD_TESTS=OFF `
             -DENABLE_SANITIZERS=OFF `
             -DAIRY_BUILD_ALL=ON `
+            -DBUILD_DAEMON=ON -DBUILD_CLI=ON `
             -DCMAKE_INSTALL_PREFIX="${{ env.STAGE_DIR }}"
 
       - name: Build
