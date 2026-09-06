@@ -72,18 +72,33 @@ jobs:
         run: |
           cmake --build ${{ env.BUILD_DIR }} --parallel "$(nproc)"
 
-      - name: Run tests (ctest)
+      - name: Run tests (ctest, auto-retry once)
         run: |
+          # --timeout 240：单测超时护栏。瞬态 flaky（tool_d_test_executor
+          # 2026-09-06 实证：linux runner 负载下并发时序单测首轮偶发红、
+          # 同环境 rerun-failed 即全过）经一次自动重试吸收；真实回归
+          # rerun 仍失败 → fail-closed。与 macOS 腿（corekern_deep
+          # 2026-09-05 实证）同口径。
           set +e
           ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure -j"$(nproc)" \
             --timeout 240 > /tmp/ctest.log 2>&1
           rc=$?
-          if [ $rc -ne 0 ]; then
-            echo "::error::ctest FAILED rc=$rc"
-            awk '/The following tests FAILED:/,/Errors while running CTest/' /tmp/ctest.log | sed 's/^/::error::  /' | head -40
-            grep -E '^\s*[0-9]+/[0-9]+ Testing|FAILED|Failed' /tmp/ctest.log | sed 's/^/::error::  /' | head -40
-            exit $rc
+          if [ $rc -eq 0 ]; then
+            exit 0
           fi
+          echo "::error::ctest FAILED rc=$rc (attempt 1)，自动 rerun-failed…"
+          awk '/The following tests FAILED:/,/Errors while running CTest/' /tmp/ctest.log | sed 's/^/::error::  /' | head -40
+          grep -E '^\s*[0-9]+/[0-9]+ Testing|FAILED|Failed' /tmp/ctest.log | sed 's/^/::error::  /' | head -40
+          ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure --rerun-failed \
+            --timeout 240 > /tmp/ctest-rerun.log 2>&1
+          rc2=$?
+          if [ $rc2 -eq 0 ]; then
+            echo "::warning::ctest attempt1 失败但 rerun-failed 全过（flaky），门禁放行"
+            exit 0
+          fi
+          echo "::error::ctest rerun FAILED rc=$rc2"
+          tail -n 40 /tmp/ctest-rerun.log | sed 's/^/::error::  /'
+          exit $rc2
 
       # 覆盖率门禁：低于阈值（COVERAGE_THRESHOLD）即失败，
       # 防止发行版功能回归（50-engineering-standards / TEST-03）。
