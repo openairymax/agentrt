@@ -341,17 +341,18 @@ jobs:
         # 逐轮 triage 列表（错误 → 修复 → 提交，随 push 自动回归）；产品面
         # 全绿后再升 gate 判据（publish REQUIRED_BIN）。测试面沿用 P25
         # 整目标守卫（daemon 链测试 Windows 不编译）。
-        # G2（0.1.13）：Release 语义不变（/O2）但带 /Zi 编译 + /DEBUG 链接，
-        # 产物生成 PDB——windows ctest SegFault（#127）无符号栈只有裸偏移
-        # （test_heapstore_core+0x4e99），cdb 栈无法落到函数名。带 PDB 后
-        # .ecxr + k 直接给出符号化调用栈，一次定位根因。
+        # G2（0.1.13）：PDB 符号注入——直接覆盖 CMAKE_C_FLAGS_RELEASE 会连默认
+        # 优化标志一起换掉，造成与既有轮次编译语义漂移（orchestrator.c C4702
+        # 曾因此暴露）；CMAKE_MSVC_DEBUG_INFORMATION_FORMAT 在默认 Release
+        # 标志之上加 /Zi + /DEBUG，产物带 PDB 且不改优化。windows ctest
+        # SegFault（#127）无符号栈只有裸偏移（test_heapstore_core+0x4e99），
+        # cdb .ecxr + k 带 PDB 直接落函数名一次定位根因。
         run: |
           cmake -S . -B ${{ env.BUILD_DIR }} `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
             -DBUILD_TESTS=ON -DAIRY_BUILD_ALL=ON -DBUILD_DAEMON=ON -DBUILD_CLI=ON `
             -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_C_FLAGS_RELEASE="/MD /O2 /Ob2 /DNDEBUG /Zi" `
-            -DCMAKE_EXE_LINKER_FLAGS_RELEASE="/INCREMENTAL:NO /DEBUG"
+            -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=ProgramDatabase
 
       - name: Build
         shell: pwsh
