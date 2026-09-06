@@ -1,102 +1,102 @@
 {
   "schema": 1,
   "channel": "stable",
-  "latest": "v0.1.12-rc6",
-  "updated_at": "2026-09-06T10:59:29Z",
+  "latest": "v0.1.12",
+  "updated_at": "2026-09-06T11:54:06Z",
   "releases": {
-    "v0.1.12-rc6": {
+    "v0.1.12": {
       "yanked": false,
       "notes": "",
       "artifacts": {
         "linux-arm-32": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-linux-arm-32.tar.gz",
-          "sha256": "9f37706eb45d5b475093e563a66a77b52b5661eb312f49c0e87b736b0fc6955d",
-          "size": 35571756
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-linux-arm-32.tar.gz",
+          "sha256": "ba0cc84edee213d9cb99973aea3b62f58126c2933e6e19b73d5756a5f8eeb5b6",
+          "size": 35571171
         },
         "linux-arm-64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-linux-arm-64.tar.gz",
-          "sha256": "f3793876760c3246811ff0c160e8a14a3cd5c8c4fd8d7a563bdbb3df9584cbf1",
-          "size": 37138511
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-linux-arm-64.tar.gz",
+          "sha256": "8f2ab0d5c347b962e3d18125f15b5084c0554597dad21c1d9679056024ed2a13",
+          "size": 37135488
         },
         "linux-x86-32": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-linux-x86-32.tar.gz",
-          "sha256": "be0765e5e9a867c6aab25e8a236f7710e2e425c8bf824cb431b2ceac7829dfb8",
-          "size": 35525116
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-linux-x86-32.tar.gz",
+          "sha256": "cca98903d9ca07228c620ae5225d4f3298a7a083be5fe0095f8ce5960feda930",
+          "size": 35523892
         },
         "linux-x86-64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-linux-x86-64.tar.gz",
-          "sha256": "f640a5e14c61ed98bcdb13c8cccb2391c737714c74c07071a1a432d742479211",
-          "size": 37656840
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-linux-x86-64.tar.gz",
+          "sha256": "9c7931bd0e9d066cfc0e28045771b21a9a72e0d5226eb372a728030b6dd5e77e",
+          "size": 37656956
         },
         "macos-arm-64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-macos-arm-64.tar.gz",
-          "sha256": "574446ddbd1149bb3df986ffb4fd489f5b1a4e0b42b34e143e6a5f9c6dfb401e",
-          "size": 14619773
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-macos-arm-64.tar.gz",
+          "sha256": "19a05a5383aa4f7eca14a3c623e4c19fffc6072279bac4449df1d1e6c5878690",
+          "size": 14621940
         },
         "macos-x86-64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-macos-x86-64.tar.gz",
-          "sha256": "3eb3b7aac51b49f3c3cb8c01fef86f6e3916baaf19ff246f14222161d334845e",
-          "size": 14796900
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-macos-x86-64.tar.gz",
+          "sha256": "d0e9af1614be8cab1b77ee242a3d8d847ca072eeb0d1a94fd30a51d3a28f064c",
+          "size": 14796789
         },
         "linux-arm32": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-linux-arm-32.tar.gz",
-          "sha256": "9f37706eb45d5b475093e563a66a77b52b5661eb312f49c0e87b736b0fc6955d",
-          "size": 35571756
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-linux-arm-32.tar.gz",
+          "sha256": "ba0cc84edee213d9cb99973aea3b62f58126c2933e6e19b73d5756a5f8eeb5b6",
+          "size": 35571171
         },
         "linux-armv7l": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-linux-arm-32.tar.gz",
-          "sha256": "9f37706eb45d5b475093e563a66a77b52b5661eb312f49c0e87b736b0fc6955d",
-          "size": 35571756
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-linux-arm-32.tar.gz",
+          "sha256": "ba0cc84edee213d9cb99973aea3b62f58126c2933e6e19b73d5756a5f8eeb5b6",
+          "size": 35571171
         },
         "linux-arm64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-linux-arm-64.tar.gz",
-          "sha256": "f3793876760c3246811ff0c160e8a14a3cd5c8c4fd8d7a563bdbb3df9584cbf1",
-          "size": 37138511
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-linux-arm-64.tar.gz",
+          "sha256": "8f2ab0d5c347b962e3d18125f15b5084c0554597dad21c1d9679056024ed2a13",
+          "size": 37135488
         },
         "linux-aarch64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-linux-arm-64.tar.gz",
-          "sha256": "f3793876760c3246811ff0c160e8a14a3cd5c8c4fd8d7a563bdbb3df9584cbf1",
-          "size": 37138511
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-linux-arm-64.tar.gz",
+          "sha256": "8f2ab0d5c347b962e3d18125f15b5084c0554597dad21c1d9679056024ed2a13",
+          "size": 37135488
         },
         "linux-x86": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-linux-x86-32.tar.gz",
-          "sha256": "be0765e5e9a867c6aab25e8a236f7710e2e425c8bf824cb431b2ceac7829dfb8",
-          "size": 35525116
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-linux-x86-32.tar.gz",
+          "sha256": "cca98903d9ca07228c620ae5225d4f3298a7a083be5fe0095f8ce5960feda930",
+          "size": 35523892
         },
         "linux-i686": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-linux-x86-32.tar.gz",
-          "sha256": "be0765e5e9a867c6aab25e8a236f7710e2e425c8bf824cb431b2ceac7829dfb8",
-          "size": 35525116
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-linux-x86-32.tar.gz",
+          "sha256": "cca98903d9ca07228c620ae5225d4f3298a7a083be5fe0095f8ce5960feda930",
+          "size": 35523892
         },
         "linux-x64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-linux-x86-64.tar.gz",
-          "sha256": "f640a5e14c61ed98bcdb13c8cccb2391c737714c74c07071a1a432d742479211",
-          "size": 37656840
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-linux-x86-64.tar.gz",
+          "sha256": "9c7931bd0e9d066cfc0e28045771b21a9a72e0d5226eb372a728030b6dd5e77e",
+          "size": 37656956
         },
         "linux-x86_64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-linux-x86-64.tar.gz",
-          "sha256": "f640a5e14c61ed98bcdb13c8cccb2391c737714c74c07071a1a432d742479211",
-          "size": 37656840
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-linux-x86-64.tar.gz",
+          "sha256": "9c7931bd0e9d066cfc0e28045771b21a9a72e0d5226eb372a728030b6dd5e77e",
+          "size": 37656956
         },
         "macos-arm64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-macos-arm-64.tar.gz",
-          "sha256": "574446ddbd1149bb3df986ffb4fd489f5b1a4e0b42b34e143e6a5f9c6dfb401e",
-          "size": 14619773
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-macos-arm-64.tar.gz",
+          "sha256": "19a05a5383aa4f7eca14a3c623e4c19fffc6072279bac4449df1d1e6c5878690",
+          "size": 14621940
         },
         "macos-aarch64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-macos-arm-64.tar.gz",
-          "sha256": "574446ddbd1149bb3df986ffb4fd489f5b1a4e0b42b34e143e6a5f9c6dfb401e",
-          "size": 14619773
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-macos-arm-64.tar.gz",
+          "sha256": "19a05a5383aa4f7eca14a3c623e4c19fffc6072279bac4449df1d1e6c5878690",
+          "size": 14621940
         },
         "macos-x64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-macos-x86-64.tar.gz",
-          "sha256": "3eb3b7aac51b49f3c3cb8c01fef86f6e3916baaf19ff246f14222161d334845e",
-          "size": 14796900
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-macos-x86-64.tar.gz",
+          "sha256": "d0e9af1614be8cab1b77ee242a3d8d847ca072eeb0d1a94fd30a51d3a28f064c",
+          "size": 14796789
         },
         "macos-x86_64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12-rc6/agentrt-v0.1.12-rc6-macos-x86-64.tar.gz",
-          "sha256": "3eb3b7aac51b49f3c3cb8c01fef86f6e3916baaf19ff246f14222161d334845e",
-          "size": 14796900
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.12/agentrt-v0.1.12-macos-x86-64.tar.gz",
+          "sha256": "d0e9af1614be8cab1b77ee242a3d8d847ca072eeb0d1a94fd30a51d3a28f064c",
+          "size": 14796789
         }
       }
     }
