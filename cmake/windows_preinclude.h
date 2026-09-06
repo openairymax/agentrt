@@ -109,6 +109,27 @@ typedef SSIZE_T ssize_t;
 
 #define strtok_r        strtok_s
 
+/* memmem：GNU 扩展（glibc），UCRT 无此函数。cli_gw.c 用于 HTTP 响应头
+ * 解析（#118 实证 LNK2001 memmem）。实现子串搜索（O(n*m)，仅作头解析
+ * 足够）；needle_len==0 返回 haystack 起点（与 glibc 语义一致）。 */
+static inline void *airy_msvc_memmem(const void *haystack, size_t haystack_len,
+                                     const void *needle, size_t needle_len)
+{
+    const unsigned char *h = (const unsigned char *)haystack;
+    const unsigned char *n = (const unsigned char *)needle;
+    if (!needle_len)
+        return (void *)h;
+    if (!haystack || !needle || haystack_len < needle_len)
+        return NULL;
+    for (size_t i = 0; i + needle_len <= haystack_len; i++) {
+        if (h[i] == n[0] && memcmp(h + i, n, needle_len) == 0)
+            return (void *)(h + i);
+    }
+    return NULL;
+}
+#define memmem(haystack, haystack_len, needle, needle_len) \
+    airy_msvc_memmem((haystack), (haystack_len), (needle), (needle_len))
+
 /* GCC __builtin_* 函数映射到标准 C 函数（MSVC 不支持 __builtin_ 前缀）*/
 #define __builtin_memcpy    memcpy
 #define __builtin_memset    memset
