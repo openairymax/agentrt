@@ -682,21 +682,26 @@ endif()
 # 读写+CAS：若无原生支持，链接阶段将因 libatomic libcall 失败。
 # ============================================================
 include(CheckCSourceCompiles)
-check_c_source_compiles("
-#include <stdatomic.h>
-_Atomic long long g_atomic64;
-int main(void) {
-    long long v = 0;
-    atomic_store_explicit(&g_atomic64, 42LL, memory_order_relaxed);
-    (void)atomic_load_explicit(&g_atomic64, memory_order_relaxed);
-    (void)atomic_compare_exchange_strong_explicit(&g_atomic64, &v, 1LL,
-                                                  memory_order_relaxed, memory_order_relaxed);
-    return 0;
-}
-" AIRY_HAVE_NATIVE_ATOMIC64)
-if(NOT AIRY_HAVE_NATIVE_ATOMIC64)
-    message(STATUS "64-bit atomics not native on this target; linking libatomic")
-    target_link_libraries(airy_platform_libs INTERFACE atomic)
+# libatomic 是 GCC/Clang 生态概念。MSVC 无 _Atomic（C11 原子走 Interlocked
+# 原生实现），探测代码会编译失败而被误判为"需链接 libatomic"，进而产生
+# LNK1181 cannot open input file 'atomic.lib'（build-test #109 实证）。
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    check_c_source_compiles("
+    #include <stdatomic.h>
+    _Atomic long long g_atomic64;
+    int main(void) {
+        long long v = 0;
+        atomic_store_explicit(&g_atomic64, 42LL, memory_order_relaxed);
+        (void)atomic_load_explicit(&g_atomic64, memory_order_relaxed);
+        (void)atomic_compare_exchange_strong_explicit(&g_atomic64, &v, 1LL,
+                                                      memory_order_relaxed, memory_order_relaxed);
+        return 0;
+    }
+    " AIRY_HAVE_NATIVE_ATOMIC64)
+    if(NOT AIRY_HAVE_NATIVE_ATOMIC64)
+        message(STATUS "64-bit atomics not native on this target; linking libatomic")
+        target_link_libraries(airy_platform_libs INTERFACE atomic)
+    endif()
 endif()
 
 # ============================================================
