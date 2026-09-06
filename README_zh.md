@@ -29,7 +29,7 @@ AgentRT 是 `airymaxhub` 伞仓下用户态工程大管理仓 `agent-workload` �
 curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh | bash
 ```
 
-已发布原生包（均经 GitHub Actions 流水线构建）：**Linux** linux-x86-64 / arm-64 / arm-32 / x86-32；**macOS** arm-64 / x86-64（v0.1.11 起）。Windows x86-64 原生包已由同一流水线构建打通，随 v0.1.12 发布。
+已发布原生包（均经 GitHub Actions 流水线构建）：**Linux** linux-x86-64 / arm-64 / arm-32 / x86-32；**macOS** arm-64 / x86-64（v0.1.11 起）。Windows x86-64 的 MSVC **基础库**编译/链接已由同一流水线打通（编译 canary 持续跟踪），完整产品（15 daemons + CLI + 运行测试）移植中，列为 0.1.13 里程碑——Windows 用户当前请用 WSL2（见下）。
 
 <details>
 <summary>无法访问 GitHub？用 atomgit 通道（内容相同）</summary>
@@ -65,10 +65,11 @@ curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/in
 > 确认 PATH 指向的是要更新的那份。
 
 > **Windows / macOS 用户**：macOS arm-64 / x86-64 与 Linux 各架构原生包由
-> GitHub Actions 流水线构建并发布（macOS 自 v0.1.11 起）。Windows x86-64
-> 原生包同样由该流水线构建（MSVC），随 v0.1.12 发布；正式发布前可用
-> WSL2：`wsl --install`（WSL2 + Ubuntu）后在 WSL 终端执行上方命令。macOS
-> 自 Catalina 起无 32 位运行环境，不存在 macos-32 包（发行说明有记录）。
+> GitHub Actions 流水线构建并发布（macOS 自 v0.1.11 起）。Windows x86-64 的
+> MSVC 基础库编译/链接已打通（编译 canary 持续验证），daemons/CLI 完整产品
+> 与运行测试在移植中（0.1.13 里程碑）；**正式发布前请用 WSL2**：`wsl --install`
+> （WSL2 + Ubuntu）后在 WSL 终端执行上方命令。macOS 自 Catalina 起无 32 位
+> 运行环境，不存在 macos-32 包（发行说明有记录）。
 
 安装完成后 `airymaxrt` 即入 PATH，`airymaxrt start` 拉起运行时。安装器
 自动按硬件裁剪运行画像（full/minimal），`airymaxrt monitor` 常驻检测外设

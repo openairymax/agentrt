@@ -295,21 +295,26 @@ jobs:
   # 保持完全体一致（config 模板 + permission_rules + maths-toolkit +
   # platform 标记），防止 Windows 包缺失组件（问题：打包漂移）。
   build-windows-x86-64:
-    # 0.1.12 B1.2 gate 化（2026-09-06，#50 rc4 实证后收口）：MSVC 全仓
-    # 编译+链接已绿（#122→#133 守卫链，P25），windows 腿晋升 tag 自动矩阵
-    # 并置 release.needs 硬门禁——v0.1.12 正式版将含 windows-x86-64 产物
-    #（installer 双端承诺，见 README）。此前 tag 自动发布不携带 windows
-    #（MSVC 移植未完成）已为历史；dispatch/experimental 阶段（U4→G1）结束。
+    # 0.1.12 P27 决策（2026-09-06，rc5 实证后回退）：MSVC **基础库层**
+    #（atoms/commons/cupolas/heapstore/protocols/gateway）编译+链接已全绿
+    #（#122→#133 守卫链，P25），本腿可产 zip；但 **daemons 15 服务与
+    # airy_cli 产品二进制尚未移植 Windows**——zip 缺 REQUIRED_BIN 关键组件，
+    # publish-release.sh 预检 fail-closed 实证（rc5 publish 中止）：
+    # "包内缺少关键组件: windows-x86-64.zip: airy_cli gateway_d llm_d think_d
+    # sched_d tool_d mem_d agent_d …"。故 Windows 不作为 v0.1.12 交付物；
+    # 本腿降级为 **dispatch-only 编译 canary**（跟踪编译/链接回归），产品
+    # 完整性（daemons/CLI/运行测试）列入 0.1.13 移植里程碑（G1/G2）。
     # E3：与 build-test windows-build 共享 ci-windows-runner-bus，防 MSVC 腿
     # 双 workflow 并跑占满 windows hosted 配额。
+    if: github.event_name == 'workflow_dispatch'
     concurrency:
       group: ci-windows-runner-bus
       cancel-in-progress: false
     runs-on: windows-latest
-    # 发布腿不跑测试（BUILD_TESTS=OFF），MSVC ctest runtime 适配（#133
-    # SegFault）归 0.1.13 移植里程碑，不阻塞发布产物。硬门禁语义：失败即
-    # 阻断 release/publish（诚实承诺 windows 包随正式版交付）。
-    continue-on-error: false
+    # canary 语义：失败/产物不完整均不阻断发布；zip 供移植进度审计。
+    #（release job 已显式剔除 windows 制品，见 "Drop experimental..." 步骤，
+    #   防 dispatch 下 zip 早于 release 完成而被并入发布 dist。）
+    continue-on-error: true
     env:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
@@ -885,14 +890,14 @@ jobs:
   # 实证：runner 美东→atomgit/OBS 上传 ~20MB 需 ~15min 撞 900s 超时被掐断）
   # 已由脚本 --max-time 3600 + 3 并发 + 上传完整性校验根治。
   release:
-    # build-windows-x86-64 自 0.1.12 起为硬门禁腿（B1.2，见该 job 头注）——
-    # 0.1.11 时代 "tag 不携带 windows" 已结束，正式版必须含 windows 产物。
-    # linux-riscv-64 仍为 dispatch-only 门控（QEMU 6h 上限，0.3.x 评估）；arm-32
-    # 为 experimental 独立腿（0.1.11 E6 矩阵解耦，见 build-linux-arm-32 job），
-    # 亦不在 needs——不阻塞 release，其制品若先完成由 Download all artifacts
-    # 并入，否则随后补发。门禁 = 已实证的 Linux x86-64 / macOS arm-64 / macOS
-    # x86-64 / Linux arm-64 / Linux 32（x86-32）/ Windows x86-64 六平台。
-    needs: [build-linux-x86-64, build-macos-arm-64, build-macos-x86-64, build-linux-arm-64, build-linux-32, build-windows-x86-64]
+    # build-windows-x86-64 / build-linux-riscv-64 为 dispatch-only 门控（P27：
+    # windows 产品未完整，zip 缺 daemons/CLI，见该 job 头注；riscv 为 QEMU
+    # 6h 上限预留 0.3.x），不在 needs；arm-32 为 experimental 独立腿（0.1.11
+    # E6 矩阵解耦，见 build-linux-arm-32 job），亦不在 needs——不阻塞 release，
+    # 其制品若先完成由 Download all artifacts 并入，否则随后补发。门禁 =
+    # 已实证全绿的 Linux x86-64 / macOS arm-64 / macOS x86-64 / Linux
+    # arm-64 / Linux 32（x86-32）五平台。
+    needs: [build-linux-x86-64, build-macos-arm-64, build-macos-x86-64, build-linux-arm-64, build-linux-32]
     runs-on: ubuntu-latest
     # tag 推送或手动 dispatch（手动时版本来自 inputs.version）皆可触发
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
@@ -919,6 +924,14 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+
+      # P27（2026-09-06，rc5 实证）：windows canary 的 zip 若早于本 job 完成会
+      # 被并入 dist；其缺 daemons/CLI（产品未完整），publish 预检 fail-closed
+      # 会中止整链。显式剔除 windows 制品（auditable），正式发布不含 windows。
+      - name: Drop experimental windows artifact from release dist
+        run: |
+          rm -f dist/agentrt-*-windows-x86-64.zip dist/agentrt-*-windows-x86-64.zip.sha256
+          echo "release dist 最终制品: $(ls dist/agentrt-*.tar.gz 2>/dev/null | wc -l) 个 tar.gz"
 
       # 0.1.10a 修复（生产实证，2026-09-05）：包内只含 gen3 标记（如
       # platform-x86-64）导致 ≤v0.1.9 更新器拒绝升级——旧更新器以精确文件名

@@ -114,7 +114,11 @@ curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/in
 ```
 
 Native packages published: **Linux** linux-x86-64 / arm-64 / arm-32 / x86-32;
-**macOS** arm-64 / x86-64 (since v0.1.11).
+**macOS** arm-64 / x86-64 (since v0.1.11). The Windows x86-64 MSVC
+foundation libraries build and link on the same pipeline (compile canary
+kept green); the full product (15 daemons + CLI + runtime tests) is still
+being ported and targets the 0.1.13 milestone — Windows users should use
+WSL2 for now (see below).
 
 <details>
 <summary>Can't reach GitHub? Use the atomgit channel (identical content)</summary>
@@ -152,11 +156,12 @@ curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/in
 
 > **Windows / macOS users**: macOS arm-64 / x86-64 and the Linux native
 > packages are built and published by the GitHub Actions pipeline (macOS
-> since v0.1.11). The Windows x86-64 native package is built by the same
-> pipeline (MSVC) and ships with v0.1.12; until then use WSL2: `wsl
-> --install` (WSL2 + Ubuntu), then run the Linux one-liner above inside
-> WSL. macOS has no 32-bit runtime since Catalina, so no macos-32 package
-> exists (documented in the release notes).
+> since v0.1.11). The Windows x86-64 MSVC foundation libraries build and
+> link on the same pipeline (compile canary); the full Windows product
+> (daemons + CLI + runtime tests) is being ported and targets the 0.1.13
+> milestone — until then use WSL2: `wsl --install` (WSL2 + Ubuntu), then run
+> the Linux one-liner above inside WSL. macOS has no 32-bit runtime since
+> Catalina, so no macos-32 package exists (documented in the release notes).
 
 After install, `airymaxrt` is on PATH and `airymaxrt start` launches the runtime.
 The installer auto-profiles the hardware (full/minimal runtime profile) and the
