@@ -261,6 +261,9 @@ jobs:
             exit 0
           fi
           echo "::error::macOS ctest rerun FAILED rc=$rc2"
+          # 断言级失败明细：corekern_deep 2026-09-06 实证 rerun 双败但
+          # tail 窗口内全是 PASS 行；全量抓取 [FAIL] 行定位具体断言。
+          grep -E '\[FAIL\]' /tmp/macos-rerun.log | head -30 | sed 's/^/::error::  /' || true
           tail -n 40 /tmp/macos-rerun.log | sed 's/^/::error::  /'
           exit $rc2
 
