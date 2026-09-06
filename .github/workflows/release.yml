@@ -70,16 +70,13 @@ jobs:
       # 完全体 finalize 在容器内执行：host 无 /usr/local 自编译库，host 侧
       # ldd 收集必 not found（对齐 arm-64 腿；.collected 不入包）。
       - name: Build in x86-64 container
-        run: |
-          docker run --rm --platform linux/amd64 \
-            -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage \
-            -v "$PWD":/src -w /src \
-            ghcr.io/openairymax/agentrt-qemu-toolchain:amd64-20260906-1@sha256:99d3ac35030b3a19ef36277b443e011005224ee53b6187e8a60ca40b429def82 \
-            bash -c '
-            # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）
-            set -euo pipefail
-            exec > >(tee /src/container-x86-64.log) 2>&1
-            trap '"'"'echo "::error::[x86-64] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-x86-64.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
+        uses: ./.github/actions/lf-build-container
+        with:
+          image: ghcr.io/openairymax/agentrt-qemu-toolchain:amd64-20260906-1@sha256:99d3ac35030b3a19ef36277b443e011005224ee53b6187e8a60ca40b429def82
+          platform: linux/amd64
+          leg: x86-64
+          envs: -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage
+          script: |
             export DEBIAN_FRONTEND=noninteractive
             export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
             cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release \
@@ -101,43 +98,17 @@ jobs:
             done
             # 完全体 finalize：容器内收集运行时 .so + fail-closed 校验
             bash /src/.github/scripts/finalize-linux-libs.sh "$STAGE_DIR" /src/_tools
-            '
 
-      # 打包：包内建 agentrt-<version> 顶层目录。install.sh 二进制模式按
-      # agentrt-* 目录名匹配解压位置，无顶层目录时二进制安装 100% 失败。
-      # 同步产出 *.sha256（install.sh/airymaxrt --file 离线校验所需）。
-      - name: Package (tar.gz)
-        run: |
-          VERSION="${{ env.VERSION }}"; VERSION_NUM="${VERSION#v}"
-          PKG_DIR="pkg/agentrt-${VERSION_NUM}"
-          mkdir -p "${PKG_DIR}/config" "${PKG_DIR}/modules"
-          cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/"
-          cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
-          # install.sh 二进制模式依赖 bin/agentrt-bootstrap.sh（daemon 编排
-          # 脚本，位于 tools 子仓，cmake --install 不会带入），host 侧显式部署
-          cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
-          # 运行时 .so 收集/校验已在构建容器内由 finalize-linux-libs.sh 完成
-          #（host 无容器 /usr/local 自编译库，ldd 收集必 not found）
-          # 平台命名规范（0.1.10 起）：OS-架构族-位宽，如 linux-x86-64。
-          # 包标记 platform-<后缀>（x86-64 等）与更新器/安装器 plat_name()
-          # 同口径校验；勿回退 uname 原始名（platform-x86_64 会触发
-          # "制品架构与主机不匹配"拒绝，v0.1.9 打包回归实证）。
-          touch "${PKG_DIR}/platform-x86-64"
-          ARTIFACT="agentrt-${VERSION}-linux-x86-64"
-          tar -czf "${ARTIFACT}.tar.gz" -C pkg .
-          sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
-          echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      # 打包：包内建 agentrt-<version> 顶层目录（install.sh 二进制模式按
+      # agentrt-* 目录名匹配解压位置），platform 标记 + sha256 + upload
+      # 由 lf-package 统一模板收敛（staging 由 cmake --install 创建，必存在，
+      # 汇总 cp 硬失败防坏包）。
+      - name: Package and upload (tar.gz)
+        uses: ./.github/actions/lf-package
         with:
-          name: ${{ env.artifact_name }}
-          path: ${{ env.artifact_name }}.*
-          if-no-files-found: error
+          version: ${{ env.VERSION }}
+          platform-tag: x86-64
+          artifact-suffix: linux-x86-64
 
   # macOS arm-64：原生 runner（无 container——容器作业仅支持 Linux）。
   # openssl/zlib/sqlite/curl 为 keg-only，需显式导出 pkg-config 路径。
@@ -218,29 +189,15 @@ jobs:
             [ -d "$p" ] && cp -r "$p" "${{ env.STAGE_DIR }}/lib/" || true
           done
 
-      - name: Package (tar.gz)
-        run: |
-          VERSION="${{ env.VERSION }}"; VERSION_NUM="${VERSION#v}"
-          PKG_DIR="pkg/agentrt-${VERSION_NUM}"
-          mkdir -p "${PKG_DIR}/config" "${PKG_DIR}/modules"
-          cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/"
-          cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
-          touch "${PKG_DIR}/platform-arm-64"
-          ARTIFACT="agentrt-${VERSION}-macos-arm-64"
-          tar -czf "${ARTIFACT}.tar.gz" -C pkg .
-          sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
-          echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      # 打包：lf-package 统一模板（macOS 原生腿无 bootstrap 部署——
+      # bin/agentrt-bootstrap.sh 为 Linux daemon 编排脚本）。
+      - name: Package and upload (tar.gz)
+        uses: ./.github/actions/lf-package
         with:
-          name: ${{ env.artifact_name }}
-          path: ${{ env.artifact_name }}.*
-          if-no-files-found: error
+          version: ${{ env.VERSION }}
+          platform-tag: arm-64
+          artifact-suffix: macos-arm-64
+          with-bootstrap: 'false'
 
   # macOS x86-64 (Intel)：macos-15-intel 原生 runner（0.1.10 并行发布决策：
   # macOS 三平台补全。build-macos-arm-64 跑 macos-latest=arm64，Intel 存量
@@ -324,29 +281,14 @@ jobs:
             [ -d "$p" ] && cp -r "$p" "${{ env.STAGE_DIR }}/lib/" || true
           done
 
-      - name: Package (tar.gz)
-        run: |
-          VERSION="${{ env.VERSION }}"; VERSION_NUM="${VERSION#v}"
-          PKG_DIR="pkg/agentrt-${VERSION_NUM}"
-          mkdir -p "${PKG_DIR}/config" "${PKG_DIR}/modules"
-          cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/"
-          cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
-          touch "${PKG_DIR}/platform-x86-64"
-          ARTIFACT="agentrt-${VERSION}-macos-x86-64"
-          tar -czf "${ARTIFACT}.tar.gz" -C pkg .
-          sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
-          echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      # 打包：lf-package 统一模板（macOS 原生腿无 bootstrap 部署）。
+      - name: Package and upload (tar.gz)
+        uses: ./.github/actions/lf-package
         with:
-          name: ${{ env.artifact_name }}
-          path: ${{ env.artifact_name }}.*
-          if-no-files-found: error
+          version: ${{ env.VERSION }}
+          platform-tag: x86-64
+          artifact-suffix: macos-x86-64
+          with-bootstrap: 'false'
 
   # Windows x64：原生 runner（无 container）。vcpkg 已预装于
   # windows-latest（$env:VCPKG_INSTALLATION_ROOT）。zip 包必须与 tar.gz 包
@@ -528,17 +470,15 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Build in riscv64 container
-        run: |
-          docker run --rm --platform linux/riscv64 \
-            -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage \
-            -v "$PWD":/src -w /src ubuntu:20.04 bash -c '
-            # v0.1.9 教训：此前无 set -e，cmake 自编译失败后外层脚本继续执行，
-            # docker run 以 0 退出、stage/ 为空 → 上传 3KB 损坏制品。fail-closed：
-            # 任一中间步骤失败立即中止本作业，杜绝假绿。诊断：tee + ERR trap
-            # 以 ::error:: 上报失败命令与日志尾部（annotation 匿名 API 可读）。
-            set -euo pipefail
-            exec > >(tee /src/container-riscv64.log) 2>&1
-            trap '"'"'echo "::error::[riscv64] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-riscv64.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
+        uses: ./.github/actions/lf-build-container
+        with:
+          # riscv64 无专用工具链镜像（已知例外：ubuntu:20.04 非 digest 钉版，
+          # 镜像化记后续工程），QEMU 全模拟。
+          image: ubuntu:20.04
+          platform: linux/riscv64
+          leg: riscv64
+          envs: -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage
+          script: |
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
             apt-get install -y -qq \
@@ -592,34 +532,17 @@ jobs:
             # 完全体 finalize：容器内收集运行时 .so + fail-closed 校验（host
             # 无 /usr/local 自编译库，收集必 not found；.collected 不入包）
             bash /src/.github/scripts/finalize-linux-libs.sh "$STAGE_DIR" /src/_tools
-            '
 
-      - name: Package (tar.gz)
-        run: |
-          VERSION="${{ env.VERSION }}"; VERSION_NUM="${VERSION#v}"
-          PKG_DIR="pkg/agentrt-${VERSION_NUM}"
-          mkdir -p "${PKG_DIR}/config" "${PKG_DIR}/modules"
-          cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/" 2>/dev/null || true
-          cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
-          # 运行时 .so 收集/校验已在构建容器内由 finalize-linux-libs.sh 完成
-          #（host 无容器 /usr/local 自编译库，ldd 收集必 not found）
-          touch "${PKG_DIR}/platform-riscv-64"
-          ARTIFACT="agentrt-${VERSION}-linux-riscv-64"
-          tar -czf "${ARTIFACT}.tar.gz" -C pkg .
-          sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
-          echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      # 打包：包内建 agentrt-<version> 顶层目录（install.sh 二进制模式按
+      # agentrt-* 目录名匹配解压位置），platform 标记 + sha256 + upload
+      # 由 lf-package 统一模板收敛（staging 由 cmake --install 创建，必存在，
+      # 汇总 cp 硬失败防坏包）。
+      - name: Package and upload (tar.gz)
+        uses: ./.github/actions/lf-package
         with:
-          name: agentrt-${{ env.VERSION }}-linux-riscv-64
-          path: agentrt-${{ env.VERSION }}-linux-riscv-64.tar.gz*
-          if-no-files-found: error
+          version: ${{ env.VERSION }}
+          platform-tag: riscv-64
+          artifact-suffix: linux-riscv-64
 
   # ARM-64 (linux-arm-64)：0.1.11 E1-B——原生 arm64 hosted runner
   # （ubuntu-24.04-arm，公开仓库免费）执行，容器内 ubuntu:20.04 arm64
@@ -649,20 +572,17 @@ jobs:
       # docker run --platform linux/arm64 在 arm64 宿主上原生执行。
 
       - name: Build in arm-64 container
-        run: |
+        uses: ./.github/actions/lf-build-container
+        with:
           # E1 收口（2026-09-05）：预构建工具链镜像（GHCR 公开，digest 钉版）。
           # apt 依赖 + lib-builddeps 自编译产物已固化进镜像（Dockerfile 与
           # release 腿同源，glibc 2.31 基线不变），本腿只做项目构建/打包——
           # 省去每轮 apt + 源码重编 deps（原生 arm64 下进一步压缩墙钟）。
-          docker run --rm --platform linux/arm64 \
-            -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage \
-            -v "$PWD":/src -w /src \
-            ghcr.io/openairymax/agentrt-qemu-toolchain:arm64-20260906-1@sha256:598a269f97744d81d80c67ffd7516f7f79ad33b8bc904346a56a5c31d3dbc146 \
-            bash -c '
-            # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）
-            set -euo pipefail
-            exec > >(tee /src/container-arm-64.log) 2>&1
-            trap '"'"'echo "::error::[arm-64] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-arm-64.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
+          image: ghcr.io/openairymax/agentrt-qemu-toolchain:arm64-20260906-1@sha256:598a269f97744d81d80c67ffd7516f7f79ad33b8bc904346a56a5c31d3dbc146
+          platform: linux/arm64
+          leg: arm-64
+          envs: -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage
+          script: |
             export DEBIAN_FRONTEND=noninteractive
             # Rust 工具链仅供 agentrt-tui 构建；TUI 不在发布必检
             # REQUIRED_BIN 之列。qemu 模拟下 rustup-init 偶发网络/执行
@@ -697,34 +617,14 @@ jobs:
             # 完全体 finalize：容器内收集运行时 .so + fail-closed 校验（host
             # 无 /usr/local 自编译库，收集必 not found；.collected 不入包）
             bash /src/.github/scripts/finalize-linux-libs.sh "$STAGE_DIR" /src/_tools
-            '
 
-      - name: Package (tar.gz)
-        run: |
-          VERSION="${{ env.VERSION }}"; VERSION_NUM="${VERSION#v}"
-          PKG_DIR="pkg/agentrt-${VERSION_NUM}"
-          mkdir -p "${PKG_DIR}/config" "${PKG_DIR}/modules"
-          cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/" 2>/dev/null || true
-          cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
-          # 运行时 .so 收集/校验已在构建容器内由 finalize-linux-libs.sh 完成
-          #（host 无容器 /usr/local 自编译库，ldd 收集必 not found）
-          touch "${PKG_DIR}/platform-arm-64"
-          ARTIFACT="agentrt-${VERSION}-linux-arm-64"
-          tar -czf "${ARTIFACT}.tar.gz" -C pkg .
-          sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
-          echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      # 打包：lf-package 统一模板（staging 汇总 cp 硬失败防坏包）。
+      - name: Package and upload (tar.gz)
+        uses: ./.github/actions/lf-package
         with:
-          name: agentrt-${{ env.VERSION }}-linux-arm-64
-          path: agentrt-${{ env.VERSION }}-linux-arm-64.tar.gz*
-          if-no-files-found: error
+          version: ${{ env.VERSION }}
+          platform-tag: arm-64
+          artifact-suffix: linux-arm-64
 
   # 32 位 Linux（x86-32 gate / arm-32 experimental 独立腿）：六架构兼容
   # 决策（2026-08-30）补全 32 位构建门禁。统一 glibc 2.31 基线；覆盖老
@@ -783,11 +683,12 @@ jobs:
       # + RUSTFLAGS -C link-arg=-m32（gcc 驱动位置无关接受 -m32）。
       # 失败降级不阻断（finalize 有 glibc 闸）。
       - name: Build TUI (i686 cross in amd64 container)
-        run: |
-          docker run --rm --platform linux/amd64 \
-            -v "$PWD":/src -w /src \
-            ghcr.io/openairymax/agentrt-qemu-toolchain:amd64-20260906-1@sha256:99d3ac35030b3a19ef36277b443e011005224ee53b6187e8a60ca40b429def82 \
-            bash -c '
+        uses: ./.github/actions/lf-build-container
+        with:
+          image: ghcr.io/openairymax/agentrt-qemu-toolchain:amd64-20260906-1@sha256:99d3ac35030b3a19ef36277b443e011005224ee53b6187e8a60ca40b429def82
+          platform: linux/amd64
+          leg: tui-i686-cross
+          script: |
             set -euo pipefail
             apt-get update -qq && apt-get install -y -qq --no-install-recommends gcc-multilib
             curl --proto =https --tlsv1.2 -sSf --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal
@@ -803,10 +704,10 @@ jobs:
               || echo "warn: x86-32 TUI 交叉构建失败（非必检组件，降级继续）"
             mkdir -p /src/stage/bin
             cp -f /tmp/tui-target/i686-unknown-linux-gnu/release/agentrt-tui /src/stage/bin/ 2>/dev/null || true
-            '
 
       - name: Build in x86-32 container
-        run: |
+        uses: ./.github/actions/lf-build-container
+        with:
           # I1 收口（2026-09-06）：预构建 i386 工具链镜像（GHCR 公开，
           # digest 钉版）。apt 依赖 + lib-builddeps 自编译产物已固化进
           # 镜像（debian:bullseye-20240812-slim + snapshot.debian.org
@@ -815,18 +716,11 @@ jobs:
           # 腿同源）。linux/386 容器在 x86_64 hosted runner 经内核
           # CONFIG_IA32_EMULATION 原生执行——零 QEMU，省去每轮
           # apt + 源码重编 deps（对比 0.1.11 qemu 腿 5-8min 准备）。
-          docker run --rm --platform linux/386 \
-            -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage -e AIRY_JOBS \
-            -v "$PWD":/src -w /src \
-            ghcr.io/openairymax/agentrt-qemu-toolchain:i386-20260906-1@sha256:1266ca270863b1a79a341acd65ca867a745f068ede80fa6f6c099ba8cbd3b76b \
-            bash -c '
-            # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）。
-            # 诊断通道：stdout 全程 tee 到 /src/container-*.log（宿主工作区），
-            # ERR trap 把失败命令与日志尾部以 ::error:: 上报——annotation 经
-            # GitHub API 匿名可读，无需 admin 下载日志即可定位失败。
-            set -euo pipefail
-            exec > >(tee /src/container-x86-32.log) 2>&1
-            trap '"'"'echo "::error::[x86-32] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-x86-32.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
+          image: ghcr.io/openairymax/agentrt-qemu-toolchain:i386-20260906-1@sha256:1266ca270863b1a79a341acd65ca867a745f068ede80fa6f6c099ba8cbd3b76b
+          platform: linux/386
+          leg: x86-32
+          envs: -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage -e AIRY_JOBS
+          script: |
             # fail-fast：容器内架构必须为 i386。uname 在 32 位容器返回
             # 内核架构（x86_64），禁用（U10 陷阱）；dpkg 视角才可信。
             [ "$(dpkg --print-architecture)" = "i386" ] || {
@@ -850,34 +744,14 @@ jobs:
             # 完全体 finalize：容器内收集运行时 .so + fail-closed 校验（host
             # 无 /usr/local 自编译库，收集必 not found；.collected 不入包）
             bash /src/.github/scripts/finalize-linux-libs.sh "$STAGE_DIR" /src/_tools
-            '
 
-      - name: Package (tar.gz)
-        run: |
-          VERSION="${{ env.VERSION }}"; VERSION_NUM="${VERSION#v}"
-          PKG_DIR="pkg/agentrt-${VERSION_NUM}"
-          mkdir -p "${PKG_DIR}/config" "${PKG_DIR}/modules"
-          cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/" 2>/dev/null || true
-          cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
-          # 运行时 .so 收集/校验已在构建容器内由 finalize-linux-libs.sh 完成
-          #（host 无容器 /usr/local 自编译库，ldd 收集必 not found）
-          touch "${PKG_DIR}/platform-x86-32"
-          ARTIFACT="agentrt-${VERSION}-linux-x86-32"
-          tar -czf "${ARTIFACT}.tar.gz" -C pkg .
-          sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
-          echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      # 打包：lf-package 统一模板（staging 汇总 cp 硬失败防坏包）。
+      - name: Package and upload (tar.gz)
+        uses: ./.github/actions/lf-package
         with:
-          name: agentrt-${{ env.VERSION }}-linux-x86-32
-          path: agentrt-${{ env.VERSION }}-linux-x86-32.tar.gz*
-          if-no-files-found: error
+          version: ${{ env.VERSION }}
+          platform-tag: x86-32
+          artifact-suffix: linux-x86-32
 
   # arm-32 (linux-arm-32) experimental 独立腿：0.1.11 E6 矩阵解耦产物。
   # 与 x86-32 解耦原因见 build-linux-32 头注（QEMU 单腿 50min+ 曾整体阻塞
@@ -926,11 +800,12 @@ jobs:
       # 天然对齐基线（cross linker 无空格，LINKER 直接可用）。
       # 失败降级不阻断（finalize 有 glibc 闸）。
       - name: Build TUI (armv7 cross in arm64 container)
-        run: |
-          docker run --rm --platform linux/arm64 \
-            -v "$PWD":/src -w /src \
-            ghcr.io/openairymax/agentrt-qemu-toolchain:arm64-20260906-1@sha256:598a269f97744d81d80c67ffd7516f7f79ad33b8bc904346a56a5c31d3dbc146 \
-            bash -c '
+        uses: ./.github/actions/lf-build-container
+        with:
+          image: ghcr.io/openairymax/agentrt-qemu-toolchain:arm64-20260906-1@sha256:598a269f97744d81d80c67ffd7516f7f79ad33b8bc904346a56a5c31d3dbc146
+          platform: linux/arm64
+          leg: tui-arm32-cross
+          script: |
             set -euo pipefail
             apt-get update -qq && apt-get install -y -qq --no-install-recommends gcc-arm-linux-gnueabihf
             curl --proto =https --tlsv1.2 -sSf --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal
@@ -944,25 +819,18 @@ jobs:
               || echo "warn: armv7 TUI 交叉构建失败（非必检组件，降级继续）"
             mkdir -p /src/stage/bin
             cp -f /tmp/tui-target-arm32/armv7-unknown-linux-gnueabihf/release/agentrt-tui /src/stage/bin/ 2>/dev/null || true
-            '
 
       - name: Build in arm-32 container
-        run: |
+        uses: ./.github/actions/lf-build-container
+        with:
           # E1 收口（2026-09-05）：预构建 armhf 工具链镜像（GHCR 公开，
           # digest 钉版）。apt 依赖 + lib-builddeps 自编译产物已固化进
           # 镜像（Dockerfile 与 release 腿同源，glibc 2.31 基线不变）。
-          docker run --rm --platform linux/arm/v7 \
-            -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage -e AIRY_JOBS \
-            -v "$PWD":/src -w /src \
-            ghcr.io/openairymax/agentrt-qemu-toolchain:arm32-20260906-1@sha256:2a661a6c33f69e00e2210e12ce185f82355218427fecfcf2ba2e75e8163d6477 \
-            bash -c '
-            # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）。
-            # 诊断通道：stdout 全程 tee 到 /src/container-*.log（宿主工作区），
-            # ERR trap 把失败命令与日志尾部以 ::error:: 上报——annotation 经
-            # GitHub API 匿名可读，无需 admin 下载日志即可定位失败。
-            set -euo pipefail
-            exec > >(tee /src/container-arm-32.log) 2>&1
-            trap '"'"'echo "::error::[arm-32] FAILED rc=$? cmd: ${BASH_COMMAND:-?}"; sleep 1; tail -n 30 /src/container-arm-32.log 2>/dev/null | sed "s/^/::error::  /" || true'"'"' ERR
+          image: ghcr.io/openairymax/agentrt-qemu-toolchain:arm32-20260906-1@sha256:2a661a6c33f69e00e2210e12ce185f82355218427fecfcf2ba2e75e8163d6477
+          platform: linux/arm/v7
+          leg: arm-32
+          envs: -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage -e AIRY_JOBS
+          script: |
             # fail-fast：容器内架构必须为 armhf。uname 在 AArch32 compat
             # 下返回内核架构（aarch64），禁用（U10 陷阱）；dpkg 才可信。
             [ "$(dpkg --print-architecture)" = "armhf" ] || {
@@ -984,34 +852,14 @@ jobs:
             # 完全体 finalize：容器内收集运行时 .so + fail-closed 校验（host
             # 无 /usr/local 自编译库，收集必 not found；.collected 不入包）
             bash /src/.github/scripts/finalize-linux-libs.sh "$STAGE_DIR" /src/_tools
-            '
 
-      - name: Package (tar.gz)
-        run: |
-          VERSION="${{ env.VERSION }}"; VERSION_NUM="${VERSION#v}"
-          PKG_DIR="pkg/agentrt-${VERSION_NUM}"
-          mkdir -p "${PKG_DIR}/config" "${PKG_DIR}/modules"
-          cp -rf "${{ env.STAGE_DIR }}"/. "${PKG_DIR}/" 2>/dev/null || true
-          cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-          cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
-          cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
-          # 运行时 .so 收集/校验已在构建容器内由 finalize-linux-libs.sh 完成
-          #（host 无容器 /usr/local 自编译库，ldd 收集必 not found）
-          touch "${PKG_DIR}/platform-arm-32"
-          ARTIFACT="agentrt-${VERSION}-linux-arm-32"
-          tar -czf "${ARTIFACT}.tar.gz" -C pkg .
-          sha256sum "${ARTIFACT}.tar.gz" > "${ARTIFACT}.tar.gz.sha256"
-          echo "artifact_name=${ARTIFACT}" >> "$GITHUB_ENV"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      # 打包：lf-package 统一模板（staging 汇总 cp 硬失败防坏包）。
+      - name: Package and upload (tar.gz)
+        uses: ./.github/actions/lf-package
         with:
-          name: agentrt-${{ env.VERSION }}-linux-arm-32
-          path: agentrt-${{ env.VERSION }}-linux-arm-32.tar.gz*
-          if-no-files-found: error
+          version: ${{ env.VERSION }}
+          platform-tag: arm-32
+          artifact-suffix: linux-arm-32
 
   # 汇聚门禁平台制品 → 聚合为 release-dist 附件：既作为下方 publish job 的
   # 发布源，也作为审计/紧急 fallback 归档留存（release 附件 90 天）。
@@ -1159,6 +1007,10 @@ jobs:
       GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
       ATOMGIT_REPO: openairymax/agentrt
+      # P23 根修配套：manifest commit 双端同步所需（publish-release.sh 阶段 5
+      # 向 GitHub main 补推，fail-soft；无 PAT 时跳过并告警）。
+      GITHUB_REPO: ${{ github.repository }}
+      GITHUB_PAT: ${{ secrets.GH_TOKEN }}
       # 同 tag 重发/修复（C4）：OBS 预签名 PUT 按文件名覆盖，设置
       # AIRY_FORCE_UPLOAD=1 使发布永远覆盖远端同名附件，杜绝"跳过上传但
       # manifest 已按新 sha 重生成"的不一致（v0.1.10 同版本修复重发实证）。
