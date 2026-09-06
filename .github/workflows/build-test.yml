@@ -382,6 +382,46 @@ jobs:
           ctest --test-dir ${{ env.BUILD_DIR }} -C Release --output-on-failure --timeout 240 2>&1 | Tee-Object -FilePath $ctestLog
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # G2（0.1.13）：ctest SegFault 栈捕获（cdb）。windows runner 带
+      # Windows SDK Debugging Tools 时，对首个失败测试类跑 cdb，crash 断点
+      # 上 .ecxr + k 输出符号化调用栈，整段落 ci-debug issue —— SegFault 只
+      # 有 "***Exception: SegFault" 无法定位，需真实调用栈逐平台域修。
+      # 仅失败时触发；runner 无 cdb 则静默跳过（记录说明），不阻塞门禁。
+      - name: Triage ctest crash stacks (cdb)
+        if: failure()
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP "ctest-triage.log"
+          $cdb = @(
+            'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe',
+            'C:\Program Files\Windows Kits\10\Debuggers\x64\cdb.exe'
+          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $cdb) {
+            "cdb not found on runner - skip stack capture" | Tee-Object -FilePath $log
+            bash .github/scripts/ci-debug-dump.sh "windows ctest triage" $log
+            exit 0
+          }
+          $bdir = (Resolve-Path $env:BUILD_DIR).Path
+          $candidates = @(
+            'commons_test_test_platform',
+            'commons_test_test_platform_time',
+            'test_heapstore_core',
+            'kernel_state',
+            'depgraph-commons-acyclic'
+          )
+          foreach ($name in $candidates) {
+            $exe = Get-ChildItem $bdir -Recurse -Filter "$name.exe" -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+            if (-not $exe) { continue }
+            "===== cdb: $name =====" | Tee-Object -FilePath $log -Append
+            # 经典 cdb 自动化：初断处 -c 先 g 跑到 crash 断点，再 .ecxr + k。
+            & $cdb -o -c "g; .ecxr; k 40; q" $exe.FullName 2>&1 |
+              Tee-Object -FilePath $log -Append
+          }
+          bash .github/scripts/ci-debug-dump.sh "windows ctest triage" $log
+
       # 失败后 rerun 仅失败测试以拿到逐测试失败详情，整段落 ci-debug issue
       - name: Rerun failed tests & dump to ci-debug issue
         if: failure()
