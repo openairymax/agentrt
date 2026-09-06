@@ -3,6 +3,21 @@
 
 #ifdef _MSC_VER
 
+/* /std:c11 → __STDC__=1 → UCRT corecrt.h 默认 _CRT_INTERNAL_NONSTDC_NAMES=0，
+ * 关闭 _access/_open/_write/_close/_mktemp_s 与 S_ISDIR 等 POSIX 系声明
+ * （#116 windows-build C4013 实证）。corecrt.h 的取值在首个 UCRT 头展开
+ * 时锁定——本文件的 winsock2.h 即触发点——因此必须在此（任何 #include
+ * 之前）定义为 1。 */
+#ifndef _CRT_DECLARE_NONSTDC_NAMES
+#define _CRT_DECLARE_NONSTDC_NAMES 1
+#endif
+/* rand_s 声明要求 _CRT_RAND_S 在 stdlib.h 首次展开前定义（本文件下方
+ * 即 #include <stdlib.h>，include guard 使后续源文件的重复包含失效）。
+ * #116 实证：atoms/memory/builtin_storage.c C4013 'rand_s'。 */
+#ifndef _CRT_RAND_S
+#define _CRT_RAND_S 1
+#endif
+
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif

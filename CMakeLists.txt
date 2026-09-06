@@ -183,7 +183,12 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 if(MSVC)
     # MSVC安全选项
     add_compile_options(/W4 /WX- /permissive-)  # 最高警告级别，但警告不视为错误
-    add_compile_definitions(_CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_WARNINGS)
+    # _CRT_DECLARE_NONSTDC_NAMES：/std:c11 下恢复 POSIX 系声明（_access/
+    # S_ISDIR 等，#116 C4013 根因；windows_preinclude.h 已同款定义，此处
+    # 为叶子仓独立构建（不走 /FI 预包含）时的命令行级双保险）。
+    # _CRT_RAND_S：rand_s 声明开关，preinclude stdlib.h 时序同理。
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_WARNINGS
+                            _CRT_DECLARE_NONSTDC_NAMES=1 _CRT_RAND_S=1)
     add_compile_options(/GS /sdl- /guard:cf /utf-8)  # 安全选项
 
     # 禁用特定警告
