@@ -1,0 +1,61 @@
+name: Smoke Selftest
+
+# 临时开发载体（0.1.13 G4）：在 macos 原生 bash 3.2 上快速验证 tools 侧
+# smoke-macos-runtime.sh 的全部判定分支，避免为脚本 bug 反复烧全量
+# release macos 腿（g4smoke 34040562014 / g4smoke2 34041918304 实证）。
+# 用法：workflow_dispatch 手动触发；出结论后随 G4 收口删除本文件。
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Init submodules (tools)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh tools
+
+      - name: Show bash version
+        run: bash --version | head -1
+
+      - name: Build fake stage binaries
+        run: |
+          mkdir -p stage/bin
+          cat > /tmp/abort.c <<'CEOF'
+          #include <signal.h>
+          int main(void){ raise(SIGABRT); return 0; }
+          CEOF
+          cat > /tmp/exit1.c <<'CEOF'
+          int main(void){ return 1; }
+          CEOF
+          cat > /tmp/sleep3.c <<'CEOF'
+          #include <unistd.h>
+          int main(void){ sleep(3); return 0; }
+          CEOF
+          clang /tmp/abort.c -o stage/bin/a2a_d
+          clang /tmp/exit1.c -o stage/bin/gateway_d
+          clang /tmp/sleep3.c -o stage/bin/tool_d
+          printf '#!/bin/sh\necho skip-me\n' > stage/bin/agentrt-bootstrap.sh
+          chmod +x stage/bin/*
+          echo "stage/bin:"; ls -1 stage/bin
+
+      - name: Run smoke selftest
+        run: |
+          out="$(bash _tools/scripts/ci/release/smoke-macos-runtime.sh stage 2>&1)"
+          echo "$out"
+          echo "$out" | grep -q "冒烟通过" || { echo "::error::smoke 未按预期 PASS"; exit 1; }
+          echo "$out" | grep -q -- "-- probe: a2a_d" || { echo "::error::缺少 probe 标识"; exit 1; }
+          if echo "$out" | grep -q -- "-- probe: agentrt-bootstrap.sh"; then
+            echo "::error::非 Mach-O 不应被探测"; exit 1
+          fi
+          echo "SELFTEST PASS"
