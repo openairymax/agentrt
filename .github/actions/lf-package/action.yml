@@ -36,10 +36,20 @@ runs:
         PKG_DIR="pkg/agentrt-${VERSION_NUM}"
         mkdir -p "${PKG_DIR}/config" "${PKG_DIR}/modules"
         cp -rf "${{ inputs.staging }}"/. "${PKG_DIR}/"
-        cp -f agent-workload/ecosystem/manager/configs/agentrt.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-        cp -f agent-workload/ecosystem/manager/model/model.yaml "${PKG_DIR}/config/" 2>/dev/null || true
-        cp -f _tools/scripts/ops/templates/secrets.env.example "${PKG_DIR}/config/" 2>/dev/null || true
-        cp -f _tools/scripts/ops/templates/permission_rules.yaml "${PKG_DIR}/config/" 2>/dev/null || true
+        # config 模板 SSoT（0.1.13 完整性强化）：此前 `|| true` 容忍拷贝，
+        # 任一模板缺失即静默漏件（发布预检只能事后拦截）。模板均在仓库内，
+        # 缺失 = 上游/检出故障，直接 fail-closed，杜绝半成品包出腿。
+        for _cfg in \
+          agent-workload/ecosystem/manager/configs/agentrt.yaml \
+          agent-workload/ecosystem/manager/model/model.yaml \
+          _tools/scripts/ops/templates/secrets.env.example \
+          _tools/scripts/ops/templates/permission_rules.yaml; do
+          if [ -f "$_cfg" ]; then
+            cp -f "$_cfg" "${PKG_DIR}/config/" || { echo "::error::config 模板拷贝失败: $_cfg"; exit 1; }
+          else
+            echo "::error::config 模板缺失（漏件）: $_cfg"; exit 1
+          fi
+        done
         cp -rf agent-workload/ecosystem/markets/tools/maths-toolkit "${PKG_DIR}/modules/" 2>/dev/null || true
         if [ "${{ inputs.with-bootstrap }}" = "true" ]; then
           # install.sh 二进制模式依赖 bin/agentrt-bootstrap.sh（daemon 编排
