@@ -189,6 +189,13 @@ jobs:
             [ -d "$p" ] && cp -r "$p" "${{ env.STAGE_DIR }}/lib/" || true
           done
 
+      # G4/U6（0.1.13）：macOS dylib 自包含——otool -L 递归收集非系统 dylib 入
+      # lib/，install_name_tool 重写为 @executable_path/../lib/，ad-hoc 重签，
+      # fail-closed 校验（干净机无 brew 依赖亦可启动 daemon 群；工具脚本 SSoT
+      # 见 _tools/scripts/ci/release/bundle-macos-dylibs.sh）。
+      - name: Bundle macOS runtime dylibs (self-contained)
+        run: bash _tools/scripts/ci/release/bundle-macos-dylibs.sh "${{ env.STAGE_DIR }}"
+
       # 打包：lf-package 统一模板（macOS 原生腿无 bootstrap 部署——
       # bin/agentrt-bootstrap.sh 为 Linux daemon 编排脚本）。
       - name: Package and upload (tar.gz)
@@ -280,6 +287,11 @@ jobs:
                    agent-workload/sdk/sdk-python/agentrt; do
             [ -d "$p" ] && cp -r "$p" "${{ env.STAGE_DIR }}/lib/" || true
           done
+
+      # G4/U6（0.1.13）：macOS dylib 自包含（同 arm-64 腿，SSoT 见
+      # _tools/scripts/ci/release/bundle-macos-dylibs.sh）
+      - name: Bundle macOS runtime dylibs (self-contained)
+        run: bash _tools/scripts/ci/release/bundle-macos-dylibs.sh "${{ env.STAGE_DIR }}"
 
       # 打包：lf-package 统一模板（macOS 原生腿无 bootstrap 部署）。
       - name: Package and upload (tar.gz)
