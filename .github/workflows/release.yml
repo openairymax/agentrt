@@ -639,7 +639,7 @@ jobs:
           platform-tag: arm-64
           artifact-suffix: linux-arm-64
 
-  # 32 位 Linux（x86-32 gate / arm-32 experimental 独立腿）：六架构兼容
+  # 32 位 Linux（x86-32 / arm-32 双腿，均门禁）：六架构兼容
   # 决策（2026-08-30）补全 32 位构建门禁。统一 glibc 2.31 基线；覆盖老
   # x86 与 32 位 ARM 用户空间——64 位内核 + 32 位用户态场景。
   # 0.1.12 I1 收口（2026-09-06）：两腿均改预构建工具链镜像（GHCR 公开，
@@ -657,13 +657,14 @@ jobs:
   # （glibc 2.31）：容器内 gcc-multilib/cross-gcc 的 32 位 glibc 即
   # 2.31，64 位 rustup + 32 位 target 交叉产物天然对齐基线；i386 容器
   # 内 rustup 不可行（U10）。失败降级不阻断（finalize 有 glibc 闸）。
-  # 矩阵解耦（0.1.11 E6，2026-09-05）：arm-32 experimental 不再与本矩阵
+  # 矩阵解耦（0.1.11 E6，2026-09-05）：arm-32 独立成腿，不再与本矩阵
   # 同组。此前 release.needs 依赖整个矩阵，arm-32 单腿 QEMU 50min+ 未完，
   # release/publish（含审批）就始终不出现（v0.1.10 同版本重发 run 实证，
   # 用户问"还在进度中？为什么这么慢"）。拆分后本 job 仅 x86-32 一项
-  #（已实证门禁架构），arm-32 独立为下方 build-linux-arm-32 job（experimental，
-  # 不阻塞 release）；arm-32 若先于 release 完成则其制品被 Download all
-  # artifacts 并入发布，否则缺省补发（先发后修契约不变）。
+  #（已实证门禁架构），arm-32 独立为下方 build-linux-arm-32 job；原生化
+  # 后 2m37s 首验 → rc3/rc4/rc6/正式发布连续全绿 → 0.1.12 G3（2026-09-06）
+  # 将其置回门禁（continue-on-error:false + 移入 release.needs，见该 job
+  # 头注）。
   build-linux-32:
     runs-on: ubuntu-latest
     continue-on-error: false
@@ -766,13 +767,13 @@ jobs:
           platform-tag: x86-32
           artifact-suffix: linux-x86-32
 
-  # arm-32 (linux-arm-32) experimental 独立腿：0.1.11 E6 矩阵解耦产物。
-  # 与 x86-32 解耦原因见 build-linux-32 头注（QEMU 单腿 50min+ 曾整体阻塞
-  # release/publish 审批）。本 job 继续先发后修契约（2026-09-03 决策）：
-  #   - continue-on-error: true：失败不使 run 失败（发布门禁不依赖本腿）
-  #   - release.needs 不含本 job：release 聚合不等本腿；若本腿先完成，
-  #     Download all artifacts 会并入其制品，否则该制品缺省随后补发
-  #   - 置回门禁须连续绿实证（G3）：experimental: false + 移入 needs
+  # arm-32 (linux-arm-32) 门禁腿：0.1.11 E6 矩阵解耦产物，与 x86-32 解耦
+  # 原因见 build-linux-32 头注（QEMU 单腿 50min+ 曾整体阻塞 release/publish
+  # 审批）。G3 收口（2026-09-06，0.1.12 正式发布后）：连续绿实证（原生首验
+  # 2m37s → rc3 #49 → rc4 #50 → rc6 → 正式 v0.1.12 tag run，共 5+ run 全绿，
+  # 包内 ELF 32-bit ARM + lib/ .so=20 + 三代 markers 产物核验通过）→ 置回
+  # 门禁：continue-on-error: false + 移入 release.needs（下方 release 头注
+  # 同步更新）。
   # E1 收口（2026-09-05）：切原生 arm64 runner（ubuntu-24.04-arm）+
   # 预构建 armhf 工具链镜像（digest 钉版，apt+lib-builddeps 已固化）。
   # linux/arm/v7 在 aarch64 宿主上经内核 CONFIG_COMPAT 原生执行（零
@@ -782,7 +783,7 @@ jobs:
   # 防 32 位链接期地址空间不足（QEMU 时代教训沿用，首切原生保守值）。
   build-linux-arm-32:
     runs-on: ubuntu-24.04-arm
-    continue-on-error: true
+    continue-on-error: false
     env:
       BUILD_DIR: build
       STAGE_DIR: stage
@@ -892,12 +893,12 @@ jobs:
   release:
     # build-windows-x86-64 / build-linux-riscv-64 为 dispatch-only 门控（P27：
     # windows 产品未完整，zip 缺 daemons/CLI，见该 job 头注；riscv 为 QEMU
-    # 6h 上限预留 0.3.x），不在 needs；arm-32 为 experimental 独立腿（0.1.11
-    # E6 矩阵解耦，见 build-linux-arm-32 job），亦不在 needs——不阻塞 release，
-    # 其制品若先完成由 Download all artifacts 并入，否则随后补发。门禁 =
-    # 已实证全绿的 Linux x86-64 / macOS arm-64 / macOS x86-64 / Linux
-    # arm-64 / Linux 32（x86-32）五平台。
-    needs: [build-linux-x86-64, build-macos-arm-64, build-macos-x86-64, build-linux-arm-64, build-linux-32]
+    # 6h 上限预留 0.3.x），不在 needs。门禁 = 已实证全绿的 Linux x86-64 /
+    # x86-32 / arm-64 / arm-32 + macOS arm-64 / x86-64 六平台（arm-32 于
+    # G3 收口 2026-09-06 从 experimental 移入 needs，连续绿证据见
+    # build-linux-arm-32 头注）。arm-32 在 needs 中 → release 聚合必含其
+    # 制品，无"随后补发"缺口。
+    needs: [build-linux-x86-64, build-macos-arm-64, build-macos-x86-64, build-linux-arm-64, build-linux-32, build-linux-arm-32]
     runs-on: ubuntu-latest
     # tag 推送或手动 dispatch（手动时版本来自 inputs.version）皆可触发
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
