@@ -400,46 +400,63 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
+          # 健壮性：任何一步失败都不阻塞收集与 dump；本步固定 exit 0。
+          $ErrorActionPreference = 'Continue'
           $log = Join-Path $env:RUNNER_TEMP "ctest-triage.log"
+          "triage start $(Get-Date -Format o)" | Out-File -FilePath $log -Encoding utf8
           $cdb = @(
             'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe',
             'C:\Program Files\Windows Kits\10\Debuggers\x64\cdb.exe'
           ) | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $cdb) {
-            "cdb not found on runner - skip stack capture" | Tee-Object -FilePath $log
-            bash .github/scripts/ci-debug-dump.sh "windows ctest triage" $log
-            exit 0
-          }
           $bdir = (Resolve-Path $env:BUILD_DIR).Path
-          # 从 ctest rerun-failed 记录解析失败测试名 → 反推可执行文件：
-          # ctest 注册名带 commons_test_ 前缀（对应 exe test_platform 等，
-          # #127 实证 hardcode candidates 用 ctest 名找不到 exe，只抓到
-          # heapstore），atoms/cupolas/heapstore/taskflow 的 ctest 名即 exe 名。
-          $names = & ctest --test-dir $env:BUILD_DIR -C Release --rerun-failed -N 2>$null |
-            ForEach-Object {
-              if ($_ -match 'Test\s+#\d+:\s+(\S+)') { $matches[1] }
-            } | Select-Object -Unique
-          $exes = foreach ($name in $names) {
-            $base = $name -replace '^commons_test_', ''
-            Get-ChildItem $bdir -Recurse -Filter "$base.exe" -ErrorAction SilentlyContinue |
-              Select-Object -First 1
-          } | Select-Object -First 4
-          if (-not $exes) {
-            "no failing test exe found from rerun-failed - fall back to heapstore_core" |
-              Tee-Object -FilePath $log -Append
-            $exes = @(Get-ChildItem $bdir -Recurse -Filter "test_heapstore_core.exe" |
-              Select-Object -First 1)
+          if (-not $cdb) {
+            "cdb not found on runner - skip stack capture" | Add-Content $log
+          } else {
+            # 从 ctest rerun-failed 记录解析失败测试名 → 反推可执行文件：
+            # ctest 注册名带 commons_test_ 前缀（对应 exe test_platform 等，
+            # #127 实证 hardcode candidates 用 ctest 名找不到 exe，只抓到
+            # heapstore），atoms/cupolas/heapstore/taskflow 的 ctest 名即 exe 名。
+            $names = @()
+            try {
+              $names = @(& ctest --test-dir $env:BUILD_DIR -C Release --rerun-failed -N 2>&1 |
+                ForEach-Object {
+                  if ($_ -match 'Test\s+#\d+:\s+(\S+)') { $matches[1] }
+                } | Select-Object -Unique)
+            } catch {
+              "ctest rerun-failed -N failed: $($_.Exception.Message)" | Add-Content $log
+            }
+            "failed test names: $($names -join ', ')" | Add-Content $log
+            $exes = @()
+            foreach ($name in $names) {
+              $base = $name -replace '^commons_test_', ''
+              $found = Get-ChildItem $bdir -Recurse -Filter "$base.exe" -ErrorAction SilentlyContinue |
+                Select-Object -First 1
+              if ($found) { $exes += $found }
+            }
+            if ($exes.Count -gt 4) { $exes = $exes[0..3] }
+            if ($exes.Count -eq 0) {
+              "no failing test exe found from rerun-failed - fall back to heapstore_core" |
+                Add-Content $log
+              $found = Get-ChildItem $bdir -Recurse -Filter 'test_heapstore_core.exe' -ErrorAction SilentlyContinue |
+                Select-Object -First 1
+              if ($found) { $exes = @($found) }
+            }
+            foreach ($exe in $exes) {
+              "===== cdb: $($exe.Name) =====" | Add-Content $log
+              try {
+                # 经典 cdb 自动化：初断处 -c 先 g 跑到 crash 断点，再 .ecxr + k。
+                # Release + ProgramDatabase 产物带 PDB，栈可直接落到函数名。
+                & $cdb -o -c "g; .ecxr; k 40; q" $exe.FullName 2>&1 | Add-Content $log
+              } catch {
+                "cdb run failed for $($exe.Name): $($_.Exception.Message)" | Add-Content $log
+              }
+            }
           }
-          foreach ($exe in $exes) {
-            "===== cdb: $($exe.Name) =====" | Tee-Object -FilePath $log -Append
-            # 经典 cdb 自动化：初断处 -c 先 g 跑到 crash 断点，再 .ecxr + k。
-            # Release + /Zi + /DEBUG 产物带 PDB，栈可直接落到函数名。
-            & $cdb -o -c "g; .ecxr; k 40; q" $exe.FullName 2>&1 |
-              Tee-Object -FilePath $log -Append
-          }
+          "triage done $(Get-Date -Format o)" | Add-Content $log
+          # 无论是否拿到栈都整段落 ci-debug issue（无栈也有排查说明）；
+          # exit 0 保证该步骤不额外报红。
           bash .github/scripts/ci-debug-dump.sh "windows ctest triage" $log
-
-      # 失败后 rerun 仅失败测试以拿到逐测试失败详情，整段落 ci-debug issue
+          exit 0
       - name: Rerun failed tests & dump to ci-debug issue
         if: failure()
         shell: pwsh
