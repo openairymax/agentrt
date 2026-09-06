@@ -22,25 +22,27 @@ AgentRT 是 `airymaxhub` 伞仓下用户态工程大管理仓 `agent-workload` �
 
 ### 一键安装（终端用户）
 
-终端用户一行安装，无需编译。命令始终拉取 agentrt 仓 **main 分支**的最新
-安装器（git push 即时生效，不存在发版滞后），自动完成 GPG 验签 +
-sha256 校验 + 架构自检：
+一行安装，无需编译。安装器从 agentrt 仓 **main 分支**实时拉取
+（无发版滞后），自动完成 GPG 验签 + sha256 校验 + 架构自检：
 
 ```bash
-# Linux / macOS（已发布原生包：linux-x86-64 / linux-arm-64 / linux-arm-32 /
-# linux-x86-32、macOS arm-64 / x86-64）
 curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh | bash
 ```
 
-> 无法访问 GitHub 时改用 atomgit 通道（内容相同，需 curl + python3）：
->
-> ```bash
-> curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
->   | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
->   | bash
-> ```
+已发布原生包：**Linux** linux-x86-64 / arm-64 / arm-32 / x86-32；**macOS** arm-64 / x86-64（v0.1.11 起）。
 
-常用变体——把参数追加在 `| bash -s --` 之后即可：
+<details>
+<summary>无法访问 GitHub？用 atomgit 通道（内容相同）</summary>
+
+```bash
+curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
+  | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
+  | bash
+```
+
+</details>
+
+需要自定义路径 / 测试通道 / 卸载时，在管道后追加参数：
 
 ```bash
 # 自定义安装路径（默认 $HOME/.airymaxrt）
@@ -56,14 +58,16 @@ curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/in
   | bash -s -- --uninstall
 ```
 
-> **自定义路径用户如何更新？** 安装器会把安装根固化到
+> **更新与自定义路径**：安装器把安装根固化到
 > `<安装根>/config/install.env`。此后 `airymaxrt update`、启动器更新和
-> `--reinstall` 全部自动作用于**原安装路径**，无需重复传 `--prefix`。
-> 若机器上装过多份，用 `which airymaxrt` 确认 PATH 指向的是要更新的那份。
+> `--reinstall` 一律**自动作用于原安装路径**（读取 install.env，不会回落
+> 默认路径），无需重复传 `--prefix`。若机器上装过多份，用 `which airymaxrt`
+> 确认 PATH 指向的是要更新的那份。
 
-> **Windows**：原生安装包正在 GitHub Actions 打包管线（0.1.12）施工中，
-> 当前推荐 WSL2：`wsl --install`（WSL2 + Ubuntu）后，在 WSL 终端执行上方
-> Linux 命令。
+> **Windows / macOS 用户**：macOS arm-64 / x86-64 原生包自 v0.1.11 起已随
+> GitHub Actions 流水线发布，可直接用上方 Linux/macOS 命令安装。Windows
+> x86-64 原生包正由 GitHub Actions 打包管线（0.1.12）构建收尾，发布前可先
+> 用 WSL2：`wsl --install`（WSL2 + Ubuntu）后在 WSL 终端执行上方命令。
 
 安装完成后 `airymaxrt` 即入 PATH，`airymaxrt start` 拉起运行时。安装器
 自动按硬件裁剪运行画像（full/minimal），`airymaxrt monitor` 常驻检测外设
