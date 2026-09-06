@@ -341,11 +341,17 @@ jobs:
         # 逐轮 triage 列表（错误 → 修复 → 提交，随 push 自动回归）；产品面
         # 全绿后再升 gate 判据（publish REQUIRED_BIN）。测试面沿用 P25
         # 整目标守卫（daemon 链测试 Windows 不编译）。
+        # G2（0.1.13）：Release 语义不变（/O2）但带 /Zi 编译 + /DEBUG 链接，
+        # 产物生成 PDB——windows ctest SegFault（#127）无符号栈只有裸偏移
+        # （test_heapstore_core+0x4e99），cdb 栈无法落到函数名。带 PDB 后
+        # .ecxr + k 直接给出符号化调用栈，一次定位根因。
         run: |
           cmake -S . -B ${{ env.BUILD_DIR }} `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
             -DBUILD_TESTS=ON -DAIRY_BUILD_ALL=ON -DBUILD_DAEMON=ON -DBUILD_CLI=ON `
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_C_FLAGS_RELEASE="/MD /O2 /Ob2 /DNDEBUG /Zi" `
+            -DCMAKE_EXE_LINKER_FLAGS_RELEASE="/INCREMENTAL:NO /DEBUG"
 
       - name: Build
         shell: pwsh
@@ -404,19 +410,29 @@ jobs:
             exit 0
           }
           $bdir = (Resolve-Path $env:BUILD_DIR).Path
-          $candidates = @(
-            'commons_test_test_platform',
-            'commons_test_test_platform_time',
-            'test_heapstore_core',
-            'kernel_state',
-            'depgraph-commons-acyclic'
-          )
-          foreach ($name in $candidates) {
-            $exe = Get-ChildItem $bdir -Recurse -Filter "$name.exe" -ErrorAction SilentlyContinue |
+          # 从 ctest rerun-failed 记录解析失败测试名 → 反推可执行文件：
+          # ctest 注册名带 commons_test_ 前缀（对应 exe test_platform 等，
+          # #127 实证 hardcode candidates 用 ctest 名找不到 exe，只抓到
+          # heapstore），atoms/cupolas/heapstore/taskflow 的 ctest 名即 exe 名。
+          $names = & ctest --test-dir $env:BUILD_DIR -C Release --rerun-failed -N 2>$null |
+            ForEach-Object {
+              if ($_ -match 'Test\s+#\d+:\s+(\S+)') { $matches[1] }
+            } | Select-Object -Unique
+          $exes = foreach ($name in $names) {
+            $base = $name -replace '^commons_test_', ''
+            Get-ChildItem $bdir -Recurse -Filter "$base.exe" -ErrorAction SilentlyContinue |
               Select-Object -First 1
-            if (-not $exe) { continue }
-            "===== cdb: $name =====" | Tee-Object -FilePath $log -Append
+          } | Select-Object -First 4
+          if (-not $exes) {
+            "no failing test exe found from rerun-failed - fall back to heapstore_core" |
+              Tee-Object -FilePath $log -Append
+            $exes = @(Get-ChildItem $bdir -Recurse -Filter "test_heapstore_core.exe" |
+              Select-Object -First 1)
+          }
+          foreach ($exe in $exes) {
+            "===== cdb: $($exe.Name) =====" | Tee-Object -FilePath $log -Append
             # 经典 cdb 自动化：初断处 -c 先 g 跑到 crash 断点，再 .ecxr + k。
+            # Release + /Zi + /DEBUG 产物带 PDB，栈可直接落到函数名。
             & $cdb -o -c "g; .ecxr; k 40; q" $exe.FullName 2>&1 |
               Tee-Object -FilePath $log -Append
           }
