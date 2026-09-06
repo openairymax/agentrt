@@ -29,7 +29,7 @@ AgentRT 是 `airymaxhub` 伞仓下用户态工程大管理仓 `agent-workload` �
 curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh | bash
 ```
 
-已发布原生包：**Linux** linux-x86-64 / arm-64 / arm-32 / x86-32；**macOS** arm-64 / x86-64（v0.1.11 起）。
+已发布原生包（均经 GitHub Actions 流水线构建）：**Linux** linux-x86-64 / arm-64 / arm-32 / x86-32；**macOS** arm-64 / x86-64（v0.1.11 起）。Windows x86-64 原生包已由同一流水线构建打通，随 v0.1.12 发布。
 
 <details>
 <summary>无法访问 GitHub？用 atomgit 通道（内容相同）</summary>
