@@ -475,9 +475,13 @@ if(NOT libmicrohttpd_FOUND AND PkgConfig_FOUND)
 endif()
 # 交叉编译（sysroot 无 gnutls.pc 等传递依赖）时 pkg-config 校验失败，
 # 回退 find_library 直查（同 SQLite3 既有模式）。
+# Windows (vcpkg libmicrohttpd port)：导入库文件名为 libmicrohttpd.lib
+# （非 microhttpd.lib），#112 实证只查 microhttpd 导致 AIRY_HAS_MICROHTTPD
+# FALSE、gateway_d 26×LNK2001（MHD_* + http_gateway 内部符号）。两名字
+# 都查：POSIX 是 -lmicrohttpd（libmicrohttpd.so 软链 = libmicrohttpd.so）。
 if(NOT libmicrohttpd_FOUND AND NOT MICROHTTPD_FOUND)
     find_path(_MICROHTTPD_INCLUDE_DIR microhttpd.h)
-    find_library(_MICROHTTPD_LIBRARY microhttpd)
+    find_library(_MICROHTTPD_LIBRARY NAMES microhttpd libmicrohttpd)
     if(_MICROHTTPD_INCLUDE_DIR AND _MICROHTTPD_LIBRARY)
         set(MICROHTTPD_INCLUDE_DIRS ${_MICROHTTPD_INCLUDE_DIR})
         set(MICROHTTPD_LIBRARIES ${_MICROHTTPD_LIBRARY})
