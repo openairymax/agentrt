@@ -64,10 +64,11 @@ curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/in
 > 默认路径），无需重复传 `--prefix`。若机器上装过多份，用 `which airymaxrt`
 > 确认 PATH 指向的是要更新的那份。
 
-> **Windows / macOS 用户**：macOS arm-64 / x86-64 原生包自 v0.1.11 起已随
-> GitHub Actions 流水线发布，可直接用上方 Linux/macOS 命令安装。Windows
-> x86-64 原生包正由 GitHub Actions 打包管线（0.1.12）构建收尾，发布前可先
-> 用 WSL2：`wsl --install`（WSL2 + Ubuntu）后在 WSL 终端执行上方命令。
+> **Windows / macOS 用户**：macOS arm-64 / x86-64 与 Linux 各架构原生包由
+> GitHub Actions 流水线构建并发布（macOS 自 v0.1.11 起）。Windows x86-64
+> 原生包同样由该流水线构建（MSVC），随 v0.1.12 发布；正式发布前可用
+> WSL2：`wsl --install`（WSL2 + Ubuntu）后在 WSL 终端执行上方命令。macOS
+> 自 Catalina 起无 32 位运行环境，不存在 macos-32 包（发行说明有记录）。
 
 安装完成后 `airymaxrt` 即入 PATH，`airymaxrt start` 拉起运行时。安装器
 自动按硬件裁剪运行画像（full/minimal），`airymaxrt monitor` 常驻检测外设
