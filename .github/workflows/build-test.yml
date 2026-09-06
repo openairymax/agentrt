@@ -429,7 +429,10 @@ jobs:
             $exes = @()
             foreach ($name in $names) {
               $base = $name -replace '^commons_test_', ''
-              $found = Get-ChildItem $bdir -Recurse -Filter "$base.exe" -ErrorAction SilentlyContinue |
+              # exe 名可能带目标名前缀（如 corekern_kernel_state / cupolas_core_tests），
+              # 用后缀匹配放宽查找（heapstore/taskflow 目标名即测试名，直接命中）。
+              $found = Get-ChildItem $bdir -Recurse -Filter '*.exe' -ErrorAction SilentlyContinue |
+                Where-Object { $_.BaseName -eq $base -or $_.BaseName.EndsWith($base) } |
                 Select-Object -First 1
               if ($found) { $exes += $found }
             }
