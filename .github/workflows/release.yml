@@ -295,20 +295,21 @@ jobs:
   # 保持完全体一致（config 模板 + permission_rules + maths-toolkit +
   # platform 标记），防止 Windows 包缺失组件（问题：打包漂移）。
   build-windows-x86-64:
-    # CI 收敛（2026-09-04）：Windows 编译验证归 build-test.yml（GitHub 测试
-    # 场）；tag 自动发布不再携带 windows 构建（MSVC 移植未完成）。手动
-    # workflow_dispatch 仍可尝试产出 windows 二进制。
-    if: github.event_name == 'workflow_dispatch'
+    # 0.1.12 B1.2 gate 化（2026-09-06，#50 rc4 实证后收口）：MSVC 全仓
+    # 编译+链接已绿（#122→#133 守卫链，P25），windows 腿晋升 tag 自动矩阵
+    # 并置 release.needs 硬门禁——v0.1.12 正式版将含 windows-x86-64 产物
+    #（installer 双端承诺，见 README）。此前 tag 自动发布不携带 windows
+    #（MSVC 移植未完成）已为历史；dispatch/experimental 阶段（U4→G1）结束。
     # E3：与 build-test windows-build 共享 ci-windows-runner-bus，防 MSVC 腿
     # 双 workflow 并跑占满 windows hosted 配额。
     concurrency:
       group: ci-windows-runner-bus
       cancel-in-progress: false
     runs-on: windows-latest
-    # 并行发布决策（2026-09-03）：MSVC 移植进行中（commons/cupolas/
-    # protocols/heapstore），build-windows-x86-64 暂作可选不阻断发布
-    #（先发后修），修好后移除 continue-on-error 并移回 release.needs。
-    continue-on-error: true
+    # 发布腿不跑测试（BUILD_TESTS=OFF），MSVC ctest runtime 适配（#133
+    # SegFault）归 0.1.13 移植里程碑，不阻塞发布产物。硬门禁语义：失败即
+    # 阻断 release/publish（诚实承诺 windows 包随正式版交付）。
+    continue-on-error: false
     env:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
@@ -388,6 +389,13 @@ jobs:
 
       - name: Build TUI + copy Python runtime
         shell: pwsh
+        env:
+          # build.rs 依赖 airy_run_stream.h（v0.1.10 事故在 Windows 的复现：
+          # #50 rc4 实证 "run_stream schema header not found"——本步骤此前绕开
+          # build-tui.sh SSoT 且未设 env，build.rs 默认相对路径按伞仓布局
+          # 找不到 header → cargo panic → TUI 缺失 + 步骤 exit 1)。显式注入
+          # checkout 直布局路径（与 Linux/macOS build-tui.sh L30 同源）。
+          AGENTRT_TUI_RUN_STREAM_H: ${{ github.workspace }}/commons/include/airy_run_stream.h
         run: |
           $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
           $env:CARGO_TARGET_DIR = "$env:RUNNER_TEMP\tui-target"
@@ -877,13 +885,14 @@ jobs:
   # 实证：runner 美东→atomgit/OBS 上传 ~20MB 需 ~15min 撞 900s 超时被掐断）
   # 已由脚本 --max-time 3600 + 3 并发 + 上传完整性校验根治。
   release:
-    # build-windows-x86-64 / build-linux-riscv-64 已按 dispatch-only 门控
-    #（见各自 if），不在 needs；arm-32 为 experimental 独立腿（0.1.11 E6
-    # 矩阵解耦，见 build-linux-arm-32 job），亦不在 needs——不阻塞 release，
-    # 其制品若先完成由 Download all artifacts 并入，否则随后补发。门禁 =
-    # 已实证全绿的 Linux x86-64 / macOS arm-64 / macOS x86-64 / Linux
-    # arm-64 / Linux 32（x86-32）五平台。
-    needs: [build-linux-x86-64, build-macos-arm-64, build-macos-x86-64, build-linux-arm-64, build-linux-32]
+    # build-windows-x86-64 自 0.1.12 起为硬门禁腿（B1.2，见该 job 头注）——
+    # 0.1.11 时代 "tag 不携带 windows" 已结束，正式版必须含 windows 产物。
+    # linux-riscv-64 仍为 dispatch-only 门控（QEMU 6h 上限，0.3.x 评估）；arm-32
+    # 为 experimental 独立腿（0.1.11 E6 矩阵解耦，见 build-linux-arm-32 job），
+    # 亦不在 needs——不阻塞 release，其制品若先完成由 Download all artifacts
+    # 并入，否则随后补发。门禁 = 已实证的 Linux x86-64 / macOS arm-64 / macOS
+    # x86-64 / Linux arm-64 / Linux 32（x86-32）/ Windows x86-64 六平台。
+    needs: [build-linux-x86-64, build-macos-arm-64, build-macos-x86-64, build-linux-arm-64, build-linux-32, build-windows-x86-64]
     runs-on: ubuntu-latest
     # tag 推送或手动 dispatch（手动时版本来自 inputs.version）皆可触发
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
