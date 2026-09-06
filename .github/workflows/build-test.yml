@@ -335,10 +335,17 @@ jobs:
 
       - name: Configure (MSVC)
         shell: pwsh
+        # G1 stage-1（0.1.13）：Windows 完整产品移植的编译数据集采集。默认
+        # 矩阵（umbrella WIN32 分支）仍关 daemons/CLI，本腿显式 opt-in 打开
+        # 全部 daemon（15 服务）+ airy_cli，把 continue-on-error 转成 MSVC
+        # 逐轮 triage 列表（错误 → 修复 → 提交，随 push 自动回归）；产品面
+        # 全绿后再升 gate 判据（publish REQUIRED_BIN）。测试面沿用 P25
+        # 整目标守卫（daemon 链测试 Windows 不编译）。
         run: |
           cmake -S . -B ${{ env.BUILD_DIR }} `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-            -DBUILD_TESTS=ON -DAIRY_BUILD_ALL=ON -DCMAKE_BUILD_TYPE=Release
+            -DBUILD_TESTS=ON -DAIRY_BUILD_ALL=ON -DBUILD_DAEMON=ON -DBUILD_CLI=ON `
+            -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         shell: pwsh
