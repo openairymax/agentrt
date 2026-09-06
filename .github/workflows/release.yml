@@ -74,7 +74,7 @@ jobs:
           docker run --rm --platform linux/amd64 \
             -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage \
             -v "$PWD":/src -w /src \
-            ghcr.io/openairymax/agentrt-qemu-toolchain:amd64-20260905-1@sha256:c260fc5c48c66b6ba7082d488a8da9502b80f63ef494abc7288a1ad003550ff6 \
+            ghcr.io/openairymax/agentrt-qemu-toolchain:amd64-20260906-1@sha256:99d3ac35030b3a19ef36277b443e011005224ee53b6187e8a60ca40b429def82 \
             bash -c '
             # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）
             set -euo pipefail
@@ -657,7 +657,7 @@ jobs:
           docker run --rm --platform linux/arm64 \
             -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage \
             -v "$PWD":/src -w /src \
-            ghcr.io/openairymax/agentrt-qemu-toolchain:arm64-20260905-1@sha256:b3224d8642c678b5d190c6654082a0892929c255a225734fa0dc1f9a60585ead \
+            ghcr.io/openairymax/agentrt-qemu-toolchain:arm64-20260906-1@sha256:598a269f97744d81d80c67ffd7516f7f79ad33b8bc904346a56a5c31d3dbc146 \
             bash -c '
             # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）
             set -euo pipefail
@@ -786,7 +786,7 @@ jobs:
         run: |
           docker run --rm --platform linux/amd64 \
             -v "$PWD":/src -w /src \
-            ghcr.io/openairymax/agentrt-qemu-toolchain:amd64-20260905-1@sha256:c260fc5c48c66b6ba7082d488a8da9502b80f63ef494abc7288a1ad003550ff6 \
+            ghcr.io/openairymax/agentrt-qemu-toolchain:amd64-20260906-1@sha256:99d3ac35030b3a19ef36277b443e011005224ee53b6187e8a60ca40b429def82 \
             bash -c '
             set -euo pipefail
             apt-get update -qq && apt-get install -y -qq --no-install-recommends gcc-multilib
@@ -818,7 +818,7 @@ jobs:
           docker run --rm --platform linux/386 \
             -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage -e AIRY_JOBS \
             -v "$PWD":/src -w /src \
-            ghcr.io/openairymax/agentrt-qemu-toolchain:i386-20260906-1@sha256:b50dc0005dec0b385104298eac1bcfa8d969eac0077bdfb3999ee5fec0b34d87 \
+            ghcr.io/openairymax/agentrt-qemu-toolchain:i386-20260906-1@sha256:1266ca270863b1a79a341acd65ca867a745f068ede80fa6f6c099ba8cbd3b76b \
             bash -c '
             # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）。
             # 诊断通道：stdout 全程 tee 到 /src/container-*.log（宿主工作区），
@@ -929,7 +929,7 @@ jobs:
         run: |
           docker run --rm --platform linux/arm64 \
             -v "$PWD":/src -w /src \
-            ghcr.io/openairymax/agentrt-qemu-toolchain:arm64-20260905-1@sha256:b3224d8642c678b5d190c6654082a0892929c255a225734fa0dc1f9a60585ead \
+            ghcr.io/openairymax/agentrt-qemu-toolchain:arm64-20260906-1@sha256:598a269f97744d81d80c67ffd7516f7f79ad33b8bc904346a56a5c31d3dbc146 \
             bash -c '
             set -euo pipefail
             apt-get update -qq && apt-get install -y -qq --no-install-recommends gcc-arm-linux-gnueabihf
@@ -954,7 +954,7 @@ jobs:
           docker run --rm --platform linux/arm/v7 \
             -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage -e AIRY_JOBS \
             -v "$PWD":/src -w /src \
-            ghcr.io/openairymax/agentrt-qemu-toolchain:arm32-20260905-1@sha256:942cebb41936c7ebe015a06cabe91805fa7a59b80bb25ce834a35b13721d18d0 \
+            ghcr.io/openairymax/agentrt-qemu-toolchain:arm32-20260906-1@sha256:2a661a6c33f69e00e2210e12ce185f82355218427fecfcf2ba2e75e8163d6477 \
             bash -c '
             # v0.1.9 教训：无 set -e 时静默失败产出空 stage（见 riscv64 job）。
             # 诊断通道：stdout 全程 tee 到 /src/container-*.log（宿主工作区），
