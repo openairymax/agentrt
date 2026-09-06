@@ -807,7 +807,14 @@ jobs:
           leg: tui-arm32-cross
           script: |
             set -euo pipefail
-            apt-get update -qq && apt-get install -y -qq --no-install-recommends gcc-arm-linux-gnueabihf
+            # #49 实证（2026-09-06）：仅装 gcc-arm-linux-gnueabihf 不够——
+            # arm64 容器内其 cross sysroot（libc6-dev-armhf-cross 提供的
+            # /usr/arm-linux-gnueabihf/include + bits/libc-header-start.h）
+            # 缺席时，gcc 的 stdint.h fallback 宿主 /usr/include/stdint.h
+            # → ring 0.17.14 C 编译 fatal（bits/libc-header-start.h 缺失）
+            # → arm-32 包 TUI 静默缺失（U11）。显式补 cross C 库头。
+            apt-get update -qq && apt-get install -y -qq --no-install-recommends \
+              gcc-arm-linux-gnueabihf libc6-dev-armhf-cross
             curl --proto =https --tlsv1.2 -sSf --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal
             export PATH="$HOME/.cargo/bin:$PATH"
             rustup target add armv7-unknown-linux-gnueabihf
