@@ -150,11 +150,13 @@ curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/in
 > to repeat `--prefix`. With multiple installs on one machine, `which
 > airymaxrt` shows which copy PATH points to.
 
-> **Windows / macOS users**: macOS arm-64 / x86-64 native packages have been
-> published by the GitHub Actions pipeline since v0.1.11 — use the Linux/macOS
-> one-liner above directly. The Windows x86-64 native package is being finalized
-> by the GitHub Actions packaging pipeline (0.1.12); until it ships, use WSL2:
-> `wsl --install` (WSL2 + Ubuntu), then run the Linux one-liner above inside WSL.
+> **Windows / macOS users**: macOS arm-64 / x86-64 and the Linux native
+> packages are built and published by the GitHub Actions pipeline (macOS
+> since v0.1.11). The Windows x86-64 native package is built by the same
+> pipeline (MSVC) and ships with v0.1.12; until then use WSL2: `wsl
+> --install` (WSL2 + Ubuntu), then run the Linux one-liner above inside
+> WSL. macOS has no 32-bit runtime since Catalina, so no macos-32 package
+> exists (documented in the release notes).
 
 After install, `airymaxrt` is on PATH and `airymaxrt start` launches the runtime.
 The installer auto-profiles the hardware (full/minimal runtime profile) and the
