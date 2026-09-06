@@ -196,6 +196,12 @@ jobs:
       - name: Bundle macOS runtime dylibs (self-contained)
         run: bash _tools/scripts/ci/release/bundle-macos-dylibs.sh "${{ env.STAGE_DIR }}"
 
+      # G4 验收代理（0.1.13）：干净机"可启"冒烟——逐个启动 bin/ Mach-O，要求
+      # 无 dyld 加载失败（非系统依赖全部自包含）。托管 runner 为一次性干净 VM，
+      # 是最强 CI 代理；工具脚本 SSoT 见 _tools/scripts/ci/release/smoke-macos-runtime.sh。
+      - name: Smoke-run packaged daemons (clean-machine proxy)
+        run: bash _tools/scripts/ci/release/smoke-macos-runtime.sh "${{ env.STAGE_DIR }}"
+
       # 打包：lf-package 统一模板（macOS 原生腿无 bootstrap 部署——
       # bin/agentrt-bootstrap.sh 为 Linux daemon 编排脚本）。
       - name: Package and upload (tar.gz)
@@ -292,6 +298,10 @@ jobs:
       # _tools/scripts/ci/release/bundle-macos-dylibs.sh）
       - name: Bundle macOS runtime dylibs (self-contained)
         run: bash _tools/scripts/ci/release/bundle-macos-dylibs.sh "${{ env.STAGE_DIR }}"
+
+      # G4 验收代理（同 arm-64 腿，SSoT 见 smoke-macos-runtime.sh）
+      - name: Smoke-run packaged daemons (clean-machine proxy)
+        run: bash _tools/scripts/ci/release/smoke-macos-runtime.sh "${{ env.STAGE_DIR }}"
 
       # 打包：lf-package 统一模板（macOS 原生腿无 bootstrap 部署）。
       - name: Package and upload (tar.gz)
