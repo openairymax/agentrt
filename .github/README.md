@@ -49,7 +49,6 @@ heapstore / protocols）作为 git 子模块，对外提供微内核原语、认
     ├── build-toolchain-images.yml  # 交叉工具链 GHCR 镜像构建推送（qemu 腿基础设施）
     ├── codegen-check.yml        # syscall.xml SSoT 漂移校验
     ├── release.yml              # 跨平台发布（8 构建腿 + release + publish）
-    ├── smoke-selftest.yml       # macOS runtime smoke 脚本自检载体（G4 调试期，绿后拆除）
     └── sync-mirror.yml          # atomgit(SSoT) → GitHub / Gitee 镜像同步触发器
 ```
 
@@ -89,7 +88,6 @@ windows job）+ 一套复用件（lf-* / 镜像 / 脚本）**，即"逻辑上三
 | `build-toolchain-images.yml` | `push main`（Dockerfile/相关变更）/ `workflow_dispatch` | 交叉工具链镜像（arm64/arm32/i386 容器腿）构建并推送 GHCR，digest 钉版供 release 腿引用 |
 | `codegen-check.yml` | `push main` / `pull_request` / `workflow_dispatch` | `syscall_gen.py --check` 校验 `syscall.xml` 与生成产物漂移 |
 | `release.yml` | `tag v*` 推送 / `workflow_dispatch`（输入 version） | 跨平台构建腿（linux-x64 / linux-arm64 / linux-arm32 / linux-riscv64 / linux-x86-32 / macos-arm64 / macos-x86-64 / windows-x64）→ cosign + GPG 签名 → 汇聚 publish（26 资产一次落库 + manifest.latest）atomgit 官方 + GitHub Release 镜像；windows 腿当前 canary（publish REQUIRED_BIN 预检过 = 升 gate 判据） |
-| `smoke-selftest.yml` | `workflow_dispatch`（仅调试期） | macOS runtime smoke 脚本（smoke-macos-runtime.sh）自检载体——假产物跑全部分支，验证脚本逻辑后再放行真实 release 腿（G4，绿后拆除） |
 | `sync-mirror.yml` | `push main` / `workflow_dispatch` | `sync-mirror.sh`：agentrt + 7 叶子从 atomgit(SSoT) 同步至 GitHub / Gitee（缺仓自动创建，atoms 私有，错误隔离汇总） |
 
 ## 布局与子模块
