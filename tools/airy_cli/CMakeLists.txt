@@ -165,6 +165,9 @@ set(CLI_INC_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/sync
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/ipc
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/sd
+    # airy_dirent.h 等 POSIX 兼容头（Windows MSVC 下无 dirent.h，走
+    # FindFirstFileA 实现；#112 实证 cmd_system/tui_complete C2065）
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/compat
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/platform/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/ime
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/llm_d/include

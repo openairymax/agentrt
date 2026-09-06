@@ -408,13 +408,15 @@ int cli_tui_leave(cli_tui_t *t)
     if (t->termios_saved)
         tcsetattr(STDIN_FILENO, TCSANOW, &t->saved_termios);
     signal(SIGWINCH, SIG_DFL);
+    /* termios_saved/saved_termios 字段仅 POSIX 编译（cli_tui_internal.h
+     * 已 #ifndef _WIN32 守卫）；清零须在守卫内，#112 实证 C2039 */
+    t->termios_saved = 0;
 #endif
     /* 恢复全屏滚动区（\x1b[r），随后退出 alt screen。
      * 2.2.1.5：退出前恢复硬件光标。 */
     fputs("\033[r\033[?2004l\033[?25h\033[?1049l", stdout);
     fflush(stdout);
     t->active = 0;
-    t->termios_saved = 0;
     t->scr_set = 0;
     return 0;
 }

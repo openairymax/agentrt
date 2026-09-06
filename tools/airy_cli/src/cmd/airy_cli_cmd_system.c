@@ -20,6 +20,9 @@
 #include "cli_render.h"
 #include "logger.h"
 #include "platform.h"
+/* Windows 无 dirent.h：airy_dirent.h 在 _WIN32 下以 FindFirstFileA 提供
+   DIR/opendir/readdir/closedir（#112 实证 cmd_system.c C2065 DIR） */
+#include "airy_dirent.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -88,13 +91,22 @@ static size_t cli_daemons_discover(cli_daemon_desc_t *out, size_t cap)
     while ((ent = readdir(dir)) != NULL && n < cap) {
         const char *name = ent->d_name;
         size_t len = strlen(name);
-        if (len < 3 || strcmp(name + len - 2, "_d") != 0) continue;
-        if (strcmp(name, "gateway_d") == 0 || strcmp(name, "maths_d") == 0) continue;
+#ifdef _WIN32
+        /* FindFirstFileA 会列出 *.exe；剥离后缀后再按 *_d 约定匹配 */
+        if (len > 4 && strcmp(name + len - 4, ".exe") == 0)
+            len -= 4;
+#endif
+        char stem[33];
+        if (len >= sizeof(stem)) len = sizeof(stem) - 1;
+        __builtin_memcpy(stem, name, len);
+        stem[len] = '\0';
+        if (len < 3 || strcmp(stem + len - 2, "_d") != 0) continue;
+        if (strcmp(stem, "gateway_d") == 0 || strcmp(stem, "maths_d") == 0) continue;
         static char ns_pool[32][32];
         static char sock_pool[32][64];
         size_t nlen = len - 2;
         if (nlen >= sizeof(ns_pool[n])) nlen = sizeof(ns_pool[n]) - 1;
-        __builtin_memcpy(ns_pool[n], name, nlen);
+        __builtin_memcpy(ns_pool[n], stem, nlen);
         ns_pool[n][nlen] = '\0';
         snprintf(sock_pool[n], sizeof(sock_pool[n]), "%s.sock", ns_pool[n]);
         out[n].ns = ns_pool[n];
