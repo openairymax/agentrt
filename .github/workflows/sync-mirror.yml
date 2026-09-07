@@ -32,7 +32,7 @@ jobs:
       # 使 agentrt 以 github-actions[bot] 身份被 403 拒推（伞仓时代 run #89：
       # "Permission to openairymax/airymaxhub.git denied to
       # github-actions[bot]"——根因同构）。叶子仓 remote 系脚本新建、无此注入，
-      # 故同 URL 格式能以 spharx01 推送成功——只有宿主仓中招。
+      # 故同 URL 格式能以普通用户 PAT 推送成功——只有宿主仓中招。
       # 本步之后所有网络操作都走 URL 内嵌 PAT / 匿名 HTTPS，不需要
       # checkout 保留凭据。
       - name: Checkout (no submodules)
