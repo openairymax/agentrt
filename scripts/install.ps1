@@ -253,6 +253,12 @@ function Install-Binary {
         $expectSha = [string]$art.sha256
         Write-Info "通道 $AIRY_CHANNEL 最新制品（$plat）: $($Url.Split('/')[-1])"
     }
+    # 解压前清理旧解压残留（0.1.6g 铁律，对齐 install.sh：清理必须在下载
+    # 之前）。多版本 agentrt-* 目录并存时 Select -First 1 按名排序可能
+    # 选中旧目录 → 装旧版。-Directory 只命中目录，不影响 tmp 内的
+    # zip/manifest/公钥等文件（对齐 rm -rf ... || true 容错语义）。
+    Get-ChildItem (Join-Path $AIRY_HOME "tmp") -Directory -Filter "agentrt-*" -ErrorAction SilentlyContinue |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
     if (Test-Path $Url) {
         Write-Info "使用本地离线包: $Url"
         $zip = $Url
@@ -286,12 +292,44 @@ function Install-Binary {
         $script:BinaryFatal = $true
         return $false
     }
-    $copied = 0
-    Get-ChildItem (Join-Path $pkgDir.FullName "bin") -ErrorAction SilentlyContinue | ForEach-Object {
-        Copy-Item $_.FullName (Join-Path $AIRY_HOME "bin") -Force -ErrorAction SilentlyContinue
-        $copied++
+    # 覆盖安装前停止旧 daemon（对齐 install.sh：旧进程仍持有旧二进制/
+    # 运行库，且 Windows 文件锁会令 Copy-Item 静默失败 → 假绿装旧版）
+    Stop-Daemons
+    # bin/ 拷贝 fail-closed（对齐 install.sh 0.1.6e：静默失败会导致 daemon
+    # 未就位却显示"全部就位"）：逐制品拷贝 + 就位校验，失败/缺失即拒绝
+    # 安装；包 bin/ 为空视为制品不完整。
+    $binDst = Join-Path $AIRY_HOME "bin"
+    New-Item -ItemType Directory -Force -Path $binDst | Out-Null
+    $pkgBinItems = Get-ChildItem (Join-Path $pkgDir.FullName "bin") -ErrorAction SilentlyContinue
+    if (-not $pkgBinItems) {
+        Write-Err "release 包 bin/ 为空，拒绝安装（制品不完整）"
+        $script:BinaryFatal = $true
+        return $false
+    }
+    foreach ($item in $pkgBinItems) {
+        try {
+            Copy-Item $item.FullName $binDst -Force -ErrorAction Stop
+        } catch {
+            Write-Err "bin/ 拷贝失败: $($item.Name) — $($_.Exception.Message)"
+            $script:BinaryFatal = $true
+            return $false
+        }
+        if (-not (Test-Path (Join-Path $binDst $item.Name))) {
+            Write-Err "bin/ 部署校验失败，缺失: $($item.Name)（检查磁盘/权限）"
+            $script:BinaryFatal = $true
+            return $false
+        }
     }
     Get-ChildItem (Join-Path $pkgDir.FullName "lib") -ErrorAction SilentlyContinue | Copy-Item -Destination (Join-Path $AIRY_HOME "lib") -Recurse -Force
+    # lib/ 部署校验（对齐 install.sh 0.1.5a）：包内含 .dll 时必须确认就位，
+    # 缺失即 fail-closed（不再静默吞错，否则 daemon 启动即失败）
+    if (Get-ChildItem (Join-Path $pkgDir.FullName "lib") -Filter "*.dll" -ErrorAction SilentlyContinue) {
+        if (-not (Get-ChildItem (Join-Path $AIRY_HOME "lib") -Filter "*.dll" -ErrorAction SilentlyContinue)) {
+            Write-Err "lib/ 部署失败（.dll 未就位），二进制将无法启动"
+            $script:BinaryFatal = $true
+            return $false
+        }
+    }
     Get-ChildItem (Join-Path $pkgDir.FullName "include") -ErrorAction SilentlyContinue | Copy-Item -Destination (Join-Path $AIRY_HOME "include") -Recurse -Force
     # LICENSE/README（share/）随包分发；config/ 内置模板（secrets.env.example 等）
     Get-ChildItem (Join-Path $pkgDir.FullName "share") -ErrorAction SilentlyContinue | Copy-Item -Destination (Join-Path $AIRY_HOME "share") -Recurse -Force
@@ -304,11 +342,6 @@ function Install-Binary {
     # 以实际安装包版本固化（manifest 通道可能高于默认 AIRY_VERSION）
     $verNum = $pkgDir.Name -replace "^agentrt-", ""
     if ($verNum) { $script:AIRY_VERSION = "v$verNum" }
-    if ($copied -eq 0) {
-        Write-Err "release 包 bin/ 为空，拒绝安装"
-        $script:BinaryFatal = $true
-        return $false
-    }
     Write-OK "完全体二进制包安装完成（v$verNum）"
     return $true
 }
