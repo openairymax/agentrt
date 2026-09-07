@@ -289,10 +289,13 @@ jobs:
     runs-on: windows-latest
     # 超时护栏（2026-09-04）：同 macOS，防 ctest/构建挂死到 6h
     timeout-minutes: 90
-    # Windows MSVC 轨（0.1.10 决策）：atoms 原生 C11 原子在 MSVC 适配完成
-    # 前，本 job 为通告性（continue-on-error），ci-debug issue/annotations
-    # 持续留档；绿后移除此标记恢复为 required 门禁（届时 Windows 纳入发布矩阵）。
-    continue-on-error: true
+    # G2（0.1.13）达成：windows ctest 失败面自 35 项 SegFault 收敛至全绿
+    # （wave-9 Build 连续绿 → wave-13d 三腿 ctest 全绿：#134 五失败经 join
+    # retval / create 非递归 trylock / depgraph 栈 reserve / yaml AIRY_FREE
+    # 与 macOS 时间戳确定性逐项修复归零）。移出 continue-on-error，本 job
+    # 恢复为 required 门禁；Windows 完整产品（daemons 15 + airy_cli）构建
+    # 链持续绿，release.yml windows leg 以 publish REQUIRED_BIN 预检为
+    # 入 needs 判据。
     env:
       # BAN-33：构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
