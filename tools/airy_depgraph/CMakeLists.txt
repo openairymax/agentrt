@@ -31,6 +31,14 @@ if(NOT MSVC)
     target_link_libraries(airy_depgraph PRIVATE m)
 endif()
 
+# MSVC 默认 1MB 栈 reserve；links 门禁在 main 栈帧叠两个 dg_manifest_t
+# （各约 400KB）+ dg_check_links 帧内 96×64×64=384KB univ，嵌套峰值超过
+# 1MB 触发 STATUS_STACK_OVERFLOW（depgraph-links-* 两 ctest 在 Windows
+# 同崩，#134 失败集）。与 Linux/macOS 默认 8MB 对齐。
+if(MSVC)
+    target_link_options(airy_depgraph PRIVATE "/STACK:8388608")
+endif()
+
 # 构建期门禁：ALL 依赖本目标；commons/deps.txt 有环或公共头跨子域
 # 引用未声明（include 漂移）即构建失败
 add_custom_target(depgraph-check
