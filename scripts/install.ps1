@@ -24,8 +24,10 @@
 #   -Prefix <path>  -Mode <auto|binary|hybrid|source>  -BinDir <path>
 #   -Uninstall [-KeepData] [-Yes]  -Help
 #
-# 卸载：install.ps1 -Uninstall 或 airymaxrt.cmd uninstall（停止 daemon +
-#       删除 $AIRY_HOME + 移除启动器；-KeepData 保留记忆数据）。
+# 卸载：install.ps1 -Uninstall，或 airymaxrt.cmd uninstall（自举在线安装器，
+#       停止 daemon + 删除 $AIRY_HOME + 移除启动器；-KeepData 保留记忆数据）。
+# 更新：重跑本文件官方安装命令（镜像覆盖到最新版，幂等；Windows 无独立
+#       update 子命令，以重装代替——0.1.13 C2a 文档口径）。
 # ============================================================================
 
 param(
@@ -306,6 +308,20 @@ function Install-Binary {
         $script:BinaryFatal = $true
         return $false
     }
+    # 覆盖洁净（0.1.13 C2b，镜像语义对齐 install.sh install_binary）：
+    # bin/lib/include/share 为纯产品目录（无用户数据），整清后重灌——旧版
+    # 独有的 *_d.exe/.dll/python 运行时不会残留成半新半旧污染面。daemons
+    # 已在上面停止（无文件锁）。config/（用户 secrets 等）绝不整清。
+    foreach ($rel in @("bin", "lib", "include", "share")) {
+        $pkgSub = Join-Path $pkgDir.FullName $rel
+        if (Test-Path $pkgSub) {
+            $dstSub = Join-Path $AIRY_HOME $rel
+            if (Test-Path $dstSub) {
+                Get-ChildItem $dstSub -Force -ErrorAction SilentlyContinue |
+                    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
     foreach ($item in $pkgBinItems) {
         try {
             Copy-Item $item.FullName $binDst -Force -ErrorAction Stop
@@ -508,6 +524,13 @@ function Finalize-Install {
         ("set ""AIRY_HOME={0}""" -f $escapedHome),
         "if exist ""%AIRY_HOME%\config\install.env"" (",
         "  for /f ""tokens=2 delims=="" %%a in ('findstr /b ""AIRY_HOME="" ""%AIRY_HOME%\config\install.env"" 2^>nul') do set ""AIRY_HOME=%%a""",
+        ")",
+        "rem 管理命令分发（0.1.13 C2a 修复）：airymaxrt.cmd uninstall 历史上把",
+        "rem 参数原样透传前端成死路；现自举在线安装器执行卸载（停 daemon +",
+        "rem 删 $AIRY_HOME + 移除启动器）。其余参数仍透传前端。",
+        "if /i ""%~1""==""uninstall"" (",
+        "  powershell -NoProfile -ExecutionPolicy Bypass -Command ""$ErrorActionPreference='Stop'; try { $c=irm 'https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.ps1?ref=main' -TimeoutSec 60; $p=Join-Path $env:TEMP 'agentrt-install.ps1'; [IO.File]::WriteAllBytes($p,[Convert]::FromBase64String(($c.content -replace '\\s',''))); & $p -Uninstall -Prefix '%AIRY_HOME%' } catch { Write-Host ('[FAIL] 卸载器自举失败: '+$_.Exception.Message); exit 1 }""",
+        "  goto :eof",
         ")",
         "if not exist ""%AIRY_HOME%\bin\agentrt-tui.exe"" goto :notfound",
         "  ""%AIRY_HOME%\bin\agentrt-tui.exe"" %*",

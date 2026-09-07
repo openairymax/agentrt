@@ -366,6 +366,27 @@ stop_daemons() {
 }
 
 # ─── 一键卸载 ────────────────────────────────────────────────────────────
+# 从 shell rc 移除 AgentRT PATH 引导标记块。path_bootstrap 只把单条 rc
+# 路径记入 install.env（AIRY_PATH_RC），但用户换 shell / 启动器自愈可能
+# 把引导块写到别的 rc（bash→zsh/fish/.profile），卸载只信单条记录会漏删。
+# 统一按标记区间（# >>> AgentRT PATH bootstrap <<< … # <<< 同 <<<）对
+# 已知 rc 候选全量扫描删除，幂等（无标记即跳过）。
+remove_path_bootstrap() {
+    local rc rc_path="${1:-}" _tmp
+    for rc in "$rc_path" "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile" "$HOME/.config/fish/config.fish"; do
+        [ -n "$rc" ] && [ -f "$rc" ] || continue
+        grep -q '# >>> AgentRT PATH bootstrap <<<' "$rc" 2>/dev/null || continue
+        _tmp="$rc.airy_uninstall_tmp"
+        if sed '\|# >>> AgentRT PATH bootstrap <<<|,\|# <<< AgentRT PATH bootstrap <<<|d' "$rc" > "$_tmp" 2>/dev/null \
+            && mv "$_tmp" "$rc"; then
+            log_ok "已从 ${rc} 移除 AgentRT PATH 引导行"
+        else
+            rm -f "$_tmp" 2>/dev/null
+            log_warn "无法自动清理 ${rc} 的 AgentRT PATH 引导行，请手动删除标记区间"
+        fi
+    done
+}
+
 do_uninstall() {
     local home="$1" keep_data="$2" yes="$3" env_file link size ans rc_path
     env_file="${home}/config/install.env"
@@ -377,8 +398,11 @@ do_uninstall() {
         log_warn "未检测到安装（$home 不存在），无需卸载"
         return 0
     fi
+    # link / rc_path 必须在 rm -rf 之前读取（install.env 随后被删除，
+    # 读晚了恒为空 → PATH 引导行永不清理——0.1.13 C2a 社区反馈实证）。
     link="$(sed -n 's/^AIRY_BIN_LINK=//p' "$env_file" 2>/dev/null | head -1)"
     [ -n "$link" ] || link="${BIN_DIR}/airymaxrt"
+    rc_path="$(sed -n 's/^AIRY_PATH_RC=//p' "$env_file" 2>/dev/null | head -1)"
     size="$(du -sh "$home" 2>/dev/null | cut -f1)"
     log_warn "将卸载 AirymaxRT：${home}（${size}）"
     if [ "$yes" != "1" ]; then
@@ -387,6 +411,17 @@ do_uninstall() {
         case "$ans" in y|Y|yes|YES) ;; *) log_info "已取消卸载"; return 0 ;; esac
     fi
     stop_daemons "$home/bin"
+    # 回收 airymaxrt monitor --daemon 常驻进程（stop_daemons 只按 bin/*_d
+    # 匹配，monitor 是常驻 bash 循环，卸载不清则残留周期性探测已删
+    # PID/写 profile——0.1.13 C2a 复核实证）。仅杀 environ 含本 AIRY_HOME
+    # 的实例（pgrep -f 全串匹配会误伤其他安装，故按环境变量精确过滤）。
+    if command -v pgrep >/dev/null 2>&1; then
+        for _mp in $(pgrep -f "airymaxrt monitor" 2>/dev/null || true); do
+            if tr '\0' '\n' < "/proc/${_mp}/environ" 2>/dev/null | grep -q "^AIRY_HOME=${home}$"; then
+                kill "$_mp" 2>/dev/null || true
+            fi
+        done
+    fi
     if [ "$keep_data" = "1" ] && [ -d "$home/data" ]; then
         rm -rf "$home"
         mkdir -p "$home/data"
@@ -395,20 +430,12 @@ do_uninstall() {
         rm -rf "$home"
         log_ok "已删除 ${home}"
     fi
-    if [ -L "$link" ]; then
+    # 启动器可能是软链或普通副本（用户手动 cp 替代 ln 场景），一律删除
+    if [ -L "$link" ] || [ -e "$link" ]; then
         rm -f "$link"
-        log_ok "已移除启动器软链 ${link}"
+        log_ok "已移除启动器 ${link}"
     fi
-    # 移除自动追加的 PATH 引导行（install.env 记录 rc 路径，带标记范围删除）
-    rc_path="$(sed -n 's/^AIRY_PATH_RC=//p' "$env_file" 2>/dev/null | head -1)"
-    if [ -n "$rc_path" ] && [ -f "$rc_path" ]; then
-        if sed '\|# >>> AgentRT PATH bootstrap <<<|,\|# <<< AgentRT PATH bootstrap <<<|d' \
-            "$rc_path" > "$rc_path.airy_tmp" 2>/dev/null && mv "$rc_path.airy_tmp" "$rc_path"; then
-            log_ok "已从 ${rc_path} 移除 AgentRT PATH 引导行"
-        else
-            rm -f "$rc_path.airy_tmp" 2>/dev/null
-        fi
-    fi
+    remove_path_bootstrap "$rc_path"
     log_ok "卸载完成"
 }
 
@@ -703,8 +730,14 @@ install_binary() {
     # bin/ 拷贝必须 fail-closed：静默失败（磁盘/权限/残留干扰）会导致 daemon
     # 未就位却显示"全部就位"（0.1.6e 实测：18 个就位但启动时
     # llm_d No such file）。lib/ 已有同类校验，bin/ 补齐。
+    # 覆盖洁净（0.1.13 C2b）：bin/lib/include/share 是纯产品目录（无用户
+    # 数据），覆盖安装/升级前整清重灌（镜像语义，与 airymaxrt update
+    # apply_package 一致）——否则旧版本独有的 *_d/.so/python 运行时残留，
+    # 会被 daemon_list 推导与自愈拉起，形成半新半旧污染面。config/（用户
+    # secrets 等）绝不整清，只按模板覆盖。
     mkdir -p "${AIRY_HOME}/bin"
     if [ -n "$EXPECTED_DAEMONS" ]; then
+        rm -rf "${AIRY_HOME}"/bin/* 2>/dev/null || true
         cp -f "${extracted}"/bin/* "${AIRY_HOME}/bin/" 2>/dev/null || true
         local _binok=1 _d2
         for _d2 in ${EXPECTED_DAEMONS}; do
@@ -720,15 +753,24 @@ install_binary() {
     # 确认部署成功，缺失即 fail-closed（不再静默吞错）。
     if [ -d "${extracted}/lib" ] && ls "${extracted}"/lib/*.so* >/dev/null 2>&1; then
         mkdir -p "${AIRY_HOME}/lib"
-        cp -f "${extracted}"/lib/* "${AIRY_HOME}/lib/" 2>/dev/null
+        rm -rf "${AIRY_HOME}"/lib/* 2>/dev/null || true
+        cp -rf "${extracted}"/lib/* "${AIRY_HOME}/lib/" 2>/dev/null
         if ! ls "${AIRY_HOME}"/lib/*.so* >/dev/null 2>&1; then
             log_err "lib/ 部署失败（.so 未就位），二进制将无法启动"
             return 2
         fi
     fi
-    cp -rf "${extracted}"/include/* "${AIRY_HOME}/include/" 2>/dev/null || true
+    if [ -d "${extracted}/include" ]; then
+        mkdir -p "${AIRY_HOME}/include"
+        rm -rf "${AIRY_HOME}"/include/* 2>/dev/null || true
+        cp -rf "${extracted}"/include/* "${AIRY_HOME}/include/" 2>/dev/null || true
+    fi
     # LICENSE/README（share/licenses|share/doc）随包分发，满足许可证随二进制分发要求
-    cp -rf "${extracted}"/share/* "${AIRY_HOME}/share/" 2>/dev/null || true
+    if [ -d "${extracted}/share" ]; then
+        mkdir -p "${AIRY_HOME}/share"
+        rm -rf "${AIRY_HOME}"/share/* 2>/dev/null || true
+        cp -rf "${extracted}"/share/* "${AIRY_HOME}/share/" 2>/dev/null || true
+    fi
     # 二进制包内置配置（secrets.env.example / agentrt.yaml / model.yaml）拷入 config/
     if [ -d "${extracted}/config" ]; then
         cp -f "${extracted}"/config/* "${AIRY_HOME}/config/" 2>/dev/null || true
