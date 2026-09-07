@@ -343,8 +343,22 @@ stop_daemons() {
     local bin="$1" found=0 d
     [ -d "$bin" ] || return 1
     for d in $(daemon_list "$bin"); do
-        if [ -x "${bin}/${d}" ] && pkill -f "${bin}/${d}" >/dev/null 2>&1; then
-            found=1
+        if [ -x "${bin}/${d}" ]; then
+            if pkill -f "${bin}/${d}" >/dev/null 2>&1; then
+                found=1
+            fi
+            # /proc exe 精确兜底：以相对路径/旧 cwd 启动的旧实例，pkill -f
+            # 按命令行参数串匹配可能漏杀（2026-08-31 实测）；对仍存活进程
+            # 按 /proc/<pid>/exe 目标逐一精确核对后再 kill，避免误杀。
+            if [ -d /proc ] && command -v readlink >/dev/null 2>&1; then
+                for _pid in /proc/[0-9]*; do
+                    _exe="$(readlink "${_pid}/exe" 2>/dev/null || true)"
+                    case "$_exe" in
+                        "${bin}/${d}"|*"/${d}")
+                            kill "${_pid#/proc/}" 2>/dev/null && found=1 || true ;;
+                    esac
+                done
+            fi
         fi
     done
     [ "$found" = "1" ] && sleep 1
@@ -1521,8 +1535,26 @@ EOF
         log_warn "agentrt-bootstrap.sh 未部署（源码缺失且二进制未含）"
     fi
 
-    # 安装器自托管（供离线卸载）
-    cp -f "$0" "${AIRY_HOME}/scripts/install.sh" 2>/dev/null || true
+    # 安装器自托管（供离线卸载/airymaxrt uninstall·reinstall 委托）。
+    # curl|bash 管道场景 $0 非文件（=bash），cp "$0" 落空使卸载无安装器
+    # 可用 → 改为从官方仓拉取自托管副本落盘（与 installer_self_bootstrap
+    # 同源），仍失败则告警（airymaxrt 侧已备在线拉取兜底）。
+    mkdir -p "${AIRY_HOME}/scripts"
+    if [ -f "$0" ] && [ -r "$0" ]; then
+        cp -f "$0" "${AIRY_HOME}/scripts/install.sh"
+    else
+        if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
+            _it_remote="$(syscurl -fsSL --max-time 30 \
+                "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" 2>/dev/null || true)"
+            if [ -n "$_it_remote" ]; then
+                printf '%s' "$_it_remote" | python3 -c 'import sys,json,base64;d=json.load(sys.stdin);sys.stdout.write(base64.b64decode(d.get("content","")).decode())' > "${AIRY_HOME}/scripts/install.sh" 2>/dev/null || true
+            fi
+        fi
+        if [ ! -s "${AIRY_HOME}/scripts/install.sh" ]; then
+            log_warn "安装器自托管失败（管道执行且联网拉取失败）；airymaxrt uninstall 将提示在线兜底"
+        fi
+    fi
+    chmod 755 "${AIRY_HOME}/scripts/install.sh" 2>/dev/null || true
     log_ok "安装位置已固化: install.env + agentrt-env.sh + 启动器"
 
     # ── PATH 引导检查（2.3.2.6，与 build.sh 同构）────────────────────────
