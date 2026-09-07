@@ -1041,6 +1041,59 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+  # H2（0.1.13）：容器洁净 e2e 门禁——在洁净 ubuntu:20.04 容器（与
+  # build-linux-x86-64 腿工具链镜像同 glibc 2.31 基线）内，对聚合后的
+  # release-dist 制品执行 install.sh --from-file 离线安装 → 启动 daemon 群
+  # → airy_cli /daemons 冒烟，一次 rc 全链出证（install→daemon→gateway→
+  # CLI）。容器内无任何开发工具链（脚本 fail-closed 断言），等价用户干净
+  # 机。门禁：publish needs 本 job，e2e 不过则不发布（残余静默面收口：
+  # spec 0.1.13 第 11 条"待 H2 e2e 载体落地后在腿级改 fail-closed"）。
+  e2e-clean-room:
+    needs: [release]
+    if: success() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      # e2e 脚本本体在 tools 仓（_tools/scripts/ci/release/e2e-clean-room.sh）。
+      - name: Init submodules (tools)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh tools
+
+      - name: Download release-dist
+        uses: actions/download-artifact@v4
+        with:
+          name: agentrt-${{ env.VERSION }}-release-dist
+          path: dist
+
+      - name: Preflight
+        run: |
+          test -f dist/install.sh || {
+            echo "::error::release-dist 缺 install.sh（安装器 SSoT）"; exit 1; }
+          test -f "dist/agentrt-${{ env.VERSION }}-linux-x86-64.tar.gz" || {
+            echo "::error::release-dist 缺 linux-x86-64 tarball，无法洁净 e2e"; exit 1; }
+          test -f "dist/agentrt-${{ env.VERSION }}-linux-x86-64.tar.gz.sha256" || {
+            echo "::error::release-dist 缺 linux-x86-64 sha256 校验件"; exit 1; }
+
+      # 镜像不用 digest 钉版：ubuntu:20.04 已 EOS（standard support 2025-05
+      # 结束），官方 tag 冻结不再重推，浮动风险趋零；glibc 2.31 基线由 tag
+      # 绑定。未来切基线（22.04/24.04）时须与构建腿工具链镜像同步切换并
+      # 恢复 digest 钉版。
+      - name: Clean-room e2e (install → daemons → CLI smoke)
+        run: |
+          docker pull ubuntu:20.04
+          docker run --rm -v "$PWD:/w:ro" ubuntu:20.04 \
+            bash /w/_tools/scripts/ci/release/e2e-clean-room.sh \
+              /w/dist/install.sh \
+              "/w/dist/agentrt-${{ env.VERSION }}-linux-x86-64.tar.gz"
+
   # 发布全链（0.1.11 D0/D1/D2）：cosign 签名制品 + GPG 签名 manifest +
   # manifest 生成（含 gen1~gen3 平台别名）+ 上传 atomgit release +
   # push latest/ 固定入口，全部在本 job 内完成，零本机操作。
@@ -1050,7 +1103,7 @@ jobs:
   #   _tools/scripts/ci/release/publish-release.sh <ver> <dist_dir>
   # （本机保留 A1 所述私钥副本）。
   publish:
-    needs: [release]
+    needs: [release, e2e-clean-room]
     if: success() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     environment: release
