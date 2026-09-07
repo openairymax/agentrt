@@ -210,17 +210,23 @@ function Install-Binary {
             }
             if (-not (Test-Path $keyf)) {
                 Write-Warn "发布公钥拉取失败，拒绝安装（fail-closed）"
+                $script:BinaryFatal = $true
                 return $false
             }
             gpg --batch --import $keyf 2>$null
             gpg --batch --verify $asc $man 2>$null
             if ($LASTEXITCODE -ne 0) {
                 Write-Err "manifest 验签失败（GPG），拒绝安装"
+                $script:BinaryFatal = $true
                 return $false
             }
             Write-OK "manifest 验签通过（GPG）"
         } elseif (-not (Test-Path $asc)) {
-            Write-Warn "manifest 签名缺失且无 gpg 环境（降级：仅 HTTPS + sha256）"
+            # fail-closed（对齐 install.sh）：缺签名且无 gpg 直接拒绝，避免
+            # HTTPS-only 降级被中间人替换 manifest（sha 随之被换）。
+            Write-Err "manifest 签名缺失且无 gpg 环境，拒绝安装（fail-closed）"
+            $script:BinaryFatal = $true
+            return $false
         }
         # 平台命名规范（0.1.10 起）：OS-架构族-位宽（windows-x86-64 等）。
         # PROCESSOR_ARCHITECTURE（AMD64/ARM64/x86）→ 平台后缀映射。
@@ -253,7 +259,11 @@ function Install-Binary {
     } else {
         Write-Info "下载完全体二进制包: $Url"
         curl.exe -fsSL --max-time 600 -o $zip $Url
-        if ($LASTEXITCODE -ne 0) { Write-Warn "release 下载失败，回退源码构建"; return $false }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Err "release 下载失败，拒绝回退源码构建（fail-closed）"
+            $script:BinaryFatal = $true
+            return $false
+        }
     }
     # sha256 校验（manifest 期望值，或相邻 .sha256 文件）
     if (-not $expectSha -and (Test-Path "$zip.sha256")) {
@@ -263,6 +273,7 @@ function Install-Binary {
         $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
         if ($hash -ne $expectSha.ToLower()) {
             Write-Err "sha256 校验失败，拒绝安装"
+            $script:BinaryFatal = $true
             return $false
         }
         Write-OK "sha256 校验通过"
@@ -270,7 +281,11 @@ function Install-Binary {
     Expand-Archive -Path $zip -DestinationPath (Join-Path $AIRY_HOME "tmp") -Force
     # 包内必须含 agentrt-* 顶层目录（release.yml 打包约定），否则视为异常
     $pkgDir = Get-ChildItem (Join-Path $AIRY_HOME "tmp") -Directory | Where-Object { $_.Name -like "agentrt-*" } | Select-Object -First 1
-    if (-not $pkgDir) { Write-Warn "release 包结构异常（缺 agentrt-* 顶层目录），回退源码构建"; return $false }
+    if (-not $pkgDir) {
+        Write-Err "release 包结构异常（缺 agentrt-* 顶层目录）"
+        $script:BinaryFatal = $true
+        return $false
+    }
     $copied = 0
     Get-ChildItem (Join-Path $pkgDir.FullName "bin") -ErrorAction SilentlyContinue | ForEach-Object {
         Copy-Item $_.FullName (Join-Path $AIRY_HOME "bin") -Force -ErrorAction SilentlyContinue
@@ -289,7 +304,11 @@ function Install-Binary {
     # 以实际安装包版本固化（manifest 通道可能高于默认 AIRY_VERSION）
     $verNum = $pkgDir.Name -replace "^agentrt-", ""
     if ($verNum) { $script:AIRY_VERSION = "v$verNum" }
-    if ($copied -eq 0) { Write-Warn "release 包 bin/ 为空，回退源码构建"; return $false }
+    if ($copied -eq 0) {
+        Write-Err "release 包 bin/ 为空，拒绝安装"
+        $script:BinaryFatal = $true
+        return $false
+    }
     Write-OK "完全体二进制包安装完成（v$verNum）"
     return $true
 }
@@ -524,6 +543,10 @@ Require-Cmd "curl"
 Init-Home
 
 $installed = $false
+# fail-closed（对齐 install.sh rc 语义）：binary 模式 / 离线包 / 确定性故障
+# （缺签·验签失败·sha 不符·下载失败·包结构异常·bin 空）一律 exit 1，绝不
+# 静默下沉源码构建；仅 auto 且"官方无制品/平台不支持"类非致命原因允许源码兜底。
+$script:BinaryFatal = $false
 # 发布来源解析：-FromFile 离线包 > AIRY_RELEASE_URL 显式 URL > 官方通道 manifest
 # （默认，stable/beta 由 -Channel 决定；-Mode source 除外）
 $releaseUrl = $env:AIRY_RELEASE_URL
@@ -541,13 +564,23 @@ if (-not $releaseUrl -and $Mode -ne "source") {
         $releaseUrl = ""
     }
 }
-if ($FromFile) { $installed = Install-Binary $FromFile }
+if ($FromFile) {
+    if (-not (Install-Binary $FromFile)) {
+        Write-Err "离线包安装失败，退出（fail-closed）"
+        exit 1
+    }
+    $installed = $true
+}
 elseif ($Mode -eq "binary" -or ($Mode -eq "auto" -and $releaseUrl)) {
     $installed = Install-Binary $releaseUrl
 }
 elseif ($Mode -eq "binary") { Write-Err "模式 binary 需要 AIRY_RELEASE_URL"; exit 1 }
 
 if (-not $installed) {
+    if ($Mode -eq "binary" -or $script:BinaryFatal) {
+        Write-Err "二进制安装失败，拒绝回退源码构建（fail-closed）"
+        exit 1
+    }
     Write-Info "进入源码构建模式（$Mode）"
     # 工具链仅在源码构建路径要求（二进制模式无需 git/cmake/编译器）
     Check-Toolchain
