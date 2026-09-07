@@ -40,6 +40,7 @@ JOB_NAME="${GITHUB_JOB:-?}" \
 "$PY" - <<'PY'
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -61,16 +62,39 @@ headers = {
 
 # 1) 提炼日志：取文件尾部整段（output-on-failure 的失败详情在 FAILED
 #    汇总之前，不能只从标记处起取）。压缩到 ~55KB 进 issue body。
+#    ctest 类失败（TITLE_SUFFIX 含 "ctest"）日志被 INFO 洪流淹没，改走
+#    "信号行摘要 + 原始尾部" 双段：只保留 Test # / PASS|FAIL / 断言 /
+#    崩溃码 / ERROR 等关键行，再附原始尾部供上下文核对。
 try:
     txt = open(logfile, encoding="utf-8", errors="replace").read()
 except Exception as e:
     print(f"ci-debug-dump: cannot read log {logfile}: {e}")
     sys.exit(0)
 txt = txt.replace("\r", "")
-out = []
-for ln in txt.splitlines(keepends=True):
-    out.append(ln if len(ln) <= 400 else ln[:400] + "\n")
-body_log = "".join(out)[-55000:]
+lines = txt.splitlines(keepends=True)
+trunc = lambda s: s if len(s) <= 400 else s[:400] + "\n"
+
+def build_body():
+    if "ctest" not in suffix:
+        # 非 ctest（编译日志等）：整段取尾部（原语义不变）
+        return "".join(trunc(ln) for ln in lines)[-55000:]
+    sig = re.compile(
+        r"(Test\s+#|Passed|\*\*\*Failed|\bPASS\b|\bFAIL\b|\[FAIL\]|\[error\]|"
+        r"assertion|Assertion|assert\b|0xc[0-9a-fA-F]{6}|Access violation|"
+        r"stack overflow|STATUS_|terminate|CRITICAL|\[WARN\]|exception|"
+        r"exit code|Error:|error [A-Z]|LNK\d|failed test names)",
+        re.IGNORECASE,
+    )
+    hits = [ln for ln in lines if sig.search(ln)]
+    digest = "".join(trunc(ln) for ln in hits)
+    if len(digest) > 43000:
+        digest = digest[-43000:]
+    tail = "".join(lines)[-11000:]
+    head = ("ctest 信号行摘要（行数 %d，原始 %d 行，截尾详见 RAW TAIL）\n```\n"
+            % (len(hits), len(lines)))
+    return head + digest + "\n```\n\n==== RAW TAIL (last 11KB) ====\n```\n" + tail + "\n```"
+
+body_log = build_body()
 
 body = f"""Job: {job}
 Step: {suffix}
