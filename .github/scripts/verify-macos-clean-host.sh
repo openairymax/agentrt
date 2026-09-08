@@ -171,8 +171,18 @@ fi
 GWP="${GWP:-8080}"
 _GW_OK=0
 _i=0
+# macOS bash 3.2（Apple 构建）禁用了 /dev/tcp 网络重定向（恒报
+# "No such file or directory"；G4b 双腿实证：gateway_d 存活且健康
+# 检查持续、total_req=0 证明零连接到达，120s 探测全败纯因探测手段）。
+# macOS 自带 nc(1)，优先 nc -z；无 nc 再回退 /dev/tcp（Linux bash 语义）。
+_HAVE_NC=0
+command -v nc >/dev/null 2>&1 && _HAVE_NC=1
 while [ "$_i" -lt 120 ]; do
-    if (exec 3<>"/dev/tcp/127.0.0.1/$GWP") 2>/dev/null; then
+    if [ "$_HAVE_NC" = "1" ]; then
+        if nc -z -w 1 127.0.0.1 "$GWP" >/dev/null 2>&1; then
+            _GW_OK=1; break
+        fi
+    elif (exec 3<>"/dev/tcp/127.0.0.1/$GWP") 2>/dev/null; then
         exec 3>&- 3<&- 2>/dev/null || true
         _GW_OK=1; break
     fi
