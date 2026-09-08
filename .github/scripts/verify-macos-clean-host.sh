@@ -194,20 +194,26 @@ if [ "$_GW_OK" != "1" ]; then
     fi
     EV="$AH/logs/g4b-evidence.txt"
     {
-        echo "gateway TCP 不可达: 127.0.0.1:${GWP}（探测 ${_i}s）"
-        echo "launcher $L_STATE"
-        echo "== launcher 日志尾部（AIRYRT_TERM_LOG=verbose，stdout+stderr 合流 LOGF）=="
-        tail -n 120 "$LOGF" 2>/dev/null
-        echo "== airymaxrt.log 尾部（boot 进度真身，含 debug）=="
-        tail -n 150 "$AH/logs/airymaxrt.log" 2>/dev/null
+        echo "== launcher 日志尾部 30 行（AIRYRT_TERM_LOG=verbose，stdout+stderr 合流 LOGF）=="
+        tail -n 30 "$LOGF" 2>/dev/null
+        echo "== airymaxrt.log 尾部 40 行（boot 进度真身，含 debug）=="
+        tail -n 40 "$AH/logs/airymaxrt.log" 2>/dev/null
         echo "== logs/ 目录 =="
         ls -la "$AH/logs" 2>/dev/null
         echo "== run/ 目录 =="
         ls -la "$AH/run" 2>/dev/null
-        echo "== gateway_d.out 尾部 =="
-        tail -n 40 "$AH/logs/gateway_d.out" 2>/dev/null
+        echo "== gateway_d.out 尾部 30 行 =="
+        tail -n 30 "$AH/logs/gateway_d.out" 2>/dev/null
         echo "== 进程表（daemon 群/launcher 残留）=="
         ps aux 2>/dev/null | grep -E '[_]d( |$)|airymax|airy' | head -20
+        # 死因判定块置于 EV 尾部：dump_file 只保尾部 9900B（9 段 × 1100B），
+        # rc 行曾因置于头部被 LOGF 大段挤丢（G4b 双腿实证：EV 头部 7.3KB
+        # 丢失，恰含 rc 与 unbound variable 消息），保尾特性要求核心证据殿后。
+        echo "== 死因判定（核心证据，务必保留）=="
+        echo "gateway TCP 不可达: 127.0.0.1:${GWP}（探测 ${_i}s）"
+        echo "launcher $L_STATE"
+        echo "判读: rc=143/130 且 LOGF 有『收到信号』→外部信号退出；rc=1 且仅有『终局清理开始』→set -u/-e 内部直死（bash 3.2 空数组类）；rc=127→命令缺失"
+        echo "launcher 黑匣子关键词: 『终局清理开始（exit_rc=N）』『收到 TERM/INT 信号』"
     } >"$EV" 2>&1 || true
     dump_file "G4b phase4 取证" "$EV"
     _EXPECTED=1
