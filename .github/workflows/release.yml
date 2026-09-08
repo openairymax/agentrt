@@ -1283,7 +1283,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     permissions:
-      contents: read
+      contents: write
     env:
       COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
       COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
@@ -1291,6 +1291,10 @@ jobs:
       GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
       ATOMGIT_REPO: openairymax/agentrt
+      # M13 发布镜像：publish-release.sh 发布 atomgit（SSoT）成功后，
+      # publish-mirror.sh 把同一 dist 附件集镜像到 GitHub/Gitee Releases
+      # （GH 用 GITHUB_PAT，Gitee 复用 sync-mirror 的 GT_TOKEN）。
+      GITEE_TOKEN: ${{ secrets.GT_TOKEN }}
       # P23 根修配套：manifest commit 双端同步所需（publish-release.sh 阶段 5
       # 向 GitHub main 补推，fail-soft；无 PAT 时跳过并告警）。
       GITHUB_REPO: ${{ github.repository }}
@@ -1347,4 +1351,16 @@ jobs:
             (cd dist && sha256sum -c "$(basename "$f")") || { echo "::error::sha256 复核失败: $f"; exit 1; }
           done
           bash _tools/scripts/ci/release/publish-release.sh "${{ env.VERSION }}" dist
+
+      # M13 发布镜像：atomgit（SSoT）发布成功后，同一 dist 附件集镜像到
+      # GitHub/Gitee Releases——修复"只有 tag 没有 Releases（无二进制包）"
+      # （社区实证反馈）。附件字节与 atomgit 同源（本 job dist 直传 GH/Gitee
+      # 快通道，不经慢通道回拉）；幂等（同名同大小跳过/元数据对齐），
+      # tag 前置校验 fail-closed，任一附件失败非零退出（C4 修复重发语义：
+      # 重跑本 job 即幂等续传）。
+      - name: Mirror release to GitHub + Gitee
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          bash _tools/scripts/ci/release/publish-mirror.sh "${{ env.VERSION }}" dist
 
