@@ -72,6 +72,28 @@ AgentRT 的每一次提交与每一个版本发布都由这里的流水线驱动
    提供同一套二进制产物（平台包 + 校验和 + 签名 + 清单 + 安装脚本），字节
    同源；安装器/更新器即可从官方渠道获取。
 
+发布面以 atomgit 为权威源（SSoT）：Release 资产以 atomgit 为基准，单向镜像
+同步到 GitHub 与 Gitee 的同名 Release，三端资产集与字节保持一致；镜像通道
+幂等，重跑安全。此外，正式发布前还会在干净 macOS 真机上做一次出口核验
+（G4b），确认安装包在不依赖任何开发环境的宿主机上可完整安装与启动。
+
+## 从 Release 页面安装
+
+每个版本的 Release 页面提供同一套资产：
+
+| 资产 | 说明 |
+|---|---|
+| `agentrt-<版本>-<平台>.tar.gz` / `.zip` | 平台自包含安装包（Linux/macOS 为 tar.gz，Windows 为 zip） |
+| 同名 `.sha256` | 安装包的 SHA-256 校验文件 |
+| 同名 `.sig` | 安装包的分离签名 |
+| `manifest.rc.json`（+ `.asc`） | 本版本全部资产的清单（及清单的分离签名）——发布字节的权威 |
+| `install.sh` / `install.ps1` | Linux/macOS 与 Windows 安装脚本 |
+
+安装前建议先验证完整性：把 `.sha256` 文件与对应的安装包放在同一目录，运行
+`sha256sum -c <包名>.sha256`；对安全敏感的场景可进一步用清单和签名校验整套
+资产的一致性。验证通过后，直接运行安装脚本或解压安装包即可——安装包内含
+全部依赖，不需要任何额外的开发环境。
+
 想从源码构建而不是用安装包？克隆后先执行
 `git submodule update --init --recursive`（叶子仓库由 gitlink 钉定），构建入口
 是仓库根的 `cmake`。完整步骤见 [CONTRIBUTING](../CONTRIBUTING.md)。
