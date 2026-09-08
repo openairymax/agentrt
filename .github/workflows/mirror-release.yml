@@ -20,6 +20,11 @@ on:
         description: '待回填版本（如 v0.1.13-rc9，须已有 atomgit Release + 三端 tag）'
         required: true
         type: string
+      fetch_missing:
+        description: 'dist 缺件时从 atomgit release 回填（历史版本/工件过期场景必开）'
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -70,5 +75,8 @@ jobs:
           ls -la dist/ || true
 
       - name: Mirror to GitHub + Gitee
+        env:
+          # 缺件回填开关透传（publish-mirror.sh 读 FETCH_MISSING=1）
+          FETCH_MISSING: ${{ inputs.fetch_missing && '1' || '0' }}
         run: |
           bash _tools/scripts/ci/release/publish-mirror.sh "${VERSION}" dist
