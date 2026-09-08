@@ -2,7 +2,7 @@
 # =============================================================================
 # i386 (linux-x86-32) 工具链镜像（0.1.12 I1 流水线优化）
 #
-# 问题：release.yml build-linux-32（x86-32 腿）每轮在 debian:bullseye i386
+# 问题：release.yml build-linux-x86-32（x86-32 腿）每轮在 debian:bullseye i386
 # 容器内从零执行「snapshot apt 源改写 + apt 安装 + lib-builddeps.sh 自编译
 # deps」，与 amd64/arm64 腿镜像化前同病（每轮 ~5-8min 纯环境准备）。
 # 方案：与 ubuntu.Dockerfile（arm64/arm32/amd64 用）同模式，把环境一次性
@@ -29,7 +29,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8
 
 # bullseye EOL：apt 源钉 snapshot.debian.org（与镜像同时间戳），跳过
-# Valid-Until 校验。与 release.yml build-linux-32 旧腿配方逐字同源。
+# Valid-Until 校验。与 release.yml build-linux-x86-32 旧腿配方逐字同源。
 RUN printf "%s\n" \
       "deb http://snapshot.debian.org/archive/debian/20240812T000000Z/ bullseye main" \
       "deb http://snapshot.debian.org/archive/debian-security/20240812T000000Z/ bullseye-security main" \
