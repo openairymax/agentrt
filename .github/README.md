@@ -53,20 +53,24 @@ AgentRT 的每一次提交与每一个版本发布都由这里的流水线驱动
 | **Build & Test** | push / pull_request | Linux、macOS、Windows 构建与门禁测试 |
 | **Codegen Checks** | push / pull_request | 校验 syscall 定义与生成代码不漂移 |
 | **Toolchain Images** | 手动触发 | 构建并推送交叉编译工具链镜像 |
-| **Release** | `v*` tag 推送 / 手动触发 | 跨平台构建 → 打包 → 干净环境核验 → 签名发布 |
-| **G4b macOS Clean-Host** | `g4b-*` tag 推送 / 手动触发 | 干净 macOS 真机安装与完整启动核验 |
+| **Release** | `v*` tag 推送 / 手动触发 | 跨平台构建 → 打包 → 干净环境核验 → 签名发布 → 镜像到 GitHub/Gitee Releases |
+| **G4b macOS Clean-Host** | 手动触发 | 干净 macOS 真机安装与完整启动核验 |
 | **Mirror Sync** | push / 手动触发 | 源码与 tag 在公开托管平台间同步 |
+| **Mirror Release Artifacts** | 手动触发 | 历史版本二进制产物回填到 GitHub/Gitee Releases |
 
 发布是“fail-closed”的：任一平台构建失败、或干净环境无法安装/启动，都会阻断
 发布，不会产出带病制品。
 
 ## 一个版本是怎么发布的
 
-1. 维护者在源码仓库打出版本 tag（如 `v0.1.13`）；
+1. 维护者在源码仓库打出版本 tag（如 `v0.1.13`）——**tag 仅在真正创建发行版
+   时打**（tag 经同步通道单向分发到各公开托管平台，避免无效冗余 tag）；
 2. Release 流水线并行构建全平台产物，打包为**自包含**安装包；
 3. 在干净环境（Linux 容器 / macOS 宿主机）按普通用户流程离线安装、启动完整
    daemon 群并做端到端冒烟，覆盖升级与回滚路径；
-4. 全部通过后产物签名并发布，安装器/更新器即可从官方渠道获取。
+4. 全部通过后产物签名并发布到 Releases——三个公开托管平台的 Release 页面均
+   提供同一套二进制产物（平台包 + 校验和 + 签名 + 清单 + 安装脚本），字节
+   同源；安装器/更新器即可从官方渠道获取。
 
 想从源码构建而不是用安装包？克隆后先执行
 `git submodule update --init --recursive`（叶子仓库由 gitlink 钉定），构建入口
