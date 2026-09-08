@@ -510,11 +510,13 @@ jobs:
           # port 清单与 x64 腿一致（nghttp2：HTTP/2 在 Windows 禁用仍入清单
           # 保持两腿依赖面同构），仅 triplet 换 x86-windows（探针实证集）
           vcpkg install sqlite3 cjson libyaml curl openssl zlib libmicrohttpd libwebsockets libevent nghttp2 --triplet x86-windows
-          # Rust 工具链（宿主 x64）+ i586-pc-windows-msvc target（TUI 32 位产物）
+          # Rust 工具链（宿主 x64）+ i686-pc-windows-msvc target（TUI 32 位产物）
+          # i586（tier 2）在 hotfix 发行（如 1.98.1）常缺 std 二进制：rc7 首跑
+          # 实证 rustup 拒绝安装；i686 为 tier 1 随每个发行必发，部署面无差
           Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile "$env:TEMP\rustup-init.exe"
           & "$env:TEMP\rustup-init.exe" -y --profile minimal --default-toolchain stable
           $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
-          rustup target add i586-pc-windows-msvc
+          rustup target add i686-pc-windows-msvc
 
       - name: Configure
         shell: pwsh
@@ -551,7 +553,7 @@ jobs:
         run: |
           cmake --install ${{ env.BUILD_DIR }} --config Release
 
-      - name: Build TUI (i586) + copy Python runtime
+      - name: Build TUI (i686) + copy Python runtime
         shell: pwsh
         env:
           AGENTRT_TUI_RUN_STREAM_H: ${{ github.workspace }}/commons/include/airy_run_stream.h
@@ -559,10 +561,10 @@ jobs:
           $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
           $env:CARGO_TARGET_DIR = "$env:RUNNER_TEMP\tui-target-x86"
           Push-Location "agent-workload/sdk/tui"
-          & cargo build --release --target i586-pc-windows-msvc
+          & cargo build --release --target i686-pc-windows-msvc
           if ($LASTEXITCODE -ne 0) { throw "[windows-x86-32] TUI 构建失败（exit $LASTEXITCODE，bin/agentrt-tui.exe 发布完整性必需）" }
           Pop-Location
-          $tuiExe = "$env:CARGO_TARGET_DIR\i586-pc-windows-msvc\release\agentrt-tui.exe"
+          $tuiExe = "$env:CARGO_TARGET_DIR\i686-pc-windows-msvc\release\agentrt-tui.exe"
           if (Test-Path $tuiExe) {
             Copy-Item $tuiExe "${{ env.STAGE_DIR }}\bin\" -Force
           } else { throw "[windows-x86-32] TUI 产物缺失: $tuiExe" }
