@@ -1,205 +1,93 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 -->
 <!-- Copyright (c) 2025-2026 SPHARX Ltd. All Rights Reserved. -->
 
-# `.github/` — AgentRT 仓库自动化与模板
+# `.github/` — AgentRT 仓库自动化
 
-> GitHub Actions 工作流、Issue / PR 模板及社区健康文件，服务于
-> [AgentRT (AirymaxAgentRT)](https://atomgit.com/openairymax/agentrt) 管理仓库。
+> 本目录承载 [AgentRT](https://atomgit.com/openairymax/agentrt) 的 CI/CD 工作流、
+> 可复用 Action、构建镜像、维护脚本与社区模板。
 
----
+## 项目背景
 
-## 定位
+AgentRT（AirymaxAgentRT）是面向 AI Agent 团队的 OS 级运行时平台——定位类似于 JVM
+之于语言、containerd 之于容器。本仓库是平台的**管理仓库**，以 git 子模块聚合 7 个
+叶子仓库（atoms / commons / cupolas / daemons / gateway / heapstore / protocols），
+对外提供微内核原语、认知循环、内存分层、安全穹顶、IPC 协议、网关服务和常驻守护
+进程等 OS 级机制。
 
-本目录承载 **agentrt 管理仓库的发布平面（workflow 宿主）**。agentrt 是 Airymax 平台的
-**AI Agent 运行时平台工程**——为 AI Agent 团队提供 OS 级运行时基础设施，定位类似于
-JVM 之于语言、containerd 之于容器。
+## 仓库拓扑
 
-本管理仓库聚合 **7 个叶子仓库**（atoms / commons / cupolas / daemons / gateway /
-heapstore / protocols）作为 git 子模块，对外提供微内核原语、认知循环、内存分层、
-安全穹顶、IPC 协议、网关服务和常驻守护进程等 OS 级机制。
+- **atomgit 为主托管（SSoT）**：源码真相与官方制品发布地；GitHub 与 Gitee 为镜像
+  与工作流执行面，由 `Mirror Sync` 单向自动同步。
+- 所有流水线宿主在本仓库：构建、测试、codegen 校验、镜像同步与跨平台发布。
+- 版本发布是跨平台原子事件：一个版本 tag 触发全平台构建，产物一次性聚合发布。
 
-**拓扑约定（2026-09 架构裁决）**：`airymaxhub` 伞仓为纯容器（superproject），
-**不承载任何流水线**；CI/CD（构建 / 测试 / codegen / SSoT / 镜像同步 / 平台矩阵发布）
-全部下沉到本 agentrt 仓，因为 agentrt 的版本发布语义（VERSION / CHANGELOG /
-7 叶子聚合）都以本仓为唯一宿主。atomgit 为 SSoT 主托管，GitHub / Gitee 仅为镜像
-与执行面（按需经各自 API/MCP 同步，不做本地循环触发）。
+## 工作流一览
 
-## 目录内容
+| 工作流（显示名） | 触发 | 职责 |
+|---|---|---|
+| `build-test.yml`（Build & Test） | `push` / `pull_request` 到 `main` | Linux / macOS / Windows 三平台构建与测试门禁（ctest + 覆盖率阈值） |
+| `codegen-check.yml`（Codegen Checks） | `push` / `pull_request` 到 `main` | 校验 syscall 定义（SSoT XML）与生成代码不漂移 |
+| `build-toolchain-images.yml`（Toolchain Images） | 工具链镜像变更 | 构建并推送交叉编译工具链镜像（GHCR，digest 钉版） |
+| `release.yml`（Release） | 版本 tag（`v*`）推送或手动派发 | 跨平台发布链（见下节） |
+| `sync-mirror.yml`（Mirror Sync） | `push` / tag | SSoT → GitHub / Gitee 镜像同步（agentrt + 7 叶子） |
+| `g4b-macos-clean-host.yml`（G4b macOS Clean-Host） | 核验 tag 或手动派发 | 在干净 macOS 宿主上离线安装发布制品并完整启动 daemon 群，正式版本发布前的真机核验 |
+
+临时性移植探针工作流（如 Windows x86-32 编译面调查）随结论拆除，不在长期清单内；
+各文件头部注释记录了其目的与载体纪律。
+
+## 发布链（release.yml）
+
+一次版本 tag 触发的完整发布流程：
+
+1. **平台构建腿**：linux-x86-64 / linux-arm-64 / linux-arm-32 / linux-x86-32 /
+   macos-arm-64 / macos-x86-64 / windows-x86-64 七条产品腿并行构建 + 打包
+   （linux-riscv-64 为编译 canary，不出制品）。qemu 交叉腿运行于固化工具链容器，
+   产物自包含（打包前收集运行依赖库）。
+2. **聚合**：所有 gate 腿产物汇成单一 release 事件。
+3. **洁净房 e2e 门禁**：在无任何开发依赖的干净容器内执行——离线安装发布制品 →
+   启动完整 daemon 群 → 网关探测 → CLI 冒烟，并覆盖旧版升级与回滚路径。任一断言
+   失败即阻塞发布。
+4. **签名与 publish**（需维护者审批放行）：产物清单完整性预检（缺件即中止）、
+   GPG 签名 + cosign 容器签名、全量资产与版本清单一次性发布。
+
+安装与升级方式见仓库根目录 [README](../README.md)。
+
+## 目录结构
 
 ```
 .github/
-├── README.md          # 本文件
-├── actions/           # 复合 action（复用模板，防 build-test/release 双实现漂移）
-│   ├── lf-init-deps/        # 定向子模块检出（agentrt 7 叶子，release 额外 + sibling 数据）
-│   ├── lf-build-container/  # Linux 容器腿统一构建模板（digest 钉版镜像 + 日志 annotation）
-│   └── lf-package/          # tar.gz 打包统一模板（staging + sha256 + upload-artifact）
-├── docker/
-│   └── qemu-toolchain/      # 交叉编译工具链镜像（固化 apt+自编译 deps，提速 qemu 腿）
-│       ├── ubuntu.Dockerfile      # arm64 / arm32 / amd64 容器腿用
-│       └── debian-i386.Dockerfile # linux-x86-32 腿用
-├── scripts/
-│   ├── init-submodules.sh       # CI 依赖布局：7 叶子子模块 + release 期 sibling 数据
-│   ├── sync-mirror.sh           # agentrt + 7 叶子 → GitHub / Gitee 镜像同步
-│   ├── setup-release-environment.sh  # release environment + branch/tag policy 幂等配置（H3）
-│   ├── ci-debug-dump.sh         # 失败步骤完整日志直传 ci-debug issue（排障拉取）
-│   ├── build-tui.sh             # Rust TUI（agentrt-tui）构建
-│   └── finalize-linux-libs.sh   # Linux 打包前运行库自包含收尾
-└── workflows/
-    ├── build-test.yml           # 构建 / 测试门禁（Linux 覆盖率 / macOS / Windows）
-    ├── build-toolchain-images.yml  # 交叉工具链 GHCR 镜像构建推送（qemu 腿基础设施）
-    ├── codegen-check.yml        # syscall.xml SSoT 漂移校验
-    ├── g3-x86-32-probe.yml      # G3 Windows x86-32 移植探针（tag 触发，出结论即拆除）
-    ├── g4b-macos-clean-host.yml # G4b macOS 干净真机核验（双腿，正式 tag 前出证）
-    ├── release.yml              # 跨平台发布（7 产品腿 + riscv canary + 聚合 + e2e 门禁 + publish）
-    └── sync-mirror.yml          # atomgit(SSoT) → GitHub / Gitee 镜像同步触发器
+├── actions/     # 可复用复合 Action（子模块检出、容器腿构建、打包模板）
+├── docker/      # 交叉编译工具链镜像（arm64 / arm32 / i386）
+├── scripts/     # 长逻辑脚本：依赖布局、镜像同步、发布环境配置、失败日志归档等
+└── workflows/   # 工作流编排（触发 × job 拓扑）
 ```
 
-### 为什么是"四层结构"——看似复杂，实际是三类历史教训的收敛
+编排层只描述"何时跑什么"，可复用的构建/打包步骤收敛在 `actions/`（避免同一逻辑
+在门禁线与发布线各写一份而漂移），交叉腿环境收敛在 `docker/`（避免每轮从源码
+重编依赖）。
 
-流水线体量的来源不是"三条平台线各写一份"，而是把**每个平台腿的公共
-步骤抽成一份模板**（复合 action / 脚本 / 镜像），四层各有单一职责：
-
-1. **workflows**（编排层）只做"触发 × 跑哪些 job"。两个主 workflow：
-   `build-test.yml` = 三平台高频门禁（Linux 覆盖率 / macOS / Windows 三个
-   job），`release.yml` = 发布时的一次性跨平台构建 + 汇聚 publish（26 资产
-   一次落库，manifest.latest 单点）。
-2. **actions/**（复用层）：历史教训是同一段 shell 在 release.yml 和
-   build-test.yml 各写一份，改一侧另一侧漂移 → 构建红。`lf-*` 把
-   checkout/子模块、容器腿构建、tar.gz 打包收敛成单一权威模板（P3 收口）。
-3. **docker/**（提速层）：qemu 交叉腿（arm64/arm32/i386）最初每轮在容器
-   内从源码重编全部依赖（arm-64 实测 88 min），把环境固化进 GHCR 镜像后
-   环境准备归零（0.1.11 E1 / 0.1.12 I1 实证）。
-4. **scripts/**（细节层）：workflow YAML 难以承载的幂等配置（H3 release
-   environment）、失败日志直传 issue（ci-debug-dump）、子模块布局等长逻辑。
-
-**"为什么不拆 Windows / Linux / macOS 三条流水线"（0.1.13 结构定案）**：
-拆线表面更清晰，实则每个平台要各自维护"触发条件 + 产物名 + 上传逻辑 +
-环境变量 + Secrets"，与现在唯一的区别是把**已收敛的公共部分再拆散成三份
-漂移源**。发布是跨平台原子事件（26 资产同一次落库 / tag 单点 / Environment
-审批不下沉），拆成三条后 release 原子性要靠三线对齐，代价更高。当前形态 =
-**一条发布流水线（release.yml）+ 三条门禁（build-test.yml 的 linux/macos/
-windows job）+ 一套复用件（lf-* / 镜像 / 脚本）**，即"逻辑上三平台、物理
-上一份"。release.yml 现约 1300 行（B9 治理评估成文：e2e-clean-room / U9 升级
-路径 / REQUIRED_BIN 预检随 rc 实证持续叠加，编排复杂度仍在单文件承载范围内；
-若继续增长再评估 workflow_call 拆腿，Environment 审批必须留在主文件）。
-
-## 工作流
-
-GitHub Actions 侧栏按 workflow 的 `name:` 显示（0.1.13 命名统一：display name = 文件名的
-人类可读版，Title Case，≤3 词；`release.yml` 另设 `run-name` 使 run 列表直接显示版本而非
-commit subject）。文件名为唯一 SSoT 标识（branch protection / dispatch 引用文件名）。
-
-| workflow（显示名） | 触发 | 说明 |
-|----------|------|------|
-| `build-test.yml`（Build & Test） | `push main` / `pull_request` / `workflow_dispatch` | 三平台高频门禁：Linux（Debug + ctest + gcovr 覆盖率阈值）/ macOS（Homebrew）/ Windows（vcpkg + MSVC）。G2 达成（0.1.13）：windows ctest 35→全绿，`windows-build` 为 required 硬门禁 |
-| `build-toolchain-images.yml`（Toolchain Images） | `push main`（Dockerfile/相关变更）/ `workflow_dispatch` | 交叉工具链镜像（arm64/arm32/i386 容器腿）构建并推送 GHCR，digest 钉版供 release 腿引用 |
-| `codegen-check.yml`（Codegen Checks） | `push main` / `pull_request` / `workflow_dispatch` | `syscall_gen.py --check` 校验 `syscall.xml` 与生成产物漂移 + SSoT registry 校验 |
-| `g3-x86-32-probe.yml`（G3 X86-32 Probe） | `g3-x86-32-*` tag 推送 / `workflow_dispatch` | G3/B6 移植性探针：x64 主机上 vcpkg x86-windows triplet + MSVC `-A Win32` 构建与 x64 腿同面全量目标（daemons 15 + airy_cli + 测试），产出 32 位错误数据集（annotation + ci-debug issue），供"探针 → leg"裁决。专用载体纪律：不入任何 needs，出结论后 workflow + tag 整体拆除 |
-| `g4b-macos-clean-host.yml`（G4b macOS Clean-Host） | `g4b-*` tag 推送 / `workflow_dispatch`（version 输入，默认 `v0.1.13-rc6`） | G4 出口末项"macOS 干净真机 daemon 群可启"的流水线内最强载体：GitHub 托管 macOS 一次性 VM 双腿（arm-64 = macos-latest / x86-64 = macos-15-intel），install.sh --from-file 离线安装 release 的 macos 平台 tar.gz → 完整启动器拉起 daemon 群 → gateway TCP 探测 → airy_cli /daemons 冒烟（online N==M 断言），判定全在脚本 fail-closed，job success 即出证 |
-| `release.yml`（Release，`run-name: Release <版本>`） | `tag v*` 推送 / `workflow_dispatch`（输入 version） | 发布链（G1 起 windows 为 required gate）：linux-x86-64 / linux-arm-64 / linux-arm-32 / linux-x86-32 / linux-riscv-64（canary）/ macos-arm-64 / macos-x86-64 / windows-x86-64 → 聚合 `release` → **`e2e-clean-room`**（H2 洁净容器：安装 → daemon 群 → CLI 冒烟 + **U9 旧版升级路径**，publish 前置门禁）→ `publish`（Environment 审批：REQUIRED_BIN/SUBTREE 预检 + cosign/GPG 签名 + 26 资产一次落库 + manifest.latest）。publish 通过后拉取 stable manifest 的 prev 制品在下一 rc/发布自动回归 U9 |
-| `sync-mirror.yml`（Mirror Sync） | `push main` / `tag v*` / `repository_dispatch` / `workflow_dispatch` | `sync-mirror.sh`：agentrt + 7 叶子从 atomgit(SSoT) 同步至 GitHub / Gitee（缺仓自动创建，atoms 私有，错误隔离汇总） |
-
-## 布局与子模块
-
-- agentrt 工作树根即 agentrt 源码；`git submodule update --init --recursive` 在根上
-  一次性拉齐 7 个叶子（SHA 由 agentrt 树 gitlink 钉定）。私有叶子 `atoms` 经
-  `GH_TOKEN`（org PAT，`~/.netrc`）认证。
-- release 链额外克隆 sibling 数据到**历史相对路径**（`tools/` 与
-  `agent-workload/{sdk,ecosystem}`，来自 GitHub 镜像期 clone，**GitHub 侧手动维护，
-  见"镜像覆盖范围"节**），使打包 / 发布脚本的路径引用与伞仓时代一致、无需逐处改写：
-  - `tools/`：`lib-builddeps.sh` / `ops/templates/*`（config 模板）/ `ops/bin/agentrt-bootstrap.sh` / `ci/release/publish-release.sh` 等；
-  - `agent-workload/sdk/tui`：Rust TUI（`agentrt-tui`）构建源；
-  - `agent-workload/ecosystem`：Python 运行时（agents / manager 配置 / markets maths-toolkit）。
-- 构建源一律 `cmake -S .`（agentrt 即宿主根），不再有 `agent-workload/agentrt` 前缀。
-
-## 脚本
-
-### init-submodules.sh — CI 依赖布局
+## 本地开发
 
 ```bash
-bash .github/scripts/init-submodules.sh               # 仅 7 叶子（build-test / codegen）
-bash .github/scripts/init-submodules.sh agent-workload tools   # 叶子 + sibling 数据（release）
+git clone --recursive git@atomgit.com:openairymax/agentrt.git
+# 或已有克隆：
+git submodule update --init --recursive
 ```
 
-参数保持伞仓时代调用形式（`agent-workload` / `tools`），脚本内部重映射；私有叶子与
-sibling clone 凭据统一走 `GH_TOKEN`。
+7 个叶子的精确提交由本仓库树内 gitlink 钉定，构建以 agentrt 根为宿主
+（`cmake -S .`）。CI 与本地同布局。
 
-### sync-mirror.sh — agentrt + 叶子双镜像同步
+## Secrets 概览
 
-同步模型：源 = atomgit(SSoT)，`clone --mirror` 抓全量 refs 后仅 push **heads + tags**
-（force 与 SSoT 一致，不透传 atomgit 平台内部 ref）；子模块树以各仓 `HEAD:.gitmodules`
-BFS 解析；缺仓自动创建（atoms 私有）；每仓错误隔离、末尾汇总。
+fork 或自部署需要配置的最小集合（本表只列用途，不含任何值）：
 
-### 镜像覆盖范围（rc2 教训：tools 等 sibling 仓 GitHub 侧需手动维护）
-
-`sync-mirror.yml` 只自动同步 **agentrt + 7 叶子**。发布链在 CI 克隆的 sibling 数据
-（`_tools` / `agent-workload/{sdk,ecosystem}`，见下节）来自 **GitHub 镜像**，而
-GitHub 侧并无自动同步这些仓的通道——rc2 实证：`github.com/openairymax/tools`
-落后 5 提交、缺 `e2e-clean-room.sh`，导致 release 的 e2e job exit 127（脚本缺失），
-publish 被正确阻塞但失败归因一度被误导为容器内阶段失败。
-
-**维护要求**：tools / sdk / ecosystem / agent-workload / docs-closed 等顶层仓在
-atomgit 提交后，若其内容被 GitHub 侧 CI 消费（release 打包脚本、bootstrap、
-e2e 脚本、TUI/Python 运行时），须手动把 `main` 快进同步到三端（GitHub + Gitee）：
-
-```bash
-git -C <repo> push git@github.com:openairymax/<repo>.git main:main
-```
-
-无分叉时快进即可（镜像终态与 SSoT 一致）；分叉时须先对齐 SSoT 再推。
-0.1.13 收口项：为这些仓补一条自动镜像通道（或在 release 链改用 atomgit 拉取），
-避免依赖人工记忆（登记于 0.2.x 规划）。
-
-### 三端终验（2026-09-08，0.1.13 mirror-close）
-
-全量 11 仓（agentrt + 7 叶子 + tools/sdk 类 sibling）main HEAD 三端比对
-**11/11 SAME**，取证通道：
-
-| 端 | 通道 | 备注 |
-|----|------|------|
-| atomgit | `git ls-remote`（SSH remote） | SSoT，本机有 key |
-| GitHub | `api.github.com`（REST，PAT） | 网络封锁下 `github.com:443` git 直连超时、API 通 |
-| Gitee | MCP `compare_branches_tags`（base=head=main 取 `base_commit.sha`） | 私有仓 HTTPS ls-remote 会卡交互式凭据，弃用 |
-
-**atoms 定性**：三端 `private: true` 一致（gitee MCP / GitHub API / atomgit），
-属**私有源码区**而非镜像缺位；HEAD 三端同为 `69b8577e958a`。
-
-**叶子自动通道实证**：commons 提交 `1aefe86` 仅推 github + atomgit，gitee 侧
-`pushed_at = 2026-09-08T15:43:54+08` 与推送同刻——`Mirror Sync`（`push main`
-触发）自动补齐 gitee，叶子仓无需手动配 gitee remote。
-
-**网络纪律**：私有仓探测一律 `GIT_SSH_COMMAND="ssh -o BatchMode=yes"` 与
-`GIT_TERMINAL_PROMPT=0`，杜绝凭据提示挂死终端。
-
-### 发布 tag 与重复 Release run（H3/P19 SOP，2026-09-06 更正根因）
-
-**根因更正**：publish-release.sh 并不回推 git tag；重复 run 的链条是——
-atomgit Release API 建 release 时若 tag 尚不存在，服务端自动补建 tag（rc 资产内
-`<tag>.tar/.zip` 源归档即服务端自动产物为证）→ sync-mirror 全量 tag 镜像推至
-GitHub → tag push 再触发 `release.yml` 全链（rc.2 重复 run 33988925887 实证）。
-
-**正式发布无重复的实证**：tag 先双端（atomgit+GitHub）打齐 → atomgit 建 release
-复用既有 tag、GitHub 已有同 sha tag → sync 幂等 no-op（正式 v0.1.12 无 echo run）。
-
-**SOP**：
-1. 任何 rc/正式发布前**先双端打 tag**（atomgit + GitHub 指向同一 commit）再放行
-   release 流程；
-2. 若走 workflow_dispatch（main）且 publish 建了缺失 tag，随之出现的 echo Release
-   run 按需取消（AIRY_FORCE_UPLOAD=1 保证即使并发重发产物亦一致，无害）；
-3. sync-mirror 的 `--force` tag 推送保证两镜像终态与 SSoT 一致，无需人工干预。
-
-## Secrets
-
-| Secret | 用途 | 使用方 |
-|--------|------|--------|
-| `GH_TOKEN` | GitHub org PAT（建仓 / 推送 / 私有子仓认证；PAT 推送的 tag 可触发 `release.yml`，`GITHUB_TOKEN` 推送不会） | 全部 workflow |
-| `GT_TOKEN` | Gitee 令牌（org 建仓 + 推送） | `sync-mirror.yml` |
-| `ATOMGIT_TOKEN` | atomgit 令牌（私有子仓 mirror clone / 官方制品上传） | `sync-mirror.yml`、`release.yml` |
-| `GPG_PRIVATE_KEY` / `GPG_PASSPHRASE` | 发布 GPG 签名（manifest `*.asc`） | `release.yml` |
-| `COSIGN_PRIVATE_KEY` / `COSIGN_PASSWORD` | cosign 容器签名（tarball `*.sig`） | `release.yml` |
-
-签名密钥初始化见 `tools/scripts/ci/release/init-signing-keys.sh`（release 期从
-`tools/` sibling 取得）。
+| Secret | 用途 |
+|---|---|
+| `GH_TOKEN` | GitHub 组织令牌：镜像推送、私有子仓检出 |
+| `GT_TOKEN` | Gitee 令牌：镜像同步 |
+| `ATOMGIT_TOKEN` | atomgit 令牌：SSoT 拉取与官方制品上传 |
+| `GPG_PRIVATE_KEY` / `GPG_PASSPHRASE` | 发布物 GPG 签名 |
+| `COSIGN_PRIVATE_KEY` / `COSIGN_PASSWORD` | 容器镜像 cosign 签名 |
 
 ## 相关链接
 
