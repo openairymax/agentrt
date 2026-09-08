@@ -48,6 +48,8 @@ heapstore / protocols）作为 git 子模块，对外提供微内核原语、认
     ├── build-test.yml           # 构建 / 测试门禁（Linux 覆盖率 / macOS / Windows）
     ├── build-toolchain-images.yml  # 交叉工具链 GHCR 镜像构建推送（qemu 腿基础设施）
     ├── codegen-check.yml        # syscall.xml SSoT 漂移校验
+    ├── g3-x86-32-probe.yml      # G3 Windows x86-32 移植探针（tag 触发，出结论即拆除）
+    ├── g4b-macos-clean-host.yml # G4b macOS 干净真机核验（双腿，正式 tag 前出证）
     ├── release.yml              # 跨平台发布（7 产品腿 + riscv canary + 聚合 + e2e 门禁 + publish）
     └── sync-mirror.yml          # atomgit(SSoT) → GitHub / Gitee 镜像同步触发器
 ```
@@ -92,6 +94,8 @@ commit subject）。文件名为唯一 SSoT 标识（branch protection / dispatc
 | `build-test.yml`（Build & Test） | `push main` / `pull_request` / `workflow_dispatch` | 三平台高频门禁：Linux（Debug + ctest + gcovr 覆盖率阈值）/ macOS（Homebrew）/ Windows（vcpkg + MSVC）。G2 达成（0.1.13）：windows ctest 35→全绿，`windows-build` 为 required 硬门禁 |
 | `build-toolchain-images.yml`（Toolchain Images） | `push main`（Dockerfile/相关变更）/ `workflow_dispatch` | 交叉工具链镜像（arm64/arm32/i386 容器腿）构建并推送 GHCR，digest 钉版供 release 腿引用 |
 | `codegen-check.yml`（Codegen Checks） | `push main` / `pull_request` / `workflow_dispatch` | `syscall_gen.py --check` 校验 `syscall.xml` 与生成产物漂移 + SSoT registry 校验 |
+| `g3-x86-32-probe.yml`（G3 X86-32 Probe） | `g3-x86-32-*` tag 推送 / `workflow_dispatch` | G3/B6 移植性探针：x64 主机上 vcpkg x86-windows triplet + MSVC `-A Win32` 构建与 x64 腿同面全量目标（daemons 15 + airy_cli + 测试），产出 32 位错误数据集（annotation + ci-debug issue），供"探针 → leg"裁决。专用载体纪律：不入任何 needs，出结论后 workflow + tag 整体拆除 |
+| `g4b-macos-clean-host.yml`（G4b macOS Clean-Host） | `g4b-*` tag 推送 / `workflow_dispatch`（version 输入，默认 `v0.1.13-rc6`） | G4 出口末项"macOS 干净真机 daemon 群可启"的流水线内最强载体：GitHub 托管 macOS 一次性 VM 双腿（arm-64 = macos-latest / x86-64 = macos-15-intel），install.sh --from-file 离线安装 release 的 macos 平台 tar.gz → 完整启动器拉起 daemon 群 → gateway TCP 探测 → airy_cli /daemons 冒烟（online N==M 断言），判定全在脚本 fail-closed，job success 即出证 |
 | `release.yml`（Release，`run-name: Release <版本>`） | `tag v*` 推送 / `workflow_dispatch`（输入 version） | 发布链（G1 起 windows 为 required gate）：linux-x86-64 / linux-arm-64 / linux-arm-32 / linux-x86-32 / linux-riscv-64（canary）/ macos-arm-64 / macos-x86-64 / windows-x86-64 → 聚合 `release` → **`e2e-clean-room`**（H2 洁净容器：安装 → daemon 群 → CLI 冒烟 + **U9 旧版升级路径**，publish 前置门禁）→ `publish`（Environment 审批：REQUIRED_BIN/SUBTREE 预检 + cosign/GPG 签名 + 26 资产一次落库 + manifest.latest）。publish 通过后拉取 stable manifest 的 prev 制品在下一 rc/发布自动回归 U9 |
 | `sync-mirror.yml`（Mirror Sync） | `push main` / `tag v*` / `repository_dispatch` / `workflow_dispatch` | `sync-mirror.sh`：agentrt + 7 叶子从 atomgit(SSoT) 同步至 GitHub / Gitee（缺仓自动创建，atoms 私有，错误隔离汇总） |
 
