@@ -214,7 +214,13 @@ if [ "$_GW_OK" != "1" ]; then
         ls -la "$AH/run" 2>/dev/null
         echo "== gateway_d.out 尾部 30 行 =="
         tail -n 30 "$AH/logs/gateway_d.out" 2>/dev/null
-        echo "== 网络层取证（runner2 双腿实证：gateway 自称 started successfully" 
+        echo "== gateway_d.out 全文关键行检索（启动期取证：MHD 版本对照/"
+        echo "   HTTP start 失败 ERROR/shutdown 触发源——尾部 30 行被停机"
+        echo "   日志占据时，此块是启动期唯一窗口；arm 腿 rc10 实证缺口）=="
+        grep -nE "MHD|microhttpd|HTTP gateway|ERROR|FATAL|fatal|EBUSY|bind|shutting|start" "$AH/logs/gateway_d.out" 2>/dev/null | head -40 || true
+        echo "== gateway_d.out 全文头部 25 行（启动最早阶段，含启动参数回显）=="
+        head -n 25 "$AH/logs/gateway_d.out" 2>/dev/null || true
+        echo "== 网络层取证（runner2 双腿实证：gateway 自称 started successfully"
         echo "   但 nc//dev/tcp 双探测法 120s 全败且 total_req=0——须定位矛盾层）=="
         echo "gateway.port 内容: [$(cat "$AH/run/gateway.port" 2>/dev/null | tr '\n' ' ')]"
         echo "nc 路径: $(command -v nc 2>/dev/null || echo 无)"
