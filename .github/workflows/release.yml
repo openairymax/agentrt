@@ -461,6 +461,149 @@ jobs:
           path: ${{ env.artifact_name }}.*
           if-no-files-found: error
 
+  # Windows x86-32（G3 leg 正式化，0.1.13 清零）：探针链（g3-x86-32-probe-1..4，
+  # run 34204269970）已实证 x64 主机上 vcpkg x86-windows triplet + MSVC -A Win32
+  # 全 C 面编译 + ctest 48/48 全绿（issue #143），三件套移植雷（ssize_t 守卫/
+  # 32 位窄化/线程入口反模式）修复已在树，探针载体按纪律拆除，本腿承接其
+  # 构建契约进入发布矩阵。x64 宿主硬件兼容 i386，32 位用户态环境（受限旧机、
+  # WOW64 兼容面）仍可安装。
+  build-windows-x86-32:
+    # E3：与全部 MSVC 腿共享 ci-windows-runner-bus 串行，防 windows hosted
+    # 配额被双 workflow 多腿并跑占满。
+    concurrency:
+      group: ci-windows-runner-bus
+      cancel-in-progress: false
+    runs-on: windows-latest
+    continue-on-error: false
+    env:
+      # BAN-33：构建目录位于源码树外；与 x64 腿异目录防 generator 互踩
+      BUILD_DIR: ../build-x86
+      STAGE_DIR: stage
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Init submodules (agent-workload, tools)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh agent-workload tools
+
+      # vcpkg 二进制缓存与 x64 腿分离（triplet 不同，产物不互通；key 随本
+      # workflow 内容失效，x86 port 全量编译一次约 40-60min，缓存命中后分钟级）
+      - name: Restore vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/vcpkg-cache-x86
+          key: vcpkg-cache-x86-${{ runner.os }}-release-${{ hashFiles('.github/workflows/release.yml') }}
+          restore-keys: |
+            vcpkg-cache-x86-${{ runner.os }}-
+
+      - name: Install build dependencies
+        shell: pwsh
+        env:
+          VCPKG_BINARY_SOURCES: "clear;files,${{ runner.temp }}/vcpkg-cache-x86,readwrite"
+        run: |
+          # port 清单与 x64 腿一致（nghttp2：HTTP/2 在 Windows 禁用仍入清单
+          # 保持两腿依赖面同构），仅 triplet 换 x86-windows（探针实证集）
+          vcpkg install sqlite3 cjson libyaml curl openssl zlib libmicrohttpd libwebsockets libevent nghttp2 --triplet x86-windows
+          # Rust 工具链（宿主 x64）+ i586-pc-windows-msvc target（TUI 32 位产物）
+          Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile "$env:TEMP\rustup-init.exe"
+          & "$env:TEMP\rustup-init.exe" -y --profile minimal --default-toolchain stable
+          $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+          rustup target add i586-pc-windows-msvc
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          cmake -S . -B ${{ env.BUILD_DIR }} -A Win32 `
+            -DVCPKG_TARGET_TRIPLET=x86-windows `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DBUILD_TESTS=OFF `
+            -DENABLE_SANITIZERS=OFF `
+            -DAIRY_BUILD_ALL=ON `
+            -DBUILD_DAEMON=ON -DBUILD_CLI=ON `
+            -DCMAKE_INSTALL_PREFIX="${{ env.STAGE_DIR }}"
+
+      - name: Build
+        shell: pwsh
+        run: |
+          # 错误数据集语义与 x64 腿一致（::error:: annotation 匿名可读）
+          $buildLog = Join-Path $env:RUNNER_TEMP "build-x86.log"
+          cmake --build ${{ env.BUILD_DIR }} --config Release --parallel 2>&1 | Tee-Object -FilePath $buildLog
+          if ($LASTEXITCODE -ne 0) {
+            $lines = Get-Content $buildLog
+            $errIdx = 0..($lines.Count - 1) | Where-Object { $lines[$_] -match ': error |error C[0-9]+|fatal error|error LNK[0-9]+' }
+            $errs = foreach ($i in $errIdx) { $lines[[Math]::Max(0, $i - 1)..$i] }
+            $tail = if ($errs) { $errs | Select-Object -Last 60 } else { $lines | Select-Object -Last 60 }
+            $msg = ("MSVC x86 build failed (exit {0})`n{1}" -f $LASTEXITCODE, ($tail -join "`n"))
+            if ($msg.Length -gt 60000) { $msg = $msg.Substring($msg.Length - 60000) }
+            $msg = $msg.Replace('%', '%25').Replace("`r", '').Replace("`n", '%0A')
+            Write-Output "::error::$msg"
+            exit $LASTEXITCODE
+          }
+
+      - name: Install (aggregate bin/)
+        run: |
+          cmake --install ${{ env.BUILD_DIR }} --config Release
+
+      - name: Build TUI (i586) + copy Python runtime
+        shell: pwsh
+        env:
+          AGENTRT_TUI_RUN_STREAM_H: ${{ github.workspace }}/commons/include/airy_run_stream.h
+        run: |
+          $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+          $env:CARGO_TARGET_DIR = "$env:RUNNER_TEMP\tui-target-x86"
+          Push-Location "agent-workload/sdk/tui"
+          & cargo build --release --target i586-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw "[windows-x86-32] TUI 构建失败（exit $LASTEXITCODE，bin/agentrt-tui.exe 发布完整性必需）" }
+          Pop-Location
+          $tuiExe = "$env:CARGO_TARGET_DIR\i586-pc-windows-msvc\release\agentrt-tui.exe"
+          if (Test-Path $tuiExe) {
+            Copy-Item $tuiExe "${{ env.STAGE_DIR }}\bin\" -Force
+          } else { throw "[windows-x86-32] TUI 产物缺失: $tuiExe" }
+          New-Item -ItemType Directory -Path "${{ env.STAGE_DIR }}\lib" -Force | Out-Null
+          foreach ($p in @("agent-workload/ecosystem/agents/airymax_agents","agent-workload/ecosystem/agents/airymax_agents_rs","agent-workload/ecosystem/agents/orchestration","agent-workload/sdk/sdk-python/agentrt")) {
+            if (-not (Test-Path $p)) { throw "[windows-x86-32] python 运行时子树缺失: $p" }
+            Copy-Item -Path $p -Destination "${{ env.STAGE_DIR }}\lib\" -Recurse -Force
+          }
+
+      # zip 包与 x64 腿完全体一致；install.ps1 PROCESSOR_ARCHITECTURE=x86 →
+      # windows-x86-32 分支按此命名消费（发布矩阵对齐）。
+      - name: Package (zip)
+        shell: pwsh
+        run: |
+          $VERSION = "${{ env.VERSION }}"; $VERSION_NUM = $VERSION.TrimStart('v')
+          $pkgDir = "pkg\agentrt-$VERSION_NUM"
+          New-Item -ItemType Directory -Path "$pkgDir\config" -Force | Out-Null
+          New-Item -ItemType Directory -Path "$pkgDir\modules" -Force | Out-Null
+          Copy-Item -Path "${{ env.STAGE_DIR }}\*" -Destination "$pkgDir\" -Recurse -Force
+          foreach ($cfg in @("agent-workload\ecosystem\manager\configs\agentrt.yaml","agent-workload\ecosystem\manager\model\model.yaml","_tools\scripts\ops\templates\secrets.env.example","_tools\scripts\ops\templates\permission_rules.yaml")) {
+            if (Test-Path $cfg) { Copy-Item -Path $cfg -Destination "$pkgDir\config\" -Force }
+          }
+          if (Test-Path "agent-workload\ecosystem\markets\tools\maths-toolkit") {
+            Copy-Item -Path "agent-workload\ecosystem\markets\tools\maths-toolkit" -Destination "$pkgDir\modules\" -Recurse -Force
+          }
+          if (Test-Path "_tools\scripts\ops\bin\agentrt-bootstrap.sh") {
+            Copy-Item -Path "_tools\scripts\ops\bin\agentrt-bootstrap.sh" -Destination "$pkgDir\bin\" -Force
+          }
+          New-Item -ItemType File -Path "$pkgDir\platform-x86-32" -Force | Out-Null
+          $artifact = "agentrt-$VERSION-windows-x86-32"
+          Compress-Archive -Path "pkg\*" -DestinationPath "$artifact.zip"
+          (Get-FileHash -Algorithm SHA256 "$artifact.zip").Hash.ToLower() + "  $artifact.zip" | Out-File -FilePath "$artifact.zip.sha256"
+          "artifact_name=$artifact" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.artifact_name }}
+          path: ${{ env.artifact_name }}.*
+          if-no-files-found: error
+
   # RISC-V (linux-riscv64)：标准 runner 无 riscv64 第三方库（libcurl 等），
   # 经 Docker buildx + qemu 多架构容器构建（ubuntu:20.04 riscv64 镜像，
   # 与 x86-64/arm-64 统一 glibc 2.31 基线）。
@@ -894,11 +1037,13 @@ jobs:
   # 已由脚本 --max-time 3600 + 3 并发 + 上传完整性校验根治。
   release:
     # 门禁（0.1.13 清零）：Linux x86-64 / x86-32 / arm-64 / arm-32 + macOS
-    # arm-64 / x86-64 + **Windows x86-64** 七平台（G1 升 gate 2026-09-07：
-    # windows 产品完整 + MSVC ctest 全绿，见 build-windows-x86-64 头注；
-    # arm-32 于 G3 收口 2026-09-06 移入 needs）。riscv 为 dispatch-only
-    # canary（B10：0.1.13 不发 RISC-V 制品，QEMU 6h 上限预留 0.3.x）。
-    needs: [build-linux-x86-64, build-macos-arm-64, build-macos-x86-64, build-linux-arm-64, build-linux-32, build-linux-arm-32, build-windows-x86-64]
+    # arm-64 / x86-64 + **Windows x86-64 / x86-32** 八平台（G1 升 gate
+    # 2026-09-07：windows 产品完整 + MSVC ctest 全绿，见 build-windows-x86-64
+    # 头注；arm-32 于 G3 收口 2026-09-06 移入 needs；windows-x86-32 随 G3 leg
+    # 正式化入列——探针链 C 面编译 + ctest 48/48 全绿实证）。riscv 为
+    # dispatch-only canary（B10：0.1.13 不发 RISC-V 制品，QEMU 6h 上限预留
+    # 0.3.x）。
+    needs: [build-linux-x86-64, build-macos-arm-64, build-macos-x86-64, build-linux-arm-64, build-linux-32, build-linux-arm-32, build-windows-x86-64, build-windows-x86-32]
     runs-on: ubuntu-latest
     # tag 推送或手动 dispatch（手动时版本来自 inputs.version）皆可触发
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
@@ -933,7 +1078,9 @@ jobs:
       - name: Assert windows zip present in release dist
         run: |
           ls -la dist/agentrt-*-windows-x86-64.zip* 2>/dev/null \
-            || { echo "::error::windows zip 未聚合入 dist（G1 出口缺失）"; exit 1; }
+            || { echo "::error::windows x86-64 zip 未聚合入 dist（G1 出口缺失）"; exit 1; }
+          ls -la dist/agentrt-*-windows-x86-32.zip* 2>/dev/null \
+            || { echo "::error::windows x86-32 zip 未聚合入 dist（G3 出口缺失）"; exit 1; }
           echo "release dist 最终制品: $(ls dist/agentrt-*.tar.gz 2>/dev/null | wc -l) 个 tar.gz + $(ls dist/*.zip 2>/dev/null | wc -l) 个 zip"
 
       # 0.1.10a 修复（生产实证，2026-09-05）：包内只含 gen3 标记（如

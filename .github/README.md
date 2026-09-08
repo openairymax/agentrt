@@ -32,17 +32,17 @@ AgentRT（AirymaxAgentRT）是面向 AI Agent 团队的 OS 级运行时平台—
 | `sync-mirror.yml`（Mirror Sync） | `push` / tag | SSoT → GitHub / Gitee 镜像同步（agentrt + 7 叶子） |
 | `g4b-macos-clean-host.yml`（G4b macOS Clean-Host） | 核验 tag 或手动派发 | 在干净 macOS 宿主上离线安装发布制品并完整启动 daemon 群，正式版本发布前的真机核验 |
 
-临时性移植探针工作流（如 Windows x86-32 编译面调查）随结论拆除，不在长期清单内；
-各文件头部注释记录了其目的与载体纪律。
+临时性移植探针工作流（如已因结论拆除的 Windows x86-32 编译面调查）不在长期
+清单内；探针结论由正式构建腿承接。
 
 ## 发布链（release.yml）
 
 一次版本 tag 触发的完整发布流程：
 
 1. **平台构建腿**：linux-x86-64 / linux-arm-64 / linux-arm-32 / linux-x86-32 /
-   macos-arm-64 / macos-x86-64 / windows-x86-64 七条产品腿并行构建 + 打包
-   （linux-riscv-64 为编译 canary，不出制品）。qemu 交叉腿运行于固化工具链容器，
-   产物自包含（打包前收集运行依赖库）。
+   macos-arm-64 / macos-x86-64 / windows-x86-64 / windows-x86-32 八条产品腿
+   并行构建 + 打包（linux-riscv-64 为编译 canary，不出制品）。qemu 交叉腿运行
+   于固化工具链容器，产物自包含（打包前收集运行依赖库）。
 2. **聚合**：所有 gate 腿产物汇成单一 release 事件。
 3. **洁净房 e2e 门禁**：在无任何开发依赖的干净容器内执行——离线安装发布制品 →
    启动完整 daemon 群 → 网关探测 → CLI 冒烟，并覆盖旧版升级与回滚路径。任一断言
