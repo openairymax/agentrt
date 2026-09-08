@@ -204,16 +204,35 @@ if [ "$_GW_OK" != "1" ]; then
     fi
     EV="$AH/logs/g4b-evidence.txt"
     {
-        echo "== launcher 日志尾部 30 行（AIRYRT_TERM_LOG=verbose，stdout+stderr 合流 LOGF）=="
-        tail -n 30 "$LOGF" 2>/dev/null
-        echo "== airymaxrt.log 尾部 40 行（boot 进度真身，含 debug）=="
-        tail -n 40 "$AH/logs/airymaxrt.log" 2>/dev/null
+        echo "== launcher 日志尾部 15 行（AIRYRT_TERM_LOG=verbose，stdout+stderr 合流 LOGF）=="
+        tail -n 15 "$LOGF" 2>/dev/null
+        echo "== airymaxrt.log 尾部 20 行（boot 进度真身，含 debug）=="
+        tail -n 20 "$AH/logs/airymaxrt.log" 2>/dev/null
         echo "== logs/ 目录 =="
         ls -la "$AH/logs" 2>/dev/null
         echo "== run/ 目录 =="
         ls -la "$AH/run" 2>/dev/null
         echo "== gateway_d.out 尾部 30 行 =="
         tail -n 30 "$AH/logs/gateway_d.out" 2>/dev/null
+        echo "== 网络层取证（runner2 双腿实证：gateway 自称 started successfully" 
+        echo "   但 nc//dev/tcp 双探测法 120s 全败且 total_req=0——须定位矛盾层）=="
+        echo "gateway.port 内容: [$(cat "$AH/run/gateway.port" 2>/dev/null | tr '\n' ' ')]"
+        echo "nc 路径: $(command -v nc 2>/dev/null || echo 无)"
+        command -v nc >/dev/null 2>&1 && nc -h 2>&1 | head -2 || true
+        echo "-- LISTEN 套接字（netstat -an -p tcp，截 25 行）--"
+        netstat -an -p tcp 2>/dev/null | grep -i listen | head -25 || true
+        echo "-- LISTEN 套接字（lsof，截 25 行）--"
+        lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | head -25 || true
+        echo "-- 终局对照探测：8081(WS)/8082(H2) vs ${GWP}(HTTP) --"
+        for _p in 8081 8082; do
+            nc -z -w 1 127.0.0.1 "$_p" >/dev/null 2>&1 \
+                && echo "nc $_p: 通" || echo "nc $_p: 不通"
+        done
+        echo "-- 终局诊断：nc -vz ${GWP}（完整 stderr）--"
+        command -v nc >/dev/null 2>&1 \
+            && nc -vz -w 2 127.0.0.1 "$GWP" 2>&1 | head -3 || true
+        echo "-- 终局诊断：curl 独立探测手段 --"
+        curl -sv --max-time 3 "http://127.0.0.1:${GWP}/" 2>&1 | head -8 || true
         echo "== 进程表（daemon 群/launcher 残留）=="
         ps aux 2>/dev/null | grep -E '[_]d( |$)|airymax|airy' | head -20
         # 死因判定块置于 EV 尾部：dump_file 只保尾部 9900B（9 段 × 1100B），
