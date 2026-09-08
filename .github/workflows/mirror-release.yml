@@ -1,0 +1,74 @@
+name: Mirror Release Artifacts
+
+# M13 配套回填通道：把 atomgit（SSoT）既有 Release 的附件集镜像到
+# GitHub/Gitee Releases。两类场景：
+#   1. 历史版本回填（v0.1.7 ~ rc9 之前各版）：发布时镜像机制尚未存在；
+#   2. 镜像修复重跑：publish-mirror.sh 幂等（同名同大小跳过），安全重放。
+#
+# 制品来源（优先级）：
+#   a) release.yml 对应 run 的 release-dist 工件（90 天保留期内首选）；
+#   b) 工件缺失时 FETCH_MISSING=1 从 atomgit release 回填（大件走慢通道，
+#      仅建议补 manifest/sig/asc 小件场景）。
+#
+# 前提（fail-closed 在脚本内校验）：目标 tag 已由 sync-mirror 同步到
+# GitHub/Gitee——tag 纪律：tag 仅在真正创建发行版时打（atomgit 单向同步）。
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '待回填版本（如 v0.1.13-rc9，须已有 atomgit Release + 三端 tag）'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror-release-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  mirror:
+    name: Mirror ${{ inputs.version }} to GitHub + Gitee
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      GITEE_TOKEN: ${{ secrets.GT_TOKEN }}
+    steps:
+      - name: Checkout (workflow only)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Init submodules (tools)
+        run: bash .github/scripts/init-submodules.sh tools
+
+      - name: Download release-dist artifact
+        # tag 触发的 release run 其 head_branch 即 tag 名；找不到（工件过期/
+        # 无该 run）时置空继续，由 FETCH_MISSING 全量回填兜底。
+        run: |
+          set -euo pipefail
+          RUN_ID="$(gh run list -R openairymax/agentrt --workflow=release.yml \
+            --branch "${VERSION}" --status success --limit 1 \
+            --json databaseId --jq '.[0].databaseId' || true)"
+          if [ -n "${RUN_ID:-}" ]; then
+            echo "release run: ${RUN_ID}"
+            gh run download "${RUN_ID}" -R openairymax/agentrt \
+              -n "agentrt-${VERSION}-release-dist" -D dist \
+              || echo "::warning::release-dist 工件下载失败（过期？），将全量回填"
+          else
+            echo "::warning::未找到 ${VERSION} 的 release run，将全量回填"
+          fi
+          mkdir -p dist
+          ls -la dist/ || true
+
+      - name: Mirror to GitHub + Gitee
+        run: |
+          bash _tools/scripts/ci/release/publish-mirror.sh "${VERSION}" dist
