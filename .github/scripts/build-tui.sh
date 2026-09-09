@@ -48,14 +48,24 @@ export AIRY_RT_VERSION_FILE="${ROOT}/VERSION"
 # build.rs 四候选路径全部落空 → 发布 TUI 从未链接 airy_ime（内置输入法
 # 实机全灭的根因）。按腿构建目录定位 libairy_common.a 并导出
 # AIRY_COMMON_LIB（build.rs 首选候选）。
+# 候选顺序（rc1 run 34329866561 实证）：容器腿 BUILD_DIR 为绝对路径
+# （/tmp/airy-build，docker -e 注入），host 腿为相对路径（../build）——
+# 两者都必须按"原值"解析（相对路径相对 CWD=源码树根），禁止剥离前导
+# 斜杠后拼 ROOT（那会把绝对路径变成 /src/tmp/... 幽灵路径）。
 if [ -z "${AIRY_COMMON_LIB:-}" ]; then
     for cand in \
         "${AIRY_COMMON_LIB:-}" \
-        "${BUILD_DIR:+$ROOT/${BUILD_DIR#/}/commons/libairy_common.a}" \
-        "${BUILD_DIR:+${BUILD_DIR#/}}/commons/libairy_common.a" \
-        "$ROOT/../build/commons/libairy_common.a"; do
+        "${BUILD_DIR:+${BUILD_DIR}/commons/libairy_common.a}" \
+        "${BUILD_DIR:+${PWD}/${BUILD_DIR#/}/commons/libairy_common.a}" \
+        "${ROOT}/../build/commons/libairy_common.a"; do
         [ -n "$cand" ] && [ -f "$cand" ] && export AIRY_COMMON_LIB="$cand" && break
     done
+    # 归一化为绝对路径：build.rs 的 CWD 是 tui crate 目录而非本脚本 CWD，
+    # 相对路径在那里会指向错误位置。
+    case "${AIRY_COMMON_LIB:-}" in
+        /*) ;;
+        ?*) export AIRY_COMMON_LIB="${PWD}/${AIRY_COMMON_LIB}" ;;
+    esac
 fi
 if [ -z "${AIRY_COMMON_LIB:-}" ]; then
     if [ "$FAIL_HARD" = "1" ]; then
