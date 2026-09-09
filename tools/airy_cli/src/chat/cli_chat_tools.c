@@ -278,6 +278,13 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
     cJSON_AddStringToObject(params, "tool_id", tool_id);
     cJSON *pargs = cJSON_Parse(args_json);
     if (!pargs) {
+        /* 0.1.14 诊断增强：解析失败时记录 cJSON 错误位置与参数前缀，
+         * 定位上游（模型输出/流帧截断）问题；此前仅返回笼统错误。 */
+        const char *epos = cJSON_GetErrorPtr();
+        int eoff = epos ? (int)(epos - args_json) : -1;
+        cli_trace("chat", "%s args parse fail len=%zu err@%d head=%.*s", CLI_ICON_CROSS,
+                  strlen(args_json), eoff, (int)cli_utf8_safe_len(args_json, 100),
+                  args_json);
         cJSON_Delete(params);
         if (out_ok)
             *out_ok = 0;
@@ -321,7 +328,16 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
         AIRY_FREE(result_json);
         if (out_ok)
             *out_ok = 0;
-        return AIRY_STRDUP("{\"ok\":false,\"error\":\"tool_d unreachable (via gateway)\"}");
+        /* cli_gw_call 的 g_cli_gw_err 已区分真实原因（网关不在线/内部错误/
+         * 方法不支持/响应异常）；原硬编码 "tool_d unreachable" 把工具层
+         * 失败也误报为网关不可达，误导排障方向。 */
+        char fallback[256];
+        snprintf(fallback, sizeof(fallback), "tool rpc failed (via gateway)");
+        extern char g_cli_gw_err[256]; /* 同 cli_render.c 的既有访问方式 */
+        const char *err_desc = g_cli_gw_err[0] ? g_cli_gw_err : fallback;
+        char msg[512];
+        snprintf(msg, sizeof(msg), "{\"ok\":false,\"error\":\"%s\"}", err_desc);
+        return AIRY_STRDUP(msg);
     }
 
     /* daemon_rpc_call 已解包 JSON-RPC 的 result 字段：result_json 即
