@@ -1426,7 +1426,10 @@ jobs:
       contents: write
       actions: write
     concurrency:
-      group: publish-mirror-${{ env.VERSION }}
+      # 独立单段并发组：仅 github 上下文（env 上下文在 job 级 concurrency
+      # 求值期不可用，会导致"Invalid workflow file / 0 jobs"校验失败——
+      # 2026-09-09 v0.1.14 tag 触发实证）。ref_name 对 tag/手动触发均唯一。
+      group: publish-mirror-${{ github.ref_name }}
       cancel-in-progress: false
     env:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
