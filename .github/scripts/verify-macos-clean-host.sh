@@ -57,8 +57,9 @@ info() { echo "  -- $*"; }
 #   - 标题 printf 不得带 \n：::error:: command 行以行尾为界，标题提前
 #     换行会把段内容抛到普通 job log（匿名不可读），message 成空壳
 #     （rc4-4 x86 实证）；
-#   - 超出 9 段配额的文件只取尾部——死点总在日志尾部（rc4-4 arm 实证：
-#     取证分支自身 wait 非 0 rc 触发 set -e，证据未生成即死）。
+#   - 超出 9 段配额的文件只取尾部——调用方必须把核心证据放文件尾部
+#     （rc10 实证"死点总在尾部"不成立：launcher/airymaxrt 日志置于 EV
+#     头部被保尾策略整体挤丢，而那正是定案死因的关键证据）。
 #   - macOS bash 3.2 在 C locale 下把紧随变量名的多字节字节并入变量名
 #     （`$var（` → unbound variable），set -u 展开错误直死且不过 ERR
 #     trap——"零 annotation 静默死"的机理本体（rc4-6 双腿实证）。规则：
@@ -204,16 +205,12 @@ if [ "$_GW_OK" != "1" ]; then
     fi
     EV="$AH/logs/g4b-evidence.txt"
     {
-        echo "== launcher 日志尾部 15 行（AIRYRT_TERM_LOG=verbose，stdout+stderr 合流 LOGF）=="
-        tail -n 15 "$LOGF" 2>/dev/null
-        echo "== airymaxrt.log 尾部 20 行（boot 进度真身，含 debug）=="
-        tail -n 20 "$AH/logs/airymaxrt.log" 2>/dev/null
         echo "== logs/ 目录 =="
-        ls -la "$AH/logs" 2>/dev/null
+        ls -la "$AH/logs" 2>/dev/null || true
         echo "== run/ 目录 =="
-        ls -la "$AH/run" 2>/dev/null
+        ls -la "$AH/run" 2>/dev/null || true
         echo "== gateway_d.out 尾部 30 行 =="
-        tail -n 30 "$AH/logs/gateway_d.out" 2>/dev/null
+        tail -n 30 "$AH/logs/gateway_d.out" 2>/dev/null || true
         echo "== gateway_d.out 全文关键行检索（启动期取证：MHD 版本对照/"
         echo "   HTTP start 失败 ERROR/shutdown 触发源——尾部 30 行被停机"
         echo "   日志占据时，此块是启动期唯一窗口；arm 腿 rc10 实证缺口）=="
@@ -239,15 +236,28 @@ if [ "$_GW_OK" != "1" ]; then
             && nc -vz -w 2 127.0.0.1 "$GWP" 2>&1 | head -3 || true
         echo "-- 终局诊断：curl 独立探测手段 --"
         curl -sv --max-time 3 "http://127.0.0.1:${GWP}/" 2>&1 | head -8 || true
-        echo "== 进程表（daemon 群/launcher 残留）=="
-        ps aux 2>/dev/null | grep -E '[_]d( |$)|airymax|airy' | head -20
-        # 死因判定块置于 EV 尾部：dump_file 只保尾部 9900B（9 段 × 1100B），
-        # rc 行曾因置于头部被 LOGF 大段挤丢（G4b 双腿实证：EV 头部 7.3KB
-        # 丢失，恰含 rc 与 unbound variable 消息），保尾特性要求核心证据殿后。
+        echo "== 进程表（daemon 群/launcher/前端残留）=="
+        ps aux 2>/dev/null | grep -E '[_]d( |$)|airymax|airy|[t]ui' | head -20 || true
+        echo "== 前端路径诊断（launcher 前端选择三分支：TTY→Rust TUI/"
+        echo "   非TTY→airy_cli -p 流式；LOGF verbose 必记录所选分支，"
+        echo "   此块+停机时序即可定案死因）=="
+        grep -nE "进入|前端|TUI|异常退出|续接|airy_cli|agentrt-tui" "$LOGF" 2>/dev/null \
+            | cut -c 1-150 | tail -20 || true
+        ls -la "$AH/bin/agentrt-tui" "$AH/bin/airy_cli" 2>/dev/null || true
+        # ── 保尾区核心证据殿后：dump_file 只保尾部 9900B（9 段 × 1100B），
+        # rc10 实证置于 EV 头部的 launcher 日志被整体挤丢（恰是定案证据）。
+        # 行宽 cut 150 控总量（≈6.8KB），确保尾区完整保留。
+        echo "== launcher 日志尾部 25 行（AIRYRT_TERM_LOG=verbose，核心取证）=="
+        tail -n 25 "$LOGF" 2>/dev/null | cut -c 1-150 || true
+        echo "== airymaxrt.log 尾部 20 行（boot 进度真身，含 debug）=="
+        tail -n 20 "$AH/logs/airymaxrt.log" 2>/dev/null | cut -c 1-150 || true
         echo "== 死因判定（核心证据，务必保留）=="
         echo "gateway TCP 不可达: 127.0.0.1:${GWP}（探测 ${_i}s）"
         echo "launcher $L_STATE"
-        echo "判读: rc=143/130 且 LOGF 有『收到信号』→外部信号退出；rc=1 且仅有『终局清理开始』→set -u/-e 内部直死（bash 3.2 空数组类）；rc=127→命令缺失"
+        echo "判读: 『进入流式 CLI』后 daemon 群秒停 → 前端进程非预期退出带动"
+        echo "cleanup（CLI -p 分支）；『进入交互界面（Rust TUI）』→ TUI 非 TTY 死；"
+        echo "rc=143/130 且 LOGF 有『收到信号』→外部信号退出；rc=1 且仅有『终局"
+        echo "清理开始』→set -u/-e 内部直死（bash 3.2 空数组类）；rc=127→命令缺失"
         echo "launcher 黑匣子关键词: 『终局清理开始（exit_rc=N）』『收到 TERM/INT 信号』"
     } >"$EV" 2>&1 || true
     dump_file "G4b phase4 取证" "$EV"
