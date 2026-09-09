@@ -106,9 +106,14 @@ fi
 # 发布完整性门禁（0.1.14 R4）：fail-hard 腿断言 IME 符号真实链接——
 # 防止"构建绿但输入法静默缺失"再次流入发布物（v0.1.13 实机实证）。
 if [ "$FAIL_HARD" = "1" ]; then
-    if command -v nm >/dev/null 2>&1; then
-        if ! nm "$OUT/agentrt-tui" 2>/dev/null | grep -q 'airy_ime_load'; then
-            _fail "agentrt-tui 未链接 airy_ime（内置输入法缺失）——发布完整性门禁"
+    if command -v strings >/dev/null 2>&1; then
+        # 判据说明（rc1 run 34330638434 实证）：Cargo [profile.release]
+        # strip=true 使发布二进制 nm "no symbols"，符号级判据恒假阴性。
+        # 改用 FFI 分支专属运行时字符串 "ime: dict loaded:"——仅当
+        # cfg(all(feature="ime", ime_linked)) 编译时存在；未链接分支的
+        # 日志串（"builtin pinyin IME disabled"）互斥，判据可区分两态。
+        if ! strings "$OUT/agentrt-tui" 2>/dev/null | grep -q 'ime: dict loaded:'; then
+            _fail "agentrt-tui 未携带内置输入法（FFI 分支字符串缺失）——发布完整性门禁"
         fi
     fi
 fi
