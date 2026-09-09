@@ -53,7 +53,7 @@ AgentRT 的每一次提交与每一个版本发布都由这里的流水线驱动
 | **Build & Test** | push / pull_request | Linux、macOS、Windows 构建与门禁测试 |
 | **Codegen Checks** | push / pull_request | 校验 syscall 定义与生成代码不漂移 |
 | **Toolchain Images** | 手动触发 | 构建并推送交叉编译工具链镜像 |
-| **Release** | `v*` tag 推送 / 手动触发 | 跨平台构建 → 打包 → 干净环境核验 → 签名发布 → 镜像到 GitHub/Gitee Releases |
+| **Release** | `v*` tag 推送 / 手动触发 | 跨平台构建 → 打包 → 干净环境核验 → 三段式发布（finalize 签名 → GitHub 快通道 → atomgit SSoT 异步上传 + Gitee 后台镜像） |
 | **G4b macOS Clean-Host** | 手动触发 | 干净 macOS 真机安装与完整启动核验 |
 | **Mirror Sync** | push / 手动触发 | 源码与 tag 在公开托管平台间同步 |
 | **Mirror Release Artifacts** | 手动触发 | 历史版本二进制产物回填到 GitHub/Gitee Releases |
@@ -63,19 +63,23 @@ AgentRT 的每一次提交与每一个版本发布都由这里的流水线驱动
 
 ## 一个版本是怎么发布的
 
-1. 维护者在源码仓库打出版本 tag（如 `v0.1.13`）——**tag 仅在真正创建发行版
+1. 维护者在源码仓库打出版本 tag（如 `v0.1.14`）——**tag 仅在真正创建发行版
    时打**（tag 经同步通道单向分发到各公开托管平台，避免无效冗余 tag）；
 2. Release 流水线并行构建全平台产物，打包为**自包含**安装包；
 3. 在干净环境（Linux 容器 / macOS 宿主机）按普通用户流程离线安装、启动完整
    daemon 群并做端到端冒烟，覆盖升级与回滚路径；
-4. 全部通过后产物签名并发布到 Releases——三个公开托管平台的 Release 页面均
-   提供同一套二进制产物（平台包 + 校验和 + 签名 + 清单 + 安装脚本），字节
-   同源；安装器/更新器即可从官方渠道获取。
+4. 全部通过后进入发布（U-3 方案 A 三段式，任一环节幂等可重跑）：
+   - **finalize-dist**：对 dist 一次性签名（cosign 制品签名 + manifest + GPG
+     asc），生成三端共享的规范签名集，不再重签；
+   - **publish-mirror**：GitHub Releases **快通道先行**（数分钟内可见）；
+     Gitee 由独立 run 后台幂等镜像，不阻塞发布；
+   - **publish-atomgit**：慢通道上传 + `latest/` 指针切换——**指针只在上传
+     完成后才提交**，安装器/更新器永远指向已就绪的制品。
 
-发布面以 atomgit 为权威源（SSoT）：Release 资产以 atomgit 为基准，单向镜像
-同步到 GitHub 与 Gitee 的同名 Release，三端资产集与字节保持一致；镜像通道
-幂等，重跑安全。此外，正式发布前还会在干净 macOS 真机上做一次出口核验
-（G4b），确认安装包在不依赖任何开发环境的宿主机上可完整安装与启动。
+可见顺序语义：GitHub 先行 → atomgit（SSoT）并行补齐 → Gitee 后台镜像。
+发布面以 atomgit 为权威源（SSoT）：资产与清单以 atomgit 为基准，GitHub/Gitee
+是镜像下载面（字节同源），不改变主平台定位。镜像通道幂等，重跑安全。此外，
+正式发布前还会在干净 macOS 真机上做一次出口核验（G4b）。
 
 ## 从 Release 页面安装
 
