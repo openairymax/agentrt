@@ -354,9 +354,21 @@ static int cli_gw_exchange(const char *host, int port, const char *path, const c
         pfd.fd = fd;
         pfd.events = POLLIN;
         pfd.revents = 0;
-        int pr = poll(&pfd, 1, (int)(total_timeout > 100 ? 100 : total_timeout));
-        if (pr <= 0)
+        int wait = (int)(total_timeout > 100 ? 100 : total_timeout);
+        int pr = poll(&pfd, 1, wait);
+        if (pr < 0) {
+            if (errno == EINTR)
+                continue;
             break;
+        }
+        if (pr == 0) {
+            /* 0.1.14 修复：空转窗口继续等待直至总预算耗尽。原实现 poll
+             * 返回 0 即 break——响应到达前的任何 >100ms 空闲（如
+             * think.process 规划需数秒）都会被提前判死，误报
+             * "网关不在线"（0.1.13 实机回归实锤；Windows 腿语义正确）。 */
+            total_timeout -= wait;
+            continue;
+        }
         ssize_t n = recv(fd, resp + rlen, cap - rlen, 0);
         if (n == 0)
             break;
@@ -476,18 +488,26 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
     int port = 0;
     cli_gw_endpoint(host, sizeof(host), &port);
 
-    char body[4096];
-    char params_buf[512] = "";
-    if (params_json && *params_json)
-        __builtin_snprintf(params_buf, sizeof(params_buf), "%s", params_json);
-    int bn = snprintf(body, sizeof(body), "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"%s\",\"params\":%s}",
-                      method, params_json ? params_json : "{}");
-    if (bn <= 0 || bn >= (int)sizeof(body))
+    /* 请求体按实际长度动态构造：固定缓冲会在工具参数（如 fs_write 大内容）
+     * 超过容量时静默截断，产生非法 JSON 导致调用失败（0.1.13 实机回归）。 */
+    size_t envelope_len = 64 + strlen(method);
+    size_t params_len = (params_json && *params_json) ? strlen(params_json) : 2;
+    size_t blen = envelope_len + params_len + 1;
+    char *body = (char *)AIRY_MALLOC(blen);
+    if (!body)
         return -1;
+    int bn = snprintf(body, blen, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"%s\",\"params\":%s}",
+                      method, (params_json && *params_json) ? params_json : "{}");
+    if (bn <= 0 || (size_t)bn >= blen) {
+        AIRY_FREE(body);
+        return -1;
+    }
 
     char *resp = NULL;
     size_t rlen = 0;
-    if (cli_gw_exchange(host, port, "/", body, timeout_ms, &resp, &rlen) != 0) {
+    int exchange_err = cli_gw_exchange(host, port, "/", body, timeout_ms, &resp, &rlen);
+    AIRY_FREE(body);
+    if (exchange_err != 0) {
         AIRY_FREE(resp);
         /* 0.1.6h 友好化：网关不可达给出可执行提示（原仅日志 WARN） */
         snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
