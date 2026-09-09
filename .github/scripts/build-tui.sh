@@ -35,6 +35,35 @@ _fail() {
 SRC="${1:?tui 源码目录}"
 OUT="${2:?目标 bin 目录}"
 
+# agentrt checkout 根（本脚本位于 <root>/.github/scripts/）
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+# 版本 SSoT 注入（0.1.14 R3 修复）：CI 兄弟仓布局下 build.rs 的伞仓相对
+# 路径 ../../agentrt/VERSION 不存在，曾致 TUI 横幅回落 Cargo 版本（实机
+# 实证 "TUI v0.1.9" vs 系统 0.1.13）。
+export AIRY_RT_VERSION_FILE="${ROOT}/VERSION"
+[ -f "$AIRY_RT_VERSION_FILE" ] || { [ "$FAIL_HARD" = 1 ] && _fail "VERSION 文件缺失: $AIRY_RT_VERSION_FILE"; }
+
+# IME 链接库注入（0.1.14 R4 修复）：CI 构建目录在源码树外（BAN-33），
+# build.rs 四候选路径全部落空 → 发布 TUI 从未链接 airy_ime（内置输入法
+# 实机全灭的根因）。按腿构建目录定位 libairy_common.a 并导出
+# AIRY_COMMON_LIB（build.rs 首选候选）。
+if [ -z "${AIRY_COMMON_LIB:-}" ]; then
+    for cand in \
+        "${AIRY_COMMON_LIB:-}" \
+        "${BUILD_DIR:+$ROOT/${BUILD_DIR#/}/commons/libairy_common.a}" \
+        "${BUILD_DIR:+${BUILD_DIR#/}}/commons/libairy_common.a" \
+        "$ROOT/../build/commons/libairy_common.a"; do
+        [ -n "$cand" ] && [ -f "$cand" ] && export AIRY_COMMON_LIB="$cand" && break
+    done
+fi
+if [ -z "${AIRY_COMMON_LIB:-}" ]; then
+    if [ "$FAIL_HARD" = "1" ]; then
+        _fail "libairy_common.a 未定位（AIRY_COMMON_LIB/BUILD_DIR 均未生效）——发布 TUI 必须携带内置输入法"
+    fi
+    echo "warn: agentrt-tui: libairy_common.a 未定位，IME 将降级禁用"
+fi
+
 # build.rs 依赖的 airy_run_stream.h（agentrt 仓 commons/include/）
 if [ ! -f commons/include/airy_run_stream.h ]; then
     _fail "commons/include/airy_run_stream.h 缺失（工作树异常）"
@@ -63,4 +92,15 @@ mkdir -p "$OUT"
 if ! cp -f "${CARGO_TARGET_DIR}/release/agentrt-tui" "$OUT/"; then
     _fail "构建产物 agentrt-tui 缺失"
 fi
+
+# 发布完整性门禁（0.1.14 R4）：fail-hard 腿断言 IME 符号真实链接——
+# 防止"构建绿但输入法静默缺失"再次流入发布物（v0.1.13 实机实证）。
+if [ "$FAIL_HARD" = "1" ]; then
+    if command -v nm >/dev/null 2>&1; then
+        if ! nm "$OUT/agentrt-tui" 2>/dev/null | grep -q 'airy_ime_load'; then
+            _fail "agentrt-tui 未链接 airy_ime（内置输入法缺失）——发布完整性门禁"
+        fi
+    fi
+fi
+
 echo "[OK] agentrt-tui -> ${OUT}/agentrt-tui"
