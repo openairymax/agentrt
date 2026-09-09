@@ -412,7 +412,10 @@ jobs:
           # build-tui.sh SSoT 且未设 env，build.rs 默认相对路径按伞仓布局
           # 找不到 header → cargo panic → TUI 缺失 + 步骤 exit 1)。显式注入
           # checkout 直布局路径（与 Linux/macOS build-tui.sh L30 同源）。
+          # AIRY_RT_VERSION_FILE（0.1.14 R3）：Windows 布局下 build.rs 伞仓
+          # 相对路径同样失效，显式注入 VERSION（版本横幅 SSoT）。
           AGENTRT_TUI_RUN_STREAM_H: ${{ github.workspace }}/commons/include/airy_run_stream.h
+          AIRY_RT_VERSION_FILE: ${{ github.workspace }}/VERSION
         run: |
           $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
           $env:CARGO_TARGET_DIR = "$env:RUNNER_TEMP\tui-target"
@@ -557,6 +560,7 @@ jobs:
         shell: pwsh
         env:
           AGENTRT_TUI_RUN_STREAM_H: ${{ github.workspace }}/commons/include/airy_run_stream.h
+          AIRY_RT_VERSION_FILE: ${{ github.workspace }}/VERSION
         run: |
           $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
           $env:CARGO_TARGET_DIR = "$env:RUNNER_TEMP\tui-target-x86"
