@@ -1134,9 +1134,10 @@ jobs:
 
       # 发布说明面向整个开源社区（公开场合）：固定模板（版本定位/平台
       # 支持/安装方式）+ 用户可见变更列表；严禁出现内部工程流水（commit
-      # 逐条罗列、CI 取证、内部路径等）。变更列表自动剔除 ci/docs/chore/
-      # test/refactor/style 等内部工程类提交，正式版发布前维护者还应
-      # 人工补充"本版亮点"段（经 RELEASE_NOTES_FILE 传给发布脚本）。
+      # 逐条罗列、CI 取证、内部路径等）。变更列表自动剔除内部维护类提交
+      # （bump/CI/文档/工具链/镜像），面向用户只留真实功能变更；正式版
+      # 发布前维护者应提供 RELEASE_NOTES.d/<VERSION>.md 作为"本版亮点"
+      # （社区向摘要，合并冗余），缺失时以变更列表兜底。
       - name: Generate release notes
         run: |
           VERSION="${{ env.VERSION }}"
@@ -1150,10 +1151,18 @@ jobs:
               echo "> 候选版本（Release Candidate）：供测试与预览，接口和行为可能继续调整；生产部署请等待正式版。"
               echo
             fi
+            # 本版亮点：维护者提供 RELEASE_NOTES.d/<VERSION>.md 时优先呈现，
+            # 避免逐条内部提交刷屏；缺失则跳到下方变更列表。
+            if [ -f "RELEASE_NOTES.d/${VERSION}.md" ]; then
+              echo "## 本版亮点"
+              echo
+              cat "RELEASE_NOTES.d/${VERSION}.md"
+              echo
+            fi
             echo "## 平台支持"
             echo
-            echo "- Linux（主力平台）：x86-64 / x86-32 / ARM64 / ARM32"
-            echo "- macOS：x86-64（Intel）/ ARM64（Apple Silicon）"
+            echo "- Linux（主力平台）：x86-64 / x86-32 / arm-64 / arm-32"
+            echo "- macOS：arm-64（Apple Silicon）/ x86-64（Intel）"
             echo "- Windows：x86-64 / x86-32"
             echo
             echo "## 安装"
@@ -1169,8 +1178,13 @@ jobs:
             echo
             echo "## 本版变更"
             echo
-            git log "${LOGARGS[@]}" --pretty='* %s' \
-              | grep -vE '^\* (ci|docs|chore|test|refactor|style|release|mirror|tools)([/:]|\(| |$)' || true
+            _log="$(git log "${LOGARGS[@]}" --pretty='* %s' \
+              | grep -vE '^\* (ci|docs|chore|test|refactor|style|release|mirror|tools|github|agents|build)([/:]|\(| |$)' || true)"
+            if [ -n "$_log" ]; then
+              printf '%s\n' "$_log"
+            else
+              echo "*（本版为稳定性与使用体验修复；详见本版亮点与仓库提交记录）"
+            fi
           } > dist/notes.txt
           echo "发布说明已生成（社区面向，$(wc -l < dist/notes.txt) 行）"
 
