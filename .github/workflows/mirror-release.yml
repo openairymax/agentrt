@@ -29,6 +29,13 @@ on:
         description: '发布说明（可选，社区面向语气；传入则覆盖 dist/notes.txt 作为 GH/Gitee release body）'
         required: false
         type: string
+      # U-3 方案 A（2026-09-09）：release.yml 的 publish-mirror 段完成 GH 快
+      # 通道后 dispatch 本 workflow 异步补齐 Gitee，release_run_id 精确定位
+      # 同一 run 的 publish-dist（canonical 规范签名集），避免回填竞态。
+      release_run_id:
+        description: 'release.yml run id（可选）：精确下载该 run 的 publish-dist 工件'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -62,16 +69,26 @@ jobs:
       - name: Download release-dist artifact
         # tag 触发的 release run 其 head_branch 即 tag 名；找不到（工件过期/
         # 无该 run）时置空继续，由 FETCH_MISSING 全量回填兜底。
+        # U-3 方案 A：优先按 release_run_id 下载 publish-dist（canonical
+        # 签名集）；未提供时回退按 tag 查成功 run 下载（release-dist）。
         run: |
           set -euo pipefail
-          RUN_ID="$(gh run list -R openairymax/agentrt --workflow=release.yml \
-            --branch "${VERSION}" --status success --limit 1 \
-            --json databaseId --jq '.[0].databaseId' || true)"
+          RUN_ID="${{ inputs.release_run_id }}"
+          if [ -z "${RUN_ID:-}" ]; then
+            RUN_ID="$(gh run list -R openairymax/agentrt --workflow=release.yml \
+              --branch "${VERSION}" --status success --limit 1 \
+              --json databaseId --jq '.[0].databaseId' || true)"
+          fi
           if [ -n "${RUN_ID:-}" ]; then
             echo "release run: ${RUN_ID}"
-            gh run download "${RUN_ID}" -R openairymax/agentrt \
-              -n "agentrt-${VERSION}-release-dist" -D dist \
-              || echo "::warning::release-dist 工件下载失败（过期？），将全量回填"
+            if gh run download "${RUN_ID}" -R openairymax/agentrt \
+                -n "agentrt-${VERSION}-publish-dist" -D dist 2>/dev/null; then
+              echo "publish-dist 已下载（canonical 签名集）"
+            else
+              gh run download "${RUN_ID}" -R openairymax/agentrt \
+                -n "agentrt-${VERSION}-release-dist" -D dist \
+                || echo "::warning::release-dist 工件下载失败（过期？），将全量回填"
+            fi
           else
             echo "::warning::未找到 ${VERSION} 的 release run，将全量回填"
           fi

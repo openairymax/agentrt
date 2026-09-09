@@ -1154,18 +1154,18 @@ jobs:
             # 本版亮点：维护者提供 RELEASE_NOTES.d/<VERSION>.md 时优先呈现，
             # 避免逐条内部提交刷屏；缺失则跳到下方变更列表。
             if [ -f "RELEASE_NOTES.d/${VERSION}.md" ]; then
-              echo "## 本版亮点"
+              echo "## 1. 本版亮点"
               echo
               cat "RELEASE_NOTES.d/${VERSION}.md"
               echo
             fi
-            echo "## 平台支持"
+            echo "## 2. 平台支持"
             echo
             echo "- Linux（主力平台）：x86-64 / x86-32 / arm-64 / arm-32"
             echo "- macOS：arm-64（Apple Silicon）/ x86-64（Intel）"
             echo "- Windows：x86-64 / x86-32"
             echo
-            echo "## 安装"
+            echo "## 3. 安装"
             echo
             echo '```bash'
             echo "curl -fsSL https://atomgit.com/openairymax/agentrt/releases/download/${VERSION}/install.sh | bash"
@@ -1176,14 +1176,14 @@ jobs:
             echo "irm https://atomgit.com/openairymax/agentrt/releases/download/${VERSION}/install.ps1 | iex"
             echo '```'
             echo
-            echo "## 本版变更"
+            echo "## 4. 本版变更"
             echo
             _log="$(git log "${LOGARGS[@]}" --pretty='* %s' \
               | grep -vE '^\* (ci|docs|chore|test|refactor|style|release|mirror|tools|github|agents|build)([/:]|\(| |$)' || true)"
             if [ -n "$_log" ]; then
               printf '%s\n' "$_log"
             else
-              echo "*（本版为稳定性与使用体验修复；详见本版亮点与仓库提交记录）"
+              echo "*（本版为稳定性与使用体验修复；详见第 1 节本版亮点与仓库提交记录）"
             fi
           } > dist/notes.txt
           echo "发布说明已生成（社区面向，$(wc -l < dist/notes.txt) 行）"
@@ -1318,43 +1318,44 @@ jobs:
               "/w/dist/agentrt-${{ env.VERSION }}-linux-x86-64.tar.gz" \
               $PREV_ARG $FULL_ARG
 
-  # 发布全链（0.1.11 D0/D1/D2）：cosign 签名制品 + GPG 签名 manifest +
-  # manifest 生成（含 gen1~gen3 平台别名）+ 上传 atomgit release +
-  # push latest/ 固定入口，全部在本 job 内完成，零本机操作。
-  # 密钥与令牌来自受保护 Environment 'release' secrets（仅 refs/tags/v*
-  # 可引用；需维护者 Approve 后本 job 才执行，审批即发布安全阀）。
-  # 紧急 fallback：下载 release-dist 附件后本地执行
+  # ─── U-3 方案 A 发布拓扑（2026-09-09 落地，0.2.x K 组成文）─────────────
+  # 痛点：旧单 job 串行 atomgit(SSoT 上传, 外网每连接 15-30KB/s, 大包 ~1.5h)
+  # → GH/Gitee 镜像，release run 墙钟被慢通道拉长到数小时，且任一环节失败
+  # 都要整体重跑。方案 A 三段式拆分，全部门禁维持"e2e 绿后才发布"：
+  #
+  #   1) finalize-dist：cosign 签名 + manifest + GPG asc 一次性"产物化"
+  #      （publish-release.sh SKIP_UPLOAD=1，阶段 0-3 即退，零远端写入）。
+  #      签名集成为三端共享的规范字节；manifest 幂等保护不再重生成、
+  #      .asc 与正文恒一致——后续任何 job 都不再触碰签名内容。
+  #   2) publish-mirror：从 finalize 的 publish-dist 直传 GitHub Releases
+  #      （快通道，先于 atomgit 可见、数分钟内完成），随后 dispatch
+  #      mirror-release.yml 在独立 run 后台幂等续跑 Gitee（不阻塞本 run）。
+  #   3) publish-atomgit：SSoT 慢通道上传 + latest/ 指针切换（指针只在
+  #      上传完成后才提交，install/update 永远指向已就绪制品）——与 GH
+  #      快通道并行，互不阻塞；独立 concurrency 组支持单段重跑续传。
+  #
+  # 发布顺序语义（社区面向文档化）：GH 数分钟先行可见 → atomgit SSoT
+  # ~1.5h 并行补齐 → Gitee 后台幂等镜像。atomgit 仍是数据权威（SSoT），
+  # GH/Gitee 只是镜像下载面，不改变主平台定位。
+  # 密钥与令牌来自受保护 Environment 'release' secrets（需维护者一次
+  # Approve；审批先于 finalize 签名与任何对外写入，仍是发布安全阀）。
+  # 紧急 fallback：下载 publish-dist 附件后本地执行
   #   _tools/scripts/ci/release/publish-release.sh <ver> <dist_dir>
   # （本机保留 A1 所述私钥副本）。
-  publish:
-    needs: [release, e2e-clean-room]
+  finalize-dist:
+    needs: [release]
     if: success() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     environment: release
     permissions:
-      contents: write
+      contents: read
     env:
       COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
       COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
       GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
       GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
       ATOMGIT_REPO: openairymax/agentrt
-      # M13 发布镜像：publish-release.sh 发布 atomgit（SSoT）成功后，
-      # publish-mirror.sh 把同一 dist 附件集镜像到 GitHub/Gitee Releases
-      # （GH 用 GITHUB_PAT，Gitee 复用 sync-mirror 的 GT_TOKEN）。
-      GITEE_TOKEN: ${{ secrets.GT_TOKEN }}
-      # P23 根修配套：manifest commit 双端同步所需（publish-release.sh 阶段 5
-      # 向 GitHub main 补推，fail-soft；无 PAT 时跳过并告警）。
-      GITHUB_REPO: ${{ github.repository }}
-      GITHUB_PAT: ${{ secrets.GH_TOKEN }}
-      # 同 tag 重发/修复（C4）：OBS 预签名 PUT 按文件名覆盖，设置
-      # AIRY_FORCE_UPLOAD=1 使发布永远覆盖远端同名附件，杜绝"跳过上传但
-      # manifest 已按新 sha 重生成"的不一致（v0.1.10 同版本修复重发实证）。
-      AIRY_FORCE_UPLOAD: '1'
-      # runner 布局与本地伞仓不同（agentrt 即工作树根，scripts/ 在根下），
-      # 显式指定安装器 SSoT；AIRY_LAUNCHER_SRC 默认已指向
-      # agent-workload/sdk/tui/scripts/airymaxrt（init-submodules 补齐）。
+      # 发布预检/安装器快照同源（agentrt 即工作树根，scripts/ 在根下）
       AIRY_INSTALLER_SRC: ${{ github.workspace }}/scripts/install.sh
       AIRY_INSTALLER_PS1_SRC: ${{ github.workspace }}/scripts/install.ps1
     steps:
@@ -1364,9 +1365,7 @@ jobs:
           fetch-depth: 0
           submodules: false
 
-      # _tools（发布脚本）+ agent-workload/sdk（更新器 airymaxrt 源）由
-      # init-submodules.sh 补齐（tools 克隆到 _tools/，与本地伞仓 tools/ 区别）。
-      - name: Init submodules (tools, sdk)
+      - name: Init submodules (tools)
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: bash .github/scripts/init-submodules.sh tools
@@ -1390,29 +1389,147 @@ jobs:
           name: agentrt-${{ env.VERSION }}-release-dist
           path: dist
 
-      - name: Publish to atomgit (sign + manifest + upload + latest/)
+      - name: Finalize dist (cosign sign + manifest + GPG asc, no upload)
         run: |
           test -n "$(ls dist/agentrt-${{ env.VERSION }}-*.tar.gz 2>/dev/null)" || {
-            echo "::error::release-dist 无 tar.gz 制品，中止发布"; exit 1
+            echo "::error::release-dist 无 tar.gz 制品，中止 finalize"; exit 1
           }
-          # 发布前对聚合制品做一遍 sha256 复核（发布预检仍在脚本内再次执行）
           for f in dist/agentrt-${{ env.VERSION }}-*.tar.gz.sha256; do
             (cd dist && sha256sum -c "$(basename "$f")") || { echo "::error::sha256 复核失败: $f"; exit 1; }
           done
-          # RELEASE_NOTES_FILE：atomgit 发布说明与 GH/Gitee 镜像（publish-mirror.sh
-          # 读 dist/notes.txt）同源，三端 body 完全一致（社区面向语气）。
-          RELEASE_NOTES_FILE="$PWD/dist/notes.txt" \
+          # SKIP_UPLOAD=1：publish-release.sh 阶段 0.5~3（预检/cosign 签名/
+          # manifest/GPG asc）后即退，把规范签名集写回 dist，供三端共享。
+          # RELEASE_NOTES_FILE：manifest notes 与 GH/Gitee body 同源。
+          SKIP_UPLOAD=1 RELEASE_NOTES_FILE="$PWD/dist/notes.txt" \
             bash _tools/scripts/ci/release/publish-release.sh "${{ env.VERSION }}" dist
 
-      # M13 发布镜像：atomgit（SSoT）发布成功后，同一 dist 附件集镜像到
-      # GitHub/Gitee Releases——修复"只有 tag 没有 Releases（无二进制包）"
-      # （社区实证反馈）。附件字节与 atomgit 同源（本 job dist 直传 GH/Gitee
-      # 快通道，不经慢通道回拉）；幂等（同名同大小跳过/元数据对齐），
-      # tag 前置校验 fail-closed，任一附件失败非零退出（C4 修复重发语义：
-      # 重跑本 job 即幂等续传）。
-      - name: Mirror release to GitHub + Gitee
+      - name: Upload publish-dist (canonical signed set for all mirrors)
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentrt-${{ env.VERSION }}-publish-dist
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 90
+
+  # M13 发布镜像（方案 A 快通道）：同一 canonical publish-dist 直传
+  # GitHub Releases——修复"只有 tag 没有 Releases（无二进制包）"（社区实证
+  # 反馈）。附件字节与 atomgit 同源（不经慢通道回拉）；幂等（同名同大小
+  # 跳过/元数据对齐）；tag 前置校验 fail-closed。GH 完成后 dispatch
+  # mirror-release.yml 把 Gitee 段放到独立 run 后台幂等续跑（Gitee 外网
+  # 限速慢，内联会拖长 release run；异步后本 run 墙钟 ≈ atomgit 段）。
+  publish-mirror:
+    needs: [finalize-dist, e2e-clean-room]
+    if: success() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      actions: write
+    concurrency:
+      group: publish-mirror-${{ env.VERSION }}
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      GITEE_TOKEN: ${{ secrets.GT_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Init submodules (tools)
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh tools
+
+      - name: Download publish-dist
+        uses: actions/download-artifact@v4
+        with:
+          name: agentrt-${{ env.VERSION }}-publish-dist
+          path: dist
+
+      - name: Mirror release to GitHub (fast channel)
         run: |
-          bash _tools/scripts/ci/release/publish-mirror.sh "${{ env.VERSION }}" dist
+          # SKIP_GITEE=1：本段只做 GH 快通道；Gitee 由下一步 dispatch 的
+          # mirror-release.yml 在独立 run 幂等补齐（读同一 publish-dist）。
+          SKIP_GITEE=1 \
+            bash _tools/scripts/ci/release/publish-mirror.sh "${{ env.VERSION }}" dist
+
+      - name: Dispatch Gitee mirror (async, non-blocking)
+        if: success()
+        run: |
+          # 同一 canonical publish-dist（release_run_id 定位）交给
+          # mirror-release.yml 在后台续跑 Gitee；GH 段幂等跳过。concurrency
+          # group=mirror-release-${{ inputs.version }} 保证同版本不叠跑。
+          # dispatch 失败只告警不阻塞（GH 快通道已完成，Gitee 可稍后手动
+          # 触发 mirror-release.yml 补齐）。
+          gh workflow run mirror-release.yml \
+            --repo "${{ github.repository }}" --ref main \
+            -f version="${{ env.VERSION }}" \
+            -f fetch_missing=false \
+            -f release_run_id="${{ github.run_id }}" \
+            || { echo "::warning::Gitee mirror dispatch 失败（GH 快通道已完成，Gitee 稍后可手动补齐）"; exit 0; }
+          echo "已 dispatch mirror-release.yml（version=${{ env.VERSION }}, run_id=${{ github.run_id }}）"
+
+  # U-3 方案 A 慢通道：atomgit（SSoT）上传 + latest/ 指针切换。与
+  # publish-mirror 并行，互不阻塞；SKIP_SIGN=1 复用 finalize 的规范签名集
+  # （manifest 幂等保护不再重生成，.asc 恒一致）。独立 concurrency 组，
+  # 单段失败可只重跑本 job 幂等续传（C4 修复重发语义：AIRY_FORCE_UPLOAD=1
+  # 先删后传）。latest/ 只在全部附件上传并校验通过后才提交（指针切换绑定
+  # SSoT 补齐），失败自动 cancel 恢复语义由重跑保持。
+  publish-atomgit:
+    needs: [finalize-dist, e2e-clean-room]
+    if: success() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    concurrency:
+      group: publish-atomgit-${{ env.VERSION }}
+      cancel-in-progress: false
+    env:
+      ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
+      ATOMGIT_REPO: openairymax/agentrt
+      # P23 根修配套：manifest commit 双端同步所需（publish-release.sh 阶段 5
+      # 向 GitHub main 补推，fail-soft；无 PAT 时跳过并告警）。
+      GITHUB_REPO: ${{ github.repository }}
+      GITHUB_PAT: ${{ secrets.GH_TOKEN }}
+      # 同 tag 重发/修复（C4）：OBS 预签名 PUT 按文件名覆盖，设置
+      # AIRY_FORCE_UPLOAD=1 使发布永远覆盖远端同名附件，杜绝"跳过上传但
+      # manifest 已按新 sha 重生成"的不一致（v0.1.10 同版本修复重发实证）。
+      AIRY_FORCE_UPLOAD: '1'
+      # runner 布局与本地伞仓不同（agentrt 即工作树根，scripts/ 在根下），
+      # 显式指定安装器 SSoT；AIRY_LAUNCHER_SRC 默认已指向
+      # agent-workload/sdk/tui/scripts/airymaxrt（init-submodules 补齐）。
+      AIRY_INSTALLER_SRC: ${{ github.workspace }}/scripts/install.sh
+      AIRY_INSTALLER_PS1_SRC: ${{ github.workspace }}/scripts/install.ps1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      - name: Init submodules (tools)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh tools
+
+      - name: Download publish-dist
+        uses: actions/download-artifact@v4
+        with:
+          name: agentrt-${{ env.VERSION }}-publish-dist
+          path: dist
+
+      - name: Publish to atomgit (SSoT upload + latest/ pointer switch)
+        run: |
+          test -n "$(ls dist/agentrt-${{ env.VERSION }}-*.tar.gz 2>/dev/null)" || {
+            echo "::error::publish-dist 无 tar.gz 制品，中止发布"; exit 1
+          }
+          # SKIP_SIGN=1：签名集已由 finalize-dist 固化于 publish-dist，
+          # 本段只上传 + 更新 latest/，绝不再重签（避免跨端字节漂移）。
+          # RELEASE_NOTES_FILE 与 finalize 同源（manifest 幂等不重生成）。
+          SKIP_SIGN=1 RELEASE_NOTES_FILE="$PWD/dist/notes.txt" \
+            bash _tools/scripts/ci/release/publish-release.sh "${{ env.VERSION }}" dist
 
