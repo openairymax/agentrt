@@ -1128,16 +1128,47 @@ jobs:
           done
           echo "标记补全完成: $(ls agentrt-${VERSION}-*.tar.gz | wc -l) 个包"
 
+      # 发布说明面向整个开源社区（公开场合）：固定模板（版本定位/平台
+      # 支持/安装方式）+ 用户可见变更列表；严禁出现内部工程流水（commit
+      # 逐条罗列、CI 取证、内部路径等）。变更列表自动剔除 ci/docs/chore/
+      # test/refactor/style 等内部工程类提交，正式版发布前维护者还应
+      # 人工补充"本版亮点"段（经 RELEASE_NOTES_FILE 传给发布脚本）。
       - name: Generate release notes
         run: |
           VERSION="${{ env.VERSION }}"
+          IS_RC=0; case "$VERSION" in *-rc*) IS_RC=1 ;; esac
           PREV="$(git describe --tags --abbrev=0 "${VERSION}^" 2>/dev/null || echo '')"
-          if [ -n "$PREV" ]; then
-            git log --oneline --no-merges "${PREV}..${VERSION}" | head -60
-          else
-            git log --oneline --no-merges -20
-          fi > dist/notes.txt
-          echo "变更摘要已生成: $(wc -l < dist/notes.txt) 行"
+          if [ -n "$PREV" ]; then LOGARGS=(--no-merges "${PREV}..${VERSION}"); else LOGARGS=(--no-merges -30); fi
+          {
+            echo "AgentRT ${VERSION}"
+            echo
+            if [ "$IS_RC" = 1 ]; then
+              echo "> 候选版本（Release Candidate）：供测试与预览，接口和行为可能继续调整；生产部署请等待正式版。"
+              echo
+            fi
+            echo "## 平台支持"
+            echo
+            echo "- Linux（主力平台）：x86-64 / x86-32 / ARM64 / ARM32"
+            echo "- macOS：x86-64（Intel）/ ARM64（Apple Silicon）"
+            echo "- Windows：x86-64 / x86-32"
+            echo
+            echo "## 安装"
+            echo
+            echo '```bash'
+            echo "curl -fsSL https://atomgit.com/openairymax/agentrt/releases/download/${VERSION}/install.sh | bash"
+            echo '```'
+            echo
+            echo "Windows（PowerShell）："
+            echo '```powershell'
+            echo "irm https://atomgit.com/openairymax/agentrt/releases/download/${VERSION}/install.ps1 | iex"
+            echo '```'
+            echo
+            echo "## 本版变更"
+            echo
+            git log "${LOGARGS[@]}" --pretty='* %s' \
+              | grep -vE '^\* (ci|docs|chore|test|refactor|style|release|mirror|tools)([/:]|\(| |$)' || true
+          } > dist/notes.txt
+          echo "发布说明已生成（社区面向，$(wc -l < dist/notes.txt) 行）"
 
       # 发布交接（发布已移出 runner）：校验 dist 后聚合上传为单一附件。
       # 本地发布命令（MCP/维护者）：
@@ -1350,7 +1381,10 @@ jobs:
           for f in dist/agentrt-${{ env.VERSION }}-*.tar.gz.sha256; do
             (cd dist && sha256sum -c "$(basename "$f")") || { echo "::error::sha256 复核失败: $f"; exit 1; }
           done
-          bash _tools/scripts/ci/release/publish-release.sh "${{ env.VERSION }}" dist
+          # RELEASE_NOTES_FILE：atomgit 发布说明与 GH/Gitee 镜像（publish-mirror.sh
+          # 读 dist/notes.txt）同源，三端 body 完全一致（社区面向语气）。
+          RELEASE_NOTES_FILE="$PWD/dist/notes.txt" \
+            bash _tools/scripts/ci/release/publish-release.sh "${{ env.VERSION }}" dist
 
       # M13 发布镜像：atomgit（SSoT）发布成功后，同一 dist 附件集镜像到
       # GitHub/Gitee Releases——修复"只有 tag 没有 Releases（无二进制包）"

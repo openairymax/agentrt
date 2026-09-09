@@ -25,6 +25,10 @@ on:
         required: false
         type: boolean
         default: true
+      notes:
+        description: '发布说明（可选，社区面向语气；传入则覆盖 dist/notes.txt 作为 GH/Gitee release body）'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -78,5 +82,8 @@ jobs:
         env:
           # 缺件回填开关透传（publish-mirror.sh 读 FETCH_MISSING=1）
           FETCH_MISSING: ${{ inputs.fetch_missing && '1' || '0' }}
+          # 发布说明覆盖（publish-mirror.sh 读 RELEASE_NOTES，优先于
+          # dist/notes.txt）：回填历史版本时可传入社区面向说明
+          RELEASE_NOTES: ${{ inputs.notes }}
         run: |
           bash _tools/scripts/ci/release/publish-mirror.sh "${VERSION}" dist
