@@ -83,10 +83,10 @@ AgentRT 的每一次提交与每一个版本发布都由这里的流水线驱动
 
 | 资产 | 说明 |
 |---|---|
-| `agentrt-<版本>-<平台>.tar.gz` / `.zip` | 平台自包含安装包（Linux/macOS 为 tar.gz，Windows 为 zip） |
+| `agentrt-<版本>-<平台>.tar.gz` / `.zip` | 平台自包含安装包（Linux/macOS 为 tar.gz，Windows 为 zip）。平台矩阵：Linux x86-64 / x86-32 / arm-64 / arm-32，macOS arm-64 / x86-64，Windows x86-64 / x86-32 |
 | 同名 `.sha256` | 安装包的 SHA-256 校验文件 |
 | 同名 `.sig` | 安装包的分离签名 |
-| `manifest.rc.json`（+ `.asc`） | 本版本全部资产的清单（及清单的分离签名）——发布字节的权威 |
+| `manifest.<channel>.json`（+ `.asc`） | 本版本全部资产的清单及清单的分离签名——发布字节的权威（正式 stable 版为 `manifest.stable.json`） |
 | `install.sh` / `install.ps1` | Linux/macOS 与 Windows 安装脚本 |
 
 安装前建议先验证完整性：把 `.sha256` 文件与对应的安装包放在同一目录，运行
