@@ -82,16 +82,21 @@
 
 set -u
 
-# ─── 颜色（无 TTY 时禁用） ──────────────────────────────────────────────
-if [ -t 1 ]; then
-    C_RED='\033[0;31m'; C_GREEN='\033[0;32m'; C_YELLOW='\033[1;33m'; C_CYAN='\033[0;36m'; C_NC='\033[0m'
+# ─── 颜色（无 TTY 或 NO_COLOR 时禁用） ──────────────────────────────────
+# 颜色变量存真实 ESC 字节（printf '\033..'），log/stage 以 %s 传入——
+# 不依赖外层 printf 对 format 串的 \033 转义（dash/busybox 等外壳亦正确）；
+# 管道/重定向/日志查看器经 [ -t 1 ] 与 NO_COLOR 双重关闭，零转义噪音。
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+    C_RED="$(printf '\033[0;31m')"; C_GREEN="$(printf '\033[0;32m')"
+    C_YELLOW="$(printf '\033[1;33m')"; C_CYAN="$(printf '\033[0;36m')"
+    C_NC="$(printf '\033[0m')"
 else
     C_RED=''; C_GREEN=''; C_YELLOW=''; C_CYAN=''; C_NC=''
 fi
-log_info()  { printf "${C_CYAN}[INFO]${C_NC} %s\n" "$1"; }
-log_ok()    { printf "${C_GREEN}[ OK ]${C_NC} %s\n" "$1"; }
-log_warn()  { printf "${C_YELLOW}[WARN]${C_NC} %s\n" "$1"; }
-log_err()   { printf "${C_RED}[FAIL]${C_NC} %s\n" "$1"; }
+log_info()  { printf '%s[INFO]%s %s\n' "$C_CYAN" "$C_NC" "$1"; }
+log_ok()    { printf '%s[ OK ]%s %s\n' "$C_GREEN" "$C_NC" "$1"; }
+log_warn()  { printf '%s[WARN]%s %s\n' "$C_YELLOW" "$C_NC" "$1"; }
+log_err()   { printf '%s[FAIL]%s %s\n' "$C_RED" "$C_NC" "$1"; }
 
 # ─── 进度反馈（进度条 + 转圈动效；非 TTY 自动静默） ─────────────────────
 # 与颜色检测同判据：stderr 为 TTY（交互终端）时启用，管道/重定向时静默，
@@ -1325,9 +1330,8 @@ persist_profile() {
         echo "AIRY_HW_ACCEL=${accel}"
     } > "${AIRY_HOME}/config/profile.env"
     chmod 600 "${AIRY_HOME}/config/profile.env" 2>/dev/null || true
-    log_ok "运行画像已固化: ${hw_profile}（${AIRY_HW_ARCH:-$(detect_arch)} · 内存 ${total}KiB/可用 ${avail}KiB · CPU ${cores} 核 · 加速器 ${accel}）"
-    log_info "  硬件变化后（内存扩容/插入显卡）执行 'airymaxrt profile' 重评估，"
-    log_info "  或 'airymaxrt monitor --daemon' 后台常驻自动恢复被裁剪功能"
+    log_ok "运行画像已固化: ${hw_profile}（详情见 config/profile.env）"
+    log_info "  硬件变化后执行 'airymaxrt profile' 重评估，或 'airymaxrt monitor --daemon' 自动恢复被裁剪功能"
 }
 
 # ─── 固化安装位置 + 生成运行环境 + 启动器软链 ──────────────────────────
@@ -1750,7 +1754,7 @@ EOF
 # 阶段导航（0.1.6f 视觉强化）：统一「序号/总数 + 名称」分隔标题，让
 # 长安装流程呈现清晰秩序感（简约、克制；POSIX 兼容）。
 stage() { # <n> <total> <title>
-    printf "${C_CYAN}\n  ── [%s/%s] %s ───────────────────────────${C_NC}\n" "$1" "$2" "$3"
+    printf '%s\n  ── [%s/%s] %s ───────────────────────────%s\n' "$C_CYAN" "$1" "$2" "$3" "$C_NC"
 }
 
 print_summary() {
@@ -1844,7 +1848,9 @@ main() {
         exit $?
     fi
 
+    stage 1 5 "准备安装环境"
     init_home
+    detect_existing_install
 
     # 重装模式：清本地缓存强制下载最新版 + 先停旧 daemon（防旧进程占用二进制）
     if [ "$REINSTALL" = "1" ]; then
@@ -1923,6 +1929,7 @@ main() {
 
     # 启动器兼容入口与 secrets 在两种模式（二进制/源码）下均需生成：
     # 二进制模式依赖 airy_cli 生成 agentrt-tui 兼容入口，否则无任何启动命令
+    stage 3 5 "部署组件与运行配置"
     ensure_cli_entry
     init_secrets
 
@@ -1939,6 +1946,7 @@ main() {
     fi
 
     # 出厂预装 maths-toolkit（数学计算后端，默认开启，可 --without-maths 跳过）
+    stage 4 5 "预装数学计算后端"
     install_maths_toolkit
 
     stage 5 5 "校验与完成"
