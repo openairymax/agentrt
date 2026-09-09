@@ -1486,7 +1486,8 @@ jobs:
     permissions:
       contents: write
     concurrency:
-      group: publish-atomgit-${{ env.VERSION }}
+      # 见 publish-mirror 注：job 级 concurrency 仅可用 github 等上下文。
+      group: publish-atomgit-${{ github.ref_name }}
       cancel-in-progress: false
     env:
       ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
