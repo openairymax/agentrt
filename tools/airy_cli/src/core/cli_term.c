@@ -361,28 +361,74 @@ static const char *const k_theme_light[CLI_TH_COUNT] = {
 
 #ifndef _WIN32
 #include <poll.h>
+#include <termios.h>
 
-/* OSC 11 背景色查询（xterm/kitty/ghostty 等）：发出查询后在 150ms 内
+/* OSC 11 背景色查询（xterm/kitty/ghostty 等）：发出查询后在 300ms 内
  * 等待响应（poll 超时防止不支持 OSC 的终端阻塞启动）。响应形如
  *   ESC ] 11 ; rgb:RRRR/GGGG/BBBB ESC \
- * 每段 1~4 位 hex（xterm 用 4 位）；取前 2 位 hex 归一化到 0-255。 */
+ * 每段 1~4 位 hex（xterm 用 4 位）；取前 2 位 hex 归一化到 0-255。
+ *
+ * 0.1.14 修复（社区实证乱码）：查询期间必须关 ECHO/ICANON——否则终端
+ * 应答被 tty 回显成 `^[]11;rgb:...`，且行缓冲下 read 会一直等到换行；
+ * 并且必须读到 BEL/ST 终止符为止（无论解析成败都读净），否则迟到应答
+ * 滞留输入队列，稍后被按键解析器当作普通字符显示（如 F8 重挂载后
+ * 出现 `11;rgb:ffff/ffff/ffff`）。 */
 static int term_query_bg(unsigned char *or, unsigned char *og,
                                      unsigned char *ob)
 {
     if (!cli_term_is_tty())
         return 0;
+
+    struct termios saved, raw;
+    int have_tio = (tcgetattr(STDIN_FILENO, &saved) == 0);
+    if (have_tio) {
+        raw = saved;
+        raw.c_lflag &= ~(ICANON | ECHO);
+        raw.c_cc[VMIN] = 1;
+        raw.c_cc[VTIME] = 0;
+        (void)tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+    }
+
     fputs("\033]11;?\033\\", stdout);
     fflush(stdout);
+
     char buf[128];
-    struct pollfd pfd;
-    pfd.fd = STDIN_FILENO;
-    pfd.events = POLLIN;
-    if (poll(&pfd, 1, 150) <= 0)
+    size_t used = 0;
+    /* 循环条件预留 2 字节：ESC 分支单轮最多追加 2 字节（ESC + 下一字节），
+     * 上限 used ≤ 127 保证 buf[used]='\0' 不越界。 */
+    while (used + 2 < sizeof(buf)) {
+        struct pollfd pfd;
+        pfd.fd = STDIN_FILENO;
+        pfd.events = POLLIN;
+        if (poll(&pfd, 1, 300) <= 0)
+            break;
+        char ch;
+        if (read(STDIN_FILENO, &ch, 1) != 1)
+            break;
+        if (ch == 0x07)                 /* BEL：OSC 终止 */
+            break;
+        if (ch == 0x1b) {               /* ESC：可能 ESC \ (ST) */
+            buf[used++] = ch;
+            struct pollfd p2;
+            p2.fd = STDIN_FILENO;
+            p2.events = POLLIN;
+            if (poll(&p2, 1, 300) > 0 &&
+                read(STDIN_FILENO, &ch, 1) == 1) {
+                buf[used++] = ch;
+                if (ch == '\\')         /* ST：结束 */
+                    break;
+            }
+            continue;
+        }
+        buf[used++] = ch;
+    }
+
+    if (have_tio)
+        (void)tcsetattr(STDIN_FILENO, TCSANOW, &saved);
+
+    if (used == 0)
         return 0;
-    ssize_t n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
-    if (n <= 0)
-        return 0;
-    buf[n] = '\0';
+    buf[used] = '\0';
     char *p = strstr(buf, "rgb:");
     if (!p)
         return 0;

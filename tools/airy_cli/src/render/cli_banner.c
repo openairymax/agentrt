@@ -125,7 +125,23 @@ void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
     cli_hero_model_seg("B·t1-f", b, 1);
     cli_hero_model_seg("C·t1-p", c, 1);
     cli_outc('\n');
-    /* 行 3：空行，与对话区留白分层（CLI_HDR_LINES=3） */
+    /* 行 3：明显分界线（替代空白行，保持 CLI_HDR_LINES=3 契约）。
+     * 社区反馈：启动区与对话区需要清晰分隔，视觉效果上不能靠残留转义
+     * 序列"凑"出分界。 */
+    cli_out(g);
+    cli_out(cli_c(CLR_DIM));
+    {
+        char rule[192];
+        size_t rw = 56, rn = 0;
+        while (rn < rw && rn + 3 < sizeof(rule)) {
+            rule[rn++] = '\xE2';
+            rule[rn++] = '\x94';
+            rule[rn++] = '\x80';   /* U+2500 ─（1 cell） */
+        }
+        rule[rn] = '\0';
+        cli_out(rule);
+    }
+    cli_out(cli_c(CLR_RESET));
     cli_outc('\n');
     fflush(stdout);
 }
