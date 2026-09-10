@@ -228,6 +228,32 @@ int tui_paste_read_end(cli_tui_t *t)
     return 1;
 }
 
+/* 丢弃一个控制字符串序列（OSC/DCS/SOS/PM/APC；ESC 与类型字节已被调用方
+ * 消费），读到 BEL(0x07) 或 ST(ESC \) 为止，超时/EOF 亦返回。
+ *
+ * 0.1.14 修复（社区实证乱码）：终端对 OSC 11 背景色查询等请求的应答可能
+ * 迟到（例如 F8 切回 CLI 时），若其落入按键流，`ESC ]` 被当孤立 ESC 丢弃
+ * 后，余下的 `11;rgb:ffff/ffff/ffff` 会作为普通字符进入输入行。此处按
+ * 控制串整段吞掉，保证应答永不显示为输入。 */
+static void tui_skip_control_string(cli_tui_t *t)
+{
+    for (int i = 0; i < 256; i++) {
+        char ch;
+        int eof = 0;
+        if (!tui_wait_byte(t, &ch, 60, &eof))
+            return;
+        if (ch == 0x07)                 /* BEL：终止 */
+            return;
+        if (ch == 0x1b) {               /* 可能 ESC \ (ST) */
+            char nx;
+            if (!tui_wait_byte(t, &nx, 60, &eof))
+                return;
+            if (nx == '\\')             /* ST：终止 */
+                return;
+        }
+    }
+}
+
 /* 读取一个按键（带第一字节超时）。返回键码；0 = EOF；-1 = 轮询超时
  * （*eof 保持 0；面板模式以此节拍刷新）。ESC 序列后续字节用 50ms
  * 短超时，避免孤立 ESC 键阻塞。 */
@@ -240,6 +266,12 @@ int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
         char b;
         if (!tui_wait_byte(t, &b, 120, eof))
             return 0x1b; /* lone ESC */
+        /* OSC/DCS/SOS/PM/APC 控制串：整段丢弃（含迟到的终端应答），
+         * 绝不把其载荷当作输入字符。 */
+        if (b == ']' || b == 'P' || b == 'X' || b == '^' || b == '_') {
+            tui_skip_control_string(t);
+            return TUI_KEY_UNKNOWN;
+        }
         if (b == '[') {
             char x;
             if (!tui_wait_byte(t, &x, 120, eof))
