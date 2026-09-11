@@ -87,8 +87,10 @@ int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
         raw.c_cflag |= CS8;
         raw.c_cc[VMIN] = 1;
         raw.c_cc[VTIME] = 0;
-        if (tcsetattr(STDIN_FILENO, TCSANOW, &raw) == 0)
+        if (tcsetattr(STDIN_FILENO, TCSANOW, &raw) == 0) {
             saved_ok = 1;
+            cli_term_note_raw_enter(&saved); /* T-19 崩溃守卫登记 */
+        }
     }
 #endif
     /* 2.2.1.5：隐藏硬件光标，改用反显块自绘光标（黑白交替闪烁） */
@@ -388,6 +390,7 @@ int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
 #ifndef _WIN32
     if (saved_ok) {
         tcsetattr(STDIN_FILENO, TCSANOW, &saved);
+        cli_term_note_raw_leave(); /* T-19 崩溃守卫注销 */
         signal(SIGWINCH, SIG_DFL); /* 行模式退出：SIGWINCH 交还终端默认 */
     }
 #endif

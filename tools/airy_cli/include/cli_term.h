@@ -159,6 +159,28 @@ void cli_term_input_submit(void);
  */
 void cli_term_input_hop(void);
 
+#ifndef _WIN32
+
+struct termios;
+
+/* ---- 崩溃守卫（T-19，对标 Rust TUI 的 T-03 RAII 守卫） ----
+ *
+ * fatal 信号（SIGSEGV/SIGBUS/SIGABRT/SIGFPE/SIGILL）若在 CLI 持有终端
+ * 改性期间到达（raw mode / 滚动区 pin / alt screen / 光标隐藏），进程
+ * 一死终端就停留在损毁态（无回显、滚动区锁死、光标消失）。守卫处理器
+ * 在进程终止前尽力还原：
+ *   1. 恢复 raw mode 前保存的 termios 快照（raw mode 持有方经
+ *      cli_term_note_raw_enter()/cli_term_note_raw_leave() 登记与注销）；
+ *   2. 无条件写复位序列：滚动区 / bracketed paste / 光标 / alt screen
+ *      （幂等，未进入的状态写之无副作用）；
+ *   3. 重挂默认处置并重发信号，core dump 与退出码语义保持不变。
+ * Windows 控制台模式由控制台宿主在进程退出时回收，无需用户态守卫。 */
+void cli_term_crash_guard_install(void);
+void cli_term_note_raw_enter(const struct termios *saved_termios);
+void cli_term_note_raw_leave(void);
+
+#endif /* !_WIN32 */
+
 #ifdef __cplusplus
 }
 #endif
