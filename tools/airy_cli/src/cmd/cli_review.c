@@ -29,6 +29,7 @@
 #include "daemon_rpc_client.h"
 #include "airy_memory.h"
 #include "logging.h"
+#include "task.h"
 
 #include <cjson/cJSON.h>
 #include <stdio.h>
@@ -289,12 +290,12 @@ int cli_cognition_review(const char *agent_sock, const char *task, const airy_ta
         jobs[i].topic = cli_review_topics[i].name;
         jobs[i].prompt = cli_review_build_prompt(cli_review_topics[i].name, task, plan_json);
         if (jobs[i].prompt)
-            airy_platform_thread_create(&threads[i], cli_review_worker, &jobs[i]);
+            airy_thread_create(&threads[i], cli_review_worker, &jobs[i]);
     }
 
     for (int i = 0; i < n; i++) {
         if (threads[i] != AIRY_INVALID_THREAD)
-            airy_platform_thread_join(threads[i], NULL);
+            airy_thread_join(threads[i], NULL);
         AIRY_FREE(jobs[i].prompt);
     }
     AIRY_FREE(plan_json);

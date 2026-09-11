@@ -16,6 +16,7 @@
 #include "cli_review.h"
 #include "cli_gw.h"
 #include "airy_cli_exec.h"
+#include "task.h"
 
 #ifdef AIRY_HAS_CJSON
 #include <cjson/cJSON.h>
@@ -336,7 +337,7 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
     wctx.exec_id = exec_id;
     airy_thread_t wthr = AIRY_INVALID_THREAD;
     int wait_threaded =
-        (airy_platform_thread_create(&wthr, cli_task_wait_worker, &wctx) == 0);
+        (airy_thread_create(&wthr, cli_task_wait_worker, &wctx) == 0);
     if (wait_threaded) {
         while (!wctx.done && !g_cli_cancel) {
             int input_rc = cli_task_poll_input();
@@ -348,7 +349,7 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
             airy_sleep_ms(200);
             cli_spinner_tick();
         }
-        airy_platform_thread_join(wthr, NULL);
+        airy_thread_join(wthr, NULL);
         err = wctx.err;
         result = wctx.result;
     } else {

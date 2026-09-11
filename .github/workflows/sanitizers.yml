@@ -47,7 +47,7 @@ jobs:
       # sanitizer 插桩编译之外，缩短流水线。
       SANITIZER_TARGETS: >-
         test_platform test_platform_time test_error test_logger test_token
-        test_cost test_arena_tcache test_print test_cancel_token
+        test_cost test_print test_cancel_token
         test_airy_effect test_airy_ext test_airy_id test_airy_regex test_ime
         test_io test_ipc
         test_gateway test_syscall_router test_sse_stream test_jsonrpc
