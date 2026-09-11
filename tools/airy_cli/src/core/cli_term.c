@@ -315,6 +315,67 @@ void cli_term_input_hop(void)
     fflush(stdout);
 }
 
+#ifndef _WIN32
+/* ==================== 崩溃守卫（T-19，对标 T-03 的 C 版） ====================
+ *
+ * fatal 信号到达时若 CLI 正持有终端改性（raw mode / 滚动区 pin / alt
+ * screen / 光标隐藏），进程一死终端就停留在损毁态。守卫在终止前尽力
+ * 还原，然后重挂默认处置重发信号（core dump / 退出码语义不变）。
+ */
+
+#include <signal.h>
+#include <termios.h>
+
+static volatile sig_atomic_t g_crash_raw_active = 0;
+static struct termios g_crash_raw_saved;
+
+/* 无条件复位序列：滚动区（DECSTBM）/ bracketed paste / 硬件光标 /
+ * 备用屏。未进入的状态写之为幂等 no-op，因此无需跟踪各状态位。 */
+static const char k_crash_restore_seq[] =
+    "\033[r"        /* 复位滚动区                 */
+    "\033[?2004l"   /* 关 bracketed paste         */
+    "\033[?25h"     /* 恢复硬件光标               */
+    "\033[?1049l";  /* 退出备用屏                 */
+
+static void cli_crash_restore_and_reraise(int sig)
+{
+    g_crash_raw_active = 0;
+    /* tcsetattr 不在 POSIX 异步信号安全白名单，但实现为单个 ioctl、
+     * 无锁无堆——崩溃处理器语境下的行业惯例（bash/ncurses 同款）。 */
+    (void)tcsetattr(STDIN_FILENO, TCSANOW, &g_crash_raw_saved);
+    ssize_t rc = write(STDOUT_FILENO, k_crash_restore_seq,
+                       sizeof(k_crash_restore_seq) - 1);
+    (void)rc;
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
+void cli_term_note_raw_enter(const struct termios *saved_termios)
+{
+    if (saved_termios) {
+        g_crash_raw_saved = *saved_termios;
+        g_crash_raw_active = 1;
+    }
+}
+
+void cli_term_note_raw_leave(void)
+{
+    g_crash_raw_active = 0;
+}
+
+void cli_term_crash_guard_install(void)
+{
+    static const int fatal_sigs[] = {SIGSEGV, SIGBUS, SIGABRT, SIGFPE, SIGILL};
+    struct sigaction sa;
+    __builtin_memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = cli_crash_restore_and_reraise;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    for (size_t i = 0; i < sizeof(fatal_sigs) / sizeof(fatal_sigs[0]); i++)
+        sigaction(fatal_sigs[i], &sa, NULL);
+}
+#endif /* !_WIN32 */
+
 /* ==================== 主题（浅色 / 深色，2026-08-25） ====================
  *
  * 配色随终端背景自适应：深色背景用高对比亮色，浅色背景切到深色调

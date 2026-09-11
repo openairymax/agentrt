@@ -393,8 +393,10 @@ int cli_tui_enter(cli_tui_t *t)
         raw.c_cflag |= CS8;
         raw.c_cc[VMIN] = 1;
         raw.c_cc[VTIME] = 0;
-        if (tcsetattr(STDIN_FILENO, TCSANOW, &raw) == 0)
+        if (tcsetattr(STDIN_FILENO, TCSANOW, &raw) == 0) {
             t->termios_saved = 1;
+            cli_term_note_raw_enter(&t->saved_termios); /* T-19 崩溃守卫登记 */
+        }
     }
     return 0;
 #endif
@@ -405,8 +407,10 @@ int cli_tui_leave(cli_tui_t *t)
     if (!t || !t->active)
         return 0;
 #ifndef _WIN32
-    if (t->termios_saved)
+    if (t->termios_saved) {
         tcsetattr(STDIN_FILENO, TCSANOW, &t->saved_termios);
+        cli_term_note_raw_leave(); /* T-19 崩溃守卫注销 */
+    }
     signal(SIGWINCH, SIG_DFL);
     /* termios_saved/saved_termios 字段仅 POSIX 编译（cli_tui_internal.h
      * 已 #ifndef _WIN32 守卫）；清零须在守卫内，#112 实证 C2039 */

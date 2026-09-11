@@ -110,6 +110,9 @@ int main(int argc, char *argv[])
     if (cli_parse_args(argc, argv, &print_prompt) != 0)
         return 1;
     cli_term_init();
+#ifndef _WIN32
+    cli_term_crash_guard_install(); /* T-19：崩溃前还原终端改性 */
+#endif
     cli_theme_init();
     cli_term_title("AgentRT · airy_cli");
 
