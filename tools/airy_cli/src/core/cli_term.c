@@ -433,7 +433,9 @@ static int term_query_bg(unsigned char *or, unsigned char *og,
     if (!p)
         return 0;
     p += 4;
-    unsigned int vals[3];
+    /* S5 修复：响应提前终止（如 "rgb:ff"）时循环 break，剩余分量未写入；
+     * 未初始化读为 UB。零初始化——缺省分量按黑色处理。 */
+    unsigned int vals[3] = {0, 0, 0};
     for (int i = 0; i < 3; i++) {
         char *end = NULL;
         unsigned long v = strtoul(p, &end, 16);
