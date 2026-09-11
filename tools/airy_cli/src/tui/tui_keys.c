@@ -27,7 +27,7 @@ static void tui_win_flush_buf(const char *s, size_t n)
 {
     if (n > sizeof(g_win_key_buf))
         n = sizeof(g_win_key_buf);
-    memcpy(g_win_key_buf, s, n);
+    AIRY_MEMCPY_SAFE(g_win_key_buf, s, n, sizeof(g_win_key_buf));
     g_win_key_len = n;
     g_win_key_off = 0;
 }
