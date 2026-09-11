@@ -322,8 +322,10 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
         add_compile_definitions(NDEBUG)
         # 发行制品体积控制：链接期 strip 符号表与残留 debug 段。
         # Sanitizer 构建保留符号（ASan 符号化依赖），仅纯 Release 剥离。
+        # 符号审计类验证目标（如 WS-8 ARC-03 的 agentrt_atoms_standalone）
+        # 需保留 .symtab，置目标属性 AIRY_KEEP_SYMBOLS 即豁免。
         if(NOT ENABLE_SANITIZERS)
-            add_link_options(-s)
+            add_link_options("$<$<NOT:$<BOOL:$<TARGET_PROPERTY:AIRY_KEEP_SYMBOLS>>>:-s>")
         endif()
     endif()
 endif()
@@ -776,6 +778,10 @@ if(AIRY_BUILD_ALL)
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/ipc
         # P0.17 阶段 4: daemon_bootstrap_sd.h、service_discovery.h、service_discovery_helper.h 迁移至 commons/utils/sd
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/sd
+        # WS8-04: 跨层边界契约类型（SSoT）位于 commons/utils/types
+        # （safety_guard_types.h / llm_service_types.h / tool_service_types.h /
+        #  tool_approval_types.h），atoms 与 daemons 两侧均经此路径解析。
+        ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/types
         # P0.17 阶段 5: thread_pool.h 迁移至 commons/utils/sync
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/sync
         # P0.17 阶段 1: airy_defaults.h 位于 commons/include
@@ -821,6 +827,7 @@ if(AIRY_BUILD_ALL)
         commons/platform/include
         commons/utils/ipc
         commons/utils/sd
+        commons/utils/types
         commons/utils/sync
         commons/include
         atoms/corekern/include
