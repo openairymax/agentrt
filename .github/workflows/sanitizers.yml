@@ -1,0 +1,141 @@
+name: Sanitizers (ASan/UBSan)
+
+# WS-6 6.4（T-13，0.1.15）：AddressSanitizer / LeakSanitizer / UndefinedBehavior
+# Sanitizer 内存与未定义行为门禁。覆盖范围——commons + gateway +
+# atoms/corekern，为 WS-4 接线与 WS-8 阶段 0~4（依赖反转、机制归位、IPC
+# 全量启用）提供内存缺陷防护：这些改造均为运行期高风险变更，无 sanitizer
+# 门禁则回归只能靠人工日志发现。
+#
+# 触发面瘦身（缓"流水线太慢"）：纯文档变更跳过（安全边界同 build-test.yml——
+# 只忽略 md/docs，源码与 workflow 变更仍全量验证）；同一 ref 并发运行自动
+# 取消；构建一律树外化到工作区上级目录（BAN-33），不落源码区。
+#
+# 超时护栏：sanitizer 构建带插桩，编译与执行均慢于常规腿，故给 120min。
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '*.md'
+      - '**/*.md'
+      - 'docs/**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  asan-ubsan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      # BAN-33：构建目录位于源码树外（工作区上级目录）
+      BUILD_DIR: ../build-sanitizer
+      # 检测到即中止：ASan/LSan/UBSan 任一问题都必须是硬失败（fail-closed），
+      # 不得因"继续跑完"而漏报。allocator_may_return_null 保留（与根
+      # CMakeLists 的 AIRY_ASAN_OPTIONS 语义一致），避免 OOM 注入测试被
+      # allocator 直接终止。
+      ASAN_OPTIONS: halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1:allocator_may_return_null=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+      # 目标子集：commons 16 个 + gateway 6 个 + corekern 5 个。
+      # 显式列目标而非全量构建，把不相关模块（daemons/CLI/集成）排除在
+      # sanitizer 插桩编译之外，缩短流水线。
+      SANITIZER_TARGETS: >-
+        test_platform test_platform_time test_error test_logger test_token
+        test_cost test_arena_tcache test_print test_cancel_token
+        test_airy_effect test_airy_ext test_airy_id test_airy_regex test_ime
+        test_io test_ipc
+        test_gateway test_syscall_router test_sse_stream test_jsonrpc
+        test_rpc_handler test_gateway_auth
+        test_kernel_state test_corekern test_memory_engine test_oom_handler
+        test_are_ipc
+      # ctest 名称子集，与上面的目标一一对应（commons 执行器注册名带
+      # commons_test_ 前缀，其余注册名即测试名）。
+      SANITIZER_CTEST_RE: >-
+        ^(commons_test_|gateway_test|syscall_router_test|sse_stream_test|jsonrpc_test|rpc_handler_test|gateway_auth_test|kernel_state|corekern_deep|memory_engine|oom_handler|are_ipc)$
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+      - name: Init submodules (targeted)
+        uses: ./.github/actions/lf-init-deps
+        with:
+          groups: agent-workload
+          gh_token: ${{ secrets.GH_TOKEN }}
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build \
+            libsqlite3-dev libcjson-dev libyaml-dev libcurl4-openssl-dev \
+            libssl-dev zlib1g-dev libzstd-dev \
+            libmicrohttpd-dev libwebsockets-dev libevent-dev \
+            python3
+
+      # ENABLE_SANITIZERS=ON 的 Linux 语义（根 CMakeLists L255-L257）：
+      # -fsanitize=address,undefined,leak,float-divide-by-zero。
+      # Debug 构建保留符号与行号，栈回溯可读（sanitizer 报告落源码行）。
+      - name: Configure (ENABLE_SANITIZERS=ON, BUILD_TESTS=ON)
+        run: |
+          cmake -S . -B ${{ env.BUILD_DIR }} \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTS=ON \
+            -DENABLE_SANITIZERS=ON \
+            -DAIRY_BUILD_ALL=ON \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Build (sanitizer instrumented subset)
+        run: |
+          set +e
+          # shellcheck disable=SC2086
+          cmake --build ${{ env.BUILD_DIR }} --parallel "$(nproc)" \
+            --target ${{ env.SANITIZER_TARGETS }} > /tmp/sanitizer-build.log 2>&1
+          rc=$?
+          if [ $rc -ne 0 ]; then
+            echo "::error::sanitizer build FAILED rc=$rc"
+            grep -E ': error:|fatal error:|Error [0-9]|undefined symbol|ld: ' /tmp/sanitizer-build.log \
+              | sort -u | head -40 | sed 's/^/::error::  /'
+            tail -n 30 /tmp/sanitizer-build.log | sed 's/^/::error::  /'
+            exit $rc
+          fi
+          tail -n 5 /tmp/sanitizer-build.log
+
+      - name: Dump build log to ci-debug issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/ci-debug-dump.sh "sanitizer build" "/tmp/sanitizer-build.log"
+
+      # sanitizer 对构建环境负载敏感（栈使用检测 + 泄漏追踪），单测超时护栏
+      # 放宽到 300s；不做自动 rerun（内存问题不是瞬态 flaky，rerun 只会掩盖）。
+      - name: Run sanitizer tests (ctest)
+        run: |
+          set +e
+          ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure -j"$(nproc)" \
+            --timeout 300 -R '${{ env.SANITIZER_CTEST_RE }}' \
+            > /tmp/sanitizer-ctest.log 2>&1
+          rc=$?
+          if [ $rc -eq 0 ]; then
+            tail -n 4 /tmp/sanitizer-ctest.log
+            exit 0
+          fi
+          echo "::error::sanitizer ctest FAILED rc=$rc"
+          # sanitizer 报告在断言行之后（SUMMARY/ERROR 行），逐类抓取定位。
+          grep -E 'ERROR: (Address|Leak|UndefinedBehavior)Sanitizer|runtime error:|SUMMARY: |The following tests FAILED:|^[[:space:]]+[0-9]+ - ' \
+            /tmp/sanitizer-ctest.log | head -60 | sed 's/^/::error::  /'
+          tail -n 60 /tmp/sanitizer-ctest.log | sed 's/^/::error::  /'
+          exit $rc
+
+      - name: Dump ctest log to ci-debug issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/ci-debug-dump.sh "sanitizer ctest" "/tmp/sanitizer-ctest.log"
