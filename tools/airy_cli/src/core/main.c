@@ -179,10 +179,18 @@ int main(int argc, char *argv[])
      * still runs on platform fallbacks (non-fatal, badge=0). */
     {
         int core_ret = airy_init();
+        /* Boot evidence goes to stderr, not AIRY_LOG_*: main() pins the
+         * module level to LOG_LEVEL_ERROR, which would silence INFO/WARN
+         * evidence lines entirely. stderr is the CLI's boot diagnostic
+         * channel (same as the log-dir fallback above); in TUI mode it is
+         * dup2'ed into airy_cli.log, in -p mode it stays on the real
+         * stderr. The 8.4.2 runtime gate greps this line. */
         if (core_ret == AIRY_SUCCESS) {
-            AIRY_LOG_INFO("corekern core initialized (airy_cli runs on corekern)");
+            fprintf(stderr, "[airy_cli] corekern core initialized"
+                            " (airy_cli runs on corekern)\n");
         } else {
-            AIRY_LOG_WARN("corekern init failed (%d) - running degraded (badge=0)", core_ret);
+            fprintf(stderr, "[airy_cli] corekern init failed (%d)"
+                            " - running degraded (badge=0)\n", core_ret);
         }
     }
 
