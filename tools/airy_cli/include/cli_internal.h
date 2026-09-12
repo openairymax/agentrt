@@ -160,7 +160,7 @@ const char *cli_chat_reasoning_peek(void);
 void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t out_size);
 void cli_chat_mem_record(const char *input, const char *reply, const char *reasoning);
 
-/* cli_chat_gccp.c：GCCP 逐问交互（cli_chat_t1p_cached 实现仍在 cli_chat.c） */
+/* cli_chat_gccp.c：GCCP 逐问交互（cli_chat_t1p_cached 实现见 cli_chat.c） */
 const char *cli_chat_t1p_cached(void);
 
 /* cli_chat_history.c：历史缓冲 / 错误描述 / 系统提示词 */
