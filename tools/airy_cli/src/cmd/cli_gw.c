@@ -9,7 +9,6 @@
  * socket。airy_cli 不依赖 curl（保持零外部 HTTP 依赖），本模块用 POSIX /
  * Winsock 原生 socket 实现 HTTP/1.1：
  *   - 非流式：POST /（JSON-RPC），解析 Content-Length 读完整响应；
- *   - 流式对话：POST /api/v1/chat/stream（SSE），逐 data: 行回调；
  *   - /health 可达性探测。
  */
 
@@ -556,59 +555,6 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
         return -1;
     *out_result = out;
     return 0;
-}
-
-/* ── SSE 流式对话（POST /api/v1/chat/stream） ─────────────────────── */
-int cli_gw_stream(const char *payload, int timeout_ms, cli_gw_line_cb cb, void *ud)
-{
-    if (!payload)
-        return -1;
-    char host[128];
-    int port = 0;
-    cli_gw_endpoint(host, sizeof(host), &port);
-
-    char *resp = NULL;
-    size_t rlen = 0;
-    if (cli_gw_exchange(host, port, "/api/v1/chat/stream", payload, timeout_ms, &resp, &rlen) !=
-        0) {
-        AIRY_FREE(resp);
-        return -1;
-    }
-    if (!resp)
-        return -1;
-
-    /* SSE：逐 data: 行解析 */
-    char *p = resp;
-    char *end = resp + rlen;
-    int done = 0;
-    while (p < end && !done) {
-        char *nl = memmem(p, (size_t)(end - p), "\n", 1);
-        size_t linelen = nl ? (size_t)(nl - p) : (size_t)(end - p);
-        char *line = (char *)AIRY_MALLOC(linelen + 1);
-        if (!line)
-            break;
-        __builtin_memcpy(line, p, linelen);
-        line[linelen] = '\0';
-        /* 去掉行尾 \r */
-        if (linelen > 0 && line[linelen - 1] == '\r')
-            line[linelen - 1] = '\0';
-        if (strncmp(line, "data:", 5) == 0) {
-            const char *val = line + 5;
-            while (*val == ' ')
-                val++;
-            if (strcmp(val, "[DONE]") == 0) {
-                done = 1;
-            } else if (cb) {
-                cb(val, ud);
-            }
-        }
-        AIRY_FREE(line);
-        if (!nl)
-            break;
-        p = nl + 1;
-    }
-    AIRY_FREE(resp);
-    return done ? 0 : -1;
 }
 
 /* ── /health 可达性 ───────────────────────────────────────────────── */
