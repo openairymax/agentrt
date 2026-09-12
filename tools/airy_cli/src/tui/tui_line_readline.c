@@ -39,11 +39,12 @@ void tui_line_redraw(cli_tui_t *t)
     fputs(TUI_INPUT_PREFIX, stdout);
     fputs(cli_c(CLR_RESET), stdout);
     size_t input_w = tui_caret_print(t); /* 2.2.1.5 反显光标（黑白闪烁） */
-    /* 拼音候选条（输入条上方一行；不占用输入行本身） */
-    if (cli_term_input_on())
-        tui_ime_draw_cands(t, t->rows > 0 ? t->rows : 1);
-    /* 光标落在编辑位置（UTF-8 显示宽度对齐，CJK 不漂移）。 */
     size_t col = ime_tag_w + (size_t)strlen(TUI_INPUT_PREFIX) + input_w;
+    /* 拼音候选条（0.1.15）：行渲染模式内联于输入行末。三区底部固定输入条
+     * 已于 0.1.7 弃用（cli_term_header_pin 无调用点 → cli_term_input_on
+     * 恒 0），原绝对定位候选条在默认 REPL 下不可达（社区反馈「输入法没
+     * 反应」根因）。内联绘制后由 CHA 把光标移回编辑位，不破坏对话滚动区。 */
+    int ime_bar = tui_ime_draw_cands_inline(t, col);
     if (cli_term_input_on()) {
         tui_write_literal("\033[");
         snprintf(num, sizeof(num), "%d", t->rows > 0 ? t->rows : 1);
@@ -52,6 +53,12 @@ void tui_line_redraw(cli_tui_t *t)
         snprintf(num, sizeof(num), "%zu", col > 0 ? col : 1);
         tui_write_literal(num);
         tui_write_literal("H");
+    } else if (ime_bar) {
+        /* 光标水平绝对定位（CHA）：与行号无关，回编辑位。 */
+        tui_write_literal("\033[");
+        snprintf(num, sizeof(num), "%zu", col > 0 ? col : 1);
+        tui_write_literal(num);
+        tui_write_literal("G");
     }
     fflush(stdout);
 }
