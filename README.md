@@ -131,16 +131,16 @@ curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/sc
 
 </details>
 
-Need a custom prefix / beta channel / uninstall? Append flags after `| bash -s --`:
+Need a custom prefix / RC channel / uninstall? Append flags after `| bash -s --`:
 
 ```bash
 # Custom prefix (default: $HOME/.airymaxrt)
 curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh \
   | bash -s -- --prefix "$HOME/.airymaxrt"
 
-# Beta channel (more aggressive updates)
+# RC channel (release candidate: preview/testing, interfaces may change)
 curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh \
-  | bash -s -- --channel beta
+  | bash -s -- --channel rc
 
 # Uninstall (--keep-data preserves memory data)
 curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh \

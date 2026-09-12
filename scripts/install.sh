@@ -12,7 +12,7 @@
 #   curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
 #     | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
 #     | bash
-#     # ↑ 最简形式：通道默认 stable（--channel 仅 beta 等非常规通道时需指定）
+#     # ↑ 最简形式：通道默认 stable（--channel 仅 rc/beta 等非常规通道时需指定）
 #     # 自定义路径：同上管道，末尾改为 `bash -s -- --prefix "$HOME/.airymaxrt"`
 #   bash install.sh --reinstall                       # 强制重装（清缓存+停旧 daemon）
 #   bash install.sh --uninstall                       # 一键卸载
@@ -25,7 +25,7 @@
 #     curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
 #       | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
 #       | bash
-#   更新   airymaxrt update           （--check 仅检查 / --channel stable|beta / --rollback 回滚）
+#   更新   airymaxrt update           （--check 仅检查 / --channel stable|rc|beta / --rollback 回滚）
 #   重装   bash install.sh --reinstall
 # 兼容入口（release 附件，latest 指向最新 release；仅在最近发版后短暂可用，
 # 同版本修复重发不更新该附件）：
@@ -62,11 +62,11 @@
 #
 # 参数：
 #   --prefix <path>  --mode <auto|binary|hybrid|source>  --bin-dir <path>
-#   --profile <full|minimal|auto>  --channel <stable|beta>  --from-file <tarball>
+#   --profile <full|minimal|auto>  --channel <stable|rc|beta>  --from-file <tarball>
 #   --reinstall     强制重装：清本地包缓存强制下载最新版 + 先停旧 daemon
 #   --uninstall [--keep-data] [--yes]  --help
 #
-# 发布通道（2.3.7）：--channel stable|beta 选择官方滚动通道；未指定
+# 发布通道（2.3.7）：--channel stable|rc|beta 选择官方滚动通道；未指定
 # AIRY_RELEASE_URL 时默认拉取官方通道 manifest（GPG 验签 + 本平台制品解析），
 # 不再强制源码构建。--from-file <tarball> 支持离线包安装（跳过网络，
 # 仅 sha256 + 架构自检）。AIRY_RELEASE_URL 亦支持直接指向 tarball URL
@@ -162,7 +162,7 @@ fi
 # 版本默认占位（仅 curl 管道/裸脚本且最终解析全部失败时兜底；banner 已不再
 # 展示该值——真实版本一律以 manifest/包内 VERSION/制品名为准，杜绝漂移误导。
 # 保持与当前最新发布一致，随发布节奏更新）。
-AIRY_VERSION="${AIRY_VERSION:-v0.1.13}"
+AIRY_VERSION="${AIRY_VERSION:-v0.1.15}"
 AIRY_BUILD_JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 AIRY_MODE="${AIRY_MODE:-auto}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
@@ -171,11 +171,13 @@ UNINSTALL=0; REINSTALL=0; KEEP_DATA=0; YES=0
 # 共享 $AIRY_HOME/venv）。默认开启，安装失败降级警告，不阻断主流程。
 WITH_MATHS=1
 AIRY_PROFILE="${AIRY_PROFILE:-auto}"
-# 发布通道（自更新器/二进制安装共用）：stable | beta。AIRY_RELEASE_URL
+# 发布通道（自更新器/二进制安装共用）：stable | rc | beta。AIRY_RELEASE_URL
 # 指向 manifest JSON 时按通道解析本平台制品；指向 tarball 时直用。
+# 白名单与发布侧 publish-release.sh（tag 含 -rc → rc、-beta → beta）及
+# 更新器 latest/airymaxrt 同口径（SSoT：三处必须同一集合，2026-09-12）。
 AIRY_CHANNEL="${AIRY_CHANNEL:-stable}"
 AIRY_FROM_FILE="${AIRY_FROM_FILE:-}"
-case "$AIRY_CHANNEL" in stable|beta) ;; *) log_err "非法 --channel: ${AIRY_CHANNEL}（支持 stable|beta）"; exit 1 ;; esac
+case "$AIRY_CHANNEL" in stable|rc|beta) ;; *) log_err "非法 --channel: ${AIRY_CHANNEL}（支持 stable|rc|beta）"; exit 1 ;; esac
 
 # 0.1.6f 系统性修复：curl 符号崩溃隔离（32 位 ARM 实测 2026-08-31）。
 # 宿主曾安装 AgentRT 时，agentrt-env.sh 会把 $AIRY_HOME/lib 注入
@@ -626,7 +628,14 @@ install_binary() {
         case "$url" in
             *openairymax/agentrt*)
                 local man_path="latest/${url##*/}"
-                fetch_repo_file "$man_path" "$man" || { log_err "官方 manifest 下载失败（网络/服务异常），请稍候重试"; return 2; }
+                fetch_repo_file "$man_path" "$man" || {
+                    # 区分"网络异常"与"该通道无制品"（2026-09-12）：beta 为
+                    # 保留通道（发布侧 tag 含 -beta 才产出 manifest.beta.json，
+                    # 至今未发布），旧文案统一报"网络/服务异常"会误导用户重试。
+                    log_err "官方 manifest 拉取失败：${man_path}"
+                    log_err "可能是网络/服务异常；也可能该通道暂无制品——当前可用：stable（生产）/ rc（候选），beta 为保留通道"
+                    return 2
+                }
                 fetch_repo_file "$man_path.asc" "$man_asc" >/dev/null 2>&1 || true
                 ;;
             *)
@@ -1793,8 +1802,8 @@ post_install_selfcheck() {
         ver_installed="$(sed -n 's/^AIRY_VERSION=//p' "${AIRY_HOME}/config/install.env" 2>/dev/null | head -1)"
     fi
     log_ok "已安装版本: ${ver_installed:-v?}（通道: ${AIRY_CHANNEL}）"
-    if [ "${AIRY_CHANNEL}" = "beta" ]; then
-        log_warn "beta 通道发布更频繁；正式环境建议 'airymaxrt update --channel stable' 切回"
+    if [ "${AIRY_CHANNEL}" != "stable" ]; then
+        log_warn "${AIRY_CHANNEL} 通道为非生产通道；正式环境建议 'airymaxrt update --channel stable' 切回"
     fi
     log_info "更新检查: airymaxrt update --check    升级: airymaxrt update"
 
