@@ -68,6 +68,7 @@ const char *tui_mode_name(cli_tui_mode_t m);
 #define TUI_TAB_CAND_MAX 64      /* Tab 补全候选上限 */
 #define TUI_TAB_NAME_MAX 192     /* 文件/目录候选字符串长度上限 */
 #define TUI_CMD_HIST_MAX 500
+#define TUI_HIST_MAX 1024 /* 会话历史行数上限：环形窗口，超出丢最老行（S-01） */
 #define TUI_SEARCH_QUERY_MAX 256
 #define TUI_INPUT_PREFIX "airy> " /* input prompt, width tracked in bytes */
 

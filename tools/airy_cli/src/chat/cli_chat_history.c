@@ -5,7 +5,7 @@
  * @file cli_chat_history.c
  * @brief airy_cli chat history buffer / error description / system prompt.
  *
- * 对话历史环形缓冲（FIFO）：容量 60 条（约 15 轮，AIRY_CHAT_HISTORY_ROUNDS
+ * 对话历史环形缓冲（FIFO）：容量 30 条（约 15 轮，AIRY_CHAT_HISTORY_ROUNDS
  * 按轮覆盖），满时丢最老一轮（user+assistant 成对）。每轮历史携带思考链
  * （reasoning）——DeepSeek 续轮规范要求 assistant 消息原样回传 reasoning，
  * 缺省会语义断裂。定义 g_history_* 全局（cli_internal.h 声明 extern）。
