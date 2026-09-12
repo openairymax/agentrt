@@ -45,6 +45,22 @@ jobs:
           submodules: false
           fetch-depth: 1
 
+      # 数据集完整性：agentrt 为 workflow 宿主仓，其 7 个叶子子模块
+      # （atoms/commons/cupolas/daemons/gateway/heapstore/protocols，SHA 由
+      # agentrt 树 gitlink 钉定）是本作业的源码底料——门禁
+      #   Gate 1 编译（airy_cli 依赖 atoms 的 airy_coreloopthree 目标）、
+      #   Gate 2 BAN-175~180（扫 atoms/coreloopthree 契约）、
+      #   Gate 5 跨仓校验（需 daemons/tool_d/src/service_builtin.c）、
+      #   Gate 7 SSoT（TP-012~016 物理宿主在 daemons/atoms/gateway）、
+      #   Gate 8 头文件重复度（子模块头文件）
+      # 全部直接读取这些叶子目录。缺席即结构性必败（run #59 实证：五门齐红）。
+      # atoms 为 GitHub 私有仓，由脚本经 GH_TOKEN（org PAT）写 ~/.netrc 认证。
+      # 复用 build-test/codegen-check 同一脚本，保持检出语义单点。
+      - name: Init submodules (agentrt leaves)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh
+
       # Gate 1（编译）所需的 C 工具链与依赖库；Gate 6（圈复杂度）需 lizard。
       # Gate 3（安全扫描）外部工具（trivy/gitleaks/cppcheck）缺失时按 skip 处理，
       # 不构成硬依赖，故此处不安装，避免拉长流水线。
