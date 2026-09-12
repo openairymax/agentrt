@@ -25,7 +25,10 @@ extern "C" {
  * @param params_json 参数 JSON（可 NULL）
  * @param timeout_ms  超时毫秒（>0）
  * @param out_result  [out] JSON-RPC result JSON 字符串（OWNER，AIRY_FREE）
- * @return 0 成功；非 0 失败（gateway 不可达 / HTTP 错误 / JSON-RPC error）
+ * @return 0 成功；-1 失败（可执行原因已写入 g_cli_gw_err：不可达 / 响应
+ *         超时 / HTTP 错误 / JSON-RPC error）；AIRY_ERR_CANCELED 用户取消
+ *         （SIGINT；S-02：与 sched.dag_cancel 语义对齐，接收等待循环内
+ *         命中即中断）
  */
 int cli_gw_call(const char *method, const char *params_json, int timeout_ms, char **out_result);
 
