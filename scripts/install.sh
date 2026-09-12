@@ -360,6 +360,37 @@ init_home() {
     log_ok "AIRY_HOME 就绪: ${AIRY_HOME}"
 }
 
+# ─── 既有安装检测（0.1.14 前置社区反馈） ────────────────────────────────
+# init_home 后立刻判定"覆盖安装 vs 全新安装"并讲清语义：默认前缀之外已有
+# 实例时，curl 直装会在默认前缀另起一套而用户误以为覆盖了旧实例；同前缀
+# 已有 install.env（含上次中断恢复）时，又须明确 config/ 与 secrets.env
+# 保留、只覆盖运行时。检测只读，不写任何状态。
+detect_existing_install() {
+    local env_file="${AIRY_HOME}/config/install.env" ver link resolved
+    if [ -f "$env_file" ]; then
+        ver="$(sed -n 's/^AIRY_VERSION=//p' "$env_file" 2>/dev/null | head -1)"
+        log_info "检测到既有安装: ${AIRY_HOME}（${ver:-版本未知}）→ 覆盖安装；config/ 与 secrets.env 保留"
+        return 0
+    fi
+    # 同前缀无固化记录：PATH 中的 airymaxrt 可能指向另一前缀。便携 readlink
+    # （macOS bash 3.2 无 readlink -f），符号链目标为相对路径时按父目录拼接。
+    link="$(command -v airymaxrt 2>/dev/null || true)"
+    [ -n "$link" ] || return 0
+    command -v readlink >/dev/null 2>&1 || return 0
+    resolved="$(readlink "$link" 2>/dev/null || true)"
+    [ -n "$resolved" ] || return 0
+    case "$resolved" in
+        /*) ;;
+        *)  resolved="$(dirname "$link")/${resolved}" ;;
+    esac
+    case "$resolved" in
+        "${AIRY_HOME}/bin/airymaxrt") return 0 ;;
+    esac
+    log_warn "PATH 中的 airymaxrt 指向其它实例: ${link} → ${resolved}"
+    log_info "  本次安装到 ${AIRY_HOME}，两套实例互不影响；覆盖既有实例请用 --prefix <其安装根>"
+    return 0
+}
+
 # ─── 停止运行中的 daemon ────────────────────────────────────────────────
 # 返回 0 = 有 daemon 被停止；返回 1 = 无运行进程（新装/已停）。调用方
 # 据此决定是否提示"已停止旧 daemon"。与 bootstrap stop 同一判据（按
