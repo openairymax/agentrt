@@ -3,10 +3,10 @@
 
 /**
  * @file cli_chat_internal.h
- * @brief 聊天域内部共享头（域拆分：classify/stream/finalize/reply 主流程）。
+ * @brief 聊天域内部共享头（域拆分：classify/finalize/reply 主流程）。
  *
- * 原 cli_chat.c（802 行）按功能域拆分后，跨文件共享的流式折叠状态与
- * 内部函数声明统一收敛于此；cli_internal.h 的公共 API 不变
+ * 原 cli_chat.c（802 行）按功能域拆分后，跨文件共享的内部函数声明
+ * 统一收敛于此；cli_internal.h 的公共 API 不变
  * （cli_classify_input / cli_chat_t1p_cached 等公共原型仍在 cli_internal.h）。
  * 此头仅限 airy_cli/src 内部使用。
  */
@@ -16,13 +16,8 @@
 
 #include "cli_internal.h"
 
-/* ---- stream 域（cli_chat_stream.c）：流式归一化 / 思考进度回调 / 模型槽缓存 ---- */
-void cli_stream_norm_flush_carry(void);
-void cli_chat_stream_cb(const char *chunk, void *user_data);
-void cli_chat_reasoning_cb(const char *delta, void *user_data);
-void cli_chat_reasoning_clear(void);
-int cli_chat_stream_round(llm_svc_adapter_t *adapter, const llm_request_config_t *cfg,
-                          llm_response_t **out_resp);
+/* ---- 模型槽缓存（实现见 cli_chat.c；C-01 ⑤：cli_chat_stream.c 已退役，
+ * 对话主路径改经网关 llm.complete 非流式单发，流式归一化/回调随域消亡） ---- */
 const char *cli_chat_t1f_cached(void);
 cli_actor_t cli_chat_think_actor(void);
 

@@ -41,9 +41,8 @@ add_executable(airy_cli
     src/chat/cli_chat_gccp.c
     src/chat/cli_chat_history.c
     src/chat/cli_chat_tools.c
-    # cli_chat.c 二轮拆分（2026-08-27：802 行 → 4 个职责模块）
+    # cli_chat.c 二轮拆分（2026-08-27：802 行 → 4 个职责模块；C-01 ⑤：cli_chat_stream.c 退役 → 3）
     src/chat/cli_chat_classify.c
-    src/chat/cli_chat_stream.c
     src/chat/cli_chat_finalize.c
     src/cmd/cli_classify.c
     src/render/cli_think.c
