@@ -48,6 +48,17 @@ jobs:
         with:
           groups: agent-workload
           gh_token: ${{ secrets.GH_TOKEN }}
+      - name: Fetch cross-repo gate fixture (sdk airymaxrt)
+        run: |
+          # WS-9 9.8 门禁跨仓判据取料（0.1.15 方案 §4.9）：release_gates 测试
+          # 断言 sdk/tui/scripts/airymaxrt（更新器源）与仓内 install.sh/
+          # latest/airymaxrt 三副本一致。sdk 不属 agent-workload 检出组
+          # （init-submodules.sh），此处 sparse 浅克隆仅取 tui/scripts；
+          # clone 失败即红（fail-closed，门禁不得静默降级）。
+          git clone -q --depth 1 --filter=blob:none --sparse \
+            "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/openairymax/sdk.git" \
+            agent-workload/sdk
+          git -C agent-workload/sdk sparse-checkout set tui/scripts
 
       - name: Install build dependencies
         run: |
@@ -187,6 +198,17 @@ jobs:
         with:
           groups: agent-workload
           gh_token: ${{ secrets.GH_TOKEN }}
+      - name: Fetch cross-repo gate fixture (sdk airymaxrt)
+        run: |
+          # WS-9 9.8 门禁跨仓判据取料（0.1.15 方案 §4.9）：release_gates 测试
+          # 断言 sdk/tui/scripts/airymaxrt（更新器源）与仓内 install.sh/
+          # latest/airymaxrt 三副本一致。sdk 不属 agent-workload 检出组
+          # （init-submodules.sh），此处 sparse 浅克隆仅取 tui/scripts；
+          # clone 失败即红（fail-closed，门禁不得静默降级）。
+          git clone -q --depth 1 --filter=blob:none --sparse \
+            "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/openairymax/sdk.git" \
+            agent-workload/sdk
+          git -C agent-workload/sdk sparse-checkout set tui/scripts
 
       - name: Install build dependencies (Homebrew)
         run: |
