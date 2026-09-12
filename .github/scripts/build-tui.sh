@@ -44,35 +44,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export AIRY_RT_VERSION_FILE="${ROOT}/VERSION"
 [ -f "$AIRY_RT_VERSION_FILE" ] || { [ "$FAIL_HARD" = 1 ] && _fail "VERSION 文件缺失: $AIRY_RT_VERSION_FILE"; }
 
-# IME 链接库注入（0.1.14 R4 修复）：CI 构建目录在源码树外（BAN-33），
-# build.rs 四候选路径全部落空 → 发布 TUI 从未链接 airy_ime（内置输入法
-# 实机全灭的根因）。按腿构建目录定位 libairy_common.a 并导出
-# AIRY_COMMON_LIB（build.rs 首选候选）。
-# 候选顺序（rc1 run 34329866561 实证）：容器腿 BUILD_DIR 为绝对路径
-# （/tmp/airy-build，docker -e 注入），host 腿为相对路径（../build）——
-# 两者都必须按"原值"解析（相对路径相对 CWD=源码树根），禁止剥离前导
-# 斜杠后拼 ROOT（那会把绝对路径变成 /src/tmp/... 幽灵路径）。
-if [ -z "${AIRY_COMMON_LIB:-}" ]; then
-    for cand in \
-        "${AIRY_COMMON_LIB:-}" \
-        "${BUILD_DIR:+${BUILD_DIR}/commons/libairy_common.a}" \
-        "${BUILD_DIR:+${PWD}/${BUILD_DIR#/}/commons/libairy_common.a}" \
-        "${ROOT}/../build/commons/libairy_common.a"; do
-        [ -n "$cand" ] && [ -f "$cand" ] && export AIRY_COMMON_LIB="$cand" && break
-    done
-    # 归一化为绝对路径：build.rs 的 CWD 是 tui crate 目录而非本脚本 CWD，
-    # 相对路径在那里会指向错误位置。
-    case "${AIRY_COMMON_LIB:-}" in
-        /*) ;;
-        ?*) export AIRY_COMMON_LIB="${PWD}/${AIRY_COMMON_LIB}" ;;
-    esac
-fi
-if [ -z "${AIRY_COMMON_LIB:-}" ]; then
-    if [ "$FAIL_HARD" = "1" ]; then
-        _fail "libairy_common.a 未定位（AIRY_COMMON_LIB/BUILD_DIR 均未生效）——发布 TUI 必须携带内置输入法"
-    fi
-    echo "warn: agentrt-tui: libairy_common.a 未定位，IME 将降级禁用"
-fi
+# 0.1.15 T-09（方案 §4.7 铁律：禁止 TUI 直连运行时库）落地后，本脚本
+# 移除 0.1.14 R4 的 AIRY_COMMON_LIB 定位注入段——tui build.rs 已删除
+# ime/memoryrovol 静态库链接逻辑，AIRY_COMMON_LIB 无消费者，内置输入法
+# 由 gateway 通道承接（F10 交回终端/OS 输入法）。
 
 # build.rs 依赖的 airy_run_stream.h（agentrt 仓 commons/include/）
 if [ ! -f commons/include/airy_run_stream.h ]; then
@@ -103,17 +78,20 @@ if ! cp -f "${CARGO_TARGET_DIR}/release/agentrt-tui" "$OUT/"; then
     _fail "构建产物 agentrt-tui 缺失"
 fi
 
-# 发布完整性门禁（0.1.14 R4）：fail-hard 腿断言 IME 符号真实链接——
-# 防止"构建绿但输入法静默缺失"再次流入发布物（v0.1.13 实机实证）。
+# 发布完整性门禁（0.1.15 T-09 对齐；0.1.14 R4 正向断言随 T-09 铁律
+# 反转）：fail-hard 腿断言运行时库 FFI 分支字符串不存在——T-09 铁律
+# （禁止 TUI 直连 daemon/运行时库）的发布侧机器化验证，与 tui W6
+# 白名单空集（build.rs panic fail-closed）构成构建期+发布期双保险；
+# 未评审的 FFI 链接回归（ime_linked 被重新置位）在此拦截。
 if [ "$FAIL_HARD" = "1" ]; then
     if command -v strings >/dev/null 2>&1; then
         # 判据说明（rc1 run 34330638434 实证）：Cargo [profile.release]
         # strip=true 使发布二进制 nm "no symbols"，符号级判据恒假阴性。
-        # 改用 FFI 分支专属运行时字符串 "ime: dict loaded:"——仅当
-        # cfg(all(feature="ime", ime_linked)) 编译时存在；未链接分支的
-        # 日志串（"builtin pinyin IME disabled"）互斥，判据可区分两态。
-        if ! strings "$OUT/agentrt-tui" 2>/dev/null | grep -q 'ime: dict loaded:'; then
-            _fail "agentrt-tui 未携带内置输入法（FFI 分支字符串缺失）——发布完整性门禁"
+        # 沿用 FFI 分支专属运行时字符串 "ime: dict loaded:"——仅当
+        # cfg(all(feature="ime", ime_linked)) 编译时存在；T-09 后
+        # build.rs 永不置位 ime_linked，正常产物必无此串（互斥可判）。
+        if strings "$OUT/agentrt-tui" 2>/dev/null | grep -q 'ime: dict loaded:'; then
+            _fail "agentrt-tui 残留运行时库 FFI 分支（违反 T-09 gateway-only 铁律）——发布完整性门禁"
         fi
     fi
 fi
