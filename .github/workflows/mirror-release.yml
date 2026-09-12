@@ -15,6 +15,10 @@ name: Mirror Release Artifacts
 #
 # 前提（fail-closed 在脚本内校验）：目标 tag 已由 sync-mirror 同步到
 # GitHub/Gitee——tag 纪律：tag 仅在真正创建发行版时打（atomgit 单向同步）。
+#
+# 触发：workflow_dispatch（人工点按，入参见 inputs）与 repository_dispatch
+# （event_type=mirror-release，payload 见 client_payload，供脚本/工作流
+# 程序化驱动）。两者入参同构，在下方 env 归一。
 
 on:
   workflow_dispatch:
@@ -39,20 +43,35 @@ on:
         description: 'release.yml run id（可选）：精确下载该 run 的 publish-dist 工件'
         required: false
         type: string
+  # N1d（0.1.15）：程序化触发通道。workflow_dispatch 的 REST 端点要求经典
+  # PAT 的 `workflow` scope（fine-grained PAT 一律 403 "Resource not
+  # accessible by integration"，0.1.15 实证），而 repository_dispatch 只需
+  # contents 写权限即可触发——补此通道后，三端正文纠偏/回填可由脚本或
+  # 其他工作流驱动，不再依赖人工点按。client_payload 与上面的 inputs 同构，
+  # 由下方 env 表达式统一归一。先例：sync-mirror.yml `types: [sync-mirror]`。
+  repository_dispatch:
+    types: [mirror-release]
 
 permissions:
   contents: read
 
 concurrency:
-  group: mirror-release-${{ inputs.version }}
+  group: mirror-release-${{ inputs.version || github.event.client_payload.version }}
   cancel-in-progress: false
 
 env:
-  VERSION: ${{ inputs.version }}
+  # 双通道入参归一：workflow_dispatch 走 inputs，repository_dispatch 走
+  # client_payload。下游一律只引用 env，避免两套表达式散落各处而漂移。
+  VERSION: ${{ inputs.version || github.event.client_payload.version }}
+  RELEASE_RUN_ID: ${{ inputs.release_run_id || github.event.client_payload.release_run_id }}
+  NOTES: ${{ inputs.notes || github.event.client_payload.notes }}
+  # fetch_missing 语义为「默认开，仅显式 false 才关」：repository_dispatch
+  # 的 client_payload 缺省该字段时解析为 null，须与 true 同等归为开。
+  FETCH_MISSING: ${{ (github.event.client_payload.fetch_missing == false || inputs.fetch_missing == false) && '0' || '1' }}
 
 jobs:
   mirror:
-    name: Mirror ${{ inputs.version }} to GitHub + Gitee + atomgit
+    name: Mirror ${{ inputs.version || github.event.client_payload.version }} to GitHub + Gitee + atomgit
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -76,7 +95,7 @@ jobs:
         # 签名集）；未提供时回退按 tag 查成功 run 下载（release-dist）。
         run: |
           set -euo pipefail
-          RUN_ID="${{ inputs.release_run_id }}"
+          RUN_ID="${RELEASE_RUN_ID:-}"
           if [ -z "${RUN_ID:-}" ]; then
             RUN_ID="$(gh run list -R openairymax/agentrt --workflow=release.yml \
               --branch "${VERSION}" --status success --limit 1 \
@@ -100,11 +119,11 @@ jobs:
 
       - name: Mirror to GitHub + Gitee
         env:
-          # 缺件回填开关透传（publish-mirror.sh 读 FETCH_MISSING=1）
-          FETCH_MISSING: ${{ inputs.fetch_missing && '1' || '0' }}
+          # 缺件回填开关（publish-mirror.sh 读 FETCH_MISSING=1）
+          FETCH_MISSING: ${{ env.FETCH_MISSING }}
           # 发布说明覆盖（publish-mirror.sh 读 RELEASE_NOTES，优先于
-          # dist/notes.txt）：回填历史版本时可传入社区面向说明
-          RELEASE_NOTES: ${{ inputs.notes }}
+          # dist/notes.txt）：回填历史版本/纠偏时传入社区面向说明
+          RELEASE_NOTES: ${{ env.NOTES }}
         run: |
           bash _tools/scripts/ci/release/publish-mirror.sh "${VERSION}" dist
 
@@ -112,12 +131,12 @@ jobs:
         # 三端正文一致性收口：atomgit 是 SSoT，正文对齐由 publish-release.sh
         # 的幂等 PATCH 承担（AIRY_NOTES_ONLY=1 只改正文，不签名/不上传）。
         # notes 为空时跳过——绝不能以空正文覆盖 SSoT（发布说明按版本维护）。
-        if: ${{ inputs.notes != '' }}
+        if: ${{ env.NOTES != '' }}
         env:
           ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
           ATOMGIT_REPO: openairymax/agentrt
           AIRY_NOTES_ONLY: '1'
-          RELEASE_NOTES: ${{ inputs.notes }}
+          RELEASE_NOTES: ${{ env.NOTES }}
         run: |
           if [ -z "${ATOMGIT_TOKEN:-}" ]; then
             echo "::warning::未配置 ATOMGIT_TOKEN，跳过 atomgit 正文对齐"
