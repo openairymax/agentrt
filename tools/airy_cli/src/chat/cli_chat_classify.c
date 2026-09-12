@@ -11,6 +11,7 @@
  */
 
 #include "cli_chat_internal.h"
+#include "llm_service.h" /* llm_response_free（llm_d 公共接口，airy_cli CMake 已含 llm_d/include） */
 
 #include <stdio.h>
 #include <stdlib.h>
