@@ -10,8 +10,9 @@
  * llm_d 在响应的 usage/top-level 回填 total_tokens 与 cost_usd（含思考
  * token，DeepSeek/OpenAI 的 completion_tokens 已包含 reasoning_tokens），
  * 此处按轮累加；回合结束由 main.c 经 cli_chat_usage_get 读取展示，并在
- * 下一轮开始前清零（cli_chat_usage_reset）。reasoning_content 全量累积后
- * 写日志（折叠展示在对话内，完整文本保留在日志，思考 token 不丢失）。
+ * 下一轮开始前清零（cli_chat_usage_reset）。reasoning_content 按回合累积
+ * （封顶 CLI_CHAT_REASONING_MAX_BYTES，防异常长推理拖爆内存）后写日志
+ * （折叠展示在对话内，完整文本保留在日志，思考 token 不丢失）。
  */
 
 #include "cli_internal.h"
@@ -29,6 +30,7 @@
 static uint64_t g_chat_tokens_total = 0;
 static double g_chat_cost_total = 0.0;
 static char *g_chat_reasoning_acc = NULL;
+static int g_chat_reasoning_truncated = 0; /* S-04：截断标记只落一次 */
 
 /* 按轮累加本轮对话真实 token/费用（工具轮与最终轮都计入；含思考 token）。 */
 void cli_chat_usage_add(const llm_response_t *resp)
@@ -39,13 +41,28 @@ void cli_chat_usage_add(const llm_response_t *resp)
     g_chat_cost_total += resp->cost_usd;
 }
 
-/* 思考链增量累积：跨工具轮与最终轮全量保留（对话内折叠展示，完整文本
- * 由 cli_chat_reasoning_persist 落日志，思考 token 不丢失）。 */
+/* 思考链增量累积：跨工具轮与最终轮保留（对话内折叠展示，文本由
+ * cli_chat_reasoning_persist 落日志，思考 token 不丢失）。S-04：单回合
+ * 封顶 CLI_CHAT_REASONING_MAX_BYTES——异常长推理不再把内存拖到无界；
+ * 达上限后整条丢弃增量并一次性落截断标记，日志回溯者可知尾部缺失。 */
 void cli_chat_reasoning_add(const char *reasoning)
 {
     if (!reasoning || !reasoning[0])
         return;
     size_t old = g_chat_reasoning_acc ? strlen(g_chat_reasoning_acc) : 0;
+    if (old >= CLI_CHAT_REASONING_MAX_BYTES) {
+        if (!g_chat_reasoning_truncated) {
+            static const char mark[] = "\n[思考链已截断：超出本回合上限]";
+            size_t mlen = sizeof(mark) - 1;
+            char *np = (char *)AIRY_REALLOC(g_chat_reasoning_acc, old + mlen + 1);
+            if (np) {
+                g_chat_reasoning_acc = np;
+                __builtin_memcpy(g_chat_reasoning_acc + old, mark, mlen + 1);
+            }
+            g_chat_reasoning_truncated = 1;
+        }
+        return;
+    }
     size_t add = strlen(reasoning);
     char *np = (char *)AIRY_REALLOC(g_chat_reasoning_acc, old + add + 2);
     if (!np)
@@ -80,6 +97,7 @@ void cli_chat_usage_reset(void)
 {
     g_chat_tokens_total = 0;
     g_chat_cost_total = 0.0;
+    g_chat_reasoning_truncated = 0;
     if (g_chat_reasoning_acc) {
         AIRY_FREE(g_chat_reasoning_acc);
         g_chat_reasoning_acc = NULL;

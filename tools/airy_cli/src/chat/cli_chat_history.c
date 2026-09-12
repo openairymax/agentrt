@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <time.h>
 
 /* 聊天场景的错误描述：llm_d 是聊天回复的唯一 RPC 目标，NOT_FOUND 即
@@ -87,10 +88,34 @@ void cli_history_clear(void)
     g_history_count = 0;
 }
 
-/* 2.1.1.6：思考链全量落盘——交互模式 cli_trace 是 no-op（仅 -p 模式
- * 写 stderr），思考链此前只在内存折叠展示后即释放。这里独立追加写入
+/* 2.1.1.6：思考链落盘——交互模式 cli_trace 是 no-op（仅 -p 模式写
+ * stderr），思考链此前只在内存折叠展示后即释放。这里独立追加写入
  * $AIRY_HOME/logs/airy_reasoning.log（所有模式生效），思考 token 不丢失。
- * 每轮带时间戳与角色前缀，便于按会话回溯。 */
+ * 每轮带时间戳与角色前缀，便于按会话回溯。S-04：写前轮转（保一代 .1），
+ * 长期使用不再让日志无界增长。 */
+
+/* S-04：现日志超过 AIRY_REASONING_LOG_MAX_BYTES 时改名为 .1（覆盖旧
+ * .1，磁盘占用封顶约两倍阈值）。remove 先行：Windows rename 目标存在
+ * 即失败，先删统一两平台语义；轮转失败不阻断本次写入。 */
+static void cli_reasoning_log_rotate(const char *logpath)
+{
+#ifdef _WIN32
+    struct _stat st;
+    if (_stat(logpath, &st) != 0 || st.st_size < AIRY_REASONING_LOG_MAX_BYTES)
+        return;
+#else
+    struct stat st;
+    if (stat(logpath, &st) != 0 || st.st_size < AIRY_REASONING_LOG_MAX_BYTES)
+        return;
+#endif
+    char backup[512];
+    int blen = snprintf(backup, sizeof(backup), "%s.1", logpath);
+    if (blen < 0 || blen >= (int)sizeof(backup))
+        return;
+    remove(backup);
+    rename(logpath, backup);
+}
+
 void cli_chat_reasoning_persist(const char *text)
 {
     if (!text || !text[0])
@@ -102,6 +127,7 @@ void cli_chat_reasoning_persist(const char *text)
     int plen = snprintf(logpath, sizeof(logpath), "%s/airy_reasoning.log", logdir);
     if (plen < 0 || plen >= (int)sizeof(logpath))
         return;
+    cli_reasoning_log_rotate(logpath);
     FILE *lf = fopen(logpath, "a");
     if (!lf)
         return;
