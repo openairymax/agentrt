@@ -79,7 +79,8 @@ jobs:
       #   tools   ← GitHub 镜像（门禁脚本与校验器宿主）
       #   docs    ← atomgit SSoT（Unify Design：SSoT 权威源，匿名可读）
       #   agentrt ← 本次工作区检出（即触发门禁的提交，最权威）
-      #   ecosystem/sdk/products ← GitHub 镜像（Gate 5 跨仓校验的兄弟叶仓）
+      #   ecosystem/sdk/products ← GitHub 镜像（Gate 5 跨仓校验的兄弟叶仓；
+      #     ecosystem 需再递归其第二层子模块，见下）
       # 私有嵌套子模块（atoms 等）经 GH_TOKEN（org PAT）~/.netrc 认证。
       - name: Assemble gate dataset (tools, docs, agent-workload)
         env:
@@ -102,6 +103,16 @@ jobs:
               "$UMB/agent-workload/$r" \
               || echo "::warning::$r mirror unavailable, cross-repo check will skip it"
           done
+          # ecosystem 的第二层子模块（agents/manager/…）承载门禁的直接数据源：
+          #   Gate 5 工具 schema 双源之一 agents/airymax_agents/base.py，
+          #   Gate 7 TP-012 物理宿主 manager/schema/plugin-manifest.schema.json。
+          # 顶层浅克隆不含子模块工作树，必须显式初始化——缺席即两门结构性
+          # 必红（run #60 实证）。子模块 URL 为相对路径（../<repo>.git），
+          # 经 .netrc 的 GH_TOKEN 认证解析到 openairymax/<repo>。
+          if [ -d "$UMB/agent-workload/ecosystem" ]; then
+            git -C "$UMB/agent-workload/ecosystem" submodule update --init --recursive \
+              || echo "::warning::ecosystem nested submodules unavailable, Gate 5/7 will fail"
+          fi
 
       - name: Run quality gates (9 scripts)
         env:
