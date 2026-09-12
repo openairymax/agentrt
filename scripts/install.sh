@@ -596,6 +596,18 @@ install_binary() {
     # 离线包（--from-file）放行任意架构（本地构建包不受官方发布清单限制）；
     # 在线安装严格按官方发布清单校验。
     if [ -z "${AIRY_FROM_FILE:-}" ]; then
+        # RISC-V 如实化（2026-09-12）：manifest 实况零 riscv 制品——发布侧
+        # release.yml 的 build-linux-riscv-64 为 workflow_dispatch canary
+        #（QEMU 6h 内无法完成，continue-on-error，不改发布门禁）；riscv32 更因
+        # glibc 用户态生态未就绪从未发布。二者一律不宣称"已支持预编译包"，
+        # 改为显式指引源码构建，杜绝 update 侧"无可用制品"死胡同。
+        case "$arch" in
+            riscv64|riscv32|riscv)
+                log_err "检测到 RISC-V（${arch}）：官方暂无预编译制品（CI 仅 canary 构建）"
+                log_err "请源码构建：AIRY_MODE=source bash install.sh（需 RISC-V 工具链 + 依赖库）"
+                return 1
+                ;;
+        esac
         case " ${SUPPORTED_ARCHS} " in
             *" ${arch} "*) ;;
             *)
@@ -607,15 +619,6 @@ install_binary() {
                 return 1
                 ;;
         esac
-        # riscv32 已入六架构清单，但 glibc riscv32 用户态生态未就绪
-        # （Ubuntu 等发行版无 riscv32 libc），预编译制品暂不发布；明确
-        # 指引回退源码构建，杜绝拉取缺制品后的隐性回退。
-        if [ "$arch" = "riscv32" ]; then
-            log_err "检测到 32 位 RISC-V（riscv32/ilp32d）。glibc riscv32 用户态生态"
-            log_err "尚未成熟（主流发行版无 riscv32 libc），官方预编译包暂不可用。"
-            log_err "请源码构建：AIRY_MODE=source bash install.sh（需 RISC-V 工具链）"
-            return 1
-        fi
     fi
 
     # 来源解析：a) manifest JSON（通道）→ GPG 验签 + 解析本平台制品；
@@ -1297,13 +1300,13 @@ detect_arch() {
         *)                echo "unknown" ;;
     esac
 }
-# 预编译包支持的架构清单（binary 模式校验；其余架构回退源码构建）
-# 与 CI release.yml build-linux-riscv-64 job（agentrt-<v>-linux-riscv-64.tar.gz）
-# 及 sdk/tui/scripts/airymaxrt detect_arch 同口径。
-# 六架构全覆盖（2026-08-30 决策：硬件使用最大化）：x86（x86-64/x86-32）、
-# ARM（arm-64/arm-32）、RISC-V（riscv-64/riscv-32）的 32 与 64 位全兼容；
-# detect_arch 以用户空间位数复判，杜绝 64 位内核 + 32 位用户空间误装。
-SUPPORTED_ARCHS="x86_64 aarch64 riscv64 i686 armv7l riscv32"
+# 预编译包支持的架构清单（binary 模式校验；其余架构回退源码构建）。
+# 取值口径 = manifest 实际发布的平台键事实集（2026-09-12 核验：stable/rc
+# 两通道全部制品键仅覆盖 x86-64/x86-32/arm-64/arm-32 四族，riscv 键计数为
+# 0），故 riscv 不列入，由上方 case 显式指引源码构建——声明不得超出制品。
+# detect_arch 以用户空间位数复判，杜绝 64 位内核 + 32 位用户空间误装；
+# 与 sdk/tui/scripts/airymaxrt detect_arch 同口径。
+SUPPORTED_ARCHS="x86_64 aarch64 i686 armv7l"
 
 # 制品平台命名规范（0.1.10 起，用户定案）：OS-架构族-位宽，弃用
 # i686/armv7l/x64/arm64 等架构行话。技术架构名（detect_arch 输出，

@@ -1311,6 +1311,14 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|rc|beta] [--ro
     fi
     [ -n "$art_url" ] || {
         log error "当前平台 ${plat} 无可用制品"
+        # I-03（2026-09-12）：声明不得超出制品——RISC-V 无预编译制品，须明确
+        # 指引源码构建，而不是把用户困在"无可用制品"死胡同里。
+        case "$plat" in
+            *riscv*)
+                log error "RISC-V（${plat}）暂无官方预编译制品（CI 仅 canary 构建）"
+                log error "请在目标机源码构建：AIRY_MODE=source bash install.sh（需 RISC-V 工具链 + 依赖库）"
+                ;;
+        esac
         log error "若您安装的是旧版本（≤v0.1.6d），安装器已过旧无法自举更新；"
         log error "请重新执行一键安装命令（见官网 install 指南）更新安装器后重试。"
         rm -rf "$TMPD"; return 1
