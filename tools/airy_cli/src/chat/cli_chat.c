@@ -209,7 +209,10 @@ static int cli_chat_gw_round(const char *model, const cli_chat_msgbuf_t *buf,
     AIRY_FREE(params_json);
     if (ret != 0) {
         AIRY_FREE(result_json);
-        return -1; /* g_cli_gw_err 已由 cli_gw_call 填写 */
+        /* 失败/取消码直通（S-02）：失败时 g_cli_gw_err 已由 cli_gw_call
+         * 填写（cli_err_desc 一次性消费）；取消（AIRY_ERR_CANCELED）语义
+         * 自明，由 cli_chat_reply 渲染如实告知。 */
+        return ret;
     }
     *out_resp = cli_chat_resp_from_json(result_json);
     AIRY_FREE(result_json);
@@ -247,6 +250,9 @@ void cli_chat_reply(const char *input)
     /* 2.1.1.5：新一轮开始清零统计（main.c 在上一轮结束后已读取展示）。
      * 清零逻辑收敛在 cli_chat_usage_reset（cli_chat_usage.c）。 */
     cli_chat_usage_reset();
+    /* S-02：逐轮复位取消标志（对齐 taskflow_run 入口惯例）——SIGINT 只
+     * 取消当前轮的等待，不污染下一轮对话。 */
+    g_cli_cancel = 0;
 
     const char *t1f_model = cli_chat_t1f_cached();
     cli_trace("chat", "%s start model=%s", CLI_ICON_DIAMOND,
@@ -312,17 +318,24 @@ void cli_chat_reply(const char *input)
         if (ret != 0 || !resp || resp->choice_count == 0) {
             if (resp)
                 llm_response_free(resp);
+            int canceled = (ret == AIRY_ERR_CANCELED);
             if (spinner_on)
-                cli_spinner_stop(0, "reply failed");
+                cli_spinner_stop(0, canceled ? "canceled" : "reply failed");
             /* 人类可读的错误描述（数字码对用户无意义）。C-01 ③：gateway
              * 路径下 cli_gw_call / cli_chat_gw_round 已把可执行原因写入
-             * g_cli_gw_err，cli_err_desc 一次性消费（取代
-             * llm_svc_adapter_last_error 直读，顺带消除空 adapter 解引用）。 */
-            const char *err_desc = cli_chat_err_desc((int)ret);
+             * g_cli_gw_err，cli_err_desc 一次性消费。S-02：取消码直通时
+             * g_cli_gw_err 未填，如实告知服务端可能仍在推理（服务端可
+             * 取消登记 0.2.x）。 */
+            const char *err_desc;
+            if (canceled)
+                err_desc = "用户中断（Ctrl+C）；服务端推理可能仍在进行，本轮结果将被丢弃";
+            else
+                err_desc = cli_chat_err_desc((int)ret);
             if (ret == 0 && (!resp || resp->choice_count == 0))
                 err_desc = "模型未返回文本（可能仅生成了思考内容）";
             char line[384];
-            snprintf(line, sizeof(line), "回复失败：%s", err_desc);
+            snprintf(line, sizeof(line), "%s：%s",
+                     canceled ? "已取消" : "回复失败", err_desc);
             cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "对话", line);
             cli_msgbuf_free(&buf);
             return;
