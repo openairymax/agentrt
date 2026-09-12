@@ -14,12 +14,14 @@
 
 #include "airy_memory.h"
 #include "cli_gw.h"
+#include "error_codes.h" /* AIRY_ERR_CANCELED（S-02：取消语义与 sched.dag_cancel 对齐） */
 #include "logger.h"
 #include "platform.h"
 #include "string_compat.h"
 
 #include <cjson/cJSON.h>
 
+#include <signal.h> /* sig_atomic_t（g_cli_cancel 类型 SSoT） */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,6 +46,16 @@
 
 /* cli_gw: 网关 RPC 客户端错误描述缓冲（cli_err_desc 优先消费，一次性） */
 char g_cli_gw_err[256] = "";
+
+/* cli_gw_exchange 内部失败细分（S-02 超时可诊断/可取消）：
+ * -1 传输失败（连接/发送/协议）；-2 用户取消；-3 接收超时。 */
+#define CLI_GW_EXCH_CANCELED (-2)
+#define CLI_GW_EXCH_TIMEOUT (-3)
+
+/* SIGINT 取消标志（main.c 拥有，cli_internal.h SSoT 声明 extern）。cmd 域
+ * 仅读，与 cli_chat.c inline extern 消费 g_cli_gw_err 同为既有跨域访问
+ * 方式：接收等待循环中命中即中断，客户端不再干等模型推理。 */
+extern volatile sig_atomic_t g_cli_cancel;
 
 /* 读取 $AIRY_HOME/run/gateway.port（完整启动器在端口漂移后固化实际端口）。
  * 0.1.6h：gateway 被占漂移 8083+ 后，CLI 硬编码 8080 会"网关不在线"；
@@ -288,9 +300,14 @@ static int cli_gw_exchange(const char *host, int port, const char *path, const c
     int header_done = 0;
     size_t content_len = 0;
     int is_chunked = 0;
+    int canceled = 0; /* S-02：两腿共用，Ctrl+C 命中即置位 */
     long long total_timeout = (long long)timeout_ms;
 #ifdef _WIN32
     while (total_timeout > 0) {
+        if (g_cli_cancel) { /* S-02：Ctrl+C 立即中断接收等待（≤10ms 响应） */
+            canceled = 1;
+            break;
+        }
         int n = recv(fd, resp + rlen, (int)(cap - rlen), 0);
         if (n == 0)
             break;
@@ -349,6 +366,10 @@ static int cli_gw_exchange(const char *host, int port, const char *path, const c
     }
 #else
     while (total_timeout > 0) {
+        if (g_cli_cancel) { /* S-02：Ctrl+C 立即中断接收等待（poll ≤100ms 步进） */
+            canceled = 1;
+            break;
+        }
         struct pollfd pfd;
         pfd.fd = fd;
         pfd.events = POLLIN;
@@ -422,15 +443,25 @@ static int cli_gw_exchange(const char *host, int port, const char *path, const c
     close(fd);
 #endif
 
+    /* S-02：用户取消优先于一切失败判定（rlen 可能半途） */
+    if (canceled) {
+        AIRY_FREE(resp);
+        return CLI_GW_EXCH_CANCELED;
+    }
+    /* 接收预算耗尽即超时（两腿同构：POSIX poll 空转扣减 / Win
+     * WSAEWOULDBLOCK 扣减）。与传输失败（对端拒绝/早断）区分，供
+     * cli_gw_call 填写可诊断文案——超时 ≠ 网关不在线。 */
+    int timed_out = (total_timeout <= 0);
+
     if (rlen == 0) {
         AIRY_FREE(resp);
-        return -1;
+        return timed_out ? CLI_GW_EXCH_TIMEOUT : -1;
     }
     /* 定位 header 结束，body = 其后内容 */
     char *he = memmem(resp, rlen, "\r\n\r\n", 4);
     if (!he) {
         AIRY_FREE(resp);
-        return -1;
+        return timed_out ? CLI_GW_EXCH_TIMEOUT : -1;
     }
     size_t hlen = (size_t)(he - resp) + 4;
     char *body_start = resp + hlen;
@@ -506,8 +537,27 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
     size_t rlen = 0;
     int exchange_err = cli_gw_exchange(host, port, "/", body, timeout_ms, &resp, &rlen);
     AIRY_FREE(body);
+    if (exchange_err == CLI_GW_EXCH_CANCELED) {
+        AIRY_FREE(resp);
+        /* S-02：用户取消返回 AIRY_ERR_CANCELED，与 sched.dag_cancel /
+         * cli_dag_wait_remote 语义对齐；描述由 cli_err_desc 统一渲染
+         * （"操作已取消"），不占 g_cli_gw_err。31 处调用面均按非 0 判
+         * 失败，新码不破坏既有调用方。 */
+        return AIRY_ERR_CANCELED;
+    }
     if (exchange_err != 0) {
         AIRY_FREE(resp);
+        if (exchange_err == CLI_GW_EXCH_TIMEOUT) {
+            /* S-02 超时可诊断：socket 已建立，区分于"网关不在线"——
+             * 模型思考超预算时不再误导用户去启动服务。 */
+            snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
+                     "网关已连接但响应超时（%d 秒，method=%s）：服务端可能仍在推理，"
+                     "可重试或排查模型负载",
+                     timeout_ms / 1000, method);
+            AIRY_LOG_WARN("cli_gw: response timeout after %dms (method=%s) at %s:%d",
+                          timeout_ms, method, host, port);
+            return -1;
+        }
         /* 0.1.6h 友好化：网关不可达给出可执行提示（原仅日志 WARN） */
         snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
                  "网关不在线（%s:%d），请运行 airymaxrt 启动服务", host, port);
