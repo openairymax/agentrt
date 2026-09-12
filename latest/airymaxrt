@@ -191,95 +191,38 @@ path_self_heal() {
 #   - rocm：AMD ROCm 运行时可用
 #   - dri：/dev/dri 渲染节点（Intel/AMD iGPU 或亮机卡）
 #   - none：无可见加速器
-# 用户空间位宽探测（0.1.6c 教训：uname -m 报内核架构，64 位内核 + 32 位
-# 用户空间会误报）。多级兜底，任一可用即输出 32/64，全失败留空：
-#   1) getconf LONG_BIT（POSIX 权威，精简镜像可能未装 getconf）
-#   2) 可执行文件 ELF class（od 读 /proc/self/exe 偏移 4：01=32 位 02=64 位）
-#   3) dpkg --print-architecture（Debian 系：arm64/amd64→64，armhf/i386→32）
-_uspace_bits() {
-    local _b
-    _b="$(getconf LONG_BIT 2>/dev/null)"
-    case "$_b" in 32|64) echo "$_b"; return ;; esac
-    if [ -r /proc/self/exe ] && command -v od >/dev/null 2>&1; then
-        _b="$(od -An -j4 -N1 -t x1 /proc/self/exe 2>/dev/null | tr -d ' \n')"
-        case "$_b" in 01) echo 32; return ;; 02) echo 64; return ;; esac
-    fi
-    if command -v dpkg >/dev/null 2>&1; then
-        _b="$(dpkg --print-architecture 2>/dev/null)"
-        case "$_b" in
-            amd64|arm64|riscv64) echo 64; return ;;
-            armhf|armel|i386)    echo 32; return ;;
-        esac
-    fi
-    echo ""
-}
-# 用户空间加载器存在性（多发行版路径）：Debian/Ubuntu 系 aarch64 加载器位于
-# /lib/aarch64-linux-gnu/ 而非 /lib——仅固定 /lib 判据会误判（2026-09-12
-# 树莓派实测：aarch64 被判成 armv7l，装上 arm-32 制品）。glibc 多架构目录
-# 形如 <triple>-linux-gnu（aarch64-linux-gnu）或 <triple>-linux-gnueabihf
-# （arm-linux-gnueabihf），故 glob 取 *-linux-gnu*，并覆盖 /lib64、/usr/lib。
-_loader_exists() {
-    local _n="$1" _p
-    for _p in "/lib/$_n" "/lib64/$_n" "/usr/lib/$_n" \
-              /lib/*-linux-gnu*/"$_n" /usr/lib/*-linux-gnu*/"$_n"; do
-        [ -f "$_p" ] && return 0
-    done
-    return 1
-}
-# 位宽判据全部不可得时的告警（log warn 走 stderr，避免污染
-# arch="$(detect_arch)" 的命令替换结果）。不静默：旧行为在 aarch64 上
-# 静默落 armv7l 并装错制品。
-_arch_warn_unknown() {
-    log warn "架构判定: 用户空间位宽未知（getconf/ELF/dpkg 均不可用），按 $1 处理"
-}
 # 架构检测（uname -m 归一化）：与 install.sh detect_arch 同口径（SSoT），
 # 记录在画像中供 status 展示；install.sh 二进制模式以 {arch} 占位符
 # 选择预编译包（见 agentrt/scripts/install.sh install_binary）。
-# 用户空间位数复判（0.1.6c 教训）：_uspace_bits 为**权威判据**（显式 32/64
-# 直接定格），加载器存在性仅在位宽未知时作第二证据——若并列用 || 判定，
-# 装有交叉多架构库的 32 位用户空间（/usr/lib/aarch64-linux-gnu 存在）会被
-# 误判为 64 位。全判据不可得时按 uname 位数取值并告警（不静默降级）。
 detect_arch() {
     local _m _bits
     _m="$(uname -m 2>/dev/null)"
-    _bits="$(_uspace_bits)"
+    # 与 install.sh detect_arch 同口径（SSoT）：uname -m 报内核架构，
+    # 64 位内核 + 32 位用户空间（树莓派 armhf / 老 x86）误报 64 位且无对应
+    # 加载器，装 64 位包后 daemon exec 全部失败（2026-08-30 树莓派实测）。
+    # 以用户空间位数（getconf LONG_BIT）复判，三架构 32/64 位全覆盖。
+    _bits="$(getconf LONG_BIT 2>/dev/null)"
     case "$_m" in
         x86_64|amd64)
-            if [ "$_bits" = "32" ]; then
-                echo "i686"
-            elif [ "$_bits" = "64" ] || _loader_exists ld-linux-x86-64.so.2; then
+            if [ "$_bits" = "64" ] || [ -f /lib64/ld-linux-x86-64.so.2 ]; then
                 echo "x86_64"
-            elif _loader_exists ld-linux.so.2; then
-                echo "i686"
             else
-                # 保守取值（0.1.6c 教训：老 x86 系统为 32 位用户空间）。
-                _arch_warn_unknown "$_m"
                 echo "i686"
             fi
             ;;
         i386|i486|i586|i686|x86) echo "i686" ;;
         aarch64|arm64)
-            if [ "$_bits" = "32" ]; then
-                echo "armv7l"
-            elif [ "$_bits" = "64" ] || _loader_exists ld-linux-aarch64.so.1; then
+            if [ "$_bits" = "64" ] || [ -f /lib/ld-linux-aarch64.so.1 ]; then
                 echo "aarch64"
-            elif _loader_exists ld-linux-armhf.so.3; then
-                echo "armv7l"
             else
-                # 不保守取值：arm64 内核极少配 32 位用户空间且无加载器，而
-                # 静默落 armv7l 会装错位宽制品（本次社区实录）。
-                _arch_warn_unknown "$_m"
-                echo "aarch64"
+                echo "armv7l"
             fi
             ;;
         armv7l|armv6l|armhf) echo "armv7l" ;;
         riscv64)
-            if [ "$_bits" = "32" ]; then
-                echo "riscv32"
-            elif [ "$_bits" = "64" ] || _loader_exists ld-linux-riscv64-lp64d.so.1; then
+            if [ "$_bits" = "64" ] || [ -f /lib/ld-linux-riscv64-lp64d.so.1 ]; then
                 echo "riscv64"
             else
-                _arch_warn_unknown "$_m"
                 echo "riscv32"
             fi
             ;;
@@ -667,11 +610,7 @@ upsert_profile_var() { # <KEY> <值>
 #      → 镜像同步热替换 → 更新 install.env（版本号 + 制品 sha256）
 #   5. 替换后自检；--rollback 手动恢复上次备份（.rollback 最多保留上一版）
 # 官方制品仓库：atomgit.com/openairymax/agentrt（releases 附件 + latest/ 固定入口）
-# 通道：stable / rc / beta（tag 含 -rc → rc、-beta → beta，否则 stable；
-# 与发布侧 publish-release.sh 及安装器 scripts/install.sh 同口径 SSoT）。
-# 制品实况（2026-09-12 核验）：latest/ 仅有 manifest.stable.json 与
-# manifest.rc.json；beta 为保留通道（尚未发布制品），故安装器与更新器的
-# 白名单统一为 stable|rc|beta，但 beta 缺失时须给出明确可操作提示。
+# 通道：stable / beta（tag 含 -beta./-rc. 归 beta）。
 AIRY_GPG_PUBKEY='-----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mDMEao7uahYJKwYBBAHaRw8BAQdAk8Ou1tA2EfX5xZT4ET79YJESeqINPyFF86MK
@@ -1146,12 +1085,12 @@ stop_running_daemons() {
     fi
 }
 
-airymaxrt_update() { # update [--check] [--yes] [--channel stable|rc|beta] [--rollback] [--file <tarball>] [--sha256 <hash>]
-    local CHECK=0 CHANNEL="" CH_EXPLICIT=0 ROLLBACK=0 FILE="" SHA256="" inst_env="$AIRY_HOME/config/install.env"
+airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--rollback] [--file <tarball>] [--sha256 <hash>]
+    local CHECK=0 CHANNEL="" ROLLBACK=0 FILE="" SHA256="" inst_env="$AIRY_HOME/config/install.env"
     while [ $# -gt 0 ]; do
         case "$1" in
             --check|-c) CHECK=1 ;;
-            --channel) CHANNEL="${2:-}"; CH_EXPLICIT=1; shift ;;
+            --channel) CHANNEL="${2:-}"; shift ;;
             --rollback) ROLLBACK=1 ;;
             --file|-f) FILE="${2:-}"; shift ;;
             --sha256) SHA256="${2:-}"; shift ;;
@@ -1169,14 +1108,7 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|rc|beta] [--ro
         cur_sha="$(sed -n 's/^AIRY_ARTIFACT_SHA256=//p' "$inst_env" | head -1)"
     fi
     CHANNEL="${CHANNEL:-${cur_ch:-stable}}"
-    case "$CHANNEL" in stable|rc|beta) ;; *) log error "通道无效: ${CHANNEL}（stable|rc|beta）"; return 2 ;; esac
-    # 通道来源可见化（2026-09-12，U-04）：未显式 --channel 时沿用 install.env
-    # 记录（"通道粘性"）——旧实现在非 stable 通道上完全静默，用户看到"已是最新"
-    # 却不知自己停在 rc/beta 线（社区"update 不生效"的真因之一）。此处显式告知
-    # 来源与切换方式，零网络开销。
-    if [ "$CH_EXPLICIT" = "0" ] && [ "$CHANNEL" != "stable" ]; then
-        log info "通道 ${CHANNEL}（继承自安装记录 config/install.env）；切回生产线：airymaxrt update --channel stable"
-    fi
+    case "$CHANNEL" in stable|beta|rc) ;; *) log error "通道无效: ${CHANNEL}（stable|beta|rc）"; return 2 ;; esac
 
     # 回滚（2026-09-07：备份按目录 mtime 排序 ls -1dt 选最新——旧实现按
     # 目录名 sort -r（v<版本>-<时间戳>）跨版本号边界会选错版本，如 v0.1.9-*
@@ -1243,15 +1175,7 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|rc|beta] [--ro
     rm -rf "$TMPD"; mkdir -p "$TMPD"
     log info "检查更新（通道: ${CHANNEL}，当前: ${cur_ver:-<未安装>}）…"
     fetch_repo_file "latest/manifest.${CHANNEL}.json" "$TMPD/manifest.json" \
-        || {
-            # 区分"网络异常"与"该通道无制品"（2026-09-12，U-02/U-03）：beta 为
-            # 保留通道（发布侧 tag 含 -beta 才产出 manifest.beta.json，至今未
-            # 发布），旧文案统一报"下载失败"会让用户误以为网络问题反复重试。
-            log error "manifest 拉取失败：latest/manifest.${CHANNEL}.json"
-            log error "可能是网络/服务异常；也可能该通道暂无制品——当前可用：stable（生产）/ rc（候选），beta 为保留通道"
-            log error "切换通道：airymaxrt update --channel stable"
-            rm -rf "$TMPD"; return 1
-        }
+        || { log error "manifest 下载失败（latest/manifest.${CHANNEL}.json）"; rm -rf "$TMPD"; return 1; }
     fetch_repo_file "latest/manifest.${CHANNEL}.json.asc" "$TMPD/manifest.json.asc" >/dev/null 2>&1 || true
     verify_gpg_sig "$TMPD/manifest.json" "$TMPD/manifest.json.asc" || { log error "manifest 验签失败（GPG），拒绝更新"; rm -rf "$TMPD"; return 1; }
     log info "manifest 验签通过（GPG）"
@@ -1259,13 +1183,8 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|rc|beta] [--ro
     [ -n "$latest" ] || { log error "manifest 解析失败"; rm -rf "$TMPD"; return 1; }
     local cmp="$(ver_cmp "${cur_ver:-0.0.0}" "$latest")"
     if [ "$cmp" = "1" ]; then
-        # 当前版本高于通道目标（多为通道回退/多通道切换）。旧实现静默按
-        # "已是最新"退出且无任何提示（U-04），用户无法分辨"确实已最新"与
-        # "停在非生产通道故看不到新版本"——改为显式 warning + 切换指引。
-        log warn "通道 ${CHANNEL} 最新为 ${latest}，低于已安装的 ${cur_ver}（不回退）"
-        if [ "$CHANNEL" != "stable" ]; then
-            log warn "若想跟随生产版本线：airymaxrt update --channel stable"
-        fi
+        # 当前版本高于通道目标（异常，多为通道回退/多通道切换）→ 视为已最新
+        log info "已是最新: ${cur_ver:-<未安装>}（通道 ${CHANNEL} 最新 ${latest}）"
         rm -rf "$TMPD"; return 0
     fi
     # 当前平台制品解析提前（2026-09-07）：同版本 sha 门禁需目标制品 sha
@@ -1311,14 +1230,6 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|rc|beta] [--ro
     fi
     [ -n "$art_url" ] || {
         log error "当前平台 ${plat} 无可用制品"
-        # I-03（2026-09-12）：声明不得超出制品——RISC-V 无预编译制品，须明确
-        # 指引源码构建，而不是把用户困在"无可用制品"死胡同里。
-        case "$plat" in
-            *riscv*)
-                log error "RISC-V（${plat}）暂无官方预编译制品（CI 仅 canary 构建）"
-                log error "请在目标机源码构建：AIRY_MODE=source bash install.sh（需 RISC-V 工具链 + 依赖库）"
-                ;;
-        esac
         log error "若您安装的是旧版本（≤v0.1.6d），安装器已过旧无法自举更新；"
         log error "请重新执行一键安装命令（见官网 install 指南）更新安装器后重试。"
         rm -rf "$TMPD"; return 1
@@ -1384,7 +1295,7 @@ case "$CMD" in
         echo "      airymaxrt doctor      组件健康检查"
         echo "      airymaxrt logs [N]    查看最近日志（默认 airymaxrt.log 末 50 行；"
         echo "                            logs <name> 看指定 daemon，如 logs llm_d）"
-        echo "      airymaxrt update      自更新（--check 仅检查 / --channel stable|rc|beta"
+        echo "      airymaxrt update      自更新（--check 仅检查 / --channel stable|beta|rc"
         echo "                            切通道 / --rollback 回滚 / --file 离线包"
         echo "                            （离线包需 --sha256 或相邻 .sha256））"
         echo "      airymaxrt uninstall   一键卸载（--keep-data 保留记忆数据）"
@@ -1721,7 +1632,7 @@ case "$CMD" in
         exec sh "$inst" --reinstall "$@"
         ;;
     update)
-        # 自更新器：检查/执行官方通道更新（stable|rc|beta），GPG 验签 + sha256 校验
+        # 自更新器：检查/执行官方通道更新（stable|beta），GPG 验签 + sha256 校验
         shift
         airymaxrt_update "$@"
         exit $?
