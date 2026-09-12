@@ -56,8 +56,14 @@ permissions:
   contents: read
 
 concurrency:
+  # 同版本镜像串行化，且**最新一次派发胜出**。原 cancel-in-progress: false
+  # 在 0.1.15 三端正文纠偏时暴露为死锁：一次陈旧镜像 run 卡在上传步（curl
+  # 无界等待），而 fine-grained PAT 无 Actions 写权限（REST cancel /
+  # force-cancel 一律 403），纠偏 run 被该并发组无限期挂起。publish-mirror.sh
+  # 幂等（同名同大小跳过、异大小删除重传），取消在途 run 不留不可恢复状态：
+  # 新 run 会补齐差额。
   group: mirror-release-${{ inputs.version || github.event.client_payload.version }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   # 双通道入参归一：workflow_dispatch 走 inputs，repository_dispatch 走
@@ -73,6 +79,9 @@ jobs:
   mirror:
     name: Mirror ${{ inputs.version || github.event.client_payload.version }} to GitHub + Gitee + atomgit
     runs-on: ubuntu-latest
+    # 有界执行：上传步若对端 socket 假死（无低速中断的 curl 会无界等待，
+    # 0.1.15 实证 76min+ 未收敛），job 超时兜底退出并释放并发位。
+    timeout-minutes: 60
     permissions:
       contents: write
     env:
