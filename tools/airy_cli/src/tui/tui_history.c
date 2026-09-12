@@ -29,6 +29,18 @@ static void tui_grow_history(tui_history_t *h)
 
 void tui_commit_line(cli_tui_t *t, char *line)
 {
+    /* S-01：会话历史环形窗口——对齐 tui_cmd_hist_push 的丢最老行策略，
+     * hist.count 恒不超过 TUI_HIST_MAX。pinned 是 lines 的绝对行索引，
+     * 裁剪头部行须同步回退；增量渲染缓存按绝对索引判定，一并失效。 */
+    if (t->hist.count >= TUI_HIST_MAX) {
+        AIRY_FREE(t->hist.lines[0]);
+        for (size_t i = 1; i < t->hist.count; i++)
+            t->hist.lines[i - 1] = t->hist.lines[i];
+        t->hist.count--;
+        if (t->hist.pinned > 0)
+            t->hist.pinned--;
+        t->vp_start_valid = 0;
+    }
     tui_grow_history(&t->hist);
     if (t->hist.count < t->hist.cap)
         t->hist.lines[t->hist.count++] = line;
