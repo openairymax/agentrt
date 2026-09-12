@@ -471,8 +471,15 @@ jobs:
   # 构建契约进入发布矩阵。x64 宿主硬件兼容 i386，32 位用户态环境（受限旧机、
   # WOW64 兼容面）仍可安装。
   build-windows-x86-32:
-    # E3：与全部 MSVC 腿共享 ci-windows-runner-bus 串行，防 windows hosted
-    # 配额被双 workflow 多腿并跑占满。
+    # E3 修正（2026-09-12 run #92 实证）：本腿与 build-windows-x86-64 同处
+    # 一个 run 且共挤 ci-windows-runner-bus，会触发 GitHub job 级 concurrency
+    # 同组互顶（先到者取得 pending 位，后到者 0 秒 cancelled）——run #92 本腿
+    # 即 0 秒 cancelled，而 release 的 needs 含本腿，导致整条发布链 skip。此与
+    # 0.1.11 已治理的 macOS 腿同组互顶（见 build-macos-x86-64 头注）同类。
+    # 改为显式 needs 串行：同一 run 内两腿永不共时请求同组；跨 workflow 仍由
+    # 本腿占组与 build-test windows-build 公平串行（cancel=false），既消除
+    # 互顶又保留 MSVC 腿不并跑占满 windows hosted 配额的原始意图。
+    needs: build-windows-x86-64
     concurrency:
       group: ci-windows-runner-bus
       cancel-in-progress: false
