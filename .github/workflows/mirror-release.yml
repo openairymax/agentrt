@@ -1,9 +1,12 @@
 name: Mirror Release Artifacts
 
 # M13 配套回填通道：把 atomgit（SSoT）既有 Release 的附件集镜像到
-# GitHub/Gitee Releases。两类场景：
+# GitHub/Gitee Releases，并支持以 notes 入参统一纠偏三端 Release 正文。
+# 三类场景：
 #   1. 历史版本回填（v0.1.7 ~ rc9 之前各版）：发布时镜像机制尚未存在；
-#   2. 镜像修复重跑：publish-mirror.sh 幂等（同名同大小跳过），安全重放。
+#   2. 镜像修复重跑：publish-mirror.sh 幂等（同名同大小跳过），安全重放；
+#   3. 发布说明修订/纠偏：notes 入参一次性对齐 GH/Gitee（publish-mirror.sh
+#      的 RELEASE_NOTES）与 atomgit（AIRY_NOTES_ONLY=1 只改正文）。
 #
 # 制品来源（优先级）：
 #   a) release.yml 对应 run 的 release-dist 工件（90 天保留期内首选）；
@@ -26,7 +29,7 @@ on:
         type: boolean
         default: true
       notes:
-        description: '发布说明（可选，社区面向语气；传入则覆盖 dist/notes.txt 作为 GH/Gitee release body）'
+        description: '发布说明（可选；传入则作为三端 Release 正文：GH/Gitee 覆盖 dist/notes.txt，atomgit 幂等对齐）'
         required: false
         type: string
       # U-3 方案 A（2026-09-09）：release.yml 的 publish-mirror 段完成 GH 快
@@ -49,7 +52,7 @@ env:
 
 jobs:
   mirror:
-    name: Mirror ${{ inputs.version }} to GitHub + Gitee
+    name: Mirror ${{ inputs.version }} to GitHub + Gitee + atomgit
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -104,3 +107,20 @@ jobs:
           RELEASE_NOTES: ${{ inputs.notes }}
         run: |
           bash _tools/scripts/ci/release/publish-mirror.sh "${VERSION}" dist
+
+      - name: Align atomgit (SSoT) release body
+        # 三端正文一致性收口：atomgit 是 SSoT，正文对齐由 publish-release.sh
+        # 的幂等 PATCH 承担（AIRY_NOTES_ONLY=1 只改正文，不签名/不上传）。
+        # notes 为空时跳过——绝不能以空正文覆盖 SSoT（发布说明按版本维护）。
+        if: ${{ inputs.notes != '' }}
+        env:
+          ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
+          ATOMGIT_REPO: openairymax/agentrt
+          AIRY_NOTES_ONLY: '1'
+          RELEASE_NOTES: ${{ inputs.notes }}
+        run: |
+          if [ -z "${ATOMGIT_TOKEN:-}" ]; then
+            echo "::warning::未配置 ATOMGIT_TOKEN，跳过 atomgit 正文对齐"
+            exit 0
+          fi
+          bash _tools/scripts/ci/release/publish-release.sh "${VERSION}" dist
