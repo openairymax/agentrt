@@ -1149,8 +1149,21 @@ jobs:
         run: |
           VERSION="${{ env.VERSION }}"
           IS_RC=0; case "$VERSION" in *-rc*) IS_RC=1 ;; esac
+          IS_PRE=0; case "$VERSION" in *-rc*|*-beta*) IS_PRE=1 ;; esac
           PREV="$(git describe --tags --abbrev=0 "${VERSION}^" 2>/dev/null || echo '')"
           if [ -n "$PREV" ]; then LOGARGS=(--no-merges "${PREV}..${VERSION}"); else LOGARGS=(--no-merges -30); fi
+          # 发行说明入口 SSoT（附录 B.4 定案 3）：正式版必须随 tag 入库
+          # RELEASE_NOTES.d/<VERSION>.md，否则本步骤会退化为内部提交列表，
+          # 与三端纠偏显式传入的正文形成双源（v0.1.15 实证：该文件 tag 后
+          # 补提，atomgit 45 行 / GH·Gitee 30 行分叉）。缺失即 fail-closed，
+          # 提示把文件提到 tag 之前再重跑，而不是静默出稿。预发布版
+          # （-rc/-beta）沿用变更列表兜底，不阻断候选发布。
+          NOTES_FILE="RELEASE_NOTES.d/${VERSION}.md"
+          if [ "$IS_PRE" = 0 ] && [ ! -f "$NOTES_FILE" ]; then
+            echo "::error::缺少发行说明入口 ${NOTES_FILE}（${VERSION} 所指提交内不存在）"
+            echo "::error::请先提交该文件到 ${VERSION} 对应提交再重跑；正式版不允许以变更列表代替 SSoT 入口"
+            exit 1
+          fi
           {
             echo "AgentRT ${VERSION}"
             echo
@@ -1159,11 +1172,11 @@ jobs:
               echo
             fi
             # 本版亮点：维护者提供 RELEASE_NOTES.d/<VERSION>.md 时优先呈现，
-            # 避免逐条内部提交刷屏；缺失则跳到下方变更列表。
-            if [ -f "RELEASE_NOTES.d/${VERSION}.md" ]; then
+            # 避免逐条内部提交刷屏；缺失（仅预发布版可能）则跳到下方变更列表。
+            if [ -f "$NOTES_FILE" ]; then
               echo "## 1. 本版亮点"
               echo
-              cat "RELEASE_NOTES.d/${VERSION}.md"
+              cat "$NOTES_FILE"
               echo
             fi
             echo "## 2. 平台支持"
