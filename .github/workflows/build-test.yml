@@ -53,12 +53,15 @@ jobs:
           # WS-9 9.8 门禁跨仓判据取料（0.1.15 方案 §4.9）：release_gates 测试
           # 断言 sdk/tui/scripts/airymaxrt（更新器源）与仓内 install.sh/
           # latest/airymaxrt 三副本一致。sdk 不属 agent-workload 检出组
-          # （init-submodules.sh），此处 sparse 浅克隆仅取 tui/scripts；
-          # clone 失败即红（fail-closed，门禁不得静默降级）。
+          # （init-submodules.sh），此处 sparse 浅克隆仅取 sdk 骨架。
+          # tui 在 sdk 内是 gitlink 子模块，sparse-checkout 不会落盘其
+          # 内容，必须显式 submodule update 才检出 tui/scripts/airymaxrt；
+          # 末行 test 兜底，取料失败即红（fail-closed，不得静默降级）。
           git clone -q --depth 1 --filter=blob:none --sparse \
             "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/openairymax/sdk.git" \
             agent-workload/sdk
-          git -C agent-workload/sdk sparse-checkout set tui/scripts
+          git -C agent-workload/sdk submodule update --init --depth 1 -- tui
+          test -f agent-workload/sdk/tui/scripts/airymaxrt
 
       - name: Install build dependencies
         run: |
@@ -110,6 +113,18 @@ jobs:
           echo "::error::ctest rerun FAILED rc=$rc2"
           tail -n 40 /tmp/ctest-rerun.log | sed 's/^/::error::  /'
           exit $rc2
+
+      # 失败（含 rerun 仍失败）即把首轮与 rerun 日志落 ci-debug issue（公共
+      # issue 匿名 API 可读，供排障拉取）；与 macOS 腿同口径。0.1.15 发布后
+      # 实证：annotation 每 job 仅保留 ≤10 条 + tail 窗口截断，无法承载断言级
+      # 明细（run #255/#256 linux ctest 失败时只能整份下载 job 日志定位）。
+      - name: Dump ctest logs to ci-debug issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          [ -f /tmp/ctest.log ] && bash .github/scripts/ci-debug-dump.sh "linux ctest" "/tmp/ctest.log" || true
+          [ -f /tmp/ctest-rerun.log ] && bash .github/scripts/ci-debug-dump.sh "linux ctest rerun" "/tmp/ctest-rerun.log" || true
 
       # 覆盖率门禁：低于阈值（COVERAGE_THRESHOLD）即失败，
       # 防止发行版功能回归（50-engineering-standards / TEST-03）。
@@ -203,12 +218,15 @@ jobs:
           # WS-9 9.8 门禁跨仓判据取料（0.1.15 方案 §4.9）：release_gates 测试
           # 断言 sdk/tui/scripts/airymaxrt（更新器源）与仓内 install.sh/
           # latest/airymaxrt 三副本一致。sdk 不属 agent-workload 检出组
-          # （init-submodules.sh），此处 sparse 浅克隆仅取 tui/scripts；
-          # clone 失败即红（fail-closed，门禁不得静默降级）。
+          # （init-submodules.sh），此处 sparse 浅克隆仅取 sdk 骨架。
+          # tui 在 sdk 内是 gitlink 子模块，sparse-checkout 不会落盘其
+          # 内容，必须显式 submodule update 才检出 tui/scripts/airymaxrt；
+          # 末行 test 兜底，取料失败即红（fail-closed，不得静默降级）。
           git clone -q --depth 1 --filter=blob:none --sparse \
             "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/openairymax/sdk.git" \
             agent-workload/sdk
-          git -C agent-workload/sdk sparse-checkout set tui/scripts
+          git -C agent-workload/sdk submodule update --init --depth 1 -- tui
+          test -f agent-workload/sdk/tui/scripts/airymaxrt
 
       - name: Install build dependencies (Homebrew)
         run: |
