@@ -81,27 +81,19 @@ void tui_ime_page_flip(cli_tui_t *t, int dir)
         t->ime_page = 0;
 }
 
-/* 绘制拼音候选条（输入行上方一行，微信式分页）：拼音高亮 + 当前页
- * 数字键候选（页内高亮以蓝底标记）+ 页码指示（多页时显示 ‹1/2›）。
- * 返回 1=已绘制（占用该行）；0=无拼音态（调用方继续画分隔线等）。 */
-int tui_ime_draw_cands(cli_tui_t *t, int input_row)
+/* 打印候选条内容（不含光标定位/清行）：拼音高亮 + 当前页数字候选
+ * （页内高亮以反显标记）+ 页码指示（多页时显示 ‹1/2›）。
+ * used = 该条起点前的已占用显示列数；limit = 可用总列数（超出即截断，
+ * 避免折行破坏行渲染布局）。两种布局（全屏绝对定位 / 行渲染内联）共用。 */
+static void tui_ime_print_bar(const cli_tui_t *t, size_t used, size_t limit)
 {
-    if (!t->ime || !t->ime_active || t->ime_buf_len == 0)
-        return 0;
-    char num[16];
-    size_t brow = input_row > 1 ? (size_t)input_row - 1 : 1;
-    tui_write_literal("\033[");
-    snprintf(num, sizeof(num), "%zu", brow);
-    tui_write_literal(num);
-    tui_write_literal(";1H");
-    tui_clear_line();
     /* 拼音高亮：紫（轻盈科技感，区别于对话区青/蓝） */
     fputs(cli_c(CLR_BOLD), stdout);
     fputs(cli_c(CLR_MAGENTA), stdout);
     fwrite(t->ime_buf, 1, t->ime_buf_len, stdout);
     fputs(cli_c(CLR_RESET), stdout);
     fputs(" ", stdout);
-    size_t used = cli_disp_width(t->ime_buf) + 1;
+    used += cli_disp_width(t->ime_buf) + 1;
     /* 当前页切片：page*9 .. min(page*9+9, count) */
     int start = t->ime_page * 9;
     int end = start + 9;
@@ -112,9 +104,9 @@ int tui_ime_draw_cands(cli_tui_t *t, int input_row)
         char tag[4];
         snprintf(tag, sizeof(tag), "%d", (i - start) + 1);
         size_t w = cli_disp_width(txt) + strlen(tag) + 1;
-        if (used + w > (size_t)t->cols)
+        if (used + w > limit)
             break;
-        if (i == t->ime_page * 9 + t->ime_sel) {
+        if (i == start + t->ime_sel) {
             /* 页内高亮：反显 + 加粗 + 青前景（不依赖蓝底，深浅色终端均醒目） */
             fputs(cli_c(CLR_REVERSE), stdout);
             fputs(cli_c(CLR_BOLD), stdout);
@@ -132,12 +124,46 @@ int tui_ime_draw_cands(cli_tui_t *t, int input_row)
     if (t->ime_pages > 1) {
         char pgbuf[32];
         snprintf(pgbuf, sizeof(pgbuf), " ‹%d/%d›", t->ime_page + 1, t->ime_pages);
-        if (used + (size_t)strlen(pgbuf) + 2 <= (size_t)t->cols) {
+        if (used + (size_t)strlen(pgbuf) + 2 <= limit) {
             fputs(cli_c(CLR_DIM), stdout);
             fputs(pgbuf, stdout);
             fputs(cli_c(CLR_RESET), stdout);
         }
     }
+}
+
+/* 绘制拼音候选条（输入行上方一行，绝对定位；全屏 TUI 布局专用，微信式
+ * 分页）。返回 1=已绘制（占用该行）；0=无拼音态（调用方继续画分隔线等）。 */
+int tui_ime_draw_cands(cli_tui_t *t, int input_row)
+{
+    if (!t->ime || !t->ime_active || t->ime_buf_len == 0)
+        return 0;
+    char num[16];
+    size_t brow = input_row > 1 ? (size_t)input_row - 1 : 1;
+    tui_write_literal("\033[");
+    snprintf(num, sizeof(num), "%zu", brow);
+    tui_write_literal(num);
+    tui_write_literal(";1H");
+    tui_clear_line();
+    tui_ime_print_bar(t, 0, (size_t)(t->cols > 0 ? t->cols : 80));
+    fflush(stdout);
+    return 1;
+}
+
+/* 行渲染模式候选条（内联于输入行末）：底部固定输入条（三区布局）已于
+ * 0.1.7 弃用，cli_term_header_pin() 无任何调用点 → cli_term_input_on()
+ * 恒为 0 → 原绝对定位候选条在默认 REPL 下不可达，拼音输入没有任何可见
+ * 反馈（社区反馈「输入法没反应」根因）。改为在输入行末内联显示，调用方
+ * 随后用 CHA 把光标移回编辑位（col 为 1 基列号）。返回 1=已绘制。 */
+int tui_ime_draw_cands_inline(const cli_tui_t *t, size_t col)
+{
+    if (!t->ime || !t->ime_active || t->ime_buf_len == 0)
+        return 0;
+    size_t limit = (size_t)(t->cols > 0 ? t->cols : 80);
+    if (col + 2 >= limit)
+        return 0;
+    fputs("  ", stdout);
+    tui_ime_print_bar(t, col + 2, limit);
     fflush(stdout);
     return 1;
 }

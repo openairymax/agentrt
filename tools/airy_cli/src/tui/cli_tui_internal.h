@@ -296,6 +296,7 @@ void tui_ime_refresh(cli_tui_t *t);
 int tui_ime_sel_index(const cli_tui_t *t);
 void tui_ime_page_flip(cli_tui_t *t, int dir);
 int tui_ime_draw_cands(cli_tui_t *t, int input_row);
+int tui_ime_draw_cands_inline(const cli_tui_t *t, size_t col);
 int tui_ime_key_hit(const cli_tui_t *t, int key);
 airy_ime_t *tui_ime_load_dict(void);
 int tui_ime_key_resolve(void);
