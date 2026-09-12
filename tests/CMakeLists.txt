@@ -88,3 +88,14 @@ target_compile_options(test_string_utils PRIVATE
 add_test(NAME test_string_utils COMMAND test_string_utils)
 
 airy_print_ok("  [str-utils] test_string_utils: safe string utility semantics unit test")
+
+# Release gates (WS-9 / 方案 9.8): community six-category fixes regression
+# gates. Bash-driven structural assertions over install scripts, manifests
+# and airy_cli sources (9.1~9.11 判据，详见 scripts/verify_release_gates.sh
+# 头注)。UNIX-only（windows job 不跑 ctest，无影响）；macOS 自带 bash 3.2，
+# 脚本已按 bash-3.2 兼容编写。
+if(UNIX)
+    add_test(NAME release_gates
+        COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/verify_release_gates.sh)
+    airy_print_ok("  [release-gates] release_gates: WS-9 community-fix gates (9.1~9.11)")
+endif()
