@@ -191,20 +191,52 @@ path_self_heal() {
 #   - rocm：AMD ROCm 运行时可用
 #   - dri：/dev/dri 渲染节点（Intel/AMD iGPU 或亮机卡）
 #   - none：无可见加速器
+# 用户空间位宽探测（0.1.6c 教训：uname -m 报内核架构，64 位内核 + 32 位
+# 用户空间会误报）。多级兜底，任一可用即输出 32/64，全失败留空：
+#   1) getconf LONG_BIT（POSIX 权威，精简镜像可能未装 getconf）
+#   2) 可执行文件 ELF class（od 读 /proc/self/exe 偏移 4：01=32 位 02=64 位）
+#   3) dpkg --print-architecture（Debian 系：arm64/amd64→64，armhf/i386→32）
+_uspace_bits() {
+    local _b
+    _b="$(getconf LONG_BIT 2>/dev/null)"
+    case "$_b" in 32|64) echo "$_b"; return ;; esac
+    if [ -r /proc/self/exe ] && command -v od >/dev/null 2>&1; then
+        _b="$(od -An -j4 -N1 -t x1 /proc/self/exe 2>/dev/null | tr -d ' \n')"
+        case "$_b" in 01) echo 32; return ;; 02) echo 64; return ;; esac
+    fi
+    if command -v dpkg >/dev/null 2>&1; then
+        _b="$(dpkg --print-architecture 2>/dev/null)"
+        case "$_b" in
+            amd64|arm64|riscv64) echo 64; return ;;
+            armhf|armel|i386)    echo 32; return ;;
+        esac
+    fi
+    echo ""
+}
+# 用户空间加载器存在性（多发行版路径）：Debian/Ubuntu 系 aarch64 加载器位于
+# /lib/aarch64-linux-gnu/ 而非 /lib——仅固定 /lib 判据会误判（2026-09-12
+# 树莓派实测：aarch64 被判成 armv7l，装上 arm-32 制品）。多架构目录与
+# /lib64 一并覆盖，作为位宽判据之外的第二证据链。
+_loader_exists() {
+    local _n="$1" _p
+    for _p in "/lib/$_n" "/lib64/$_n" "/usr/lib/$_n" \
+              /lib/*-linux-gnu/"$_n" /usr/lib/*-linux-gnu/"$_n"; do
+        [ -f "$_p" ] && return 0
+    done
+    return 1
+}
 # 架构检测（uname -m 归一化）：与 install.sh detect_arch 同口径（SSoT），
 # 记录在画像中供 status 展示；install.sh 二进制模式以 {arch} 占位符
 # 选择预编译包（见 agentrt/scripts/install.sh install_binary）。
+# 用户空间位数复判（0.1.6c 教训）：以 _uspace_bits 为主判据，加载器
+# 存在性兜底，三架构（x86/ARM/RISC-V）的 32/64 位全覆盖。
 detect_arch() {
     local _m _bits
     _m="$(uname -m 2>/dev/null)"
-    # 与 install.sh detect_arch 同口径（SSoT）：uname -m 报内核架构，
-    # 64 位内核 + 32 位用户空间（树莓派 armhf / 老 x86）误报 64 位且无对应
-    # 加载器，装 64 位包后 daemon exec 全部失败（2026-08-30 树莓派实测）。
-    # 以用户空间位数（getconf LONG_BIT）复判，三架构 32/64 位全覆盖。
-    _bits="$(getconf LONG_BIT 2>/dev/null)"
+    _bits="$(_uspace_bits)"
     case "$_m" in
         x86_64|amd64)
-            if [ "$_bits" = "64" ] || [ -f /lib64/ld-linux-x86-64.so.2 ]; then
+            if [ "$_bits" = "64" ] || _loader_exists ld-linux-x86-64.so.2; then
                 echo "x86_64"
             else
                 echo "i686"
@@ -212,15 +244,21 @@ detect_arch() {
             ;;
         i386|i486|i586|i686|x86) echo "i686" ;;
         aarch64|arm64)
-            if [ "$_bits" = "64" ] || [ -f /lib/ld-linux-aarch64.so.1 ]; then
+            if [ "$_bits" = "64" ] || _loader_exists ld-linux-aarch64.so.1; then
                 echo "aarch64"
-            else
+            elif [ "$_bits" = "32" ] || _loader_exists ld-linux-armhf.so.3; then
                 echo "armv7l"
+            else
+                # 判据全部不可得：uname 已报 aarch64，按 64 位处理（旧行为
+                # 静默落 armv7l，会装错位宽制品且无任何提示）。log 走
+                # stderr，不污染 arch="$(detect_arch)" 的命令替换结果。
+                log warn "架构判定: 用户空间位宽未知（getconf/ELF/dpkg 均不可用），按 ${_m} 处理"
+                echo "aarch64"
             fi
             ;;
         armv7l|armv6l|armhf) echo "armv7l" ;;
         riscv64)
-            if [ "$_bits" = "64" ] || [ -f /lib/ld-linux-riscv64-lp64d.so.1 ]; then
+            if [ "$_bits" = "64" ] || _loader_exists ld-linux-riscv64-lp64d.so.1; then
                 echo "riscv64"
             else
                 echo "riscv32"
