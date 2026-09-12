@@ -4,8 +4,11 @@ name: Quality Gates
 # 编排器接入 agentrt 发布平面的 workflow（接线前 workflow 引用数 = 0）。
 #
 # 宿主迁移范式（同 codegen-check.yml 的 ssot-registry-validate）：门禁脚本与
-# SSoT 数据位于伞仓 airymaxhub（tools/docs/agent-workload），故本作业以伞仓
-# GitHub 镜像为数据源浅克隆到临时区、初始化子模块后运行 quality-gate.sh。
+# SSoT 数据位于伞仓 airymaxhub（tools/docs/agent-workload），故本作业按来源
+# 显式直取到临时区、组装出 quality-gate.sh 期望的 PROJECT_ROOT 布局后运行。
+# 不递归 clone 伞仓子模块图——那条路径会去解析闭源/超大/镜像缺位的 gitlink
+# （docs 在 GitHub 无仓、docs-closed 闭源、agent-linux 1.5G），使门禁在供给
+# 面结构性必败。
 #
 # 九门禁：1 编译 · 2 BAN 规则 · 3 安全扫描 · 4 合约版本 · 5 跨仓验证 ·
 #          6 圈复杂度 · 7 SSoT 权威源 · 8 头文件重复度 · 9 coreloopthree ABI 冻结。
@@ -56,9 +59,13 @@ jobs:
             python3 python3-pip
           python3 -m pip install --quiet 'lizard==1.23.0'
 
-      # 以伞仓 GitHub 镜像为数据源（脚本=tools、registry=docs、宿主=agent-workload）。
-      # 私有嵌套子模块（agentrt/atoms 等）经 GH_TOKEN（org PAT）~/.netrc 认证。
-      - name: Clone umbrella dataset (docs, tools, agent-workload)
+      # 组装门禁数据集，对齐 quality-gate.sh 的 PROJECT_ROOT 布局契约：
+      #   tools   ← GitHub 镜像（门禁脚本与校验器宿主）
+      #   docs    ← atomgit SSoT（Unify Design：SSoT 权威源，匿名可读）
+      #   agentrt ← 本次工作区检出（即触发门禁的提交，最权威）
+      #   ecosystem/sdk/products ← GitHub 镜像（Gate 5 跨仓校验的兄弟叶仓）
+      # 私有嵌套子模块（atoms 等）经 GH_TOKEN（org PAT）~/.netrc 认证。
+      - name: Assemble gate dataset (tools, docs, agent-workload)
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
@@ -67,10 +74,18 @@ jobs:
               "$GH_TOKEN" > "$HOME/.netrc"
             chmod 600 "$HOME/.netrc"
           fi
-          git clone -q --depth 1 \
-            https://github.com/openairymax/airymaxhub.git "$RUNNER_TEMP/airymaxhub"
-          git -C "$RUNNER_TEMP/airymaxhub" submodule update --init --recursive -- \
-            docs tools agent-workload
+          set -euo pipefail
+          UMB="$RUNNER_TEMP/airymaxhub"
+          mkdir -p "$UMB/agent-workload"
+          git clone -q --depth 1 https://github.com/openairymax/tools.git "$UMB/tools"
+          git clone -q --depth 1 https://atomgit.com/openairymax/docs.git "$UMB/docs" \
+            || git clone -q --depth 1 https://github.com/openairymax/docs.git "$UMB/docs"
+          ln -s "$GITHUB_WORKSPACE" "$UMB/agent-workload/agentrt"
+          for r in ecosystem sdk products; do
+            git clone -q --depth 1 "https://github.com/openairymax/$r.git" \
+              "$UMB/agent-workload/$r" \
+              || echo "::warning::$r mirror unavailable, cross-repo check will skip it"
+          done
 
       - name: Run quality gates (9 scripts)
         env:
