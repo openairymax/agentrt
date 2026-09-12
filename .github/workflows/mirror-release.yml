@@ -130,16 +130,23 @@ jobs:
       - name: Align atomgit (SSoT) release body
         # 三端正文一致性收口：atomgit 是 SSoT，正文对齐由 publish-release.sh
         # 的幂等 PATCH 承担（AIRY_NOTES_ONLY=1 只改正文，不签名/不上传）。
-        # notes 为空时跳过——绝不能以空正文覆盖 SSoT（发布说明按版本维护）。
-        if: ${{ env.NOTES != '' }}
+        # 正文来源：显式 notes 优先，其次本次 dist 的 notes.txt（release.yml
+        # 生成）；两者皆缺则跳过——脚本内的兜底是占位串 "AgentRT <tag>"，
+        # 一旦落库即把 SSoT 正文清空，故必须在入口 fail-closed。
         env:
           ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
           ATOMGIT_REPO: openairymax/agentrt
           AIRY_NOTES_ONLY: '1'
           RELEASE_NOTES: ${{ env.NOTES }}
+          RELEASE_NOTES_FILE: ${{ github.workspace }}/dist/notes.txt
         run: |
+          set -euo pipefail
           if [ -z "${ATOMGIT_TOKEN:-}" ]; then
             echo "::warning::未配置 ATOMGIT_TOKEN，跳过 atomgit 正文对齐"
+            exit 0
+          fi
+          if [ -z "${RELEASE_NOTES:-}" ] && [ ! -s "${RELEASE_NOTES_FILE}" ]; then
+            echo "::warning::notes 未传入且 dist/notes.txt 缺失，跳过 atomgit 正文对齐（不以占位正文覆盖 SSoT）"
             exit 0
           fi
           bash _tools/scripts/ci/release/publish-release.sh "${VERSION}" dist
