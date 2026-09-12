@@ -151,6 +151,7 @@ void cli_chat_usage_get_session(uint64_t *tokens, double *cost);
 /* ===== cli_chat.c 域拆分（2026-08-27：2040 行 → 6 个职责模块） ===== */
 
 /* cli_chat_usage.c：对话轮 token/费用统计与思考链累计/清零 */
+#define CLI_CHAT_REASONING_MAX_BYTES (128 * 1024) /* 单回合思考链累积上限（S-04） */
 void cli_chat_usage_add(const llm_response_t *resp);
 void cli_chat_usage_reset(void);
 void cli_chat_reasoning_add(const char *reasoning);
@@ -167,6 +168,7 @@ const char *cli_chat_t1p_cached(void);
 const char *cli_chat_err_desc(int err);
 void cli_history_add(const char *role, const char *content, const char *reasoning);
 const char *cli_system_prompt_now(void);
+#define AIRY_REASONING_LOG_MAX_BYTES (4 * 1024 * 1024) /* 思考链日志轮转阈值（S-04） */
 void cli_chat_reasoning_persist(const char *text);
 
 /* cli_chat_tools.c：聊天工具回路（schema / 消息缓冲 / 工具执行 / 工具轮） */
