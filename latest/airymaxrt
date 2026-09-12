@@ -667,7 +667,11 @@ upsert_profile_var() { # <KEY> <值>
 #      → 镜像同步热替换 → 更新 install.env（版本号 + 制品 sha256）
 #   5. 替换后自检；--rollback 手动恢复上次备份（.rollback 最多保留上一版）
 # 官方制品仓库：atomgit.com/openairymax/agentrt（releases 附件 + latest/ 固定入口）
-# 通道：stable / beta（tag 含 -beta./-rc. 归 beta）。
+# 通道：stable / rc / beta（tag 含 -rc → rc、-beta → beta，否则 stable；
+# 与发布侧 publish-release.sh 及安装器 scripts/install.sh 同口径 SSoT）。
+# 制品实况（2026-09-12 核验）：latest/ 仅有 manifest.stable.json 与
+# manifest.rc.json；beta 为保留通道（尚未发布制品），故安装器与更新器的
+# 白名单统一为 stable|rc|beta，但 beta 缺失时须给出明确可操作提示。
 AIRY_GPG_PUBKEY='-----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mDMEao7uahYJKwYBBAHaRw8BAQdAk8Ou1tA2EfX5xZT4ET79YJESeqINPyFF86MK
@@ -1142,12 +1146,12 @@ stop_running_daemons() {
     fi
 }
 
-airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--rollback] [--file <tarball>] [--sha256 <hash>]
-    local CHECK=0 CHANNEL="" ROLLBACK=0 FILE="" SHA256="" inst_env="$AIRY_HOME/config/install.env"
+airymaxrt_update() { # update [--check] [--yes] [--channel stable|rc|beta] [--rollback] [--file <tarball>] [--sha256 <hash>]
+    local CHECK=0 CHANNEL="" CH_EXPLICIT=0 ROLLBACK=0 FILE="" SHA256="" inst_env="$AIRY_HOME/config/install.env"
     while [ $# -gt 0 ]; do
         case "$1" in
             --check|-c) CHECK=1 ;;
-            --channel) CHANNEL="${2:-}"; shift ;;
+            --channel) CHANNEL="${2:-}"; CH_EXPLICIT=1; shift ;;
             --rollback) ROLLBACK=1 ;;
             --file|-f) FILE="${2:-}"; shift ;;
             --sha256) SHA256="${2:-}"; shift ;;
@@ -1165,7 +1169,14 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
         cur_sha="$(sed -n 's/^AIRY_ARTIFACT_SHA256=//p' "$inst_env" | head -1)"
     fi
     CHANNEL="${CHANNEL:-${cur_ch:-stable}}"
-    case "$CHANNEL" in stable|beta|rc) ;; *) log error "通道无效: ${CHANNEL}（stable|beta|rc）"; return 2 ;; esac
+    case "$CHANNEL" in stable|rc|beta) ;; *) log error "通道无效: ${CHANNEL}（stable|rc|beta）"; return 2 ;; esac
+    # 通道来源可见化（2026-09-12，U-04）：未显式 --channel 时沿用 install.env
+    # 记录（"通道粘性"）——旧实现在非 stable 通道上完全静默，用户看到"已是最新"
+    # 却不知自己停在 rc/beta 线（社区"update 不生效"的真因之一）。此处显式告知
+    # 来源与切换方式，零网络开销。
+    if [ "$CH_EXPLICIT" = "0" ] && [ "$CHANNEL" != "stable" ]; then
+        log info "通道 ${CHANNEL}（继承自安装记录 config/install.env）；切回生产线：airymaxrt update --channel stable"
+    fi
 
     # 回滚（2026-09-07：备份按目录 mtime 排序 ls -1dt 选最新——旧实现按
     # 目录名 sort -r（v<版本>-<时间戳>）跨版本号边界会选错版本，如 v0.1.9-*
@@ -1232,7 +1243,15 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
     rm -rf "$TMPD"; mkdir -p "$TMPD"
     log info "检查更新（通道: ${CHANNEL}，当前: ${cur_ver:-<未安装>}）…"
     fetch_repo_file "latest/manifest.${CHANNEL}.json" "$TMPD/manifest.json" \
-        || { log error "manifest 下载失败（latest/manifest.${CHANNEL}.json）"; rm -rf "$TMPD"; return 1; }
+        || {
+            # 区分"网络异常"与"该通道无制品"（2026-09-12，U-02/U-03）：beta 为
+            # 保留通道（发布侧 tag 含 -beta 才产出 manifest.beta.json，至今未
+            # 发布），旧文案统一报"下载失败"会让用户误以为网络问题反复重试。
+            log error "manifest 拉取失败：latest/manifest.${CHANNEL}.json"
+            log error "可能是网络/服务异常；也可能该通道暂无制品——当前可用：stable（生产）/ rc（候选），beta 为保留通道"
+            log error "切换通道：airymaxrt update --channel stable"
+            rm -rf "$TMPD"; return 1
+        }
     fetch_repo_file "latest/manifest.${CHANNEL}.json.asc" "$TMPD/manifest.json.asc" >/dev/null 2>&1 || true
     verify_gpg_sig "$TMPD/manifest.json" "$TMPD/manifest.json.asc" || { log error "manifest 验签失败（GPG），拒绝更新"; rm -rf "$TMPD"; return 1; }
     log info "manifest 验签通过（GPG）"
@@ -1240,8 +1259,13 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|beta|rc] [--ro
     [ -n "$latest" ] || { log error "manifest 解析失败"; rm -rf "$TMPD"; return 1; }
     local cmp="$(ver_cmp "${cur_ver:-0.0.0}" "$latest")"
     if [ "$cmp" = "1" ]; then
-        # 当前版本高于通道目标（异常，多为通道回退/多通道切换）→ 视为已最新
-        log info "已是最新: ${cur_ver:-<未安装>}（通道 ${CHANNEL} 最新 ${latest}）"
+        # 当前版本高于通道目标（多为通道回退/多通道切换）。旧实现静默按
+        # "已是最新"退出且无任何提示（U-04），用户无法分辨"确实已最新"与
+        # "停在非生产通道故看不到新版本"——改为显式 warning + 切换指引。
+        log warn "通道 ${CHANNEL} 最新为 ${latest}，低于已安装的 ${cur_ver}（不回退）"
+        if [ "$CHANNEL" != "stable" ]; then
+            log warn "若想跟随生产版本线：airymaxrt update --channel stable"
+        fi
         rm -rf "$TMPD"; return 0
     fi
     # 当前平台制品解析提前（2026-09-07）：同版本 sha 门禁需目标制品 sha
@@ -1352,7 +1376,7 @@ case "$CMD" in
         echo "      airymaxrt doctor      组件健康检查"
         echo "      airymaxrt logs [N]    查看最近日志（默认 airymaxrt.log 末 50 行；"
         echo "                            logs <name> 看指定 daemon，如 logs llm_d）"
-        echo "      airymaxrt update      自更新（--check 仅检查 / --channel stable|beta|rc"
+        echo "      airymaxrt update      自更新（--check 仅检查 / --channel stable|rc|beta"
         echo "                            切通道 / --rollback 回滚 / --file 离线包"
         echo "                            （离线包需 --sha256 或相邻 .sha256））"
         echo "      airymaxrt uninstall   一键卸载（--keep-data 保留记忆数据）"
@@ -1689,7 +1713,7 @@ case "$CMD" in
         exec sh "$inst" --reinstall "$@"
         ;;
     update)
-        # 自更新器：检查/执行官方通道更新（stable|beta），GPG 验签 + sha256 校验
+        # 自更新器：检查/执行官方通道更新（stable|rc|beta），GPG 验签 + sha256 校验
         shift
         airymaxrt_update "$@"
         exit $?

@@ -49,9 +49,9 @@ curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/sc
 curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh \
   | bash -s -- --prefix "$HOME/.airymaxrt"
 
-# 测试通道（更激进更新）
+# 候选通道（rc：预发布，行为可能继续调整）
 curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh \
-  | bash -s -- --channel beta
+  | bash -s -- --channel rc
 
 # 卸载（--keep-data 保留记忆数据）
 curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh \
