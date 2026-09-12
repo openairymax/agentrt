@@ -173,6 +173,19 @@ int main(int argc, char *argv[])
         cli_tui_pin_header(tui);
     }
 
+    /* WS-8 stage 4 (8.4.1): bring up the corekern core (mem/oom/task/ipc/
+     * eventloop/persist) before the CLI pipeline (mechanism layer first,
+     * policy layer second). airy_init() is idempotent; on failure the CLI
+     * still runs on platform fallbacks (non-fatal, badge=0). */
+    {
+        int core_ret = airy_init();
+        if (core_ret == AIRY_SUCCESS) {
+            AIRY_LOG_INFO("corekern core initialized (airy_cli runs on corekern)");
+        } else {
+            AIRY_LOG_WARN("corekern init failed (%d) - running degraded (badge=0)", core_ret);
+        }
+    }
+
     airy_core_loop_t *loop = cli_setup_core_engines();
     if (!loop)
         return 1;
