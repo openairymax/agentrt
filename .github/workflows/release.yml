@@ -1185,12 +1185,19 @@ jobs:
             echo
             echo "## 4. 本版变更"
             echo
+            # 内部维护类提交剔除：已知内部前缀，外加子模块 gitlink bump
+            # （形如 `x: bump ...` / `x: pick up ...` / 裸 `bump ...`），
+            # 后者只改 submodule 指针，对用户无可见行为——漏滤会整屏刷屏
+            # （0.1.15 生成正文实证）。
+            _internal='^\* (((ci|docs|chore|test|refactor|style|release|mirror|tools|github|agents|build|deps|submodules)([/:]|\(| |$))|([a-z0-9_.+-]+(/[a-z0-9_.+-]+)?: )?(bump|pick up)( |$))'
             _log="$(git log "${LOGARGS[@]}" --pretty='* %s' \
-              | grep -vE '^\* (ci|docs|chore|test|refactor|style|release|mirror|tools|github|agents|build)([/:]|\(| |$)' || true)"
+              | grep -vE "$_internal" || true)"
             if [ -n "$_log" ]; then
               printf '%s\n' "$_log"
-            else
+            elif [ -f "RELEASE_NOTES.d/${VERSION}.md" ]; then
               echo "*（本版为稳定性与使用体验修复；详见第 1 节本版亮点与仓库提交记录）"
+            else
+              echo "*（本版为稳定性与使用体验修复；详见仓库提交记录）"
             fi
           } > dist/notes.txt
           echo "发布说明已生成（社区面向，$(wc -l < dist/notes.txt) 行）"
