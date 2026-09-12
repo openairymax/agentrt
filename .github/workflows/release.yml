@@ -1448,6 +1448,9 @@ jobs:
     needs: [finalize-dist, e2e-clean-room]
     if: success() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
+    # GH 快通道（SKIP_GITEE=1）无长杆；60min 与 mirror-release.yml 同口径，
+    # 封顶避免数据面停滞把 job 挂到默认上限。
+    timeout-minutes: 60
     environment: release
     permissions:
       contents: write
@@ -1512,6 +1515,10 @@ jobs:
     needs: [finalize-dist, e2e-clean-room]
     if: success() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
+    # 单文件 PUT 上限 60min × UPLOAD_RETRY 4 = 4h 理论最坏；封顶 300min
+    # 使"上传挂死"以失败态收口（fail-fast，进入可重跑的重试路径），而非
+    # 静默耗尽默认 360min 上限。
+    timeout-minutes: 300
     environment: release
     permissions:
       contents: write
