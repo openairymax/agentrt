@@ -81,7 +81,11 @@ jobs:
     runs-on: ubuntu-latest
     # 有界执行：上传步若对端 socket 假死（无低速中断的 curl 会无界等待，
     # 0.1.15 实证 76min+ 未收敛），job 超时兜底退出并释放并发位。
-    timeout-minutes: 60
+    # 0.1.15 二次实证：Gitee 附件上传带宽 ~24KB/s，单件 ~36MB 需 ~24min，
+    # 全量 30 件需 ~158min（历史成功 run 34368538753 实测）。60min 会在
+    # 上传第 3~4 件时截断，导致 Gitee 长期缺件；放宽到 240min 以覆盖全量，
+    # 真正假死仍由 CURL_STALL(--speed-limit 1024 --speed-time 60) 兜底。
+    timeout-minutes: 240
     permissions:
       contents: write
     env:
