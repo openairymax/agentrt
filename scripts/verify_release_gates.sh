@@ -18,6 +18,8 @@
 #   I  9.10/I-03  架构白名单精确串 + 全仓零 riscv 表述 + 源码构建指引
 #   J  9.1/U-01   更新器 detect_pending_release（更新问题：落后指针静默）
 #   K  （可选）   发布侧 publish-release.sh 白名单契约（本地可达才断言）
+#   L  §4.10 R-5  provider 默认超时 < 网关 LLM 转发背压（连不上网络：精确诊断
+#                 不被网关超时吞掉；含重试最坏总耗时上界）
 #
 # 跨仓判据（B/J/部分 H/I）依赖 sdk 仓 airymaxrt。探测顺序：
 #   1. AIRY_GATE_SDK_AIRYMAXRT 显式指定（CI 取料 step 用；指定但缺失 → FAIL）
@@ -465,6 +467,49 @@ if [ -f "$PUBLISH" ]; then
     fi
 else
     skip "K1 hub tools 仓未检出，发布侧契约跳过（CI 不取料，属预期）"
+fi
+
+# ============================================================
+# 组 L · §4.10 R-5 provider 默认超时 < 网关 LLM 转发背压
+# ============================================================
+section "L" "R-5 provider 默认超时 < 网关 LLM 转发背压（连不上网络：精确诊断先于网关返回）"
+
+PROVIDER_C="$ROOT/daemons/llm_d/src/providers/provider.c"
+LLM_METHODS="$ROOT/daemons/llm_d/src/llm_daemon_methods.c"
+GW_INTERNAL="$ROOT/gateway/src/biz/gateway_biz_internal.h"
+
+_gate_define() { # <file> <macro>  → 打印宏字面量（无则空）
+    sed -n "s/^#define $2[[:space:]]*\([0-9][0-9.]*\).*/\1/p" "$1" | head -1
+}
+_prov_to="$(_gate_define "$PROVIDER_C" PROVIDER_DEFAULT_TIMEOUT_SEC)"
+_gw_ms="$(_gate_define "$GW_INTERNAL" GW_LLM_DEFAULT_TIMEOUT_MS)"
+_retries="$(_gate_define "$LLM_METHODS" LLM_MAX_RETRIES)"
+_fast_ms="$(_gate_define "$LLM_METHODS" LLM_RETRY_FAST_FAIL_MS)"
+
+if [ -z "$_prov_to" ] || [ -z "$_gw_ms" ]; then
+    bad "L1 无法解析 PROVIDER_DEFAULT_TIMEOUT_SEC / GW_LLM_DEFAULT_TIMEOUT_MS（宏被删改）"
+elif awk -v t="$_prov_to" -v g="$_gw_ms" 'BEGIN { exit !(t * 1000 < g) }'; then
+    ok "L1 单次 provider 超时 ${_prov_to}s < 网关 LLM 背压 ${_gw_ms}ms（单次失败诊断先于网关返回）"
+else
+    bad "L1 单次 provider 超时 ${_prov_to}s 未小于网关背压 ${_gw_ms}ms（诊断会被网关超时吞掉）"
+fi
+
+if grep -Fq ': 120.0' "$PROVIDER_C"; then
+    bad "L2 provider 默认超时仍写死 120.0s（超过网关背压，超时倒挂回归）"
+else
+    ok "L2 provider 默认超时无 120.0s 硬编码残留（统一走 PROVIDER_DEFAULT_TIMEOUT_SEC）"
+fi
+
+if [ -n "$_prov_to" ] && [ -n "$_gw_ms" ] && [ -n "$_retries" ] && [ -n "$_fast_ms" ] \
+   && grep -Fq 'LLM_RETRY_FAST_FAIL_MS' "$LLM_METHODS"; then
+    if awk -v t="$_prov_to" -v r="$_retries" -v f="$_fast_ms" -v g="$_gw_ms" \
+         'BEGIN { exit !(r * f + t * 1000 < g) }'; then
+        ok "L3 重试最坏总耗时 ${_retries}×${_fast_ms}ms+${_prov_to}s < 网关背压 ${_gw_ms}ms"
+    else
+        bad "L3 重试最坏总耗时越过网关背压（${_retries}×${_fast_ms}ms+${_prov_to}s）"
+    fi
+else
+    bad "L3 缺 LLM_MAX_RETRIES / LLM_RETRY_FAST_FAIL_MS 或其使用点（重试预算护栏缺失）"
 fi
 
 # ============================================================
