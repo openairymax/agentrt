@@ -63,6 +63,19 @@ jobs:
           git -C agent-workload/sdk submodule update --init --depth 1 -- tui
           test -f agent-workload/sdk/tui/scripts/airymaxrt
 
+      - name: Fetch cross-repo gate fixture (tools permission_rules.yaml)
+        run: |
+          # WS-9 9.8 门禁跨仓判据取料（0.1.15 方案 §4.10 R-6）：release_gates
+          # 断言 tools 仓 permission_rules.yaml 的 external 授权集 ⊇ /mcp
+          # tools/list 暴露集（防"工具齐列但不可调用"回归）。tools 不属
+          # agent-workload 检出组，此处 sparse 浅克隆仅取模板。末行 test
+          # 兜底，取料失败即红（fail-closed，不得静默降级）。
+          git clone -q --depth 1 --filter=blob:none --sparse \
+            "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/openairymax/tools.git" \
+            _tools
+          git -C _tools sparse-checkout set scripts/ops/templates
+          test -f _tools/scripts/ops/templates/permission_rules.yaml
+
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -227,6 +240,19 @@ jobs:
             agent-workload/sdk
           git -C agent-workload/sdk submodule update --init --depth 1 -- tui
           test -f agent-workload/sdk/tui/scripts/airymaxrt
+
+      - name: Fetch cross-repo gate fixture (tools permission_rules.yaml)
+        run: |
+          # WS-9 9.8 门禁跨仓判据取料（0.1.15 方案 §4.10 R-6）：release_gates
+          # 断言 tools 仓 permission_rules.yaml 的 external 授权集 ⊇ /mcp
+          # tools/list 暴露集（防"工具齐列但不可调用"回归）。tools 不属
+          # agent-workload 检出组，此处 sparse 浅克隆仅取模板。末行 test
+          # 兜底，取料失败即红（fail-closed，不得静默降级）。
+          git clone -q --depth 1 --filter=blob:none --sparse \
+            "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/openairymax/tools.git" \
+            _tools
+          git -C _tools sparse-checkout set scripts/ops/templates
+          test -f _tools/scripts/ops/templates/permission_rules.yaml
 
       - name: Install build dependencies (Homebrew)
         run: |
