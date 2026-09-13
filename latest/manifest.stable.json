@@ -2,151 +2,151 @@
   "schema": 1,
   "channel": "stable",
   "latest": "v0.1.15",
-  "updated_at": "2026-09-13T00:10:34Z",
+  "updated_at": "2026-09-13T02:52:49Z",
   "releases": {
     "v0.1.15": {
       "yanked": false,
-      "notes": "AgentRT v0.1.15\n\n## 1. 本版亮点\n\n- **社区反馈六类问题修复（安装/更新/启动/稳定/长对话/长任务）**：安装器补齐 `detect_existing_install()` 定义；修复 Debian 系加载器上 aarch64 的架构误判，改以 userland 位宽为权威判据；发布渠道白名单三副本收敛为 `stable|rc|beta`，RISC-V 撤出预编译白名单并明示源码构建指引；CLI 对话主路径统一经网关 `llm.complete`；对话历史引入环形窗口裁剪，reasoning 累计封顶并按轮转写日志；网关等待可取消、超时可一跳诊断；默认 REPL 直接显示拼音候选栏。\n- **核心运行稳定性**：corekern 内核经 `airy_init()` 正式接入 CLI 启动链路，并输出可追溯的启动证据；修复 IPC 通道、IPC 回复路由、binder 关闭顺序与零长度分配等一批崩溃/泄漏缺陷。\n- **终端体验**：TUI 在收到致命信号时恢复终端状态（不再残留乱码或隐藏光标）；正确消费终端 OSC 回复并新增标题分隔线；背景色解析零初始化，避免随机色值；按键刷新改用 `AIRY_MEMCPY_SAFE`，消除未定义行为。\n- **安全加固**：网关入口鉴权与监听绑定加固；commons、gateway、corekern 引入 ASan/UBSan 消毒器质量门禁，内存安全缺陷在合并前拦截。\n- **构建与诊断**：新增 `AIRY_KEEP_SYMBOLS` 开关，发布包可按需保留符号用于现场诊断。\n- **发布工程**：九项质量门禁在发布平面统一执行；Windows 两条构建腿串行化，规避并发资源争用导致的构建抖动；新增 9.8 发布门禁，组 A~K 共 29 项断言入 ctest `release_gates`（linux+macos required），CI sdk 取料 fail-closed。\n\n## 2. 平台支持\n\n- Linux（主力平台）：x86-64 / x86-32 / arm-64 / arm-32\n- macOS：arm-64（Apple Silicon）/ x86-64（Intel）\n- Windows：x86-64 / x86-32\n\n## 3. 安装\n\n```bash\ncurl -fsSL https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/install.sh | bash\n```\n\nWindows（PowerShell）：\n```powershell\nirm https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/install.ps1 | iex\n```\n\n## 4. 本版变更\n\n* latest: refresh the launcher to match the sdk update source\n* subprojects: 更新所有子模块commit哈希\n* cli/chat: cap per-turn reasoning accumulation and rotate its log\n* cli/gw: make gateway waits cancelable and timeouts diagnosable\n* tui/history: cap conversation history with a ring window\n* cli/chat: route the chat main path through gateway llm.complete\n* scripts: withdraw RISC-V from the prebuilt arch whitelist\n* scripts: converge release-channel whitelist to stable|rc|beta\n* scripts: make userland bitness the authoritative arch evidence\n* cli/tui: show the pinyin candidate bar in the default REPL\n* scripts: fix aarch64 misdetection on Debian-family loaders\n* scripts: define the missing detect_existing_install()",
+      "notes": "AgentRT v0.1.15\n\n## 1. 本版亮点\n\n- **二轮社区反馈修复（工具不可用 / 连接不上网络）**：工具子进程不再继承运行时 `LD_LIBRARY_PATH`——覆盖 `shell_run`、`web_fetch`/`web_search`、git 工具以及经 `sys_tool_execute` 启动的外部工具，消除 `libcurl.so.4: no version information available` 一类因 ABI 错配导致的工具失效；LLM 供应商 HTTP 401/403/429 不再统一归一化为 `AIRY_ERR_IO`，改为返回可区分的鉴权/限流错误码，用户不再被\"网络请求失败\"误导去排查并不存在的网络故障，仅 `http_code == 0`（连接确实未建立）仍报网络错误；未配置密钥时不再发送空的 `Authorization` 头，并在日志中明确告警；鉴权、模型与参数类确定性失败不再触发外层 4 次 × 内层 5 次的请求风暴，报错更快且不会触发供应商侧风控；启动阶段适配器暂不可用降级为提示日志，不再记为 ERROR；LLM 供应商单次超时收敛为 70s 并引入 5s 快失败门限，使一次 `complete` 的最坏总耗时（3×5s+70s=85s）始终小于网关 90s 转发背压，精确的鉴权/限流/连接失败诊断不再被网关超时吞掉。\n- **社区反馈六类问题修复（安装/更新/启动/稳定/长对话/长任务）**：安装器补齐 `detect_existing_install()` 定义；修复 Debian 系加载器上 aarch64 的架构误判，改以 userland 位宽为权威判据；发布渠道白名单三副本收敛为 `stable|rc|beta`，RISC-V 撤出预编译白名单并明示源码构建指引；CLI 对话主路径统一经网关 `llm.complete`；对话历史引入环形窗口裁剪，reasoning 累计封顶并按轮转写日志；网关等待可取消、超时可一跳诊断；默认 REPL 直接显示拼音候选栏。\n- **核心运行稳定性**：corekern 内核经 `airy_init()` 正式接入 CLI 启动链路，并输出可追溯的启动证据；修复 IPC 通道、IPC 回复路由、binder 关闭顺序与零长度分配等一批崩溃/泄漏缺陷。\n- **终端体验**：TUI 在收到致命信号时恢复终端状态（不再残留乱码或隐藏光标）；正确消费终端 OSC 回复并新增标题分隔线；背景色解析零初始化，避免随机色值；按键刷新改用 `AIRY_MEMCPY_SAFE`，消除未定义行为。\n- **安全加固**：网关入口鉴权与监听绑定加固；commons、gateway、corekern 引入 ASan/UBSan 消毒器质量门禁，内存安全缺陷在合并前拦截。\n- **构建与诊断**：新增 `AIRY_KEEP_SYMBOLS` 开关，发布包可按需保留符号用于现场诊断。\n- **发布工程**：九项质量门禁在发布平面统一执行；Windows 两条构建腿串行化，规避并发资源争用导致的构建抖动；新增 9.8 发布门禁，组 A~L 共 32 项断言入 ctest `release_gates`（linux+macos required），CI sdk 取料 fail-closed。\n\n## 2. 平台支持\n\n- Linux（主力平台）：x86-64 / x86-32 / arm-64 / arm-32\n- macOS：arm-64（Apple Silicon）/ x86-64（Intel）\n- Windows：x86-64 / x86-32\n\n## 3. 安装\n\n```bash\ncurl -fsSL https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/install.sh | bash\n```\n\nWindows（PowerShell）：\n```powershell\nirm https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/install.ps1 | iex\n```\n\n## 4. 本版变更\n\n* latest: refresh the launcher to match the sdk update source\n* subprojects: 更新所有子模块commit哈希\n* cli/chat: cap per-turn reasoning accumulation and rotate its log\n* cli/gw: make gateway waits cancelable and timeouts diagnosable\n* tui/history: cap conversation history with a ring window\n* cli/chat: route the chat main path through gateway llm.complete\n* scripts: withdraw RISC-V from the prebuilt arch whitelist\n* scripts: converge release-channel whitelist to stable|rc|beta\n* scripts: make userland bitness the authoritative arch evidence\n* cli/tui: show the pinyin candidate bar in the default REPL\n* scripts: fix aarch64 misdetection on Debian-family loaders\n* scripts: define the missing detect_existing_install()",
       "artifacts": {
         "linux-arm-32": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-linux-arm-32.tar.gz",
-          "sha256": "e58acacfbc337992b1fe8ce9d9559a3b0df24e0daf2f0e731bc879c93281cc20",
-          "size": 35840938
+          "sha256": "beb3c5d5efe16d009ada436b5b45c6faea256fb0ed35c4473a14a024ef2c2b6b",
+          "size": 35842840
         },
         "linux-arm-64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-linux-arm-64.tar.gz",
-          "sha256": "441a9ed8918f7e7d1a327149905bb9c3dad753632ce77fca680c53854a63bd42",
-          "size": 37412910
+          "sha256": "e096e32055209a7e75743c7cf9da3c48b1b034af8fc3864690aaea5f7dd20322",
+          "size": 37414485
         },
         "linux-x86-32": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-linux-x86-32.tar.gz",
-          "sha256": "baf1fe7db99e0b89390e82baa24c9010cde620ba8ab0b1266b6449f933d749db",
-          "size": 35843736
+          "sha256": "2ccab5b3d7ea9863c5e7efe139793f15af6dbf7968496a64de0b0fb7104eeef3",
+          "size": 35841878
         },
         "linux-x86-64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-linux-x86-64.tar.gz",
-          "sha256": "e5a6bfd2be8de67ebf2ac63e637bc0f0cdad3cbcd8ea273737c593a9c163edf8",
-          "size": 37956468
+          "sha256": "62b642818a5edd7b0a9e19b79638650b8cc02779129fefeb4a00d837590c698c",
+          "size": 37959347
         },
         "macos-arm-64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-macos-arm-64.tar.gz",
-          "sha256": "efa1dba67aef3e06ec7c49a35e8adec603142639cf83d6d59c834fb717b25ed1",
-          "size": 22684914
+          "sha256": "d08f9234811d9ba01755682bc766774fd153206f5f78bd833d7f85a52371ede2",
+          "size": 22685556
         },
         "macos-x86-64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-macos-x86-64.tar.gz",
-          "sha256": "310d25d6f6b99eebd8c40a34cf6bab5e24b9fa6a23f0b303f2dae45ca68d7a30",
-          "size": 23044451
+          "sha256": "4701757d4b3d27971421356f1da61a2d4cbe9006d2e3dcd6d4a8f780f6cb1647",
+          "size": 23046299
         },
         "windows-x86-32": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-windows-x86-32.zip",
-          "sha256": "120eeec4cb5e927929a8662587f529ee46620d91a25ec4b5199f14125dd18caf",
-          "size": 56917496
+          "sha256": "0f7c673fe9bd992f3d56b2618015c94d1baced5fd1bd9db3c481a7b5eea5161f",
+          "size": 56918865
         },
         "windows-x86-64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-windows-x86-64.zip",
-          "sha256": "273476f290c19ad3734aa5b3d971f883664f534150b4385eca62198cd0261924",
-          "size": 57755433
+          "sha256": "2d2b179921c5ac74a75e7263db6734ead673f55bcfb8feea4792e23e1a368549",
+          "size": 57756478
         },
         "linux-arm32": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-linux-arm-32.tar.gz",
-          "sha256": "e58acacfbc337992b1fe8ce9d9559a3b0df24e0daf2f0e731bc879c93281cc20",
-          "size": 35840938
+          "sha256": "beb3c5d5efe16d009ada436b5b45c6faea256fb0ed35c4473a14a024ef2c2b6b",
+          "size": 35842840
         },
         "linux-armv7l": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-linux-arm-32.tar.gz",
-          "sha256": "e58acacfbc337992b1fe8ce9d9559a3b0df24e0daf2f0e731bc879c93281cc20",
-          "size": 35840938
+          "sha256": "beb3c5d5efe16d009ada436b5b45c6faea256fb0ed35c4473a14a024ef2c2b6b",
+          "size": 35842840
         },
         "linux-arm64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-linux-arm-64.tar.gz",
-          "sha256": "441a9ed8918f7e7d1a327149905bb9c3dad753632ce77fca680c53854a63bd42",
-          "size": 37412910
+          "sha256": "e096e32055209a7e75743c7cf9da3c48b1b034af8fc3864690aaea5f7dd20322",
+          "size": 37414485
         },
         "linux-aarch64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-linux-arm-64.tar.gz",
-          "sha256": "441a9ed8918f7e7d1a327149905bb9c3dad753632ce77fca680c53854a63bd42",
-          "size": 37412910
+          "sha256": "e096e32055209a7e75743c7cf9da3c48b1b034af8fc3864690aaea5f7dd20322",
+          "size": 37414485
         },
         "linux-x86": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-linux-x86-32.tar.gz",
-          "sha256": "baf1fe7db99e0b89390e82baa24c9010cde620ba8ab0b1266b6449f933d749db",
-          "size": 35843736
+          "sha256": "2ccab5b3d7ea9863c5e7efe139793f15af6dbf7968496a64de0b0fb7104eeef3",
+          "size": 35841878
         },
         "linux-i686": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-linux-x86-32.tar.gz",
-          "sha256": "baf1fe7db99e0b89390e82baa24c9010cde620ba8ab0b1266b6449f933d749db",
-          "size": 35843736
+          "sha256": "2ccab5b3d7ea9863c5e7efe139793f15af6dbf7968496a64de0b0fb7104eeef3",
+          "size": 35841878
         },
         "linux-x64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-linux-x86-64.tar.gz",
-          "sha256": "e5a6bfd2be8de67ebf2ac63e637bc0f0cdad3cbcd8ea273737c593a9c163edf8",
-          "size": 37956468
+          "sha256": "62b642818a5edd7b0a9e19b79638650b8cc02779129fefeb4a00d837590c698c",
+          "size": 37959347
         },
         "linux-x86_64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-linux-x86-64.tar.gz",
-          "sha256": "e5a6bfd2be8de67ebf2ac63e637bc0f0cdad3cbcd8ea273737c593a9c163edf8",
-          "size": 37956468
+          "sha256": "62b642818a5edd7b0a9e19b79638650b8cc02779129fefeb4a00d837590c698c",
+          "size": 37959347
         },
         "macos-arm64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-macos-arm-64.tar.gz",
-          "sha256": "efa1dba67aef3e06ec7c49a35e8adec603142639cf83d6d59c834fb717b25ed1",
-          "size": 22684914
+          "sha256": "d08f9234811d9ba01755682bc766774fd153206f5f78bd833d7f85a52371ede2",
+          "size": 22685556
         },
         "macos-aarch64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-macos-arm-64.tar.gz",
-          "sha256": "efa1dba67aef3e06ec7c49a35e8adec603142639cf83d6d59c834fb717b25ed1",
-          "size": 22684914
+          "sha256": "d08f9234811d9ba01755682bc766774fd153206f5f78bd833d7f85a52371ede2",
+          "size": 22685556
         },
         "macos-x64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-macos-x86-64.tar.gz",
-          "sha256": "310d25d6f6b99eebd8c40a34cf6bab5e24b9fa6a23f0b303f2dae45ca68d7a30",
-          "size": 23044451
+          "sha256": "4701757d4b3d27971421356f1da61a2d4cbe9006d2e3dcd6d4a8f780f6cb1647",
+          "size": 23046299
         },
         "macos-x86_64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-macos-x86-64.tar.gz",
-          "sha256": "310d25d6f6b99eebd8c40a34cf6bab5e24b9fa6a23f0b303f2dae45ca68d7a30",
-          "size": 23044451
+          "sha256": "4701757d4b3d27971421356f1da61a2d4cbe9006d2e3dcd6d4a8f780f6cb1647",
+          "size": 23046299
         },
         "windows-x86": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-windows-x86-32.zip",
-          "sha256": "120eeec4cb5e927929a8662587f529ee46620d91a25ec4b5199f14125dd18caf",
-          "size": 56917496
+          "sha256": "0f7c673fe9bd992f3d56b2618015c94d1baced5fd1bd9db3c481a7b5eea5161f",
+          "size": 56918865
         },
         "windows-i686": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-windows-x86-32.zip",
-          "sha256": "120eeec4cb5e927929a8662587f529ee46620d91a25ec4b5199f14125dd18caf",
-          "size": 56917496
+          "sha256": "0f7c673fe9bd992f3d56b2618015c94d1baced5fd1bd9db3c481a7b5eea5161f",
+          "size": 56918865
         },
         "win-x86": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-windows-x86-32.zip",
-          "sha256": "120eeec4cb5e927929a8662587f529ee46620d91a25ec4b5199f14125dd18caf",
-          "size": 56917496
+          "sha256": "0f7c673fe9bd992f3d56b2618015c94d1baced5fd1bd9db3c481a7b5eea5161f",
+          "size": 56918865
         },
         "win-i686": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-windows-x86-32.zip",
-          "sha256": "120eeec4cb5e927929a8662587f529ee46620d91a25ec4b5199f14125dd18caf",
-          "size": 56917496
+          "sha256": "0f7c673fe9bd992f3d56b2618015c94d1baced5fd1bd9db3c481a7b5eea5161f",
+          "size": 56918865
         },
         "windows-x64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-windows-x86-64.zip",
-          "sha256": "273476f290c19ad3734aa5b3d971f883664f534150b4385eca62198cd0261924",
-          "size": 57755433
+          "sha256": "2d2b179921c5ac74a75e7263db6734ead673f55bcfb8feea4792e23e1a368549",
+          "size": 57756478
         },
         "windows-x86_64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-windows-x86-64.zip",
-          "sha256": "273476f290c19ad3734aa5b3d971f883664f534150b4385eca62198cd0261924",
-          "size": 57755433
+          "sha256": "2d2b179921c5ac74a75e7263db6734ead673f55bcfb8feea4792e23e1a368549",
+          "size": 57756478
         },
         "win-x64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-windows-x86-64.zip",
-          "sha256": "273476f290c19ad3734aa5b3d971f883664f534150b4385eca62198cd0261924",
-          "size": 57755433
+          "sha256": "2d2b179921c5ac74a75e7263db6734ead673f55bcfb8feea4792e23e1a368549",
+          "size": 57756478
         },
         "win-x86_64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/agentrt-v0.1.15-windows-x86-64.zip",
-          "sha256": "273476f290c19ad3734aa5b3d971f883664f534150b4385eca62198cd0261924",
-          "size": 57755433
+          "sha256": "2d2b179921c5ac74a75e7263db6734ead673f55bcfb8feea4792e23e1a368549",
+          "size": 57756478
         }
       }
     }
