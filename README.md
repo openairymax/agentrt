@@ -45,22 +45,30 @@ One command, no compilation required. The installer detects the platform,
 downloads the matching prebuilt package, and verifies it:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh | bash
+curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
+  | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
+  | bash
 ```
 
-If GitHub raw content is not reachable from your network, the equivalent script
-is published with every release:
+This entry reads the installer straight from the `main` branch and is therefore
+always current. If `python3` is not available, use the script attached to the
+latest release instead:
 
 ```bash
-curl -fsSL https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/install.sh | bash
+curl -fsSL https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh | bash
 ```
+
+Note: pipe into `bash`, not `sh` — `sh` (dash) does not forward positional
+arguments, so `--prefix`, `--channel` and similar flags would be silently
+dropped. When an attached script is saved to disk and executed there, the
+installer self-updates to the newest version.
 
 ### Windows
 
 A native PowerShell installer is published for x86-64 and x86-32:
 
 ```powershell
-irm https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/install.ps1 | iex
+irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 | iex
 ```
 
 ### Options
@@ -322,7 +330,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and coding
 conventions. Run the test suite locally before opening a pull request; CI
 enforces the same quality gates.
 
-- Report bugs or request features: <https://github.com/openairymax/agentrt/issues>
+- Report bugs or request features: <https://atomgit.com/openairymax/agentrt/issues>
 - Security vulnerabilities: see [SECURITY.md](SECURITY.md). Please do not file
   a public issue for anything exploitable.
 - Support and questions: [SUPPORT.md](SUPPORT.md)

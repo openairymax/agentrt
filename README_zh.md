@@ -40,21 +40,28 @@
 一行命令，无需编译。安装器自动识别平台、下载匹配的预构建包并完成校验：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/openairymax/agentrt/main/scripts/install.sh | bash
+curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
+  | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
+  | bash
 ```
 
-若当前网络无法访问 GitHub raw，可使用随发布包一同提供的等价脚本：
+该入口直接读取 `main` 分支上的安装器，始终是最新版。若环境没有 `python3`，
+可改用随最新发布一同提供的附件脚本：
 
 ```bash
-curl -fsSL https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/install.sh | bash
+curl -fsSL https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh | bash
 ```
+
+注意：请用 `bash`（而非 `sh`）执行管道安装——`sh`（dash）不接收位置参数，
+`--prefix`、`--channel` 等选项会静默失效。附件脚本下载为文件后再执行时，
+安装器会自动更新自身到最新版本。
 
 ### Windows
 
 x86-64 与 x86-32 均提供原生 PowerShell 安装器：
 
 ```powershell
-irm https://atomgit.com/openairymax/agentrt/releases/download/v0.1.15/install.ps1 | iex
+irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 | iex
 ```
 
 ### 可选参数
@@ -293,7 +300,7 @@ airymaxrt update --rollback   # 回滚到上一版本
 开发流程与编码约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。提交 Pull Request
 前请在本地跑通测试套件，CI 会执行同样的质量门禁。
 
-- 缺陷反馈与功能建议：<https://github.com/openairymax/agentrt/issues>
+- 缺陷反馈与功能建议：<https://atomgit.com/openairymax/agentrt/issues>
 - 安全漏洞：见 [SECURITY.md](SECURITY.md)。请勿直接开公开 issue 讨论可被利用的问题。
 - 获取支持：[SUPPORT.md](SUPPORT.md)
 
