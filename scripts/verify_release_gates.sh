@@ -20,6 +20,9 @@
 #   K  （可选）   发布侧 publish-release.sh 白名单契约（本地可达才断言）
 #   L  §4.10 R-5  provider 默认超时 < 网关 LLM 转发背压（连不上网络：精确诊断
 #                 不被网关超时吞掉；含重试最坏总耗时上界）
+#   M  §4.10 R-6  PDP 双 Schema 兼容 + external 授权集 ⊇ /mcp tools/list 暴露集
+#                 （工具不可用：/mcp tools/call 以 external 主体过 PEP，缺任一
+#                 工具授权即 fail-closed 返回 -32603）
 #
 # 跨仓判据（B/J/部分 H/I）依赖 sdk 仓 airymaxrt。探测顺序：
 #   1. AIRY_GATE_SDK_AIRYMAXRT 显式指定（CI 取料 step 用；指定但缺失 → FAIL）
@@ -510,6 +513,91 @@ if [ -n "$_prov_to" ] && [ -n "$_gw_ms" ] && [ -n "$_retries" ] && [ -n "$_fast_
     fi
 else
     bad "L3 缺 LLM_MAX_RETRIES / LLM_RETRY_FAST_FAIL_MS 或其使用点（重试预算护栏缺失）"
+fi
+
+# ============================================================
+# 组 M · §4.10 R-6 工具授权面 ⊇ MCP 暴露面（双 Schema 解析防回归）
+# ============================================================
+# 现象："各种工具不可用"——MCP 客户端 tools/list 能列出工具，tools/call 一律
+# 返回 -32603。根因：同一份 permission_rules.yaml 被两个解析器按不同 Schema
+# 读取——daemon_security（daemons/common）读 {agent,tool,effect}，PDP
+# （cupolas permission_rule.c）原生读 {agent,action,resource,allow}。后者
+# "resource" 回退 "*"、"allow" 回退 false ⇒ 134 条规则全部 fail-closed deny。
+# 本组断言：① PDP 解析器保留 ACL Schema 别名（防双 Schema 冲突回归）；
+# ② 网关工具执行路径经 PEP；③ 模板 external 授权集覆盖 /mcp 暴露的全部工具。
+section "M" "R-6 工具授权面 ⊇ MCP 暴露面（双 Schema 解析防回归）"
+
+PDP_RULE_C="$ROOT/cupolas/src/permission/permission_rule.c"
+MCP_BUILTIN="$ROOT/daemons/tool_d/src/service_builtin.c"
+GW_BACKEND="$ROOT/gateway/src/biz/gateway_biz_backend.c"
+
+# M1 · PDP 解析器兼容 ACL Schema（resource←tool / allow←effect）
+if grep -Fq 'cupolas_permission_rule_resource' "$PDP_RULE_C" \
+   && grep -Fq 'cupolas_permission_rule_allow' "$PDP_RULE_C" \
+   && grep -Fq 'yaml_get(entry, "tool")' "$PDP_RULE_C" \
+   && grep -Fq 'yaml_get(entry, "effect")' "$PDP_RULE_C"; then
+    ok "M1 PDP 解析器兼容 ACL Schema（resource←tool / allow←effect），双 Schema 冲突已修"
+else
+    bad "M1 permission_rule.c 缺 tool→resource / effect→allow 别名（双 Schema 冲突回归，/mcp 工具将被 fail-closed 全拒）"
+fi
+
+# M2 · 网关工具执行路径接入 PEP（gw_acl_check_tool）
+if grep -Fq 'gw_acl_check_tool' "$GW_BACKEND"; then
+    ok "M2 网关工具执行路径经 PEP 判定（gw_acl_check_tool）"
+else
+    bad "M2 gateway 工具执行路径未接入 PEP（gw_acl_check_tool 缺失，权限判定旁路）"
+fi
+
+# M3 · /mcp 暴露工具集（tool_d service_builtin.c 的 .id 为 SSoT）
+if [ ! -f "$MCP_BUILTIN" ]; then
+    bad "M3 缺失 MCP 工具 SSoT: $MCP_BUILTIN"
+else
+    _mcp_tools="$TMP/mcp_tools.txt"
+    sed -n 's/^[[:space:]]*\.id = "\([^"]*\)".*/\1/p' "$MCP_BUILTIN" > "$_mcp_tools"
+    _mcp_n="$(wc -l < "$_mcp_tools" | tr -d ' ')"
+
+    # 模板探测顺序：显式指定 → CI 取料（_tools）→ hub 本地布局（tools 并列）
+    PERM_TMPL=""
+    _tools_root="${AIRY_GATE_TOOLS_ROOT:-}"
+    for _cand in "${_tools_root:+$_tools_root/scripts/ops/templates/permission_rules.yaml}" \
+                 "$ROOT/_tools/scripts/ops/templates/permission_rules.yaml" \
+                 "$ROOT/../../tools/scripts/ops/templates/permission_rules.yaml"; do
+        if [ -n "$_cand" ] && [ -f "$_cand" ]; then PERM_TMPL="$_cand"; break; fi
+    done
+
+    if [ "$_mcp_n" -lt 15 ]; then
+        bad "M3 /mcp 暴露工具数 $_mcp_n < 15（内置工具集被删减）"
+    elif [ -z "$PERM_TMPL" ]; then
+        if [ -n "$_tools_root" ]; then
+            bad "M3 AIRY_GATE_TOOLS_ROOT 显式指定但模板缺失（$AIRY_GATE_TOOLS_ROOT）"
+        else
+            skip "M3 未取到 tools 仓 permission_rules.yaml（本地无 tools 仓）；CI 侧由取料 step fail-closed 兜底"
+        fi
+    else
+        _ext_tools="$TMP/ext_tools.txt"
+        awk '
+            $1 == "-" && $2 == "agent:" { a = $3; gsub(/"/, "", a); next }
+            $1 == "tool:" { t = $2; gsub(/"/, "", t); if (a == "external") print t }
+        ' "$PERM_TMPL" > "$_ext_tools"
+        _miss=0
+        while IFS= read -r _t; do
+            [ -n "$_t" ] || continue
+            grep -qxF "$_t" "$_ext_tools" \
+                || { bad "M3 external 缺工具授权: $_t（/mcp tools/call 将 -32603）"; _miss=1; }
+        done < "$_mcp_tools"
+        if [ "$_miss" -eq 0 ]; then
+            ok "M3 external 授权集 ⊇ /mcp tools/list 暴露集（$_mcp_n 个工具全覆盖）"
+        fi
+
+        # M4 · external 保有网关高敏能力授权（T-11b agent.run 收口）
+        _capmiss=0
+        for _cap in cap:agent.run cap:agent.control; do
+            grep -qxF "$_cap" "$_ext_tools" \
+                || { bad "M4 external 缺高敏能力授权: $_cap"; _capmiss=1; }
+        done
+        [ "$_capmiss" -eq 0 ] \
+            && ok "M4 external 保有 cap:agent.run / cap:agent.control（T-11b 网关高敏入口授权）"
+    fi
 fi
 
 # ============================================================
