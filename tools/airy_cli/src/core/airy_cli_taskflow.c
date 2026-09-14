@@ -16,7 +16,9 @@
 #include "cli_review.h"
 #include "cli_gw.h"
 #include "airy_cli_exec.h"
-#include "task.h"
+/* 0.1.16 B2：corekern task.h 已摘除，airy_task_plan_t 来自 coreloopthree
+ * cognition.h（经 cli_internal.h/airy_cli_exec.h 传入），错误码由
+ * airy_types.h 提供。 */
 
 #ifdef AIRY_HAS_CJSON
 #include <cjson/cJSON.h>

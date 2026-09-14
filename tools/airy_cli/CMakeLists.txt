@@ -90,6 +90,9 @@ add_executable(airy_cli
 # airy_taskflow / svc_common 已无符号引用（本地 cog 装配与本地 DAG 适配
 # 退役，全量经 gateway 派发），从链接集移除；chat 经 llm/tool service
 # 客户端（llm_response_*/tool_approval_*），二者保留。
+# 0.1.16 B2（CLI 进程内 corekern 收回，2026-09-14 裁决）：airy_atoms（微
+# 核心）从链接集移除——CLI 是 gateway 纯客户端，任务/查询/规划全量经
+# gateway → daemon 派发，进程内不再实例化微内核（airy_init() 已摘除）。
 if(TARGET airy_llm_service AND TARGET airy_tool_service)
     if(UNIX AND NOT APPLE)
         target_link_libraries(airy_cli PRIVATE
@@ -99,7 +102,6 @@ if(TARGET airy_llm_service AND TARGET airy_tool_service)
             airy_tool_service
             airy_core
             airy_memory
-            airy_atoms
             airy_common
             "-Wl,--end-group"
         )
@@ -110,7 +112,6 @@ if(TARGET airy_llm_service AND TARGET airy_tool_service)
             airy_tool_service
             airy_core
             airy_memory
-            airy_atoms
             airy_common
         )
     endif()
@@ -121,7 +122,6 @@ if(TARGET airy_llm_service AND TARGET airy_tool_service)
 else()
     target_link_libraries(airy_cli PRIVATE
         airy_coreloopthree
-        airy_atoms
         airy_core
         airy_memory
     )
@@ -153,9 +153,9 @@ set(CLI_INC_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/render
     ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/coreloopthree/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/taskflow/include
-    # 0a 地基归位：airy_rt.h 为 atoms/corekern 头，显式声明依赖（此前借道
-    # commons 的 PUBLIC include 间接获得——已摘除，此处为显式引路）
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/corekern/include
+    # 0.1.16 B2/B4（include 面收口）：corekern include 路径已摘除——CLI
+    # 不再引用 atoms/corekern 任何头文件（airy_rt.h/task.h 均已替换为
+    # commons airy_types.h / coreloopthree cognition.h）。
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/memory
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/string

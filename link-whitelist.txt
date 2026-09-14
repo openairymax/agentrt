@@ -23,6 +23,13 @@
 #   执行体集中化历史形态（llm/tool 执行引擎库在进程内复用），登记为
 #   事实基线；后续 M 阶段重构为总线调用后可收紧该允许集。
 #
+# 架构约束（0.1.16 B4，2026-09-14 裁决③）: 第 2 句铁律「内核机制只被
+#   daemon 服务面访问」的链接面判据——客户端目标（airy_cli/gateway 系）
+#   禁链 airy_atoms 微核心聚合；airy_core（libairy_core.a）仅允许为解析
+#   coreloopthree 无状态时间符号（airy_time_*）而出现在工具节点允许集，
+#   任何目标出现 airy_init/airy_oom_*/airy_persist_* 机制符号引用即为
+#   违规（发布门禁 B4 组机器断言：nm 扫描 fail-closed）。
+#
 # 事实基线（2026-09-02 实测，gateway/CMakeLists.txt L172-180、
 #   daemons/gateway_d/CMakeLists.txt L110-166/L439-458）:
 gateway: svc_common airy_syscall airy_protocols airy_common airy_memory
@@ -47,4 +54,6 @@ maths_d: airy_platform_libs airy_common svc_common
 # CLI 是 gateway 纯客户端：任务执行/查询/规划全量经 gateway 派发，不再
 # 进程内持本地 cog/DAG 适配——airy_cognition / airy_taskflow / svc_common
 # 已无符号引用（chat 经 llm/tool service 客户端 llm_response_*/tool_approval_*）。
-airy_cli: airy_coreloopthree airy_llm_service airy_tool_service airy_core airy_memory airy_atoms airy_common
+# 0.1.16 B2（CLI 进程内 corekern 收回，2026-09-14 裁决）：airy_atoms 移除
+# ——CLI 进程内微内核实例化已全量收回，零 corekern 符号依赖（构建期门禁）。
+airy_cli: airy_coreloopthree airy_llm_service airy_tool_service airy_core airy_memory airy_common

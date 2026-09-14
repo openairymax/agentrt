@@ -26,7 +26,7 @@
  *   airy_cli_taskflow.c  任务执行管线（规划 → DAG → 提交 → 轮询 → 等待 → 结果）
  */
 
-#include "airy_rt.h"
+#include <airy_types.h> /* 0.1.16 B2: userspace error contract (commons SSoT) */
 #include "loop.h"
 #include "cli_gw.h"
 #include "platform.h"
@@ -173,24 +173,24 @@ int main(int argc, char *argv[])
         cli_tui_pin_header(tui);
     }
 
-    /* WS-8 stage 4 (8.4.1): bring up the corekern core (mem/oom/task/ipc/
-     * eventloop/persist) before the CLI pipeline (mechanism layer first,
-     * policy layer second). airy_init() is idempotent; on failure the CLI
-     * still runs on platform fallbacks (non-fatal, badge=0). */
+    /* 0.1.16 B2 (design §5.2): the CLI is a pure gateway client — no
+     * in-process microkernel (airy_init() withdrawn, 2026-09-14 ruling).
+     * Boot evidence is a gateway reachability probe (HTTP /health); the
+     * retired "badge=0 degraded" concept no longer applies: offline gateway
+     * only means calls will fail until it is up, not a degraded kernel. */
     {
-        int core_ret = airy_init();
+        int gw_up = cli_gw_health(2000);
         /* Boot evidence goes to stderr, not AIRY_LOG_*: main() pins the
          * module level to LOG_LEVEL_ERROR, which would silence INFO/WARN
          * evidence lines entirely. stderr is the CLI's boot diagnostic
          * channel (same as the log-dir fallback above); in TUI mode it is
          * dup2'ed into airy_cli.log, in -p mode it stays on the real
-         * stderr. The 8.4.2 runtime gate greps this line. */
-        if (core_ret == AIRY_SUCCESS) {
-            fprintf(stderr, "[airy_cli] corekern core initialized"
-                            " (airy_cli runs on corekern)\n");
+         * stderr. */
+        if (gw_up == 1) {
+            fprintf(stderr, "[airy_cli] gateway reachable - client mode ready\n");
         } else {
-            fprintf(stderr, "[airy_cli] corekern init failed (%d)"
-                            " - running degraded (badge=0)\n", core_ret);
+            fprintf(stderr, "[airy_cli] gateway unreachable -"
+                            " calls will fail until it is up\n");
         }
     }
 

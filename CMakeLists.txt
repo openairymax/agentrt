@@ -786,7 +786,10 @@ if(AIRY_BUILD_ALL)
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/sync
         # P0.17 阶段 1: airy_defaults.h 位于 commons/include
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/atoms/corekern/include
+        # 0.1.16 B4（include 面收口，2026-09-14 裁决③）：corekern include
+        # 不再进入全局面——可见面收缩为「atoms 内部（airy_core/coreloopthree
+        # PRIVATE）+ daemons 服务面（daemons/ 目录级注入）」。gateway/CLI/
+        # cupolas 等客户端面不再看见内核头。
         ${CMAKE_CURRENT_SOURCE_DIR}/protocols/include
         # daemons/common/include 作为兼容层放在最后（仅 daemons 自己需要，
         # atoms 应通过上述 commons 权威路径解析已迁移的头文件）
@@ -802,7 +805,8 @@ if(AIRY_BUILD_ALL)
     if(AIRY_ATOMS_PREBUILT_DIR)
         airy_print_ok("Atoms prebuilt include dirs: ${AIRY_ATOMS_PREBUILT_DIR}")
         include_directories(
-            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/corekern/include
+            # 0.1.16 B4：corekern 头不再全局注入（含预编译镜像），改由
+            # AIRY_COREKERN_INCLUDE_DIR 供 atoms 内部与 daemons 服务面按需获取。
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/include
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/src/cognition
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/src/cognition/grad
@@ -830,7 +834,6 @@ if(AIRY_BUILD_ALL)
         commons/utils/types
         commons/utils/sync
         commons/include
-        atoms/corekern/include
         protocols/include
         daemons/common/include
         gateway/src
@@ -950,6 +953,16 @@ if(AIRY_BUILD_ALL)
     endif()
 
     # 包含子目录（构建顺序：commons 优先于 atoms）
+    # 0.1.16 B4（include 面收口）：corekern 头的权威路径变量——供 atoms
+    # 内部目标（airy_core/coreloopthree，PRIVATE）与 daemons 服务面
+    # （daemons/ 目录级注入）按需获取；客户端面（gateway/CLI/cupolas）
+    # 不再获得该路径。
+    if(AIRY_ATOMS_PREBUILT_DIR)
+        set(AIRY_COREKERN_INCLUDE_DIR "${AIRY_ATOMS_PREBUILT_DIR}/atoms/corekern/include")
+    else()
+        set(AIRY_COREKERN_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/atoms/corekern/include")
+    endif()
+
     if(BUILD_COMMONS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/commons/CMakeLists.txt")
         add_subdirectory(commons)
     else()
@@ -1029,7 +1042,9 @@ if(AIRY_BUILD_ALL)
     )
 
     # 安装头文件（0.1.9 0d 扁平化后仅装公共头，排除 .c 与内部头）
-    install(DIRECTORY atoms/corekern/include/ DESTINATION include/agentrt/corekern)
+    # 0.1.16 B4（2026-09-14 裁决③）：corekern 内核头移出发布安装面——
+    # 内核机制只被 daemon 服务面访问，客户端/下游不消费内核头；agent-linux
+    # 的 uapi 头经其自身发行渠道交付。
     install(DIRECTORY atoms/coreloopthree/include/ DESTINATION include/agentrt/coreloopthree)
     install(DIRECTORY atoms/syscall/include/ DESTINATION include/agentrt/syscall)
     install(DIRECTORY commons/utils/memory/ DESTINATION include/agentrt/commons/memory
