@@ -199,19 +199,28 @@ if(BUILD_TESTS)
     # 端到端往返——本进程内 mock HTTP/1.1 服务端 + 真实 loopback socket，
     # 覆盖端点发现/调用往返/失败分诊/取消/可达性（12 用例）。cli_gw.c 仅
     # 经宏展开引用 airy_common 的 airy_malloc/airy_log_write 等符号。
-    add_executable(test_cli_gw tests/test_cli_gw.c src/cmd/cli_gw.c)
-    target_include_directories(test_cli_gw PRIVATE ${CLI_INC_DIRS})
-    # AIRY_COMPLIANCE_IMPL：测试 TU 的 mock 服务端使用裸 memset/sscanf/free，
-    # 需豁免全局 banned_functions.h 毒化（与 gateway/tests 同策略）。
-    target_compile_definitions(test_cli_gw PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
-    if(AIRY_CJSON_INCLUDE_DIRS)
-        target_include_directories(test_cli_gw PRIVATE ${AIRY_CJSON_INCLUDE_DIRS})
+    #
+    # P25 模式（与 daemons 全树 Windows 中央关闭同策略；2026-09-14 windows
+    # 腿实证 C1083 后补门）：mock 服务端直引 POSIX 头面（arpa/inet.h /
+    # netinet/in.h / sys/socket.h / unistd.h）并以 pthread 起服务线程，
+    # MSVC 无对应头与线程垫片（commons/utils/compat 只垫 unistd/netdb/
+    # dirent，无 pthread shim），移植无低成本路径。覆盖由 POSIX 腿
+    # （linux/macos）保障；Windows 侧只跑可移植的 cli_classify_heuristic。
+    if(NOT WIN32)
+        add_executable(test_cli_gw tests/test_cli_gw.c src/cmd/cli_gw.c)
+        target_include_directories(test_cli_gw PRIVATE ${CLI_INC_DIRS})
+        # AIRY_COMPLIANCE_IMPL：测试 TU 的 mock 服务端使用裸 memset/sscanf/free，
+        # 需豁免全局 banned_functions.h 毒化（与 gateway/tests 同策略）。
+        target_compile_definitions(test_cli_gw PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
+        if(AIRY_CJSON_INCLUDE_DIRS)
+            target_include_directories(test_cli_gw PRIVATE ${AIRY_CJSON_INCLUDE_DIRS})
+        endif()
+        target_link_libraries(test_cli_gw PRIVATE airy_common Threads::Threads)
+        if(TARGET cJSON OR TARGET cjson)
+            target_link_libraries(test_cli_gw PRIVATE $<IF:$<TARGET_EXISTS:cJSON>,cJSON,cjson>)
+        elseif(AIRY_CJSON_LIBRARIES)
+            target_link_libraries(test_cli_gw PRIVATE ${AIRY_CJSON_LIBRARIES})
+        endif()
+        add_test(NAME cli_gw_e2e COMMAND test_cli_gw)
     endif()
-    target_link_libraries(test_cli_gw PRIVATE airy_common Threads::Threads)
-    if(TARGET cJSON OR TARGET cjson)
-        target_link_libraries(test_cli_gw PRIVATE $<IF:$<TARGET_EXISTS:cJSON>,cJSON,cjson>)
-    elseif(AIRY_CJSON_LIBRARIES)
-        target_link_libraries(test_cli_gw PRIVATE ${AIRY_CJSON_LIBRARIES})
-    endif()
-    add_test(NAME cli_gw_e2e COMMAND test_cli_gw)
 endif()
