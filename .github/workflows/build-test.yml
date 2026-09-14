@@ -20,6 +20,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# CI-3（0.1.16，附录 B.7）：跨仓门禁取料锁定 commit，杜绝默认分支 HEAD 快照
+# 漂移——release_gates 断言的是 sdk/tui/scripts/airymaxrt 与 tools/
+# permission_rules.yaml 的**具体内容**；上游 main 一推进判据内容即变，同一
+# agentrt 树会在两次 run 间一时绿一时红，且本地复现不可得。锁 SHA 后上游
+# 变更须**显式** bump 下列值才生效，漂移由静默转为可见。取值经
+# `git ls-remote <repo> refs/heads/main` 核验即为该仓 main 当前 HEAD。
+env:
+  GATE_SDK_SHA: 39c8406e15717c60fa3efd38793c5bce4f6ea390
+  GATE_TOOLS_SHA: b237a98e3dd9dac642fde8da1da9aa43957016dd
+
 jobs:
   # ==================== Linux 全量构建 + 测试 + 覆盖率门禁 ====================
   linux-build-test-coverage:
@@ -57,9 +67,15 @@ jobs:
           # tui 在 sdk 内是 gitlink 子模块，sparse-checkout 不会落盘其
           # 内容，必须显式 submodule update 才检出 tui/scripts/airymaxrt；
           # 末行 test 兜底，取料失败即红（fail-closed，不得静默降级）。
-          git clone -q --depth 1 --filter=blob:none --sparse \
+          # CI-3（0.1.16）：改为按 SHA 取料（见文件头 GATE_SDK_SHA，经
+          # ls-remote 核验为 sdk main HEAD）——不再跟随默认分支 HEAD，
+          # 上游判据漂移须显式 bump。fetch 后再 checkout，得到 detached
+          # 的锁定快照；submodule update 随该 commit 记录的 gitlink 锁定 tui。
+          git clone -q --filter=blob:none --sparse \
             "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/openairymax/sdk.git" \
             agent-workload/sdk
+          git -C agent-workload/sdk fetch -q --depth 1 origin "${{ env.GATE_SDK_SHA }}"
+          git -C agent-workload/sdk checkout -q "${{ env.GATE_SDK_SHA }}"
           git -C agent-workload/sdk submodule update --init --depth 1 -- tui
           test -f agent-workload/sdk/tui/scripts/airymaxrt
 
@@ -70,9 +86,13 @@ jobs:
           # tools/list 暴露集（防"工具齐列但不可调用"回归）。tools 不属
           # agent-workload 检出组，此处 sparse 浅克隆仅取模板。末行 test
           # 兜底，取料失败即红（fail-closed，不得静默降级）。
-          git clone -q --depth 1 --filter=blob:none --sparse \
+          # CI-3（0.1.16）：同 sdk 腿，按 SHA 取料（见文件头 GATE_TOOLS_SHA，
+          # 经 ls-remote 核验为 tools main HEAD）。
+          git clone -q --filter=blob:none --sparse \
             "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/openairymax/tools.git" \
             _tools
+          git -C _tools fetch -q --depth 1 origin "${{ env.GATE_TOOLS_SHA }}"
+          git -C _tools checkout -q "${{ env.GATE_TOOLS_SHA }}"
           git -C _tools sparse-checkout set scripts/ops/templates
           test -f _tools/scripts/ops/templates/permission_rules.yaml
 
@@ -138,6 +158,21 @@ jobs:
         run: |
           [ -f /tmp/ctest.log ] && bash .github/scripts/ci-debug-dump.sh "linux ctest" "/tmp/ctest.log" || true
           [ -f /tmp/ctest-rerun.log ] && bash .github/scripts/ci-debug-dump.sh "linux ctest rerun" "/tmp/ctest-rerun.log" || true
+
+      # CI-1（0.1.16，附录 B.7）：日志直传 artifact。ci-debug issue 依赖
+      # GH_TOKEN 与 issue 可见性——run #255/#256 ctest 红时无 artifact、issue
+      # 亦未产出，只能整份下载 job 日志，断言级明细不可达。artifact 无需凭据
+      # 即可从 run 页面下载，作为兜底取证通道。
+      - name: Upload ctest logs artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ctest-logs
+          path: |
+            /tmp/ctest.log
+            /tmp/ctest-rerun.log
+          if-no-files-found: ignore
+          retention-days: 14
 
       # 覆盖率门禁：低于阈值（COVERAGE_THRESHOLD）即失败，
       # 防止发行版功能回归（50-engineering-standards / TEST-03）。
@@ -235,9 +270,15 @@ jobs:
           # tui 在 sdk 内是 gitlink 子模块，sparse-checkout 不会落盘其
           # 内容，必须显式 submodule update 才检出 tui/scripts/airymaxrt；
           # 末行 test 兜底，取料失败即红（fail-closed，不得静默降级）。
-          git clone -q --depth 1 --filter=blob:none --sparse \
+          # CI-3（0.1.16）：改为按 SHA 取料（见文件头 GATE_SDK_SHA，经
+          # ls-remote 核验为 sdk main HEAD）——不再跟随默认分支 HEAD，
+          # 上游判据漂移须显式 bump。fetch 后再 checkout，得到 detached
+          # 的锁定快照；submodule update 随该 commit 记录的 gitlink 锁定 tui。
+          git clone -q --filter=blob:none --sparse \
             "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/openairymax/sdk.git" \
             agent-workload/sdk
+          git -C agent-workload/sdk fetch -q --depth 1 origin "${{ env.GATE_SDK_SHA }}"
+          git -C agent-workload/sdk checkout -q "${{ env.GATE_SDK_SHA }}"
           git -C agent-workload/sdk submodule update --init --depth 1 -- tui
           test -f agent-workload/sdk/tui/scripts/airymaxrt
 
@@ -248,9 +289,13 @@ jobs:
           # tools/list 暴露集（防"工具齐列但不可调用"回归）。tools 不属
           # agent-workload 检出组，此处 sparse 浅克隆仅取模板。末行 test
           # 兜底，取料失败即红（fail-closed，不得静默降级）。
-          git clone -q --depth 1 --filter=blob:none --sparse \
+          # CI-3（0.1.16）：同 sdk 腿，按 SHA 取料（见文件头 GATE_TOOLS_SHA，
+          # 经 ls-remote 核验为 tools main HEAD）。
+          git clone -q --filter=blob:none --sparse \
             "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/openairymax/tools.git" \
             _tools
+          git -C _tools fetch -q --depth 1 origin "${{ env.GATE_TOOLS_SHA }}"
+          git -C _tools checkout -q "${{ env.GATE_TOOLS_SHA }}"
           git -C _tools sparse-checkout set scripts/ops/templates
           test -f _tools/scripts/ops/templates/permission_rules.yaml
 
@@ -344,6 +389,18 @@ jobs:
           if [ -f /tmp/macos-rerun.log ]; then
             bash .github/scripts/ci-debug-dump.sh "macos ctest rerun" "/tmp/macos-rerun.log"
           fi
+
+      # CI-1（0.1.16）：与 linux 腿同口径，日志直传 artifact 作为免凭据兜底取证。
+      - name: Upload ctest logs artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-ctest-logs
+          path: |
+            /tmp/macos-ctest.log
+            /tmp/macos-rerun.log
+          if-no-files-found: ignore
+          retention-days: 14
 
   # ==================== Windows 跨平台构建门禁 ====================
   windows-build:
@@ -538,6 +595,20 @@ jobs:
           $rerunLog = Join-Path $env:RUNNER_TEMP "ctest-rerun.log"
           ctest --test-dir ${{ env.BUILD_DIR }} -C Release --output-on-failure --rerun-failed --timeout 240 2>&1 | Tee-Object -FilePath $rerunLog
           bash .github/scripts/ci-debug-dump.sh "windows ctest rerun" $rerunLog
+
+      # CI-1（0.1.16）：与 linux/macos 腿同口径，日志直传 artifact 作为免凭据
+      # 兜底取证（windows 日志在 RUNNER_TEMP 而非 /tmp）。
+      - name: Upload ctest logs artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ctest-logs
+          path: |
+            ${{ runner.temp }}/ctest.log
+            ${{ runner.temp }}/ctest-rerun.log
+            ${{ runner.temp }}/ctest-triage.log
+          if-no-files-found: ignore
+          retention-days: 14
 
   # ==================== MemoryRovol 独立构建门禁（OSS + PRO） ====================
   # 禁用：memoryrovol 为闭源仓（.gitmodules update=none，GitHub 不存在，
