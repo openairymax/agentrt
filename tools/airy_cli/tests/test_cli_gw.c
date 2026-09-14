@@ -121,8 +121,9 @@ static void mock_handle(int fd)
         return;
     buf[n] = '\0';
 
+    char method[8] = "";
     char path[64] = "";
-    (void)sscanf(buf, "POST %63s HTTP/1.1", path);
+    (void)sscanf(buf, "%7s %63s HTTP/1.1", method, path);
 
     char *he = strstr(buf, "\r\n\r\n");
     if (!he)
@@ -177,9 +178,14 @@ static void mock_handle(int fd)
     int mode = g_mode;
     pthread_mutex_unlock(&g_lock);
 
-    /* /health 与模式无关，恒回 healthy */
+    /* /health 按真实网关契约：仅 GET 返回 200 healthy，其他方法 404
+     * -32601（方法契约锁进 mock，防止探针方法回归）。 */
     if (strcmp(path, "/health") == 0) {
-        mock_send(fd, 200, "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"healthy\":true}}");
+        if (strcmp(method, "GET") == 0)
+            mock_send(fd, 200, "{\"status\":\"healthy\",\"version\":\"0.1.16\"}");
+        else
+            mock_send(fd, 404, "{\"jsonrpc\":\"2.0\",\"id\":null,"
+                               "\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}");
         return;
     }
     if (mode == MOCK_MODE_SILENT) {

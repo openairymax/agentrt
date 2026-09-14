@@ -212,8 +212,8 @@ static int cli_gw_connect(const char *host, int port, int timeout_ms)
 }
 
 /* ── HTTP 请求发送 + 响应体读取（返回 malloc'd body，调用方 AIRY_FREE）── */
-static int cli_gw_exchange(const char *host, int port, const char *path, const char *body,
-                           int timeout_ms, char **out_body, size_t *out_body_len)
+static int cli_gw_exchange(const char *method, const char *host, int port, const char *path,
+                           const char *body, int timeout_ms, char **out_body, size_t *out_body_len)
 {
     *out_body = NULL;
     *out_body_len = 0;
@@ -223,14 +223,14 @@ static int cli_gw_exchange(const char *host, int port, const char *path, const c
 
     char req[512];
     int reqn = snprintf(req, sizeof(req),
-                        "POST %s HTTP/1.1\r\n"
+                        "%s %s HTTP/1.1\r\n"
                         "Host: %s:%d\r\n"
                         "Content-Type: application/json\r\n"
                         "Content-Length: %zu\r\n"
                         "Connection: close\r\n"
                         "Accept: text/event-stream\r\n"
                         "\r\n",
-                        path, host, port, body ? strlen(body) : 0);
+                        method, path, host, port, body ? strlen(body) : 0);
     /* P2: snprintf returns the would-be length; if it exceeds the stack
      * buffer the header was truncated and the memcpy below would over-read. */
     if (reqn < 0 || (size_t)reqn >= sizeof(req)) {
@@ -565,7 +565,7 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
 
     char *resp = NULL;
     size_t rlen = 0;
-    int exchange_err = cli_gw_exchange(host, port, "/", body, timeout_ms, &resp, &rlen);
+    int exchange_err = cli_gw_exchange("POST", host, port, "/", body, timeout_ms, &resp, &rlen);
     AIRY_FREE(body);
     if (exchange_err == CLI_GW_EXCH_CANCELED) {
         AIRY_FREE(resp);
@@ -653,7 +653,9 @@ int cli_gw_health(int timeout_ms)
     cli_gw_endpoint(host, sizeof(host), &port);
     char *resp = NULL;
     size_t rlen = 0;
-    if (cli_gw_exchange(host, port, "/health", NULL, timeout_ms, &resp, &rlen) != 0) {
+    /* /health 仅支持 GET；此前误用 POST 得 404，导致网关健康时仍误报
+     * "gateway unreachable"（v0.1.16 现场缺陷根因）。 */
+    if (cli_gw_exchange("GET", host, port, "/health", NULL, timeout_ms, &resp, &rlen) != 0) {
         AIRY_FREE(resp);
         return 0;
     }
