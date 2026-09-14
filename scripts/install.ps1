@@ -74,6 +74,13 @@ $AIRY_VERSION = if ($env:AIRY_VERSION) { $env:AIRY_VERSION }
                 else { "v0.1.13" }
 $AIRY_REPO_URL = if ($env:AIRY_REPO_URL) { $env:AIRY_REPO_URL } else { "https://atomgit.com/openairymax/airymaxhub.git" }
 $AIRY_CHANNEL = if ($Channel) { $Channel } elseif ($env:AIRY_CHANNEL) { $env:AIRY_CHANNEL } else { "stable" }
+# 通道白名单（与 install.sh / 更新器 latest/airymaxrt 同口径；发布侧
+# tag 含 -rc → rc、-beta → beta）。非法通道显式拒绝，避免落到 manifest
+# 404 后被误读为“网络异常”（U-02 通道选择 fail-closed）。
+if (@('stable', 'rc', 'beta') -notcontains $AIRY_CHANNEL) {
+    Write-Err "非法 -Channel: $AIRY_CHANNEL（支持 stable|rc|beta）"
+    exit 1
+}
 $AIRY_SRC_DIR = Join-Path $AIRY_HOME "src\airymaxhub"
 $MODULES_DIR  = Join-Path $AIRY_HOME "modules"
 $BIN_DIR      = if ($BinDir) { $BinDir } elseif ($env:AIRY_BIN_DIR) { $env:AIRY_BIN_DIR } else { Join-Path $HOME ".local\bin" }
@@ -242,6 +249,15 @@ function Install-Binary {
             Write-Warn "不支持的处理器架构 $($env:PROCESSOR_ARCHITECTURE)，回退源码构建"; return $false
         }
         $json = Get-Content $man -Raw | ConvertFrom-Json
+        # U-02 通道状态门禁（2026-09-13）：保留通道（state=reserved）官方零制品，
+        # 显式 fail-closed（同 install.sh rc 2 语义），避免被误读为“本平台无包”
+        # 而静默下沉源码构建。缺省（旧 manifest 无 state 字段）视作 active。
+        if ($json.state -eq 'reserved') {
+            Write-Err "通道 $AIRY_CHANNEL 为保留通道（state=reserved），官方尚未发布任何制品"
+            Write-Err "当前可用：stable（生产）/ rc（候选）——请改用 -Channel stable"
+            $script:BinaryFatal = $true
+            return $false
+        }
         $art = $json.releases.($json.latest).artifacts.$plat
         # 旧两代 manifest 键兜底（windows-x64 / win-x86-64 / win-x64）
         if (-not $art) {
@@ -616,7 +632,8 @@ if (-not $releaseUrl -and $Mode -ne "source") {
         $releaseUrl = $manLocal
         Write-Info "通道 manifest 已获取（$AIRY_CHANNEL）"
     } else {
-        Write-Warn "通道 manifest 获取失败，回退源码构建"
+        Write-Warn "通道 manifest 获取失败：可能是网络/服务异常，也可能该通道暂无制品"
+        Write-Warn "当前可用：stable（生产）/ rc（候选），beta 为保留通道；将回退源码构建"
         $releaseUrl = ""
     }
 }

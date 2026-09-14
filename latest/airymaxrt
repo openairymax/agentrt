@@ -813,6 +813,8 @@ except Exception:
 mode = sys.argv[2]
 if mode == "latest":
     print(m.get("latest", ""))
+elif mode == "state":
+    print(m.get("state", "active"))
 elif mode.startswith("artifact:"):
     plat = mode.split(":", 1)[1]
     rel = m.get("releases", {}).get(m.get("latest", ""), {})
@@ -827,6 +829,7 @@ PYEOF
     # （--file + --sha256）不依赖本函数。
     case "$mode" in
         latest) sed -n 's/.*"latest"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$f" | head -1 ;;
+        state)  sed -n 's/.*"state"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$f" | head -1 ;;
         artifact:*) : ;;
     esac
 }
@@ -1307,6 +1310,15 @@ airymaxrt_update() { # update [--check] [--yes] [--channel stable|rc|beta] [--ro
     fetch_repo_file "latest/manifest.${CHANNEL}.json.asc" "$TMPD/manifest.json.asc" >/dev/null 2>&1 || true
     verify_gpg_sig "$TMPD/manifest.json" "$TMPD/manifest.json.asc" || { log error "manifest 验签失败（GPG），拒绝更新"; rm -rf "$TMPD"; return 1; }
     log info "manifest 验签通过（GPG）"
+    # U-02 通道状态门禁（2026-09-13）：保留通道（state=reserved）官方零制品，
+    # 旧行为以空 latest 归因"manifest 解析失败"，用户无从得知是通道未发布。
+    # 显式 fail-closed 并给出可用通道指引。
+    if [ "$(manifest_get "$TMPD/manifest.json" state)" = "reserved" ]; then
+        log error "通道 ${CHANNEL} 为保留通道（state=reserved），官方尚未发布任何制品"
+        log error "当前可用：stable（生产）/ rc（候选）"
+        log error "切换通道：airymaxrt update --channel stable"
+        rm -rf "$TMPD"; return 1
+    fi
     local latest="$(manifest_get "$TMPD/manifest.json" latest)"
     [ -n "$latest" ] || { log error "manifest 解析失败"; rm -rf "$TMPD"; return 1; }
     local cmp="$(ver_cmp "${cur_ver:-0.0.0}" "$latest")"
