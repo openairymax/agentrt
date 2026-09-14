@@ -178,6 +178,12 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
             cli_render_collapsed(step.reasoning, 4, 4, 1);
         if (step.done)
             break; /* 已收敛 */
+        /* 边界校验：回显刚答过的问题不算有效追问（防同题循环）。
+         * LLM 输出属不可信外部输入，消费前必须校验。 */
+        if (step.question[0] && strcmp(step.question, q->question) == 0) {
+            step.question[0] = '\0';
+            step.hint[0] = '\0';
+        }
         if (step.question[0]) {
             AIRY_STRNCPY_TERM(g_last_step_q, step.question, sizeof(g_last_step_q));
             AIRY_STRNCPY_TERM(g_last_step_hint, step.hint, sizeof(g_last_step_hint));
