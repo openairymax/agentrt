@@ -162,7 +162,7 @@ fi
 # 版本默认占位（仅 curl 管道/裸脚本且最终解析全部失败时兜底；banner 已不再
 # 展示该值——真实版本一律以 manifest/包内 VERSION/制品名为准，杜绝漂移误导。
 # 保持与当前最新发布一致，随发布节奏更新）。
-AIRY_VERSION="${AIRY_VERSION:-v0.1.15}"
+AIRY_VERSION="${AIRY_VERSION:-v0.1.16}"
 AIRY_BUILD_JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 AIRY_MODE="${AIRY_MODE:-auto}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
@@ -573,6 +573,21 @@ PYEOF
     sed -n "s/.*\"$3\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$1" | head -1
 }
 
+# manifest 通道状态（U-02：state 契约，缺省视作 active 以向后兼容旧 manifest）
+manifest_state() { # <manifest>
+    if command -v python3 >/dev/null 2>&1; then
+        python3 - "$1" <<'PYEOF'
+import json, sys
+try:
+    print(json.load(open(sys.argv[1])).get("state", "active"))
+except Exception:
+    print("active")
+PYEOF
+        return 0
+    fi
+    sed -n 's/.*"state"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$1" | head -1
+}
+
 install_binary() {
     # 返回码语义（系统性收敛，2026-09-05）：
     #   0  = 成功
@@ -648,6 +663,14 @@ install_binary() {
         esac
         verify_gpg_sig "$man" "$man_asc" || { log_err "manifest 验签失败（GPG），拒绝安装——请确认网络环境未被劫持后重试"; return 2; }
         [ -s "$man_asc" ] && log_ok "manifest 验签通过（GPG）"
+        # U-02 通道状态门禁（2026-09-13）：保留通道（state=reserved）官方零制品，
+        # 旧行为落到"无本平台制品 → 源码构建"会把"选错通道"误导为"本平台无包"。
+        # 显式 fail-closed（rc 2，绝不静默源码构建）并给出可用通道指引。
+        if [ "$(manifest_state "$man")" = "reserved" ]; then
+            log_err "通道 ${AIRY_CHANNEL} 为保留通道（state=reserved），官方尚未发布任何制品"
+            log_err "当前可用：stable（生产）/ rc（候选）——切换：AIRY_CHANNEL=stable bash install.sh"
+            return 2
+        fi
         # plat 已在函数入口统一计算（macOS 走 uname -m，其余走 detect_arch）
         url="$(parse_manifest "$man" "$plat" url)"
         expect_sha="$(parse_manifest "$man" "$plat" sha256)"
