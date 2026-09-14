@@ -77,7 +77,7 @@ Append flags after `| bash -s --` (or pass them directly when running the
 script from a file):
 
 ```bash
-# Custom install prefix (default: $HOME/.airymaxrt)
+# Custom install prefix (default: $HOME/.airymaxrt); first bootstrap only
 ... | bash -s -- --prefix "$HOME/.airymaxrt"
 
 # Install from a release candidate instead of the stable channel
@@ -90,10 +90,23 @@ script from a file):
 ... | bash -s -- --uninstall
 ```
 
-The install root is recorded in `<root>/config/install.env`, so `airymaxrt
-update`, `airymaxrt uninstall` and `--reinstall` all act on the installation
-they belong to — you do not have to repeat `--prefix`. If several copies are
-present on one machine, `which airymaxrt` shows which one your shell resolves.
+`--prefix` is meaningful only for the **first bootstrap install**: at that
+point there is no install root to infer from, so you must supply it. Once the
+root is on disk (recorded in `<root>/config/install.env`), the launcher
+resolves it on its own, so `airymaxrt update`, `airymaxrt uninstall` and
+`--reinstall` all act on the installation they belong to — they neither need
+nor should carry `--prefix`.
+
+```bash
+airymaxrt update            # updates the custom-path install in place
+airymaxrt update --check    # check only, change nothing
+```
+
+Note: re-running `curl … | bash` after you are already installed is a **fresh
+install**, not an update — without `--prefix` it falls back to the default
+`$HOME/.airymaxrt` and leaves you with a second copy. To update an existing
+install, use `airymaxrt update`. If several copies are present on one machine,
+`which airymaxrt` shows which one your shell resolves.
 
 ### Supported platforms
 

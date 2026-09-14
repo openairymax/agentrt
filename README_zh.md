@@ -69,7 +69,7 @@ irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1
 在 `| bash -s --` 之后追加参数（从文件执行脚本时直接传参即可）：
 
 ```bash
-# 自定义安装路径（默认 $HOME/.airymaxrt）
+# 自定义安装路径（默认 $HOME/.airymaxrt）；仅首次 bootstrap 安装时需要
 ... | bash -s -- --prefix "$HOME/.airymaxrt"
 
 # 安装候选版本通道，而非稳定通道
@@ -82,10 +82,20 @@ irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1
 ... | bash -s -- --uninstall
 ```
 
-安装根目录会被记录到 `<安装根>/config/install.env`。此后 `airymaxrt update`、
-`airymaxrt uninstall` 与 `--reinstall` 都会作用于其自身所属的那份安装，无需
-重复传 `--prefix`。同一台机器上存在多份安装时，用 `which airymaxrt` 确认
-shell 实际解析到的是哪一份。
+`--prefix` 只在**首次 bootstrap 安装**时才有意义：那一刻还没有安装根可供推断，
+必须由你显式指定。安装根一旦落盘（记录在 `<安装根>/config/install.env`），启动器
+便会自行解析，此后 `airymaxrt update`、`airymaxrt uninstall` 与 `--reinstall`
+都会作用于其自身所属的那份安装，**无需、也不应再带 `--prefix`**。
+
+```bash
+airymaxrt update            # 就地更新自定义路径的安装，不需要 --prefix
+airymaxrt update --check    # 只检查，不做任何变更
+```
+
+注意：若你已经装好，又再次执行 `curl … | bash` 重新 bootstrap，那会是一次
+**全新安装**而非更新——不传 `--prefix` 时会落回默认 `$HOME/.airymaxrt`，从而
+产生第二份实例。要更新既有安装，请直接用 `airymaxrt update`。同一台机器上存在
+多份安装时，用 `which airymaxrt` 确认 shell 实际解析到的是哪一份。
 
 ### 支持平台
 
