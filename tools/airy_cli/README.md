@@ -70,8 +70,12 @@ ctest --test-dir /tmp/airy-build -R "cli_classify_heuristic" --output-on-failure
 |------|------|------|
 | CoreLoopThree | atoms/coreloopthree | loop 引擎底座 / 计划类型 / 通信适配（必需） |
 | llm_service / tool_service | daemons/llm_d, daemons/tool_d | chat 链路客户端（llm_response_* / tool_approval_*） |
-| CoreKern | atoms/corekern | `airy_rt.h` 运行时基础（统一入口 `airy_init()`） |
 | commons | agentrt/commons | 统一类型、IPC、平台兼容（compat）、IME 等公共能力 |
+
+> 0.1.16 B2（CLI 进程内 corekern 收回）：CLI 为 gateway 纯客户端，不再链接
+> atoms/corekern（`airy_atoms`）微核心聚合，亦不引用 corekern 总伞头
+> `airy_rt.h`——内核机制只被 daemon 服务面访问（架构铁律第 2 句）。错误码
+> 契约经 commons `airy_types.h` 提供。
 
 > TaskFlow 与 cupolas 不构成编译期依赖：CLI 对 taskflow 无符号引用；
 > cupolas 仅经 RPC 方法名调用。

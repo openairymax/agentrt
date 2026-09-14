@@ -719,32 +719,42 @@ else
 fi
 
 # P3 · CLI include 面断言：源树零 corekern 头引用 + 构建文件零 corekern 路径
-_p3_hdr="$(grep -rln 'corekern' "$ROOT/tools/airy_cli/src" "$ROOT/tools/airy_cli/include" \
-    --include='*.c' --include='*.h' | grep -v '注释\|裁决\|B2' || true)"
-_p3_cmake="$(grep -n 'corekern' "$ROOT/tools/airy_cli/CMakeLists.txt" \
-    | grep -v 'B2\|B4\|裁决\|摘除\|收回' || true)"
+# 注：仅断言「真实引用」（#include 指令 / 非注释构建路径），B2 说明性注释不算违规。
+_p3_hdr="$(grep -rnE '^[[:space:]]*#[[:space:]]*include[[:space:]]*[<"]' \
+    "$ROOT/tools/airy_cli/src" "$ROOT/tools/airy_cli/include" \
+    --include='*.c' --include='*.h' 2>/dev/null \
+    | grep -E '[<"](airy_rt|task|mem|ipc|airy_time|export|error)\.h[>"]|corekern/' || true)"
+_p3_cmake="$(grep -n 'corekern/include' "$ROOT/tools/airy_cli/CMakeLists.txt" \
+    | grep -vE '^[0-9]+:[[:space:]]*#' || true)"
 if [ -z "$_p3_hdr" ] && [ -z "$_p3_cmake" ]; then
     ok "P3 CLI 源树与构建文件零 corekern 引用（include 面收口保持）"
 else
-    [ -n "$_p3_hdr" ] && bad "P3 CLI 源树出现 corekern 引用: $(echo "$_p3_hdr" | tr '\n' ' ')"
+    [ -n "$_p3_hdr" ] && bad "P3 CLI 源树出现 corekern 头引用: $(echo "$_p3_hdr" | tr '\n' ' ')"
     [ -n "$_p3_cmake" ] && bad "P3 CLI 构建文件出现 corekern 路径: $_p3_cmake"
 fi
 
 # P4 · CLI 产物断言：零内核机制符号（airy_time_* 等无状态时钟符号豁免，
 # 见 link-whitelist.txt 0.1.16 B4 头注）
-_cli_bin="$(find "$ROOT/../..$PWD" -maxdepth 0 2>/dev/null; true)"
-for _cand in \
-    "${AIRY_GATE_BUILD_DIR:-}/bin/airy_cli" \
-    "${AIRY_GATE_BUILD_DIR:-}/tools/airy_cli/airy_cli"; do
-    [ -x "$_cand" ] && _cli_bin="$_cand" && break
-done
-if [ ! -f "$_cli_bin" ]; then
-    # 产物探测（构建树布局差异兜底）：沿 ctest 二进制目录向上找
-    _cli_bin="$(find "$(dirname "$(dirname "$0" 2>/dev/null || echo .)")" \
-        -maxdepth 4 -type f -name 'airy_cli' -perm -u+x 2>/dev/null | head -1)"
+#
+# 产物定位：由 ctest 注入 AIRY_GATE_BUILD_DIR=<CMAKE_BINARY_DIR>（tests/
+# CMakeLists.txt 的 release_gates ENVIRONMENT），于其中探测 airy_cli 两种
+# 常见落点。语义对齐脚本既有 fail-closed 约定：
+#   · AIRY_GATE_BUILD_DIR 显式指定但产物缺失 → FAIL（构建契约被破坏）；
+#   · 未指定（本地手工直接跑脚本常态）→ SKIP，CI 侧由 ctest 注入兜底。
+_cli_bin=""
+if [ -n "${AIRY_GATE_BUILD_DIR:-}" ]; then
+    for _cand in \
+        "$AIRY_GATE_BUILD_DIR/tools/airy_cli/airy_cli" \
+        "$AIRY_GATE_BUILD_DIR/bin/airy_cli"; do
+        if [ -f "$_cand" ] && [ -x "$_cand" ]; then _cli_bin="$_cand"; break; fi
+    done
 fi
-if [ -z "$_cli_bin" ] || [ ! -f "$_cli_bin" ]; then
-    skip "P4 未找到 airy_cli 产物（本地无构建树常态），CI 侧由构建后断言兜底"
+if [ -z "$_cli_bin" ]; then
+    if [ -n "${AIRY_GATE_BUILD_DIR:-}" ]; then
+        bad "P4 构建树指定但 airy_cli 产物缺失: $AIRY_GATE_BUILD_DIR（构建契约破坏）"
+    else
+        skip "P4 未收到 AIRY_GATE_BUILD_DIR，跳过产物断言（ctest 注入兜底）"
+    fi
 else
     _cli_syms="$(nm "$_cli_bin" 2>/dev/null | awk '{print $3}' \
         | grep -E '^(airy_init|airy_shutdown)$|^airy_oom_|^airy_persist_' || true)"
@@ -753,6 +763,65 @@ else
     else
         bad "P4 airy_cli 产物出现内核机制符号: $(echo "$_cli_syms" | tr '\n' ' ')"
     fi
+fi
+
+# ============================================================
+# 组 Q · 0.1.16 B6 gateway 零编排（退役 SSE 编排死代码物理移除）
+# ============================================================
+# 依据：0.1.16 A-IPC 架构收口设计 §7（2026-09-14 改判，采甲）。
+# 现象：gateway 的 /api/v1/chat/stream 自 0.1.13（B11 清零）起恒返
+# 410 Gone，其后工具循环状态机（含 EXEC_TOOLS 相位）为不可达死代码，
+# 与铁律第 3 句「gateway 翻译、daemon 干活」相悖。B6 将其物理移除。
+# 本组断言：死模块零残留、编排常量零残留、退役路由未登记，且 live
+# 端点（run_stream/hall_watch）与共享助手仍在——防无声再生。
+section "Q" "B6 gateway 零编排（退役 SSE 编排死代码物理移除）"
+
+# Q1 · 死模块与单测零残留
+_q1_dead=""
+for _f in \
+    "$ROOT/gateway/src/gateway/gateway_sse_tool.c" \
+    "$ROOT/gateway/src/gateway/gateway_sse_frame.c" \
+    "$ROOT/gateway/src/gateway/gateway_sse_stream.c" \
+    "$ROOT/gateway/src/gateway/gateway_sse_memory.c" \
+    "$ROOT/gateway/tests/test_sse_stream.c" \
+    "$ROOT/gateway/tests/test_sse_utf8.c"; do
+    [ -e "$_f" ] && _q1_dead="$_q1_dead $(basename "$_f")"
+done
+if [ -z "$_q1_dead" ]; then
+    ok "Q1 退役 SSE 编排死模块与单测零残留"
+else
+    bad "Q1 退役 SSE 编排死模块再生:$_q1_dead"
+fi
+
+# Q2 · 编排常量与相位零残留（说明性注释豁免，同 P3 口径）
+_q2_hits="$(grep -rnE 'GW_SSE_MAX_TOOL_LOOPS|GW_SSE_TOOL_LIMIT_MSG|GW_SSE_TEXT_CHUNK|GW_SSE_SUMMARY_MAX|GW_SSE_TOOL_FEEDBACK_MAX|gw_sse_phase_t|EXEC_TOOLS' \
+    "$ROOT/gateway/src" --include='*.c' --include='*.h' 2>/dev/null \
+    | grep -vE ':[0-9]+:[[:space:]]*(\*|/\*|//)' || true)"
+if [ -z "$_q2_hits" ]; then
+    ok "Q2 gateway/src 零编排常量与相位（EXEC_TOOLS 等未再生）"
+else
+    bad "Q2 gateway/src 重现编排常量/相位: $(echo "$_q2_hits" | tr '\n' ' ')"
+fi
+
+# Q3 · 退役路由未登记（宏与字面量双重断言）
+_q3_hits="$(grep -rnE 'GW_SSE_CHAT_PATH|"/api/v1/chat/stream"' \
+    "$ROOT/gateway/src" --include='*.c' --include='*.h' 2>/dev/null || true)"
+if [ -z "$_q3_hits" ]; then
+    ok "Q3 退役路由 /api/v1/chat/stream 未登记（宏与字面量均零残留）"
+else
+    bad "Q3 退役路由 /api/v1/chat/stream 再生: $(echo "$_q3_hits" | tr '\n' ' ')"
+fi
+
+# Q4 · live 端点与共享助手仍在
+_q4_missing=""
+for _sym in gw_sse_send_json_error handle_run_stream_sse handle_hall_watch_sse; do
+    grep -rq "$_sym" "$ROOT/gateway/src" --include='*.c' --include='*.h' 2>/dev/null \
+        || _q4_missing="$_q4_missing $_sym"
+done
+if [ -z "$_q4_missing" ]; then
+    ok "Q4 live 端点与共享助手仍在（run_stream/hall_watch/gw_sse_send_json_error）"
+else
+    bad "Q4 live 端点或共享助手缺失:$_q4_missing"
 fi
 
 # ============================================================

@@ -97,5 +97,9 @@ airy_print_ok("  [str-utils] test_string_utils: safe string utility semantics un
 if(UNIX)
     add_test(NAME release_gates
         COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/verify_release_gates.sh)
+    # 0.1.16 B4：向门禁注入构建树根，供组 P · P4 定位 airy_cli 产物并做
+    # 内核机制符号断言（脚本内 AIRY_GATE_BUILD_DIR 显式 → 产物缺失即 fail-closed）。
+    set_tests_properties(release_gates PROPERTIES
+        ENVIRONMENT "AIRY_GATE_BUILD_DIR=${CMAKE_BINARY_DIR}")
     airy_print_ok("  [release-gates] release_gates: WS-9 community-fix gates (9.1~9.11)")
 endif()
