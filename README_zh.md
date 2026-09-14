@@ -5,7 +5,7 @@
 
 **语言：** [English](README.md) | 简体中文
 
-[![Version](https://img.shields.io/badge/version-0.1.15-5a6b7e)](https://atomgit.com/openairymax/agentrt/releases/tag/v0.1.15)
+[![Version](https://img.shields.io/badge/version-0.1.16-5a6b7e)](https://atomgit.com/openairymax/agentrt/releases/tag/v0.1.16)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
 
@@ -16,7 +16,7 @@
 **AgentRT** 是 Airymax 平台的运行时层，为智能体团队在真实硬件上长期运行提供
 所需机制：
 
-- 具备调度、系统调用与内存原语的微内核核心；
+- 具备调度、系统调用与内存原语的微核心；
 - 三阶段认知循环（认知 → 执行 → 记忆）；
 - 会话级与会话间的分层持久记忆；
 - 默认 fail-closed 的四层安全穹顶；
@@ -286,16 +286,17 @@ airymaxrt update --rollback   # 回滚到上一版本
 它。版本说明位于 [`RELEASE_NOTES.d/`](RELEASE_NOTES.d)，每个版本一个文件；
 更完整的历史记录见 [CHANGELOG.md](CHANGELOG.md)。
 
-当前版本为 **v0.1.15**，要点如下：
+当前版本为 **v0.1.16**，要点如下：
 
-- `corekern` 经 `airy_init()` 正式接入 CLI 启动链路，并输出可追溯的启动证据；
-  修复了 IPC 通道、IPC 回复路由、binder 关闭顺序与零长度分配等一批缺陷。
-- 终端界面在收到致命信号时恢复终端状态，不再残留乱码或隐藏光标；并能正确
-  消费终端 OSC 回复。
-- 网关入口鉴权与监听绑定得到加固；`commons`、`gateway`、`corekern` 引入
-  ASan / UBSan 质量门禁，内存安全缺陷在合并前即被拦截。
-- 新增 `AIRY_KEEP_SYMBOLS` 开关，便于构建保留符号用于现场诊断。
-- Windows x86-64 与 x86-32 包与 Linux、macOS 由同一流水线一同发布。
+- 记忆写入与召回的截断改为按 **UTF-8 字符边界**回退，不再按字节下标硬切；
+  含中文或 emoji 的长对话不再破坏记忆库，也不会再触发上游 HTTP 400
+  `invalid unicode code point`。CLI 与 gateway 两条路径同步修复，gateway
+  侧对残余非法字节再做一次清洗。
+- 模型服务拒绝（HTTP 400/422）现在如实上报为「请求被模型服务拒绝」并附带
+  供应商返回的原文，而不再被归入笼统的读写错误。
+- 早期版本已写入的损坏记忆记录已就地清理（保留备份）。
+- CI 在失败时上传 `ctest` 日志为 artifact；跨仓发布门禁 fixture 锁定到显式
+  commit，不再跟随会移动的默认分支。
 
 ## 文档
 
