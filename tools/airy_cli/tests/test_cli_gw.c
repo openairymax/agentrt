@@ -210,6 +210,11 @@ static void *mock_thread(void *arg)
                 break;
             continue;
         }
+        if (g_stop) {
+            /* mock_stop() 的自连接唤醒连接：不为它服务，直接收线程 */
+            close(fd);
+            break;
+        }
         mock_handle(fd);
         close(fd);
     }
@@ -244,8 +249,23 @@ static int mock_start(void)
 static void mock_stop(void)
 {
     g_stop = 1;
-    if (g_srv_fd >= 0)
-        shutdown(g_srv_fd, SHUT_RDWR);
+    /* 唤醒阻塞在 accept() 的 mock 线程：shutdown() 对监听套接字在 Linux 上
+     * 可唤醒 accept()，但 macOS/BSD 语义下返回 ENOTCONN 且不唤醒（0.1.16
+     * macos cli_gw_e2e 超时实证：pthread_join 永久阻塞至 ctest 240s 掐断）。
+     * 改用自连接——向本服务端口发起一次连接使 accept() 返回，线程见 g_stop
+     * 即收（见 mock_thread），跨平台行为一致，不依赖平台 socket 细节。 */
+    if (g_srv_fd >= 0) {
+        int w = socket(AF_INET, SOCK_STREAM, 0);
+        if (w >= 0) {
+            struct sockaddr_in a;
+            memset(&a, 0, sizeof(a));
+            a.sin_family = AF_INET;
+            a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+            a.sin_port = htons((unsigned short)g_srv_port);
+            (void)connect(w, (struct sockaddr *)&a, sizeof(a));
+            close(w);
+        }
+    }
     pthread_join(g_srv_thr, NULL);
     if (g_srv_fd >= 0) {
         close(g_srv_fd);
