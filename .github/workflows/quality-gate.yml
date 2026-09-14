@@ -7,8 +7,8 @@ name: Quality Gates
 # SSoT 数据位于伞仓 airymaxhub（tools/docs/agent-workload），故本作业按来源
 # 显式直取到临时区、组装出 quality-gate.sh 期望的 PROJECT_ROOT 布局后运行。
 # 不递归 clone 伞仓子模块图——那条路径会去解析闭源/超大/镜像缺位的 gitlink
-# （docs 在 GitHub 无仓、docs-closed 闭源、agent-linux 1.5G），使门禁在供给
-# 面结构性必败。
+# （docs 无公开镜像仓、部分闭源内容不入镜像、agent-linux 体量 1.5G），使门
+# 禁在供给面结构性必败。
 #
 # 九门禁：1 编译 · 2 BAN 规则 · 3 安全扫描 · 4 合约版本 · 5 跨仓验证 ·
 #          6 圈复杂度 · 7 SSoT 权威源 · 8 头文件重复度 · 9 coreloopthree ABI 冻结。

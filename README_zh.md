@@ -150,15 +150,15 @@ SDK 层      — 命令行、终端界面、Python / Go / Rust / TypeScript 绑�
 服务层      — 15 个守护进程，负责运行时编排                     (daemons/)
 协议层      — AgentsIPC 与 A2A / A2T 协议栈                     (protocols/)
 网关层      — 各类传输 → JSON-RPC 2.0                           (gateway/)
-存储层      — 堆式运行时数据持久化                              (heapstore/)
+存储层      — 运行时数据存储                                    (heapstore/)
 安全层      — 四层穹顶：策略决策点与各进程本地执行点            (cupolas/)
-内核层      — 5 个原子微内核模块                                (atoms/)
+微核心系统层 — 5 个机制模块                                      (atoms/)
 支撑层      — 32 个内聚工具模块 + 共享头文件                    (commons/)
 ```
 
 - **支撑层（`commons`）** — 其他各层的共同基础：日志、同步、内存辅助、字符串
   处理、IPC 助手、配置、可观测性等，同时提供权威的类型与错误契约。
-- **内核层（`atoms`）** — 5 个原子模块：`corekern`（初始化与生命周期）、
+- **微核心系统层（`atoms`）** — 5 个机制模块：`corekern`（初始化与生命周期）、
   `coreloopthree`（认知 → 执行 → 记忆循环）、`syscall`（统一的系统调用接口）、
   `taskflow`（任务图与调度）、`memory`（记忆原语与后端）。
 - **安全层（`cupolas`）** — 策略决策点负责加载、下发与回滚策略；每个守护进程
@@ -175,11 +175,11 @@ SDK 层      — 命令行、终端界面、Python / Go / Rust / TypeScript 绑�
 
 ```
 agentrt/
-├── atoms/                # 微内核原语（submodule）
+├── atoms/                # 微核心系统层原语（submodule）
 ├── commons/              # 共享基础库（submodule）
 ├── cupolas/              # 安全穹顶（submodule）
 ├── gateway/              # 协议网关（submodule）
-├── heapstore/            # 堆式持久化（submodule）
+├── heapstore/            # 运行时数据存储（submodule）
 ├── protocols/            # AgentsIPC、A2A / A2T（submodule）
 ├── daemons/              # 15 个运行时守护进程 + 框架（submodule）
 ├── cmake/                # 构建系统模块
@@ -202,10 +202,10 @@ agentrt/
 
 | 组件 | 仓库 | 职责 |
 |------|------|------|
-| **atoms** | [openairymax/atoms](https://atomgit.com/openairymax/atoms) | 微内核层：`corekern`、`coreloopthree`、`syscall`、`taskflow`、`memory` |
+| **atoms** | [openairymax/atoms](https://atomgit.com/openairymax/atoms) | 微核心系统层：`corekern`、`coreloopthree`、`syscall`、`taskflow`、`memory` |
 | **commons** | [openairymax/commons](https://atomgit.com/openairymax/commons) | 类型与错误契约，以及 32 个内聚工具模块 |
 | **cupolas** | [openairymax/cupolas](https://atomgit.com/openairymax/cupolas) | 四层安全穹顶：策略决策点与本地执行点 |
-| **heapstore** | [openairymax/heapstore](https://atomgit.com/openairymax/heapstore) | 堆式运行时数据持久化 |
+| **heapstore** | [openairymax/heapstore](https://atomgit.com/openairymax/heapstore) | 运行时数据存储 |
 | **protocols** | [openairymax/protocols](https://atomgit.com/openairymax/protocols) | AgentsIPC（128 字节消息头）、A2A 与 A2T 协议栈 |
 | **gateway** | [openairymax/gateway](https://atomgit.com/openairymax/gateway) | HTTP / WS / SSE / MCP / A2A / OpenAI → JSON-RPC 2.0 |
 | **daemons** | [openairymax/daemons](https://atomgit.com/openairymax/daemons) | `gateway_d`、`agent_d`、`llm_d`、`tool_d`、`sched_d`、`think_d`、`mem_d`、`market_d`、`monit_d`、`notify_d`、`channel_d`、`a2a_d`、`cupolas_d`、`maths_d`、`hook_d` |

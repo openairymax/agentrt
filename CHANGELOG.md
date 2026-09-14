@@ -828,7 +828,7 @@ AgentRT 0.1.1 是唯一的奠基版本，完成全部架构、标准、许可证
 - 调度服务 `MAX_AGENTS` 从 128 修正为 1024（低于契约 8 倍的功能 bug）
 - 文档错误码值对齐 SSoT（`02-error-code-reference.md`）
 - 文档许可证冲突修正（`GPL-3.0-only`/`AGPL-3.0-only` → `AGPL-3.0-or-later OR Apache-2.0`）
-- `docs-closed/02-corekern.md` `agentos_` 改名收尾 + "微内核"→"微核心（MicroCoreRT）"
+- `02-corekern.md` `agentos_` 改名收尾 + "微内核"→"微核心（MicroCoreRT）"
 - `taskflow_graph_partition` 实现真实分区
 
 ### Removed
