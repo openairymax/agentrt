@@ -12,7 +12,9 @@
 #ifndef AIRY_CLI_EXEC_H
 #define AIRY_CLI_EXEC_H
 
-#include "airy_rt.h"
+/* 0.1.16 B2：CLI 为 gateway 纯客户端，仅依赖 commons 用户态错误码契约，
+ * 不再引用 corekern 总伞头 airy_rt.h（进程内微内核已收回）。 */
+#include "airy_types.h"
 #include "airy_cli_pipeline.h" /* cli_runtime_ctx_t / airy_task_plan_t */
 
 #include <signal.h>

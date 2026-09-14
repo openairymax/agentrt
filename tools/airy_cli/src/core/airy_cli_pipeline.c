@@ -18,7 +18,8 @@
 #include "cli_internal.h"
 #include "cli_render.h"
 
-#include "airy_rt.h"
+/* 0.1.16 B2：corekern 总伞头已摘除，错误码契约由 airy_types.h 提供
+ * （经 cli_internal.h 传入，此处不再单独引用 airy_rt.h）。 */
 #include "loop.h"
 #include "cli_gw.h"
 #include "cognition.h"

@@ -29,7 +29,8 @@
 #include "daemon_rpc_client.h"
 #include "airy_memory.h"
 #include "logging.h"
-#include "task.h"
+/* 0.1.16 B2：corekern task.h 已摘除，plan 类型来自 cognition.h
+ * （经 cli_review.h 传入），错误码由 airy_types.h 提供。 */
 
 #include <cjson/cJSON.h>
 #include <stdio.h>

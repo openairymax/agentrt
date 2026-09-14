@@ -656,6 +656,106 @@ else
 fi
 
 # ============================================================
+# 组 N · 0.1.16 B3 南向 A-IPC 客户端面归一（AF_UNIX 白名单）
+# ============================================================
+# 现象：gateway 四处手搓 UDS 客户端（sse_tool/sse_stream/sse_run_stream/
+# pep_cache）绕过统一客户端面，第二套传输实现与 A-IPC 漂移，L2 灰度
+# 永远覆盖不了这些路径（0.1.16 A-IPC 架构收口设计 §4.3 门禁 N2）。
+# 本组断言：AF_UNIX socket 创建在 gateway/src 内仅允许出现在统一
+# 南向客户端面 gateway_aipc_client.c；手搓点删除后不得无声再生。
+section "N" "B3 南向 A-IPC 客户端面归一（gateway/src AF_UNIX 白名单）"
+
+_aipc_face="$ROOT/gateway/src/biz/gateway_aipc_client.c"
+if [ ! -f "$_aipc_face" ]; then
+    bad "N1 缺失南向统一客户端面: gateway/src/biz/gateway_aipc_client.c（客户端面被删除）"
+else
+    _aipc_offenders="$(grep -rl 'socket(AF_UNIX' "$ROOT/gateway/src" --include='*.c' \
+        | grep -v 'gateway_aipc_client.c' || true)"
+    if [ -z "$_aipc_offenders" ]; then
+        ok "N2 AF_UNIX socket 创建仅存在于统一客户端面 gateway_aipc_client.c（四处手搓点未再生）"
+    else
+        bad "N2 gateway/src 出现统一客户端面之外的手搓 AF_UNIX socket: $(echo "$_aipc_offenders" | tr '\n' ' ')"
+    fi
+    for _sym in gw_aipc_call gw_aipc_stream gw_aipc_subscribe; do
+        grep -Fq "$_sym" "$_aipc_face" \
+            || bad "N3 统一客户端面缺入口 $_sym（客户端面 API 面被削）"
+    done
+    grep -Fq 'gw_aipc_call' "$ROOT/gateway/src/biz/gateway_biz_forward.c" \
+        && ok "N3 gw_svc_call 转调统一客户端面（gw_aipc_call）" \
+        || bad "N3 gw_svc_call 未转调 gw_aipc_call（第二套传输实现回归）"
+fi
+
+# ============================================================
+# 组 P · 0.1.16 B4 构建收口（corekern include 面 + 客户端零内核机制）
+# ============================================================
+# 依据：0.1.16 A-IPC 架构收口设计 §5.3（2026-09-14 裁决③）。
+# 第 2 句铁律「内核机制只被 daemon 服务面访问」的构建面判据：
+#   P1 白名单断言：airy_cli 允许集不含 airy_atoms 微核心聚合；
+#   P2 全局面断言：根 CMakeLists 全局 include 不含 atoms/corekern/include；
+#   P3 CLI include 面断言：tools/airy_cli 构建与源树均无 corekern 引用；
+#   P4 CLI 产物断言：nm 扫描零内核机制符号（airy_init/airy_shutdown/
+#      airy_oom_*/airy_persist_*），有即 fail-closed。
+section "P" "B4 构建收口（corekern include 面 + CLI 零内核机制）"
+
+_whitelist="$ROOT/link-whitelist.txt"
+
+# P1 · 白名单机器断言：客户端目标禁链 airy_atoms
+_p1_line="$(grep -E '^airy_cli:' "$_whitelist" || true)"
+if [ -z "$_p1_line" ]; then
+    bad "P1 link-whitelist.txt 缺 airy_cli 登记（白名单被削）"
+elif echo "$_p1_line" | grep -q 'airy_atoms'; then
+    bad "P1 airy_cli 允许集含 airy_atoms（CLI 进程内微核心违规再生）"
+else
+    ok "P1 airy_cli 允许集不含 airy_atoms（进程内微核心收回固化）"
+fi
+
+# P2 · 全局面断言：corekern include 不得进入根 CMakeLists 全局注入
+_p2_hits="$(grep -n 'atoms/corekern/include' "$ROOT/CMakeLists.txt" \
+    | grep -v 'AIRY_COREKERN_INCLUDE_DIR\|corekern 头不再全局注入' || true)"
+if [ -z "$_p2_hits" ]; then
+    ok "P2 根 CMakeLists 全局面无 atoms/corekern/include 注入（B4 收口保持）"
+else
+    bad "P2 根 CMakeLists 全局面重现 corekern include 注入: $_p2_hits"
+fi
+
+# P3 · CLI include 面断言：源树零 corekern 头引用 + 构建文件零 corekern 路径
+_p3_hdr="$(grep -rln 'corekern' "$ROOT/tools/airy_cli/src" "$ROOT/tools/airy_cli/include" \
+    --include='*.c' --include='*.h' | grep -v '注释\|裁决\|B2' || true)"
+_p3_cmake="$(grep -n 'corekern' "$ROOT/tools/airy_cli/CMakeLists.txt" \
+    | grep -v 'B2\|B4\|裁决\|摘除\|收回' || true)"
+if [ -z "$_p3_hdr" ] && [ -z "$_p3_cmake" ]; then
+    ok "P3 CLI 源树与构建文件零 corekern 引用（include 面收口保持）"
+else
+    [ -n "$_p3_hdr" ] && bad "P3 CLI 源树出现 corekern 引用: $(echo "$_p3_hdr" | tr '\n' ' ')"
+    [ -n "$_p3_cmake" ] && bad "P3 CLI 构建文件出现 corekern 路径: $_p3_cmake"
+fi
+
+# P4 · CLI 产物断言：零内核机制符号（airy_time_* 等无状态时钟符号豁免，
+# 见 link-whitelist.txt 0.1.16 B4 头注）
+_cli_bin="$(find "$ROOT/../..$PWD" -maxdepth 0 2>/dev/null; true)"
+for _cand in \
+    "${AIRY_GATE_BUILD_DIR:-}/bin/airy_cli" \
+    "${AIRY_GATE_BUILD_DIR:-}/tools/airy_cli/airy_cli"; do
+    [ -x "$_cand" ] && _cli_bin="$_cand" && break
+done
+if [ ! -f "$_cli_bin" ]; then
+    # 产物探测（构建树布局差异兜底）：沿 ctest 二进制目录向上找
+    _cli_bin="$(find "$(dirname "$(dirname "$0" 2>/dev/null || echo .)")" \
+        -maxdepth 4 -type f -name 'airy_cli' -perm -u+x 2>/dev/null | head -1)"
+fi
+if [ -z "$_cli_bin" ] || [ ! -f "$_cli_bin" ]; then
+    skip "P4 未找到 airy_cli 产物（本地无构建树常态），CI 侧由构建后断言兜底"
+else
+    _cli_syms="$(nm "$_cli_bin" 2>/dev/null | awk '{print $3}' \
+        | grep -E '^(airy_init|airy_shutdown)$|^airy_oom_|^airy_persist_' || true)"
+    if [ -z "$_cli_syms" ]; then
+        ok "P4 airy_cli 产物零内核机制符号（$(basename "$_cli_bin")）"
+    else
+        bad "P4 airy_cli 产物出现内核机制符号: $(echo "$_cli_syms" | tr '\n' ' ')"
+    fi
+fi
+
+# ============================================================
 # 汇总
 # ============================================================
 printf '\n门禁汇总: PASS=%d FAIL=%d\n' "$PASS" "$FAIL"
