@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "channel": "beta",
+  "state": "reserved",
+  "latest": "",
+  "updated_at": "1970-01-01T00:00:00Z",
+  "releases": {},
+  "notes": "beta 为保留通道，暂无制品；当前可用：stable（生产）/ rc（候选）。"
+}

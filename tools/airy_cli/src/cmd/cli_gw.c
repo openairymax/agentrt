@@ -508,6 +508,36 @@ static int cli_gw_exchange(const char *host, int port, const char *path, const c
     return 0;
 }
 
+/* N-3（0.1.16）：provider 400/422（请求体非法，典型是消息含无效 UTF-8 →
+ * "invalid unicode code point"）在 llm_d 已归入专用码 AIRY_ERR_LLM_BAD_REQUEST，
+ * 经 llm_error_message() 渲染为 "Provider rejected the request body (HTTP
+ * 400/422): malformed JSON or invalid UTF-8 in messages; …"（见
+ * openai_rate_limit.c / provider_stream.c / llm_daemon_methods.c）。但网关
+ * 转发时把 daemon 错误码统一折叠为 -32603，只透传 message 文本，故 CLI 侧
+ * 对网关 error.message 做特征分诊，避免把 provider 400 误报为"读写错误/
+ * 网络错误"（R-1 已处理 401/403，R-5 已处理超时/连接失败，此处补齐 400/422）。
+ * 返回：2=请求体被明确拒绝；1=provider 请求失败（请求体非法或不可达）；
+ *       0=与 provider 无关。 */
+static int cli_gw_provider_state(const char *m)
+{
+    if (!m || !m[0])
+        return 0;
+    static const char *const body_reject[] = {
+        "Provider rejected the request body",
+        "invalid unicode",
+        "Failed to parse the request body",
+        "request body as JSON",
+        "invalid_request_error",
+    };
+    for (size_t i = 0; i < sizeof(body_reject) / sizeof(body_reject[0]); i++) {
+        if (strstr(m, body_reject[i]))
+            return 2;
+    }
+    if (strstr(m, "Network request to provider failed"))
+        return 1;
+    return 0;
+}
+
 /* ── JSON-RPC over HTTP POST / ─────────────────────────────────────── */
 int cli_gw_call(const char *method, const char *params_json, int timeout_ms, char **out_result)
 {
@@ -581,7 +611,15 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
         cJSON *msg = cJSON_GetObjectItem(err, "message");
         int c = code && cJSON_IsNumber(code) ? (int)code->valuedouble : 0;
         const char *m = msg && cJSON_IsString(msg) ? msg->valuestring : "";
-        if (c == -32603)
+        int pr = cli_gw_provider_state(m);
+        if (pr > 0)
+            /* N-3：provider 请求被拒（400/422）不再表现为"读写/网络错误"，
+             * 并保留网关 error.message 原文供自助定位。 */
+            snprintf(g_cli_gw_err, sizeof(g_cli_gw_err), "%s；网关原文：%s",
+                     (pr == 2) ? "请求被模型服务拒绝（请求体非法，如消息含无效 UTF-8 字符）"
+                               : "请求被模型服务拒绝或模型服务不可达（请检查消息内容与网络连通性）",
+                     m);
+        else if (c == -32603)
             snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
                      "网关服务内部错误（%s），请查看 %s/logs/gateway_d.out",
                      m[0] ? m : "Internal error", getenv("AIRY_HOME") ? getenv("AIRY_HOME") : "~/.airymaxrt");
