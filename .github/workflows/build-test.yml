@@ -26,8 +26,18 @@ concurrency:
 # agentrt 树会在两次 run 间一时绿一时红，且本地复现不可得。锁 SHA 后上游
 # 变更须**显式** bump 下列值才生效，漂移由静默转为可见。取值经
 # `git ls-remote <repo> refs/heads/main` 核验即为该仓 main 当前 HEAD。
+#
+# GATE_SDK_SHA 时效性更正（2026-09-14，H5 红根因）：原锁 39c8406e 落后 sdk
+# main 一个 commit——39c8406e..5a91b617 的全部差异即 sdk-python 与 tui 两个
+# gitlink，其中 tui 由 a623889d 变为 f605930，后者才引入 U-02 通道状态
+# （state=reserved）fail-closed 分支。旧 pin 下 sdk/tui/scripts/airymaxrt
+# 无该判据，H5 三腿（install.sh / install.ps1 / sdk 更新器）缺一即红。
+# GATE_TOOLS_SHA 保持 b237a98 不随 main 推进而 bump：本门禁只消费
+# scripts/ops/templates/permission_rules.yaml，而该文件在 b237a98..tools
+# main（cc241da）间零差异（两者唯一差异 publish-release.sh 走 release.yml
+# 的 _tools 独立取料，不经本 env），故 pin 仍然有效。
 env:
-  GATE_SDK_SHA: 39c8406e15717c60fa3efd38793c5bce4f6ea390
+  GATE_SDK_SHA: 5a91b617a67c11c43663fa2088fe6c6e36758360
   GATE_TOOLS_SHA: b237a98e3dd9dac642fde8da1da9aa43957016dd
 
 jobs:
