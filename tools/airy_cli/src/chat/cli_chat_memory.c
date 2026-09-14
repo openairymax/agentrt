@@ -6,9 +6,11 @@
  * @brief airy_cli chat memory sub-module: memory inject and record.
  *
  * 2.2.4 对话记忆读写（2026-08-25 统一）：CLI 对话路径的记忆统一经
- * gateway mem_d（与 TUI 共享记忆库），失败回退进程内 L1 记忆引擎。
- * 此前 CLI 用 coreloop L1 记忆引擎、TUI 用 gateway mem_d，两套存储——
- * CLI/TUI 切换后"记不住上一句"的直接根因；统一后共享同一记忆库。
+ * gateway mem_d，失败回退进程内 L1 记忆引擎。此前 CLI 直接写进程内
+ * coreloop L1 记忆引擎，与 gateway mem_d 是两套存储——统一后 CLI 与
+ * gateway/mem_d 共享同一记忆库（CLI 内多轮、跨会话可持续召回）。
+ * 0.1.16 起 TUI 记忆后端亦收敛到 gateway mem.*，不再持有独立本地库，
+ * 故 CLI 与 TUI 共享同一 mem_d 记忆库（架构级：TUI 为 CLI 的可选渲染层）。
  *
  * 记忆注入（cli_chat_mem_inject_system）：检索相关历史记忆拼成 system
  * 追加段（最多 3 条、每条截断 200 字符），随本轮消息发送给模型。
@@ -53,9 +55,10 @@ static int cli_chat_is_greeting(const char *s)
     return 0;
 }
 
-/* gateway 统一记忆注入（mem_d，与 TUI/gateway 共享召回；失败回退 L1）。
- * CLI 曾用 coreloop L1 记忆引擎（memoryrovol），与 gateway 的 mem_d 是两套
- * 存储——CLI/TUI 切换后"记不住上一句"的直接根因。统一后共享同一记忆库。 */
+/* gateway 统一记忆注入（mem_d；失败回退 L1）。CLI 曾直接写进程内
+ * coreloop L1 记忆引擎（memoryrovol），与 gateway 的 mem_d 是两套存储——
+ * 统一后 CLI 与 gateway/mem_d 共享同一记忆库。
+ * 注：TUI（0.1.16 起）经 gateway mem.* 访问同一 mem_d，参与此共享。 */
 static int cli_chat_mem_inject_gw(const char *input, char *out_buf, size_t out_size)
 {
     if (!input || !input[0] || !out_buf || out_size < 16)
@@ -129,7 +132,9 @@ static int cli_chat_mem_inject_gw(const char *input, char *out_buf, size_t out_s
             size_t dlen = strlen(rec);
             if (!(dlen >= input_prefix_len && strncmp(rec, "用户: ", 9) == 0 &&
                   strncmp(rec + 9, input, strlen(input)) == 0)) {
-                size_t n = dlen < 200 ? dlen : 200;
+                /* UTF-8 边界回退：%.*s 精度是字节数，直接取 200 会切断
+                 * 汉字/emoji，产生非法序列经 messages[].content 上报 400。 */
+                size_t n = cli_utf8_safe_len(rec, 200);
                 if (off < out_size - 1) {
                     int w1 = snprintf(out_buf + off, out_size - off, "\n- %.*s", (int)n, rec);
                     if (w1 > 0)
@@ -146,7 +151,7 @@ static int cli_chat_mem_inject_gw(const char *input, char *out_buf, size_t out_s
 }
 
 /* 检索相关历史记忆，拼成 system 追加段（最多 3 条、每条截断 200 字符）。
- * 统一经 gateway（mem_d）召回，与 TUI 共享记忆库；gateway 不可用时回退
+ * 统一经 gateway（mem_d）召回；gateway 不可用时回退
  * 进程内 L1 记忆引擎（离线/单机降级）。 */
 void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t out_size)
 {
@@ -201,7 +206,14 @@ void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t out_siz
             strncmp(data, "用户: ", 9) == 0 &&
             strncmp(data + 9, input, strlen(input)) == 0)
             continue;
-        size_t n = dlen < 200 ? dlen : 200;
+        /* memory_record_data 是长度前缀缓冲区（非 NUL 结尾），不能用内部
+         * 走 strlen 的 cli_utf8_safe_len()；按 dlen 做 UTF-8 边界回退。 */
+        size_t n = dlen;
+        if (n > 200) {
+            n = 200;
+            while (n > 0 && ((unsigned char)data[n] & 0xC0) == 0x80)
+                n--;
+        }
         if (off < out_size - 1) {
             int w1 = snprintf(out_buf + off, out_size - off, "\n- %.*s", (int)n, data);
             if (w1 > 0)
@@ -213,7 +225,7 @@ void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t out_siz
     airy_memory_result_free(res);
 }
 
-/* gateway 统一记忆写回（mem_d，与 TUI 共享存储；失败回退 L1）。 */
+/* gateway 统一记忆写回（mem_d；失败回退 L1）。 */
 static int cli_chat_mem_record_gw(const char *input, const char *reply, const char *reasoning)
 {
     if (!input || !input[0] || !reply || !reply[0])
@@ -231,8 +243,8 @@ static int cli_chat_mem_record_gw(const char *input, const char *reply, const ch
         if (rn > 0)
             n += (rn < (int)(sizeof(content) - n - 1)) ? rn : (int)(sizeof(content) - n - 1);
     }
-    if (n > 1600)
-        n = 1600;
+    /* UTF-8 边界回退：1600 是字节数，直接截断会切坏多字节序列。 */
+    n = (int)cli_utf8_safe_len(content, 1600);
     content[n] = '\0';
 
     cJSON *params = cJSON_CreateObject();
@@ -258,9 +270,8 @@ static int cli_chat_mem_record_gw(const char *input, const char *reply, const ch
 
 /* 一轮对话完成后写入记忆：用户输入 + 回复（截断防噪声，只记事实）。
  * 2.1.1.6 修订：携带思考链（reasoning）——记忆检索按 content 匹配，
- * 拼接进记录后思考 token 可被下轮/下次会话召回（与 TUI 记忆的
- * reasoning 语义对齐），不再"只存档不可用"。
- * 统一经 gateway（mem_d）写回，与 TUI 共享记忆库；gateway 不可用时
+ * 拼接进记录后思考 token 可被下轮/下次会话召回，不再"只存档不可用"）。
+ * 统一经 gateway（mem_d）写回；gateway 不可用时
  * 回退进程内 L1 记忆引擎（离线/单机降级）。 */
 void cli_chat_mem_record(const char *input, const char *reply, const char *reasoning)
 {
@@ -287,8 +298,8 @@ void cli_chat_mem_record(const char *input, const char *reply, const char *reaso
         if (rn > 0)
             n += (rn < (int)(sizeof(content) - n - 1)) ? rn : (int)(sizeof(content) - n - 1);
     }
-    if (n > 1600)
-        n = 1600;
+    /* UTF-8 边界回退：1600 是字节数，直接截断会切坏多字节序列。 */
+    n = (int)cli_utf8_safe_len(content, 1600);
 
     airy_memory_record_t rec;
     __builtin_memset(&rec, 0, sizeof(rec));
