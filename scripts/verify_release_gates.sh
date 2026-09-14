@@ -14,7 +14,9 @@
 #   E  9.6/S-01   TUI 会话历史环形裁剪（长对话问题）
 #   F  9.7/S-02   长任务可取消 + 超时可诊断
 #   G  9.11/S-04  reasoning 截断 + 日志轮转（长任务问题）
-#   H  9.9/U-02~4 三份脚本通道白名单同集 + 保留通道文案 + 版本占位合法
+#   H  9.9/U-02~4 三份脚本通道白名单同集 + 保留通道文案（bash/ps1/更新器）
+#                 + 版本占位合法 + 保留通道声明 manifest（state=reserved）
+#                 + 消费端 state 门禁（U-02 通道选择 fail-closed）
 #   I  9.10/I-03  架构白名单精确串 + 全仓零 riscv 表述 + 源码构建指引
 #   J  9.1/U-01   更新器 detect_pending_release（更新问题：落后指针静默）
 #   K  （可选）   发布侧 publish-release.sh 白名单契约（本地可达才断言）
@@ -49,6 +51,7 @@ section() { printf '\n[组%s] %s\n' "$1" "$2"; }
 
 # ---------- 路径 ----------
 INSTALL="$ROOT/scripts/install.sh"
+INSTALL_PS1="$ROOT/scripts/install.ps1"
 LATEST_RT="$ROOT/latest/airymaxrt"
 CLI="$ROOT/tools/airy_cli"
 
@@ -78,7 +81,7 @@ extract_fn() { # <file> <fnname> <outfile>
 
 # ---------- 结构性文件存在性前置（缺失即红，不逐条刷屏）----------
 _missing=0
-for _f in "$INSTALL" "$LATEST_RT" \
+for _f in "$INSTALL" "$INSTALL_PS1" "$LATEST_RT" \
           "$CLI/src/chat/cli_chat.c" \
           "$CLI/src/tui/cli_tui_internal.h" \
           "$CLI/src/tui/tui_history.c" \
@@ -375,11 +378,12 @@ esac
 
 _h2=1
 grep -Fq 'beta 为保留通道' "$INSTALL" || _h2=0
+grep -Fq 'beta 为保留通道' "$INSTALL_PS1" || _h2=0
 if [ -f "$SDK_AIRYMAXRT" ]; then
     grep -Fq 'beta 为保留通道' "$SDK_AIRYMAXRT" || _h2=0
 fi
 if [ "$_h2" -eq 1 ]; then
-    ok "H2 beta 缺席时保留通道明确文案在位（U-03：可操作提示）"
+    ok "H2 beta 缺席时保留通道明确文案在位（U-03：可操作提示；bash/ps1/更新器三副本）"
 else
     bad "H2 保留通道文案缺失（beta 403 时用户无指引）"
 fi
@@ -388,6 +392,36 @@ if grep -Eq '^AIRY_VERSION="\$\{AIRY_VERSION:-v[0-9]+\.[0-9]+\.[0-9]+\}"$' "$INS
     ok "H3 版本占位格式合法（U-04：curl 管道形态兜底可解析；占位超前指针属 bump 窗口常态不断言相等）"
 else
     bad "H3 版本占位行缺失或格式漂移"
+fi
+
+# H4（U-02 收口）：latest/ 必须为保留通道备「显式声明式 manifest」——通道选择
+# fail-closed 的权威依据。断言 state/latest/channel 三字段与签名同在；旧行为
+# （manifest 缺失 → 客户端 404 猜测）即回归。
+BETA_DECL="$ROOT/latest/manifest.beta.json"
+_h4=1
+[ -s "$BETA_DECL" ] || _h4=0
+[ "$_h4" -eq 1 ] && { grep -Fq '"channel": "beta"' "$BETA_DECL" || _h4=0; }
+[ "$_h4" -eq 1 ] && { grep -Fq '"state": "reserved"' "$BETA_DECL" || _h4=0; }
+[ "$_h4" -eq 1 ] && { grep -Fq '"latest": ""' "$BETA_DECL" || _h4=0; }
+[ "$_h4" -eq 1 ] && { [ -s "$BETA_DECL.asc" ] || _h4=0; }
+if [ "$_h4" -eq 1 ]; then
+    ok "H4 保留通道声明 manifest 在位（beta state=reserved + 空指针 + 已签名）"
+else
+    bad "H4 latest/manifest.beta.json 缺失/字段漂移/未签名（通道选择将退回 404 猜测）"
+fi
+
+# H5（U-02 收口）：三消费端均以 state=reserved 显式 fail-closed（不再以空
+# latest 含糊归因，也不把选错通道误作「本平台无包」下沉源码构建）。
+_h5=1
+grep -Fq 'state=reserved' "$INSTALL"     || _h5=0
+grep -Fq 'state=reserved' "$INSTALL_PS1" || _h5=0
+if [ -f "$SDK_AIRYMAXRT" ]; then
+    grep -Fq 'state=reserved' "$SDK_AIRYMAXRT" || _h5=0
+fi
+if [ "$_h5" -eq 1 ]; then
+    ok "H5 消费端保留通道 fail-closed 门禁在位（install.sh / install.ps1 / 更新器）"
+else
+    bad "H5 消费端缺 state=reserved 门禁（保留通道将被静默源码构建）"
 fi
 
 # ============================================================
@@ -402,13 +436,14 @@ else
 fi
 
 _i2=0
-for _mf in "$ROOT/latest/manifest.stable.json" "$ROOT/latest/manifest.rc.json"; do
+for _mf in "$ROOT/latest/manifest.stable.json" "$ROOT/latest/manifest.rc.json" \
+           "$ROOT/latest/manifest.beta.json"; do
     if [ -f "$_mf" ] && grep -riq 'riscv' "$_mf"; then
         _i2=1
     fi
 done
 if [ "$_i2" -eq 0 ]; then
-    ok "I2 latest/ 双 manifest 零 riscv（不宣发未支持架构）"
+    ok "I2 latest/ 三 manifest 零 riscv（不宣发未支持架构）"
 else
     bad "I2 latest/ manifest 出现 riscv 表述"
 fi
@@ -470,6 +505,26 @@ if [ -f "$PUBLISH" ]; then
     fi
 else
     skip "K1 hub tools 仓未检出，发布侧契约跳过（CI 不取料，属预期）"
+fi
+
+# K2（U-02 收口）：发布链须为 latest/ 缺失通道合成声明式 manifest，否则
+# 通道全集不全，客户端 `--channel <ch>` 只能得 404 并退回「网络异常」猜测。
+if [ -f "$PUBLISH" ]; then
+    if grep -Fq 'emit_channel_declarations() {' "$PUBLISH" \
+       && grep -Fq 'emit_channel_declarations "$LATEST_DIR" "$CHANNEL"' "$PUBLISH" \
+       && grep -Fq '"state": "reserved"' "$PUBLISH" \
+       && grep -Fq '"state": "active"' "$PUBLISH"; then
+        ok "K2 发布侧保留通道声明链在位（emit_channel_declarations + state=active/reserved）"
+    else
+        bad "K2 发布侧保留通道声明链破裂（latest/ 通道 manifest 不全，客户端退回 404 猜测）"
+    fi
+    if grep -Fq 'SKIP_SIGN' "$PUBLISH" && grep -Fq '跳过保留通道声明 manifest' "$PUBLISH"; then
+        ok "K3 无有效签名时不假签声明（SKIP_SIGN/SKIP_GPG 宁缺不假签）"
+    else
+        bad "K3 声明 manifest 缺签名保护（假签名将被客户端误读为签名篡改）"
+    fi
+else
+    skip "K2/K3 hub tools 仓未检出，发布侧契约跳过（CI 不取料，属预期）"
 fi
 
 # ============================================================
