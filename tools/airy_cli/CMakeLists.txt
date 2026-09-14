@@ -194,4 +194,24 @@ if(BUILD_TESTS)
     # cli_classify.c 无外部符号引用，静态库按需抽取，无重链接负担。
     target_link_libraries(test_cli_classify PRIVATE airy_coreloopthree)
     add_test(NAME cli_classify_heuristic COMMAND test_cli_classify)
+
+    # 0.1.16 审计 E2E：cli_gw 统一网关客户端（JSON-RPC over HTTP POST）
+    # 端到端往返——本进程内 mock HTTP/1.1 服务端 + 真实 loopback socket，
+    # 覆盖端点发现/调用往返/失败分诊/取消/可达性（12 用例）。cli_gw.c 仅
+    # 经宏展开引用 airy_common 的 airy_malloc/airy_log_write 等符号。
+    add_executable(test_cli_gw tests/test_cli_gw.c src/cmd/cli_gw.c)
+    target_include_directories(test_cli_gw PRIVATE ${CLI_INC_DIRS})
+    # AIRY_COMPLIANCE_IMPL：测试 TU 的 mock 服务端使用裸 memset/sscanf/free，
+    # 需豁免全局 banned_functions.h 毒化（与 gateway/tests 同策略）。
+    target_compile_definitions(test_cli_gw PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
+    if(AIRY_CJSON_INCLUDE_DIRS)
+        target_include_directories(test_cli_gw PRIVATE ${AIRY_CJSON_INCLUDE_DIRS})
+    endif()
+    target_link_libraries(test_cli_gw PRIVATE airy_common Threads::Threads)
+    if(TARGET cJSON OR TARGET cjson)
+        target_link_libraries(test_cli_gw PRIVATE $<IF:$<TARGET_EXISTS:cJSON>,cJSON,cjson>)
+    elseif(AIRY_CJSON_LIBRARIES)
+        target_link_libraries(test_cli_gw PRIVATE ${AIRY_CJSON_LIBRARIES})
+    endif()
+    add_test(NAME cli_gw_e2e COMMAND test_cli_gw)
 endif()
