@@ -50,14 +50,14 @@ jobs:
         test_cost test_print test_cancel_token
         test_airy_effect test_airy_ext test_airy_id test_airy_regex test_ime
         test_io test_ipc
-        test_gateway test_syscall_router test_sse_stream test_jsonrpc
+        test_gateway test_syscall_router test_sse_stream test_sse_utf8 test_jsonrpc
         test_rpc_handler test_gateway_auth
         test_kernel_state test_corekern test_memory_engine test_oom_handler
         test_are_ipc
       # ctest 名称子集，与上面的目标一一对应（commons 执行器注册名带
       # commons_test_ 前缀，其余注册名即测试名）。
       SANITIZER_CTEST_RE: >-
-        ^(commons_test_|gateway_test|syscall_router_test|sse_stream_test|jsonrpc_test|rpc_handler_test|gateway_auth_test|kernel_state|corekern_deep|memory_engine|oom_handler|are_ipc)$
+        ^(commons_test_|gateway_test|syscall_router_test|sse_stream_test|sse_utf8_test|jsonrpc_test|rpc_handler_test|gateway_auth_test|kernel_state|corekern_deep|memory_engine|oom_handler|are_ipc)$
     steps:
       - name: Checkout
         uses: actions/checkout@v4
