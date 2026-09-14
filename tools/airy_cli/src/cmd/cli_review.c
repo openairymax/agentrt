@@ -163,10 +163,9 @@ static char *cli_review_build_prompt(const char *topic, const char *task, const 
     return prompt;
 }
 
-/* Extract "<field>" (or "result.<field>") from a daemon RPC response; OWNER
- * via AIRY_STRDUP. daemon_rpc_call returns the serialized result object
- * directly (no JSON-RPC "result" wrapper); keep the wrapped form as a
- * fallback for callers that pass the raw response. */
+/* Extract "<field>" (or "result.<field>") from a gateway RPC response; OWNER
+ * via AIRY_STRDUP. Handles both the bare result object and the JSON-RPC
+ * "result"-wrapped form, so callers may pass either shape. */
 static char *cli_review_rpc_field(const char *resp, const char *field)
 {
     if (!resp)
