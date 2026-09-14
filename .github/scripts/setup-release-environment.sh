@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # setup-release-environment.sh — release environment 全量配置固化（0.1.12 H3）
 #
-# 背景（docs-closed/agentrt/0.1.12-架构改进方案.md P17/P18）：
+# 背景（0.1.12-架构改进方案.md P17/P18）：
 #   - deployment_branch_policy 为 custom 模式但列表为空时，publish job 的
 #     deployment 永不创建、卡 waiting（v0.1.10 正式 tag 曾卡死）；
 #   - branch 型 policy 只匹配分支不匹配 tag：tag 触发 run 的 deployment ref
