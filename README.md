@@ -6,7 +6,7 @@
 
 **Language:** English | [简体中文](README_zh.md)
 
-[![Version](https://img.shields.io/badge/version-0.1.15-5a6b7e)](https://atomgit.com/openairymax/agentrt/releases/tag/v0.1.15)
+[![Version](https://img.shields.io/badge/version-0.1.16-5a6b7e)](https://atomgit.com/openairymax/agentrt/releases/tag/v0.1.16)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
 
@@ -313,21 +313,21 @@ what the updater reads. Release notes live in
 [`RELEASE_NOTES.d/`](RELEASE_NOTES.d), one file per version, and
 [CHANGELOG.md](CHANGELOG.md) records the longer history.
 
-The current release is **v0.1.15**. Highlights:
+The current release is **v0.1.16**. Highlights:
 
-- `corekern` now enters the CLI startup path through `airy_init()` and emits
-  traceable boot evidence; a batch of IPC routing, binder shutdown-order and
-  zero-length-allocation defects were fixed.
-- The terminal UI restores your terminal state on fatal signals — no more
-  leftover garbled output or a hidden cursor — and consumes OSC replies
-  correctly.
-- Gateway entry authentication and socket binding were hardened, and ASan /
-  UBSan quality gates were added across `commons`, `gateway` and `corekern` so
-  memory-safety regressions are caught before they are merged.
-- A new `AIRY_KEEP_SYMBOLS` switch lets a build retain symbols for field
-  diagnosis.
-- Windows packages for x86-64 and x86-32 are published on the same pipeline as
-  Linux and macOS.
+- Memory writes and recall now truncate on a UTF-8 character boundary instead
+  of a byte offset, so long conversations containing CJK text or emoji no
+  longer corrupt the memory store or trip an upstream HTTP 400 `invalid
+  unicode code point`. The same fix is applied on both the CLI and gateway
+  paths, with residual invalid bytes sanitised at the gateway.
+- A model-service rejection (HTTP 400/422) is now reported as what it is —
+  "request rejected by the model service" together with the provider's own
+  message — rather than being folded into a generic read/write error.
+- Memory records already written in a corrupted form by earlier versions are
+  cleaned up in place (backup kept).
+- CI uploads `ctest` logs as artifacts on failure, and the cross-repository
+  release-gate fixtures are pinned to explicit commits instead of a moving
+  default branch.
 
 ## Documentation
 
