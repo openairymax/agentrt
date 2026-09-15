@@ -44,7 +44,8 @@ int cmd_orch(const char *arg, void *ctx)
     int rc = cli_gw_call("think.orchestrate", ps, 120000, &result);
     AIRY_FREE(ps);
     if (rc != 0 || !result) {
-        cli_outf("  %s[编排]%s gateway 不可达或 RPC 失败（rc=%d）\n", CLR_RED, CLR_RESET, rc);
+        /* C-5 收敛：经 cli_err_desc 统一渲染，契约外码值不进用户面 */
+        cli_outf("  %s[编排]%s 编排请求失败：%s\n", CLR_RED, CLR_RESET, cli_err_desc(rc));
         AIRY_FREE(result);
         return 1;
     }
