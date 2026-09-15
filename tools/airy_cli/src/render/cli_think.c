@@ -377,7 +377,7 @@ airy_err_t cli_think_process_remote(const char *input, airy_task_plan_t **out_pl
  *
  * 结构约定（ecosystem/manager/model/model.yaml）：
  *   llm:
- *     model: "deepseek-v4-flash"
+ *     model: "deepseek-flash"
  *   think:
  *     think2_slow_model: ""
  *     think1_fast_model: ""
