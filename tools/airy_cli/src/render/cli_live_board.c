@@ -59,6 +59,9 @@ static void cli_live_board_icon(const char *state, const char **icon, const char
     } else if (state && (strcmp(state, "failed") == 0 || strcmp(state, "canceled") == 0)) {
         *icon = CLI_ICON_CROSS;
         *col = CLR_RED;
+    } else if (state && strcmp(state, "semantic_failed") == 0) {
+        *icon = CLI_ICON_CROSS;
+        *col = CLR_YELLOW;
     } else if (state && (strcmp(state, "running") == 0 || strcmp(state, "active") == 0 ||
                          strcmp(state, "queued") == 0 || strcmp(state, "retrying") == 0)) {
         *icon = CLI_ICON_HALF;
@@ -118,6 +121,7 @@ static void cli_live_board_footer_line(const char *state, double progress)
         if (strcmp(g_live_board.states[i], "completed") == 0)
             done++;
         else if (strcmp(g_live_board.states[i], "failed") == 0 ||
+                 strcmp(g_live_board.states[i], "semantic_failed") == 0 ||
                  strcmp(g_live_board.states[i], "canceled") == 0)
             fail++;
     }

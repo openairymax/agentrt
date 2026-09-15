@@ -278,8 +278,9 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
             cli_spinner_resume();
         }
         if (prc == CLI_DAG_POLL_DONE) {
-            run_failed =
-                (strcmp(cur_state, "failed") == 0 || strcmp(cur_state, "canceled") == 0);
+            /* 终态即停止轮询；semantic_failed（节点进程成功但无产出）与
+             * failed / canceled 一并按失败呈现，避免把「无产出」误报为成功。 */
+            run_failed = cli_state_failed(cur_state);
             cli_spinner_pause();
             if (!cli_live_board_refresh(cur_state, cur_progress))
                 cli_board_line("sched_d", exec_id, cur_state, cur_progress);

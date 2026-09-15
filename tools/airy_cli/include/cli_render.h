@@ -198,6 +198,13 @@ const char *cli_err_desc(int err);
  * 字符串，直接用于进度行展示即可。 */
 const char *cli_state_cn(const char *state);
 
+/* 执行体终态 / 失败态判定（单一事实源）：completed / semantic_failed /
+ * failed / canceled 均为终态；其中 semantic_failed（进程成功但无产出）、
+ * failed、canceled 视为失败态。轮询、看板、快照与任务流共用，避免新增状态
+ * 时判定漂移。 */
+int cli_state_terminal(const char *state);
+int cli_state_failed(const char *state);
+
 typedef enum {
     CLI_ROLE_USER = 0,        /* [For Thee]     cyan     */
     CLI_ROLE_SUPER_AGENT,     /* [Super Agent]  green    */

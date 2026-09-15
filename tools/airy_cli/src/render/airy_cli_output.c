@@ -265,6 +265,8 @@ void cli_render_task_line(const char *tag, const char *id, const char *state,
         st_col = cli_c(CLR_GREEN); st_icon = CLI_ICON_CHECK; bar_bright = 1;
     } else if (strcmp(st, "failed") == 0) {
         st_col = cli_c(CLR_RED); st_icon = CLI_ICON_CROSS; bar_bright = 0;
+    } else if (strcmp(st, "semantic_failed") == 0) {
+        st_col = cli_c(CLR_YELLOW); st_icon = CLI_ICON_CROSS; bar_bright = 0;
     } else if (strcmp(st, "running") == 0 || strcmp(st, "active") == 0 ||
                strcmp(st, "queued") == 0) {
         st_col = cli_c(CLR_DIM); st_icon = CLI_ICON_DIAMOND;

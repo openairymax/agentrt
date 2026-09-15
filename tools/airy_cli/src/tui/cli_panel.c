@@ -50,6 +50,8 @@ static const char *cli_panel_state_icon(const char *state)
         return CLI_ICON_CLOCK;
     if (strcmp(state, "failed") == 0)
         return CLI_ICON_CROSS;
+    if (strcmp(state, "semantic_failed") == 0)
+        return CLI_ICON_CROSS;
     if (strcmp(state, "canceled") == 0)
         return CLI_ICON_CANCEL;
     return CLI_ICON_BULLET;
@@ -63,6 +65,8 @@ static const char *cli_panel_state_color(const char *state)
         return cli_c(CLR_GREEN);
     if (strcmp(state, "failed") == 0 || strcmp(state, "canceled") == 0)
         return cli_c(CLR_RED);
+    if (strcmp(state, "semantic_failed") == 0)
+        return cli_c(CLR_YELLOW);
     if (strcmp(state, "active") == 0 || strcmp(state, "running") == 0 ||
         strcmp(state, "pending") == 0 || strcmp(state, "scheduled") == 0)
         return cli_c(CLR_YELLOW);

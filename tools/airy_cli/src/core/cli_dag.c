@@ -260,8 +260,7 @@ cli_dag_poll_rc_t cli_dag_poll_remote(const char *dag_id, double *out_progress, 
     double done_n = cJSON_IsNumber(pg) ? pg->valuedouble : 0.0;
     *out_progress = node_n > 0.0 ? done_n / node_n : 0.0;
 
-    int terminal = (strcmp(status, "completed") == 0 || strcmp(status, "failed") == 0 ||
-                    strcmp(status, "canceled") == 0);
+    int terminal = cli_state_terminal(status);
     if (terminal && out_result) {
         cJSON *agg = cJSON_CreateObject();
         if (agg) {
@@ -489,6 +488,8 @@ struct cli_dag_board_s {
     size_t node_count;
 };
 
+/* 节点态图标：semantic_failed（进程成功但无产出）以「半叉」降级色呈现，
+ * 与 completed 绿、failed/canceled 红区分，让「跑完了但结果不可用」一眼可见。 */
 static void cli_dag_board_icon_color(const char *status, const char **icon,
                                      const char **color)
 {
@@ -498,6 +499,9 @@ static void cli_dag_board_icon_color(const char *status, const char **icon,
     } else if (strcmp(status, "failed") == 0 || strcmp(status, "canceled") == 0) {
         *icon = CLI_ICON_CROSS;
         *color = CLR_RED;
+    } else if (strcmp(status, "semantic_failed") == 0) {
+        *icon = CLI_ICON_CROSS;
+        *color = CLR_YELLOW;
     } else if (strcmp(status, "running") == 0 || strcmp(status, "active") == 0 ||
                strcmp(status, "queued") == 0) {
         *icon = CLI_ICON_DIAMOND;
@@ -561,8 +565,7 @@ int cli_dag_node_board_tick(cli_dag_board_t *b, const char *dag_id)
 
     cJSON *st = cJSON_GetObjectItem(root, "status");
     const char *status = (cJSON_IsString(st) && st->valuestring) ? st->valuestring : "unknown";
-    int terminal = (strcmp(status, "completed") == 0 || strcmp(status, "failed") == 0 ||
-                    strcmp(status, "canceled") == 0);
+    int terminal = cli_state_terminal(status);
 
     cJSON *nodes = cJSON_GetObjectItem(root, "nodes");
     int nsz = (nodes && cJSON_IsArray(nodes)) ? cJSON_GetArraySize(nodes) : 0;
@@ -642,8 +645,7 @@ int cli_dag_board_snapshot(const char *dag_id, void (*cb)(const char *node_id, c
 
     cJSON *st = cJSON_GetObjectItem(root, "status");
     const char *status = (cJSON_IsString(st) && st->valuestring) ? st->valuestring : "unknown";
-    int terminal = (strcmp(status, "completed") == 0 || strcmp(status, "failed") == 0 ||
-                    strcmp(status, "canceled") == 0);
+    int terminal = cli_state_terminal(status);
 
     cJSON *nodes = cJSON_GetObjectItem(root, "nodes");
     int nsz = (nodes && cJSON_IsArray(nodes)) ? cJSON_GetArraySize(nodes) : 0;

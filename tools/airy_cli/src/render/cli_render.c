@@ -359,12 +359,32 @@ void cli_render_collapsed(const char *text, size_t indent, size_t max_lines, int
 
 /* ---- status helpers ---- */
 
+/* 单一事实源：执行体的终态与失败态判定。sched_d 与工作大厅的终态串为
+ * completed / semantic_failed / failed / canceled，其中 semantic_failed
+ * （节点进程成功但没有可交付产物）同样是终态，且必须按失败呈现，否则会把
+ * 「无产出」渲染成绿勾。轮询、看板、快照与任务流多处共用本函数，避免新增
+ * 状态时各写一遍而漂移。 */
+int cli_state_terminal(const char *state)
+{
+    if (!state) return 0;
+    return strcmp(state, "completed") == 0 || strcmp(state, "semantic_failed") == 0 ||
+           strcmp(state, "failed") == 0 || strcmp(state, "canceled") == 0;
+}
+
+int cli_state_failed(const char *state)
+{
+    if (!state) return 0;
+    return strcmp(state, "semantic_failed") == 0 || strcmp(state, "failed") == 0 ||
+           strcmp(state, "canceled") == 0;
+}
+
 const char *cli_icon_for_state(const char *state)
 {
     if (!state) return CLI_ICON_BULLET;
     if (strcmp(state, "completed") == 0 || strcmp(state, "success") == 0 ||
         strcmp(state, "done") == 0) return CLI_ICON_CHECK;
     if (strcmp(state, "failed") == 0 || strcmp(state, "error") == 0) return CLI_ICON_CROSS;
+    if (strcmp(state, "semantic_failed") == 0) return CLI_ICON_CROSS;
     if (strcmp(state, "running") == 0 || strcmp(state, "active") == 0 ||
         strcmp(state, "executing") == 0) return CLI_ICON_DIAMOND;
     if (strcmp(state, "pending") == 0 || strcmp(state, "queued") == 0 ||
@@ -380,6 +400,7 @@ const char *cli_state_cn(const char *state)
     if (strcmp(state, "completed") == 0 || strcmp(state, "success") == 0 ||
         strcmp(state, "done") == 0) return "完成";
     if (strcmp(state, "failed") == 0) return "失败";
+    if (strcmp(state, "semantic_failed") == 0) return "无产出";
     if (strcmp(state, "canceled") == 0) return "已取消";
     if (strcmp(state, "error") == 0) return "出错";
     if (strcmp(state, "running") == 0 || strcmp(state, "active") == 0 ||
