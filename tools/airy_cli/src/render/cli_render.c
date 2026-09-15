@@ -191,6 +191,9 @@ const char *cli_err_desc(int err)
     case AIRY_ERR_OUT_OF_MEMORY:    return "内存不足";
     case AIRY_ERR_CANCELED:         return "操作已取消";
     case AIRY_ERR_WOULD_BLOCK:      return "资源暂时不可用，请稍后重试";
+    /* GCCP 两段式交互哨兵：正常流程在 CLI 内部闭环；漏出即交互未收敛，
+     * 给出可读文案而非"发生错误"误导为引擎故障 */
+    case AIRY_ERR_GCCP_INTERACTION: return "意图信息不完整，GCCP 确认未收敛，请补充任务描述";
     default:                        return "发生错误";
     }
 }
