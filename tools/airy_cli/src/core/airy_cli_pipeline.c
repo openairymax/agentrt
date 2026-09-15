@@ -164,6 +164,15 @@ void cli_teardown_runtime(cli_runtime_ctx_t *rt)
     AIRY_MEMSET(rt, 0, sizeof(*rt));
 }
 
+/* B-1：蓝图快速路径与 chat / task 回合共用同一计费展示口径（唯一出口
+ * cli_chat_usage_metrics）。L1 状态机命中为零消耗，无指标可展示；L2 语义
+ * 匹配若触发厂商调用，则按会话差值如实回显。 */
+static const char *cli_fastpath_metrics(void)
+{
+    static char buf[192];
+    return cli_chat_usage_metrics(buf, sizeof(buf)) ? buf : NULL;
+}
+
 int cli_blueprint_fastpath(const char *input, uint64_t turn_start)
 {
     if (!input || !input[0])
@@ -255,7 +264,8 @@ int cli_blueprint_fastpath(const char *input, uint64_t turn_start)
         }
         AIRY_FREE(rs_out);
         if (!g_cli_json_mode)
-            cli_render_turn_separator(cli_now_ms() - turn_start, NULL);
+            cli_render_turn_separator(cli_now_ms() - turn_start,
+                                      cli_fastpath_metrics());
         return 1;
     }
     if (strcmp(tier, "l2") == 0) {
@@ -312,7 +322,8 @@ int cli_blueprint_fastpath(const char *input, uint64_t turn_start)
         }
         AIRY_FREE(rs_out);
         if (!g_cli_json_mode)
-            cli_render_turn_separator(cli_now_ms() - turn_start, NULL);
+            cli_render_turn_separator(cli_now_ms() - turn_start,
+                                      cli_fastpath_metrics());
         return 1;
     }
     if (rs_out && rs_out[0]) {

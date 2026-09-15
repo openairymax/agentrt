@@ -144,11 +144,9 @@ void cli_history_clear(void);
 int cli_classify_heuristic(const char *input);
 int cli_classify_input(const char *input);
 void cli_chat_reply(const char *input);
-/* 2.1.1.5：读取最近一轮对话的真实 token/费用统计（main.c 回合分隔处展示） */
-void cli_chat_usage_get(uint64_t *tokens, double *cost);
-/* 1.7：读取全链路真实 token/费用会话差值（llm_d cost_tracker 真相源，
- * 覆盖 chat + task 双思考路径；llm_d 离线回退 chat 累计） */
-void cli_chat_usage_get_session(uint64_t *tokens, double *cost);
+/* B-1/B-2：计费展示口径 SSoT，所有回合出口（chat / task / 蓝图快速路径）
+ * 共用；返回 1 = buf 写入非空指标，0 = 本回合无消耗 */
+int cli_chat_usage_metrics(char *buf, size_t n);
 
 /* ===== cli_chat.c 域拆分（2026-08-27：2040 行 → 6 个职责模块） ===== */
 

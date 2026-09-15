@@ -397,14 +397,8 @@ int main(int argc, char *argv[])
         cli_trace("intent", "%s", is_task ? "task" : "chat");
         if (is_task == 0) {
             cli_chat_reply(input);
-            char chat_metrics[96];
-            chat_metrics[0] = '\0';
-            uint64_t toks = 0;
-            double cost = 0.0;
-            cli_chat_usage_get_session(&toks, &cost);
-            if (toks > 0 || cost > 0.0)
-                snprintf(chat_metrics, sizeof(chat_metrics), "Tokens: %llu · Cost: $%.6f",
-                         (unsigned long long)toks, cost);
+            char chat_metrics[192];
+            cli_chat_usage_metrics(chat_metrics, sizeof(chat_metrics));
             cli_render_turn_separator(cli_now_ms() - turn_start,
                                       chat_metrics[0] ? chat_metrics : NULL);
             continue;
