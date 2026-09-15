@@ -105,13 +105,16 @@ void cli_panel_board_destroy(void *ud)
     AIRY_FREE(ud);
 }
 
-/* 拉取 sched_d 当前 DAG 摘要（秒级节流），结果缓存在 p->items */
+/* 拉取 sched_d 当前 DAG 摘要（秒级节流），结果缓存在 p->items。
+ * 先落 staging 再替换快照：gateway 不可达时保留上次数据，
+ * 避免断线瞬间看板闪空（与 board_count 节流注释语义一致）。 */
 static void cli_panel_board_fetch(cli_board_panel_t *p)
 {
-    p->count = 0;
+    cli_dag_item_t items[CLI_BOARD_MAX];
     size_t n = 0;
-    if (cli_dag_list_remote(p->items, CLI_BOARD_MAX, &n) != AIRY_EOK)
+    if (cli_dag_list_remote(items, CLI_BOARD_MAX, &n) != AIRY_EOK)
         return;
+    AIRY_MEMCPY(p->items, items, n * sizeof(cli_dag_item_t));
     p->count = n;
 }
 
