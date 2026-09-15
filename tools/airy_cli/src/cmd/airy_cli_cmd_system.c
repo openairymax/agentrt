@@ -54,6 +54,10 @@
 
 #define CLI_GW_PROBE_TIMEOUT_MS 1000
 
+#ifdef AIRY_HAS_CJSON
+#include <cjson/cJSON.h>
+#endif
+
 /* ==================== shared infrastructure ==================== */
 
 const cli_daemon_desc_t CLI_DAEMONS[] = {
@@ -645,11 +649,123 @@ int cmd_daemon(const char *arg, void *ctx)
     return 0;
 }
 
+#ifdef AIRY_HAS_CJSON
+/* mem_d 统计含语义缓存命中率与上下文台账两层子对象，默认视图下拆行可读渲染；
+ * --print / --json 仍输出原始 JSON 供脚本消费。 */
+static void cli_mem_stats_show(const char *ns, const char *json)
+{
+    cJSON *root = cJSON_Parse(json);
+    if (!root) {
+        cli_render_sub_agent(ns, json);
+        return;
+    }
+
+    char line[200];
+    const cJSON *records = cJSON_GetObjectItem(root, "records");
+    const cJSON *max_records = cJSON_GetObjectItem(root, "max_records");
+    if (cJSON_IsNumber(records)) {
+        snprintf(line, sizeof(line), "records %d / %d",
+                 records->valueint, cJSON_IsNumber(max_records) ? max_records->valueint : 0);
+        cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, line);
+    }
+
+    const cJSON *cache = cJSON_GetObjectItem(root, "cache");
+    if (cJSON_IsObject(cache)) {
+        const cJSON *e = cJSON_GetObjectItem(cache, "entries");
+        const cJSON *h = cJSON_GetObjectItem(cache, "hits");
+        const cJSON *m = cJSON_GetObjectItem(cache, "misses");
+        const cJSON *r = cJSON_GetObjectItem(cache, "hit_rate");
+        const cJSON *v = cJSON_GetObjectItem(cache, "evictions");
+        snprintf(line, sizeof(line),
+                 "semantic cache: entries=%d hits=%d misses=%d hit_rate=%.1f%% evictions=%d",
+                 e ? e->valueint : 0, h ? h->valueint : 0, m ? m->valueint : 0,
+                 r ? r->valuedouble * 100.0 : 0.0, v ? v->valueint : 0);
+        cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, line);
+    }
+
+    const cJSON *ledger = cJSON_GetObjectItem(root, "ledger");
+    if (cJSON_IsObject(ledger)) {
+        const cJSON *s = cJSON_GetObjectItem(ledger, "sessions");
+        const cJSON *e = cJSON_GetObjectItem(ledger, "entries");
+        const cJSON *t = cJSON_GetObjectItem(ledger, "total_tokens");
+        snprintf(line, sizeof(line), "ledger: sessions=%d entries=%d total_tokens=%d",
+                 s ? s->valueint : 0, e ? e->valueint : 0, t ? t->valueint : 0);
+        cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, line);
+    }
+
+    cJSON_Delete(root);
+}
+
+/* llm_d 统计含进程内缓存命中率与逐模型 token/成本累计。 */
+static void cli_llm_stats_show(const char *ns, const char *json)
+{
+    cJSON *root = cJSON_Parse(json);
+    if (!root) {
+        cli_render_sub_agent(ns, json);
+        return;
+    }
+
+    char line[200];
+    const cJSON *size = cJSON_GetObjectItem(root, "llm_cache_size");
+    const cJSON *cap = cJSON_GetObjectItem(root, "llm_cache_capacity");
+    const cJSON *h = cJSON_GetObjectItem(root, "llm_cache_hits");
+    const cJSON *m = cJSON_GetObjectItem(root, "llm_cache_misses");
+    const cJSON *r = cJSON_GetObjectItem(root, "llm_cache_hit_rate");
+    if (size || h) {
+        snprintf(line, sizeof(line),
+                 "llm cache: size=%d/%d hits=%d misses=%d hit_rate=%.1f%%",
+                 size ? size->valueint : 0, cap ? cap->valueint : 0, h ? h->valueint : 0,
+                 m ? m->valueint : 0, r ? r->valuedouble * 100.0 : 0.0);
+        cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, line);
+    }
+
+    const cJSON *cost = cJSON_GetObjectItem(root, "cost");
+    const cJSON *models = cJSON_IsObject(cost) ? cJSON_GetObjectItem(cost, "models") : NULL;
+    if (cJSON_IsArray(models)) {
+        cJSON *entry = NULL;
+        cJSON_ArrayForEach(entry, models) {
+            const cJSON *name = cJSON_GetObjectItem(entry, "model");
+            const cJSON *in = cJSON_GetObjectItem(entry, "prompt_tokens");
+            const cJSON *out = cJSON_GetObjectItem(entry, "completion_tokens");
+            const cJSON *usd = cJSON_GetObjectItem(entry, "cost_usd");
+            snprintf(line, sizeof(line), "usage %s: in=%d out=%d cost=$%.6f",
+                     cJSON_IsString(name) ? name->valuestring : "?", in ? in->valueint : 0,
+                     out ? out->valueint : 0, usd ? usd->valuedouble : 0.0);
+            cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, line);
+        }
+    }
+
+    cJSON_Delete(root);
+}
+#endif /* AIRY_HAS_CJSON */
+
+static void cli_stats_print(const char *ns, const char *method)
+{
+#ifdef AIRY_HAS_CJSON
+    if (!g_cli_print_mode && !g_cli_json_mode &&
+        (strcmp(ns, "mem") == 0 || strcmp(ns, "llm") == 0)) {
+        char method_buf[32];
+        snprintf(method_buf, sizeof(method_buf), "%s.get_stats", ns);
+        char *result = NULL;
+        if (cli_gw_call(method_buf, NULL, CLI_RPC_TIMEOUT_MS, &result) == 0 && result) {
+            if (strcmp(ns, "mem") == 0)
+                cli_mem_stats_show(ns, result);
+            else
+                cli_llm_stats_show(ns, result);
+            AIRY_FREE(result);
+            return;
+        }
+        AIRY_FREE(result);
+    }
+#endif
+    cli_rpc_print(ns, method, NULL);
+}
+
 int cmd_stats(const char *arg, void *ctx)
 {
     (void)ctx;
-    if (arg && arg[0]) cli_rpc_print(arg, "get_stats", NULL);
-    else { for (size_t i = 0; i < CLI_DAEMONS_COUNT; i++) cli_rpc_print(CLI_DAEMONS[i].ns, "get_stats", NULL); }
+    if (arg && arg[0]) cli_stats_print(arg, "get_stats");
+    else { for (size_t i = 0; i < CLI_DAEMONS_COUNT; i++) cli_stats_print(CLI_DAEMONS[i].ns, "get_stats"); }
     return 0;
 }
 
