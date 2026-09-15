@@ -13,6 +13,7 @@
 
 #include "cli_internal.h"
 
+#include "agent_vocab.h"
 #include "cli_gw.h" /* 架构约束 2026-08-25：统一经 gateway 派发 */
 #include "id_utils.h"
 
@@ -47,7 +48,7 @@
 static const char *cli_handler_role(const char *handler)
 {
     if (!handler || handler[0] == '\0')
-        return "coding";
+        return AGENT_VOCAB_FALLBACK;
     if (strncmp(handler, "agent:", 6) == 0)
         return handler + 6;
     return handler;
