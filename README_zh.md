@@ -187,7 +187,6 @@ agentrt/
 ├── tests/                # 冒烟测试与工具链自测
 ├── tools/                # 开发者工具（airy_cli、airy_depgraph、codegen）
 ├── latest/               # 滚动发布清单与签名密钥
-├── RELEASE_NOTES.d/      # 面向用户的版本说明，每个版本一个文件
 ├── LICENSES/             # 附加许可证全文
 ├── CMakeLists.txt        # 顶层构建入口
 ├── VERSION               # 本目录树对应的发布版本
@@ -283,8 +282,7 @@ airymaxrt update --rollback   # 回滚到上一版本
 ```
 
 每个版本都在 [`latest/`](latest) 中提供 GPG 签名的发布清单，更新器读取的正是
-它。版本说明位于 [`RELEASE_NOTES.d/`](RELEASE_NOTES.d)，每个版本一个文件；
-更完整的历史记录见 [CHANGELOG.md](CHANGELOG.md)。
+它。更完整的历史记录见 [CHANGELOG.md](CHANGELOG.md)。
 
 当前版本为 **v0.1.16**，要点如下：
 
