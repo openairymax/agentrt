@@ -54,6 +54,11 @@
 #define CLI_REVIEW_HEALTH_TIMEOUT_MS 3000
 #define CLI_REVIEW_SPAWN_TIMEOUT_MS 90000
 #define CLI_REVIEW_INVOKE_TIMEOUT_MS 180000
+/* Inner agent.invoke read budget: must stay below the outer CLI gw deadline
+ * so the agent_d worker times out first and returns a structured error,
+ * instead of the CLI abandoning the call while the worker keeps reading the
+ * runner for the remaining 120s (0.1.16 budget inversion). */
+#define CLI_REVIEW_INVOKE_BUDGET_S 170
 #define CLI_REVIEW_PROMPT_MAX 4096
 #define CLI_REVIEW_SPEC_MAX 256
 
@@ -222,6 +227,7 @@ static void *cli_review_worker(void *arg)
     }
     cJSON_AddStringToObject(params, "agent_id", agent_id);
     cJSON_AddStringToObject(params, "input", job->prompt);
+    cJSON_AddNumberToObject(params, "timeout_s", CLI_REVIEW_INVOKE_BUDGET_S);
     char *params_str = cJSON_PrintUnformatted(params);
     cJSON_Delete(params);
     AIRY_FREE(agent_id);
