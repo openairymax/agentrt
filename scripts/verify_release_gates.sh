@@ -8,7 +8,8 @@
 #
 # 判据分组（编号对应方案 §4.9 步骤表）：
 #   A  9.2/I-01   install.sh 前向兼容（安装问题：函数先定义后调用）
-#   B  9.3/I-02① detect_arch 等四函数三副本逐字节一致（install.sh/latest/sdk）
+#   B  9.3/I-02① detect_arch 等架构函数 + 制品 platform 标记判定/平台键/
+#                 体积渲染三副本逐字节一致（install.sh/latest/sdk）
 #   C  9.3/I-02② detect_arch 20 例平台矩阵仿真（含 aarch64 32 位陷阱）
 #   D  9.4/C-01   airy_cli 聊天路径单一实现（cli_chat.c，无 stream 遗留）
 #   E  9.6/S-01   TUI 会话历史环形裁剪（长对话问题）
@@ -129,11 +130,15 @@ else
 fi
 
 # ============================================================
-# 组 B · 9.3/I-02① detect_arch 四函数三副本逐字节一致
+# 组 B · 9.3/I-02① detect_arch 及平台键/标记判定函数三副本逐字节一致
 # ============================================================
-section "B" "9.3/I-02① 架构检测四函数三副本逐字节一致（install.sh / latest / sdk）"
+section "B" "9.3/I-02① 架构检测 + 平台键/标记判定 + 体积渲染三副本逐字节一致（install.sh / latest / sdk）"
 
-for _fn in _uspace_bits _loader_exists _arch_warn_unknown detect_arch; do
+# arch_markers_ok 为 T4b 跨版本更新「制品架构与当前主机不匹配」误拒的修复
+# 落点：判定口径必须三副本同源，否则安装放行、更新拒绝（或反之）。原盲区
+# 仅覆盖 detect_arch 四函数，plat_markers/arch_markers_ok 漂移不报警。
+for _fn in _uspace_bits _loader_exists _arch_warn_unknown detect_arch \
+           plat_markers arch_markers_ok human_size plat_name plat_legacy_name; do
     extract_fn "$INSTALL"   "$_fn" "$TMP/a_$_fn"
     extract_fn "$LATEST_RT" "$_fn" "$TMP/b_$_fn"
 
@@ -170,6 +175,126 @@ for _fn in _uspace_bits _loader_exists _arch_warn_unknown detect_arch; do
             ;;
     esac
 done
+
+# ============================================================
+# 组 B2 · P0 安装根 SSoT（自锚定复用既有实例；跨根候选零残留）
+# ============================================================
+section "B2" "P0 安装根 SSoT（安装/重装/更新定位同一实例；跨根候选零残留）"
+
+# B2-0 幽灵根守卫：非注释行不得残留跨根候选
+#   $HOME/.airymaxrt/config/install.env
+#   $HOME/.local/share/airymaxrt/config/install.env
+# 历史故障：装在非默认前缀的实例被静默劫持到默认根 ⇒ 两套实例并行，
+# update 读到另一套的 install.env（“刚装 vX 却提示当前 vY”），运行期数据
+# 写进幽灵根。覆盖两份 shell 副本与 C 侧解析实现。
+_ghost=""
+for _f in "$INSTALL" "$LATEST_RT" \
+          "$ROOT/commons/platform/src/platform_paths.c"; do
+    [ -f "$_f" ] || continue
+    if sed -e 's/^[[:space:]]*#.*$//' -e 's/^[[:space:]]*\*.*$//' "$_f" \
+       | grep -Eq '\.airymaxrt/config/install\.env|\.local/share/airymaxrt'; then
+        _ghost="$_ghost $_f"
+    fi
+done
+if [ -z "$_ghost" ]; then
+    ok "B2-0 跨根候选零残留（install.sh / latest + commons/platform_paths.c）"
+else
+    bad "B2-0 跨根候选残留（幽灵根劫持命门）:${_ghost}"
+fi
+
+# B2-6 自锚定读取存在性：三副本均须以 install.env 自锚定解析权威根
+_anchor_missing=""
+for _f in "$INSTALL" "$LATEST_RT"; do
+    grep -q '}/\.\./config/install\.env' "$_f" || _anchor_missing="$_anchor_missing $_f"
+done
+case "$(sdk_ready; echo $?)" in
+    0) grep -q '}/\.\./config/install\.env' "$SDK_AIRYMAXRT" \
+           || _anchor_missing="$_anchor_missing $SDK_AIRYMAXRT" ;;
+esac
+if [ -z "$_anchor_missing" ]; then
+    ok "B2-6 自锚定读取存在（install.sh 内嵌启动器 / latest / sdk）"
+else
+    bad "B2-6 自锚定读取缺失（解析链退化为兜底根，将误建幽灵根）:${_anchor_missing}"
+fi
+
+# B2-1..B2-5 discover_install_home 行为矩阵：提取仓内真实实现组装（零硬拷贝，
+# 实现漂移即暴露），用 env -i 隔离宿主 PATH/环境，$0 由 sh -c 末位参数精确注入。
+cat > "$TMP/homelib.sh" <<'EOS'
+log_warn() { printf '[WARN] %s\n' "$1" >&2; }
+EOS
+extract_fn "$INSTALL" resolve_link_chain    "$TMP/fn_rlc"
+extract_fn "$INSTALL" is_install_home       "$TMP/fn_iih"
+extract_fn "$INSTALL" discover_install_home "$TMP/fn_dih"
+cat "$TMP/homelib.sh" "$TMP/fn_rlc" "$TMP/fn_iih" "$TMP/fn_dih" \
+    > "$TMP/homelib_full.sh"
+
+_CORE_PATH="/usr/bin:/bin"
+_mkroot() { # <dir> [version] —— 造一个含 install.env + bin/airy_cli 的安装根
+    mkdir -p "$1/bin" "$1/config"
+    printf 'AIRY_HOME=%s\nAIRY_VERSION=%s\n' "$1" "${2:-v0.1.16}" \
+        > "$1/config/install.env"
+    : > "$1/bin/airy_cli"; chmod +x "$1/bin/airy_cli"
+    : > "$1/bin/airymaxrt"; chmod +x "$1/bin/airymaxrt"
+}
+_DIH_SCRIPT='. "$DIHLIB"; discover_install_home'
+
+# B2-1 环境变量指向既有根 → 复用（不新建）
+mkdir -p "$TMP/b2/home"
+_mkroot "$TMP/b2/root1"
+_out="$(env -i HOME="$TMP/b2/home" PATH="$_CORE_PATH" \
+        DIHLIB="$TMP/homelib_full.sh" AIRY_HOME="$TMP/b2/root1" \
+        sh -c "$_DIH_SCRIPT" plain.sh 2>/dev/null)"
+if [ "$_out" = "$TMP/b2/root1" ]; then
+    ok "B2-1 AIRY_HOME 指向既有根 → 复用该根"
+else
+    bad "B2-1 AIRY_HOME 有效根未被复用（out=${_out:-<空>}）"
+fi
+
+# B2-2 环境变量指向无效目录 → 忽略并告警（终端残留 export 不得劫持）
+_err="$TMP/b2/err2"
+_out="$(env -i HOME="$TMP/b2/home" PATH="$_CORE_PATH" \
+        DIHLIB="$TMP/homelib_full.sh" AIRY_HOME="$TMP/b2/nonexistent" \
+        sh -c "$_DIH_SCRIPT" plain.sh 2>"$_err")"
+if [ -z "$_out" ] && grep -q '已忽略环境变量' "$_err"; then
+    ok "B2-2 AIRY_HOME 指向无效目录 → 忽略 + 告警（不落幽灵根）"
+else
+    bad "B2-2 残留环境变量未拦截（out=${_out:-<空>}）"
+fi
+
+# B2-3 PATH 中 airymaxrt 符号链 → 复用其安装根（社区 curl 直装主场景）
+_mkroot "$TMP/b2/root3"
+mkdir -p "$TMP/b2/link3" "$TMP/b2/other3"
+ln -s "$TMP/b2/root3/bin/airymaxrt" "$TMP/b2/link3/airymaxrt"
+_out="$(env -i HOME="$TMP/b2/home" PATH="$TMP/b2/link3:$_CORE_PATH" \
+        DIHLIB="$TMP/homelib_full.sh" \
+        sh -c "$_DIH_SCRIPT" "$TMP/b2/other3/tool.sh" 2>/dev/null)"
+if [ "$_out" = "$TMP/b2/root3" ]; then
+    ok "B2-3 PATH 符号链命中既有根 → 复用（跨前缀重装不再另建一套）"
+else
+    bad "B2-3 PATH 符号链未复用（out=${_out:-<空>}）"
+fi
+
+# B2-4 默认根存在但无其它信号 → 不得被跨根候选命中（B2-0 的行为回归）
+_mkroot "$TMP/b2/home/.airymaxrt"
+_out="$(env -i HOME="$TMP/b2/home" PATH="$_CORE_PATH" \
+        DIHLIB="$TMP/homelib_full.sh" \
+        sh -c "$_DIH_SCRIPT" tool 2>/dev/null)"
+if [ -z "$_out" ]; then
+    ok "B2-4 \$HOME/.airymaxrt 存在也不被跨根候选命中（幽灵根劫持已断）"
+else
+    bad "B2-4 仍被跨根候选命中: $_out"
+fi
+
+# B2-5 安装副本 bin/ 内启动 → 自锚定到该副本根
+_mkroot "$TMP/b2/root5"
+_out="$(env -i HOME="$TMP/b2/home" PATH="$_CORE_PATH" \
+        DIHLIB="$TMP/homelib_full.sh" \
+        sh -c "$_DIH_SCRIPT" "$TMP/b2/root5/bin/agentrt-bootstrap.sh" 2>/dev/null)"
+if [ "$_out" = "$TMP/b2/root5" ]; then
+    ok "B2-5 安装副本 bin/ 内启动 → 自锚定到副本根"
+else
+    bad "B2-5 自锚定失败（out=${_out:-<空>}）"
+fi
 
 # ============================================================
 # 组 C · 9.3/I-02② detect_arch 20 例平台矩阵仿真
@@ -822,6 +947,95 @@ if [ -z "$_q4_missing" ]; then
     ok "Q4 live 端点与共享助手仍在（run_stream/hall_watch/gw_sse_send_json_error）"
 else
     bad "Q4 live 端点或共享助手缺失:$_q4_missing"
+fi
+
+# ============================================================
+# 组 R · T4b 制品 platform-* 标记判定语义 + 下载体积渲染
+# ============================================================
+section "R" "T4b 制品 platform-* 标记判定语义（跨版本更新误拒根因）+ 下载体积渲染"
+
+# 回归根因：旧口径 tar -tzf | grep -oE 'platform-...' | head -1 会把归档内
+# 任意含该子串的路径（子目录 agentrt-<ver>/platform-*、库名 libplatform-*.so）
+# 当作标记，且「首个匹配」随 tar 遍历序漂移 → 同一制品在不同遍历序下判定
+# 相反（社区 v0.1.14→v0.1.16 更新被误拒）。本组用真实提取实现（零硬拷贝）
+# 断言新口径：仅认「完整文件名」形态的 platform-*，任一命中放行集即通过。
+extract_fn "$INSTALL" plat_markers    "$TMP/r_plat"
+extract_fn "$INSTALL" arch_markers_ok "$TMP/r_amok"
+extract_fn "$INSTALL" human_size      "$TMP/r_hsize"
+cat "$TMP/r_plat" "$TMP/r_amok" "$TMP/r_hsize" > "$TMP/r_lib.sh"
+
+mkdir -p "$TMP/r_cases"
+r_mk() { # <name> <marker-path>...
+    _n="$1"; shift
+    _d="$TMP/r_build-$_n"
+    rm -rf "$_d"; mkdir -p "$_d/agentrt-9.9.9/bin"
+    : > "$_d/agentrt-9.9.9/bin/airymaxrt"
+    for _p in "$@"; do
+        mkdir -p "$_d/$(dirname "$_p")"; : > "$_d/$_p"
+    done
+    tar -czf "$TMP/r_cases/$_n.tar.gz" -C "$_d" . 2>/dev/null
+    rm -rf "$_d"
+}
+r_mk root_x86      platform-x86-64
+r_mk subdir_x86    agentrt-9.9.9/platform-x86-64
+r_mk libname_arm   lib/libplatform-arm-64.so
+r_mk wrong_arm     platform-arm-64
+r_mk mixed         platform-arm-64 platform-x86-64
+r_mk gen2_x64      platform-x64
+r_mk riscv         platform-riscv-64
+r_mk none
+
+r_fail=0
+r_n=0
+r_chk() { # <case> <expect_rc> <arch> <expect_out>
+    r_n=$((r_n+1))
+    _rc=0
+    _out="$(bash -c ". '$TMP/r_lib.sh'; arch_markers_ok '$TMP/r_cases/$1.tar.gz' '$3'")" || _rc=$?
+    if [ "$_rc" = "$2" ] && [ "$_out" = "$4" ]; then :; else
+        r_fail=$((r_fail+1))
+        printf '    [marker] %s arch=%s: rc=%s want=%s out=<%s> want_out=<%s>\n' \
+            "$1" "$3" "$_rc" "$2" "$_out" "$4"
+    fi
+}
+# 放行：根级标记 / 子目录标记（安装布局） / 任一命中（多标记并存） / 存量 gen2 键
+r_chk root_x86    0 x86_64 ""
+r_chk subdir_x86  0 x86_64 ""
+r_chk mixed       0 x86_64 ""
+r_chk gen2_x64    0 x86_64 ""
+r_chk wrong_arm   0 aarch64 ""
+# 库名子串不再被误认为标记（旧口径在此误拒 x86_64 主机）
+r_chk libname_arm 0 x86_64 ""
+# 无标记放行（历史安装包/本地源码打包形态）
+r_chk none        0 x86_64 ""
+# 拒绝：异架构明确拒绝，且 stdout 供诊断用不匹配标记集
+r_chk wrong_arm   1 x86_64 "platform-arm-64"
+r_chk riscv       1 x86_64 "platform-riscv-64"
+r_chk root_x86    1 aarch64 "platform-x86-64"
+r_chk mixed       1 riscv64 "platform-arm-64 platform-x86-64"
+# 放行表未知架构：保守拒绝（fail-closed）
+r_chk root_x86    1 mips "platform-x86-64"
+
+r_hs_fail=0
+r_hs() { # <bytes> <expect>
+    _g="$(bash -c ". '$TMP/r_lib.sh'; human_size '$1'")"
+    if [ "$_g" = "$2" ]; then :; else
+        r_hs_fail=$((r_hs_fail+1))
+        printf '    [size] human_size(%s)=<%s> want=<%s>\n' "$1" "$_g" "$2"
+    fi
+}
+r_hs ""           未知
+r_hs abc          未知
+r_hs 0            0B
+r_hs 512          512B
+r_hs 1024         1KiB
+r_hs 4096         4KiB
+r_hs 1048576      1.0MiB
+r_hs 37709685     35.9MiB
+
+if [ "$r_fail" -eq 0 ] && [ "$r_hs_fail" -eq 0 ]; then
+    ok "R T4b 标记判定 $r_n 例 + 体积渲染 8 例全通过（库名子串误判/子目录标记/任一命中/异架构拒绝/fail-closed）"
+else
+    bad "R T4b 标记判定失配 $r_fail/$r_n 例、体积渲染失配 $r_hs_fail/8 例（见上方明细）"
 fi
 
 # ============================================================

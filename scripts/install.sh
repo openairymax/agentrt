@@ -139,15 +139,81 @@ run_spin() { # <label> <cmd...>
     "$@" >/dev/null 2>&1
 }
 
+# ─── 符号链解析（POSIX；macOS bash 3.2 无 readlink -f） ─────────────────
+# 逐级解析符号链到真实文件路径；相对目标按当前链接父目录拼接。上限 16 级
+# 防环。与启动器 side 同名逻辑同源，改动须同步（见 verify_release_gates）。
+resolve_link_chain() { # <path> → 真实文件路径（stdout）
+    local _p="$1" _d _t _i=0
+    while [ -L "$_p" ] && [ "$_i" -lt 16 ]; do
+        _d="$(cd -P "$(dirname "$_p")" 2>/dev/null && pwd || dirname "$_p")"
+        _t="$(readlink "$_p" 2>/dev/null || true)"
+        [ -n "$_t" ] || break
+        case "$_t" in
+            /*) _p="$_t" ;;
+            *)  _p="${_d}/${_t}" ;;
+        esac
+        _i=$((_i + 1))
+    done
+    printf '%s' "$_p"
+}
+
+# 判定目录是否为一个既有安装根（有固化安装信息或运行时入口即算）。
+is_install_home() { # <dir>
+    [ -n "$1" ] || return 1
+    [ -f "$1/config/install.env" ] || [ -x "$1/bin/airy_cli" ]
+}
+
+# ─── 既有安装根发现（只读；0=发现并输出根路径 / 1=未发现） ───────────────
+# 解析顺序（自锚定优先，跨根探测全部移除）：
+#   1) 环境变量 AIRY_HOME——仅当其指向真实既有安装根；指向已删除/无关目录
+#      的终端残留 export 仍被拦截（历史故障：劫持安装位置）。
+#   2) PATH 中 airymaxrt → 符号链真实目标 → 其 bin/ 的父目录（社区 curl
+#      直装场景的权威信号：既有实例必然已装 bin/airymaxrt 并置于 PATH）。
+#   3) 脚本自身锚定（源码树内 <repo>/scripts/install.sh → ../config/install.env；
+#      管道执行时 $0 无 '/'，跳过以免误读 CWD 相对路径）。
+# 未发现返回 1，由调用方回落 ${HOME}/.airymaxrt。
+discover_install_home() {
+    local _h="${AIRY_HOME:-}" _link _real
+    if [ -n "$_h" ]; then
+        if is_install_home "$_h"; then printf '%s' "$_h"; return 0; fi
+        log_warn "已忽略环境变量 AIRY_HOME=${_h}（非既有安装根，疑似终端残留）" >&2
+    fi
+    _link="$(command -v airymaxrt 2>/dev/null || true)"
+    if [ -n "$_link" ] && command -v readlink >/dev/null 2>&1; then
+        _real="$(cd -P "$(dirname "$(resolve_link_chain "$_link")")" 2>/dev/null && pwd || true)"
+        if [ -n "$_real" ]; then
+            _h="$(dirname "$_real")"
+            if is_install_home "$_h"; then printf '%s' "$_h"; return 0; fi
+        fi
+    fi
+    case "$0" in
+        */*)
+            _real="$(cd -P "$(dirname "$0")" 2>/dev/null && pwd || true)"
+            if [ -n "$_real" ] && [ -f "${_real}/../config/install.env" ]; then
+                _h="$(sed -n 's/^AIRY_HOME=//p' "${_real}/../config/install.env" 2>/dev/null | head -1)"
+                if is_install_home "$_h" && [ "${_real}" = "$(cd -P "${_h}/bin" 2>/dev/null && pwd || true)" ]; then
+                    printf '%s' "$_h"; return 0
+                fi
+            fi
+            ;;
+    esac
+    return 1
+}
+
 # ─── 默认值 ──────────────────────────────────────────────────────────────
-# 安装路径强制统一 $HOME/.airymaxrt（社区用户与本地开发同一逻辑，2026-08-28）。
-# 环境变量 AIRY_HOME 不再继承——历史故障：Trae 持久终端残留 export
-# AIRY_HOME=<已删除目录>，静默劫持安装位置与启动器目标。需要非默认位置时
-# 用显式 --prefix 参数（安装完成后打印实际位置，无隐藏状态）。
-if [ -n "${AIRY_HOME:-}" ] && [ "${AIRY_HOME}" != "${HOME}/.airymaxrt" ]; then
-    log_warn "已忽略环境变量 AIRY_HOME=${AIRY_HOME}（防残留劫持）；安装位置统一为 \${HOME}/.airymaxrt，非默认位置请用 --prefix"
+# 安装根默认**复用既有实例**（2026-09-16 系统性修复）：先探测既有安装根，
+# 只有确实不存在时才落到 ${HOME}/.airymaxrt。历史故障：默认写死
+# ${HOME}/.airymaxrt 且忽略环境变量，用户既有实例位于非默认前缀时，重跑
+# 安装器即在默认前缀再装一套（社区"重复在其他路径安装/更新"、"刚装的版本
+# 与 update 报的当前版本不一致"的共同根因——两套实例各有 install.env，
+# 启动器/更新器解析到哪一套取决于 PATH 与残留环境变量）。需要并列新实例时
+# 用显式 --prefix（参数解析覆盖本结论）。
+AIRY_HOME="$(discover_install_home || true)"
+if [ -n "$AIRY_HOME" ]; then
+    log_info "复用既有安装根: ${AIRY_HOME}（并列新实例请加 --prefix <path>）"
+else
+    AIRY_HOME="${HOME}/.airymaxrt"
 fi
-AIRY_HOME="${HOME}/.airymaxrt"
 AIRY_REPO_URL="${AIRY_REPO_URL:-https://atomgit.com/openairymax/airymaxhub.git}"
 # 版本 SSoT：优先读取同仓 agentrt/VERSION（源码树内运行），否则回退默认值。
 # 注意：curl 管道 / 裸脚本场景无 VERSION 文件可读，默认值只作占位——
@@ -362,11 +428,12 @@ init_home() {
     log_ok "AIRY_HOME 就绪: ${AIRY_HOME}"
 }
 
-# ─── 既有安装检测（0.1.14 前置社区反馈） ────────────────────────────────
-# init_home 后立刻判定"覆盖安装 vs 全新安装"并讲清语义：默认前缀之外已有
-# 实例时，curl 直装会在默认前缀另起一套而用户误以为覆盖了旧实例；同前缀
-# 已有 install.env（含上次中断恢复）时，又须明确 config/ 与 secrets.env
-# 保留、只覆盖运行时。检测只读，不写任何状态。
+# ─── 既有安装检测（0.1.14 前置社区反馈；2026-09-16 收敛为自锚定） ────────
+# init_home 后立刻判定"覆盖安装 vs 全新安装"并讲清语义。安装根已由
+# discover_install_home 默认复用既有实例（见"默认值"段），本函数只做
+# 只读陈述：同前缀有 install.env（含上次中断恢复）→ 明确 config/ 与
+# secrets.env 保留、只覆盖运行时。仅当调用方用 --prefix / 环境变量显式
+# 指定了与 PATH 中实例**不同**的根时才提示并存风险（不再静默另起一套）。
 detect_existing_install() {
     local env_file="${AIRY_HOME}/config/install.env" ver link resolved
     if [ -f "$env_file" ]; then
@@ -374,22 +441,17 @@ detect_existing_install() {
         log_info "检测到既有安装: ${AIRY_HOME}（${ver:-版本未知}）→ 覆盖安装；config/ 与 secrets.env 保留"
         return 0
     fi
-    # 同前缀无固化记录：PATH 中的 airymaxrt 可能指向另一前缀。便携 readlink
-    # （macOS bash 3.2 无 readlink -f），符号链目标为相对路径时按父目录拼接。
     link="$(command -v airymaxrt 2>/dev/null || true)"
     [ -n "$link" ] || return 0
     command -v readlink >/dev/null 2>&1 || return 0
-    resolved="$(readlink "$link" 2>/dev/null || true)"
+    resolved="$(resolve_link_chain "$link")"
     [ -n "$resolved" ] || return 0
-    case "$resolved" in
-        /*) ;;
-        *)  resolved="$(dirname "$link")/${resolved}" ;;
-    esac
     case "$resolved" in
         "${AIRY_HOME}/bin/airymaxrt") return 0 ;;
     esac
     log_warn "PATH 中的 airymaxrt 指向其它实例: ${link} → ${resolved}"
-    log_info "  本次安装到 ${AIRY_HOME}，两套实例互不影响；覆盖既有实例请用 --prefix <其安装根>"
+    log_info "  本次显式安装到 ${AIRY_HOME}，两套实例互不影响；若只想重装既有实例，"
+    log_info "  去掉 --prefix/AIRY_HOME 后重跑即可（默认自动复用 PATH 中的安装根）"
     return 0
 }
 
@@ -557,7 +619,7 @@ verify_gpg_sig() { # <file> <sig.asc>
 }
 
 # manifest 字段提取（python3 优先，回退 sed 单行提取）
-parse_manifest() { # <manifest> <platform> <field:url|sha256>
+parse_manifest() { # <manifest> <platform> <field:url|sha256|size>
     if command -v python3 >/dev/null 2>&1; then
         python3 - "$1" "$2" "$3" <<'PYEOF'
 import json, sys
@@ -570,7 +632,11 @@ except Exception:
 PYEOF
         return 0
     fi
-    sed -n "s/.*\"$3\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$1" | head -1
+    # 回退：两条 BRE 依次尝试——带引号字符串（url/sha256）与裸数字（size，
+    # 发布侧 manifest 以 JSON number 落盘）。POSIX BRE 无 "\?"，故不复用
+    # 单条可选引号表达式（BSD/macOS sed 不支持该扩展）。
+    sed -n "s/.*\"$3\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p
+            s/.*\"$3\"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p" "$1" | head -1
 }
 
 # manifest 通道状态（U-02：state 契约，缺省视作 active 以向后兼容旧 manifest）
@@ -597,7 +663,7 @@ install_binary() {
     #        调用方必须失败退出并给出可诊断指引，绝不静默降级源码构建
     # 历史教训：auto 静默源码构建把网络/校验故障误当"需源码"，社区用户被
     # 拖入克隆伞仓 + 全量 cmake，体验崩溃（0.1.10 安装事故）。fail-closed。
-    local url="$1" arch plat expect_sha="" legacy="" tarball="" local_src=0
+    local url="$1" arch plat expect_sha="" expect_size="" legacy="" tarball="" local_src=0 _dl_flags=""
     arch="$(detect_arch)"
     # 运行平台显示（OS-架构族-位宽，与发布命名一致，0.1.11 消息结构优化）：
     # 平台名 + 架构名并排呈现，不再堆叠预编译支持清单——社区用户反馈
@@ -674,6 +740,7 @@ install_binary() {
         # plat 已在函数入口统一计算（macOS 走 uname -m，其余走 detect_arch）
         url="$(parse_manifest "$man" "$plat" url)"
         expect_sha="$(parse_manifest "$man" "$plat" sha256)"
+        expect_size="$(parse_manifest "$man" "$plat" size)"
         # 平台键兼容（三代 manifest）：本版主键 = OS-架构族-位宽（如
         # linux-x86-64）；旧两代（gen2：linux-x64 等 / gen1：linux-x86_64
         # 等）未命中时按 plat_legacy_name 候选依序反查，杜绝"无可用制品"
@@ -683,6 +750,7 @@ install_binary() {
                 [ -n "$legacy" ] || continue
                 url="$(parse_manifest "$man" "$legacy" url)"
                 expect_sha="$(parse_manifest "$man" "$legacy" sha256)"
+                expect_size="$(parse_manifest "$man" "$legacy" size)"
                 [ -n "$url" ] && { log_info "平台键 ${plat} 未命中，已用兼容命名 ${legacy}"; break; }
             done
         fi
@@ -748,8 +816,17 @@ install_binary() {
                 log_err "离线包不存在或已被移除: ${tarball}，请重新指定 --from-file 路径"
                 return 2
             fi
-            log_info "下载完全体二进制包: ${url}"
-            if ! syscurl -fsSL --max-time 600 -o "${tarball}" "${url}"; then
+            # 下载可观测性（社区反馈：安装/更新无进度、不知制品体积）。
+            # 体积已知时先报期望值；TTY 下开 curl 进度条，非 TTY（CI/管道）
+            # 保持静默，避免日志洪水。
+            _dl_flags="-fsSL"
+            [ "$HAS_TTY" = "1" ] && _dl_flags="-fL --progress-bar"
+            if [ -n "$expect_size" ]; then
+                log_info "下载完全体二进制包（$(human_size "$expect_size")）: ${url}"
+            else
+                log_info "下载完全体二进制包: ${url}"
+            fi
+            if ! syscurl $_dl_flags --max-time 600 -o "${tarball}" "${url}"; then
                 rm -f "${tarball}"
                 if [ "$_retry_download" -lt 1 ]; then
                     log_warn "release 下载失败，重试一次（网络抖动兜底）…"
@@ -759,6 +836,7 @@ install_binary() {
                 log_err "  curl -fsSL \"https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main\" | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)[\"content\"]))' | bash"
                 return 2
             fi
+            log_ok "下载完成: $(human_size "$(wc -c < "${tarball}" 2>/dev/null | tr -d ' ')")"
         fi
         # 缓存自检（期望 sha256 已知）：本地缓存不符期望 → 删后重下。
         # 这覆盖同 tag 修复重传 / 上次下载残留 / CDN 缓存陈旧三类场景。
@@ -797,20 +875,16 @@ install_binary() {
     # 下载到异架构包后静默安装（跨架构 daemon 启动即崩溃）。三代标记
     # 兼容：本版生成 platform-<架构族-位宽>（如 platform-x86-64），旧
     # gen2/gen1 标记（platform-x64 / platform-x86_64 等）同放行；异架构
-    # 标记（如 x86-64 主机遇 platform-arm-64）明确拒绝。
-    _marker="$(tar -tzf "${tarball}" 2>/dev/null | grep -oE 'platform-[A-Za-z0-9_-]+' | head -1 || true)"
-    if [ -n "$_marker" ]; then
-        _arch_ok=""
-        for _p in $(plat_markers "${arch}"); do
-            [ "$_marker" = "$_p" ] && { _arch_ok=1; break; }
-        done
-        if [ -z "$_arch_ok" ]; then
-            log_err "二进制包架构与当前主机（${arch}）不匹配（标记 ${_marker}），拒绝安装"
-            [ "$local_src" = "1" ] || rm -f "${tarball}"
-            return 2
-        fi
-        log_ok "二进制包架构校验通过（${arch}）"
+    # 标记（如 x86-64 主机遇 platform-arm-64）明确拒绝。判定归一到
+    # arch_markers_ok（整名匹配 + 任一命中），与更新器同一实现。
+    if ! _marker="$(arch_markers_ok "${tarball}" "${arch}")"; then
+        log_err "二进制包架构与当前主机（${arch}）不匹配（包内标记 $(echo $_marker | tr ' ' '/')），拒绝安装"
+        log_err "  期望标记之一: $(plat_markers "${arch}")"
+        log_err "  制品: ${tarball}"
+        [ "$local_src" = "1" ] || rm -f "${tarball}"
+        return 2
     fi
+    log_ok "二进制包架构校验通过（${arch}）"
     tar -xzf "${tarball}" -C "${AIRY_HOME}/tmp" || { log_err "release 包解压失败（tar），制品可能损坏"; [ "$local_src" = "1" ] || rm -f "$tarball"; return 2; }
     local extracted
     extracted="$(find "${AIRY_HOME}/tmp" -maxdepth 1 -type d -name 'agentrt-*' | head -1)"
@@ -1379,6 +1453,45 @@ plat_markers() {
     esac
 }
 
+# 包内架构标记判定（SSoT：install.sh / latest/airymaxrt / sdk airymaxrt 三
+# 副本逐字节一致，由 verify_release_gates 组 B 守卫）。取归档内全部「完整
+# 文件名」形态的 platform-* 标记（根级与顶层子目录级皆可），其中任一命中
+# plat_markers 放行集即通过；全部不命中才拒绝。
+# 弃用旧口径「grep -oE 取任意位置首个子串 + head -1」：该口径会把遍历中
+# 先出现的 ./agentrt-<ver>/platform-* 子目录路径、乃至库名子串当作标记，
+# 且首个匹配随 tar 目录序漂移，同一制品在不同遍历序下判定相反——社区
+# v0.1.14→v0.1.16 跨版本更新「制品架构与当前主机不匹配」误拒即此因。
+# 退出码 0=通过（stdout 空）；1=拒绝（stdout 为不匹配标记集，空格分隔）。
+arch_markers_ok() { # <tarball> <arch>
+    local _t="$1" _a="$2" _ms _m _p _bad=""
+    # 管道状态吞掉：归档损坏/无标记均非错误（无标记=放行），且须避免
+    # set -e + pipefail 下 grep 空匹配（退出 1）中断整个流程。
+    _ms="$(tar -tzf "$_t" 2>/dev/null | awk -F/ '{print $NF}' \
+        | grep -E '^platform-[A-Za-z0-9_-]+$' | sort -u || true)"
+    [ -n "$_ms" ] || return 0
+    for _m in $_ms; do
+        for _p in $(plat_markers "$_a"); do
+            if [ "$_m" = "$_p" ]; then return 0; fi
+        done
+        _bad="$_bad $_m"
+    done
+    printf '%s' "${_bad# }"
+    return 1
+}
+
+# 字节数 → 人类可读（下载进度/体积呈现层；非判定路径）
+human_size() { # <bytes>
+    local _b="${1:-}"
+    case "$_b" in ''|*[!0-9]*) echo "未知"; return 0 ;; esac
+    if [ "$_b" -ge 1048576 ]; then
+        echo "$((_b / 1048576)).$((_b % 1048576 / 104858))MiB"
+    elif [ "$_b" -ge 1024 ]; then
+        echo "$((_b / 1024))KiB"
+    else
+        echo "${_b}B"
+    fi
+}
+
 detect_accel() {
     if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
         echo "nvidia:$(nvidia-smi -L 2>/dev/null | wc -l)"
@@ -1548,14 +1661,20 @@ while [ -L "\$_SELF" ]; do
     esac
 done
 _DIR="\$(cd -P "\$(dirname "\$_SELF")" && pwd)"
-# 解析顺序：环境变量（须通过 airy_cli 存在性校验——终端残留 export
-# 指向已删除目录时自动失效）→ install.env 固化值（同样校验）→
-# 默认统一安装根。
-_AH="\${AIRY_HOME:-}"
-[ -n "\$_AH" ] && [ -x "\$_AH/bin/airy_cli" ] || _AH=""
-if [ -z "\$_AH" ]; then
+# 解析顺序（自锚定 SSoT，2026-09-16，与完整启动器 latest/airymaxrt 同源）：
+# ① 自锚定 \${_DIR}/../config/install.env（安装副本权威根）→ ② 环境变量
+# AIRY_HOME（须通过 airy_cli 存在性校验——终端残留 export 指向已删除目录
+# 时自动失效）→ ③ 兜底 \$HOME/.airymaxrt。跨根候选
+# （\$HOME/.airymaxrt/config/install.env）已移除：它会让装在非默认前缀的
+# 实例被静默劫持到默认根（版本双源漂移/在其它路径重复安装的根因）。
+_AH=""
+if [ -f "\${_DIR}/../config/install.env" ]; then
     _AH="\$(sed -n 's/^AIRY_HOME=//p' "\${_DIR}/../config/install.env" 2>/dev/null | head -1)"
     [ -x "\$_AH/bin/airy_cli" ] || _AH=""
+fi
+if [ -z "\$_AH" ]; then
+    _AH="\${AIRY_HOME:-}"
+    [ -n "\$_AH" ] && [ -x "\$_AH/bin/airy_cli" ] || _AH=""
 fi
 [ -n "\$_AH" ] || _AH="\$HOME/.airymaxrt"
 AIRY_HOME="\$_AH"
