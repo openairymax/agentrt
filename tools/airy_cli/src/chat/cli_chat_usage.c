@@ -9,8 +9,9 @@
  *
  * llm_d 在响应的 usage/top-level 回填 total_tokens 与 cost_usd（含思考
  * token，DeepSeek/OpenAI 的 completion_tokens 已包含 reasoning_tokens），
- * 此处按轮累加；回合结束由 main.c 经 cli_chat_usage_get 读取展示，并在
- * 下一轮开始前清零（cli_chat_usage_reset）。reasoning_content 按回合累积
+ * 此处按轮累加；回合结束由 cli_chat_usage_metrics 统一组装展示口径
+ * （chat / task / 蓝图快速路径共用），并在下一轮开始前清零
+ * （cli_chat_usage_reset）。reasoning_content 按回合累积
  * （封顶 CLI_CHAT_REASONING_MAX_BYTES，防异常长推理拖爆内存）后写日志
  * （折叠展示在对话内，完整文本保留在日志，思考 token 不丢失）。
  */
@@ -28,16 +29,22 @@
 #endif
 
 static uint64_t g_chat_tokens_total = 0;
+static uint64_t g_chat_prompt_total = 0;
+static uint64_t g_chat_comp_total = 0;
 static double g_chat_cost_total = 0.0;
 static char *g_chat_reasoning_acc = NULL;
 static int g_chat_reasoning_truncated = 0; /* S-04：截断标记只落一次 */
 
-/* 按轮累加本轮对话真实 token/费用（工具轮与最终轮都计入；含思考 token）。 */
+/* 按轮累加本轮对话真实 token/费用（工具轮与最终轮都计入；含思考 token）。
+ * prompt/completion 与 total 分别累计：厂商 usage 三者齐全时按细目展示，
+ * 缺失细目时只剩 total 可用。 */
 void cli_chat_usage_add(const llm_response_t *resp)
 {
     if (!resp)
         return;
     g_chat_tokens_total += resp->total_tokens;
+    g_chat_prompt_total += resp->prompt_tokens;
+    g_chat_comp_total += resp->completion_tokens;
     g_chat_cost_total += resp->cost_usd;
 }
 
@@ -81,21 +88,13 @@ const char *cli_chat_reasoning_peek(void)
     return g_chat_reasoning_acc;
 }
 
-/* 供 main.c 在回合结束时读取本轮消耗统计（随后由 cli_chat_usage_reset
- * 在下一轮开始时清零）。 */
-void cli_chat_usage_get(uint64_t *tokens, double *cost)
-{
-    if (tokens)
-        *tokens = g_chat_tokens_total;
-    if (cost)
-        *cost = g_chat_cost_total;
-}
-
 /* 新一轮对话开始清零：本轮统计归零 + 释放思考链累积（安全网，覆盖
  * 上轮异常中断未走到收尾清理的路径）。 */
 void cli_chat_usage_reset(void)
 {
     g_chat_tokens_total = 0;
+    g_chat_prompt_total = 0;
+    g_chat_comp_total = 0;
     g_chat_cost_total = 0.0;
     g_chat_reasoning_truncated = 0;
     if (g_chat_reasoning_acc) {
@@ -162,13 +161,25 @@ static int cli_llm_usage_snap(uint64_t *out_prompt, uint64_t *out_completion,
     return 0;
 }
 
-/* 1.7：全链路真实消耗（会话差值）；llm_d 离线回退 chat 累计。 */
-void cli_chat_usage_get_session(uint64_t *tokens, double *cost)
+/* 1.7：全链路真实消耗细目（会话差值）。B-2 口径 SSoT：in/out 直接对应厂商
+ * usage 的 prompt_tokens / completion_tokens，cost 取 llm_d cost_tracker
+ * 差值（按厂商 usage × pricing_rule 计算并落盘），因此展示值可与厂商账单
+ * 逐字段对照，而非本地估算。llm_d 离线时回退本轮 chat 累计（此路径
+ * total_tokens 与 in+out 未必相等，故 total 单独回传）。 */
+static void cli_usage_detail(uint64_t *in, uint64_t *out, uint64_t *total,
+                             double *cost)
 {
     uint64_t prompt = 0, comp = 0;
     double c = 0.0;
     if (cli_llm_usage_snap(&prompt, &comp, &c) != 0) {
-        cli_chat_usage_get(tokens, cost);
+        if (in)
+            *in = g_chat_prompt_total;
+        if (out)
+            *out = g_chat_comp_total;
+        if (total)
+            *total = g_chat_tokens_total;
+        if (cost)
+            *cost = g_chat_cost_total;
         return;
     }
 
@@ -177,15 +188,46 @@ void cli_chat_usage_get_session(uint64_t *tokens, double *cost)
         g_llm_base_completion = comp;
         g_llm_base_cost = c;
         g_llm_base_set = 1;
-        if (tokens)
-            *tokens = 0;
-        if (cost)
-            *cost = 0.0;
-        return;
+        prompt = comp = 0;
+        c = 0.0;
+    } else {
+        prompt -= g_llm_base_prompt;
+        comp -= g_llm_base_completion;
+        c -= g_llm_base_cost;
     }
 
-    if (tokens)
-        *tokens = (prompt - g_llm_base_prompt) + (comp - g_llm_base_completion);
+    if (in)
+        *in = prompt;
+    if (out)
+        *out = comp;
+    if (total)
+        *total = prompt + comp;
     if (cost)
-        *cost = c - g_llm_base_cost;
+        *cost = c;
+}
+
+/* 计费展示口径 SSoT：所有回合出口（chat / task / 蓝图快速路径）共用本函数
+ * 组装同一串指标，避免各调用点各写一套口径。返回 1 = buf 已写入非空指标，
+ * 返回 0 = 本回合无消耗（buf 置空串，调用方不展示计费段）。 */
+int cli_chat_usage_metrics(char *buf, size_t n)
+{
+    if (!buf || n == 0)
+        return 0;
+    buf[0] = '\0';
+
+    uint64_t in = 0, out = 0, total = 0;
+    double cost = 0.0;
+    cli_usage_detail(&in, &out, &total, &cost);
+    if (total == 0 && cost <= 0.0)
+        return 0;
+
+    if (in > 0 || out > 0)
+        snprintf(buf, n,
+                 "Tokens: %llu (prompt %llu · completion %llu) · Cost: $%.6f",
+                 (unsigned long long)total, (unsigned long long)in,
+                 (unsigned long long)out, cost);
+    else
+        snprintf(buf, n, "Tokens: %llu · Cost: $%.6f",
+                 (unsigned long long)total, cost);
+    return 1;
 }

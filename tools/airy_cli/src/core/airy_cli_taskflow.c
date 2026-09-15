@@ -386,14 +386,11 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
 #endif
     {
         char metrics[192];
-        uint64_t toks = 0;
-        double cost = 0.0;
-        cli_chat_usage_get_session(&toks, &cost);
-        if (toks > 0 || cost > 0.0)
-            snprintf(metrics, sizeof(metrics),
-                     "nodes=%zu deps=%zu · Tokens: %llu · Cost: $%.6f",
-                     plan->task_plan_node_count, cli_plan_deps_count(plan),
-                     (unsigned long long)toks, cost);
+        char usage[160];
+        cli_chat_usage_metrics(usage, sizeof(usage));
+        if (usage[0])
+            snprintf(metrics, sizeof(metrics), "nodes=%zu deps=%zu · %s",
+                     plan->task_plan_node_count, cli_plan_deps_count(plan), usage);
         else
             snprintf(metrics, sizeof(metrics), "nodes=%zu deps=%zu",
                      plan->task_plan_node_count, cli_plan_deps_count(plan));

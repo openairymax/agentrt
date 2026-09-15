@@ -223,4 +223,25 @@ if(BUILD_TESTS)
         endif()
         add_test(NAME cli_gw_e2e COMMAND test_cli_gw)
     endif()
+
+    # B-1/B-2：回合计费展示口径 SSoT（cli_chat_usage_metrics）。AIRY_GATEWAY_URL
+    # 指向已关闭端口，令 llm.get_stats 必失败，从而走"回退本轮 chat 累计"路径
+    # ——该路径的累计字段即厂商 usage 字段，可逐项断言映射关系。
+    if(NOT WIN32)
+        add_executable(test_cli_usage tests/test_cli_usage.c
+                       src/chat/cli_chat_usage.c src/cmd/cli_gw.c)
+        target_include_directories(test_cli_usage PRIVATE ${CLI_INC_DIRS})
+        target_compile_definitions(test_cli_usage PRIVATE AIRY_HAS_CJSON=1)
+        if(AIRY_CJSON_INCLUDE_DIRS)
+            target_include_directories(test_cli_usage PRIVATE ${AIRY_CJSON_INCLUDE_DIRS})
+        endif()
+        target_link_libraries(test_cli_usage PRIVATE airy_coreloopthree airy_common
+                                                     Threads::Threads)
+        if(TARGET cJSON OR TARGET cjson)
+            target_link_libraries(test_cli_usage PRIVATE $<IF:$<TARGET_EXISTS:cJSON>,cJSON,cjson>)
+        elseif(AIRY_CJSON_LIBRARIES)
+            target_link_libraries(test_cli_usage PRIVATE ${AIRY_CJSON_LIBRARIES})
+        endif()
+        add_test(NAME cli_chat_usage COMMAND test_cli_usage)
+    endif()
 endif()
