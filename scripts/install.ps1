@@ -1,34 +1,3 @@
-# ============================================================================
-# Airymax AgentRT 一键安装脚本 (Windows PowerShell)
-#
-# 位置：agentrt 管理仓 scripts/install.ps1（v0.1.2 起自伞仓 scripts/ 迁移，
-#       构建系统与安装器属 IRON-9 [IND] 完全独立层；伞仓保留兼容重定向）。
-# 用法：
-#   powershell -ExecutionPolicy Bypass -Command "irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 | iex"
-#   powershell -ExecutionPolicy Bypass -File install.ps1 -Prefix "$HOME\.airymaxrt"
-#   powershell -ExecutionPolicy Bypass -File install.ps1 -Uninstall -Yes
-#
-# 安装策略（三模式，与 install.sh 对齐）：
-#   模式 A 二进制：AIRY_RELEASE_URL 指向完全体 zip（含闭源模块预编译产物），
-#      下载解压到 $AIRY_HOME，秒级安装、无需工具链（完全体二进制为主）。
-#   模式 B 混合构建：公开源码编译；闭源模块（atoms/memory/memoryrovol）下载预编译包
-#      到 $AIRY_HOME\modules 后链接（AIRY_ATOMS_PREBUILT_DIR /
-#      MEMORYROVOL_PRO_LIB）。
-#   模式 C 全源码构建：本地持有闭源模块源码，全量编译（-Mode source）。
-#
-# 路径体系（与 platform.h AIRY_HOME 一致，全产物收敛）：
-#   $AIRY_HOME = ${AIRY_HOME:-~/.airymaxrt}（-Prefix 覆盖）
-#   bin / lib / include / config / run / logs / data / tmp / cache / modules / scripts
-#
-# 参数：
-#   -Prefix <path>  -Mode <auto|binary|hybrid|source>  -BinDir <path>
-#   -Uninstall [-KeepData] [-Yes]  -Help
-#
-# 卸载：install.ps1 -Uninstall，或 airymaxrt.cmd uninstall（自举在线安装器，
-#       停止 daemon + 删除 $AIRY_HOME + 移除启动器；-KeepData 保留记忆数据）。
-# 更新：重跑本文件官方安装命令（镜像覆盖到最新版，幂等；Windows 无独立
-#       update 子命令，以重装代替——0.1.13 C2a 文档口径）。
-# ============================================================================
 
 param(
     [string]$Prefix,
@@ -44,29 +13,37 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# ─── 颜色 ────────────────────────────────────────────────────────────────
 function Write-Info  { Write-Host "[INFO] $args" -ForegroundColor Cyan }
 function Write-OK    { Write-Host "[ OK ] $args" -ForegroundColor Green }
 function Write-Warn  { Write-Host "[WARN] $args" -ForegroundColor Yellow }
 function Write-Err   { Write-Host "[FAIL] $args" -ForegroundColor Red }
 
 if ($Help) {
-    Get-Content $MyInvocation.MyCommand.Path | Select-Object -First 30 |
-        Where-Object { $_ -match "^#" } | ForEach-Object { $_ -replace "^# ?","" }
+    Write-Host "AirymaxRT 安装器 (Windows)"
+    Write-Host ""
+    Write-Host "用法:"
+    Write-Host "  一键安装: powershell -ExecutionPolicy Bypass -Command `"irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 | iex`""
+    Write-Host "  本地执行: powershell -ExecutionPolicy Bypass -File install.ps1 [参数]"
+    Write-Host "  更新/重装: 重跑一键安装命令（镜像覆盖最新版，幂等）"
+    Write-Host "  卸载:     powershell -ExecutionPolicy Bypass -File install.ps1 -Uninstall [-KeepData] [-Yes]"
+    Write-Host ""
+    Write-Host "参数:"
+    Write-Host "  -Prefix <path>      安装根目录（默认 ~\.airymaxrt）"
+    Write-Host "  -Mode <mode>        安装模式: auto|binary|hybrid|source（默认 auto）"
+    Write-Host "  -BinDir <path>      可执行文件链接目录（默认 ~\.local\bin）"
+    Write-Host "  -Channel <channel>  发布通道: stable|rc|beta（默认 stable）"
+    Write-Host "  -FromFile <file>    从本地制品文件安装"
+    Write-Host "  -Uninstall          卸载"
+    Write-Host "  -KeepData           卸载时保留用户数据"
+    Write-Host "  -Yes                跳过交互确认"
+    Write-Host "  -Help               显示本帮助"
     exit 0
 }
 
-# ─── 参数 ────────────────────────────────────────────────────────────────
-# 安装路径强制统一 $HOME\.airymaxrt（与 install.sh 同逻辑，2026-08-28）。
-# 环境变量 AIRY_HOME 不再继承——历史故障：持久终端残留 export AIRY_HOME=
-# <已删除目录>，静默劫持安装位置。非默认位置请用显式 -Prefix 参数。
 if ($env:AIRY_HOME -and (Join-Path $env:AIRY_HOME "") -ne (Join-Path $HOME ".airymaxrt\")) {
     Write-Warn "已忽略环境变量 AIRY_HOME=$env:AIRY_HOME（防残留劫持）；安装位置统一为 ~\.airymaxrt，非默认位置请用 -Prefix"
 }
 $AIRY_HOME    = if ($Prefix) { $Prefix } else { Join-Path $HOME ".airymaxrt" }
-# 版本 SSoT：显式 AIRY_VERSION 优先；源码树内运行读 agentrt/VERSION；
-# 否则回退占位默认值（源码构建路径会以 clone 到的 agentrt/VERSION 为准，
-# 二进制路径以 manifest/实际包版本为准）。
 $AiryVersionSpecified = $false
 if ($env:AIRY_VERSION) { $AiryVersionSpecified = $true }
 $AIRY_VERSION = if ($env:AIRY_VERSION) { $env:AIRY_VERSION }
@@ -74,9 +51,6 @@ $AIRY_VERSION = if ($env:AIRY_VERSION) { $env:AIRY_VERSION }
                 else { "v0.1.13" }
 $AIRY_REPO_URL = if ($env:AIRY_REPO_URL) { $env:AIRY_REPO_URL } else { "https://atomgit.com/openairymax/airymaxhub.git" }
 $AIRY_CHANNEL = if ($Channel) { $Channel } elseif ($env:AIRY_CHANNEL) { $env:AIRY_CHANNEL } else { "stable" }
-# 通道白名单（与 install.sh / 更新器 latest/airymaxrt 同口径；发布侧
-# tag 含 -rc → rc、-beta → beta）。非法通道显式拒绝，避免落到 manifest
-# 404 后被误读为“网络异常”（U-02 通道选择 fail-closed）。
 if (@('stable', 'rc', 'beta') -notcontains $AIRY_CHANNEL) {
     Write-Err "非法 -Channel: $AIRY_CHANNEL（支持 stable|rc|beta）"
     exit 1
@@ -85,8 +59,6 @@ $AIRY_SRC_DIR = Join-Path $AIRY_HOME "src\airymaxhub"
 $MODULES_DIR  = Join-Path $AIRY_HOME "modules"
 $BIN_DIR      = if ($BinDir) { $BinDir } elseif ($env:AIRY_BIN_DIR) { $env:AIRY_BIN_DIR } else { Join-Path $HOME ".local\bin" }
 
-# daemon 清单单一真相源：以制品 bin/*_d.exe 推导（与 install.sh
-# daemon_list 同源策略；daemon 增删不再改脚本硬编码，0.1.9 M4-S4 收敛）
 function Get-ExpectedDaemons {
     Get-ChildItem (Join-Path $AIRY_HOME "bin\*_d.exe") -ErrorAction SilentlyContinue |
         ForEach-Object { $_.BaseName }
@@ -103,7 +75,6 @@ function Require-Cmd {
     }
 }
 
-# 工具链仅在源码构建路径要求（二进制模式无需 git/cmake/编译器）
 function Check-Toolchain {
     Require-Cmd "git"
     Require-Cmd "cmake"
@@ -123,14 +94,12 @@ function Init-Home {
 }
 
 function Stop-Daemons {
-    # daemon 清单动态推导（bin\*_d.exe），避免卸载/停止残留进程
     foreach ($name in (Get-ExpectedDaemons)) {
         Get-Process -Name $name -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     }
     Start-Sleep -Seconds 1
 }
 
-# ─── 一键卸载 ────────────────────────────────────────────────────────────
 function Uninstall-All {
     param([string]$Home, [switch]$KeepData, [switch]$Yes)
     $envFile = Join-Path $Home "config\install.env"
@@ -169,11 +138,6 @@ if ($Uninstall) {
     exit 0
 }
 
-# ─── 模式 A：完全体二进制 zip（优先） ────────────────────────────────────
-# 仓库文件经 AtomGit v5 contents API 获取（与 install.sh fetch_repo_file
-# 同源）：主域 raw 路径对非 Markdown 返回 HTML 预览页、raw.atomgit.com
-# 子域部分网络 403/不可达（0.1.6b 社区实测"暂不支持预览"）；contents
-# API 匿名 GET 返回 base64 JSON，无重定向，可靠。
 function Fetch-RepoFile {
     param([string]$RepoPath, [string]$Dest)
     $api = "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/$RepoPath?ref=main"
@@ -190,12 +154,9 @@ function Install-Binary {
     param([string]$Url)
     $zip = Join-Path $AIRY_HOME "tmp\agentrt-$AIRY_VERSION.zip"
     $expectSha = ""
-    # 来源解析：a) manifest JSON（通道）→ 解析本平台制品 url+sha256；
-    #          b) 本地 zip（-FromFile）→ 直用；c) 远程 zip URL → 下载
     if ($Url -like "*.json") {
         $man = Join-Path $AIRY_HOME "tmp\manifest.json"
         if (Test-Path $Url) {
-            # 本地 manifest（通道入口已经 contents API 获取）→ 直用
             Copy-Item $Url $man -Force
             Write-Info "使用已获取的通道 manifest"
         } else {
@@ -203,9 +164,6 @@ function Install-Binary {
             curl.exe -fsSL --max-time 60 -o $man $Url
             if ($LASTEXITCODE -ne 0) { Write-Warn "manifest 下载失败，回退源码构建"; return $false }
         }
-        # GPG 验签 manifest（权威校验链，与 install.sh/airymaxrt 同源）：
-        #   系统装有 gpg → fail-closed（验签失败拒绝安装）；
-        #   无 gpg 环境 → 降级 HTTPS + sha256（Windows 最小环境，显式告警）。
         $asc = Join-Path $AIRY_HOME "tmp\manifest.json.asc"
         $ascSrc = "$Url.asc"
         if (Test-Path $ascSrc) { Copy-Item $ascSrc $asc -Force }
@@ -231,14 +189,10 @@ function Install-Binary {
             }
             Write-OK "manifest 验签通过（GPG）"
         } elseif (-not (Test-Path $asc)) {
-            # fail-closed（对齐 install.sh）：缺签名且无 gpg 直接拒绝，避免
-            # HTTPS-only 降级被中间人替换 manifest（sha 随之被换）。
             Write-Err "manifest 签名缺失且无 gpg 环境，拒绝安装（fail-closed）"
             $script:BinaryFatal = $true
             return $false
         }
-        # 平台命名规范（0.1.10 起）：OS-架构族-位宽（windows-x86-64 等）。
-        # PROCESSOR_ARCHITECTURE（AMD64/ARM64/x86）→ 平台后缀映射。
         $plat = switch ($env:PROCESSOR_ARCHITECTURE) {
             'AMD64' { 'windows-x86-64' }
             'ARM64' { 'windows-arm-64' }
@@ -249,9 +203,6 @@ function Install-Binary {
             Write-Warn "不支持的处理器架构 $($env:PROCESSOR_ARCHITECTURE)，回退源码构建"; return $false
         }
         $json = Get-Content $man -Raw | ConvertFrom-Json
-        # U-02 通道状态门禁（2026-09-13）：保留通道（state=reserved）官方零制品，
-        # 显式 fail-closed（同 install.sh rc 2 语义），避免被误读为“本平台无包”
-        # 而静默下沉源码构建。缺省（旧 manifest 无 state 字段）视作 active。
         if ($json.state -eq 'reserved') {
             Write-Err "通道 $AIRY_CHANNEL 为保留通道（state=reserved），官方尚未发布任何制品"
             Write-Err "当前可用：stable（生产）/ rc（候选）——请改用 -Channel stable"
@@ -259,7 +210,6 @@ function Install-Binary {
             return $false
         }
         $art = $json.releases.($json.latest).artifacts.$plat
-        # 旧两代 manifest 键兜底（windows-x64 / win-x86-64 / win-x64）
         if (-not $art) {
             foreach ($alt in @('windows-x64', 'win-x86-64', 'win-x64')) {
                 $art = $json.releases.($json.latest).artifacts.$alt
@@ -271,10 +221,6 @@ function Install-Binary {
         $expectSha = [string]$art.sha256
         Write-Info "通道 $AIRY_CHANNEL 最新制品（$plat）: $($Url.Split('/')[-1])"
     }
-    # 解压前清理旧解压残留（0.1.6g 铁律，对齐 install.sh：清理必须在下载
-    # 之前）。多版本 agentrt-* 目录并存时 Select -First 1 按名排序可能
-    # 选中旧目录 → 装旧版。-Directory 只命中目录，不影响 tmp 内的
-    # zip/manifest/公钥等文件（对齐 rm -rf ... || true 容错语义）。
     Get-ChildItem (Join-Path $AIRY_HOME "tmp") -Directory -Filter "agentrt-*" -ErrorAction SilentlyContinue |
         Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
     if (Test-Path $Url) {
@@ -289,7 +235,6 @@ function Install-Binary {
             return $false
         }
     }
-    # sha256 校验（manifest 期望值，或相邻 .sha256 文件）
     if (-not $expectSha -and (Test-Path "$zip.sha256")) {
         $expectSha = (Get-Content "$zip.sha256").Split(' ')[0]
     }
@@ -303,19 +248,13 @@ function Install-Binary {
         Write-OK "sha256 校验通过"
     }
     Expand-Archive -Path $zip -DestinationPath (Join-Path $AIRY_HOME "tmp") -Force
-    # 包内必须含 agentrt-* 顶层目录（release.yml 打包约定），否则视为异常
     $pkgDir = Get-ChildItem (Join-Path $AIRY_HOME "tmp") -Directory | Where-Object { $_.Name -like "agentrt-*" } | Select-Object -First 1
     if (-not $pkgDir) {
         Write-Err "release 包结构异常（缺 agentrt-* 顶层目录）"
         $script:BinaryFatal = $true
         return $false
     }
-    # 覆盖安装前停止旧 daemon（对齐 install.sh：旧进程仍持有旧二进制/
-    # 运行库，且 Windows 文件锁会令 Copy-Item 静默失败 → 假绿装旧版）
     Stop-Daemons
-    # bin/ 拷贝 fail-closed（对齐 install.sh 0.1.6e：静默失败会导致 daemon
-    # 未就位却显示"全部就位"）：逐制品拷贝 + 就位校验，失败/缺失即拒绝
-    # 安装；包 bin/ 为空视为制品不完整。
     $binDst = Join-Path $AIRY_HOME "bin"
     New-Item -ItemType Directory -Force -Path $binDst | Out-Null
     $pkgBinItems = Get-ChildItem (Join-Path $pkgDir.FullName "bin") -ErrorAction SilentlyContinue
@@ -324,10 +263,6 @@ function Install-Binary {
         $script:BinaryFatal = $true
         return $false
     }
-    # 覆盖洁净（0.1.13 C2b，镜像语义对齐 install.sh install_binary）：
-    # bin/lib/include/share 为纯产品目录（无用户数据），整清后重灌——旧版
-    # 独有的 *_d.exe/.dll/python 运行时不会残留成半新半旧污染面。daemons
-    # 已在上面停止（无文件锁）。config/（用户 secrets 等）绝不整清。
     foreach ($rel in @("bin", "lib", "include", "share")) {
         $pkgSub = Join-Path $pkgDir.FullName $rel
         if (Test-Path $pkgSub) {
@@ -353,8 +288,6 @@ function Install-Binary {
         }
     }
     Get-ChildItem (Join-Path $pkgDir.FullName "lib") -ErrorAction SilentlyContinue | Copy-Item -Destination (Join-Path $AIRY_HOME "lib") -Recurse -Force
-    # lib/ 部署校验（对齐 install.sh 0.1.5a）：包内含 .dll 时必须确认就位，
-    # 缺失即 fail-closed（不再静默吞错，否则 daemon 启动即失败）
     if (Get-ChildItem (Join-Path $pkgDir.FullName "lib") -Filter "*.dll" -ErrorAction SilentlyContinue) {
         if (-not (Get-ChildItem (Join-Path $AIRY_HOME "lib") -Filter "*.dll" -ErrorAction SilentlyContinue)) {
             Write-Err "lib/ 部署失败（.dll 未就位），二进制将无法启动"
@@ -363,22 +296,18 @@ function Install-Binary {
         }
     }
     Get-ChildItem (Join-Path $pkgDir.FullName "include") -ErrorAction SilentlyContinue | Copy-Item -Destination (Join-Path $AIRY_HOME "include") -Recurse -Force
-    # LICENSE/README（share/）随包分发；config/ 内置模板（secrets.env.example 等）
     Get-ChildItem (Join-Path $pkgDir.FullName "share") -ErrorAction SilentlyContinue | Copy-Item -Destination (Join-Path $AIRY_HOME "share") -Recurse -Force
     Get-ChildItem (Join-Path $pkgDir.FullName "config") -ErrorAction SilentlyContinue | Copy-Item -Destination (Join-Path $AIRY_HOME "config") -Force
-    # 签名公钥随包同步
     if (Test-Path (Join-Path $pkgDir.FullName "keys\agentrt.asc")) {
         New-Item -ItemType Directory -Force -Path (Join-Path $AIRY_HOME "keys") | Out-Null
         Copy-Item (Join-Path $pkgDir.FullName "keys\agentrt.asc") (Join-Path $AIRY_HOME "keys") -Force
     }
-    # 以实际安装包版本固化（manifest 通道可能高于默认 AIRY_VERSION）
     $verNum = $pkgDir.Name -replace "^agentrt-", ""
     if ($verNum) { $script:AIRY_VERSION = "v$verNum" }
     Write-OK "完全体二进制包安装完成（v$verNum）"
     return $true
 }
 
-# ─── 闭源预编译模块下载（模式 B） ────────────────────────────────────────
 function Fetch-PrebuiltModule {
     param([string]$Name, [string]$Url, [string]$DirName)
     if (-not $Url) { Write-Warn "未配置 $Name 预编译包 URL，跳过"; return }
@@ -393,29 +322,20 @@ function Fetch-PrebuiltModule {
     Write-OK "$Name 预编译模块就位: $dest"
 }
 
-# ─── 源码获取 + 构建（模式 B/C） ─────────────────────────────────────────
 function Build-FromSource {
     if (-not (Test-Path (Join-Path $AIRY_SRC_DIR ".git"))) {
         Write-Info "git 拉取 airymaxhub（$AIRY_REPO_URL）…"
         New-Item -ItemType Directory -Force -Path (Split-Path $AIRY_SRC_DIR) | Out-Null
-        # 版本来源二选一：显式 AIRY_VERSION → 固定 tag 精确安装；
-        # 未指定 → clone 默认分支，随后从 agentrt/VERSION 读取真实版本
-        # （SSoT 单一来源），杜绝脚本内置默认版本与当前发布漂移。
         if ($AiryVersionSpecified) {
             git clone --depth 1 -b $AIRY_VERSION $AIRY_REPO_URL $AIRY_SRC_DIR
         } else {
             git clone --depth 1 $AIRY_REPO_URL $AIRY_SRC_DIR
         }
         if ($LASTEXITCODE -ne 0) { Write-Err "git 拉取失败（子仓私有时请配置 AIRY_RELEASE_URL 走二进制模式）"; throw "git clone failed" }
-        # --recursive：agentrt 的 7 个核心子仓（atoms/commons/daemons/gateway/
-        # cupolas/protocols/heapstore）与 sdk/ecosystem 子仓均为公开仓，必须
-        # 一并拉取，否则模式 C 源码构建缺核心源码必然失败。闭源子仓（标
-        # update=none）自动跳过。
         git -C $AIRY_SRC_DIR submodule update --init --recursive --depth 1 2>$null
     } else {
         Write-Info "airymaxhub 源码已存在，复用本地源码树"
     }
-    # 源码版本 SSoT：以 agentrt/VERSION 为权威（兼容管理仓 submodule 布局）
     $srcApp = Join-Path $AIRY_SRC_DIR "agent-workload"
     if (-not (Test-Path (Join-Path $srcApp "agentrt\VERSION"))) { $srcApp = $AIRY_SRC_DIR }
     $verFile = Join-Path $srcApp "agentrt\VERSION"
@@ -433,8 +353,6 @@ function Build-FromSource {
     if (Test-Path (Join-Path $MODULES_DIR "atoms")) {
         $cmakeArgs += " -DAIRY_ATOMS_PREBUILT_DIR=$(Join-Path $MODULES_DIR 'atoms')"
     }
-    # 预编译库文件名：Windows 为 .lib（MSVC 静态库），POSIX 为 .a。
-    # 与 install.sh 及 products/memoryrovol 的归档命名对齐。
     $mrLibName = "libagentrt_memoryrovol.lib"
     $mrLibA = Join-Path $MODULES_DIR "memoryrovol\libagentrt_memoryrovol.a"
     $mrLib = Join-Path $MODULES_DIR "memoryrovol\$mrLibName"
@@ -458,7 +376,6 @@ function Build-FromSource {
     Write-OK "源码构建安装完成"
 }
 
-# ─── secrets.env 模板（源码模式用 tools 模板，二进制模式回退随包 config/） ─
 function Init-Secrets {
     $secrets = Join-Path $AIRY_HOME "config\secrets.env"
     if (-not (Test-Path $secrets)) {
@@ -473,18 +390,15 @@ function Init-Secrets {
     } else {
         Write-OK "secrets.env 已存在，跳过"
     }
-    # agentrt.yaml / model.yaml（二进制模式已由 Install-Binary 拷入 config/）
     $srcYaml = Join-Path $AIRY_SRC_DIR "ecosystem\manager\configs\agentrt.yaml"
     if (Test-Path $srcYaml) { Copy-Item $srcYaml (Join-Path $AIRY_HOME "config") -Force -ErrorAction SilentlyContinue }
     $srcModel = Join-Path $AIRY_SRC_DIR "ecosystem\manager\model\model.yaml"
     if (Test-Path $srcModel) { Copy-Item $srcModel (Join-Path $AIRY_HOME "config") -Force -ErrorAction SilentlyContinue }
 }
 
-# ─── 固化安装位置 + 生成运行环境 + 启动器 ────────────────────────────────
 function Finalize-Install {
     $envFile = Join-Path $AIRY_HOME "config\install.env"
     $link = Join-Path $BIN_DIR "airymaxrt.cmd"
-    # vault 主密钥口令（AES-256-GCM 凭据加密，64 位 hex），对齐 install.sh
     $vaultPassword = -join (1..64 | ForEach-Object { '{0:x}' -f (Get-Random -Maximum 16) })
     @(
         "# AirymaxRT 安装信息（由 install.ps1 生成，勿手改）",
@@ -496,12 +410,6 @@ function Finalize-Install {
         "AIRY_VAULT_PASSWORD=$vaultPassword"
     ) | Set-Content -Path $envFile -Encoding UTF8
 
-    # 运行环境脚本（agentrt-env.ps1，含 Agent 工具 ACL 预授权，
-    # fail-closed：无 AIRY_AGENT_ACL 时 agent 工具全部拒绝，对齐 install.sh）
-    # 路径体系与 install.sh / platform.h 一致（2026-08-25 铁律）：运行时
-    # 数据全量统一 $AIRY_HOME\data\agentrt（日志/缓存/临时/工作区），
-    # 顶层仅保留分发物、配置与易失 run/。此前 Windows 版把日志放顶层
-    # logs\、缓存放 cache\，与 daemon airy_paths_init 实际路径分叉。
     $aclTools = "fs_read,fs_write,fs_list,fs_glob,fs_grep,fs_edit,fs_delete,shell_run,web_search,web_fetch,git_diff,git_exec,git_apply"
     $agents = @("coding_v1","devops_v1","backend_v1","frontend_v1","tester_v1","architect_v1",
                 "product_manager_v1","data_engineer_v1","security_v1","reviewer_v1","analyst_v1")
@@ -509,7 +417,6 @@ function Finalize-Install {
     $envScript = @(
         "# AgentRT 运行环境（由 install.ps1 生成，source 使用）",
         ('$env:AIRY_HOME = "' + $AIRY_HOME + '"'),
-        # PowerShell 5.1 兼容：避免 ?? 运算符（PS7+ 才有）
         'if (-not $env:AIRY_RUNTIME_DIR) { $env:AIRY_RUNTIME_DIR = Join-Path $env:AIRY_HOME "run" }',
         'if (-not $env:AIRY_DATA_DIR) { $env:AIRY_DATA_DIR = Join-Path $env:AIRY_HOME "data" }',
         'if (-not $env:AIRY_LOG_DIR) { $env:AIRY_LOG_DIR = Join-Path $env:AIRY_HOME "data\agentrt\logs" }',
@@ -519,19 +426,11 @@ function Finalize-Install {
         'if (-not $env:AIRY_CONFIG_DIR) { $env:AIRY_CONFIG_DIR = Join-Path $env:AIRY_HOME "config" }',
         'if (-not $env:AIRY_BIN_DIR) { $env:AIRY_BIN_DIR = Join-Path $env:AIRY_HOME "bin" }',
         'if (-not $env:AIRY_LIB_DIR) { $env:AIRY_LIB_DIR = Join-Path $env:AIRY_HOME "lib" }',
-        "# Agent 工具 ACL 预授权（fail-closed：无此变量时 agent 工具全部拒绝）",
         ('if (-not $env:AIRY_AGENT_ACL) { $env:AIRY_AGENT_ACL = "' + $aclDefault + '" }'),
         '$env:PATH = (Join-Path $env:AIRY_HOME "bin") + [IO.Path]::PathSeparator + $env:PATH'
     )
     $envScript | Set-Content -Path (Join-Path $AIRY_HOME "bin\agentrt-env.ps1") -Encoding UTF8
 
-    # 启动器（读 install.env 定位运行时根，任意路径执行 airymaxrt 即启动）
-    # Windows zip 不构建 Rust TUI：优先 agentrt-tui.exe，回退 C 实现 airy_cli.exe
-    # 启动器头部固化真实 AIRY_HOME（-Prefix 自定义安装的关键：cmd 子进程
-    # 不继承父 shell 的 $env:AIRY_HOME，此前硬编码 %USERPROFILE%\.airymaxrt
-    # 导致自定义路径安装后启动器失效——历史故障，2026-08-25 修复）。
-    # 保留 findstr install.env 覆盖：环境变量显式设置 / install.env 变更时
-    # 以权威文件为准（幂等）。
     $launcher = Join-Path $AIRY_HOME "bin\airymaxrt.cmd"
     $escapedHome = $AIRY_HOME.Replace('"','""')
     $cmdContent = @(
@@ -541,9 +440,6 @@ function Finalize-Install {
         "if exist ""%AIRY_HOME%\config\install.env"" (",
         "  for /f ""tokens=2 delims=="" %%a in ('findstr /b ""AIRY_HOME="" ""%AIRY_HOME%\config\install.env"" 2^>nul') do set ""AIRY_HOME=%%a""",
         ")",
-        "rem 管理命令分发（0.1.13 C2a 修复）：airymaxrt.cmd uninstall 历史上把",
-        "rem 参数原样透传前端成死路；现自举在线安装器执行卸载（停 daemon +",
-        "rem 删 $AIRY_HOME + 移除启动器）。其余参数仍透传前端。",
         "if /i ""%~1""==""uninstall"" (",
         "  powershell -NoProfile -ExecutionPolicy Bypass -Command ""$ErrorActionPreference='Stop'; try { $c=irm 'https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.ps1?ref=main' -TimeoutSec 60; $p=Join-Path $env:TEMP 'agentrt-install.ps1'; [IO.File]::WriteAllBytes($p,[Convert]::FromBase64String(($c.content -replace '\\s',''))); & $p -Uninstall -Prefix '%AIRY_HOME%' } catch { Write-Host ('[FAIL] 卸载器自举失败: '+$_.Exception.Message); exit 1 }""",
         "  goto :eof",
@@ -570,7 +466,6 @@ function Finalize-Install {
     Write-OK "安装位置已固化: install.env + airymaxrt.cmd"
 }
 
-# ─── 完整性校验 ──────────────────────────────────────────────────────────
 function Verify-Daemons {
     param([switch]$Strict)
     $list = @(Get-ExpectedDaemons)
@@ -597,7 +492,6 @@ function Verify-Daemons {
     }
 }
 
-# ─── 主流程 ──────────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "  ┌─────────────────────────────────────────────────────┐" -ForegroundColor Cyan
 Write-Host "  │         Airymax Agent Platform Engineering          │" -ForegroundColor Cyan
@@ -615,17 +509,9 @@ Require-Cmd "curl"
 Init-Home
 
 $installed = $false
-# fail-closed（对齐 install.sh rc 语义）：binary 模式 / 离线包 / 确定性故障
-# （缺签·验签失败·sha 不符·下载失败·包结构异常·bin 空）一律 exit 1，绝不
-# 静默下沉源码构建；仅 auto 且"官方无制品/平台不支持"类非致命原因允许源码兜底。
 $script:BinaryFatal = $false
-# 发布来源解析：-FromFile 离线包 > AIRY_RELEASE_URL 显式 URL > 官方通道 manifest
-# （默认，stable/beta 由 -Channel 决定；-Mode source 除外）
 $releaseUrl = $env:AIRY_RELEASE_URL
 if (-not $releaseUrl -and $Mode -ne "source") {
-    # 通道 manifest 经 v5 contents API 获取（无重定向；主域 raw 返回 HTML
-    # 预览页、raw.atomgit.com 子域部分网络不可达——0.1.6b 修复，与 install.sh
-    # fetch_repo_file 同源）。本地文件交给 Install-Binary 直用。
     $manLocal = Join-Path $AIRY_HOME "tmp\manifest.$AIRY_CHANNEL.json"
     if (Fetch-RepoFile "latest/manifest.$AIRY_CHANNEL.json" $manLocal) {
         Fetch-RepoFile "latest/manifest.$AIRY_CHANNEL.json.asc" "$manLocal.asc" | Out-Null
@@ -655,9 +541,7 @@ if (-not $installed) {
         exit 1
     }
     Write-Info "进入源码构建模式（$Mode）"
-    # 工具链仅在源码构建路径要求（二进制模式无需 git/cmake/编译器）
     Check-Toolchain
-    # 模式 B：无闭源源码 → 先下载闭源预编译模块（cmake 配置需要）
     if ($Mode -ne "source") {
         Fetch-PrebuiltModule "atoms" $env:AIRY_ATOMS_PREBUILT_URL "atoms"
         Fetch-PrebuiltModule "memoryrovol" $env:AIRY_MEMORYROVOL_PREBUILT_URL "memoryrovol"

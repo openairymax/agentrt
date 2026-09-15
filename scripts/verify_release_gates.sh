@@ -1,41 +1,4 @@
 #!/usr/bin/env bash
-# scripts/verify_release_gates.sh — WS-9 社区六类问题修复发布门禁（0.1.15 方案 §4.9 / 步骤 9.8）
-# @owner: team-C
-#
-# 断言 9.1~9.11 各步骤的「可复现判据」在仓内保持成立，防止已修复的社区
-# 六类问题（更新/安装/启动/稳定/长对话/长任务）回归。由 ctest 以
-# release_gates 用例驱动（tests/CMakeLists.txt，挂 WS-6 CI required）。
-#
-# 判据分组（编号对应方案 §4.9 步骤表）：
-#   A  9.2/I-01   install.sh 前向兼容（安装问题：函数先定义后调用）
-#   B  9.3/I-02① detect_arch 等架构函数 + 制品 platform 标记判定/平台键/
-#                 体积渲染三副本逐字节一致（install.sh/latest/sdk）
-#   C  9.3/I-02② detect_arch 20 例平台矩阵仿真（含 aarch64 32 位陷阱）
-#   D  9.4/C-01   airy_cli 聊天路径单一实现（cli_chat.c，无 stream 遗留）
-#   E  9.6/S-01   TUI 会话历史环形裁剪（长对话问题）
-#   F  9.7/S-02   长任务可取消 + 超时可诊断
-#   G  9.11/S-04  reasoning 截断 + 日志轮转（长任务问题）
-#   H  9.9/U-02~4 三份脚本通道白名单同集 + 保留通道文案（bash/ps1/更新器）
-#                 + 版本占位合法 + 保留通道声明 manifest（state=reserved）
-#                 + 消费端 state 门禁（U-02 通道选择 fail-closed）
-#   I  9.10/I-03  架构白名单精确串 + 全仓零 riscv 表述 + 源码构建指引
-#   J  9.1/U-01   更新器 detect_pending_release（更新问题：落后指针静默）
-#   K  （可选）   发布侧 publish-release.sh 白名单契约（本地可达才断言）
-#   L  §4.10 R-5  provider 默认超时 < 网关 LLM 转发背压（连不上网络：精确诊断
-#                 不被网关超时吞掉；含重试最坏总耗时上界）
-#   M  §4.10 R-6  PDP 双 Schema 兼容 + external 授权集 ⊇ /mcp tools/list 暴露集
-#                 （工具不可用：/mcp tools/call 以 external 主体过 PEP，缺任一
-#                 工具授权即 fail-closed 返回 -32603）
-#
-# 跨仓判据（B/J/部分 H/I）依赖 sdk 仓 airymaxrt。探测顺序：
-#   1. AIRY_GATE_SDK_AIRYMAXRT 显式指定（CI 取料 step 用；指定但缺失 → FAIL）
-#   2. $ROOT/../sdk/tui/scripts/airymaxrt（hub 本地布局，与 agentrt 并列）
-#   3. $ROOT/agent-workload/sdk/tui/scripts/airymaxrt（CI 取料布局）
-# 自动探测失败 → 跨仓组 SKIP（本地开发常态）；CI 侧由取料 step fail-closed
-# 兜底（clone 失败即红，门禁不静默降级）。
-#
-# 兼容性：macOS job 亦跑 ctest，本脚本必须 bash-3.2 兼容
-# （无关联数组/mapfile/${var,,}/lastpipe；计数 while 用重定向非管道）。
 
 set -u
 
@@ -50,7 +13,6 @@ bad()  { FAIL=$((FAIL+1)); printf '  [FAIL] %s\n' "$1"; }
 skip() { printf '  [SKIP] %s\n' "$1"; }
 section() { printf '\n[组%s] %s\n' "$1" "$2"; }
 
-# ---------- 路径 ----------
 INSTALL="$ROOT/scripts/install.sh"
 INSTALL_PS1="$ROOT/scripts/install.ps1"
 LATEST_RT="$ROOT/latest/airymaxrt"
@@ -66,7 +28,6 @@ if [ "$SDK_EXPLICIT" -eq 0 ]; then
     done
 fi
 
-# 跨仓判据前置：rc 0=可执行 / 1=应 SKIP（本地无 sdk）/ 2=应 FAIL（显式指定但缺失）
 sdk_ready() {
     if [ "$SDK_EXPLICIT" -eq 1 ] && [ ! -f "$SDK_AIRYMAXRT" ]; then
         return 2
@@ -75,12 +36,10 @@ sdk_ready() {
     return 1
 }
 
-# 提取顶格函数定义全文（函数体内均缩进，顶格 } 仅出现在函数结束）
 extract_fn() { # <file> <fnname> <outfile>
     sed -n "/^$2() {/,/^}$/p" "$1" > "$3"
 }
 
-# ---------- 结构性文件存在性前置（缺失即红，不逐条刷屏）----------
 _missing=0
 for _f in "$INSTALL" "$INSTALL_PS1" "$LATEST_RT" \
           "$CLI/src/chat/cli_chat.c" \
@@ -100,9 +59,6 @@ if [ "$_missing" -eq 1 ]; then
     exit 1
 fi
 
-# ============================================================
-# 组 A · 9.2/I-01 install.sh 前向兼容
-# ============================================================
 section "A" "9.2/I-01 install.sh 前向兼容（安装/启动问题：函数先定义后调用）"
 
 if bash -n "$INSTALL" 2>/dev/null; then
@@ -129,14 +85,8 @@ else
     bad "A3 存在函数定义晚于 main 调用行（直跑会 command not found）"
 fi
 
-# ============================================================
-# 组 B · 9.3/I-02① detect_arch 及平台键/标记判定函数三副本逐字节一致
-# ============================================================
 section "B" "9.3/I-02① 架构检测 + 平台键/标记判定 + 体积渲染三副本逐字节一致（install.sh / latest / sdk）"
 
-# arch_markers_ok 为 T4b 跨版本更新「制品架构与当前主机不匹配」误拒的修复
-# 落点：判定口径必须三副本同源，否则安装放行、更新拒绝（或反之）。原盲区
-# 仅覆盖 detect_arch 四函数，plat_markers/arch_markers_ok 漂移不报警。
 for _fn in _uspace_bits _loader_exists _arch_warn_unknown detect_arch \
            plat_markers arch_markers_ok human_size plat_name plat_legacy_name; do
     extract_fn "$INSTALL"   "$_fn" "$TMP/a_$_fn"
@@ -146,8 +96,6 @@ for _fn in _uspace_bits _loader_exists _arch_warn_unknown detect_arch \
         0)
             extract_fn "$SDK_AIRYMAXRT" "$_fn" "$TMP/c_$_fn"
             if [ "$_fn" = "_arch_warn_unknown" ]; then
-                # 呈现层函数：宿主日志设施各异（install.sh/latest=printf>&2+C_YELLOW，
-                # sdk=log warn），SSoT 边界=触发条件与文案，不做逐字节 cmp
                 _w=0
                 for _g in "$TMP/a_$_fn" "$TMP/b_$_fn" "$TMP/c_$_fn"; do
                     grep -q '用户空间位宽未知' "$_g" || _w=1
@@ -176,17 +124,8 @@ for _fn in _uspace_bits _loader_exists _arch_warn_unknown detect_arch \
     esac
 done
 
-# ============================================================
-# 组 B2 · P0 安装根 SSoT（自锚定复用既有实例；跨根候选零残留）
-# ============================================================
 section "B2" "P0 安装根 SSoT（安装/重装/更新定位同一实例；跨根候选零残留）"
 
-# B2-0 幽灵根守卫：非注释行不得残留跨根候选
-#   $HOME/.airymaxrt/config/install.env
-#   $HOME/.local/share/airymaxrt/config/install.env
-# 历史故障：装在非默认前缀的实例被静默劫持到默认根 ⇒ 两套实例并行，
-# update 读到另一套的 install.env（“刚装 vX 却提示当前 vY”），运行期数据
-# 写进幽灵根。覆盖两份 shell 副本与 C 侧解析实现。
 _ghost=""
 for _f in "$INSTALL" "$LATEST_RT" \
           "$ROOT/commons/platform/src/platform_paths.c"; do
@@ -202,7 +141,6 @@ else
     bad "B2-0 跨根候选残留（幽灵根劫持命门）:${_ghost}"
 fi
 
-# B2-6 自锚定读取存在性：三副本均须以 install.env 自锚定解析权威根
 _anchor_missing=""
 for _f in "$INSTALL" "$LATEST_RT"; do
     grep -q '}/\.\./config/install\.env' "$_f" || _anchor_missing="$_anchor_missing $_f"
@@ -217,8 +155,6 @@ else
     bad "B2-6 自锚定读取缺失（解析链退化为兜底根，将误建幽灵根）:${_anchor_missing}"
 fi
 
-# B2-1..B2-5 discover_install_home 行为矩阵：提取仓内真实实现组装（零硬拷贝，
-# 实现漂移即暴露），用 env -i 隔离宿主 PATH/环境，$0 由 sh -c 末位参数精确注入。
 cat > "$TMP/homelib.sh" <<'EOS'
 log_warn() { printf '[WARN] %s\n' "$1" >&2; }
 EOS
@@ -238,7 +174,6 @@ _mkroot() { # <dir> [version] —— 造一个含 install.env + bin/airy_cli 的
 }
 _DIH_SCRIPT='. "$DIHLIB"; discover_install_home'
 
-# B2-1 环境变量指向既有根 → 复用（不新建）
 mkdir -p "$TMP/b2/home"
 _mkroot "$TMP/b2/root1"
 _out="$(env -i HOME="$TMP/b2/home" PATH="$_CORE_PATH" \
@@ -250,7 +185,6 @@ else
     bad "B2-1 AIRY_HOME 有效根未被复用（out=${_out:-<空>}）"
 fi
 
-# B2-2 环境变量指向无效目录 → 忽略并告警（终端残留 export 不得劫持）
 _err="$TMP/b2/err2"
 _out="$(env -i HOME="$TMP/b2/home" PATH="$_CORE_PATH" \
         DIHLIB="$TMP/homelib_full.sh" AIRY_HOME="$TMP/b2/nonexistent" \
@@ -261,7 +195,6 @@ else
     bad "B2-2 残留环境变量未拦截（out=${_out:-<空>}）"
 fi
 
-# B2-3 PATH 中 airymaxrt 符号链 → 复用其安装根（社区 curl 直装主场景）
 _mkroot "$TMP/b2/root3"
 mkdir -p "$TMP/b2/link3" "$TMP/b2/other3"
 ln -s "$TMP/b2/root3/bin/airymaxrt" "$TMP/b2/link3/airymaxrt"
@@ -274,7 +207,6 @@ else
     bad "B2-3 PATH 符号链未复用（out=${_out:-<空>}）"
 fi
 
-# B2-4 默认根存在但无其它信号 → 不得被跨根候选命中（B2-0 的行为回归）
 _mkroot "$TMP/b2/home/.airymaxrt"
 _out="$(env -i HOME="$TMP/b2/home" PATH="$_CORE_PATH" \
         DIHLIB="$TMP/homelib_full.sh" \
@@ -285,7 +217,6 @@ else
     bad "B2-4 仍被跨根候选命中: $_out"
 fi
 
-# B2-5 安装副本 bin/ 内启动 → 自锚定到该副本根
 _mkroot "$TMP/b2/root5"
 _out="$(env -i HOME="$TMP/b2/home" PATH="$_CORE_PATH" \
         DIHLIB="$TMP/homelib_full.sh" \
@@ -296,19 +227,13 @@ else
     bad "B2-5 自锚定失败（out=${_out:-<空>}）"
 fi
 
-# ============================================================
-# 组 C · 9.3/I-02② detect_arch 20 例平台矩阵仿真
-# ============================================================
 section "C" "9.3/I-02② detect_arch 20 例平台矩阵仿真（stub 注入 uname/bits/loader）"
 
-# 用仓内真实实现组装被测库（零硬拷贝，实现漂移即暴露）
 extract_fn "$INSTALL" _uspace_bits       "$TMP/fn_bits"
 extract_fn "$INSTALL" _loader_exists     "$TMP/fn_loader"
 extract_fn "$INSTALL" _arch_warn_unknown "$TMP/fn_warn"
 extract_fn "$INSTALL" detect_arch        "$TMP/fn_detect"
 cat "$TMP/fn_bits" "$TMP/fn_loader" "$TMP/fn_warn" "$TMP/fn_detect" > "$TMP/archlib.sh"
-# 同名 stub 后定义覆盖先定义：_uspace_bits/_loader_exists 由环境变量供值；
-# uname 走 PATH 前置 stub；_arch_warn_unknown 的 stderr 告警丢弃保 stdout 纯净。
 cat >> "$TMP/archlib.sh" <<'GA_STUB'
 _uspace_bits()   { printf '%s' "${GA_BITS:-}"; }
 _loader_exists() { [ "${GA_LOADER:-}" = "$1" ]; }
@@ -324,12 +249,8 @@ arch_one() { # <machine> <bits> <loader> <expected>
     [ "$got" = "$4" ]
 }
 
-# 表：uname -m|_uspace_bits|loader 存在名|期望 detect_arch 输出。
-# 空字段统一用 "-" 占位（bash read 末变量吃剩余整段，连续分隔符会错位），
-# read 后还原为空串。
 arch_fail=0
 arch_n=0
-# while 用重定向（非管道）防 bash-3.2 子 shell 丢计数
 while IFS='|' read -r _m _b _l _e; do
     [ -z "$_m" ] && continue
     [ "$_b" = "-" ] && _b=""
@@ -369,9 +290,6 @@ else
     bad "C detect_arch 平台矩阵 $arch_fail/$arch_n 例失配（见上方明细）"
 fi
 
-# ============================================================
-# 组 D · 9.4/C-01 聊天路径单一实现
-# ============================================================
 section "D" "9.4/C-01 airy_cli 聊天路径单一实现（稳定问题：stream 遗留死码清除）"
 
 CHAT="$CLI/src/chat/cli_chat.c"
@@ -399,9 +317,6 @@ else
     ok "D4 cli_chat.c 零 llm_svc_adapter_create（旧 adapter 解耦完成）"
 fi
 
-# ============================================================
-# 组 E · 9.6/S-01 TUI 会话历史环形裁剪（长对话）
-# ============================================================
 section "E" "9.6/S-01 TUI 会话历史环形裁剪（长对话问题：无界增长拖垮 TUI）"
 
 if grep -Fq '#define TUI_HIST_MAX 1024' "$CLI/src/tui/cli_tui_internal.h"; then
@@ -416,9 +331,6 @@ else
     bad "E2 历史超限裁剪分支缺失（无界增长回归）"
 fi
 
-# ============================================================
-# 组 F · 9.7/S-02 长任务可取消 + 超时可诊断
-# ============================================================
 section "F" "9.7/S-02 长任务可取消 + 超时可诊断（稳定问题：Ctrl+C 假死/超时黑箱）"
 
 GW="$CLI/src/cmd/cli_gw.c"
@@ -442,9 +354,6 @@ else
     bad "F3 AIRY_ERR_CANCELED 映射缺失"
 fi
 
-# ============================================================
-# 组 G · 9.11/S-04 reasoning 截断 + 日志轮转（长任务）
-# ============================================================
 section "G" "9.11/S-04 reasoning 无界累计封顶 + 日志轮转（长任务问题：内存/磁盘无界）"
 
 if grep -Fq 'CLI_CHAT_REASONING_MAX_BYTES' "$CLI/include/cli_internal.h" \
@@ -467,9 +376,6 @@ else
     bad "G3 思考链日志轮转缺失（磁盘无界回归）"
 fi
 
-# ============================================================
-# 组 H · 9.9/U-02~4 通道白名单三副本同集 + 占位合法
-# ============================================================
 section "H" "9.9/U-02~4 通道白名单三副本同集 + 保留通道文案 + 版本占位格式合法"
 
 case "$(sdk_ready; echo $?)" in
@@ -519,9 +425,6 @@ else
     bad "H3 版本占位行缺失或格式漂移"
 fi
 
-# H4（U-02 收口）：latest/ 必须为保留通道备「显式声明式 manifest」——通道选择
-# fail-closed 的权威依据。断言 state/latest/channel 三字段与签名同在；旧行为
-# （manifest 缺失 → 客户端 404 猜测）即回归。
 BETA_DECL="$ROOT/latest/manifest.beta.json"
 _h4=1
 [ -s "$BETA_DECL" ] || _h4=0
@@ -535,8 +438,6 @@ else
     bad "H4 latest/manifest.beta.json 缺失/字段漂移/未签名（通道选择将退回 404 猜测）"
 fi
 
-# H5（U-02 收口）：三消费端均以 state=reserved 显式 fail-closed（不再以空
-# latest 含糊归因，也不把选错通道误作「本平台无包」下沉源码构建）。
 _h5=1
 grep -Fq 'state=reserved' "$INSTALL"     || _h5=0
 grep -Fq 'state=reserved' "$INSTALL_PS1" || _h5=0
@@ -549,9 +450,6 @@ else
     bad "H5 消费端缺 state=reserved 门禁（保留通道将被静默源码构建）"
 fi
 
-# ============================================================
-# 组 I · 9.10/I-03 架构白名单 + 全仓零 riscv 表述
-# ============================================================
 section "I" "9.10/I-03 架构白名单精确串 + 全仓零 riscv 表述 + 源码构建指引"
 
 if grep -Fq 'SUPPORTED_ARCHS="x86_64 aarch64 i686 armv7l"' "$INSTALL"; then
@@ -597,9 +495,6 @@ case "$(sdk_ready; echo $?)" in
     *) bad "I4 AIRY_GATE_SDK_AIRYMAXRT 显式指定但文件缺失: $SDK_AIRYMAXRT" ;;
 esac
 
-# ============================================================
-# 组 J · 9.1/U-01 更新器落后指针静默修复
-# ============================================================
 section "J" "9.1/U-01 更新器 detect_pending_release（更新问题：manifest 指针落后于发布）"
 
 case "$(sdk_ready; echo $?)" in
@@ -616,9 +511,6 @@ case "$(sdk_ready; echo $?)" in
     *) bad "J1 AIRY_GATE_SDK_AIRYMAXRT 显式指定但文件缺失: $SDK_AIRYMAXRT" ;;
 esac
 
-# ============================================================
-# 组 K · 发布侧白名单契约（可选，本地可达才断言）
-# ============================================================
 section "K" "（可选）发布侧 publish-release.sh 白名单契约"
 
 PUBLISH="$ROOT/../../tools/scripts/ci/release/publish-release.sh"
@@ -632,8 +524,6 @@ else
     skip "K1 hub tools 仓未检出，发布侧契约跳过（CI 不取料，属预期）"
 fi
 
-# K2（U-02 收口）：发布链须为 latest/ 缺失通道合成声明式 manifest，否则
-# 通道全集不全，客户端 `--channel <ch>` 只能得 404 并退回「网络异常」猜测。
 if [ -f "$PUBLISH" ]; then
     if grep -Fq 'emit_channel_declarations() {' "$PUBLISH" \
        && grep -Fq 'emit_channel_declarations "$LATEST_DIR" "$CHANNEL"' "$PUBLISH" \
@@ -652,9 +542,6 @@ else
     skip "K2/K3 hub tools 仓未检出，发布侧契约跳过（CI 不取料，属预期）"
 fi
 
-# ============================================================
-# 组 L · §4.10 R-5 provider 默认超时 < 网关 LLM 转发背压
-# ============================================================
 section "L" "R-5 provider 默认超时 < 网关 LLM 转发背压（连不上网络：精确诊断先于网关返回）"
 
 PROVIDER_C="$ROOT/daemons/llm_d/src/providers/provider.c"
@@ -695,23 +582,12 @@ else
     bad "L3 缺 LLM_MAX_RETRIES / LLM_RETRY_FAST_FAIL_MS 或其使用点（重试预算护栏缺失）"
 fi
 
-# ============================================================
-# 组 M · §4.10 R-6 工具授权面 ⊇ MCP 暴露面（双 Schema 解析防回归）
-# ============================================================
-# 现象："各种工具不可用"——MCP 客户端 tools/list 能列出工具，tools/call 一律
-# 返回 -32603。根因：同一份 permission_rules.yaml 被两个解析器按不同 Schema
-# 读取——daemon_security（daemons/common）读 {agent,tool,effect}，PDP
-# （cupolas permission_rule.c）原生读 {agent,action,resource,allow}。后者
-# "resource" 回退 "*"、"allow" 回退 false ⇒ 134 条规则全部 fail-closed deny。
-# 本组断言：① PDP 解析器保留 ACL Schema 别名（防双 Schema 冲突回归）；
-# ② 网关工具执行路径经 PEP；③ 模板 external 授权集覆盖 /mcp 暴露的全部工具。
 section "M" "R-6 工具授权面 ⊇ MCP 暴露面（双 Schema 解析防回归）"
 
 PDP_RULE_C="$ROOT/cupolas/src/permission/permission_rule.c"
 MCP_BUILTIN="$ROOT/daemons/tool_d/src/service_builtin.c"
 GW_BACKEND="$ROOT/gateway/src/biz/gateway_biz_backend.c"
 
-# M1 · PDP 解析器兼容 ACL Schema（resource←tool / allow←effect）
 if grep -Fq 'cupolas_permission_rule_resource' "$PDP_RULE_C" \
    && grep -Fq 'cupolas_permission_rule_allow' "$PDP_RULE_C" \
    && grep -Fq 'yaml_get(entry, "tool")' "$PDP_RULE_C" \
@@ -721,14 +597,12 @@ else
     bad "M1 permission_rule.c 缺 tool→resource / effect→allow 别名（双 Schema 冲突回归，/mcp 工具将被 fail-closed 全拒）"
 fi
 
-# M2 · 网关工具执行路径接入 PEP（gw_acl_check_tool）
 if grep -Fq 'gw_acl_check_tool' "$GW_BACKEND"; then
     ok "M2 网关工具执行路径经 PEP 判定（gw_acl_check_tool）"
 else
     bad "M2 gateway 工具执行路径未接入 PEP（gw_acl_check_tool 缺失，权限判定旁路）"
 fi
 
-# M3 · /mcp 暴露工具集（tool_d service_builtin.c 的 .id 为 SSoT）
 if [ ! -f "$MCP_BUILTIN" ]; then
     bad "M3 缺失 MCP 工具 SSoT: $MCP_BUILTIN"
 else
@@ -736,7 +610,6 @@ else
     sed -n 's/^[[:space:]]*\.id = "\([^"]*\)".*/\1/p' "$MCP_BUILTIN" > "$_mcp_tools"
     _mcp_n="$(wc -l < "$_mcp_tools" | tr -d ' ')"
 
-    # 模板探测顺序：显式指定 → CI 取料（_tools）→ hub 本地布局（tools 并列）
     PERM_TMPL=""
     _tools_root="${AIRY_GATE_TOOLS_ROOT:-}"
     for _cand in "${_tools_root:+$_tools_root/scripts/ops/templates/permission_rules.yaml}" \
@@ -769,7 +642,6 @@ else
             ok "M3 external 授权集 ⊇ /mcp tools/list 暴露集（$_mcp_n 个工具全覆盖）"
         fi
 
-        # M4 · external 保有网关高敏能力授权（T-11b agent.run 收口）
         _capmiss=0
         for _cap in cap:agent.run cap:agent.control; do
             grep -qxF "$_cap" "$_ext_tools" \
@@ -780,14 +652,6 @@ else
     fi
 fi
 
-# ============================================================
-# 组 N · 0.1.16 B3 南向 A-IPC 客户端面归一（AF_UNIX 白名单）
-# ============================================================
-# 现象：gateway 四处手搓 UDS 客户端（sse_tool/sse_stream/sse_run_stream/
-# pep_cache）绕过统一客户端面，第二套传输实现与 A-IPC 漂移，L2 灰度
-# 永远覆盖不了这些路径（0.1.16 A-IPC 架构收口设计 §4.3 门禁 N2）。
-# 本组断言：AF_UNIX socket 创建在 gateway/src 内仅允许出现在统一
-# 南向客户端面 gateway_aipc_client.c；手搓点删除后不得无声再生。
 section "N" "B3 南向 A-IPC 客户端面归一（gateway/src AF_UNIX 白名单）"
 
 _aipc_face="$ROOT/gateway/src/biz/gateway_aipc_client.c"
@@ -810,21 +674,10 @@ else
         || bad "N3 gw_svc_call 未转调 gw_aipc_call（第二套传输实现回归）"
 fi
 
-# ============================================================
-# 组 P · 0.1.16 B4 构建收口（corekern include 面 + 客户端零内核机制）
-# ============================================================
-# 依据：0.1.16 A-IPC 架构收口设计 §5.3（2026-09-14 裁决③）。
-# 第 2 句铁律「内核机制只被 daemon 服务面访问」的构建面判据：
-#   P1 白名单断言：airy_cli 允许集不含 airy_atoms 微核心聚合；
-#   P2 全局面断言：根 CMakeLists 全局 include 不含 atoms/corekern/include；
-#   P3 CLI include 面断言：tools/airy_cli 构建与源树均无 corekern 引用；
-#   P4 CLI 产物断言：nm 扫描零内核机制符号（airy_init/airy_shutdown/
-#      airy_oom_*/airy_persist_*），有即 fail-closed。
 section "P" "B4 构建收口（corekern include 面 + CLI 零内核机制）"
 
 _whitelist="$ROOT/link-whitelist.txt"
 
-# P1 · 白名单机器断言：客户端目标禁链 airy_atoms
 _p1_line="$(grep -E '^airy_cli:' "$_whitelist" || true)"
 if [ -z "$_p1_line" ]; then
     bad "P1 link-whitelist.txt 缺 airy_cli 登记（白名单被削）"
@@ -834,7 +687,6 @@ else
     ok "P1 airy_cli 允许集不含 airy_atoms（进程内微核心收回固化）"
 fi
 
-# P2 · 全局面断言：corekern include 不得进入根 CMakeLists 全局注入
 _p2_hits="$(grep -n 'atoms/corekern/include' "$ROOT/CMakeLists.txt" \
     | grep -v 'AIRY_COREKERN_INCLUDE_DIR\|corekern 头不再全局注入' || true)"
 if [ -z "$_p2_hits" ]; then
@@ -843,8 +695,6 @@ else
     bad "P2 根 CMakeLists 全局面重现 corekern include 注入: $_p2_hits"
 fi
 
-# P3 · CLI include 面断言：源树零 corekern 头引用 + 构建文件零 corekern 路径
-# 注：仅断言「真实引用」（#include 指令 / 非注释构建路径），B2 说明性注释不算违规。
 _p3_hdr="$(grep -rnE '^[[:space:]]*#[[:space:]]*include[[:space:]]*[<"]' \
     "$ROOT/tools/airy_cli/src" "$ROOT/tools/airy_cli/include" \
     --include='*.c' --include='*.h' 2>/dev/null \
@@ -858,14 +708,6 @@ else
     [ -n "$_p3_cmake" ] && bad "P3 CLI 构建文件出现 corekern 路径: $_p3_cmake"
 fi
 
-# P4 · CLI 产物断言：零内核机制符号（airy_time_* 等无状态时钟符号豁免，
-# 见 link-whitelist.txt 0.1.16 B4 头注）
-#
-# 产物定位：由 ctest 注入 AIRY_GATE_BUILD_DIR=<CMAKE_BINARY_DIR>（tests/
-# CMakeLists.txt 的 release_gates ENVIRONMENT），于其中探测 airy_cli 两种
-# 常见落点。语义对齐脚本既有 fail-closed 约定：
-#   · AIRY_GATE_BUILD_DIR 显式指定但产物缺失 → FAIL（构建契约被破坏）；
-#   · 未指定（本地手工直接跑脚本常态）→ SKIP，CI 侧由 ctest 注入兜底。
 _cli_bin=""
 if [ -n "${AIRY_GATE_BUILD_DIR:-}" ]; then
     for _cand in \
@@ -890,18 +732,8 @@ else
     fi
 fi
 
-# ============================================================
-# 组 Q · 0.1.16 B6 gateway 零编排（退役 SSE 编排死代码物理移除）
-# ============================================================
-# 依据：0.1.16 A-IPC 架构收口设计 §7（2026-09-14 改判，采甲）。
-# 现象：gateway 的 /api/v1/chat/stream 自 0.1.13（B11 清零）起恒返
-# 410 Gone，其后工具循环状态机（含 EXEC_TOOLS 相位）为不可达死代码，
-# 与铁律第 3 句「gateway 翻译、daemon 干活」相悖。B6 将其物理移除。
-# 本组断言：死模块零残留、编排常量零残留、退役路由未登记，且 live
-# 端点（run_stream/hall_watch）与共享助手仍在——防无声再生。
 section "Q" "B6 gateway 零编排（退役 SSE 编排死代码物理移除）"
 
-# Q1 · 死模块与单测零残留
 _q1_dead=""
 for _f in \
     "$ROOT/gateway/src/gateway/gateway_sse_tool.c" \
@@ -918,7 +750,6 @@ else
     bad "Q1 退役 SSE 编排死模块再生:$_q1_dead"
 fi
 
-# Q2 · 编排常量与相位零残留（说明性注释豁免，同 P3 口径）
 _q2_hits="$(grep -rnE 'GW_SSE_MAX_TOOL_LOOPS|GW_SSE_TOOL_LIMIT_MSG|GW_SSE_TEXT_CHUNK|GW_SSE_SUMMARY_MAX|GW_SSE_TOOL_FEEDBACK_MAX|gw_sse_phase_t|EXEC_TOOLS' \
     "$ROOT/gateway/src" --include='*.c' --include='*.h' 2>/dev/null \
     | grep -vE ':[0-9]+:[[:space:]]*(\*|/\*|//)' || true)"
@@ -928,7 +759,6 @@ else
     bad "Q2 gateway/src 重现编排常量/相位: $(echo "$_q2_hits" | tr '\n' ' ')"
 fi
 
-# Q3 · 退役路由未登记（宏与字面量双重断言）
 _q3_hits="$(grep -rnE 'GW_SSE_CHAT_PATH|"/api/v1/chat/stream"' \
     "$ROOT/gateway/src" --include='*.c' --include='*.h' 2>/dev/null || true)"
 if [ -z "$_q3_hits" ]; then
@@ -937,7 +767,6 @@ else
     bad "Q3 退役路由 /api/v1/chat/stream 再生: $(echo "$_q3_hits" | tr '\n' ' ')"
 fi
 
-# Q4 · live 端点与共享助手仍在
 _q4_missing=""
 for _sym in gw_sse_send_json_error handle_run_stream_sse handle_hall_watch_sse; do
     grep -rq "$_sym" "$ROOT/gateway/src" --include='*.c' --include='*.h' 2>/dev/null \
@@ -949,16 +778,8 @@ else
     bad "Q4 live 端点或共享助手缺失:$_q4_missing"
 fi
 
-# ============================================================
-# 组 R · T4b 制品 platform-* 标记判定语义 + 下载体积渲染
-# ============================================================
 section "R" "T4b 制品 platform-* 标记判定语义（跨版本更新误拒根因）+ 下载体积渲染"
 
-# 回归根因：旧口径 tar -tzf | grep -oE 'platform-...' | head -1 会把归档内
-# 任意含该子串的路径（子目录 agentrt-<ver>/platform-*、库名 libplatform-*.so）
-# 当作标记，且「首个匹配」随 tar 遍历序漂移 → 同一制品在不同遍历序下判定
-# 相反（社区 v0.1.14→v0.1.16 更新被误拒）。本组用真实提取实现（零硬拷贝）
-# 断言新口径：仅认「完整文件名」形态的 platform-*，任一命中放行集即通过。
 extract_fn "$INSTALL" plat_markers    "$TMP/r_plat"
 extract_fn "$INSTALL" arch_markers_ok "$TMP/r_amok"
 extract_fn "$INSTALL" human_size      "$TMP/r_hsize"
@@ -997,22 +818,17 @@ r_chk() { # <case> <expect_rc> <arch> <expect_out>
             "$1" "$3" "$_rc" "$2" "$_out" "$4"
     fi
 }
-# 放行：根级标记 / 子目录标记（安装布局） / 任一命中（多标记并存） / 存量 gen2 键
 r_chk root_x86    0 x86_64 ""
 r_chk subdir_x86  0 x86_64 ""
 r_chk mixed       0 x86_64 ""
 r_chk gen2_x64    0 x86_64 ""
 r_chk wrong_arm   0 aarch64 ""
-# 库名子串不再被误认为标记（旧口径在此误拒 x86_64 主机）
 r_chk libname_arm 0 x86_64 ""
-# 无标记放行（历史安装包/本地源码打包形态）
 r_chk none        0 x86_64 ""
-# 拒绝：异架构明确拒绝，且 stdout 供诊断用不匹配标记集
 r_chk wrong_arm   1 x86_64 "platform-arm-64"
 r_chk riscv       1 x86_64 "platform-riscv-64"
 r_chk root_x86    1 aarch64 "platform-x86-64"
 r_chk mixed       1 riscv64 "platform-arm-64 platform-x86-64"
-# 放行表未知架构：保守拒绝（fail-closed）
 r_chk root_x86    1 mips "platform-x86-64"
 
 r_hs_fail=0
@@ -1038,9 +854,6 @@ else
     bad "R T4b 标记判定失配 $r_fail/$r_n 例、体积渲染失配 $r_hs_fail/8 例（见上方明细）"
 fi
 
-# ============================================================
-# 汇总
-# ============================================================
 printf '\n门禁汇总: PASS=%d FAIL=%d\n' "$PASS" "$FAIL"
 if [ "$FAIL" -gt 0 ]; then
     printf '  [GATE] WS-9 社区六类问题修复发布门禁未通过（方案 §4.9 / 9.8）\n'
