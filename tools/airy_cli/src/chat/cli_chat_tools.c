@@ -63,9 +63,10 @@ int web_fetch_tool(const char *params_json, tool_result_t *res);
 
 /* OpenAI function-calling schema（聊天工具回路）。工具行为 SSoT 在 tool_d
  * （builtin.c 真实实现）；本 schema 与 commons 契约层
- * （commons/include/airy_tool_schema.h）保持同构（2026-08-16 对齐）。
- * 本地文件读写 + 联网检索构成超级智能体的日常能力：
- * fs_read/fs_write/fs_list/fs_glob/fs_grep/fs_edit/fs_delete + web_search/web_fetch。
+ * （commons/include/airy_tool_schema.h）保持同构。
+ * 本地文件读写 + 联网检索 + 数学外挂构成超级智能体的日常能力：
+ * fs_read/fs_write/fs_list/fs_glob/fs_grep/fs_edit/fs_delete +
+ * web_search/web_fetch + maths_eval/maths_stats/maths_plot。
  * shell_run / git_* 不入聊天回路（高危，留给任务管线审批链）。 */
 const char *cli_chat_tools_json =
     "["
@@ -126,7 +127,34 @@ const char *cli_chat_tools_json =
     "\"description\":\"Fetch and read the text content of a web page by URL.\","
     "\"parameters\":{\"type\":\"object\",\"properties\":{"
     "\"url\":{\"type\":\"string\",\"description\":\"Full http(s) URL\"}},"
-    "\"required\":[\"url\"]}}}"
+    "\"required\":[\"url\"]}}},"
+    "{\"type\":\"function\",\"function\":{"
+    "\"name\":\"maths_eval\","
+    "\"description\":\"Evaluate a math expression precisely (arithmetic, "
+    "powers, factorial, sqrt/sin/cos/tan/ln/log10/log2/exp/abs/min/max/floor/ceil "
+    "etc.)\","
+    "\"parameters\":{\"type\":\"object\",\"properties\":{"
+    "\"expression\":{\"type\":\"string\"}},\"required\":[\"expression\"]}}},"
+    "{\"type\":\"function\",\"function\":{"
+    "\"name\":\"maths_stats\","
+    "\"description\":\"Compute descriptive statistics of a numeric array "
+    "(sum/mean/median/min/max/variance/stddev)\","
+    "\"parameters\":{\"type\":\"object\",\"properties\":{"
+    "\"op\":{\"type\":\"string\"},"
+    "\"values\":{\"type\":\"array\",\"items\":{\"type\":\"number\"}}},"
+    "\"required\":[\"op\",\"values\"]}}},"
+    "{\"type\":\"function\",\"function\":{"
+    "\"name\":\"maths_plot\","
+    "\"description\":\"Sample y=f(x) over [xmin,xmax] and return a plot block "
+    "that the TUI renders as a braille canvas. Use for any function graph the "
+    "user asks to draw.\","
+    "\"parameters\":{\"type\":\"object\",\"properties\":{"
+    "\"expression\":{\"type\":\"string\",\"description\":\"Expression in "
+    "variable x, e.g. sin(x)+x/2\"},"
+    "\"xmin\":{\"type\":\"number\"},\"xmax\":{\"type\":\"number\"},"
+    "\"samples\":{\"type\":\"integer\",\"description\":\"Sample count, "
+    "default 128, max 256\"}},"
+    "\"required\":[\"expression\",\"xmin\",\"xmax\"]}}}"
     "]";
 
 /* 动态消息缓冲：工具轮需要逐步追加 assistant tool_calls 与 role="tool"
