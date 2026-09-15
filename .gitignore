@@ -60,3 +60,23 @@
 !cmake/**
 !scripts/
 !scripts/**
+!VERSION
+!latest/
+!latest/**
+# ---------------------------------------------------------------------------
+# 叶子仓根放行：gitlink 已入库，此处仅解除忽略以免仓库级检索跳过整棵子树
+# ---------------------------------------------------------------------------
+!atoms/
+!atoms/**
+!commons/
+!commons/**
+!cupolas/
+!cupolas/**
+!daemons/
+!daemons/**
+!gateway/
+!gateway/**
+!heapstore/
+!heapstore/**
+!protocols/
+!protocols/**
