@@ -208,7 +208,6 @@ agentrt/
 ├── tests/                # smoke tests and toolchain self-tests
 ├── tools/                # developer tooling (airy_cli, airy_depgraph, codegen)
 ├── latest/               # rolling release manifests and signing keys
-├── RELEASE_NOTES.d/      # user-facing notes, one file per release
 ├── LICENSES/             # additional license texts
 ├── CMakeLists.txt        # top-level build entry point
 ├── VERSION               # version this tree was released at
@@ -309,9 +308,8 @@ airymaxrt update --rollback   # return to the previously installed version
 ```
 
 Each version ships with a GPG-signed manifest in [`latest/`](latest), which is
-what the updater reads. Release notes live in
-[`RELEASE_NOTES.d/`](RELEASE_NOTES.d), one file per version, and
-[CHANGELOG.md](CHANGELOG.md) records the longer history.
+what the updater reads. [CHANGELOG.md](CHANGELOG.md) records the release
+history.
 
 The current release is **v0.1.16**. Highlights:
 

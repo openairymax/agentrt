@@ -17,9 +17,7 @@
 !.github/**
 !ACKNOWLEDGMENTS.md
 !CHANGELOG.md
-# 版本发布"本版亮点"（release workflow 消费 RELEASE_NOTES.d/<VERSION>.md，随仓入库）
-!RELEASE_NOTES.d/
-!RELEASE_NOTES.d/**
+# RELEASE_NOTES.d/：维护者本地发布素材目录，不入库、不随仓分发
 !CMakeLists.txt
 !CONTRIBUTING.md
 !Doxyfile
