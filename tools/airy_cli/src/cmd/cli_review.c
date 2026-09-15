@@ -17,8 +17,9 @@
  *    worker only performs agent.spawn/invoke RPCs.
  *  - The reviewer prompt asks for a strict JSON verdict, so the report stays
  *    small and machine-mergeable.
- *  - Every failure path degrades silently (return 0); the pipeline must not
- *    depend on the review stage.
+ *  - The pipeline must not depend on the review stage (return 0 = degraded),
+ *    but no failure is silent: workers record per-topic error status and the
+ *    main thread renders every failure explicitly after joining.
  */
 
 // @owner: team-B
@@ -93,12 +94,43 @@ static int cli_review_parallelism(void)
     return 1;
 }
 
+/* Per-worker failure taxonomy: the worker only records status (rendering is
+ * not thread-safe); the main thread turns each status into a visible,
+ * explainable failure line after joining. */
+typedef enum {
+    CLI_REVIEW_OK = 0,
+    CLI_REVIEW_ERR_SPAWN,
+    CLI_REVIEW_ERR_NO_AGENT,
+    CLI_REVIEW_ERR_MEM,
+    CLI_REVIEW_ERR_INVOKE,
+    CLI_REVIEW_ERR_EMPTY,
+} cli_review_err_t;
+
 typedef struct {
     const char *sock;
     const char *topic;
     const char *prompt; /* OWNER (built by caller) */
     char *output;       /* OWNER (filled by worker) */
+    cli_review_err_t status;
 } cli_review_job_t;
+
+static const char *cli_review_err_str(cli_review_err_t st)
+{
+    switch (st) {
+    case CLI_REVIEW_ERR_SPAWN:
+        return "spawn failed";
+    case CLI_REVIEW_ERR_NO_AGENT:
+        return "spawn returned no agent_id";
+    case CLI_REVIEW_ERR_MEM:
+        return "out of memory";
+    case CLI_REVIEW_ERR_INVOKE:
+        return "invoke failed";
+    case CLI_REVIEW_ERR_EMPTY:
+        return "empty verdict";
+    default:
+        return "failed";
+    }
+}
 
 /* Resolve agent_d socket: AIRY_AGENT_SOCK -> $AIRY_HOME/run/agent.sock
  * (same origin as the daemon commands). */
@@ -213,16 +245,20 @@ static void *cli_review_worker(void *arg)
     int rc = cli_gw_call("agent.spawn", spec, CLI_REVIEW_SPAWN_TIMEOUT_MS, &resp);
     if (rc != 0 || !resp) {
         AIRY_FREE(resp);
+        job->status = CLI_REVIEW_ERR_SPAWN;
         return NULL;
     }
     char *agent_id = cli_review_rpc_field(resp, "agent_id");
     AIRY_FREE(resp);
-    if (!agent_id)
+    if (!agent_id) {
+        job->status = CLI_REVIEW_ERR_NO_AGENT;
         return NULL;
+    }
 
     cJSON *params = cJSON_CreateObject();
     if (!params) {
         AIRY_FREE(agent_id);
+        job->status = CLI_REVIEW_ERR_MEM;
         return NULL;
     }
     cJSON_AddStringToObject(params, "agent_id", agent_id);
@@ -231,16 +267,22 @@ static void *cli_review_worker(void *arg)
     char *params_str = cJSON_PrintUnformatted(params);
     cJSON_Delete(params);
     AIRY_FREE(agent_id);
-    if (!params_str)
+    if (!params_str) {
+        job->status = CLI_REVIEW_ERR_MEM;
         return NULL;
+    }
 
     resp = NULL;
     rc = cli_gw_call("agent.invoke", params_str, CLI_REVIEW_INVOKE_TIMEOUT_MS, &resp);
     AIRY_FREE(params_str);
     if (rc == 0 && resp)
         job->output = cli_review_rpc_field(resp, "output");
-    if (job->output && job->output[0])
+    if (job->output && job->output[0]) {
+        job->status = CLI_REVIEW_OK;
         cli_trace("review", "sub-agent[%s] verdict: %.*s", job->topic, (int)cli_utf8_safe_len(job->output, 180), job->output);
+    } else {
+        job->status = (rc == 0) ? CLI_REVIEW_ERR_EMPTY : CLI_REVIEW_ERR_INVOKE;
+    }
     AIRY_FREE(resp);
     return NULL;
 }
@@ -261,12 +303,15 @@ int cli_cognition_review(const char *agent_sock, const char *task, const airy_ta
     if (!sock[0])
         return 0;
 
-    /* agent_d must be reachable; a failed probe degrades silently.
+    /* agent_d must be reachable; the pipeline degrades (return 0) but the
+     * user must still see why the review was skipped.
      * 架构约束（2026-08-25）：统一经 gateway 派发（agent.health_check）。 */
     char *hc = NULL;
     int hc_rc = cli_gw_call("agent.health_check", NULL, CLI_REVIEW_HEALTH_TIMEOUT_MS, &hc);
     if (hc_rc != 0) {
         AIRY_FREE(hc);
+        cli_render_sub_agent_line(CLI_ROLE_ERROR, "review",
+                                  "cognition review unavailable: agent_d health check failed");
         return 0;
     }
     AIRY_FREE(hc);
@@ -297,6 +342,8 @@ int cli_cognition_review(const char *agent_sock, const char *task, const airy_ta
         jobs[i].prompt = cli_review_build_prompt(cli_review_topics[i].name, task, plan_json);
         if (jobs[i].prompt)
             airy_thread_create(&threads[i], cli_review_worker, &jobs[i]);
+        else
+            jobs[i].status = CLI_REVIEW_ERR_MEM;
     }
 
     for (int i = 0; i < n; i++) {
@@ -308,10 +355,17 @@ int cli_cognition_review(const char *agent_sock, const char *task, const airy_ta
 
     int produced = 0;
     for (int i = 0; i < n; i++) {
-        if (jobs[i].output)
+        if (jobs[i].output) {
             produced++;
+        } else {
+            /* Rendering happens here (main thread) — never inside workers. */
+            cli_render_sub_agent_line(CLI_ROLE_ERROR, cli_review_topics[i].name,
+                                      cli_review_err_str(jobs[i].status));
+        }
     }
     if (produced == 0) {
+        cli_render_sub_agent_line(CLI_ROLE_ERROR, "review",
+                                  "cognition review produced no verdicts");
         AIRY_FREE(jobs);
         AIRY_FREE(threads);
         return 0;
