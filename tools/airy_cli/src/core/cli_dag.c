@@ -409,14 +409,25 @@ airy_err_t cli_dag_cancel_remote(const char *dag_id)
 }
 
 /* Wait dag_status until the final state. Ctrl+C propagates: really calls
- * sched.dag_cancel to abort the remote DAG. */
-#define CLI_DAG_WAIT_MAX_POLLS 36000
+ * sched.dag_cancel to abort the remote DAG. Poll interval backs off
+ * 200ms → 1.6s while the DAG makes no progress (reset on any change), so a
+ * long-running task no longer floods the daemon with short-lived
+ * connections at ~5Hz; the ~2h budget is preserved (4500 polls ≈ 2h at
+ * the capped interval). */
+#define CLI_DAG_WAIT_MAX_POLLS 4500
+#define CLI_DAG_WAIT_BASE_MS 200
+#define CLI_DAG_WAIT_MAX_MS 1600
+#define CLI_DAG_WAIT_SLICE_MS 100
 
 airy_err_t cli_dag_wait_remote(const char *dag_id, char **out_result)
 {
     if (!dag_id || !out_result)
         return AIRY_ERR_INVALID_PARAM;
     *out_result = NULL;
+
+    int interval_ms = CLI_DAG_WAIT_BASE_MS;
+    char last_state[16] = "";
+    double last_prog = -1.0;
 
     for (int poll = 0; poll < CLI_DAG_WAIT_MAX_POLLS; poll++) {
         if (g_cli_cancel) {
@@ -437,7 +448,22 @@ airy_err_t cli_dag_wait_remote(const char *dag_id, char **out_result)
         }
         if (prc == CLI_DAG_POLL_ERROR)
             return AIRY_ERR_GENERIC_FAIL;
-        airy_sleep_ms(200);
+
+        if (strcmp(st, last_state) != 0 || (prog - last_prog) >= 0.01) {
+            interval_ms = CLI_DAG_WAIT_BASE_MS;
+            snprintf(last_state, sizeof(last_state), "%s", st);
+            last_prog = prog;
+        } else if (interval_ms < CLI_DAG_WAIT_MAX_MS) {
+            interval_ms *= 2;
+        }
+
+        int remain = interval_ms;
+        while (remain > 0 && !g_cli_cancel) {
+            int slice =
+                (remain > CLI_DAG_WAIT_SLICE_MS) ? CLI_DAG_WAIT_SLICE_MS : remain;
+            airy_sleep_ms((unsigned)slice);
+            remain -= slice;
+        }
     }
     return AIRY_ERR_TIMEOUT;
 }
