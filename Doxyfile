@@ -1,9 +1,8 @@
 # Doxyfile 1.9.8 — AgentRT API Documentation
-# R-09-23: Doxygen API文档配置
 
 DOXYFILE_ENCODING      = UTF-8
 PROJECT_NAME           = "AgentRT"
-PROJECT_NUMBER         = "0.1.13"
+PROJECT_NUMBER         = "0.1.16"
 PROJECT_BRIEF          = "AI Agent Runtime Platform Engineering — Multi-Agent Framework with MemoryRovol"
 PROJECT_LOGO           =
 OUTPUT_DIRECTORY       = docs/api/doxygen_html

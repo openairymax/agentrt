@@ -28,7 +28,7 @@ endif()
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     message(FATAL_ERROR
-        "AgentRT in-source builds are not allowed! (BAN-33)\n"
+        "AgentRT in-source builds are not allowed!\n"
         "Please use out-of-source build with cmake -B:\n"
         "  cmake -B ../AgentRT-build -DCMAKE_BUILD_TYPE=Release\n"
         "  cmake --build ../AgentRT-build\n"
@@ -37,14 +37,14 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
     )
 endif()
 
-# BAN-33强化：禁止在源码树内任何子目录构建
+# 禁止在源码树内任何子目录构建
 # 使用 cmake_path 进行路径前缀检测（避免 "AgentRT-build" 误匹配 "AgentRT"）
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.20")
     cmake_path(IS_PREFIX CMAKE_SOURCE_DIR "${CMAKE_BINARY_DIR}" _BAN33_IS_SUBDIR)
     cmake_path(IS_PREFIX CMAKE_BINARY_DIR "${CMAKE_SOURCE_DIR}" _BAN33_IS_SAME_OR_PARENT)
     if((NOT _BAN33_IS_SAME_OR_PARENT) AND (_BAN33_IS_SUBDIR OR CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR))
         message(FATAL_ERROR
-            "AgentRT build directory MUST be outside the source tree! (BAN-33)\n"
+            "AgentRT build directory MUST be outside the source tree!\n"
             "Your build directory '${CMAKE_BINARY_DIR}' is inside the source tree.\n"
             "Please use an out-of-source build directory:\n"
             "  cmake -B ../AgentRT-build -DCMAKE_BUILD_TYPE=Release\n"
@@ -57,7 +57,7 @@ else()
     string(FIND "${CMAKE_BINARY_DIR}/" "${CMAKE_SOURCE_DIR}/" _BAN33_BUILD_INSIDE)
     if(_BAN33_BUILD_INSIDE EQUAL 0 AND NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
         message(FATAL_ERROR
-            "AgentRT build directory MUST be outside the source tree! (BAN-33)\n"
+            "AgentRT build directory MUST be outside the source tree!\n"
             "Your build directory '${CMAKE_BINARY_DIR}' is inside the source tree.\n"
             "Please use an out-of-source build directory:\n"
             "  cmake -B ../AgentRT-build -DCMAKE_BUILD_TYPE=Release\n"
@@ -73,7 +73,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # 引入统一构建打印系统（彩色 + 时间戳 + 级别）
-# v4.1: cmake 模块归位至 agentrt 管理仓 cmake/（v0.1.2 决策：构建系统属
+# cmake 模块归位至 agentrt 管理仓 cmake/（构建系统属
 # IRON-9 [IND] 完全独立层，agentrt 与 agent-linux 各自独立，不再共享
 # 伞仓直属模块；独立 clone agentrt 仓即可完整构建）
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/airy_print.cmake)
@@ -100,7 +100,7 @@ option(AIRY_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider"
 option(AIRY_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe functions)" ON)
 set(AIRY_MEMORY_BACKEND "builtin" CACHE STRING "Memory backend (builtin|memoryrovol)")
 
-# 版本宏 SSoT 注入（0.1.8 审计修复）：commons/include/airyrt_version.h 的
+# 版本宏 SSoT 注入：commons/include/airyrt_version.h 的
 # AIRYRT_VERSION 此前是无保护手工副本，每次发版须人肉同步 VERSION，是
 # "构建后才发现版本硬编码漂移"的系统性根因。现统一从 VERSION 文件（RAW
 # 含字母后缀，如 0.1.6a）经 add_compile_definitions 注入，覆盖本目录及全部
@@ -122,7 +122,7 @@ endif()
 # R-09-SEC: Strict compliance mode and tests are now independent.
 # Tests MUST run under strict compliance to catch BAN violations at compile time.
 # Previously, strict mode forced BUILD_TESTS=OFF, which prevented test execution
-# in the default configuration. This was a design error (BAN-181 compliance fix).
+# in the default configuration. This was a design error (compliance fix).
 if(BUILD_TESTS)
     if(AIRY_COMPLIANCE_STRICT)
         airy_print_ok("Tests enabled with strict compliance (AIRY_COMPLIANCE_STRICT=ON)")
@@ -308,8 +308,8 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
         # 这样链接器扫描静态库时可用传统符号表解析，避免 LTO 符号摘要导致的
         # undefined reference 错误（LTO + ASan 组合下尤其常见）。
         # 代价：对象文件体积约增加 2x，但保留了 LTO 跨模块优化能力。
-        # 注意：Apple clang（macOS）不支持 -ffat-lto-objects（v0.1.9
-        # Release run 实证 "unsupported option"），故探测后启用；探测失败
+        # 注意：Apple clang（macOS）不支持 -ffat-lto-objects
+        # （"unsupported option"），故探测后启用；探测失败
         # 回退纯 -O3 无 LTO，不影响正确性。
         include(CheckCCompilerFlag)
         check_c_compiler_flag("-flto -ffat-lto-objects" AIRY_HAVE_FAT_LTO_OBJECTS)
@@ -322,7 +322,7 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
         add_compile_definitions(NDEBUG)
         # 发行制品体积控制：链接期 strip 符号表与残留 debug 段。
         # Sanitizer 构建保留符号（ASan 符号化依赖），仅纯 Release 剥离。
-        # 符号审计类验证目标（如 WS-8 ARC-03 的 agentrt_atoms_standalone）
+        # 符号审计类验证目标（如 WS-8 的 agentrt_atoms_standalone）
         # 需保留 .symtab，置目标属性 AIRY_KEEP_SYMBOLS 即豁免。
         if(NOT ENABLE_SANITIZERS)
             add_link_options("$<$<NOT:$<BOOL:$<TARGET_PROPERTY:AIRY_KEEP_SYMBOLS>>>:-s>")
@@ -355,7 +355,7 @@ if(CMAKE_THREAD_LIBS_INIT)
 endif()
 
 # ============================================================
-# 集中化第三方依赖检测（BAN-12: 单一依赖检测点）
+# 集中化第三方依赖检测（单一依赖检测点）
 # 所有子模块通过 target_link_libraries 获取依赖，
 # 禁止在子模块中重复 find_package / pkg_check_modules
 # ============================================================
@@ -684,7 +684,7 @@ if(AIRY_HAS_LIBEVENT)
 endif()
 
 # ============================================================
-# 跨平台系统库统一管理（BAN-15: 禁止硬编码平台库）
+# 跨平台系统库统一管理（禁止硬编码平台库）
 # airy_platform_libs, dl, pthread, m, ws2_32 等通过此 INTERFACE 库统一提供
 # 平台映射：
 #   - m（libm）：POSIX 平台存在；MSVC 无独立 m.lib（数学函数在 CRT 内），
@@ -711,7 +711,7 @@ if(WIN32)
 endif()
 
 # ============================================================
-# 64 位原子操作架构兼容（0.1.6f 强化）
+# 64 位原子操作架构兼容
 # C11 _Atomic int64_t/uint64_t/double 在部分 32 位目标上无法编译为
 # 原生指令：riscv32（RV32A 无 64 位原子指令）、armv6 等会生成对
 # libatomic 的 libcall（__atomic_load_8/__atomic_store_8/__atomic_*_8）。
@@ -744,7 +744,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 # ============================================================
-# 测试链接选项统一管理（BAN-26: 禁止硬编码链接器标志）
+# 测试链接选项统一管理（禁止硬编码链接器标志）
 # --allow-multiple-definition 仅在 Linux/GNU ld 下有效
 # ============================================================
 add_library(airy_test_ldflags INTERFACE)
@@ -786,10 +786,9 @@ if(AIRY_BUILD_ALL)
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/sync
         # P0.17 阶段 1: airy_defaults.h 位于 commons/include
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/include
-        # 0.1.16 B4（include 面收口，2026-09-14 裁决③）：corekern include
-        # 不再进入全局面——可见面收缩为「atoms 内部（airy_core/coreloopthree
-        # PRIVATE）+ daemons 服务面（daemons/ 目录级注入）」。gateway/CLI/
-        # cupolas 等客户端面不再看见内核头。
+        # corekern include 不进入全局面——可见面收缩为「atoms 内部
+        # （airy_core/coreloopthree PRIVATE）+ daemons 服务面（daemons/
+        # 目录级注入）」。gateway/CLI/cupolas 等客户端面不再看见内核头。
         ${CMAKE_CURRENT_SOURCE_DIR}/protocols/include
         # daemons/common/include 作为兼容层放在最后（仅 daemons 自己需要，
         # atoms 应通过上述 commons 权威路径解析已迁移的头文件）
@@ -805,7 +804,7 @@ if(AIRY_BUILD_ALL)
     if(AIRY_ATOMS_PREBUILT_DIR)
         airy_print_ok("Atoms prebuilt include dirs: ${AIRY_ATOMS_PREBUILT_DIR}")
         include_directories(
-            # 0.1.16 B4：corekern 头不再全局注入（含预编译镜像），改由
+            # corekern 头不全局注入（含预编译镜像），改由
             # AIRY_COREKERN_INCLUDE_DIR 供 atoms 内部与 daemons 服务面按需获取。
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/include
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/src/cognition
@@ -895,16 +894,16 @@ if(AIRY_BUILD_ALL)
     option(BUILD_ATOMS "Build atoms module (core kernel components)" ON)
     option(BUILD_COMMONS "Build commons module (common utilities)" ON)
     option(BUILD_CUPOLAS "Build cupolas module (security framework)" ON)
-    # Windows 支持矩阵（2026-09-04 决策）：daemons 子系统（svc/ipc/
+    # Windows 支持矩阵：daemons 子系统（svc/ipc/
     # discovery/各 *_d 服务）现为 POSIX 绑定——DIR/strings.h/sys/socket/
-    # unistd 直引（MSVC 实证 C1083/C2065 大面积失败），Windows 侧默认
-    # 不构建；全量 Windows 移植随 0.1.12/13 GitHub 三平台打包里程碑落地。
+    # unistd 直引（MSVC 下 C1083/C2065 大面积失败），Windows 侧默认
+    # 不构建；全量 Windows 移植待后续三平台打包里程碑落地。
     # CLI（airy_cli）依赖 daemon 控制平面（svc_common/gateway RPC），
     # daemons 缺席时一并退出默认矩阵。
     if(WIN32)
         set(AIRY_DAEMON_DEFAULT OFF)
         set(AIRY_CLI_DEFAULT OFF)
-        airy_print_warn("Support matrix: daemons/CLI excluded on Windows (POSIX-bound, port milestone 0.1.12/13)")
+        airy_print_warn("Support matrix: daemons/CLI excluded on Windows (POSIX-bound)")
     else()
         set(AIRY_DAEMON_DEFAULT ON)
         set(AIRY_CLI_DEFAULT ON)
@@ -953,7 +952,7 @@ if(AIRY_BUILD_ALL)
     endif()
 
     # 包含子目录（构建顺序：commons 优先于 atoms）
-    # 0.1.16 B4（include 面收口）：corekern 头的权威路径变量——供 atoms
+    # corekern 头的权威路径变量——供 atoms
     # 内部目标（airy_core/coreloopthree，PRIVATE）与 daemons 服务面
     # （daemons/ 目录级注入）按需获取；客户端面（gateway/CLI/cupolas）
     # 不再获得该路径。
@@ -1010,7 +1009,7 @@ if(AIRY_BUILD_ALL)
         airy_print_warn("airy_cli module not found or disabled")
     endif()
 
-    # 依赖图门禁工具（0.1.6 P1-2）：commons 子域依赖声明 + Kahn 拓扑排序 +
+    # 依赖图门禁工具：commons 子域依赖声明 + Kahn 拓扑排序 +
     # 环检测（fail-closed）+ 依赖图报告；复用 taskflow graph_engine
     if(BUILD_COMMONS AND BUILD_ATOMS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/airy_depgraph/CMakeLists.txt")
         add_subdirectory(tools/airy_depgraph)
@@ -1041,8 +1040,8 @@ if(AIRY_BUILD_ALL)
         COMMENT "Build all AgentRT core components (atoms/commons/cupolas/gateway/heapstore/svc_common)"
     )
 
-    # 安装头文件（0.1.9 0d 扁平化后仅装公共头，排除 .c 与内部头）
-    # 0.1.16 B4（2026-09-14 裁决③）：corekern 内核头移出发布安装面——
+    # 安装头文件（仅装公共头，排除 .c 与内部头）
+    # corekern 内核头移出发布安装面——
     # 内核机制只被 daemon 服务面访问，客户端/下游不消费内核头；agent-linux
     # 的 uapi 头经其自身发行渠道交付。
     install(DIRECTORY atoms/coreloopthree/include/ DESTINATION include/agentrt/coreloopthree)
@@ -1061,9 +1060,9 @@ if(AIRY_BUILD_ALL)
         add_subdirectory(tests)
     endif()
 
-    # 集成测试：当从伞仓构建时，包含 tools（v0.1.4 由 devtools 改名）中的
+    # 集成测试：当从伞仓构建时，包含 tools（由 devtools 改名）中的
     # 连接线集成测试（12 条 C-L 测试 + 端到端测试）
-    # Task #38: 将 tools/tests/integration/c/ 的 12 个连接线测试纳入构建系统
+    # 将 tools/tests/integration/c/ 的 12 个连接线测试纳入构建系统
     if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/tests/integration/c/CMakeLists.txt")
         add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../tools/tests/integration/c integration_c_tests)
         airy_print_ok("Integration tests (tools/tests/integration/c) included — 12 C-L link tests + E2E")

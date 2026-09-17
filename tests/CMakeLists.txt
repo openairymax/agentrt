@@ -1,5 +1,5 @@
 # AgentRT 合规性测试
-# Task #39: BAN-030/BAN-155/BAN-154/BAN-073 编译期验证测试
+# 编译期验证测试
 # @owner: team-C
 #
 # 此测试在 AIRY_COMPLIANCE_STRICT 模式下编译，不定义 AIRY_COMPLIANCE_IMPL，
@@ -8,8 +8,8 @@
 #
 # 此测试为自包含测试，不链接外部库（避免 ASan 符号依赖）。
 
-# GCC/Clang 告警旗标：MSVC 不识别 -W* 语法（D8021，windows-build #101
-# 实证），与根 CMakeLists if(MSVC)/else() 惯例对齐
+# GCC/Clang 告警旗标：MSVC 不识别 -W* 语法（D8021），
+# 与根 CMakeLists if(MSVC)/else() 惯例对齐
 if(NOT MSVC)
     set(AIRY_COMPLIANCE_TEST_WARN -Wall -Wextra -Wpedantic -Wno-type-limits)
 endif()
@@ -30,7 +30,7 @@ target_compile_options(test_banned_functions PRIVATE
 
 add_test(NAME test_banned_functions COMMAND test_banned_functions)
 
-airy_print_ok("  [compliance] test_banned_functions: BAN-030/155/154/073 compile-time + runtime verification")
+airy_print_ok("  [compliance] test_banned_functions: compile-time + runtime verification")
 
 # Build smoke test: fast sanity check of the compliance build environment.
 add_executable(test_smoke test_smoke.c)
@@ -97,9 +97,9 @@ airy_print_ok("  [str-utils] test_string_utils: safe string utility semantics un
 if(UNIX)
     add_test(NAME release_gates
         COMMAND bash ${CMAKE_SOURCE_DIR}/scripts/verify_release_gates.sh)
-    # 0.1.16 B4：向门禁注入构建树根，供组 P · P4 定位 airy_cli 产物并做
+    # 向门禁注入构建树根，供组 P · P4 定位 airy_cli 产物并做
     # 内核机制符号断言（脚本内 AIRY_GATE_BUILD_DIR 显式 → 产物缺失即 fail-closed）。
     set_tests_properties(release_gates PROPERTIES
         ENVIRONMENT "AIRY_GATE_BUILD_DIR=${CMAKE_BINARY_DIR}")
-    airy_print_ok("  [release-gates] release_gates: WS-9 community-fix gates (9.1~9.11)")
+    airy_print_ok("  [release-gates] release_gates: community-fix gates (9.1~9.11)")
 endif()

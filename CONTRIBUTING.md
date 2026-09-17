@@ -57,7 +57,7 @@ cd ecosystem/agents && pip install -r orchestration/requirements.txt
 ### 2.3 构建项目
 
 ```bash
-# 在 AgentRT 源码目录外构建（BAN-33 合规）
+# 在 AgentRT 源码目录外构建
 cd /path/to/AgentRT
 cmake -B ../AgentRT-build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON
 cmake --build ../AgentRT-build --parallel $(nproc)

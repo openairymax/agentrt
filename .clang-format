@@ -10,7 +10,7 @@
 #   clang-format -i <file>          格式化单文件
 #   find . -name '*.c' -o -name '*.h' | xargs clang-format -i   全仓
 #
-# 约束: SortIncludes 必须为 false（OS-BAN-008 禁止自动排序 include，
+# 约束: SortIncludes 必须为 false（禁止自动排序 include，
 #       include 顺序承载语义分组）。
 ---
 BasedOnStyle: LLVM
@@ -72,7 +72,7 @@ PenaltyBreakBeforeFirstCallParameter: 100
 PenaltyExcessCharacter: 100
 PenaltyReturnTypeOnItsOwnLine: 200
 
-# ---- include 顺序：禁止自动排序（OS-BAN-008） ----
+# ---- include 顺序：禁止自动排序 ----
 SortIncludes: false
 
 # ---- 其他 ----
