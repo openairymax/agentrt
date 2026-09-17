@@ -26,6 +26,7 @@
 
 #define _POSIX_C_SOURCE 200809L
 
+#include "cli_gw.h"
 #include "cli_internal.h"
 
 #include <arpa/inet.h>
