@@ -10,9 +10,9 @@ else
     C_RED=''; C_GREEN=''; C_YELLOW=''; C_CYAN=''; C_NC=''
 fi
 log_info()  { printf '%s[INFO]%s %s\n' "$C_CYAN" "$C_NC" "$1"; }
-log_ok()    { printf '%s[ OK ]%s %s\n' "$C_GREEN" "$C_NC" "$1"; }
+log_ok()    { printf '%s[YES]%s %s\n' "$C_GREEN" "$C_NC" "$1"; }
 log_warn()  { printf '%s[WARN]%s %s\n' "$C_YELLOW" "$C_NC" "$1"; }
-log_err()   { printf '%s[FAIL]%s %s\n' "$C_RED" "$C_NC" "$1"; }
+log_err()   { printf '%s[NO]%s %s\n' "$C_RED" "$C_NC" "$1"; }
 
 if [ -t 2 ]; then
     CURL_FLAG="--progress-bar -S"
@@ -812,25 +812,6 @@ install_maths_toolkit() {
     fi
 }
 
-build_mr_oss() {
-    local mr_src="${AIRY_SRC_APP}/products/memoryrovol"
-    [ -d "$mr_src" ] || { log_warn "products/memoryrovol 源码缺失，跳过 OSS 库构建（TUI 降级 JsonlMemory）"; return 0; }
-    local mr_build="${AIRY_HOME}/build-mr-oss"
-    log_info "构建 MemoryRovol OSS 库（L1+L2，TUI 独立链接）…"
-    cmake -S "$mr_src" -B "$mr_build" \
-        -DCMAKE_BUILD_TYPE=Release -DMEMORYROVOL_OSS=ON -DBUILD_TESTS=OFF \
-        || { log_warn "memoryrovol OSS cmake 配置失败，TUI 降级 JsonlMemory"; return 0; }
-    cmake --build "$mr_build" -j"${AIRY_BUILD_JOBS}" 2>&1 | tail -5 \
-        || { log_warn "memoryrovol OSS 构建失败，TUI 降级 JsonlMemory"; return 0; }
-    local oss_lib="$mr_build/src/libagentrt_memoryrovol.a"
-    if [ -f "$oss_lib" ]; then
-        cp -f "$oss_lib" "${AIRY_HOME}/lib/libagentrt_memoryrovol_oss.a"
-        log_ok "MemoryRovol OSS 库就位: ${AIRY_HOME}/lib/libagentrt_memoryrovol_oss.a"
-    else
-        log_warn "OSS 库产物缺失（${oss_lib}），TUI 降级 JsonlMemory"
-    fi
-}
-
 build_tui() {
     [ -d "${AIRY_SRC_APP}/sdk/tui" ] || return 0
     export AIRY_HOME
@@ -844,22 +825,6 @@ build_tui() {
     [ -f "${CARGO_TARGET_DIR}/release/agentrt-tui" ] && \
         cp -f "${CARGO_TARGET_DIR}/release/agentrt-tui" "${AIRY_HOME}/bin/agentrt-tui"
     log_ok "agentrt-tui 部署完成"
-}
-
-ensure_cli_entry() {
-    [ -x "${AIRY_HOME}/bin/agentrt-tui" ] && return 0
-    if [ -x "${AIRY_HOME}/bin/airy_cli" ]; then
-        cat > "${AIRY_HOME}/bin/agentrt-tui" <<'TUIEOF'
-#!/bin/sh
-_DIR="$(cd -P "$(dirname "$0")" && pwd)"
-. "$_DIR/agentrt-env.sh"
-exec "$_DIR/airy_cli" "$@"
-TUIEOF
-        chmod 755 "${AIRY_HOME}/bin/agentrt-tui"
-        log_ok "agentrt-tui 使用 C airy_cli 兼容入口（Rust TUI 未构建）"
-    else
-        log_warn "agentrt-tui 与 airy_cli 均缺失"
-    fi
 }
 
 init_secrets() {
@@ -1306,17 +1271,14 @@ case "\$1" in
         fi
         ;;
 esac
-if [ -t 0 ] && [ -t 1 ] && [ -x "\$AIRY_HOME/bin/agentrt-tui" ]; then
-    exec "\$AIRY_HOME/bin/agentrt-tui" --gateway-url "http://127.0.0.1:\${_GWP:-8080}"
+if [ ! -x "\$AIRY_HOME/bin/airy_cli" ]; then
+    echo "airymaxrt: airy_cli 缺失（\$AIRY_HOME/bin/airy_cli），请重新安装" >&2
+    exit 1
 fi
-if [ -x "\$AIRY_HOME/bin/airy_cli" ]; then
-    exec "\$AIRY_HOME/bin/airy_cli" -p
+if [ -t 0 ] && [ -t 1 ]; then
+    exec "\$AIRY_HOME/bin/airy_cli" --tui
 fi
-if [ -x "\$AIRY_HOME/bin/agentrt-tui" ]; then
-    exec "\$AIRY_HOME/bin/agentrt-tui" --gateway-url "http://127.0.0.1:\${_GWP:-8080}"
-fi
-echo "airymaxrt: 未找到可执行前端（agentrt-tui / airy_cli 均缺失）" >&2
-exit 1
+exec "\$AIRY_HOME/bin/airy_cli" -p
 EOF
         chmod 755 "${AIRY_HOME}/bin/airymaxrt"
     fi
@@ -1586,13 +1548,11 @@ main() {
         if [ "${AIRY_NO_BUILD:-}" != "1" ]; then
             build_and_install
             install_python_deps
-            build_mr_oss
             build_tui
         fi
     fi
 
     stage 3 5 "部署组件与运行配置"
-    ensure_cli_entry
     init_secrets
 
     persist_profile
