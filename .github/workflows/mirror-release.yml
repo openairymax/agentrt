@@ -1,9 +1,9 @@
 name: Mirror Release Artifacts
 
-# M13 配套回填通道：把 atomgit（SSoT）既有 Release 的附件集镜像到
+# 发布镜像回填通道：把 atomgit（SSoT）既有 Release 的附件集镜像到
 # GitHub/Gitee Releases，并支持以 notes 入参统一纠偏三端 Release 正文。
 # 三类场景：
-#   1. 历史版本回填（v0.1.7 ~ rc9 之前各版）：发布时镜像机制尚未存在；
+#   1. 历史版本回填（镜像机制建立前各版）；
 #   2. 镜像修复重跑：publish-mirror.sh 幂等（同名同大小跳过），安全重放；
 #   3. 发布说明修订/纠偏：notes 入参一次性对齐 GH/Gitee（publish-mirror.sh
 #      的 RELEASE_NOTES）与 atomgit（AIRY_NOTES_ONLY=1 只改正文）。
@@ -24,7 +24,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '待回填版本（如 v0.1.13-rc9，须已有 atomgit Release + 三端 tag）'
+        description: '待回填版本（如 v0.1.17，须已有 atomgit Release + 三端 tag）'
         required: true
         type: string
       fetch_missing:
@@ -36,19 +36,19 @@ on:
         description: '发布说明（可选；传入则作为三端 Release 正文：GH/Gitee 覆盖 dist/notes.txt，atomgit 幂等对齐）'
         required: false
         type: string
-      # U-3 方案 A（2026-09-09）：release.yml 的 publish-mirror 段完成 GH 快
-      # 通道后 dispatch 本 workflow 异步补齐 Gitee，release_run_id 精确定位
-      # 同一 run 的 publish-dist（canonical 规范签名集），避免回填竞态。
+      # release.yml 的 publish-mirror 段完成 GH 快通道后 dispatch 本
+      # workflow 异步补齐 Gitee，release_run_id 精确定位同一 run 的
+      # publish-dist（canonical 规范签名集），避免回填竞态。
       release_run_id:
         description: 'release.yml run id（可选）：精确下载该 run 的 publish-dist 工件'
         required: false
         type: string
-  # N1d（0.1.15）：程序化触发通道。workflow_dispatch 的 REST 端点要求经典
-  # PAT 的 `workflow` scope（fine-grained PAT 一律 403 "Resource not
-  # accessible by integration"，0.1.15 实证），而 repository_dispatch 只需
-  # contents 写权限即可触发——补此通道后，三端正文纠偏/回填可由脚本或
-  # 其他工作流驱动，不再依赖人工点按。client_payload 与上面的 inputs 同构，
-  # 由下方 env 表达式统一归一。先例：sync-mirror.yml `types: [sync-mirror]`。
+  # 程序化触发通道。workflow_dispatch 的 REST 端点要求经典 PAT 的
+  # `workflow` scope（fine-grained PAT 一律 403 "Resource not accessible
+  # by integration"），而 repository_dispatch 只需 contents 写权限即可触发
+  # ——三端正文纠偏/回填可由脚本或其他工作流驱动，不再依赖人工点按。
+  # client_payload 与上面的 inputs 同构，由下方 env 表达式统一归一。
+  # 先例：sync-mirror.yml `types: [sync-mirror]`。
   repository_dispatch:
     types: [mirror-release]
 
@@ -56,12 +56,11 @@ permissions:
   contents: read
 
 concurrency:
-  # 同版本镜像串行化，且**最新一次派发胜出**。原 cancel-in-progress: false
-  # 在 0.1.15 三端正文纠偏时暴露为死锁：一次陈旧镜像 run 卡在上传步（curl
-  # 无界等待），而 fine-grained PAT 无 Actions 写权限（REST cancel /
-  # force-cancel 一律 403），纠偏 run 被该并发组无限期挂起。publish-mirror.sh
-  # 幂等（同名同大小跳过、异大小删除重传），取消在途 run 不留不可恢复状态：
-  # 新 run 会补齐差额。
+  # 同版本镜像串行化，且**最新一次派发胜出**。若 cancel-in-progress: false，
+  # 一次陈旧镜像 run 卡在上传步（curl 无界等待）且 fine-grained PAT 无
+  # Actions 写权限（REST cancel / force-cancel 一律 403）时，后续 run 会被
+  # 并发组无限期挂起。publish-mirror.sh 幂等（同名同大小跳过、异大小删除
+  # 重传），取消在途 run 不留不可恢复状态：新 run 会补齐差额。
   group: mirror-release-${{ inputs.version || github.event.client_payload.version }}
   cancel-in-progress: true
 
@@ -79,12 +78,11 @@ jobs:
   mirror:
     name: Mirror ${{ inputs.version || github.event.client_payload.version }} to GitHub + Gitee + atomgit
     runs-on: ubuntu-latest
-    # 有界执行：上传步若对端 socket 假死（无低速中断的 curl 会无界等待，
-    # 0.1.15 实证 76min+ 未收敛），job 超时兜底退出并释放并发位。
-    # 0.1.15 二次实证：Gitee 附件上传带宽 ~24KB/s，单件 ~36MB 需 ~24min，
-    # 全量 30 件需 ~158min（历史成功 run 34368538753 实测）。60min 会在
-    # 上传第 3~4 件时截断，导致 Gitee 长期缺件；放宽到 240min 以覆盖全量，
-    # 真正假死仍由 CURL_STALL(--speed-limit 1024 --speed-time 60) 兜底。
+    # 有界执行：上传步若对端 socket 假死（无低速中断的 curl 会无界等待），
+    # job 超时兜底退出并释放并发位。Gitee 附件上传带宽可达低至 ~24KB/s：
+    # 单件 ~36MB 需 ~24min，全量 30 件需 ~158min，60min 会在上传第 3~4 件
+    # 时截断，导致 Gitee 长期缺件；放宽到 240min 以覆盖全量，真正假死仍由
+    # CURL_STALL(--speed-limit 1024 --speed-time 60) 兜底。
     timeout-minutes: 240
     permissions:
       contents: write
@@ -104,8 +102,8 @@ jobs:
       - name: Download release-dist artifact
         # tag 触发的 release run 其 head_branch 即 tag 名；找不到（工件过期/
         # 无该 run）时置空继续，由 FETCH_MISSING 全量回填兜底。
-        # U-3 方案 A：优先按 release_run_id 下载 publish-dist（canonical
-        # 签名集）；未提供时回退按 tag 查成功 run 下载（release-dist）。
+        # 优先按 release_run_id 下载 publish-dist（canonical 签名集）；
+        # 未提供时回退按 tag 查成功 run 下载（release-dist）。
         run: |
           set -euo pipefail
           RUN_ID="${RELEASE_RUN_ID:-}"
@@ -141,7 +139,7 @@ jobs:
           bash _tools/scripts/ci/release/publish-mirror.sh "${VERSION}" dist
 
       - name: Align atomgit (SSoT) release body
-        # 三端正文一致性收口：atomgit 是 SSoT，正文对齐由 publish-release.sh
+        # 三端正文一致性对齐：atomgit 是 SSoT，正文对齐由 publish-release.sh
         # 的幂等 PATCH 承担（AIRY_NOTES_ONLY=1 只改正文，不签名/不上传）。
         # 正文来源：显式 notes 优先，其次本次 dist 的 notes.txt（release.yml
         # 生成）；两者皆缺则跳过——脚本内的兜底是占位串 "AgentRT <tag>"，

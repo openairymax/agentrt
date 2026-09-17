@@ -1,48 +1,46 @@
-name: G4b macOS Clean-Host
+name: macOS Clean-Host Verify
 
-# 0.1.13 G4b 真机核验载体：在 GitHub 托管 macOS runner（一次性干净 VM）上
+# macOS 干净真机核验载体：在 GitHub 托管 macOS runner（一次性干净 VM）上
 # 复刻 e2e-clean-room 语义——install.sh --from-file 离线安装发布制品 →
 # 完整启动器拉起 daemon 群 → gateway TCP 探测 → airy_cli /daemons 冒烟
-# （online N==M 断言）。这是"macOS 干净真机 daemon 群可启"（G4 出口末项）
-# 在流水线内可到达的最强载体；正式 tag v0.1.13 发布前以此出证。
+# （online N==M 断言）。正式发布前以此对 macOS 干净真机出证。
 #
 # 制品口径：安装器与完整启动器取本 workflow 所在提交树（agentrt main 的
-# scripts/install.sh + latest/airymaxrt——含 G4b 修正的 macOS-clean 实现，
-# 即正式 v0.1.13 将随包发布的同一对象）；daemon/TUI/CLI 产品二进制取
-# 指定版本 release 的 macos 平台 tar.gz（product 内容与正式发布一致）。
+# scripts/install.sh + latest/airymaxrt，即正式发布随包的同一对象）；
+# daemon/TUI/CLI 产品二进制取指定版本 release 的 macos 平台 tar.gz
+# （product 内容与正式发布一致）。
 #
 # 触发：
-#   - workflow_dispatch（版本由输入指定）。tag 纪律（0.1.13 M15）：tag 仅在
-#     真正创建发行版时打（atomgit SSoT 单向同步），核验类运行一律 dispatch，
-#     不再为触发 CI 造 g4b-* 冗余 tag。
+#   - workflow_dispatch（版本由输入指定）。tag 仅在真正创建发行版时打
+#     （atomgit SSoT 单向同步），核验类运行一律 dispatch。
 # 两条腿：arm-64（macos-latest）与 x86-64（macos-15-intel），各自验证
 # 对应架构发布包。判定全在脚本内 fail-closed：job 结论 success 即出证。
 #
 # 注意（镜像拓扑）：产品 tar.gz 从 atomgit(SSoT) release 拉取；
-# GitHub-hosted runner 可达 atomgit（rc e2e U9 阶段同源实证）。断言输出
-# 打在步骤日志；job/step 结论经匿名 jobs API 可读，即台账证据。
+# GitHub-hosted runner 可达 atomgit。断言输出打在步骤日志；
+# job/step 结论经匿名 jobs API 可读，即证据链。
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: '待核验产品版本（如 v0.1.13-rc9）'
+        description: '待核验产品版本（如 v0.1.17）'
         required: true
-        default: 'v0.1.13-rc9'
+        default: 'v0.1.17'
 
 permissions:
   contents: read
 
 concurrency:
-  group: g4b-macos-clean-host
+  group: macos-clean-host
   cancel-in-progress: false
 
 env:
-  VERSION: ${{ github.event.inputs.version || 'v0.1.13-rc9' }}
+  VERSION: ${{ github.event.inputs.version || 'v0.1.17' }}
 
 jobs:
   clean-host-arm64:
-    name: G4b macOS arm-64 clean-host
+    name: macOS arm-64 clean-host
     runs-on: macos-latest
     env:
       SUFFIX: macos-arm-64
@@ -63,10 +61,10 @@ jobs:
             || { echo "::error::download failed: agentrt-${VERSION}-${SUFFIX}.tar.gz.sha256" >&2; exit 1; }
           ls -la agentrt-*
 
-      - name: Run G4b clean-host verify
+      - name: Run clean-host verify
         # AIRY_INSTALLER_BOOTSTRAPPED=1：钉死核验对象为本树 scripts/install.sh
-        # （安装器自举对同内容仍误切远程 main 重执行，rc4-5 实证；核验语义
-        # 要求测随版发布物，禁止运行时漂移）。
+        # （安装器自举对同内容仍会误切远程 main 重执行；核验语义要求测随版
+        # 发布物，禁止运行时漂移）。
         env:
           AIRY_INSTALLER_BOOTSTRAPPED: '1'
         run: |
@@ -76,7 +74,7 @@ jobs:
             "$PWD/latest/airymaxrt"
 
   clean-host-x86_64:
-    name: G4b macOS x86-64 clean-host
+    name: macOS x86-64 clean-host
     runs-on: macos-15-intel
     env:
       SUFFIX: macos-x86-64
@@ -97,12 +95,11 @@ jobs:
             || { echo "::error::download failed: agentrt-${VERSION}-${SUFFIX}.tar.gz.sha256" >&2; exit 1; }
           ls -la agentrt-*
 
-      - name: Run G4b clean-host verify
+      - name: Run clean-host verify
         # 必须用 block scalar（|）：plain scalar 多行折叠会把行尾 \ 与折叠
-        # 空格合并成转义空格，参数获得前导空格 → [ -f ] false
-        # （G4b rc4-2 x86 腿失败根因，2026-09-08 实证）。
-        # AIRY_INSTALLER_BOOTSTRAPPED=1：钉死核验对象为本树 install.sh（rc4-5
-        # 实证自举对同内容仍误切远程 main，核验禁止运行时漂移）。
+        # 空格合并成转义空格，参数获得前导空格 → [ -f ] false。
+        # AIRY_INSTALLER_BOOTSTRAPPED=1：钉死核验对象为本树 install.sh
+        # （自举对同内容仍会误切远程 main，核验禁止运行时漂移）。
         env:
           AIRY_INSTALLER_BOOTSTRAPPED: '1'
         run: |

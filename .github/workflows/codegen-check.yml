@@ -1,7 +1,6 @@
 name: Codegen Checks
 
-# 0.2.0 CI 收敛（2026-09-04）：原 codegen-check.yml + ssot-validate.yml 两条
-# "校验类"流水线合并为一条（agentrt workflow 数 5→4）。触发器语义保持：
+# 校验类流水线，触发器语义：
 #   - codegen 漂移检查：push/PR 常开（纯 python3，无编译依赖，开销小）；
 #   - ssot registry 校验：仅 workflow_dispatch 手动（较重——clone 伞仓
 #     只读数据源 + 初始化嵌套子模块），不随 push/PR 自动跑。
@@ -32,7 +31,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: bash .github/scripts/init-submodules.sh
 
-      # P2-3: syscall.xml（SSoT）与生成产物 syscall_ids.h / syscall_table_gen.h
+      # syscall.xml（SSoT）与生成产物 syscall_ids.h / syscall_table_gen.h
       # 一致性校验。生成器仅依赖 python3 标准库，无需编译环境即可运行。
       # 任一生成产物与 SSoT 漂移即返回非零，阻止合入。
       - name: Verify syscall.xml SSoT drift (agentrt userland syscall)
@@ -42,17 +41,11 @@ jobs:
             --output-dir atoms/syscall/include \
             --check
 
-  # 用户态 SSoT 技术点权威源门禁（0.1.6 P2-3）：docs/AirymaxRT/.../
-  # 09-ssot-registry.md §1.7 登记的 agentrt 技术点（TP-012~016）权威源
+  # 用户态 SSoT 技术点权威源门禁：registry 登记的 agentrt 技术点权威源
   # 与物理宿主路径必须全部存在，登记了不存在的路径即 CI 失败（漂移门禁）。
-  #
-  # 宿主迁移（2026-09 架构裁决）：workflow 下沉到 agentrt 发布平面；伞仓
-  # airymaxhub 恢复纯容器、不再承载流水线。但 SSoT registry 与校验脚本本体
-  # 位于伞仓数据（docs / tools / agent-workload），故本 job 以 airymaxhub 的
-  # GitHub 镜像为只读数据源克隆到临时区、初始化其子模块后运行 validate-ssot.py。
+  # registry 与校验脚本位于伞仓数据（docs / tools / agent-workload），
+  # 故本 job 克隆伞仓 GitHub 镜像到临时区并初始化子模块后运行校验。
   ssot-registry-validate:
-    # 原 ssot-validate.yml 为独立 workflow_dispatch 流水线；合并后保持
-    # 同样语义，避免对 agentrt push/PR 造成额外自动负载。
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
@@ -62,8 +55,8 @@ jobs:
           submodules: false
           fetch-depth: 1
 
-      # 以伞仓 GitHub 镜像为数据源（registry=docs、脚本=tools、宿主=agent-workload）。
-      # 私有嵌套子模块（agentrt/atoms 等）经 GH_TOKEN（org PAT）~/.netrc 认证。
+      # 克隆伞仓 GitHub 镜像（registry=docs、脚本=tools、宿主=agent-workload），
+      # 嵌套子模块经 GH_TOKEN 认证。
       - name: Clone umbrella dataset (docs, tools, agent-workload)
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}

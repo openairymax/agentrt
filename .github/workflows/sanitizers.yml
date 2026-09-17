@@ -1,14 +1,13 @@
 name: Sanitizers (ASan/UBSan)
 
-# WS-6 6.4（T-13，0.1.15）：AddressSanitizer / LeakSanitizer / UndefinedBehavior
-# Sanitizer 内存与未定义行为门禁。覆盖范围——commons + gateway +
-# atoms/corekern，为 WS-4 接线与 WS-8 阶段 0~4（依赖反转、机制归位、IPC
-# 全量启用）提供内存缺陷防护：这些改造均为运行期高风险变更，无 sanitizer
-# 门禁则回归只能靠人工日志发现。
+# AddressSanitizer / LeakSanitizer / UndefinedBehavior Sanitizer 内存与
+# 未定义行为门禁。覆盖范围——commons + gateway + atoms/corekern，为依赖
+# 反转、机制归位、IPC 全量启用等运行期高风险改造提供内存缺陷防护：无
+# sanitizer 门禁则内存缺陷只能靠人工日志发现。
 #
 # 触发面瘦身（缓"流水线太慢"）：纯文档变更跳过（安全边界同 build-test.yml——
 # 只忽略 md/docs，源码与 workflow 变更仍全量验证）；同一 ref 并发运行自动
-# 取消；构建一律树外化到工作区上级目录（BAN-33），不落源码区。
+# 取消；构建一律树外化到工作区上级目录，不落源码区。
 #
 # 超时护栏：sanitizer 构建带插桩，编译与执行均慢于常规腿，故给 120min。
 
@@ -34,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      # BAN-33：构建目录位于源码树外（工作区上级目录）
+      # 构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build-sanitizer
       # 检测到即中止：ASan/LSan/UBSan 任一问题都必须是硬失败（fail-closed），
       # 不得因"继续跑完"而漏报。allocator_may_return_null 保留（与根

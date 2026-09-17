@@ -3,7 +3,7 @@ name: Build & Test
 on:
   push:
     branches: [main]
-    # E5 触发面瘦身（0.1.11）：纯文档/说明变更跳过重型门禁，避免无效
+    # 触发面瘦身：纯文档/说明变更跳过重型门禁，避免无效
     # runner 队列占用。安全边界：只忽略 md/docs，workflow 与一切源码变更
     # 仍全量验证；PR 保持全量（评审面不因触发优化而缩水）。
     paths-ignore:
@@ -20,22 +20,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# CI-3（0.1.16，附录 B.7）：跨仓门禁取料锁定 commit，杜绝默认分支 HEAD 快照
-# 漂移——release_gates 断言的是 sdk/tui/scripts/airymaxrt 与 tools/
-# permission_rules.yaml 的**具体内容**；上游 main 一推进判据内容即变，同一
-# agentrt 树会在两次 run 间一时绿一时红，且本地复现不可得。锁 SHA 后上游
-# 变更须**显式** bump 下列值才生效，漂移由静默转为可见。取值经
-# `git ls-remote <repo> refs/heads/main` 核验即为该仓 main 当前 HEAD。
-#
-# GATE_SDK_SHA 时效性更正（2026-09-14，H5 红根因）：原锁 39c8406e 落后 sdk
-# main 一个 commit——39c8406e..5a91b617 的全部差异即 sdk-python 与 tui 两个
-# gitlink，其中 tui 由 a623889d 变为 f605930，后者才引入 U-02 通道状态
-# （state=reserved）fail-closed 分支。旧 pin 下 sdk/tui/scripts/airymaxrt
-# 无该判据，H5 三腿（install.sh / install.ps1 / sdk 更新器）缺一即红。
-# GATE_TOOLS_SHA 保持 b237a98 不随 main 推进而 bump：本门禁只消费
-# scripts/ops/templates/permission_rules.yaml，而该文件在 b237a98..tools
-# main（cc241da）间零差异（两者唯一差异 publish-release.sh 走 release.yml
-# 的 _tools 独立取料，不经本 env），故 pin 仍然有效。
+# 跨仓门禁取料锁定 commit，杜绝默认分支 HEAD 快照漂移——release_gates
+# 断言的是 sdk/tui/scripts/airymaxrt 与 tools/permission_rules.yaml 的
+# **具体内容**；上游 main 一推进判据内容即变，同一 agentrt 树会在两次
+# run 间一时绿一时红，且本地复现不可得。锁 SHA 后上游变更须**显式** bump
+# 下列值才生效，漂移由静默转为可见。取值经
+# `git ls-remote <repo> refs/heads/main` 核验即为该仓 main 当前 HEAD；
+# bump 前须核对新 commit 与旧 pin 在本门禁消费路径上零差异，否则同步
+# 更新 release_gates 判据。
 env:
   GATE_SDK_SHA: 5a91b617a67c11c43663fa2088fe6c6e36758360
   GATE_TOOLS_SHA: b237a98e3dd9dac642fde8da1da9aa43957016dd
@@ -44,20 +36,19 @@ jobs:
   # ==================== Linux 全量构建 + 测试 + 覆盖率门禁 ====================
   linux-build-test-coverage:
     runs-on: ubuntu-latest
-    # 超时护栏（2026-09-04）：构建+ctest+覆盖率合计上限，防挂死无结论
+    # 超时护栏：构建+ctest+覆盖率合计上限，防挂死无结论
     timeout-minutes: 150
     env:
-      # BAN-33：agentrt 即源码根，构建目录必须在源码树外（工作区上级目录）
+      # agentrt 即源码根，构建目录必须在源码树外（工作区上级目录）
       BUILD_DIR: ../build
-      # 首次真实行覆盖基线（2026-09-04 实测 28.61%，37674/131693）。
-      # 阈值 25 起步 = 基线以下留 fail-closed 余量（30 一度高于基线致门禁
-      # 误红，dc06d4fde 实证）；随测试补充逐版上调（见 Linux job 注释）。
+      # 真实行覆盖基线 28.61%（37674/131693）。阈值 25 = 基线以下留
+      # fail-closed 余量，随测试补充逐版上调。
       COVERAGE_THRESHOLD: 25
     steps:
-      # M3 方案 B（0.1.12）：定向子模块检出收敛为 lf-init-deps 复合 action
-      # （同源模板，防 build-test/release 双实现漂移——P3）。checkout 必
-      # 须是独立远程 action 首步（build-test #103 实证：本地 composite 在
-      # job 初始化阶段解析、早于任何 step，无法在内部自举 checkout）。
+      # 定向子模块检出收敛为 lf-init-deps 复合 action（同源模板，防
+      # build-test/release 双实现漂移）。checkout 必须是独立远程 action
+      # 首步（本地 composite 在 job 初始化阶段解析、早于任何 step，无法
+      # 在内部自举 checkout）。
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -70,17 +61,16 @@ jobs:
           gh_token: ${{ secrets.GH_TOKEN }}
       - name: Fetch cross-repo gate fixture (sdk airymaxrt)
         run: |
-          # WS-9 9.8 门禁跨仓判据取料（0.1.15 方案 §4.9）：release_gates 测试
-          # 断言 sdk/tui/scripts/airymaxrt（更新器源）与仓内 install.sh/
-          # latest/airymaxrt 三副本一致。sdk 不属 agent-workload 检出组
-          # （init-submodules.sh），此处 sparse 浅克隆仅取 sdk 骨架。
-          # tui 在 sdk 内是 gitlink 子模块，sparse-checkout 不会落盘其
-          # 内容，必须显式 submodule update 才检出 tui/scripts/airymaxrt；
-          # 末行 test 兜底，取料失败即红（fail-closed，不得静默降级）。
-          # CI-3（0.1.16）：改为按 SHA 取料（见文件头 GATE_SDK_SHA，经
-          # ls-remote 核验为 sdk main HEAD）——不再跟随默认分支 HEAD，
-          # 上游判据漂移须显式 bump。fetch 后再 checkout，得到 detached
-          # 的锁定快照；submodule update 随该 commit 记录的 gitlink 锁定 tui。
+          # 门禁跨仓判据取料：release_gates 测试断言 sdk/tui/scripts/
+          # airymaxrt（更新器源）与仓内 install.sh/latest/airymaxrt 三副本
+          # 一致。sdk 不属 agent-workload 检出组（init-submodules.sh），
+          # 此处 sparse 浅克隆仅取 sdk 骨架。tui 在 sdk 内是 gitlink 子模块，
+          # sparse-checkout 不会落盘其内容，必须显式 submodule update 才
+          # 检出 tui/scripts/airymaxrt；末行 test 兜底，取料失败即红
+          # （fail-closed，不得静默降级）。按 SHA 取料（见文件头
+          # GATE_SDK_SHA）——不跟随默认分支 HEAD，上游判据漂移须显式
+          # bump。fetch 后再 checkout，得到 detached 的锁定快照；
+          # submodule update 随该 commit 记录的 gitlink 锁定 tui。
           git clone -q --filter=blob:none --sparse \
             "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/openairymax/sdk.git" \
             agent-workload/sdk
@@ -91,13 +81,12 @@ jobs:
 
       - name: Fetch cross-repo gate fixture (tools permission_rules.yaml)
         run: |
-          # WS-9 9.8 门禁跨仓判据取料（0.1.15 方案 §4.10 R-6）：release_gates
-          # 断言 tools 仓 permission_rules.yaml 的 external 授权集 ⊇ /mcp
-          # tools/list 暴露集（防"工具齐列但不可调用"回归）。tools 不属
+          # 门禁跨仓判据取料：release_gates 断言 tools 仓
+          # permission_rules.yaml 的 external 授权集 ⊇ /mcp tools/list
+          # 暴露集（防"工具齐列但不可调用"回归）。tools 不属
           # agent-workload 检出组，此处 sparse 浅克隆仅取模板。末行 test
-          # 兜底，取料失败即红（fail-closed，不得静默降级）。
-          # CI-3（0.1.16）：同 sdk 腿，按 SHA 取料（见文件头 GATE_TOOLS_SHA，
-          # 经 ls-remote 核验为 tools main HEAD）。
+          # 兜底，取料失败即红（fail-closed，不得静默降级）。同 sdk 腿，
+          # 按 SHA 取料（见文件头 GATE_TOOLS_SHA）。
           git clone -q --filter=blob:none --sparse \
             "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/openairymax/tools.git" \
             _tools
@@ -131,11 +120,9 @@ jobs:
 
       - name: Run tests (ctest, auto-retry once)
         run: |
-          # --timeout 240：单测超时护栏。瞬态 flaky（tool_d_test_executor
-          # 2026-09-06 实证：linux runner 负载下并发时序单测首轮偶发红、
-          # 同环境 rerun-failed 即全过）经一次自动重试吸收；真实回归
-          # rerun 仍失败 → fail-closed。与 macOS 腿（corekern_deep
-          # 2026-09-05 实证）同口径。
+          # --timeout 240：单测超时护栏。瞬态 flaky（runner 负载下并发时序
+          # 单测首轮偶发红、同环境 rerun-failed 即全过）经一次自动重试吸收；
+          # 真实回归 rerun 仍失败 → fail-closed。与 macOS 腿同口径。
           set +e
           ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure -j"$(nproc)" \
             --timeout 240 > /tmp/ctest.log 2>&1
@@ -158,9 +145,9 @@ jobs:
           exit $rc2
 
       # 失败（含 rerun 仍失败）即把首轮与 rerun 日志落 ci-debug issue（公共
-      # issue 匿名 API 可读，供排障拉取）；与 macOS 腿同口径。0.1.15 发布后
-      # 实证：annotation 每 job 仅保留 ≤10 条 + tail 窗口截断，无法承载断言级
-      # 明细（run #255/#256 linux ctest 失败时只能整份下载 job 日志定位）。
+      # issue 匿名 API 可读，供排障拉取）；与 macOS 腿同口径。annotation
+      # 每 job 仅保留 ≤10 条 + tail 窗口截断，无法承载断言级明细，故以
+      # issue 承载完整日志。
       - name: Dump ctest logs to ci-debug issue
         if: failure()
         env:
@@ -169,10 +156,8 @@ jobs:
           [ -f /tmp/ctest.log ] && bash .github/scripts/ci-debug-dump.sh "linux ctest" "/tmp/ctest.log" || true
           [ -f /tmp/ctest-rerun.log ] && bash .github/scripts/ci-debug-dump.sh "linux ctest rerun" "/tmp/ctest-rerun.log" || true
 
-      # CI-1（0.1.16，附录 B.7）：日志直传 artifact。ci-debug issue 依赖
-      # GH_TOKEN 与 issue 可见性——run #255/#256 ctest 红时无 artifact、issue
-      # 亦未产出，只能整份下载 job 日志，断言级明细不可达。artifact 无需凭据
-      # 即可从 run 页面下载，作为兜底取证通道。
+      # 日志直传 artifact：ci-debug issue 依赖 GH_TOKEN 与 issue 可见性；
+      # artifact 无需凭据即可从 run 页面下载，作为兜底取证通道。
       - name: Upload ctest logs artifact
         if: failure()
         uses: actions/upload-artifact@v4
@@ -187,22 +172,22 @@ jobs:
       # 覆盖率门禁：低于阈值（COVERAGE_THRESHOLD）即失败，
       # 防止发行版功能回归（50-engineering-standards / TEST-03）。
       # 用 gcovr（非 lcov 2.0）：lcov 2.0 + gcc 13.3 中间 gcov 格式下
-      # geninfo 处理到部分 .gcda 即崩溃（rc=1、无错误输出，多轮实证），
-      # 未命中 exclude 又判硬错误、空 tracefile 却 rc=0；gcovr 对单个
-      # gcov 文件错误鲁棒。Cobertura XML 的 lines-covered/lines-valid
-      # 作为行覆盖率唯一口径（exclude tests/build/usr 源码）。
+      # geninfo 处理到部分 .gcda 即崩溃且无错误输出，未命中 exclude 又判
+      # 硬错误、空 tracefile 却 rc=0；gcovr 对单个 gcov 文件错误鲁棒。
+      # Cobertura XML 的 lines-covered/lines-valid 作为行覆盖率唯一口径
+      #（exclude tests/build/usr 源码）。
       # --gcov-ignore-errors=no_working_dir_found：树外构建（BUILD_DIR=../build）
-      # 中个别测试 .gcda 源路径带前缀解析不到（coreloopthree tests 实证，
-      # rc=64）；tests 覆盖率本就排除，忽略该错误不参与统计。
+      # 中个别测试 .gcda 源路径带前缀解析不到；tests 覆盖率本就排除，忽略
+      # 该错误不参与统计。
       # --root 取工作区父目录：树外构建的 .gcda 记录源路径带 agentrt/ 前缀
       #（gcc 工作目录为 checkout 父级），root=. 时 gcovr 对全部源解析失败
-      #（lines-valid=0，2026-09-04 实证），root=父目录后 agentrt/<src> 命中。
+      #（lines-valid=0），root=父目录后 agentrt/<src> 命中。
       # --gcov-ignore-parse-errors=negative_hits：gcc gcov 已知 bug 产生
       # "branch taken -1"（gcc.gnu.org/68080），按 gcovr 官方建议 warn 忽略。
-      # --merge-mode-functions=merge-use-line-0：LTO/内联克隆致同名函数多行出现
-      #（ws_gateway_create 246/323 实证），strict 抛 AssertionError；gcovr 7.0
-      # 合法取值 strict/merge-use-line-{0,min,max}/separate（无 merge），
-      # merge-use-line-0 将多行同名函数并入 file 级条目。
+      # --merge-mode-functions=merge-use-line-0：LTO/内联克隆致同名函数多行
+      # 出现，strict 抛 AssertionError；gcovr 7.0 合法取值 strict/
+      # merge-use-line-{0,min,max}/separate（无 merge），merge-use-line-0
+      # 将多行同名函数并入 file 级条目。
       - name: Collect coverage (gcovr)
         run: |
           set +e
@@ -244,23 +229,23 @@ jobs:
 
   # ==================== macOS 跨平台构建门禁 ====================
   macos-build:
-    # E3 hosted runner 争抢治理（0.1.11）：macos-latest 腿跨 workflow（本 job
-    # 与 release.yml macos 腿）共享 ci-macos-runner-bus，串行不抢占，避免
+    # hosted runner 争抢治理：macos-latest 腿跨 workflow（本 job 与
+    # release.yml macos 腿）共享 ci-macos-runner-bus，串行不抢占，避免
     # 多 workflow 齐发把 mac 配额打满排队；cancel-in-progress:false=公平等待
     #（不杀测试中的 job）。
     concurrency:
       group: ci-macos-runner-bus
       cancel-in-progress: false
     runs-on: macos-latest
-    # 超时护栏（2026-09-04 系统性加固）：此前无 timeout，任一测试挂死会让
-    # job 挂到 GitHub 默认 6h 上限，整轮门禁长期 in_progress、无结论。
+    # 超时护栏：无 timeout 时任一测试挂死会让 job 挂到 GitHub 默认 6h 上限，
+    # 整轮门禁长期 in_progress、无结论。
     timeout-minutes: 90
     env:
-      # BAN-33：构建目录位于源码树外（工作区上级目录）
+      # 构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
     steps:
       # 同 linux job：checkout 独立远程首步 + lf-init-deps 定向检出
-      # （#103 实证：本地 composite 无法在内部自举 checkout）。
+      # （本地 composite 无法在内部自举 checkout）。
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -273,17 +258,16 @@ jobs:
           gh_token: ${{ secrets.GH_TOKEN }}
       - name: Fetch cross-repo gate fixture (sdk airymaxrt)
         run: |
-          # WS-9 9.8 门禁跨仓判据取料（0.1.15 方案 §4.9）：release_gates 测试
-          # 断言 sdk/tui/scripts/airymaxrt（更新器源）与仓内 install.sh/
-          # latest/airymaxrt 三副本一致。sdk 不属 agent-workload 检出组
-          # （init-submodules.sh），此处 sparse 浅克隆仅取 sdk 骨架。
-          # tui 在 sdk 内是 gitlink 子模块，sparse-checkout 不会落盘其
-          # 内容，必须显式 submodule update 才检出 tui/scripts/airymaxrt；
-          # 末行 test 兜底，取料失败即红（fail-closed，不得静默降级）。
-          # CI-3（0.1.16）：改为按 SHA 取料（见文件头 GATE_SDK_SHA，经
-          # ls-remote 核验为 sdk main HEAD）——不再跟随默认分支 HEAD，
-          # 上游判据漂移须显式 bump。fetch 后再 checkout，得到 detached
-          # 的锁定快照；submodule update 随该 commit 记录的 gitlink 锁定 tui。
+          # 门禁跨仓判据取料：release_gates 测试断言 sdk/tui/scripts/
+          # airymaxrt（更新器源）与仓内 install.sh/latest/airymaxrt 三副本
+          # 一致。sdk 不属 agent-workload 检出组（init-submodules.sh），
+          # 此处 sparse 浅克隆仅取 sdk 骨架。tui 在 sdk 内是 gitlink 子模块，
+          # sparse-checkout 不会落盘其内容，必须显式 submodule update 才
+          # 检出 tui/scripts/airymaxrt；末行 test 兜底，取料失败即红
+          # （fail-closed，不得静默降级）。按 SHA 取料（见文件头
+          # GATE_SDK_SHA）——不跟随默认分支 HEAD，上游判据漂移须显式
+          # bump。fetch 后再 checkout，得到 detached 的锁定快照；
+          # submodule update 随该 commit 记录的 gitlink 锁定 tui。
           git clone -q --filter=blob:none --sparse \
             "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/openairymax/sdk.git" \
             agent-workload/sdk
@@ -294,13 +278,12 @@ jobs:
 
       - name: Fetch cross-repo gate fixture (tools permission_rules.yaml)
         run: |
-          # WS-9 9.8 门禁跨仓判据取料（0.1.15 方案 §4.10 R-6）：release_gates
-          # 断言 tools 仓 permission_rules.yaml 的 external 授权集 ⊇ /mcp
-          # tools/list 暴露集（防"工具齐列但不可调用"回归）。tools 不属
+          # 门禁跨仓判据取料：release_gates 断言 tools 仓
+          # permission_rules.yaml 的 external 授权集 ⊇ /mcp tools/list
+          # 暴露集（防"工具齐列但不可调用"回归）。tools 不属
           # agent-workload 检出组，此处 sparse 浅克隆仅取模板。末行 test
-          # 兜底，取料失败即红（fail-closed，不得静默降级）。
-          # CI-3（0.1.16）：同 sdk 腿，按 SHA 取料（见文件头 GATE_TOOLS_SHA，
-          # 经 ls-remote 核验为 tools main HEAD）。
+          # 兜底，取料失败即红（fail-closed，不得静默降级）。同 sdk 腿，
+          # 按 SHA 取料（见文件头 GATE_TOOLS_SHA）。
           git clone -q --filter=blob:none --sparse \
             "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/openairymax/tools.git" \
             _tools
@@ -322,8 +305,8 @@ jobs:
           # AIRY_HAS_CURL=FALSE 导致 macOS 构建静默剔除 HTTP/联网功能
           export PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig:$(brew --prefix zlib)/lib/pkgconfig:$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix curl)/lib/pkgconfig"
           # 与 release.yml 对齐：keg-only openssl 头文件、Apple Silicon 下裸库名
-          # （-lmicrohttpd 等）需显式 -I/-L，否则 build-test 与 release 环境漂移，
-          # 门禁绿但发布红（release.yml 实证）
+          # （-lmicrohttpd 等）需显式 -I/-L，否则 build-test 与 release 环境
+          # 漂移，门禁绿但发布红
           # arm64 Homebrew 头文件在 $(brew --prefix)/include，clang 不自动搜索：
           # 缺该 -I 时 yaml.h/microhttpd.h 等非 keg-only 头同样报 file not found。
           export CFLAGS="-I$(brew --prefix)/include -I$(brew --prefix openssl)/include"
@@ -357,12 +340,11 @@ jobs:
 
       - name: Run tests (ctest, auto-retry once)
         run: |
-          # --timeout 240：单测超时护栏——macOS ctest 曾长期挂死无结论
-          #（2026-09-04 实证，>25min 仍 in_progress）。
-          # 瞬态 flaky（corekern_deep 2026-09-05 实证：macOS runner 慢负载下
-          # 定时敏感单测首轮偶发红、同环境 rerun-failed 即全过）经一次自动
-          # 重试吸收；真实回归 rerun 仍失败 → fail-closed（exit rc2）。门禁
-          # 口径：首轮失败但 rerun-failed 全过视为 flaky 放行，明细留档。
+          # --timeout 240：单测超时护栏——防 macOS ctest 挂死无结论。
+          # 瞬态 flaky（macOS runner 慢负载下定时敏感单测首轮偶发红、
+          # 同环境 rerun-failed 即全过）经一次自动重试吸收；真实回归
+          # rerun 仍失败 → fail-closed（exit rc2）。门禁口径：首轮失败但
+          # rerun-failed 全过视为 flaky 放行，明细留档。
           set +e
           ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure -j"$(sysctl -n hw.ncpu)" \
             --timeout 240 > /tmp/macos-ctest.log 2>&1
@@ -382,8 +364,8 @@ jobs:
             exit 0
           fi
           echo "::error::macOS ctest rerun FAILED rc=$rc2"
-          # 断言级失败明细：corekern_deep 2026-09-06 实证 rerun 双败但
-          # tail 窗口内全是 PASS 行；全量抓取 [FAIL] 行定位具体断言。
+          # 断言级失败明细：rerun 双败时 tail 窗口内可能全是 PASS 行；
+          # 全量抓取 [FAIL] 行定位具体断言。
           grep -E '\[FAIL\]' /tmp/macos-rerun.log | head -30 | sed 's/^/::error::  /' || true
           tail -n 40 /tmp/macos-rerun.log | sed 's/^/::error::  /'
           exit $rc2
@@ -400,7 +382,7 @@ jobs:
             bash .github/scripts/ci-debug-dump.sh "macos ctest rerun" "/tmp/macos-rerun.log"
           fi
 
-      # CI-1（0.1.16）：与 linux 腿同口径，日志直传 artifact 作为免凭据兜底取证。
+      # 与 linux 腿同口径，日志直传 artifact 作为免凭据兜底取证。
       - name: Upload ctest logs artifact
         if: failure()
         uses: actions/upload-artifact@v4
@@ -414,27 +396,23 @@ jobs:
 
   # ==================== Windows 跨平台构建门禁 ====================
   windows-build:
-    # E3 hosted runner 争抢治理（0.1.11）：windows 腿与 release.yml windows
-    # leg 共享 ci-windows-runner-bus，串行防 MSVC 构建双重占满 windows 配额。
+    # hosted runner 争抢治理：windows 腿与 release.yml windows leg 共享
+    # ci-windows-runner-bus，串行防 MSVC 构建双重占满 windows 配额。
     concurrency:
       group: ci-windows-runner-bus
       cancel-in-progress: false
     runs-on: windows-latest
-    # 超时护栏（2026-09-04）：同 macOS，防 ctest/构建挂死到 6h
+    # 超时护栏：同 macOS，防 ctest/构建挂死到 6h
     timeout-minutes: 90
-    # G2（0.1.13）达成：windows ctest 失败面自 35 项 SegFault 收敛至全绿
-    # （wave-9 Build 连续绿 → wave-13d 三腿 ctest 全绿：#134 五失败经 join
-    # retval / create 非递归 trylock / depgraph 栈 reserve / yaml AIRY_FREE
-    # 与 macOS 时间戳确定性逐项修复归零）。移出 continue-on-error，本 job
-    # 恢复为 required 门禁；Windows 完整产品（daemons 15 + airy_cli）构建
-    # 链持续绿，release.yml windows leg 以 publish REQUIRED_BIN 预检为
-    # 入 needs 判据。
+    # windows ctest 全绿，本 job 为 required 门禁；Windows 完整产品
+    # （daemons 15 + airy_cli）构建链持续绿，release.yml windows leg 以
+    # publish REQUIRED_BIN 预检为入 needs 判据。
     env:
-      # BAN-33：构建目录位于源码树外（工作区上级目录）
+      # 构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
     steps:
       # 同 linux job：checkout 独立远程首步 + lf-init-deps 定向检出
-      # （#103 实证：本地 composite 无法在内部自举 checkout）。
+      # （本地 composite 无法在内部自举 checkout）。
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -446,7 +424,7 @@ jobs:
           groups: agent-workload
           gh_token: ${{ secrets.GH_TOKEN }}
 
-      # E4：vcpkg 二进制缓存恢复（须在 install 之前；key 随 workflow 内容变化
+      # vcpkg 二进制缓存恢复（须在 install 之前；key 随 workflow 内容变化
       # 自动失效并回退前缀 key；加性缓存由 vcpkg 自身保证正确性）
       - name: Restore vcpkg binary cache
         uses: actions/cache@v4
@@ -458,8 +436,8 @@ jobs:
 
       - name: Install dependencies (vcpkg)
         shell: pwsh
-        # E4：vcpkg 二进制缓存。runner.temp 只能在 step 级 env 解析（job 级 env
-        # 无 runner context，GitHub 判整个 workflow 无效——0.1.11 实证）。
+        # vcpkg 二进制缓存。runner.temp 只能在 step 级 env 解析（job 级 env
+        # 无 runner context，GitHub 判整个 workflow 无效）。
         # 命中缓存复用已编译 port；未命中照常编译写回（classic 加性缓存安全）。
         env:
           VCPKG_BINARY_SOURCES: "clear;files,${{ runner.temp }}/vcpkg-cache,readwrite"
@@ -471,18 +449,13 @@ jobs:
 
       - name: Configure (MSVC)
         shell: pwsh
-        # G1 stage-1（0.1.13）：Windows 完整产品移植的编译数据集采集。默认
-        # 矩阵（umbrella WIN32 分支）仍关 daemons/CLI，本腿显式 opt-in 打开
-        # 全部 daemon（15 服务）+ airy_cli，把 continue-on-error 转成 MSVC
-        # 逐轮 triage 列表（错误 → 修复 → 提交，随 push 自动回归）；产品面
-        # 全绿后再升 gate 判据（publish REQUIRED_BIN）。测试面沿用 P25
-        # 整目标守卫（daemon 链测试 Windows 不编译）。
-        # G2（0.1.13）：PDB 符号注入——直接覆盖 CMAKE_C_FLAGS_RELEASE 会连默认
-        # 优化标志一起换掉，造成与既有轮次编译语义漂移（orchestrator.c C4702
-        # 曾因此暴露）；CMAKE_MSVC_DEBUG_INFORMATION_FORMAT 在默认 Release
-        # 标志之上加 /Zi + /DEBUG，产物带 PDB 且不改优化。windows ctest
-        # SegFault（#127）无符号栈只有裸偏移（test_heapstore_core+0x4e99），
-        # cdb .ecxr + k 带 PDB 直接落函数名一次定位根因。
+        # Windows 完整产品构建：本腿显式 opt-in 打开全部 daemon（15 服务）+
+        # airy_cli；产品面判据由 release.yml publish REQUIRED_BIN 预检承接。
+        # 测试面整目标守卫：daemon 链测试 Windows 不编译。
+        # PDB 符号注入：直接覆盖 CMAKE_C_FLAGS_RELEASE 会连默认优化标志一起
+        # 换掉，造成编译语义漂移；CMAKE_MSVC_DEBUG_INFORMATION_FORMAT 在默认
+        # Release 标志之上加 /Zi + /DEBUG，产物带 PDB 且不改优化，ctest
+        # SegFault 时 cdb .ecxr + k 可直接落函数名定位。
         run: |
           cmake -S . -B ${{ env.BUILD_DIR }} `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
@@ -525,11 +498,11 @@ jobs:
           ctest --test-dir ${{ env.BUILD_DIR }} -C Release --output-on-failure --timeout 240 2>&1 | Tee-Object -FilePath $ctestLog
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      # G2（0.1.13）：ctest SegFault 栈捕获（cdb）。windows runner 带
-      # Windows SDK Debugging Tools 时，对首个失败测试类跑 cdb，crash 断点
-      # 上 .ecxr + k 输出符号化调用栈，整段落 ci-debug issue —— SegFault 只
-      # 有 "***Exception: SegFault" 无法定位，需真实调用栈逐平台域修。
-      # 仅失败时触发；runner 无 cdb 则静默跳过（记录说明），不阻塞门禁。
+      # ctest SegFault 栈捕获（cdb）。windows runner 带 Windows SDK Debugging
+      # Tools 时，对失败测试跑 cdb，crash 断点上 .ecxr + k 输出符号化调用栈，
+      # 整段落 ci-debug issue —— SegFault 只有 "***Exception: SegFault" 无法
+      # 定位，需真实调用栈定位。仅失败时触发；runner 无 cdb 则静默跳过
+      # （记录说明），不阻塞门禁。
       - name: Triage ctest crash stacks (cdb)
         if: failure()
         shell: pwsh
@@ -550,8 +523,8 @@ jobs:
           } else {
             # 从 ctest rerun-failed 记录解析失败测试名 → 反推可执行文件：
             # ctest 注册名带 commons_test_ 前缀（对应 exe test_platform 等，
-            # #127 实证 hardcode candidates 用 ctest 名找不到 exe，只抓到
-            # heapstore），atoms/cupolas/heapstore/taskflow 的 ctest 名即 exe 名。
+            # hardcode candidates 用 ctest 名找不到 exe），atoms/cupolas/
+            # heapstore/taskflow 的 ctest 名即 exe 名。
             $names = @()
             try {
               $names = @(& ctest --test-dir $env:BUILD_DIR -C Release --rerun-failed -N 2>&1 |
@@ -606,8 +579,8 @@ jobs:
           ctest --test-dir ${{ env.BUILD_DIR }} -C Release --output-on-failure --rerun-failed --timeout 240 2>&1 | Tee-Object -FilePath $rerunLog
           bash .github/scripts/ci-debug-dump.sh "windows ctest rerun" $rerunLog
 
-      # CI-1（0.1.16）：与 linux/macos 腿同口径，日志直传 artifact 作为免凭据
-      # 兜底取证（windows 日志在 RUNNER_TEMP 而非 /tmp）。
+      # 与 linux/macos 腿同口径，日志直传 artifact 作为免凭据兜底取证
+      # （windows 日志在 RUNNER_TEMP 而非 /tmp）。
       - name: Upload ctest logs artifact
         if: failure()
         uses: actions/upload-artifact@v4

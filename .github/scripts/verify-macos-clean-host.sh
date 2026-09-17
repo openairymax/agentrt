@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# verify-macos-clean-host.sh — macOS 干净真机核验（0.1.13 G4b）
+# verify-macos-clean-host.sh — macOS 干净真机核验
 #
-# 背景：G4 出口的最后真机核验项 = "macOS 干净真机 daemon 群可启"。
+# 背景：发布出口的最后真机核验项 = "macOS 干净真机 daemon 群可启"。
 #   - 托管 macos runner 为一次性干净 VM，是"干净机"的最强 CI 代理；
 #   - 本脚本在 macOS host 上复刻 e2e-clean-room 语义：install.sh
 #     --from-file 离线安装打包产物 → 完整启动器拉起 daemon 群 →
 #     gateway TCP 探测 → airy_cli /daemons 冒烟（online N/N）。
 #   - 与 Linux e2e 不同点：macOS 系统 bash 为 3.2，无 GNU coreutils
 #     （sha256sum/seq/readlink -f 均缺失），安装器/启动器/本脚本全部
-#     走 shasum -a 256 与 bash 内建（G4b 2026-09-08 修正）。
+#     走 shasum -a 256 与 bash 内建。
 #
 # 判定语义（fail-closed，stdout 为断言面）：
 #   阶段 1  离线安装：install.sh --from-file <tarball>，相邻 .sha256
@@ -25,7 +25,7 @@
 #   阶段 6  收尾：TERM 启动器 → EXIT trap 回收 daemon 群。
 #
 # 用法：verify-macos-clean-host.sh <install.sh> <tarball> [airymaxrt-full]
-#   第三参存在时预置到 $AH/bin/airymaxrt-full（离线自举，同 U9 语义）。
+#   第三参存在时预置到 $AH/bin/airymaxrt-full（离线自举）。
 # 退出码：0=全链通过；非 0=阶段失败。
 set -Eeuo pipefail
 
@@ -133,7 +133,7 @@ info "安装产物齐备: $AH"
 
 # ─── 阶段 2：完整启动器就位 ───────────────────────────────────────────────
 if [ -n "$FULL" ] && [ -f "$FULL" ]; then
-    # 离线自举（同 U9）：thin 管理命令联网拉取 full 的对象即此物，跳过网络
+    # 离线自举：thin 管理命令联网拉取 full 的对象即此物，跳过网络
     cp -f "$FULL" "$AH/bin/airymaxrt-full" 2>/dev/null || true
     chmod 755 "$AH/bin/airymaxrt-full" 2>/dev/null || true
 fi
@@ -145,16 +145,16 @@ fi
 
 # ─── 阶段 3：daemon 群拉起（完整启动器默认流程）─────────────────────────
 info "拉起 daemon 群（完整启动器默认流程，健康等待含 gateway）"
-CTRL="$AH/tmp/g4b-ctrl.$$"
+CTRL="$AH/tmp/clean-host-ctrl.$$"
 mkdir -p "$AH/tmp" 2>/dev/null || true
 rm -f "$CTRL"; mkfifo "$CTRL" 2>/dev/null || true
 # FIFO 创建失败时 exec 9<> 会在 set -e 下静默死（无 annotation 出证）
 [ -p "$CTRL" ] || fail "mkfifo 失败: $CTRL"
 # 保持 stdin 写端打开：非 TTY 前端（airy_cli -p）读 stdin，EOF 会让会话退出。
 # 注意必须以读写方式（<>）打开 FIFO：只写（>）会在无读者时阻塞 exec，而
-# 读者（启动器）要等本行返回后才启动——互相等待死锁（G4b 实测修正）。
+# 读者（启动器）要等本行返回后才启动——互相等待死锁。
 exec 9<>"$CTRL"
-LOGF="$AH/logs/g4b-clean-host.out"
+LOGF="$AH/logs/clean-host.out"
 mkdir -p "$AH/logs" 2>/dev/null || true
 # AIRYRT_TERM_LOG=verbose：launcher 文档化排障开关（默认 quiet 时 INFO 只写
 # airymaxrt.log 不进 stderr）。核验场景要求启动时序全量可见——stdout+stderr
@@ -173,7 +173,7 @@ GWP="${GWP:-8080}"
 _GW_OK=0
 _i=0
 # macOS bash 3.2（Apple 构建）禁用了 /dev/tcp 网络重定向（恒报
-# "No such file or directory"；G4b 双腿实证：gateway_d 存活且健康
+# "No such file or directory"；双腿实测：gateway_d 存活且健康
 # 检查持续、total_req=0 证明零连接到达，120s 探测全败纯因探测手段）。
 # macOS 自带 nc(1)，优先 nc -z；无 nc 再回退 /dev/tcp（Linux bash 语义）。
 _HAVE_NC=0
@@ -193,17 +193,17 @@ done
 if [ "$_GW_OK" != "1" ]; then
     # 取证：launcher 存活/退出态（含 wait rc）→ 单一证据文件 → annotation
     # 分段通道（job log 需 admin，annotation 匿名可读；逐行 ::error:: 受
-    # 10 条上限截断，rc4-3 实证——故走 dump_file 多行 message）。
+    # 10 条上限截断——故走 dump_file 多行 message）。
     if kill -0 "$L_PID" 2>/dev/null; then
         L_STATE="仍存活（PID ${L_PID}）——非 set -e 退出"
     else
-        # wait 非 0 rc 不得触发 set -e（rc4-4 arm 实证：取证分支自身
+        # wait 非 0 rc 不得触发 set -e（否则取证分支自身
         # 被 set -e 杀死，EV 未生成、dump 未输出，仅剩 runner 默认标注）
         L_RC=0
         wait "$L_PID" 2>/dev/null || L_RC=$?
         L_STATE="已退出（PID ${L_PID}, rc=${L_RC}）——set -e 静默终止嫌疑"
     fi
-    EV="$AH/logs/g4b-evidence.txt"
+    EV="$AH/logs/clean-host-evidence.txt"
     {
         echo "== logs/ 目录 =="
         ls -la "$AH/logs" 2>/dev/null || true
@@ -213,11 +213,11 @@ if [ "$_GW_OK" != "1" ]; then
         tail -n 30 "$AH/logs/gateway_d.out" 2>/dev/null || true
         echo "== gateway_d.out 全文关键行检索（启动期取证：MHD 版本对照/"
         echo "   HTTP start 失败 ERROR/shutdown 触发源——尾部 30 行被停机"
-        echo "   日志占据时，此块是启动期唯一窗口；arm 腿 rc10 实证缺口）=="
+        echo "   日志占据时，此块是启动期唯一窗口）=="
         grep -nE "MHD|microhttpd|HTTP gateway|ERROR|FATAL|fatal|EBUSY|bind|shutting|start" "$AH/logs/gateway_d.out" 2>/dev/null | head -40 || true
         echo "== gateway_d.out 全文头部 25 行（启动最早阶段，含启动参数回显）=="
         head -n 25 "$AH/logs/gateway_d.out" 2>/dev/null || true
-        echo "== 网络层取证（runner2 双腿实证：gateway 自称 started successfully"
+        echo "== 网络层取证（gateway 自称 started successfully"
         echo "   但 nc//dev/tcp 双探测法 120s 全败且 total_req=0——须定位矛盾层）=="
         echo "gateway.port 内容: [$(cat "$AH/run/gateway.port" 2>/dev/null | tr '\n' ' ')]"
         echo "nc 路径: $(command -v nc 2>/dev/null || echo 无)"
@@ -245,7 +245,7 @@ if [ "$_GW_OK" != "1" ]; then
             | cut -c 1-150 | tail -20 || true
         ls -la "$AH/bin/agentrt-tui" "$AH/bin/airy_cli" 2>/dev/null || true
         # ── 保尾区核心证据殿后：dump_file 只保尾部 9900B（9 段 × 1100B），
-        # rc10 实证置于 EV 头部的 launcher 日志被整体挤丢（恰是定案证据）。
+        # 置于 EV 头部的 launcher 日志会被整体挤丢（恰是定案证据）。
         # 行宽 cut 150 控总量（≈6.8KB），确保尾区完整保留。
         echo "== launcher 日志尾部 25 行（AIRYRT_TERM_LOG=verbose，核心取证）=="
         tail -n 25 "$LOGF" 2>/dev/null | cut -c 1-150 || true
@@ -260,7 +260,7 @@ if [ "$_GW_OK" != "1" ]; then
         echo "清理开始』→set -u/-e 内部直死（bash 3.2 空数组类）；rc=127→命令缺失"
         echo "launcher 黑匣子关键词: 『终局清理开始（exit_rc=N）』『收到 TERM/INT 信号』"
     } >"$EV" 2>&1 || true
-    dump_file "G4b phase4 取证" "$EV"
+    dump_file "phase4 取证" "$EV"
     _EXPECTED=1
     exit 1
 fi
@@ -272,7 +272,7 @@ info "CLI 冒烟: airy_cli -p /daemons"
 # macOS 无 timeout(1)：以后台 + 轮询实现 30s 超时（bash3.2 兼容）。
 OUT=""
 _i=0
-CLI_OUT="$AH/logs/g4b-cli.out"
+CLI_OUT="$AH/logs/clean-host-cli.out"
 # 冒烟失败时输出经 annotation 通道出证（job log 需 admin）
 smoke_fail() { dump_file "CLI 冒烟输出" "$CLI_OUT"; fail "$*"; }
 while [ "$_i" -lt 60 ]; do

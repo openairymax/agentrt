@@ -2,12 +2,10 @@ name: Mirror Sync
 on:
   push:
     branches: [main]
-    # 0.1.11 A4：tag 也要触发同步——agentrt 侧 tag（SSoT）需及时到达
-    # GitHub，release.yml（v*）才得以自动触发全链发布。根因（v0.1.10
-    # 实证）：此前只监听 main，tag force-move 后 GH tag 缺失，只能手工
-    # REST DELETE+POST 补建。
+    # tag 也要触发同步——agentrt 侧 tag（SSoT）需及时到达 GitHub，
+    # release.yml（v*）才得以自动触发全链发布。
     tags: ['v*']
-  # 0.1.11 A4：atomgit 侧 webhook（推送事件）→ GitHub repository_dispatch
+  # atomgit 侧 webhook（推送事件）→ GitHub repository_dispatch
   # 作为主/备 tag 同步通道（UI 配置；GH 侧 PAT 推送可再触发本工作流）。
   repository_dispatch:
     types: [sync-mirror]
@@ -23,18 +21,10 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      # 关键修复：不检出子模块。旧版 submodules:true 需要从 GitHub 拉
-      # 子模块镜像仓，而这些仓正是本工作流负责创建/更新的——循环依赖
-      # 导致 checkout 即失败（run #82，9 秒），tag 永远到不了 GitHub。
-      # 子模块数据源改为 atomgit（SSoT），见 .github/scripts/sync-mirror.sh。
-      # persist-credentials:false：checkout 默认向工作树注入 GITHUB_TOKEN
-      # extraHeader，宿主仓 push 时该 header 会压过推送 URL 内嵌的 GH_TOKEN，
-      # 使 agentrt 以 github-actions[bot] 身份被 403 拒推（伞仓时代 run #89：
-      # "Permission to openairymax/airymaxhub.git denied to
-      # github-actions[bot]"——根因同构）。叶子仓 remote 系脚本新建、无此注入，
-      # 故同 URL 格式能以普通用户 PAT 推送成功——只有宿主仓中招。
-      # 本步之后所有网络操作都走 URL 内嵌 PAT / 匿名 HTTPS，不需要
-      # checkout 保留凭据。
+      # 不检出子模块：子模块镜像仓由本工作流创建/更新，检出即循环
+      # 依赖；子模块数据源为 atomgit，见 .github/scripts/sync-mirror.sh。
+      # persist-credentials:false：本步之后所有网络操作走 URL 内嵌
+      # PAT / 匿名 HTTPS，不需要保留凭据。
       - name: Checkout (no submodules)
         uses: actions/checkout@v4
         with:
