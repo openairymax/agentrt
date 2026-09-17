@@ -44,17 +44,35 @@
 #define CLI_GW_RECV_CHUNK 8192
 #define CLI_GW_MAX_BODY (64u * 1024u * 1024u) /* 64MiB 响应上限 */
 
-/* cli_gw: 网关 RPC 客户端错误描述缓冲（cli_err_desc 优先消费，一次性） */
-char g_cli_gw_err[256] = "";
+/* 网关 RPC 客户端错误描述缓冲（本模块唯一权威；外部经 cli_gw_last_err /
+ * cli_gw_err_take / cli_gw_err_set 访问，禁止跨 TU 直接引用）。 */
+static char g_cli_gw_err[256] = "";
+
+const char *cli_gw_last_err(void)
+{
+    return g_cli_gw_err;
+}
+
+const char *cli_gw_err_take(void)
+{
+    static char taken[256];
+    snprintf(taken, sizeof(taken), "%s", g_cli_gw_err);
+    g_cli_gw_err[0] = '\0';
+    return taken;
+}
+
+void cli_gw_err_set(const char *msg)
+{
+    snprintf(g_cli_gw_err, sizeof(g_cli_gw_err), "%s", msg ? msg : "");
+}
 
 /* cli_gw_exchange 内部失败细分（S-02 超时可诊断/可取消）：
  * -1 传输失败（连接/发送/协议）；-2 用户取消；-3 接收超时。 */
 #define CLI_GW_EXCH_CANCELED (-2)
 #define CLI_GW_EXCH_TIMEOUT (-3)
 
-/* SIGINT 取消标志（main.c 拥有，cli_internal.h SSoT 声明 extern）。cmd 域
- * 仅读，与 cli_chat.c inline extern 消费 g_cli_gw_err 同为既有跨域访问
- * 方式：接收等待循环中命中即中断，客户端不再干等模型推理。 */
+/* SIGINT 取消标志（main.c 拥有，cli_internal.h SSoT 声明 extern）：cmd 域
+ * 仅读，接收等待循环中命中即中断。 */
 extern volatile sig_atomic_t g_cli_cancel;
 
 /* 读取 $AIRY_HOME/run/gateway.port（完整启动器在端口漂移后固化实际端口）。
@@ -541,8 +559,12 @@ static int cli_gw_provider_state(const char *m)
 /* ── JSON-RPC over HTTP POST / ─────────────────────────────────────── */
 int cli_gw_call(const char *method, const char *params_json, int timeout_ms, char **out_result)
 {
-    if (!method || !out_result)
+    if (!method || !out_result) {
+        snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
+                 "网关调用参数非法（method%s，out_result%s）",
+                 method ? " 已给出" : " 为空", out_result ? " 已给出" : " 为空");
         return -1;
+    }
     *out_result = NULL;
     char host[128];
     int port = 0;
@@ -554,11 +576,16 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
     size_t params_len = (params_json && *params_json) ? strlen(params_json) : 2;
     size_t blen = envelope_len + params_len + 1;
     char *body = (char *)AIRY_MALLOC(blen);
-    if (!body)
+    if (!body) {
+        snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
+                 "请求缓冲分配失败（method=%s，%zu 字节）", method, blen);
         return -1;
+    }
     int bn = snprintf(body, blen, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"%s\",\"params\":%s}",
                       method, (params_json && *params_json) ? params_json : "{}");
     if (bn <= 0 || (size_t)bn >= blen) {
+        snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
+                 "请求信封构造失败（method=%s），参数过长", method);
         AIRY_FREE(body);
         return -1;
     }
@@ -602,8 +629,13 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
     /* 提取 JSON-RPC result（忽略 id 字段） */
     cJSON *root = cJSON_Parse(resp);
     AIRY_FREE(resp);
-    if (!root)
+    if (!root) {
+        snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
+                 "网关响应不是合法 JSON（method=%s），请查看 %s/logs/gateway_d.out",
+                 method, getenv("AIRY_HOME") ? getenv("AIRY_HOME") : "~/.airymaxrt");
+        AIRY_LOG_WARN("cli_gw: malformed json response (method=%s) at %s:%d", method, host, port);
         return -1;
+    }
     cJSON *err = cJSON_GetObjectItem(root, "error");
     if (err) {
         /* 0.1.6h 友好化：解析 error 详情，避免裸 JSON-RPC 刷屏 */
@@ -634,13 +666,19 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
     }
     cJSON *result = cJSON_GetObjectItem(root, "result");
     if (!result) {
+        snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
+                 "网关响应缺少 result 字段（method=%s），服务面实现异常", method);
+        AIRY_LOG_WARN("cli_gw: response without result (method=%s) at %s:%d", method, host, port);
         cJSON_Delete(root);
         return -1;
     }
     char *out = cJSON_PrintUnformatted(result);
     cJSON_Delete(root);
-    if (!out)
+    if (!out) {
+        snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
+                 "网关响应序列化失败（method=%s）", method);
         return -1;
+    }
     *out_result = out;
     return 0;
 }

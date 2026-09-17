@@ -191,7 +191,8 @@ static int cli_chat_gw_round(const char *model, const cli_chat_msgbuf_t *buf,
         cJSON_AddItemToArray(messages, j);
     }
     cJSON_AddNumberToObject(params, "temperature", 0.7);
-    cJSON_AddNumberToObject(params, "max_tokens", 2048);
+    /* 不写 max_tokens：输出上限由 llm_d 依 model.yaml 的 max_output 裁决，
+     * 客户端写死会覆盖用户配置。 */
     if (with_tools) {
         cJSON *tools = cJSON_Parse(cli_chat_tools_json);
         if (tools && cJSON_IsArray(tools) && cJSON_GetArraySize(tools) > 0)
@@ -217,9 +218,7 @@ static int cli_chat_gw_round(const char *model, const cli_chat_msgbuf_t *buf,
     *out_resp = cli_chat_resp_from_json(result_json);
     AIRY_FREE(result_json);
     if (!*out_resp) {
-        extern char g_cli_gw_err[256]; /* 同 cli_chat_tools.c 的既有访问方式 */
-        snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
-                 "模型响应解析失败（网关返回格式异常）");
+        cli_gw_err_set("模型响应解析失败（网关返回格式异常）");
         return -1;
     }
     return 0;

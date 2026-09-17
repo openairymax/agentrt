@@ -218,24 +218,29 @@ airy_err_t cli_dag_submit_remote(const airy_task_plan_t *plan, const char *task_
     return *out_dag_id ? AIRY_EOK : AIRY_ERR_OUT_OF_MEMORY;
 }
 
-/* Poll sched.dag_status once: parse the snapshot (progress=done nodes/node_count).
-  * At the final state, aggregate node outputs/errors into a root-level output for display. */
-cli_dag_poll_rc_t cli_dag_poll_remote(const char *dag_id, double *out_progress, char *out_state,
-                                      size_t state_cap, char **out_result)
+/* ==================== dag_status 快照（单次拉取 SSoT） ====================
+ * 板卡轮询每轮只发一次 sched.dag_status，状态面与节点面共用同一份解析结果。
+ * 此前两条消费路径各自发起一次 RPC，每轮 2 次重复请求把 sched_d 打成
+ * 200ms 周期的短连接洪泛（0.1.17 R4-① 根因）。 */
+
+struct cli_dag_snapshot {
+    cJSON *root;
+    char dag_id[64];
+};
+
+cli_dag_snapshot_t *cli_dag_snapshot_fetch(const char *dag_id)
 {
-    if (!dag_id || !out_progress || !out_state || state_cap == 0)
-        return CLI_DAG_POLL_ERROR;
-    if (out_result)
-        *out_result = NULL;
+    if (!dag_id || !dag_id[0])
+        return NULL;
 
     cJSON *params = cJSON_CreateObject();
     if (!params)
-        return CLI_DAG_POLL_ERROR;
+        return NULL;
     cJSON_AddStringToObject(params, "dag_id", dag_id);
     char *params_json = cJSON_PrintUnformatted(params);
     cJSON_Delete(params);
     if (!params_json)
-        return CLI_DAG_POLL_ERROR;
+        return NULL;
 
     /* 架构约束（2026-08-25）：统一经 gateway 派发（sched.dag_status） */
     char *rpc_result = NULL;
@@ -243,20 +248,56 @@ cli_dag_poll_rc_t cli_dag_poll_remote(const char *dag_id, double *out_progress, 
     AIRY_FREE(params_json);
     if (rc != AIRY_SUCCESS || !rpc_result) {
         AIRY_FREE(rpc_result);
-        return CLI_DAG_POLL_ERROR;
+        return NULL;
     }
 
-    cJSON *root = cJSON_Parse(rpc_result);
+    cli_dag_snapshot_t *snap = (cli_dag_snapshot_t *)AIRY_CALLOC(1, sizeof(cli_dag_snapshot_t));
+    if (!snap) {
+        AIRY_FREE(rpc_result);
+        return NULL;
+    }
+    snap->root = cJSON_Parse(rpc_result);
     AIRY_FREE(rpc_result);
-    if (!root)
+    if (!snap->root) {
+        AIRY_FREE(snap);
+        return NULL;
+    }
+    AIRY_STRNCPY_TERM(snap->dag_id, dag_id, sizeof(snap->dag_id));
+    return snap;
+}
+
+void cli_dag_snapshot_free(cli_dag_snapshot_t *snap)
+{
+    if (!snap)
+        return;
+    if (snap->root)
+        cJSON_Delete(snap->root);
+    AIRY_FREE(snap);
+}
+
+static const char *cli_dag_snapshot_state(const cli_dag_snapshot_t *snap)
+{
+    if (!snap || !snap->root)
+        return "unknown";
+    cJSON *st = cJSON_GetObjectItem(snap->root, "status");
+    return (cJSON_IsString(st) && st->valuestring) ? st->valuestring : "unknown";
+}
+
+/* Consume one fetched snapshot: progress = done nodes / node_count. At the
+ * final state, aggregate node outputs/errors into a root-level output. */
+cli_dag_poll_rc_t cli_dag_snapshot_poll(const cli_dag_snapshot_t *snap, double *out_progress,
+                                        char *out_state, size_t state_cap, char **out_result)
+{
+    if (out_result)
+        *out_result = NULL;
+    if (!snap || !snap->root || !out_progress || !out_state || state_cap == 0)
         return CLI_DAG_POLL_ERROR;
 
-    cJSON *st = cJSON_GetObjectItem(root, "status");
-    const char *status = (cJSON_IsString(st) && st->valuestring) ? st->valuestring : "unknown";
+    const char *status = cli_dag_snapshot_state(snap);
     snprintf(out_state, state_cap, "%s", status);
 
-    cJSON *nc = cJSON_GetObjectItem(root, "node_count");
-    cJSON *pg = cJSON_GetObjectItem(root, "progress");
+    cJSON *nc = cJSON_GetObjectItem(snap->root, "node_count");
+    cJSON *pg = cJSON_GetObjectItem(snap->root, "progress");
     double node_n = cJSON_IsNumber(nc) ? nc->valuedouble : 0.0;
     double done_n = cJSON_IsNumber(pg) ? pg->valuedouble : 0.0;
     *out_progress = node_n > 0.0 ? done_n / node_n : 0.0;
@@ -265,9 +306,9 @@ cli_dag_poll_rc_t cli_dag_poll_remote(const char *dag_id, double *out_progress, 
     if (terminal && out_result) {
         cJSON *agg = cJSON_CreateObject();
         if (agg) {
-            cJSON_AddStringToObject(agg, "dag_id", dag_id);
+            cJSON_AddStringToObject(agg, "dag_id", snap->dag_id);
             cJSON_AddStringToObject(agg, "status", status);
-            cJSON *nodes = cJSON_GetObjectItem(root, "nodes");
+            cJSON *nodes = cJSON_GetObjectItem(snap->root, "nodes");
             int nsz = (nodes && cJSON_IsArray(nodes)) ? cJSON_GetArraySize(nodes) : 0;
 
             size_t cap = 4096;
@@ -321,7 +362,6 @@ cli_dag_poll_rc_t cli_dag_poll_remote(const char *dag_id, double *out_progress, 
         }
     }
 
-    cJSON_Delete(root);
     return terminal ? CLI_DAG_POLL_DONE : CLI_DAG_POLL_ACTIVE;
 }
 
@@ -438,7 +478,12 @@ airy_err_t cli_dag_wait_remote(const char *dag_id, char **out_result)
         double prog = 0.0;
         char st[16];
         char *final_result = NULL;
-        cli_dag_poll_rc_t prc = cli_dag_poll_remote(dag_id, &prog, st, sizeof(st), &final_result);
+        cli_dag_snapshot_t *snap = cli_dag_snapshot_fetch(dag_id);
+        if (!snap)
+            return AIRY_ERR_GENERIC_FAIL;
+        cli_dag_poll_rc_t prc =
+            cli_dag_snapshot_poll(snap, &prog, st, sizeof(st), &final_result);
+        cli_dag_snapshot_free(snap);
         if (prc == CLI_DAG_POLL_DONE) {
             if (final_result) {
                 *out_result = final_result;
@@ -446,8 +491,6 @@ airy_err_t cli_dag_wait_remote(const char *dag_id, char **out_result)
             }
             return AIRY_ERR_STATE_ERROR;
         }
-        if (prc == CLI_DAG_POLL_ERROR)
-            return AIRY_ERR_GENERIC_FAIL;
 
         if (strcmp(st, last_state) != 0 || (prog - last_prog) >= 0.01) {
             interval_ms = CLI_DAG_WAIT_BASE_MS;
@@ -533,42 +576,20 @@ void cli_dag_node_board_destroy(cli_dag_board_t *b)
     AIRY_FREE(b);
 }
 
-/* Query dag_status, diff node states against the last snapshot and print
- * every node whose state changed. Returns 0 while the DAG is still active,
- * 1 once a terminal state is observed (caller stops polling). */
-int cli_dag_node_board_tick(cli_dag_board_t *b, const char *dag_id)
+/* Diff node states in a fetched snapshot against the last board state and
+ * print every node whose state changed. Returns 0 while the DAG is still
+ * active, 1 once a terminal state is observed (caller stops polling).
+ * 0.1.17 R4-①: consumes the caller's snapshot instead of issuing its own
+ * sched.dag_status RPC. */
+int cli_dag_node_board_tick(cli_dag_board_t *b, const cli_dag_snapshot_t *snap)
 {
-    if (!b || !dag_id)
+    if (!b || !snap || !snap->root)
         return 0;
 
-    cJSON *params = cJSON_CreateObject();
-    if (!params)
-        return 0;
-    cJSON_AddStringToObject(params, "dag_id", dag_id);
-    char *params_json = cJSON_PrintUnformatted(params);
-    cJSON_Delete(params);
-    if (!params_json)
-        return 0;
-
-    /* 架构约束（2026-08-25）：统一经 gateway 派发（sched.dag_status） */
-    char *rpc_result = NULL;
-    int rc = cli_gw_call("sched.dag_status", params_json, 10000, &rpc_result);
-    AIRY_FREE(params_json);
-    if (rc != AIRY_SUCCESS || !rpc_result) {
-        AIRY_FREE(rpc_result);
-        return 0;
-    }
-
-    cJSON *root = cJSON_Parse(rpc_result);
-    AIRY_FREE(rpc_result);
-    if (!root)
-        return 0;
-
-    cJSON *st = cJSON_GetObjectItem(root, "status");
-    const char *status = (cJSON_IsString(st) && st->valuestring) ? st->valuestring : "unknown";
+    const char *status = cli_dag_snapshot_state(snap);
     int terminal = cli_state_terminal(status);
 
-    cJSON *nodes = cJSON_GetObjectItem(root, "nodes");
+    cJSON *nodes = cJSON_GetObjectItem(snap->root, "nodes");
     int nsz = (nodes && cJSON_IsArray(nodes)) ? cJSON_GetArraySize(nodes) : 0;
     if (nsz > CLI_DAG_BOARD_MAX_NODES)
         nsz = CLI_DAG_BOARD_MAX_NODES;
@@ -608,7 +629,6 @@ int cli_dag_node_board_tick(cli_dag_board_t *b, const char *dag_id)
         }
     }
 
-    cJSON_Delete(root);
     return terminal ? 1 : 0;
 }
 
@@ -616,39 +636,16 @@ int cli_dag_node_board_tick(cli_dag_board_t *b, const char *dag_id)
  * dag_status and reports every node's (id, state) through cb without
  * printing anything — the live plan board renders the block itself.
  * Returns 1 once a terminal state is observed, 0 otherwise. */
-int cli_dag_board_snapshot(const char *dag_id, void (*cb)(const char *node_id, const char *state))
+int cli_dag_board_snapshot(const cli_dag_snapshot_t *snap,
+                           void (*cb)(const char *node_id, const char *state))
 {
-    if (!dag_id || !cb)
+    if (!snap || !snap->root || !cb)
         return 0;
 
-    cJSON *params = cJSON_CreateObject();
-    if (!params)
-        return 0;
-    cJSON_AddStringToObject(params, "dag_id", dag_id);
-    char *params_json = cJSON_PrintUnformatted(params);
-    cJSON_Delete(params);
-    if (!params_json)
-        return 0;
-
-    /* 架构约束（2026-08-25）：统一经 gateway 派发（sched.dag_status） */
-    char *rpc_result = NULL;
-    int rc = cli_gw_call("sched.dag_status", params_json, 10000, &rpc_result);
-    AIRY_FREE(params_json);
-    if (rc != AIRY_SUCCESS || !rpc_result) {
-        AIRY_FREE(rpc_result);
-        return 0;
-    }
-
-    cJSON *root = cJSON_Parse(rpc_result);
-    AIRY_FREE(rpc_result);
-    if (!root)
-        return 0;
-
-    cJSON *st = cJSON_GetObjectItem(root, "status");
-    const char *status = (cJSON_IsString(st) && st->valuestring) ? st->valuestring : "unknown";
+    const char *status = cli_dag_snapshot_state(snap);
     int terminal = cli_state_terminal(status);
 
-    cJSON *nodes = cJSON_GetObjectItem(root, "nodes");
+    cJSON *nodes = cJSON_GetObjectItem(snap->root, "nodes");
     int nsz = (nodes && cJSON_IsArray(nodes)) ? cJSON_GetArraySize(nodes) : 0;
     for (int i = 0; i < nsz; i++) {
         cJSON *nj = cJSON_GetArrayItem(nodes, i);
@@ -663,6 +660,5 @@ int cli_dag_board_snapshot(const char *dag_id, void (*cb)(const char *node_id, c
         }
     }
 
-    cJSON_Delete(root);
     return terminal ? 1 : 0;
 }

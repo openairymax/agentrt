@@ -24,7 +24,7 @@ const cli_command_t CLI_COMMANDS[] = {
     {"/hall", "事件流：/hall（统计）/hall audit（审计完整性）/hall replay [n]（全局回放）", CLI_CAT_SYSTEM, 0, cmd_hall},
     {"/orch", "流程编排：/orch <task>（七阶段管线：分解→规划→生成→批判→验证→审计→对齐）", CLI_CAT_SYSTEM, 1, cmd_orch},
     {"/quit", "退出 agentrt", CLI_CAT_SESSION, 0, cmd_quit},
-    {"/tui", "切换到图形 TUI（agentrt-tui）", CLI_CAT_SESSION, 0, cmd_tui},
+    {"/tui", "切换到全屏 TUI 渲染层（退出后返回行式对话）", CLI_CAT_SESSION, 0, cmd_tui},
     {"/daemons", "查看全部 daemon 在线状态", CLI_CAT_SYSTEM, 0, cmd_daemons},
     {"/daemon", "管理 daemon：/daemon start|stop|restart|status [ns...]（默认全部）", CLI_CAT_SYSTEM, 0, cmd_daemon},
     {"/rpc", "直接调用 daemon 方法：/rpc <ns>.<method> [json]（ns 或 ns_d 均可）", CLI_CAT_SYSTEM, 1, cmd_rpc},
@@ -48,6 +48,8 @@ const cli_command_t CLI_COMMANDS[] = {
     {"/perm", "权限裁决：/perm <agent> <action> <resource>", CLI_CAT_SECURITY, 1, cmd_perm},
     {"/sanitize", "输入净化：/sanitize <input>", CLI_CAT_SESSION, 1, cmd_sanitize},
     {"/security", "安全状态（网络规则统计）", CLI_CAT_SECURITY, 0, cmd_security},
+    {"/pending", "待审批工具调用（只读视图）", CLI_CAT_SECURITY, 0, cmd_pending},
+    {"/approve", "回传审批决议：/approve <request_id> allow|always|deny", CLI_CAT_SECURITY, 1, cmd_approve},
 };
 
 #define CLI_COMMANDS_COUNT (sizeof(CLI_COMMANDS) / sizeof(CLI_COMMANDS[0]))
@@ -103,6 +105,10 @@ static void cli_print_usage(void)
     cli_outf("                           （无 banner/提示符；省略 PROMPT 时从 stdin 读取）\n");
     cli_outf("  %s--json%s                 结构化 JSON 输出（与 %s-p%s 组合使用）\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_outf("  %s--tui%s                  全屏 TUI 渲染层（agentrt-tui 子进程，退出码回传）\n",
+           cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_outf("  %s--continue%s, %s--resume%s   恢复上次会话上下文（读 mem_d 最近记忆装配视图）\n",
+           cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %s-h%s, %s--help%s             显示本帮助\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("交互模式：直接运行 airy_cli 进入对话；输入 /help 查看命令。\n");
@@ -119,6 +125,11 @@ int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
             g_cli_print_mode = 1;
         } else if (strcmp(argv[i], "--json") == 0) {
             g_cli_json_mode = 1;
+        } else if (strcmp(argv[i], "--tui") == 0) {
+            g_cli_tui_mode = 1;
+        } else if (strcmp(argv[i], "--continue") == 0 ||
+                   strcmp(argv[i], "--resume") == 0) {
+            g_cli_resume_mode = 1;
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             cli_print_usage();
             return 1;
@@ -141,6 +152,11 @@ int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
             cli_print_usage();
             return 1;
         }
+    }
+    if (g_cli_tui_mode && g_cli_print_mode) {
+        cli_outf("airy_cli: %s--tui%s 与 %s-p%s 互斥（全屏渲染层 vs 无界面单轮）\n",
+               cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
+        return 1;
     }
     return 0;
 }

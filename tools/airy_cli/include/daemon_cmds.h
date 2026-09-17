@@ -40,6 +40,8 @@ int cmd_vault(const char *arg, void *ctx);
 int cmd_perm(const char *arg, void *ctx);
 int cmd_sanitize(const char *arg, void *ctx);
 int cmd_security(const char *arg, void *ctx);
+int cmd_pending(const char *arg, void *ctx);
+int cmd_approve(const char *arg, void *ctx);
 
 /* 运行时目录解析（统一走 airy_runtime_dir()，AIRY_HOME/run）。
  * cli_chat.c 工具回路用它拼 tool.sock。 */

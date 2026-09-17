@@ -36,6 +36,12 @@ void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
                                     ? final_resp->choices[0].content
                                     : "";
 
+    /* finish_reason 走全栈 canonical 词汇表（llm_service_types.h SSoT）：
+     * 截断（length）时收到的正文只是模型答案的前缀，必须在用户面可判读。 */
+    const char *final_reason =
+        final_resp->finish_reason ? final_resp->finish_reason : LLM_FINISH_STOP;
+    int truncated = llm_finish_is_truncated(final_reason);
+
     /* 1.3 推理语言网关服务面化（M1-1c）：输出后处理（语言漂移检测 +
      * 术语一致性 + 润色）经 gateway → think.lang_postprocess（think_d
      * 承载）。期望输出语言取路由决策 output_lang（wire 值）；仅作用于
@@ -108,6 +114,7 @@ void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
             cJSON_AddNumberToObject(usage, "cost_usd", final_resp->cost_usd);
             cJSON_AddItemToObject(root, "usage", usage);
         }
+        cJSON_AddStringToObject(root, "finish_reason", final_reason);
         char *js = cJSON_PrintUnformatted(root);
         if (js) {
             cli_outf("%s\n", js);
@@ -120,7 +127,7 @@ void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
             cli_outf(",\"content\":\"%s\"", render_content);
         else
             cli_outf(",\"error\":\"reply failed\"");
-        cli_outf("}\n");
+        cli_outf(",\"finish_reason\":\"%s\"}\n", final_reason);
 #endif /* AIRY_HAS_CJSON */
     } else if (g_cli_print_mode) {
         /* 流式模式：final_content 已随块实时直出，不再重复打印。
@@ -133,6 +140,11 @@ void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
             fprintf(stderr,
                     "[chat] warning: empty reply (model returned no text; "
                     "reasoning-only or provider error)\n");
+        /* 截断诊断（0.1.17）：stdout 已直出的正文是答案前缀，stderr 告警
+         * 不改动 stdout 内容，脚本仍可完整解析。 */
+        if (truncated)
+            fprintf(stderr, "[chat] warning: reply truncated at the output token cap; "
+                            "the text above is incomplete\n");
     } else {
         cli_tui_t *r_tui = cli_tui_get_default();
         (void)r_tui;
@@ -154,6 +166,8 @@ void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
                 cli_render_collapsed(final_resp->choices[0].reasoning_content,
                                      4, CLI_REPLY_FOLD_KEEP, 1);
             }
+            if (truncated)
+                cli_render_super_agent(CLI_REPLY_TRUNCATED_HINT);
         } else {
             /* TUI / 非流式交互：思考链折叠展示（进历史）；结果完整渲染
              * 进历史（用户要求结果不折叠，长结果经视口滚动浏览）。 */
@@ -170,6 +184,8 @@ void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
             } else {
                 cli_render_super_agent(CLI_REPLY_EMPTY_HINT);
             }
+            if (truncated)
+                cli_render_super_agent(CLI_REPLY_TRUNCATED_HINT);
         }
     }
 

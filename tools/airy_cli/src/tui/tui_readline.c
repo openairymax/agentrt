@@ -3,12 +3,12 @@
 
 /**
  * @file tui_readline.c
- * @brief TUI 引擎全屏 readline 主循环（域拆分自 cli_tui.c，2026-08-27）。
+ * @brief readline 入口分派与全屏分支（域拆分自 cli_tui.c，2026-08-27）。
  *
- * cli_tui_readline 的完整循环骨架：轮询节拍（面板实时刷新 / 光标闪烁）、
- * 内置拼音输入法交互、视图模式（tab）切换、面板按键分派、Ctrl+R/S 反向
- * 搜索、提交/清行/删除/移动等编辑快捷键，以及方向键/翻页/粘贴/普通字符
- * 分派（后者收敛在 tui_readline_nav.c 的 tui_readline_arrow_keys）。
+ * cli_tui_readline 的入口：非 TTY 走 fgets，TTY 非全屏走行式
+ * tui_readline_line_mode（0.1.17 R5-G2 后 CLI 的唯一交互形态），
+ * 全屏分支的循环骨架（面板实时刷新、视图模式切换、面板按键分派、
+ * Ctrl+R/S 反向搜索等）随全屏套件一并冻结（cli_tui_enter 恒拒绝）。
  * 共享声明见 cli_tui_internal.h。
  */
 
@@ -22,9 +22,8 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
         *out_len = 0;
 
     if (!t || !t->active) {
-        /* Non-TUI. 2.3.7：F8 转义序列 (ESC[19~) 出现在行输入中 →
-         * 请求进入全屏页面（返回 2）。交互 TTY 走字节级 readline
-         * （方向键/PgUp 翻历史、无乱码）；管道/日志走 fgets。 */
+        /* Non-TUI. 0.1.17 R5-G2：CLI 无全屏形态，交互 TTY 走字节级
+         * readline（方向键/PgUp 翻历史、无乱码）；管道/日志走 fgets。 */
         if (cli_term_is_tty())
             return tui_readline_line_mode(t, buf, cap, out_len);
         if (!fgets(buf, (int)cap, stdin))
@@ -32,11 +31,6 @@ int cli_tui_readline(cli_tui_t *t, char *buf, size_t cap, size_t *out_len)
         size_t n = strlen(buf);
         while (n > 0 && (buf[n - 1] == '\n' || buf[n - 1] == '\r'))
             buf[--n] = '\0';
-        if (strstr(buf, "\x1b[19~")) {
-            if (out_len)
-                *out_len = 0;
-            return 2;
-        }
         if (out_len)
             *out_len = n;
         return 1;

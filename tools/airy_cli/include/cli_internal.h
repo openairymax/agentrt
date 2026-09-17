@@ -73,6 +73,18 @@ extern "C" {
   * (user+assistant) is dropped, keeping FIFO. */
 #define CLI_HISTORY_MAX_MSGS 60
 
+/* CLI 整轮记忆记录的线格式 SSoT：cli_chat_memory.c 写入、cli_chat_session.c
+ * 还原、cli_panel.c / airy_cli_cmd_cognition.c 展示剥离共用同一组字面量。
+ * 前缀字节数一律用 (sizeof(X) - 1) 求取，禁止硬编码——"用户: " 在 UTF-8 下
+ * 为 8 字节（"用户" 6 + ": " 2），历史上误记为 9，使 "用户: " 前缀过滤分支
+ * 永不命中（把字面量 NUL 也纳入比较），自我回灌与面板前缀剥离同时失效。 */
+#define CLI_TURN_USER_PREFIX "用户: "
+#define CLI_TURN_USER_PREFIX_LEN (sizeof(CLI_TURN_USER_PREFIX) - 1)
+#define CLI_TURN_AGENT_SEP "\nAgentRT: "
+#define CLI_TURN_AGENT_SEP_LEN (sizeof(CLI_TURN_AGENT_SEP) - 1)
+#define CLI_TURN_REASON_SEP "\n[reasoning] "
+#define CLI_TURN_REASON_SEP_LEN (sizeof(CLI_TURN_REASON_SEP) - 1)
+
 /* 命令类别：/help 按组展示，避免 26 个命令平铺淹没关键入口。 */
 typedef enum {
     CLI_CAT_SESSION = 0, /* 会话控制：/help /clear /quit /tui /sanitize */
@@ -91,8 +103,8 @@ typedef struct {
 
 typedef struct {
     int *quit;
-    /* 2026-08-17：/tui 切换请求——退出 CLI 主循环后 exec agentrt-tui
-     * （进程替换，无嵌套进程；仅 CLI 全屏 TUI 页面被激活时可用）。 */
+    /* 0.1.17 R5-G6：/tui 切换请求——主循环内 fork agentrt-tui 子进程
+     * （唯一实现 cli_run_tui_frontend），TUI 退出后回到行式对话。 */
     int *switch_tui;
 } cli_cmd_ctx_t;
 
@@ -120,6 +132,19 @@ extern airy_hall_store_t *g_cli_hall_store;
 extern int g_cli_print_mode;
 extern int g_cli_json_mode;
 
+/* 全屏 TUI 渲染层模式（--tui）：airy_cli 调起 agentrt-tui 子进程并回传
+ * 退出码，CLI 自身不初始化终端。与 -p 互斥。 */
+extern int g_cli_tui_mode;
+
+/* 会话恢复视图模式（--continue / --resume，0.1.17 R5-G5）：启动时读一次
+ * mem.recent 装配 g_history_*，前端不落任何本地会话状态。 */
+extern int g_cli_resume_mode;
+
+/* TUI 前端子进程唯一入口（airy_cli_frontend.c）：--tui 模式与 /tui 切换
+ * 共用；返回 TUI 退出码（126=调起失败，128+N=信号终止）。异常退出仅渲染
+ * 可判读错误，不做接力降级（R5-G6 判据④）。 */
+int cli_run_tui_frontend(int resume);
+
 /* Chat history buffer (defined in cli_chat.c) */
 extern char *g_history_roles[CLI_HISTORY_MAX_MSGS];
 extern char *g_history_contents[CLI_HISTORY_MAX_MSGS];
@@ -139,6 +164,13 @@ int cli_parse_args(int argc, char *argv[], const char **out_print_prompt);
 
 char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data);
 void cli_history_clear(void);
+
+/* 会话恢复视图装配（cli_chat_session.c，0.1.17 R5-G5）：--continue/--resume
+ * 启动时读一次 mem.recent（会话权威在 mem_d）还原为 g_history_*，前端不落
+ * 任何本地会话状态。cli_history_capacity 为消息预算 SSoT（cli_chat_history.c），
+ * 恢复时按"每记录最多展开两条消息"的保守口径裁剪。 */
+void cli_session_restore(void);
+size_t cli_history_capacity(void);
 /* 2.5.x 意图分辨：纯字符串启发式（consult > task > chat 三级优先），
  * 返回 1=task / 0=chat / -1=未命中（调用方交 LLM 兜底） */
 int cli_classify_heuristic(const char *input);
@@ -195,8 +227,14 @@ airy_err_t cli_think_process_remote(const char *input, airy_task_plan_t **out_pl
  * 本地 hall 降级与 sched.sock 开关已退役，失败即错误可见化）。 */
 airy_err_t cli_dag_submit_remote(const airy_task_plan_t *plan, const char *task_input,
                                  const char *workspace_dir, char **out_dag_id);
-cli_dag_poll_rc_t cli_dag_poll_remote(const char *dag_id, double *out_progress,
-                                      char *out_state, size_t state_cap, char **out_result);
+/* sched.dag_status 快照（opaque; cli_dag.c）：一次 RPC 取回，状态面与节点面
+ * 共用同一份解析结果。0.1.17 R4-① 前两条消费路径各自发一次 RPC，200ms
+ * 轮询节拍下把 sched_d 打成短连接洪泛。 */
+typedef struct cli_dag_snapshot cli_dag_snapshot_t;
+cli_dag_snapshot_t *cli_dag_snapshot_fetch(const char *dag_id);
+void cli_dag_snapshot_free(cli_dag_snapshot_t *snap);
+cli_dag_poll_rc_t cli_dag_snapshot_poll(const cli_dag_snapshot_t *snap, double *out_progress,
+                                        char *out_state, size_t state_cap, char **out_result);
 airy_err_t cli_dag_wait_remote(const char *dag_id, char **out_result);
 
 /* sched_d 远程 DAG 摘要条目（sched.dag_list 消费，/status 与 TUI board
@@ -216,10 +254,10 @@ airy_err_t cli_dag_cancel_remote(const char *dag_id);
 typedef struct cli_dag_board_s cli_dag_board_t;
 cli_dag_board_t *cli_dag_node_board_create(void);
 void cli_dag_node_board_destroy(cli_dag_board_t *board);
-int cli_dag_node_board_tick(cli_dag_board_t *board, const char *dag_id);
+int cli_dag_node_board_tick(cli_dag_board_t *board, const cli_dag_snapshot_t *snap);
 /* Remote DAG per-node state snapshot: reports (node_id, state) via cb without
  * printing (feeds the live plan board). Returns 1 on terminal state. */
-int cli_dag_board_snapshot(const char *dag_id,
+int cli_dag_board_snapshot(const cli_dag_snapshot_t *snap,
                            void (*cb)(const char *node_id, const char *state));
 
 /* plan→DAG 归一 helper（cli_dag.c，语义唯一真相源）：节点 handler 归一

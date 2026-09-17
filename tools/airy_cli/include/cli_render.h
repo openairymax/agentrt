@@ -94,6 +94,10 @@ size_t cli_render_meter_phys(cli_line_meter_t *m);
  * 对话中出现"空返回"却无任何说明。 */
 #define CLI_REPLY_EMPTY_HINT "（未产生回复：模型可能仅生成了思考内容，请重试）"
 
+/* 截断提示（0.1.17）：finish_reason=length 表示收到的正文只是模型答案的
+ * 前缀，此前被当作完整回复渲染。渲染明确提示，避免用户误判为完整答案。 */
+#define CLI_REPLY_TRUNCATED_HINT "（回复已达输出上限被截断，以上内容不完整；请缩短问题后重试）"
+
 /* Opaque TUI engine handle (full definition in cli_tui.h). */
 struct cli_tui_s;
 

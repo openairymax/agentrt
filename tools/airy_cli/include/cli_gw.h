@@ -34,12 +34,30 @@ extern "C" {
  * @param params_json 参数 JSON（可 NULL）
  * @param timeout_ms  超时毫秒（>0）
  * @param out_result  [out] JSON-RPC result JSON 字符串（OWNER，AIRY_FREE）
- * @return 0 成功；-1 失败（失败原因已写入 g_cli_gw_err：不可达 / 响应
+ * @return 0 成功；-1 失败（失败原因经 cli_gw_last_err / cli_gw_err_take：不可达 / 响应
  *         超时 / HTTP 错误 / JSON-RPC error）；AIRY_ERR_CANCELED 用户取消
  *         （SIGINT；S-02：与 sched.dag_cancel 语义对齐，接收等待循环内
  *         命中即中断）
  */
 int cli_gw_call(const char *method, const char *params_json, int timeout_ms, char **out_result);
+
+/**
+ * @brief 最近一次失败原因（只读，不消费）。
+ * @return 失败描述；当前无失败为空串
+ */
+const char *cli_gw_last_err(void);
+
+/**
+ * @brief 一次性取走失败原因（读后清空，供 cli_err_desc 消费）。
+ * @return 失败描述；当前无失败为空串
+ */
+const char *cli_gw_err_take(void);
+
+/**
+ * @brief 由上层记录失败原因（如响应解析失败），供统一渲染面消费。
+ * @param msg 失败描述（NULL 等价于空串）
+ */
+void cli_gw_err_set(const char *msg);
 
 /** @brief gateway 可达性（HTTP /health）。 @return 1 在线；0 离线 */
 int cli_gw_health(int timeout_ms);

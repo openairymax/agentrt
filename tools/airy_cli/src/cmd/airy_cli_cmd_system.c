@@ -737,10 +737,69 @@ static void cli_llm_stats_show(const char *ns, const char *json)
 
     cJSON_Delete(root);
 }
+
+/* think_d 推理语言网关统计：Tokenizer 特征校准状态与逐模型语言画像。
+ * 默认视图拆分呈现校准漂移；--print / --json 输出原始 JSON。 */
+static void cli_lang_stats_show(const char *ns, const char *json)
+{
+    cJSON *root = cJSON_Parse(json);
+    if (!root) {
+        cli_render_sub_agent(ns, json);
+        return;
+    }
+
+    char line[200];
+    const cJSON *pc = cJSON_GetObjectItem(root, "process_count");
+    const cJSON *cc = cJSON_GetObjectItem(root, "calibrate_count");
+    const cJSON *dd = cJSON_GetObjectItem(root, "drift_detected");
+    const cJSON *ri = cJSON_GetObjectItem(root, "recalibrate_interval");
+    snprintf(line, sizeof(line), "lang gateway: process=%d calibrate=%d drift=%d interval=%d",
+             pc ? pc->valueint : 0, cc ? cc->valueint : 0,
+             dd ? dd->valueint : 0, ri ? ri->valueint : 0);
+    cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, line);
+
+    const cJSON *profiles = cJSON_GetObjectItem(root, "profiles");
+    if (cJSON_IsArray(profiles)) {
+        cJSON *p = NULL;
+        cJSON_ArrayForEach(p, profiles) {
+            const cJSON *mid = cJSON_GetObjectItem(p, "model_id");
+            const cJSON *fam = cJSON_GetObjectItem(p, "family");
+            const cJSON *nl = cJSON_GetObjectItem(p, "native_lang");
+            const cJSON *ratio = cJSON_GetObjectItem(p, "lang_ratio");
+            const cJSON *conf = cJSON_GetObjectItem(p, "lang_confidence");
+            snprintf(line, sizeof(line),
+                     "profile %s: family=%s native=%s ratio=%.3f conf=%.3f",
+                     cJSON_IsString(mid) ? mid->valuestring : "?",
+                     cJSON_IsString(fam) ? fam->valuestring : "?",
+                     cJSON_IsString(nl) ? nl->valuestring : "?",
+                     ratio ? ratio->valuedouble : 0.0,
+                     conf ? conf->valuedouble : 0.0);
+            cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, line);
+        }
+    }
+
+    cJSON_Delete(root);
+}
 #endif /* AIRY_HAS_CJSON */
 
 static void cli_stats_print(const char *ns, const char *method)
 {
+    if (strcmp(ns, "lang") == 0) {
+#ifdef AIRY_HAS_CJSON
+        if (!g_cli_print_mode && !g_cli_json_mode) {
+            char *result = NULL;
+            if (cli_gw_call("think.lang_stats", NULL, CLI_RPC_TIMEOUT_MS, &result) == 0 &&
+                result) {
+                cli_lang_stats_show(ns, result);
+                AIRY_FREE(result);
+                return;
+            }
+            AIRY_FREE(result);
+        }
+#endif
+        cli_rpc_print("think", "lang_stats", NULL);
+        return;
+    }
 #ifdef AIRY_HAS_CJSON
     if (!g_cli_print_mode && !g_cli_json_mode &&
         (strcmp(ns, "mem") == 0 || strcmp(ns, "llm") == 0)) {

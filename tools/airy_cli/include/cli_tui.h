@@ -134,10 +134,9 @@ void cli_tui_mode_set(cli_tui_t *t, cli_tui_mode_t m);
 /**
  * @brief Create the TUI engine handle (does NOT enter the full-screen page).
  *
- * 2.3.7 (2026-08-17): the interactive session defaults to the line-oriented
- * streaming renderer (typewriter + folded thought chain); the full-screen
- * page is entered explicitly with cli_tui_enter() (F8) so the CLI keeps its
- * streaming interaction until the user asks for the full-screen view.
+ * The interactive session is line-oriented (typewriter + folded thought
+ * chain); the engine handle carries the line-mode state (command history,
+ * built-in IME, completion) and is always created with active == 0.
  * Non-TTY / unsupported platforms degrade to plain stdout everywhere.
  *
  * @param out_tui output engine handle (may return a handle with active==0)
@@ -146,22 +145,25 @@ void cli_tui_mode_set(cli_tui_t *t, cli_tui_mode_t m);
 int cli_tui_create(cli_tui_t **out_tui);
 
 /**
- * @brief Enter the full-screen page (alt screen + raw mode + redraw).
+ * @brief Retired full-screen page entry (0.1.17 R5-G2 freeze).
  *
- * Safe no-op when already active or when stdout is not a TTY / the terminal
- * is too small. Routes the renderer into the TUI (cli_render_set_tui) so
- * subsequent output lands in the page history. The conversation history
- * accumulated while in line mode is replayed via cli_tui_replay_history()
- * by the caller so the page is not empty on switch-in.
+ * Always returns non-zero without touching the terminal. The C side no longer
+ * carries a full-screen form; the only full-screen renderer is the console
+ * renderer reachable through the CLI's `--tui` mode. Kept for one release so
+ * out-of-tree callers fail loudly instead of silently; physical removal is
+ * scheduled for 0.1.18.
  *
- * @return 0 on success, non-zero when the page could not be entered
+ * @return always -1 (page not entered)
  */
 int cli_tui_enter(cli_tui_t *tui);
 
 /**
- * @brief Leave the full-screen page (restore alt screen + raw mode).
+ * @brief Retired full-screen page teardown (0.1.17 R5-G2 freeze).
  *
- * Safe no-op when inactive. Routes the renderer back to plain stdout.
+ * The page can no longer be entered, so this is an idempotent no-op: it only
+ * routes the renderer back to plain stdout. The alt-screen restore sequence it
+ * still emits is inert because the page is never armed. Physical removal is
+ * scheduled for 0.1.18.
  *
  * @return 0 on success, non-zero on failure
  */
@@ -281,7 +283,7 @@ void cli_tui_set_status(cli_tui_t *tui, const char *status);
  * @brief Snapshot the three-model names for hero re-rendering (2.2.1.3).
  *
  * main 启动时填充（与 cli_print_system_header 同一组模型名）。终端
- * resize / F8 退出全屏时，cli_tui_rebuild_three_zone 用它重建 hero，
+ * resize 触发 cli_tui_rebuild_three_zone 行渲染重建时，用它重绘 hero，
  * 不依赖 main 的局部变量。传 NULL/"" 表示该模型未设置。
  */
 void cli_tui_set_header_models(cli_tui_t *tui, const char *t2, const char *t1f,
@@ -290,10 +292,9 @@ void cli_tui_set_header_models(cli_tui_t *tui, const char *t2, const char *t1f,
 /**
  * @brief Rebuild the line-mode three-zone layout (hero / dialogue / input).
  *
- * 2.2.1.2/2.2.1.3：退出全屏（alt screen 残留主屏画面）或终端 resize
- * 后，滚动区与 hero 可能错位导致重叠。此函数：解 pin → 清屏 → 用
- * 模型名快照重绘 hero（内部重 pin + 保留输入条）→ 按角色重放对话
- * 历史 → 光标落回滚动区末行。仅 TTY 且非全屏时生效，否则 no-op。
+ * 2.2.1.2/2.2.1.3：终端 resize 后滚动区与 hero 可能错位导致重叠。
+ * 此函数：解 pin → 清屏 → 用模型名快照重绘 hero → 按角色重放对话
+ * 历史。仅 TTY 且非全屏时生效，否则 no-op（0.1.17 R5-G2 后非全屏恒真）。
  */
 void cli_tui_rebuild_three_zone(cli_tui_t *tui);
 

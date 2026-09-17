@@ -508,17 +508,17 @@ int cmd_quit(const char *arg, void *ctx)
     return 0;
 }
 
-/* 2026-08-17：/tui 切换到图形 TUI（agentrt-tui）。
- * 定位同 $AIRY_HOME/bin 下的 agentrt-tui（由 airymaxrt 启动器保证两个
- * 前端二进制同装），仅当 CLI 运行于全屏 TUI 页面时切换才有意义——该
- * 页面激活说明终端已就绪，exec 后由 agentrt-tui 接管同一终端。切换请求
- * 只置标志，真正的 exec 发生在主循环清理之后（main.c），保证无进程嵌套。 */
+/* 0.1.17 R5-G6：/tui 切换到全屏 TUI 渲染层。只置请求标志；主循环随后
+ * fork agentrt-tui 子进程（唯一实现 cli_run_tui_frontend），TUI 退出后
+ * 回到行式对话（exec 替换形态已退役）。 */
 int cmd_tui(const char *arg, void *ctx)
 {
     (void)arg;
+    if (g_cli_print_mode) {
+        cli_outf("  -p 模式无界面，/tui 不可用。\n");
+        return 0;
+    }
     cli_cmd_ctx_t *c = (cli_cmd_ctx_t *)ctx;
-    if (c && c->quit)
-        *c->quit = 1;
     if (c && c->switch_tui)
         *c->switch_tui = 1;
     return 0;
