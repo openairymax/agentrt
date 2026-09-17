@@ -36,6 +36,13 @@ sdk_ready() {
     return 1
 }
 
+SDK_CONSOLE="${AIRY_GATE_CONSOLE_DIR:-}"
+if [ -z "$SDK_CONSOLE" ]; then
+    for _cand in "$ROOT/../sdk/console" "$ROOT/agent-workload/sdk/console"; do
+        if [ -d "$_cand" ]; then SDK_CONSOLE="$_cand"; break; fi
+    done
+fi
+
 extract_fn() { # <file> <fnname> <outfile>
     sed -n "/^$2() {/,/^}$/p" "$1" > "$3"
 }
@@ -852,6 +859,252 @@ if [ "$r_fail" -eq 0 ] && [ "$r_hs_fail" -eq 0 ]; then
     ok "R T4b 标记判定 $r_n 例 + 体积渲染 8 例全通过（库名子串误判/子目录标记/任一命中/异架构拒绝/fail-closed）"
 else
     bad "R T4b 标记判定失配 $r_fail/$r_n 例、体积渲染失配 $r_hs_fail/8 例（见上方明细）"
+fi
+
+section "S" "R1-c 执行体角色词汇表 SSoT（字面量零外泄 + 权威点唯一）"
+
+# S1 豁免清单：SSoT 本体与结构性非角色用法（YAML 配置节键 / A2A 协议任务类型 / 报告 JSON 键）。
+for _a in \
+    commons/utils/cognition/agent_vocab.h \
+    commons/utils/cognition/agent_vocab.c \
+    daemons/common/include/agent_vocab.h \
+    atoms/coreloopthree/include/hall_store.h \
+    atoms/coreloopthree/src/config/yaml_loader_parse.c \
+    daemons/gateway_d/src/main.c \
+    tools/airy_cli/src/cmd/cli_review.c; do
+    printf '%s:\n' "$ROOT/$_a"
+done > "$TMP/s_allow"
+
+_s_hits="$(grep -rnE '"(product_manager|architect|backend|frontend|devops|security|tester|coding|data_engineer|reviewer|analyst)"' \
+    "$ROOT/atoms" "$ROOT/daemons" "$ROOT/gateway" "$ROOT/tools" \
+    --include='*.c' --include='*.h' 2>/dev/null \
+    | grep -vE ':[0-9]+:[[:space:]]*(\*|/\*|//)' \
+    | grep -v '/tests/' \
+    | grep -vFf "$TMP/s_allow" || true)"
+if [ -z "$_s_hits" ]; then
+    ok "S1 角色字面量零外泄（仅 SSoT 与结构性非角色用法保留）"
+else
+    bad "S1 角色字面量外泄: $(echo "$_s_hits" | tr '\n' ' ')"
+fi
+
+_s2=""
+[ -f "$ROOT/commons/utils/cognition/agent_vocab.c" ] || _s2="$_s2 权威实现缺失"
+[ -e "$ROOT/daemons/common/src/svc/agent_vocab.c" ] && _s2="$_s2 daemons 侧重复实现"
+grep -q 'agent_vocab_canonical' "$ROOT/commons/utils/cognition/agent_vocab.c" 2>/dev/null \
+    || _s2="$_s2 归一化符号缺失"
+grep -q 'agent_vocab_canonical' "$ROOT/atoms/coreloopthree/src/work_hall/work_hall_agent.c" 2>/dev/null \
+    || _s2="$_s2 归一化边界缺失"
+grep -q 'agent_vocab.h' "$ROOT/daemons/common/include/agent_vocab.h" 2>/dev/null \
+    || _s2="$_s2 兼容头重导出缺失"
+grep -q 'agent_vocab_resolve' "$ROOT/commons/utils/cognition/agent_vocab.c" 2>/dev/null \
+    || _s2="$_s2 严格解析符号缺失"
+grep -q 'agent_vocab_resolve' "$ROOT/atoms/coreloopthree/src/work_hall/work_hall_auth.c" 2>/dev/null \
+    || _s2="$_s2 权限判定未用严格解析（fail-open 风险）"
+if [ -z "$_s2" ]; then
+    ok "S2 SSoT 权威点唯一（commons 实现 + daemons 重导出 + 归一化边界单点 + 权限判定严格解析）"
+else
+    bad "S2 SSoT 结构异常:$_s2"
+fi
+
+section "T" "§8 交付防复发判据（DR-1 能力接线 / DR-4 失败可判读 / DR-5 码值契约 / DR-6 运行态门禁 / 判据6 命令面唯一）"
+
+REG="$ROOT/gateway/src/biz/gateway_cap_registry.c"
+ERRS="$ROOT/commons/utils/error/error_codes.h"
+ERRN="$ROOT/commons/utils/error/handler.c"
+
+_t1_n=0
+_t1_bad=""
+for _cap in $(grep -rhoE 'cli_gw_call\("[a-z_]+\.[a-z_0-9]+"' "$CLI/src" 2>/dev/null \
+              | sed 's/.*("//' | tr -d '"' | sort -u); do
+    _t1_n=$((_t1_n+1))
+    grep -q "{\"$_cap\"," "$REG" 2>/dev/null || _t1_bad="$_t1_bad $_cap"
+done
+if [ "$_t1_n" -gt 0 ] && [ -z "$_t1_bad" ]; then
+    ok "T1 DR-1 用户面能力串全部登记于网关能力表（$_t1_n 项）"
+else
+    bad "T1 DR-1 用户面能力串未登记:${_t1_bad:- 无用户面能力串}"
+fi
+
+# EXC-T7(T2) 例外登记：CLI ⇄ TUI 的 JSON Lines 事件流位于「TUI 是 CLI 的渲染层」同层内部边界，
+# 不构成跨层调用，A-IPC 铁律不适用于该边界；T6/T7 判据集据此取证，禁止按“A-IPC 全链统一”误判为违规。
+_t2_n=0
+_t2_bad=""
+for _cap in llm.complete think.process think.lang_process think.lang_postprocess \
+            think.lang_stats mem.get_stats mem.write mem.search \
+            agent.spawn agent.invoke agent.health_check \
+            sched.plan sched.absorb sched.dag_submit sched.dag_status \
+            sched.dag_list sched.dag_cancel tool.execute; do
+    _t2_n=$((_t2_n+1))
+    _line="$(grep -m1 "{\"$_cap\"," "$REG" 2>/dev/null)"
+    if [ -z "$_line" ]; then _t2_bad="$_t2_bad $_cap(无网关登记)"; continue; fi
+    _ns="$(printf '%s' "$_line" | sed -E 's/.*\{"[^"]*", *"([^"]*)", *"([^"]*)".*/\1/')"
+    _m="$(printf '%s' "$_line" | sed -E 's/.*\{"[^"]*", *"([^"]*)", *"([^"]*)".*/\2/')"
+    grep -rq "\"$_m\"" "$ROOT/daemons/${_ns}_d/src" 2>/dev/null \
+        || _t2_bad="$_t2_bad $_cap(服务面未注册 $_m)"
+    if ! grep -rq "cli_gw_call(\"$_cap\"" "$CLI/src" 2>/dev/null; then
+        if [ "$_m" != "get_stats" ] || \
+           ! grep -rq '%s\.get_stats' "$CLI/src" 2>/dev/null; then
+            _t2_bad="$_t2_bad $_cap(无用户面调用方)"
+        fi
+    fi
+done
+if [ -z "$_t2_bad" ]; then
+    ok "T2 DR-1 关键能力三件套齐备（$_t2_n 项：网关登记 + 服务面注册 + 用户面调用）"
+else
+    bad "T2 DR-1 能力断链:$_t2_bad"
+fi
+
+_t3_bad=""
+[ "$(grep -rl 'gw_syscall_error_response' "$ROOT/gateway/src" 2>/dev/null | wc -l)" -ge 2 ] \
+    || _t3_bad="$_t3_bad 网关统一错误响应面缺失"
+grep -rq 'cli_err_desc' "$CLI/src" 2>/dev/null || _t3_bad="$_t3_bad CLI 错误描述面缺失"
+grep -rq 'g_cli_gw_err' "$CLI/src" 2>/dev/null || _t3_bad="$_t3_bad CLI 失败原因透传缺失"
+grep -q 'airy_err_code_name' "$ERRN" 2>/dev/null || _t3_bad="$_t3_bad 错误码名称面缺失"
+_sl_src="$CLI/src/cmd/cli_gw.c"
+if [ -f "$_sl_src" ]; then
+    _sl_bad="$(awk '
+        /^[a-zA-Z_].*cli_gw_call\(/ { _f=1; _n=0; next }
+        _f && /^}/ { _f=0; next }
+        _f {
+            _n++; _b[_n % 16]=$0;
+            if ($0 ~ /return -1;/) {
+                _hit=0;
+                for (_i=1; _i<=15; _i++) {
+                    if (_n-_i >= 1 && _b[(_n-_i) % 16] ~ /(g_cli_gw_err|cli_gw_err_set)/) { _hit=1; break }
+                }
+                if (!_hit) printf " 静默return-1@%d行", NR;
+            }
+        }
+    ' "$_sl_src")"
+    if [ -n "$_sl_bad" ]; then
+        _t3_bad="$_t3_bad cli_gw_call$_sl_bad"
+    fi
+fi
+if [ -z "$_t3_bad" ]; then
+    ok "T3 DR-4 失败可判读（统一错误响应 + CLI 描述面 + 原因透传 + 名称面）"
+else
+    bad "T3 DR-4 失败可判读结构异常:$_t3_bad"
+fi
+
+_t4_n=0
+_t4_bad=""
+for _code in $(grep -rhoE 'AIRY_ERR_[A-Z0-9_]+' "$CLI/src" 2>/dev/null | sort -u); do
+    _t4_n=$((_t4_n+1))
+    grep -qE "^#define $_code\b" "$ERRS" 2>/dev/null \
+        || { _t4_bad="$_t4_bad $_code(未登记契约)"; continue; }
+    if ! grep -qE "\{ *$_code," "$ERRN" 2>/dev/null && \
+       ! grep -rqE "case $_code:" "$CLI/src" 2>/dev/null; then
+        _t4_bad="$_t4_bad $_code(无可读名称)"
+    fi
+done
+if [ "$_t4_n" -gt 0 ] && [ -z "$_t4_bad" ]; then
+    ok "T4 DR-5 错误码契约完整（$_t4_n 项：契约登记 + 可读名称）"
+else
+    bad "T4 DR-5 错误码契约缺口:${_t4_bad:- 无错误码引用}"
+fi
+
+# EXC-T7(T5) 例外登记：门禁自检口径承认 CLI ⇄ TUI 同层内部边界为例外（见 T7 判据），
+# 该边界内的 JSON Lines 事件流不计入 A-IPC 跨层调用面，T7 据此维护例外清单。
+_t5_bad=""
+grep -q 'verify_release_gates.sh' "$ROOT/tests/CMakeLists.txt" 2>/dev/null \
+    || _t5_bad="$_t5_bad 门禁未注册到 ctest"
+for _g in A S T; do
+    grep -qE "^section \"$_g\" " "$0" 2>/dev/null || _t5_bad="$_t5_bad 分组 $_g 缺失"
+done
+if [ -z "$_t5_bad" ]; then
+    ok "T5 DR-6 运行态门禁（ctest 注册 + A/S/T 分组齐备）"
+else
+    bad "T5 DR-6 运行态门禁异常:$_t5_bad"
+fi
+
+CMDL="$CLI/src/core/airy_cli_cmdline.c"
+HELP_SRC="$CLI/src/cmd/cli_cmds.c"
+COMP_SRC="$CLI/src/tui/tui_complete.c"
+FE_SRC="$CLI/src/core/airy_cli_frontend.c"
+MAIN_SRC="$CLI/src/core/main.c"
+
+_t6_bad=""
+_t6_n=0
+if [ -f "$CMDL" ]; then
+    _t6_n="$(awk '/^const cli_command_t CLI_COMMANDS\[\] = \{/,/^\};/' "$CMDL" \
+             | grep -cE '^[[:space:]]*\{ *"/')"
+    _t6_impl="$(grep -rhoE '^int cmd_[a-z_0-9]+\(' "$CLI/src" 2>/dev/null \
+                | sed 's/^int //;s/(//' | sort -u | wc -l)"
+    if [ "$_t6_n" -eq 0 ]; then
+        _t6_bad="$_t6_bad 命令面契约源 CLI_COMMANDS 为空"
+    elif [ "$_t6_n" -ne "$_t6_impl" ]; then
+        _t6_bad="$_t6_bad 表项($_t6_n)≠cmd_*实现($_t6_impl)：存在第二命令面或孤立实现"
+    fi
+    for _fn in $(awk '/^const cli_command_t CLI_COMMANDS\[\] = \{/,/^\};/' "$CMDL" \
+                 | grep -oE 'cmd_[a-z_0-9]+' | sort -u); do
+        grep -rqE "^int $_fn\(" "$CLI/src" 2>/dev/null \
+            || _t6_bad="$_t6_bad 表项函数未定义:$_fn"
+    done
+    grep -qE '#define CLI_COMMANDS_COUNT \(sizeof\(CLI_COMMANDS\) / sizeof\(CLI_COMMANDS\[0\]\)\)' "$CMDL" \
+        || _t6_bad="$_t6_bad 命令计数非 sizeof 派生（存在漂移风险）"
+else
+    _t6_bad="$_t6_bad 命令面契约源缺失:$CMDL"
+fi
+grep -q 'cli_commands_count' "$HELP_SRC" 2>/dev/null || _t6_bad="$_t6_bad /help 未遍历 SSoT"
+grep -q 'CLI_COMMANDS' "$COMP_SRC" 2>/dev/null || _t6_bad="$_t6_bad Tab 补全未遍历 SSoT"
+grep -q 'cli_run_tui_frontend' "$MAIN_SRC" 2>/dev/null || _t6_bad="$_t6_bad /tui 未收敛至唯一实现"
+if [ -n "$SDK_CONSOLE" ]; then
+    grep -qE '^\[\[bin\]\]' "$SDK_CONSOLE/Cargo.toml" 2>/dev/null \
+        && _t6_bad="$_t6_bad 第二用户面复活（console 含 [[bin]]）"
+    [ -f "$SDK_CONSOLE/src/main.rs" ] \
+        && _t6_bad="$_t6_bad 第二用户面复活（console 含 src/main.rs）"
+else
+    skip "T6 判据6 console 仓未检出，第二用户面防复活降级"
+fi
+if [ -z "$_t6_bad" ]; then
+    ok "T6 判据6 用户命令面唯一（CLI_COMMANDS $_t6_n 项 = cmd_* 实现；/help 与补全共用 SSoT；console 零可执行面）"
+else
+    bad "T6 判据6 命令面一致性异常:$_t6_bad"
+fi
+
+_t7_bad=""
+grep -q 'EXC-T7(T2)' "$0" 2>/dev/null || _t7_bad="$_t7_bad T2 取证口径未登记例外"
+grep -q 'EXC-T7(T5)' "$0" 2>/dev/null || _t7_bad="$_t7_bad T5 门禁自检未登记例外"
+if [ -f "$FE_SRC" ]; then
+    if grep -qE 'aipc|airy_ipc|AIPC' "$FE_SRC" 2>/dev/null; then
+        _t7_bad="$_t7_bad 同层内部边界误用 A-IPC"
+    fi
+    grep -q 'execve' "$FE_SRC" 2>/dev/null \
+        || _t7_bad="$_t7_bad 渲染层同层派生子进程形态缺失"
+else
+    _t7_bad="$_t7_bad 渲染层入口实现缺失:$FE_SRC"
+fi
+if [ -z "$_t7_bad" ]; then
+    ok "T7 §0.1 通信铁律例外登记（CLI ⇄ TUI 同层内部边界，T2/T5 判据集双点登记 + 实现侧零 A-IPC 依赖）"
+else
+    bad "T7 通信铁律例外登记异常:$_t7_bad"
+fi
+
+_t8_bad=""
+if [ -f "$INSTALL" ]; then
+    grep -q 'ensure_cli_entry' "$INSTALL" 2>/dev/null \
+        && _t8_bad="$_t8_bad install.sh 垫片生成器复活"
+    grep -qE 'exec "\$_DIR/airy_cli"' "$INSTALL" 2>/dev/null \
+        && _t8_bad="$_t8_bad install.sh 以垫片冒充 agentrt-tui"
+    if ! grep -qE 'exec "\\\$AIRY_HOME/bin/airy_cli" --tui' "$INSTALL" 2>/dev/null; then
+        _t8_bad="$_t8_bad install.sh 启动器未以 airy_cli 为唯一前端"
+    fi
+else
+    _t8_bad="$_t8_bad install.sh 缺失"
+fi
+_t8_seen=0
+for _f in "$LATEST_RT" "$SDK_AIRYMAXRT"; do
+    [ -f "$_f" ] || continue
+    _t8_seen=$((_t8_seen+1))
+    if grep -qE '自动续接|将使用 airy_cli 作为前端|TUI_BIN|AIRYRT_FORCE_CLI|terminal_capable_tui' "$_f" 2>/dev/null; then
+        _t8_bad="$_t8_bad 启动器接力逻辑残留:${_f##*/agent-workload/}"
+    fi
+done
+[ "$_t8_seen" -eq 0 ] && _t8_bad="$_t8_bad 启动器副本全不可达"
+if [ -z "$_t8_bad" ]; then
+    ok "T8 垫片与接力禁止（install.sh 无垫片 + $_t8_seen 份启动器零接力残留）"
+else
+    bad "T8 垫片或接力残留:$_t8_bad"
 fi
 
 printf '\n门禁汇总: PASS=%d FAIL=%d\n' "$PASS" "$FAIL"

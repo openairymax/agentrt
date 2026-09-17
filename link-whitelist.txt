@@ -1,4 +1,4 @@
-# 模块链接白名单（M1-1b，2026-09-02）—— 单一权威源（SSoT）
+# 模块链接白名单 —— 单一权威源（SSoT）
 #
 # 语法: <目标>: <允许链接的项目内库...>    依赖以空格分隔；无依赖可省略
 # 语义:
@@ -12,30 +12,30 @@
 #   - 白名单库全集之外出现项目库前缀（airy_/libairy_/coreloopthree/
 #     cognition/svc_/daemon_）即视为未登记项目库，fail-closed
 #
-# 架构约束（0.1.9 方案 §2.2）: "认知引擎只对 think_d 暴露服务面"——
+# 架构约束: "认知引擎只对 think_d 暴露服务面"——
 #   gateway 系目标禁链 coreloopthree/cognition。新增任何模块的链接
 #   约束只需在本文件登记；新增目标须在此登记后才可被门禁校验。
 #
-# 架构约束（0.1.9 方案 §5.1）: "跨界调用必须走总线"——daemon 之间禁止
+# 架构约束: "跨界调用必须走总线"——daemon 之间禁止
 #   进程内符号引用。15 daemon 节点全部在此登记（允许集 = 自身服务库 +
 #   公共底座），未来任何未登记的跨 daemon/模块链接即构建期 fail-closed。
 #   注记：tool_d/sched_d/think_d 链 airy_llm_service/airy_tool_service 系
 #   执行体集中化历史形态（llm/tool 执行引擎库在进程内复用），登记为
-#   事实基线；后续 M 阶段重构为总线调用后可收紧该允许集。
+#   事实基线；后续重构为总线调用后可收紧该允许集。
 #
-# 架构约束（0.1.16 B4，2026-09-14 裁决③）: 第 2 句铁律「内核机制只被
+# 架构约束: 第 2 句铁律「内核机制只被
 #   daemon 服务面访问」的链接面判据——客户端目标（airy_cli/gateway 系）
 #   禁链 airy_atoms 微核心聚合；airy_core（libairy_core.a）仅允许为解析
 #   coreloopthree 无状态时间符号（airy_time_*）而出现在工具节点允许集，
 #   任何目标出现 airy_init/airy_oom_*/airy_persist_* 机制符号引用即为
-#   违规（发布门禁 B4 组机器断言：nm 扫描 fail-closed）。
+#   违规（发布门禁机器断言：nm 扫描 fail-closed）。
 #
-# 事实基线（2026-09-02 实测，gateway/CMakeLists.txt L172-180、
+# 事实基线（gateway/CMakeLists.txt L172-180、
 #   daemons/gateway_d/CMakeLists.txt L110-166/L439-458）:
 gateway: svc_common airy_syscall airy_protocols airy_common airy_memory
 airy_gateway_service: svc_common airy_protocols airy_platform_libs
 gateway_d: airy_gateway_service airy_syscall airy_platform_libs
-# daemon 节点（0.1.9 §5.1，2026-09-02 configure 期 linkgate/*.links.txt 实测）
+# daemon 节点（configure 期 linkgate/*.links.txt 实测）
 llm_d: airy_platform_libs airy_llm_service
 tool_d: airy_platform_libs airy_common airy_tool_service airy_coreloopthree airy_cognition airy_core airy_memory airy_atoms airy_llm_service
 monit_d: airy_platform_libs airy_monit_service
@@ -50,10 +50,10 @@ a2a_d: airy_platform_libs airy_common airy_a2a_service airy_protocols
 think_d: airy_platform_libs airy_common airy_think_service airy_coreloopthree airy_cognition airy_llm_service airy_tool_service
 cupolas_d: airy_platform_libs airy_common airy_cupolas_service
 maths_d: airy_platform_libs airy_common svc_common
-# 工具节点：airy_cli（M1-1c 引擎壳化 + C2e 链接收敛，2026-09-02 实测）。
+# 工具节点：airy_cli。
 # CLI 是 gateway 纯客户端：任务执行/查询/规划全量经 gateway 派发，不再
 # 进程内持本地 cog/DAG 适配——airy_cognition / airy_taskflow / svc_common
 # 已无符号引用（chat 经 llm/tool service 客户端 llm_response_*/tool_approval_*）。
-# 0.1.16 B2（CLI 进程内 corekern 收回，2026-09-14 裁决）：airy_atoms 移除
-# ——CLI 进程内微内核实例化已全量收回，零 corekern 符号依赖（构建期门禁）。
+# airy_atoms 已移除——CLI 进程内微内核实例化已全量收回，零 corekern
+# 符号依赖（构建期门禁）。
 airy_cli: airy_coreloopthree airy_llm_service airy_tool_service airy_core airy_memory airy_common
