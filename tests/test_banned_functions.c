@@ -3,15 +3,15 @@
 
 /**
  * @file test_banned_functions.c
-  * @brief BAN-030/BAN-155/BAN-154/BAN-073 编译期与运行期合规验证测试
+  * @brief 编译期与运行期合规验证测试
  *
  * 此测试在 AIRY_COMPLIANCE_STRICT 模式下编译（不定义 AIRY_COMPLIANCE_IMPL），
   * 验证以下合规要求：
  *
- * 1. BAN-030 (strcpy): 被毒化，必须使用 AIRY_STRNCPY_TERM 替代
- * 2. BAN-155 (strncpy): 被毒化，必须使用 AIRY_STRNCPY_TERM 替代
- * 3. BAN-154 (memcpy/memset): 被毒化，必须使用 AIRY_MEMCPY/AIRY_MEMSET 替代
-  * 4. BAN-073 (return -1): 生产代码禁止裸 return -1，必须使用 AIRY_ERR_* Error code
+ * 1. strcpy: 被毒化，必须使用 AIRY_STRNCPY_TERM 替代
+ * 2. strncpy: 被毒化，必须使用 AIRY_STRNCPY_TERM 替代
+ * 3. memcpy/memset: 被毒化，必须使用 AIRY_MEMCPY/AIRY_MEMSET 替代
+  * 4. return -1: 生产代码禁止裸 return -1，必须使用 AIRY_ERR_* Error code
  *
   * 编译期验证：
  * - 此文件在 STRICT 模式下成功编译即证明安全宏不依赖被毒化的函数
@@ -22,14 +22,14 @@
   * - Error code值正确性
  *
  * 输出说明：
- * - STRICT 模式下 printf/fprintf 被毒化（BAN-151 区域），此测试使用
+ * - STRICT 模式下 printf/fprintf 被毒化，此测试使用
   *   fputs + vsnprintf 输出（两者均未毒化），验证合规测试自身也遵守禁令。
  *
  * 自包含说明：
  * - 此测试不链接 airy_common 库（避免 ASan 符号依赖）
  * - 仅使用基于 __builtin_* 的安全宏，无需外部链接
  *
-  * Task #39: 补充 BAN-073/BAN-154 编译期验证测试
+  * 补充编译期验证测试
  */
 
 #include "airy_memory.h" /* AIRY_MEMSET/MEMCPY/STRNCPY_TERM/MALLOC/FREE */
@@ -47,31 +47,31 @@
 #define TEST_FUNC __attribute__((noinline))
 
 #ifndef AIRY_MEMSET
-#error "BAN-154: AIRY_MEMSET must be defined (memset is poisoned under STRICT)"
+#error "AIRY_MEMSET must be defined (memset is poisoned under STRICT)"
 #endif
 #ifndef AIRY_MEMCPY
-#error "BAN-154: AIRY_MEMCPY must be defined (memcpy is poisoned under STRICT)"
+#error "AIRY_MEMCPY must be defined (memcpy is poisoned under STRICT)"
 #endif
 
 #ifndef AIRY_STRNCPY_TERM
-#error "BAN-155: AIRY_STRNCPY_TERM must be defined (strncpy is poisoned under STRICT)"
+#error "AIRY_STRNCPY_TERM must be defined (strncpy is poisoned under STRICT)"
 #endif
 
 #ifndef AIRY_MALLOC
-#error "BAN-073: AIRY_MALLOC must be defined (malloc is poisoned under STRICT)"
+#error "AIRY_MALLOC must be defined (malloc is poisoned under STRICT)"
 #endif
 #ifndef AIRY_FREE
-#error "BAN-073: AIRY_FREE must be defined (free is poisoned under STRICT)"
+#error "AIRY_FREE must be defined (free is poisoned under STRICT)"
 #endif
 
 #ifndef AIRY_OK
-#error "BAN-073: AIRY_OK (0) must be defined"
+#error "AIRY_OK (0) must be defined"
 #endif
 #ifndef AIRY_ERR_NOT_FOUND
-#error "BAN-073: AIRY_ERR_NOT_FOUND must be defined"
+#error "AIRY_ERR_NOT_FOUND must be defined"
 #endif
 #ifndef AIRY_ERR_INVALID_PARAM
-#error "BAN-073: AIRY_ERR_INVALID_PARAM must be defined"
+#error "AIRY_ERR_INVALID_PARAM must be defined"
 #endif
 
 /* In STRICT mode printf/fprintf are poisoned; use fputs + vsnprintf instead.
@@ -111,7 +111,7 @@ static void test_printf(const char *fmt, ...)
 
 static TEST_FUNC void test_memset_basic_fill(void)
 {
-    TEST("BAN-154: AIRY_MEMSET fills buffer with specified value");
+    TEST("AIRY_MEMSET fills buffer with specified value");
     unsigned char buf[64];
     AIRY_MEMSET(buf, 0xAB, sizeof(buf));
     int ok = 1;
@@ -129,7 +129,7 @@ static TEST_FUNC void test_memset_basic_fill(void)
 
 static TEST_FUNC void test_memset_zero_fill(void)
 {
-    TEST("BAN-154: AIRY_MEMSET zero-fills buffer");
+    TEST("AIRY_MEMSET zero-fills buffer");
     char buf[32];
     for (int i = 0; i < 32; i++)
         buf[i] = 'X';
@@ -149,7 +149,7 @@ static TEST_FUNC void test_memset_zero_fill(void)
 
 static TEST_FUNC void test_memset_zero_size(void)
 {
-    TEST("BAN-154: AIRY_MEMSET with size=0 is safe no-op");
+    TEST("AIRY_MEMSET with size=0 is safe no-op");
     char buf[8] = "ABCDEFG";
     AIRY_MEMSET(buf, 0, 0);
     if (strcmp(buf, "ABCDEFG") == 0)
@@ -160,7 +160,7 @@ static TEST_FUNC void test_memset_zero_size(void)
 
 static TEST_FUNC void test_memset_partial_fill(void)
 {
-    TEST("BAN-154: AIRY_MEMSET partial fill respects size boundary");
+    TEST("AIRY_MEMSET partial fill respects size boundary");
     char buf[16];
     AIRY_MEMSET(buf, 0, sizeof(buf)); /* clear all */
     AIRY_MEMSET(buf, 'Y', 8); /* only first 8 bytes */
@@ -185,7 +185,7 @@ static TEST_FUNC void test_memset_partial_fill(void)
 
 static TEST_FUNC void test_memcpy_basic_copy(void)
 {
-    TEST("BAN-154: AIRY_MEMCPY copies string data correctly");
+    TEST("AIRY_MEMCPY copies string data correctly");
     const char src[] = "Hello, AgentRT!";
     char dst[32] = {0};
     AIRY_MEMCPY(dst, src, sizeof(src));
@@ -197,7 +197,7 @@ static TEST_FUNC void test_memcpy_basic_copy(void)
 
 static TEST_FUNC void test_memcpy_zero_size(void)
 {
-    TEST("BAN-154: AIRY_MEMCPY with size=0 is safe no-op");
+    TEST("AIRY_MEMCPY with size=0 is safe no-op");
     char dst[16] = "original"; /* 16 bytes: "original" (8 chars + null) fits safely */
     const char src[] = "XXXXXXX";
     AIRY_MEMCPY(dst, src, 0);
@@ -209,7 +209,7 @@ static TEST_FUNC void test_memcpy_zero_size(void)
 
 static TEST_FUNC void test_memcpy_binary_data(void)
 {
-    TEST("BAN-154: AIRY_MEMCPY handles binary data with embedded nulls");
+    TEST("AIRY_MEMCPY handles binary data with embedded nulls");
     const unsigned char src[8] = {0x00, 0x01, 0x02, 0x00, 0x04, 0x05, 0x06, 0x07};
     unsigned char dst[8] = {0};
     AIRY_MEMCPY(dst, src, 8);
@@ -228,7 +228,7 @@ static TEST_FUNC void test_memcpy_binary_data(void)
 
 static TEST_FUNC void test_strncpy_term_short_src(void)
 {
-    TEST("BAN-155: AIRY_STRNCPY_TERM with short src copies correctly");
+    TEST("AIRY_STRNCPY_TERM with short src copies correctly");
     char dst[32];
     AIRY_STRNCPY_TERM(dst, "Hi", sizeof(dst));
     if (strcmp(dst, "Hi") == 0 && dst[2] == '\0')
@@ -239,7 +239,7 @@ static TEST_FUNC void test_strncpy_term_short_src(void)
 
 static TEST_FUNC void test_strncpy_term_long_src_null_termination(void)
 {
-    TEST("BAN-155: AIRY_STRNCPY_TERM guarantees null termination (long src)");
+    TEST("AIRY_STRNCPY_TERM guarantees null termination (long src)");
     char dst[8];
     AIRY_STRNCPY_TERM(dst, "This is a very long string exceeding buffer", sizeof(dst));
     /* Critical: dst must be null-terminated at dst[size-1] */
@@ -251,7 +251,7 @@ static TEST_FUNC void test_strncpy_term_long_src_null_termination(void)
 
 static TEST_FUNC void test_strncpy_term_exact_fit(void)
 {
-    TEST("BAN-155: AIRY_STRNCPY_TERM with exact-fit src (dst[size-1]=null)");
+    TEST("AIRY_STRNCPY_TERM with exact-fit src (dst[size-1]=null)");
     char dst[6]; /* fits "Hello" (5 chars) + null */
     AIRY_STRNCPY_TERM(dst, "Hello", sizeof(dst));
     if (strcmp(dst, "Hello") == 0 && dst[5] == '\0')
@@ -262,7 +262,7 @@ static TEST_FUNC void test_strncpy_term_exact_fit(void)
 
 static TEST_FUNC void test_strncpy_term_empty_src(void)
 {
-    TEST("BAN-155: AIRY_STRNCPY_TERM with empty src produces empty string");
+    TEST("AIRY_STRNCPY_TERM with empty src produces empty string");
     char dst[8] = "XXXXXXX";
     AIRY_STRNCPY_TERM(dst, "", sizeof(dst));
     if (dst[0] == '\0')
@@ -273,7 +273,7 @@ static TEST_FUNC void test_strncpy_term_empty_src(void)
 
 static TEST_FUNC void test_strncpy_term_single_byte_dst(void)
 {
-    TEST("BAN-155: AIRY_STRNCPY_TERM with 1-byte dst (null only)");
+    TEST("AIRY_STRNCPY_TERM with 1-byte dst (null only)");
     char dst[1];
     AIRY_STRNCPY_TERM(dst, "overflow", sizeof(dst));
     if (dst[0] == '\0')
@@ -284,8 +284,8 @@ static TEST_FUNC void test_strncpy_term_single_byte_dst(void)
 
 static TEST_FUNC void test_error_codes_values(void)
 {
-    TEST("BAN-073: Key error codes have correct semantic values");
-    /* BAN-073 core requirement: 0 on success, negative on error.
+    TEST("Key error codes have correct semantic values");
+    /* core requirement: 0 on success, negative on error.
       * Production code must not return bare -1; use these semantic error codes. */
     if (AIRY_OK == 0 && AIRY_ERR_INVALID_PARAM < 0 && AIRY_ERR_NOT_FOUND < 0 &&
         AIRY_ERR_UNKNOWN < 0) {
@@ -297,7 +297,7 @@ static TEST_FUNC void test_error_codes_values(void)
 
 static TEST_FUNC void test_poison_active(void)
 {
-    TEST("BAN-030/155/154: Poison active under AIRY_COMPLIANCE_STRICT");
+    TEST("Poison active under AIRY_COMPLIANCE_STRICT");
     /*
       * This function compiling proves:
       * 1. no poisoned functions are used (strcpy/strncpy/memcpy/memset/malloc/free, etc.)
@@ -319,29 +319,29 @@ int main(void)
     fputs("\n", stdout);
     fputs("================================================\n", stdout);
     fputs("  Banned Functions Compliance Test Suite\n", stdout);
-    fputs("  BAN-030 (strcpy) / BAN-155 (strncpy)\n", stdout);
-    fputs("  BAN-154 (memcpy/memset) / BAN-073 (return -1)\n", stdout);
+    fputs("  strcpy / strncpy\n", stdout);
+    fputs("  memcpy/memset / return -1\n", stdout);
     fputs("================================================\n\n", stdout);
 
-    fputs("--- BAN-154: AIRY_MEMSET ---\n", stdout);
+    fputs("--- AIRY_MEMSET ---\n", stdout);
     test_memset_basic_fill();
     test_memset_zero_fill();
     test_memset_zero_size();
     test_memset_partial_fill();
 
-    fputs("\n--- BAN-154: AIRY_MEMCPY ---\n", stdout);
+    fputs("\n--- AIRY_MEMCPY ---\n", stdout);
     test_memcpy_basic_copy();
     test_memcpy_zero_size();
     test_memcpy_binary_data();
 
-    fputs("\n--- BAN-155: AIRY_STRNCPY_TERM ---\n", stdout);
+    fputs("\n--- AIRY_STRNCPY_TERM ---\n", stdout);
     test_strncpy_term_short_src();
     test_strncpy_term_long_src_null_termination();
     test_strncpy_term_exact_fit();
     test_strncpy_term_empty_src();
     test_strncpy_term_single_byte_dst();
 
-    fputs("\n--- BAN-073: Error Codes ---\n", stdout);
+    fputs("\n--- Error Codes ---\n", stdout);
     test_error_codes_values();
 
     fputs("\n--- Compile-Time Poison Verification ---\n", stdout);

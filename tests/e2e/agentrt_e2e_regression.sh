@@ -126,7 +126,7 @@ rpc hook.register "{\"name\":\"$HOOK_N\",\"type\":\"pre_exec\",\"impl\":\"shell\
 rpc hook.unregister "{\"name\":\"$HOOK_N\"}" "hook.unregister($HOOK_N, 成对清理)"
 rpc_match hook.trigger '{"type":"pre_exec"}' '"decision"' "hook.trigger(空注册表, continue)"
 
-# ── plugin（0.1.9 M4：plugin.* 经 gateway 转发 tool_d 的 plugin_* 方法）───
+# ── plugin（plugin.* 经 gateway 转发 tool_d 的 plugin_* 方法）───
 log "[plugin→tool_d]"
 rpc_err plugin.get_metadata '{"name":"nope"}' -32601 "plugin.get_metadata(不存在, 错误路径)"
 rpc plugin.get_state '{"name":"nope"}' "plugin.get_state(任意 name 返回状态)"
@@ -225,7 +225,7 @@ rpc cupolas.audit_flush '{}' "cupolas.audit_flush"
 rpc cupolas.health_check '{}' "cupolas.health_check"
 rpc cupolas.get_stats '{}' "cupolas.get_stats"
 
-# M2-S2/S3（0.1.9 §3.2 PDP）：policy.* 两段式生效——load 暂存不生效、
+# PDP：policy.* 两段式生效——load 暂存不生效、
 # activate 提交运行集（epoch+1 + 广播），deny-wins 裁决翻转可经
 # cupolas.check_permission 观测；写操作需 cap:cupolas.admin 授权。
 POLY="e2e_pol_${TS}"
@@ -312,7 +312,7 @@ fi
 rpc_match a2a.unregister_agent "{\"agent_id\":\"$AA\"}" '"unregistered"' "a2a.unregister_agent($AA, 成对清理)"
 [ "$SKIP_EXTERNAL" = 0 ] && rpc_match a2a.send_message "{\"target_agent_id\":\"$AA\",\"role\":\"user\",\"content\":\"hi\"}" '"responses"' "a2a.send_message(离线目标, ack 语义)"
 
-# ── monit_d:info（0.1.9 M4：原 info_d 并入 monit_d，外部 cap key 不变） ──
+# ── monit_d:info（原 info_d 并入 monit_d，外部 cap key 不变） ──
 log "[monit_d:info]"
 rpc_match info.system '{}' '"system"|"platform"' "info.system"
 rpc info.history '{}' "info.history"
@@ -332,7 +332,7 @@ rpc_match notify.subscribe "{\"topic\":\"$NT\",\"client_id\":\"client_${TS}\"}" 
 rpc_match notify.publish "{\"message\":\"e2e\",\"topic\":\"$NT\"}" '"queued"' "notify.publish($NT)"
 rpc_match notify.unsubscribe "{\"topic\":\"$NT\",\"client_id\":\"client_${TS}\"}" '"unsubscribed"' "notify.unsubscribe($NT, 成对清理)"
 
-# ── monit_d:observe（0.1.9 M4：原 observe_d 并入 monit_d，外部 cap key 不变） ──
+# ── monit_d:observe（原 observe_d 并入 monit_d，外部 cap key 不变） ──
 log "[monit_d:observe]"
 rpc observe.get_stats '{}' "observe.get_stats"
 rpc observe.health_check '{}' "observe.health_check"
