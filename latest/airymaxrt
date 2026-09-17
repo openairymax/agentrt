@@ -350,11 +350,6 @@ find_tool() {
     fi
 }
 
-TUI_BIN="$(find_tool AIRY_TUI_BIN agentrt-tui \
-    "$AIRY_HOME/bin/agentrt-tui" \
-    "$AIRYRT_HOME/sdk/tui/target/release/agentrt-tui" \
-    "$AIRYRT_HOME/sdk/tui/target/debug/agentrt-tui")"
-
 CLI_BIN="$(find_tool AIRY_CLI_BIN airy_cli \
     "$AIRY_HOME/bin/airy_cli" \
     "$AIRYRT_HOME/agentrt/build/tools/airy_cli/airy_cli" \
@@ -375,7 +370,6 @@ THINK_BIN="$(find_tool AIRY_THINK_BIN think_d \
     "$AIRYRT_HOME/agentrt/build/bin/think_d" \
     "$AIRYRT_HOME/build/bin/think_d")"
 
-log debug "组件定位结果: TUI_BIN=${TUI_BIN:-（缺失）}"
 log debug "组件定位结果: CLI_BIN=${CLI_BIN:-（缺失）}"
 log debug "组件定位结果: GATEWAY_BIN=${GATEWAY_BIN:-（缺失）}"
 log debug "组件定位结果: LLM_BIN=${LLM_BIN:-（缺失）}"
@@ -1061,13 +1055,13 @@ ensure_installer() {
     return 1
 }
 
-AIRYRT_FORCE_CLI=0
+FRONTEND_TUI=1
 CLI_ARGS=()
 CMD="${1:-}"
 case "$CMD" in
     --help|-h|help)
-        echo "用法: airymaxrt [--gateway-url URL] [--agent-file FILE]"
-        echo "      airymaxrt cli [airy_cli 参数]  强制 CLI 模式（默认 TUI；随时可切换）"
+        echo "用法: airymaxrt [airy_cli 参数]（默认进入 TUI 渲染层）"
+        echo "      airymaxrt cli [airy_cli 参数]  行式模式（不经 TUI 渲染层）"
         echo "      airymaxrt profile [full|minimal|auto]  查看/切换运行画像（硬件自适应）"
         echo "      airymaxrt monitor   硬件监控：检测到能力增强自动恢复功能"
         echo "                        （monitor --daemon 后台常驻 / --stop 停止）"
@@ -1087,8 +1081,11 @@ case "$CMD" in
             log error "airy_cli 未找到（CLI_BIN 为空）"
             exit 1
         fi
-        AIRYRT_FORCE_CLI=1
+        FRONTEND_TUI=0
         shift
+        CLI_ARGS=("$@")
+        ;;
+    -*)
         CLI_ARGS=("$@")
         ;;
     profile)
@@ -1212,7 +1209,7 @@ case "$CMD" in
     status)
         log info "AIRY_HOME=$AIRY_HOME"
         log info "画像: ${AIRYRT_PROFILE:-auto} · 架构: $(detect_arch) · 加速器: $(detect_accel)"
-        log info "组件: TUI=${TUI_BIN:-缺失} GATEWAY=${GATEWAY_BIN:-缺失} LLM=${LLM_BIN:-缺失}"
+        log info "组件: CLI=${CLI_BIN:-缺失} GATEWAY=${GATEWAY_BIN:-缺失} LLM=${LLM_BIN:-缺失}"
         if [ -f "$AIRY_HOME/config/install.env" ]; then
             _BP="$(sed -n 's/^AIRY_BIN_DIR_IN_PATH=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
             _BL="$(sed -n 's/^AIRY_BIN_LINK=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
@@ -1253,7 +1250,7 @@ case "$CMD" in
         ;;
     doctor)
         miss=0
-        for name in TUI_BIN GATEWAY_BIN LLM_BIN THINK_BIN; do
+        for name in CLI_BIN GATEWAY_BIN LLM_BIN THINK_BIN; do
             eval "val=\${$name:-}"
             if [ -n "$val" ] && [ -x "$val" ]; then log info "$name: $val"; else log warn "$name: 缺失"; miss=1; fi
         done
@@ -1390,17 +1387,12 @@ if [ -z "${AIRYRT_TERM_LOG:-}" ]; then
     AIRYRT_TERM_LOG=quiet
 fi
 
-if [ -z "$TUI_BIN" ] && [ -z "$CLI_BIN" ]; then
-    log error "未找到 agentrt-tui 与 airy_cli，请先构建："
-    log error "  TUI: cd \"$AIRYRT_HOME/sdk/tui\" && cargo build --release"
+if [ -z "$CLI_BIN" ]; then
+    log error "未找到 airy_cli，请先构建："
     log error "  CLI: cd \"$AIRYRT_HOME/agentrt\" && cmake --build build --target airy_cli"
     exit 1
 fi
-if [ -n "$TUI_BIN" ]; then
-    log info "组件就绪: TUI=$(basename "$TUI_BIN")"
-else
-    log warn "agentrt-tui 未找到，将使用 airy_cli 作为前端"
-fi
+log info "组件就绪: CLI=$(basename "$CLI_BIN")"
 
 path_self_heal
 
@@ -1410,85 +1402,29 @@ clear_front_screen() {
     fi
 }
 
-terminal_capable_tui() {
-    [ -n "${AIRYRT_FORCE_TUI:-}" ] && return 0
-    local term rows cols
-    term="${TERM:-dumb}"
-    case "$term" in
-        dumb|unknown|"") return 1 ;;
-    esac
-    if command -v stty >/dev/null 2>&1; then
-        read -r rows cols < <(stty size 2>/dev/null || printf "24 80")
-        if [ "${rows:-0}" -lt 20 ] || [ "${cols:-0}" -lt 60 ]; then
-            log debug "终端尺寸过小（${rows}x${cols}），TUI 降级 CLI"
-            return 1
-        fi
-    fi
-    return 0
-}
-
 launch_frontend() {
     log debug "TTY 检测: stdin=$([ -t 0 ] && echo tty || echo pipe) stdout=$([ -t 1 ] && echo tty || echo pipe)"
     if [ -d "$AIRY_HOME/tmp" ]; then
         find "$AIRY_HOME/tmp" -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null
         log debug "tmp 清理: 已回收超过 24h 未修改的临时文件/目录"
     fi
-    if [ "$AIRYRT_FORCE_CLI" = "1" ]; then
-        if [ -n "$CLI_BIN" ]; then
-            if [ -t 0 ] && [ -t 1 ] && [ "${#CLI_ARGS[@]}" -eq 0 ]; then
-                clear_front_screen
-                log debug "执行: \"$CLI_BIN\"（CLI 交互模式，TUI 让位）"
-                log info "进入交互界面（airy_cli，Ctrl+C 退出）"
-                "$CLI_BIN" <&0 &
-            else
-                log debug "执行: \"$CLI_BIN\" ${CLI_ARGS[*]:-}"
-                "$CLI_BIN" "${CLI_ARGS[@]}" <&0 &
-            fi
-            TUI_PID=$!
-            wait "$TUI_PID" || return $?
-            return 0
-        fi
-        log warn "airy_cli 不可用，回退默认前端"
-    fi
-    if [ -t 0 ] && [ -t 1 ] && [ -n "$TUI_BIN" ] && [ "$GATEWAY_DOWN" != "1" ] && terminal_capable_tui; then
-        clear_front_screen
-        log debug "执行: \"$TUI_BIN\" --gateway-url \"$GATEWAY_URL\" --agent-file \"$AGENT_FILE\""
-        log info "进入交互界面（Rust TUI，Ctrl+C 退出）"
-        "$TUI_BIN" --gateway-url "$GATEWAY_URL" --agent-file "$AGENT_FILE" <&0 &
-        TUI_PID=$!
-        wait "$TUI_PID"
-        local rc=$?
-        if [ "$rc" -ne 0 ] && [ -n "$CLI_BIN" ] && [ -t 0 ] && [ -t 1 ]; then
-            log warn "TUI 异常退出（code=${rc}），自动续接 CLI 交互模式"
+    export AIRY_GATEWAY_URL="$GATEWAY_URL"
+    export AIRY_AGENT_FILE="$AGENT_FILE"
+    if [ "$FRONTEND_TUI" = "1" ] && [ -t 0 ] && [ -t 1 ]; then
+        if [ "${#CLI_ARGS[@]}" -eq 0 ]; then
             clear_front_screen
-            log info "进入交互界面（airy_cli，/quit 退出）"
-            "$CLI_BIN" <&0 &
-            TUI_PID=$!
-            wait "$TUI_PID"
+            log info "进入交互界面（Ctrl+C 退出）"
         fi
-        return 0
-    elif [ -n "$CLI_BIN" ]; then
-        if [ -t 0 ] && [ -t 1 ]; then
-            clear_front_screen
-            log debug "执行: \"$CLI_BIN\"（TTY 交互模式，TUI 不可用降级）"
-            log info "进入交互界面（airy_cli，Ctrl+C 退出）"
-            "$CLI_BIN" <&0 &
-        else
-            log debug "执行: \"$CLI_BIN\" -p（非 TTY 流式单轮，stdin 读指令）"
-            log info "进入流式 CLI（airy_cli，非 TTY 环境；stdin 读指令）"
-            "$CLI_BIN" -p <&0 &
-        fi
+        set -- --tui "${CLI_ARGS[@]}"
     else
-        clear_front_screen
-        log warn "airy_cli 不可用，回退 Rust TUI（可能需要 TTY）"
-        "$TUI_BIN" --gateway-url "$GATEWAY_URL" --agent-file "$AGENT_FILE" <&0 &
+        set -- "${CLI_ARGS[@]}"
     fi
+    "$CLI_BIN" "$@" <&0 &
     TUI_PID=$!
     wait "$TUI_PID" || return $?
     return 0
 }
 
-GATEWAY_DOWN=0
 GATEWAY_ALIVE=0
 if wait_for_health "$GATEWAY_URL" 1; then
     GATEWAY_ALIVE=1
@@ -1748,10 +1684,9 @@ else
         log warn "gateway 未能就绪（${GATEWAY_URL}），查看日志: $AIRY_HOME/logs/gateway_d.out"
         boot_line "gateway 未就绪（${GATEWAY_URL}），降级模式…"
         if [ -n "$CLI_BIN" ]; then
-            GATEWAY_DOWN=1
-            log warn "降级：使用 airy_cli 直连 daemon 群（不依赖 gateway）"
+            log warn "降级：airy_cli 直连 daemon 群（不依赖 gateway）"
         else
-            log error "TUI 依赖 gateway，但当前无 airy_cli 可降级"
+            log error "交互界面依赖 gateway，但 airy_cli 缺失，无法降级"
             log error "可执行 'airymaxrt doctor' 检查组件，或删除 $RUNTIME_DIR 下残留 socket 后重试"
             exit 1
         fi
