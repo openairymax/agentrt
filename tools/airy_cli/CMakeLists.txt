@@ -30,10 +30,14 @@ add_executable(airy_cli
     # main.c 二轮拆分（2026-08-27：893 行 → 3 个职责模块）
     src/core/airy_cli_cmdline.c
     src/core/airy_cli_taskflow.c
+    # 0.1.17 R5-G6 入口唯一化：TUI 前端子进程唯一入口（--tui 模式 / /tui 切换）
+    src/core/airy_cli_frontend.c
     # daemon_cmds.c 域拆分（2026-08-27：1480 行 → 3 个命名空间模块）
     src/cmd/airy_cli_cmd_system.c
     src/cmd/airy_cli_cmd_cognition.c
     src/cmd/airy_cli_cmd_capability.c
+    # 0.1.17 R5-G4 审批视图：tool.pending 只读视图 + tool.approve 决议回传
+    src/cmd/airy_cli_cmd_approval.c
     src/chat/cli_chat.c
     # cli_chat.c 域拆分（2026-08-27：2040 行 → 6 个职责模块）
     src/chat/cli_chat_usage.c
@@ -44,6 +48,8 @@ add_executable(airy_cli
     # cli_chat.c 二轮拆分（2026-08-27：802 行 → 4 个职责模块；C-01 ⑤：cli_chat_stream.c 退役 → 3）
     src/chat/cli_chat_classify.c
     src/chat/cli_chat_finalize.c
+    # 0.1.17 R5-G5 会话视图：--continue/--resume 读 mem.recent 装配 g_history_*
+    src/chat/cli_chat_session.c
     src/cmd/cli_classify.c
     src/render/cli_think.c
     src/core/cli_dag.c
@@ -243,5 +249,56 @@ if(BUILD_TESTS)
             target_link_libraries(test_cli_usage PRIVATE ${AIRY_CJSON_LIBRARIES})
         endif()
         add_test(NAME cli_chat_usage COMMAND test_cli_usage)
+    endif()
+
+    # 0.1.17 R5-G4：审批面（/pending 只读视图 + /approve 决议回传）端到端——
+    # mock 网关承接出站派发，断言 tool.approve 的 request_id/decision 逐字
+    # 抵达、本地自检不出站、pending 三形态解析容错。与 cli_gw_e2e 同策略
+    # （mock 服务端直引 POSIX 头面 + pthread），Windows 腿不参与。
+    if(NOT WIN32)
+        add_executable(test_cli_approval tests/test_cli_approval.c
+                       src/cmd/airy_cli_cmd_approval.c src/cmd/cli_gw.c
+                       src/render/cli_render.c src/render/airy_cli_markdown.c
+                       src/render/airy_cli_output.c src/core/cli_term.c)
+        target_include_directories(test_cli_approval PRIVATE ${CLI_INC_DIRS})
+        target_compile_definitions(test_cli_approval PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
+        if(AIRY_CJSON_INCLUDE_DIRS)
+            target_include_directories(test_cli_approval PRIVATE ${AIRY_CJSON_INCLUDE_DIRS})
+        endif()
+        target_link_libraries(test_cli_approval PRIVATE airy_common Threads::Threads)
+        if(TARGET cJSON OR TARGET cjson)
+            target_link_libraries(test_cli_approval PRIVATE $<IF:$<TARGET_EXISTS:cJSON>,cJSON,cjson>)
+        elseif(AIRY_CJSON_LIBRARIES)
+            target_link_libraries(test_cli_approval PRIVATE ${AIRY_CJSON_LIBRARIES})
+        endif()
+        add_test(NAME cli_approval_e2e COMMAND test_cli_approval)
+    endif()
+
+    # 0.1.17 R5-G5：--continue/--resume 会话恢复视图端到端——mock 网关承接
+    # mem.recent，断言出站 limit 与消息预算同源、权威新→旧倒序回放得旧→新、
+    # 整轮线格式拆分为 user/assistant（reasoning 保留）、metadata.role 单条
+    # 还原、成对 FIFO 裁剪不超预算、不可达/不可解析降级不崩溃。与
+    # cli_approval_e2e 同策略（mock 服务端直引 POSIX 头面 + pthread），
+    # Windows 腿不参与。此处链接真实的 cli_chat_history.c：装配结果直接写
+    # g_history_*，历史缓冲语义必须是被测实现本体，不用测试替身。
+    if(NOT WIN32)
+        add_executable(test_cli_session tests/test_cli_session.c
+                       src/chat/cli_chat_session.c src/chat/cli_chat_history.c
+                       src/cmd/cli_gw.c src/render/cli_render.c
+                       src/render/airy_cli_markdown.c src/render/airy_cli_output.c
+                       src/core/cli_term.c)
+        target_include_directories(test_cli_session PRIVATE ${CLI_INC_DIRS})
+        target_compile_definitions(test_cli_session PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
+        if(AIRY_CJSON_INCLUDE_DIRS)
+            target_include_directories(test_cli_session PRIVATE ${AIRY_CJSON_INCLUDE_DIRS})
+        endif()
+        target_link_libraries(test_cli_session PRIVATE airy_coreloopthree airy_common
+                                                       Threads::Threads)
+        if(TARGET cJSON OR TARGET cjson)
+            target_link_libraries(test_cli_session PRIVATE $<IF:$<TARGET_EXISTS:cJSON>,cJSON,cjson>)
+        elseif(AIRY_CJSON_LIBRARIES)
+            target_link_libraries(test_cli_session PRIVATE ${AIRY_CJSON_LIBRARIES})
+        endif()
+        add_test(NAME cli_session_restore COMMAND test_cli_session)
     endif()
 endif()

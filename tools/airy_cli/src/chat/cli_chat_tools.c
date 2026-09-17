@@ -361,8 +361,8 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
          * 失败也误报为网关不可达，误导排障方向。 */
         char fallback[256];
         snprintf(fallback, sizeof(fallback), "tool rpc failed (via gateway)");
-        extern char g_cli_gw_err[256]; /* 同 cli_render.c 的既有访问方式 */
-        const char *err_desc = g_cli_gw_err[0] ? g_cli_gw_err : fallback;
+        const char *gw_err = cli_gw_last_err();
+        const char *err_desc = gw_err[0] ? gw_err : fallback;
         char msg[512];
         snprintf(msg, sizeof(msg), "{\"ok\":false,\"error\":\"%s\"}", err_desc);
         return AIRY_STRDUP(msg);

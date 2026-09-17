@@ -39,7 +39,7 @@ char *g_history_contents[CLI_HISTORY_MAX_MSGS];
 char *g_history_reasonings[CLI_HISTORY_MAX_MSGS];
 size_t g_history_count = 0;
 
-static size_t cli_history_capacity(void)
+size_t cli_history_capacity(void)
 {
     const char *env = getenv("AIRY_CHAT_HISTORY_ROUNDS");
     if (env && env[0] != '\0') {

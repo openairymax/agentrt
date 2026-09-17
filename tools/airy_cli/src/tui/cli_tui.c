@@ -21,18 +21,15 @@
  * 生命周期；全屏 readline 主循环 → tui_readline.c；方向键/翻页/粘贴等
  * 导航编辑键分派 → tui_readline_nav.c（tui_readline_arrow_keys）。
  *
- * Layout (on an interactive terminal):
+ * 0.1.17 R5-G2 冻结退役：本文件的备用屏全屏形态（pinned header + 会话视口 +
+ * 底部输入条的三区布局）不再可进入——cli_tui_enter() 恒拒绝，全屏渲染唯一由
+ * Rust 侧控制台渲染层（`airy_cli --tui` 调起的 agentrt-tui）提供。本文件
+ * 只保留行式渲染所需的引擎骨架、状态与视图查询；渲染/面板域的物理删除见
+ * 0.1.18「TUI 渲染引擎化」。
  *
- *   ┌──────────────────────────────────────────────┐
- *   │  pinned header  (banner + model panel)        │  fixed
- *   ├──────────────────────────────────────────────┤
- *   │  conversation viewport (scrollable history)  │  middle
- *   │                                              │
- *   ├──────────────────────────────────────────────┤
- *   │  > input line …                              │  bottom (fixed)
- *   └──────────────────────────────────────────────┘
- *
- * ANSI used: alt screen 1049, cursor home, erase line, cursor movement.
+ * ANSI used: cursor home, erase line, cursor movement. The alt-screen (1049)
+ * exit sequence survives only in the idempotent teardown path, which can no
+ * longer be armed because the entry choke point refuses.
  * No curses — plain POSIX termios + ANSI, consistent with the project's
  * "no curses" rendering philosophy.
  */
@@ -295,12 +292,13 @@ void cli_tui_set_header_models(cli_tui_t *t, const char *t2, const char *t1f,
         snprintf(t->hdr_t1p, sizeof(t->hdr_t1p), "%s", t1p);
 }
 
-/* 2.2.1.2/2.2.1.3 → 0.1.8：退出全屏/尺寸变化后重建行渲染视图。
+/* 2.2.1.2/2.2.1.3 → 0.1.8：终端尺寸变化后重建行渲染视图。
  * 0.1.7 已声明弃用「固定滚动区 + 底部输入条」三区布局（cli_banner.c），
- * 但本函数此前仍 cli_term_header_pin 重设 DECSTBM——F8 进出全屏后终端
- * 被强加固定滚动区，滚轮失效、hero 钉死，与默认 REPL 行为不一致
- * （社区反馈「CLI 页面操作混乱」根因）。现与启动路径对齐：只重绘
- * 头部与历史，保持普通滚动（unpin 状态）。 */
+ * 但本函数此前仍 cli_term_header_pin 重设 DECSTBM——终端被强加固定
+ * 滚动区，滚轮失效、hero 钉死，与默认 REPL 行为不一致（社区反馈
+ * 「CLI 页面操作混乱」根因）。现与启动路径对齐：只重绘头部与历史，
+ * 保持普通滚动（unpin 状态）。0.1.17 R5-G2 后唯一调用方为行式
+ * readline 的 SIGWINCH 处理。 */
 void cli_tui_rebuild_three_zone(cli_tui_t *t)
 {
     if (!t || !cli_term_is_tty() || t->active)
@@ -350,56 +348,19 @@ int cli_tui_create(cli_tui_t **out_tui)
     t->ime_key = tui_ime_key_resolve();
     t->ime_key_alt = tui_ime_key_alt_resolve();
     /* 2.3.7 (2026-08-17)：交互默认行渲染流式模式，不自动进入全屏页面；
-     * 全屏由 cli_tui_enter() 显式进入（F8 切换）。 */
+     * 0.1.17 R5-G2：C 侧全屏页面已冻结退役，全屏渲染唯一由 `--tui`
+     * 模式调起 agentrt-tui 提供。 */
     return 0;
 }
 
 int cli_tui_enter(cli_tui_t *t)
 {
-    if (!t || t->active)
-        return 0;
-    if (!cli_term_is_tty())
-        return -1;
-
-    t->active = 1;
-    t->scr_set = 0; /* 滚动区在首次全量渲染时建立 */
-    tui_get_size(t);
-    if (t->rows <= 6 || t->cols <= 10) {
-        t->active = 0;
-        return -1;
-    }
-
-#ifdef _WIN32
-    t->active = 0; /* POSIX-only full-screen mode */
+    (void)t;
+    /* 0.1.17 R5-G2：C 侧全屏套件冻结退役——备用屏 / 原始输入 / SIGWINCH
+     * 接管全部收回，终端改性只由控制台渲染层（`airy_cli --tui` 调起的
+     * agentrt-tui）持有。此处恒拒绝，全屏能力的唯一入口是 --tui 模式；
+     * 本套件的物理删除见 0.1.18。 */
     return -1;
-#else
-    /* Enter alternate screen + bracketed paste + raw mode.
-     * 2.2.1.5：隐藏硬件光标，输入光标由反显块自绘（黑白交替闪烁）。 */
-    fputs("\033[?1049h\033[?2004h\033[?25l\033[2J\033[H", stdout);
-    fflush(stdout);
-
-    g_tui_resize_pending = 0;
-    signal(SIGWINCH, tui_sigwinch_handler);
-
-    if (tcgetattr(STDIN_FILENO, &t->saved_termios) == 0) {
-        /* Full raw mode (cfmakeraw semantics): the CLI owns every byte of
-         * input. IXON must go so Ctrl+S is not swallowed as terminal flow
-         * control; ISIG goes so Ctrl+C is delivered to the readline loop. */
-        struct termios raw = t->saved_termios;
-        raw.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-        raw.c_oflag &= ~OPOST;
-        raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
-        raw.c_cflag &= ~(CSIZE | PARENB);
-        raw.c_cflag |= CS8;
-        raw.c_cc[VMIN] = 1;
-        raw.c_cc[VTIME] = 0;
-        if (tcsetattr(STDIN_FILENO, TCSANOW, &raw) == 0) {
-            t->termios_saved = 1;
-            cli_term_note_raw_enter(&t->saved_termios); /* T-19 崩溃守卫登记 */
-        }
-    }
-    return 0;
-#endif
 }
 
 int cli_tui_leave(cli_tui_t *t)

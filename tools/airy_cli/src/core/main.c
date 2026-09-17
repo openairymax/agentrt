@@ -70,6 +70,11 @@ volatile sig_atomic_t g_cli_cancel = 0;
 /* Server one-shot mode (-p/--print) and --json structured output. */
 int g_cli_print_mode = 0;
 int g_cli_json_mode = 0;
+/* 全屏 TUI 渲染层模式（--tui，0.1.17 R5-G6）。 */
+int g_cli_tui_mode = 0;
+/* 会话恢复视图模式（--continue / --resume，0.1.17 R5-G5）：启动时读一次
+ * mem.recent 装配 g_history_*，前端不落任何本地会话状态。 */
+int g_cli_resume_mode = 0;
 
 #if !defined(_WIN32)
 static void cli_sigint_handler(int sig)
@@ -109,6 +114,13 @@ int main(int argc, char *argv[])
     const char *print_prompt = NULL;
     if (cli_parse_args(argc, argv, &print_prompt) != 0)
         return 1;
+    /* 0.1.17 R5-G6 入口唯一化：--tui 为 CLI 的一个模式——调起 agentrt-tui
+     * 子进程并回传退出码；CLI 父进程不初始化终端（保持零终端改性），
+     * TUI 异常退出仅报错，不做接力。R5-G5：--resume/--continue 原样转发，
+     * 使 `airy_cli --tui --resume` 与 `agentrt-tui --resume` 呈现同一会话
+     * （会话权威在 mem_d，两个前端各自只读装配，均不落本地会话状态）。 */
+    if (g_cli_tui_mode)
+        return cli_run_tui_frontend(g_cli_resume_mode);
     cli_term_init();
 #ifndef _WIN32
     cli_term_crash_guard_install(); /* T-19：崩溃前还原终端改性 */
@@ -210,6 +222,11 @@ int main(int argc, char *argv[])
     if (err != AIRY_EOK)
         AIRY_LOG_WARN("airy_cli: set cancel flag failed (err=%d)", (int)err);
 
+    /* 0.1.17 R5-G5：--continue/--resume 会话恢复视图——启动时一次性只读
+     * 装配（mem.recent → g_history_*），此后请求/渲染路径自动同源生效。 */
+    if (g_cli_resume_mode)
+        cli_session_restore();
+
     char input[8192];
     int quit_flag = 0;
     int switch_tui_flag = 0;
@@ -235,6 +252,19 @@ int main(int argc, char *argv[])
             cli_tui_set_status(tui, st);
         }
         (void)cli_daemon_lifecycle_reconcile_once();
+        /* 0.1.17 R5-G6：/tui 切换到全屏 TUI 渲染层。fork agentrt-tui 子进程
+         * （唯一实现 cli_run_tui_frontend），TUI 退出后返回行式对话；不 exec
+         * 替换 CLI 进程，故会话上下文与历史保留。 */
+        if (switch_tui_flag) {
+            switch_tui_flag = 0;
+            cli_term_header_unpin();
+            (void)cli_run_tui_frontend(0);
+            if (cli_tui_active(tui)) {
+                cli_tui_pin_header(tui);
+                cli_tui_redraw(tui);
+            }
+            continue;
+        }
         size_t input_len = 0;
         if (g_cli_print_mode) {
             if (print_prompt && print_prompt[0]) {
@@ -279,26 +309,8 @@ int main(int argc, char *argv[])
                 cli_term_input_submit();
                 break;
             }
-            if (rl == 2) {
-                cli_tui_enter(tui);
-                if (cli_tui_active(tui)) {
-                    cli_tui_reset_history(tui);
-                    cli_render_set_tui(tui);
-                    cli_print_system_header(m_s2[0] ? m_s2 : NULL,
-                                            m_verify[0] ? m_verify : NULL,
-                                            m_expert[0] ? m_expert : NULL);
-                    cli_tui_pin_header(tui);
-                    cli_tui_replay_history(tui);
-                    cli_tui_redraw(tui);
-                }
-                continue;
-            }
-            if (rl == 3) {
-                cli_tui_leave(tui);
-                cli_render_set_tui(NULL);
-                cli_tui_rebuild_three_zone(tui);
-                continue;
-            }
+            /* 0.1.17 R5-G2：行式是 CLI 唯一交互形态，readline 只返回 0/1；
+             * 全屏切换（原 rl==2 / rl==3）随 C 侧全屏套件冻结退役。 */
             cli_term_input_submit();
             if (input_len > 0 && cli_term_input_on()) {
                 cli_term_input_begin();
@@ -417,28 +429,6 @@ int main(int argc, char *argv[])
     airy_loop_destroy(loop);
     cli_render_set_tui(NULL);
     cli_tui_destroy(tui);
-
-    if (!g_cli_print_mode && switch_tui_flag) {
-        cli_term_header_unpin();
-        char tui_bin[AIRY_PATH_MAX];
-        snprintf(tui_bin, sizeof(tui_bin), "%s/agentrt-tui", airy_bin_dir());
-#ifndef _WIN32
-        extern char **environ;
-        char gw_url[128] = "";
-        const char *gw = getenv("AIRY_GATEWAY_URL");
-        if (gw && gw[0])
-            snprintf(gw_url, sizeof(gw_url), "%s", gw);
-        else
-            snprintf(gw_url, sizeof(gw_url), "http://127.0.0.1:8080");
-        char *const argv[] = {(char *)tui_bin, "--gateway-url", gw_url, "--resume", NULL};
-        execve(tui_bin, argv, environ);
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "tui",
-                             "agentrt-tui 不可用，无法切换。");
-        return 0;
-#else
-        (void)0;
-#endif
-    }
 
     if (!g_cli_print_mode) {
         if (cli_term_input_on())

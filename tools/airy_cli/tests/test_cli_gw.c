@@ -29,6 +29,7 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,9 +38,8 @@
 #include <unistd.h>
 
 /* cli_gw.c 依赖的跨 TU 符号：SIGINT 取消标志由 main.c 拥有（S-02），本测试
- * 作为独立可执行体定义它；g_cli_gw_err 由 cli_gw.c 定义、测试读取断言。 */
+ * 作为独立可执行体定义它；失败原因经 cli_gw_last_err() 读取断言。 */
 volatile sig_atomic_t g_cli_cancel = 0;
-extern char g_cli_gw_err[256];
 
 /* ── 极简测试框架 ─────────────────────────────────────────────────── */
 
@@ -62,19 +62,21 @@ static int g_tests_passed = 0;
 #define MOCK_MODE_OK     0 /* POST / → result OK；/health → healthy:true */
 #define MOCK_MODE_ERROR  1 /* POST / → JSON-RPC error -32601 */
 #define MOCK_MODE_SILENT 2 /* 收完请求后保持静默，用于驱动客户端超时 */
+#define MOCK_MODE_BADJSON 3 /* POST / → 响应体非合法 JSON */
+#define MOCK_MODE_NORESULT 4 /* POST / → 合法 JSON 但既无 result 也无 error */
 
 static int g_srv_fd = -1;
 static int g_srv_port = 0;
 static pthread_t g_srv_thr;
-static volatile int g_stop = 0;
-static volatile int g_mode = MOCK_MODE_OK;
+static _Atomic int g_stop = 0;
+static _Atomic int g_mode = MOCK_MODE_OK;
 
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
-static int g_reqs = 0;
+static _Atomic int g_reqs = 0;
 static char g_last_method[128] = "";
 static char g_last_params[512] = "";
 static char g_last_jsonrpc[16] = "";
-static int g_last_id = -1;
+static _Atomic int g_last_id = -1;
 static char g_last_path[64] = "";
 
 static void mock_reset(void)
@@ -195,6 +197,14 @@ static void mock_handle(int fd)
     if (mode == MOCK_MODE_ERROR) {
         mock_send(fd, 200, "{\"jsonrpc\":\"2.0\",\"id\":1,"
                            "\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}");
+        return;
+    }
+    if (mode == MOCK_MODE_BADJSON) {
+        mock_send(fd, 200, "<html>gateway panic</html>");
+        return;
+    }
+    if (mode == MOCK_MODE_NORESULT) {
+        mock_send(fd, 200, "{\"jsonrpc\":\"2.0\",\"id\":1}");
         return;
     }
     char resp[512];
@@ -403,8 +413,36 @@ static void test_call_error_32601(void)
     int rc = cli_gw_call("no.such.method", "{}", 3000, &out);
     CHECK(rc == -1, "call_error_32601 rc==-1");
     CHECK(out == NULL, "call_error_32601 out==NULL");
-    CHECK(strstr(g_cli_gw_err, "不支持该方法") != NULL,
+    CHECK(strstr(cli_gw_last_err(), "不支持该方法") != NULL,
           "call_error_32601 err mentions 不支持该方法");
+    g_mode = MOCK_MODE_OK;
+}
+
+static void test_call_badjson(void)
+{
+    mock_reset();
+    g_mode = MOCK_MODE_BADJSON;
+    set_url_port(g_srv_port);
+    char *out = NULL;
+    int rc = cli_gw_call("echo", "{}", 3000, &out);
+    CHECK(rc == -1, "call_badjson rc==-1");
+    CHECK(out == NULL, "call_badjson out==NULL");
+    CHECK(strstr(cli_gw_last_err(), "不是合法 JSON") != NULL,
+          "call_badjson err mentions 不是合法 JSON");
+    g_mode = MOCK_MODE_OK;
+}
+
+static void test_call_noresult(void)
+{
+    mock_reset();
+    g_mode = MOCK_MODE_NORESULT;
+    set_url_port(g_srv_port);
+    char *out = NULL;
+    int rc = cli_gw_call("echo", "{}", 3000, &out);
+    CHECK(rc == -1, "call_noresult rc==-1");
+    CHECK(out == NULL, "call_noresult out==NULL");
+    CHECK(strstr(cli_gw_last_err(), "缺少 result") != NULL,
+          "call_noresult err mentions 缺少 result");
     g_mode = MOCK_MODE_OK;
 }
 
@@ -415,7 +453,7 @@ static void test_call_offline(void)
     int rc = cli_gw_call("echo", "{}", 1000, &out);
     CHECK(rc == -1, "call_offline rc==-1");
     CHECK(out == NULL, "call_offline out==NULL");
-    CHECK(strstr(g_cli_gw_err, "网关不在线") != NULL, "call_offline err mentions 网关不在线");
+    CHECK(strstr(cli_gw_last_err(), "网关不在线") != NULL, "call_offline err mentions 网关不在线");
 }
 
 static void test_call_timeout(void)
@@ -427,9 +465,9 @@ static void test_call_timeout(void)
     int rc = cli_gw_call("slow.method", "{}", 400, &out);
     CHECK(rc == -1, "call_timeout rc==-1");
     CHECK(out == NULL, "call_timeout out==NULL");
-    CHECK(strstr(g_cli_gw_err, "响应超时") != NULL, "call_timeout err mentions 响应超时");
+    CHECK(strstr(cli_gw_last_err(), "响应超时") != NULL, "call_timeout err mentions 响应超时");
     /* 超时 ≠ 离线：文案不得误报"网关不在线" */
-    CHECK(strstr(g_cli_gw_err, "网关不在线") == NULL, "call_timeout not misreported offline");
+    CHECK(strstr(cli_gw_last_err(), "网关不在线") == NULL, "call_timeout not misreported offline");
     g_mode = MOCK_MODE_OK;
 }
 
@@ -490,6 +528,8 @@ int main(void)
 
     test_call_ok_roundtrip();
     test_call_error_32601();
+    test_call_badjson();
+    test_call_noresult();
     test_call_offline();
     test_call_timeout();
     test_call_canceled();

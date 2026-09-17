@@ -6,8 +6,9 @@
  * @brief TUI 引擎行渲染模式（非全屏）readline（域拆分自 tui_input.c，2026-08-27）。
  *
  * 非全屏 TTY 下的字节级 readline：输入行重绘（底部输入条或当前行）、
- * 反显光标闪烁、内置拼音输入法、方向键翻命令历史 / ↑ 空行进入全屏 TUI、
- * 以及编辑快捷键。F8 转义序列（ESC[19~）请求进入全屏页面（返回 2）。
+ * 反显光标闪烁、内置拼音输入法、方向键翻命令历史，以及编辑快捷键。
+ * 0.1.17 R5-G2 起本文件是 CLI 唯一的交互形态：不再存在进入全屏页面的
+ * 按键通路（F8 / 空输入 ↑ 均已退役），全屏由 `--tui` 模式调起渲染层。
  * 共享声明见 cli_tui_internal.h。
  */
 
@@ -134,13 +135,6 @@ int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
             tui_line_redraw(t);
             continue;
         }
-        if (key == TUI_KEY_F8) {
-            /* 行渲染 → 全屏 TUI（与 main.c 的 rl==2 分支一致）。 */
-            if (out_len)
-                *out_len = 0;
-            rc = 2;
-            break;
-        }
         /* 2.2.3 内置拼音输入法：中/英切换。 */
         if (tui_ime_key_hit(t, key)) {
             t->ime_active = !t->ime_active;
@@ -262,15 +256,6 @@ int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
             t->input_col = 0;
             break;
         }
-        if (key == TUI_KEY_UP && t->input_len == 0) {
-            /* 空输入 ↑：翻动会话历史 → 进入全屏 TUI（return 2）。 */
-            if (out_len)
-                *out_len = 0;
-            rc = 2;
-            break;
-        }
-        if (key == TUI_KEY_DOWN && t->input_len == 0)
-            continue; /* 已在尾部，忽略 */
         if (key == 0x03) { /* Ctrl+C：非空清行，空行退出 */
             if (t->input_len > 0) {
                 t->input_len = 0;

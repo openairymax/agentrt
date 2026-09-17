@@ -257,26 +257,30 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
         char cur_state[16];
         double cur_progress = -1.0;
         char *final_result = NULL;
-        cli_dag_poll_rc_t prc = cli_dag_poll_remote(exec_id, &cur_progress, cur_state,
-                                                    sizeof(cur_state), &final_result);
-        AIRY_FREE(final_result);
-        if (prc == CLI_DAG_POLL_ERROR) {
+        /* 0.1.17 R4-①: 每轮只拉一次 sched.dag_status，状态面与节点面共用同一
+         * 份快照。此前两条路径各发一次 RPC，200ms 节拍下形成短连接洪泛。 */
+        cli_dag_snapshot_t *snap = cli_dag_snapshot_fetch(exec_id);
+        if (!snap) {
             cli_spinner_stop(0, "status query failed");
             spin_running = 0;
             cli_render_sub_agent_line(CLI_ROLE_ERROR, "sched_d", "Status query failed.");
             break;
         }
+        cli_dag_poll_rc_t prc = cli_dag_snapshot_poll(snap, &cur_progress, cur_state,
+                                                      sizeof(cur_state), &final_result);
+        AIRY_FREE(final_result);
         if (node_board) {
             cli_spinner_pause();
             if (cli_board_active())
-                cli_dag_board_snapshot(exec_id, cli_live_board_set_node);
+                cli_dag_board_snapshot(snap, cli_live_board_set_node);
             else {
-                int nb_terminal = cli_dag_node_board_tick(node_board, exec_id);
+                int nb_terminal = cli_dag_node_board_tick(node_board, snap);
                 if (nb_terminal)
                     cli_dag_node_board_destroy(node_board), node_board = NULL;
             }
             cli_spinner_resume();
         }
+        cli_dag_snapshot_free(snap);
         if (prc == CLI_DAG_POLL_DONE) {
             /* 终态即停止轮询；semantic_failed（节点进程成功但无产出）与
              * failed / canceled 一并按失败呈现，避免把「无产出」误报为成功。 */
@@ -361,7 +365,11 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
     cli_trace("wait", "%s done err=%d has_result=%d", CLI_ICON_DONE, (int)err,
               result ? 1 : 0);
     if (spin_running && cli_board_active() && !g_cli_cancel) {
-        cli_dag_board_snapshot(exec_id, cli_live_board_set_node);
+        cli_dag_snapshot_t *snap = cli_dag_snapshot_fetch(exec_id);
+        if (snap) {
+            cli_dag_board_snapshot(snap, cli_live_board_set_node);
+            cli_dag_snapshot_free(snap);
+        }
         cli_spinner_pause();
         cli_live_board_refresh((err == AIRY_EOK && result) ? "completed" : "failed",
                                1.0);
