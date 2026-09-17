@@ -48,7 +48,7 @@ $AiryVersionSpecified = $false
 if ($env:AIRY_VERSION) { $AiryVersionSpecified = $true }
 $AIRY_VERSION = if ($env:AIRY_VERSION) { $env:AIRY_VERSION }
                 elseif (Test-Path (Join-Path $PSScriptRoot "..\VERSION")) { "v" + ((Get-Content (Join-Path $PSScriptRoot "..\VERSION")).Trim()) }
-                else { "v0.1.13" }
+                else { "v0.1.16" }
 $AIRY_REPO_URL = if ($env:AIRY_REPO_URL) { $env:AIRY_REPO_URL } else { "https://atomgit.com/openairymax/airymaxhub.git" }
 $AIRY_CHANNEL = if ($Channel) { $Channel } elseif ($env:AIRY_CHANNEL) { $env:AIRY_CHANNEL } else { "stable" }
 if (@('stable', 'rc', 'beta') -notcontains $AIRY_CHANNEL) {
@@ -444,16 +444,16 @@ function Finalize-Install {
         "  powershell -NoProfile -ExecutionPolicy Bypass -Command ""$ErrorActionPreference='Stop'; try { $c=irm 'https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.ps1?ref=main' -TimeoutSec 60; $p=Join-Path $env:TEMP 'agentrt-install.ps1'; [IO.File]::WriteAllBytes($p,[Convert]::FromBase64String(($c.content -replace '\\s',''))); & $p -Uninstall -Prefix '%AIRY_HOME%' } catch { Write-Host ('[FAIL] 卸载器自举失败: '+$_.Exception.Message); exit 1 }""",
         "  goto :eof",
         ")",
-        "if not exist ""%AIRY_HOME%\bin\agentrt-tui.exe"" goto :notfound",
-        "  ""%AIRY_HOME%\bin\agentrt-tui.exe"" %*",
-        "  goto :eof",
-        ":notfound",
-        "if exist ""%AIRY_HOME%\bin\airy_cli.exe"" (",
-        "  ""%AIRY_HOME%\bin\airy_cli.exe"" %*",
+        "if not exist ""%AIRY_HOME%\bin\airy_cli.exe"" goto :notfound",
+        "if ""%~1""=="""" (",
+        "  ""%AIRY_HOME%\bin\airy_cli.exe"" --tui",
         ") else (",
-        "  echo [FAIL] agentrt-tui / airy_cli not found under %AIRY_HOME%\bin",
-        "  exit /b 1",
+        "  ""%AIRY_HOME%\bin\airy_cli.exe"" %*",
         ")",
+        "goto :eof",
+        ":notfound",
+        "echo [FAIL] airy_cli.exe not found under %AIRY_HOME%\bin",
+        "exit /b 1",
         "endlocal"
     )
     $cmdContent | Set-Content -Path $launcher -Encoding ASCII
