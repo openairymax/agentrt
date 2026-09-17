@@ -15,8 +15,8 @@
 
 ## AgentRT 是什么
 
-AgentRT（AirymaxAgentRT）是面向 AI Agent 团队的 OS 级运行时平台——定位类似于
-JVM 之于语言、containerd 之于容器。它把多智能体认知循环、记忆演进、安全隔离
+AgentRT（AirymaxAgentRT）是 AI Agent 运行时平台工程——定位类似于 Kubernetes
+之于容器编排。它把多智能体认知循环、记忆演进、安全隔离
 与协议互操作收敛为一套统一运行时，定义 AI Agent 团队如何运行。
 
 这个仓库以 git 子模块聚合 7 个叶子源码仓库（atoms / commons / cupolas /
