@@ -676,10 +676,16 @@ static void cli_mem_stats_show(const char *ns, const char *json)
         const cJSON *m = cJSON_GetObjectItem(cache, "misses");
         const cJSON *r = cJSON_GetObjectItem(cache, "hit_rate");
         const cJSON *v = cJSON_GetObjectItem(cache, "evictions");
+        /* 无查询样本时 hit_rate 为负：呈现"不可用"，不得伪零（§2.1-6） */
+        char rate[16];
+        if (cJSON_IsNumber(r) && r->valuedouble >= 0.0)
+            snprintf(rate, sizeof(rate), "%.1f%%", r->valuedouble * 100.0);
+        else
+            snprintf(rate, sizeof(rate), "unavailable");
         snprintf(line, sizeof(line),
-                 "semantic cache: entries=%d hits=%d misses=%d hit_rate=%.1f%% evictions=%d",
-                 e ? e->valueint : 0, h ? h->valueint : 0, m ? m->valueint : 0,
-                 r ? r->valuedouble * 100.0 : 0.0, v ? v->valueint : 0);
+                 "semantic cache: entries=%d hits=%d misses=%d hit_rate=%s evictions=%d",
+                 e ? e->valueint : 0, h ? h->valueint : 0, m ? m->valueint : 0, rate,
+                 v ? v->valueint : 0);
         cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, line);
     }
 

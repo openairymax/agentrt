@@ -192,20 +192,37 @@ detect_accel() {
 }
 
 assess_hardware() {
-    local mem_kib mem_avail_kib nproc_val accel profile
-    mem_kib="$(awk '/^MemTotal:/{print $2}' /proc/meminfo 2>/dev/null || echo 0)"
-    mem_avail_kib="$(awk '/^MemAvailable:/{print $2}' /proc/meminfo 2>/dev/null || echo "$mem_kib")"
-    nproc_val="$(nproc 2>/dev/null || echo 1)"
+    local mem_kib="" mem_avail_kib="" nproc_val="" accel profile raw
+    if [ -r /proc/meminfo ]; then
+        mem_kib="$(awk '/^MemTotal:/{print $2}' /proc/meminfo 2>/dev/null || true)"
+        mem_avail_kib="$(awk '/^MemAvailable:/{print $2}' /proc/meminfo 2>/dev/null || true)"
+    elif command -v sysctl >/dev/null 2>&1; then
+        raw="$(sysctl -n hw.memsize 2>/dev/null || true)"
+        case "${raw:-0}" in ''|*[!0-9]*) raw=0 ;; esac
+        mem_kib=$((raw / 1024))
+        mem_avail_kib="$mem_kib"
+    fi
+    case "${mem_kib:-}" in ''|*[!0-9]*) mem_kib="" ;; esac
+    case "${mem_avail_kib:-}" in ''|*[!0-9]*) mem_avail_kib="$mem_kib" ;; esac
+    if command -v nproc >/dev/null 2>&1; then
+        nproc_val="$(nproc 2>/dev/null || true)"
+    elif command -v sysctl >/dev/null 2>&1; then
+        nproc_val="$(sysctl -n hw.ncpu 2>/dev/null || true)"
+    fi
+    case "${nproc_val:-}" in ''|*[!0-9]*) nproc_val="" ;; esac
+    if [ -z "$mem_kib" ] || [ "$mem_kib" -eq 0 ] || [ -z "$nproc_val" ]; then
+        printf 'assess_hardware: 硬件探测失败（内存/核数不可得），拒绝静默降级为 minimal\n' >&2
+        return 1
+    fi
     accel="$(detect_accel)"
-    if [ -n "$mem_kib" ] && [ "$mem_kib" -gt 0 ] && \
-       [ "$mem_kib" -ge $((2560 * 1024)) ] && \
+    if [ "$mem_kib" -ge $((2560 * 1024)) ] && \
        [ "$mem_avail_kib" -ge $((1536 * 1024)) ] && \
        [ "$nproc_val" -ge 3 ]; then
         profile="full"
     else
         profile="minimal"
     fi
-    printf '%s|%s|%s|%s|%s' "$profile" "${mem_kib:-0}" "${mem_avail_kib:-0}" "$nproc_val" "$accel"
+    printf '%s|%s|%s|%s|%s' "$profile" "$mem_kib" "${mem_avail_kib:-0}" "$nproc_val" "$accel"
 }
 
 PROFILE_ENV="$AIRY_HOME/config/profile.env"
@@ -221,7 +238,10 @@ case "$AIRYRT_PROFILE" in
        exit 2 ;;
 esac
 if [ "$AIRYRT_PROFILE" = "auto" ]; then
-    _HW_ASSESS="$(assess_hardware)"
+    if ! _HW_ASSESS="$(assess_hardware)"; then
+        log error "硬件探测失败，无法自动评估画像；请显式设置 AIRYRT_PROFILE=full|minimal 后重试"
+        exit 2
+    fi
     AIRYRT_PROFILE="${_HW_ASSESS%%|*}"
     log info "硬件评估: 内存 ${_HW_ASSESS#*|}"
     log info "自动画像: $AIRYRT_PROFILE"
@@ -260,27 +280,9 @@ diag_daemons() {
     fi
 }
 
-_SECRET_FILE="$AIRY_HOME/config/secrets.env"
-if [ -f "$_SECRET_FILE" ]; then
-    log info "加载密钥文件: $_SECRET_FILE"
-    set -a
-    . "$_SECRET_FILE"
-    set +a
-fi
-
 log debug "==== airymaxrt 启动 ===="
 log debug "配置: AIRYRT_HOME=$AIRYRT_HOME AIRY_HOME=$AIRY_HOME RUNTIME_DIR=$RUNTIME_DIR"
 log debug "配置: GATEWAY_URL=$GATEWAY_URL MODEL_CONFIG=$MODEL_CONFIG AGENT_FILE=$AGENT_FILE"
-
-if [ -f "$AIRY_HOME/bin/agentrt-env.sh" ]; then
-    log debug "注入运行环境: $AIRY_HOME/bin/agentrt-env.sh"
-    _AIRY_HOME_RESOLVED="$AIRY_HOME"
-    . "$AIRY_HOME/bin/agentrt-env.sh"
-    AIRY_HOME="$_AIRY_HOME_RESOLVED"
-    export AIRY_HOME
-    RUNTIME_DIR="${AIRY_HOME}/run"
-    log debug "agentrt-env.sh 注入后恢复 AIRY_HOME=$AIRY_HOME RUNTIME_DIR=$RUNTIME_DIR"
-fi
 
 case ":${LD_LIBRARY_PATH:-}:" in
     *":$AIRY_HOME/lib:"*) ;;
@@ -619,7 +621,15 @@ fetch_repo_file() {
     if command -v python3 >/dev/null 2>&1; then
         python3 -c 'import json,sys,base64; sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin).get("content","").replace("\n","")))' < "$tmp" > "$2" || { rm -f "$tmp"; return 1; }
     else
-        sed -n 's/.*"content"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp" | tr -d '\n' | base64 -d > "$2" 2>/dev/null || { rm -f "$tmp"; return 1; }
+        sed -n 's/.*"content"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp" | tr -d '\n' > "${tmp}.b64"
+        if base64 -d < "${tmp}.b64" > "$2" 2>/dev/null \
+           || base64 -D < "${tmp}.b64" > "$2" 2>/dev/null \
+           || openssl base64 -d -A < "${tmp}.b64" > "$2" 2>/dev/null; then
+            rm -f "${tmp}.b64"
+        else
+            rm -f "$tmp" "${tmp}.b64"
+            return 1
+        fi
     fi
     rm -f "$tmp"
     [ -s "$2" ]
@@ -683,91 +693,285 @@ verify_gpg_sig() {
     gpg --batch --no-tty --homedir "$GNUPG" --verify "$sig" "$f" >/dev/null 2>&1
 }
 
-restore_from_backup() {
-    local rb="$1" d ok=1
-    for d in bin lib include share; do
-        if [ -d "$rb/$d" ]; then
-            rm -rf "$AIRY_HOME/$d"
-            cp -r "$rb/$d" "$AIRY_HOME/$d" 2>/dev/null || ok=0
-        else
-            rm -rf "$AIRY_HOME/$d"
-        fi
-    done
-    [ "$ok" = "1" ]
+# ---- 事务化更新基元（B10）：版本目录 releases/<id> + current 符号链接原子切换 ----
+# 不变量：镜像替换只发生"新目录就位 + current 重指"两点，永不就地改写已发布版本目录；
+# 回滚 = current 重指上一版本，全流程 mkdir 互斥 + intent 幂等重放。
+
+upd_lock_acq() {
+    local q="${1:-}" lk="$AIRY_HOME/run/update.lock" pid
+    mkdir -p "$AIRY_HOME/run" 2>/dev/null || true
+    if mkdir "$lk" 2>/dev/null; then
+        printf '%s\n' "$$" > "$lk/pid" 2>/dev/null || true
+        return 0
+    fi
+    pid="$(cat "$lk/pid" 2>/dev/null)"
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        [ "$q" = "quiet" ] || log error "另一更新进程持锁运行中（pid $pid），本次操作拒绝"
+        return 1
+    fi
+    [ "$q" = "quiet" ] || log warn "清理残留更新锁（持锁进程 ${pid:-?} 已不存在）"
+    rm -rf "$lk" 2>/dev/null || true
+    mkdir "$lk" 2>/dev/null || { [ "$q" = "quiet" ] || log error "更新锁获取失败"; return 1; }
+    printf '%s\n' "$$" > "$lk/pid" 2>/dev/null || true
+    return 0
 }
 
-prune_rollback() {
-    ls -1dt "$AIRY_HOME"/.rollback/*/ 2>/dev/null | tail -n +2 | while read -r old; do
-        rm -rf "$old"
+upd_lock_rel() {
+    rm -rf "$AIRY_HOME/run/update.lock" 2>/dev/null || true
+}
+
+upd_intent_set() {
+    mkdir -p "$AIRY_HOME/run" 2>/dev/null || true
+    printf 'target=%s\n' "$1" > "$AIRY_HOME/run/update.intent"
+}
+
+upd_intent_clear() {
+    rm -f "$AIRY_HOME/run/update.intent" 2>/dev/null || true
+}
+
+rel_commit() {
+    local target="$1"
+    [ -d "$target" ] || { log error "提交目标不存在: $target"; return 1; }
+    # -n: dest 为目录符号链接时直接替换链接本身（mv 会移入目录内部）
+    if ! ln -sfn "$target" "$AIRY_HOME/current" 2>/dev/null; then
+        log error "current 切换失败（releases 布局异常）"
+        return 1
+    fi
+    return 0
+}
+
+rel_links_ensure() {
+    local d
+    for d in bin lib include share; do
+        if [ -e "$AIRY_HOME/$d" ] && [ ! -L "$AIRY_HOME/$d" ]; then
+            log error "布局异常: $AIRY_HOME/$d 为真实目录（预期符号链接），请先重装"
+            return 1
+        fi
+        [ -L "$AIRY_HOME/$d" ] || ln -s "current/$d" "$AIRY_HOME/$d" 2>/dev/null || true
     done
+    return 0
+}
+
+rel_cur_id() {
+    readlink "$AIRY_HOME/current" 2>/dev/null | sed 's|.*/||'
+}
+
+rel_prev() {
+    local cur cands d best=""
+    cur="$(rel_cur_id)"
+    cands="$(ls -1dt "$AIRY_HOME"/releases/*/ 2>/dev/null)"
+    for d in $cands; do
+        d="${d%/}"
+        [ "$(basename "$d")" = "$cur" ] && continue
+        case "$(basename "$d")" in .*) continue ;; esac
+        [ -f "$d/.complete" ] || continue
+        best="$d"
+        break
+    done
+    [ -n "$best" ] && printf '%s\n' "$best"
+    return 0
+}
+
+rel_prune() {
+    local cur keep=0 d
+    cur="$(rel_cur_id)"
+    ls -1dt "$AIRY_HOME"/releases/*/ 2>/dev/null | while read -r d; do
+        d="${d%/}"
+        [ "$(basename "$d")" = "$cur" ] && continue
+        case "$(basename "$d")" in .*) continue ;; esac
+        keep=$((keep + 1))
+        [ "$keep" = "1" ] && continue
+        rm -rf "$d"
+    done
+}
+
+rel_env_write() {
+    local rel="$1" ver="$2" sha="$3"
+    {
+        printf 'AIRY_VERSION=%s\n' "$ver"
+        [ -n "$sha" ] && printf 'AIRY_ARTIFACT_SHA256=%s\n' "$sha"
+        printf 'AIRY_RELEASE_ID=%s\n' "$(basename "$rel")"
+    } > "$rel/release.env"
+}
+
+upd_env_sync() {
+    local rel="$1" env="$AIRY_HOME/config/install.env" k v
+    [ -f "$rel/release.env" ] || { log warn "版本快照缺失（release.env），install.env 保持不变"; return 0; }
+    [ -f "$env" ] || { mkdir -p "$AIRY_HOME/config" 2>/dev/null || true; : > "$env"; }
+    for k in AIRY_VERSION AIRY_ARTIFACT_SHA256; do
+        v="$(sed -n "s/^$k=//p" "$rel/release.env" 2>/dev/null | head -1)"
+        [ -n "$v" ] || continue
+        if grep -q "^$k=" "$env" 2>/dev/null; then
+            sed_inplace "s|^$k=.*|$k=$v|" "$env"
+        else
+            printf '%s=%s\n' "$k" "$v" >> "$env"
+        fi
+    done
+    chmod 600 "$env" 2>/dev/null || true
+}
+
+migrate_layout() {
+    [ -L "$AIRY_HOME/current" ] && return 0
+    [ -e "$AIRY_HOME/bin" ] || return 0
+    local rel id d ts
+    ts="$(date +%Y%m%d%H%M%S)"
+    id="$(sed -n 's/^AIRY_VERSION=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
+    id="${id#v}"; [ -n "$id" ] || id="unknown"
+    rel="$AIRY_HOME/releases/$id-mig$ts"
+    mkdir -p "$AIRY_HOME/releases" 2>/dev/null || { log error "releases/ 目录创建失败"; return 1; }
+    mkdir -p "$rel"
+    for d in bin lib include share; do
+        [ -d "$AIRY_HOME/$d" ] && cp -r "$AIRY_HOME/$d" "$rel/" 2>/dev/null || true
+    done
+    if [ ! -e "$rel/bin" ] || [ ! -e "$rel/lib" ]; then
+        log error "布局迁移失败（复制不完整），保持原布局继续"
+        rm -rf "$rel"
+        return 1
+    fi
+    rel_env_write "$rel" "v${id}" "$(sed -n 's/^AIRY_ARTIFACT_SHA256=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
+    : > "$rel/.complete"
+    if ! rel_commit "$rel"; then
+        log error "布局迁移失败（current 切换被拒），保持原布局继续"
+        rm -rf "$rel"
+        return 1
+    fi
+    for d in bin lib include share; do
+        [ -d "$AIRY_HOME/$d" ] || continue
+        if ! mv "$AIRY_HOME/$d" "$AIRY_HOME/$d.mig.bak" 2>/dev/null; then
+            log error "布局迁移失败（$d 重命名被拒），保持原布局继续"
+            rm -rf "$rel"
+            return 1
+        fi
+        if ! ln -s "current/$d" "$AIRY_HOME/$d" 2>/dev/null; then
+            mv "$AIRY_HOME/$d.mig.bak" "$AIRY_HOME/$d" 2>/dev/null || true
+            log error "布局迁移失败（$d 符号链接建立被拒），保持原布局继续"
+            rm -rf "$rel"
+            return 1
+        fi
+        rm -rf "$AIRY_HOME/$d.mig.bak"
+    done
+    rm -rf "$AIRY_HOME/.rollback" 2>/dev/null || true
+    log ok "安装布局已迁移至版本化目录（releases/$(basename "$rel")）"
+    return 0
+}
+
+upd_recover() {
+    local it="$AIRY_HOME/run/update.intent" target rel d
+    [ -f "$it" ] || return 0
+    target="$(sed -n 's/^target=//p' "$it" 2>/dev/null | head -1)"
+    if [ -n "$target" ] && [ -d "$AIRY_HOME/releases/$target" ]; then
+        rel="$AIRY_HOME/releases/$target"
+        if [ -f "$rel/.complete" ]; then
+            if rel_commit "$rel"; then
+                upd_env_sync "$rel"
+                log ok "已恢复上次中断的更新（当前版本: $target）"
+            else
+                log error "在途更新恢复失败（current 切换被拒），intent 已保留待重试"
+                return 1
+            fi
+        else
+            rm -rf "$rel"
+            log warn "上次更新在提交前中断，已清理未完成版本（当前版本未受影响）"
+        fi
+    else
+        log warn "上次更新意图记录不完整，已忽略"
+    fi
+    upd_intent_clear
+    [ -d "$AIRY_HOME/releases" ] && \
+        find "$AIRY_HOME/releases" -maxdepth 1 -name '.staging.*' -exec rm -rf {} + 2>/dev/null || true
+    for d in bin lib include share; do
+        if [ -d "$AIRY_HOME/$d.mig.bak" ]; then
+            rm -rf "$AIRY_HOME/$d"
+            mv "$AIRY_HOME/$d.mig.bak" "$AIRY_HOME/$d" 2>/dev/null || true
+            log warn "已恢复迁移中断目录: $d"
+        fi
+    done
+    return 0
+}
+
+upd_boot_recover() {
+    [ -f "$AIRY_HOME/run/update.intent" ] || return 0
+    upd_lock_acq quiet || return 0
+    upd_recover || log warn "在途更新恢复未完成（保留 intent 待下次重试）"
+    upd_lock_rel
 }
 
 apply_package() {
     local tarball="$1" expect_sha="$2" arch="$(detect_arch)"
-    find "$AIRY_HOME/tmp" -maxdepth 1 \( -name 'apply.*' -o -name 'update.*' \) -mtime +0 -exec rm -rf {} + 2>/dev/null
-    local TMPD="$AIRY_HOME/tmp/apply.$$"
-    rm -rf "$TMPD"; mkdir -p "$TMPD"
-    if [ -n "$expect_sha" ]; then
-        if [ "$(sha256_file "$tarball")" != "$expect_sha" ]; then
-            log error "sha256 校验失败，拒绝安装"; rm -rf "$TMPD"; return 1
-        fi
-        log ok "sha256 校验通过"
-    else
-        log error "缺少 sha256 期望值，拒绝安装（防供应链绕过）"; rm -rf "$TMPD"; return 1
+    find "$AIRY_HOME/releases" -maxdepth 1 -name '.staging.*' -mtime +0 -exec rm -rf {} + 2>/dev/null || true
+    migrate_layout || return 1
+    upd_lock_acq || return 1
+    upd_recover || { upd_lock_rel; return 1; }
+    local TMPD="$AIRY_HOME/releases/.staging.$$"
+    rm -rf "$TMPD"
+    if ! mkdir -p "$AIRY_HOME/releases" "$TMPD" 2>/dev/null; then
+        log error "releases/ 目录创建失败（磁盘/权限），当前版本未受影响"
+        upd_lock_rel; return 1
     fi
+    if [ -z "$expect_sha" ]; then
+        log error "缺少 sha256 期望值，拒绝安装（防供应链绕过）"; rm -rf "$TMPD"; upd_lock_rel; return 1
+    fi
+    if [ "$(sha256_file "$tarball")" != "$expect_sha" ]; then
+        log error "sha256 校验失败，拒绝安装"; rm -rf "$TMPD"; upd_lock_rel; return 1
+    fi
+    log ok "sha256 校验通过"
     _am_bad=""
     if ! _am_bad="$(arch_markers_ok "$tarball" "$arch")"; then
         log error "制品架构与当前主机（${arch}）不匹配（包内标记 $(echo $_am_bad | tr ' ' '/')），拒绝更新"
         log error "  期望标记之一: $(plat_markers "$arch")"
         log error "  制品: $tarball"
-        rm -rf "$TMPD"; return 1
+        rm -rf "$TMPD"; upd_lock_rel; return 1
     fi
     log info "架构校验通过（${arch}）"
-    tar -xzf "$tarball" -C "$TMPD" || { log error "解压失败"; rm -rf "$TMPD"; return 1; }
+    if ! tar -xzf "$tarball" -C "$TMPD"; then
+        log error "解压失败（制品损坏或磁盘不足），当前版本未受影响"
+        rm -rf "$TMPD"; upd_lock_rel; return 1
+    fi
     local extracted="$(find "$TMPD" -maxdepth 1 -type d -name 'agentrt-*' | head -1)"
-    [ -n "$extracted" ] || { log error "包结构异常（缺 agentrt-* 顶层目录）"; rm -rf "$TMPD"; return 1; }
+    [ -n "$extracted" ] || { log error "包结构异常（缺 agentrt-* 顶层目录）"; rm -rf "$TMPD"; upd_lock_rel; return 1; }
     local new_ver="$(basename "$extracted" | sed -e 's/^agentrt-//' -e 's/^v//')"
-    local cur_ver="$(sed -n 's/^AIRY_VERSION=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
-    local bkup="$AIRY_HOME/.rollback/${cur_ver:-pre-update}-$(date +%Y%m%d%H%M%S)"
-    rm -rf "$bkup"; mkdir -p "$bkup"
-    [ -f "$AIRY_HOME/config/install.env" ] && \
-        cp -f "$AIRY_HOME/config/install.env" "$bkup/install.env" 2>/dev/null || true
-    for d in bin lib include share; do
-        [ -d "$AIRY_HOME/$d" ] && cp -r "$AIRY_HOME/$d" "$bkup/" 2>/dev/null || true
-    done
-    log info "已备份当前版本: .rollback/（${cur_ver:-pre-update}）"
-    local KEEP="$TMPD/keep-bin"
-    mkdir -p "$KEEP"
-    for _ef in airymaxrt airymaxrt-full agentrt-env.sh; do
-        [ -f "$AIRY_HOME/bin/$_ef" ] && cp -f "$AIRY_HOME/bin/$_ef" "$KEEP/$_ef" 2>/dev/null || true
-    done
-    for d in bin lib include share; do
-        rm -rf "$AIRY_HOME/$d"
-        if [ -d "$extracted/$d" ]; then
-            if ! cp -r "$extracted/$d" "$AIRY_HOME/$d" 2>/dev/null; then
-                log error "镜像同步失败（${d}/ 拷贝出错），自动回滚…"
-                restore_from_backup "$bkup"
-                rm -rf "$TMPD"
-                return 1
-            fi
+    local new_id="${new_ver}-$(printf '%s' "$expect_sha" | cut -c1-8)"
+    local rel="$AIRY_HOME/releases/$new_id"
+    [ -e "$rel" ] && rel="$AIRY_HOME/releases/${new_id}-$(date +%H%M%S)"
+    if ! mv "$extracted" "$rel"; then
+        log error "版本目录就位失败（rename 被拒，检查磁盘/权限），当前版本未受影响"
+        rm -rf "$TMPD"; upd_lock_rel; return 1
+    fi
+    rm -rf "$TMPD"
+    upd_intent_set "$new_id"
+    [ -d "$rel/bin" ] || mkdir -p "$rel/bin"
+    if [ -d "$AIRY_HOME/bin" ]; then
+        local _ef
+        for _ef in airymaxrt airymaxrt-full agentrt-env.sh; do
+            [ -e "$rel/bin/$_ef" ] && continue
+            [ -f "$AIRY_HOME/bin/$_ef" ] && cp -f "$AIRY_HOME/bin/$_ef" "$rel/bin/$_ef" 2>/dev/null || true
+        done
+    fi
+    if [ ! -x "$rel/bin/airy_cli" ] || [ ! -x "$rel/bin/agentrt-bootstrap.sh" ]; then
+        log error "制品自检失败（bin/ 关键组件缺失），已中止更新，当前版本未受影响"
+        rm -rf "$rel"; upd_intent_clear; upd_lock_rel; return 1
+    fi
+    local _py
+    for _py in airymax_agents airymax_agents_rs orchestration agentrt; do
+        if [ ! -d "$rel/lib/$_py" ]; then
+            log error "制品自检失败（lib/${_py} python 运行时缺失），已中止更新，当前版本未受影响"
+            rm -rf "$rel"; upd_intent_clear; upd_lock_rel; return 1
         fi
     done
-    for _ef in airymaxrt airymaxrt-full agentrt-env.sh; do
-        [ -f "$KEEP/$_ef" ] || continue
-        [ -e "$extracted/bin/$_ef" ] && continue
-        mkdir -p "$AIRY_HOME/bin"
-        if cp -f "$KEEP/$_ef" "$AIRY_HOME/bin/$_ef" 2>/dev/null; then
-            if [ "$_ef" = "agentrt-env.sh" ]; then
-                chmod 700 "$AIRY_HOME/bin/$_ef" 2>/dev/null || true
-            else
-                chmod 755 "$AIRY_HOME/bin/$_ef" 2>/dev/null || true
-            fi
-        fi
-    done
-    rm -rf "$KEEP"
-    if [ -d "$extracted/config" ]; then
+    rel_env_write "$rel" "v${new_ver}" "$expect_sha"
+    : > "$rel/.complete"
+    local prev_rel=""
+    prev_rel="$(readlink "$AIRY_HOME/current" 2>/dev/null || true)"
+    if ! rel_commit "$rel"; then
+        log error "更新提交失败（current 切换被拒），当前版本未受影响"
+        rm -rf "$rel"; upd_intent_clear; upd_lock_rel; return 1
+    fi
+    upd_intent_clear
+    log ok "新版本已提交: $new_id"
+    if [ -d "$rel/config" ]; then
         mkdir -p "$AIRY_HOME/config"
-        for f in "$extracted"/config/*; do
+        local f b
+        for f in "$rel"/config/*; do
             [ -f "$f" ] || continue
             b="$(basename "$f")"
             case "$b" in
@@ -784,21 +988,7 @@ apply_package() {
         cp -f "$AIRY_HOME/config/permission_rules.yaml" "$AIRY_HOME/config/cupolas/permission_rules.yaml" 2>/dev/null || true
         chmod 600 "$AIRY_HOME/config/cupolas/permission_rules.yaml" 2>/dev/null || true
     fi
-    [ -f "$extracted/keys/agentrt.asc" ] && cp -f "$extracted/keys/agentrt.asc" "$AIRY_HOME/keys/" 2>/dev/null || true
-    if [ ! -x "$AIRY_HOME/bin/airy_cli" ] || [ ! -x "$AIRY_HOME/bin/agentrt-bootstrap.sh" ]; then
-        log error "镜像同步自检失败（bin/ 关键组件缺失），自动回滚…"
-        restore_from_backup "$bkup" || log error "回滚恢复不完整，请执行 reinstall 修复"
-        rm -rf "$TMPD"
-        return 1
-    fi
-    for _py in airymax_agents airymax_agents_rs orchestration agentrt; do
-        if [ ! -d "$AIRY_HOME/lib/$_py" ]; then
-            log error "镜像同步自检失败（lib/${_py} python 运行时缺失），自动回滚…"
-            restore_from_backup "$bkup" || log error "回滚恢复不完整，请执行 reinstall 修复"
-            rm -rf "$TMPD"
-            return 1
-        fi
-    done
+    [ -f "$rel/keys/agentrt.asc" ] && cp -f "$rel/keys/agentrt.asc" "$AIRY_HOME/keys/" 2>/dev/null || true
     if [ -f "$AIRY_HOME/config/install.env" ]; then
         if grep -q '^AIRY_VERSION=' "$AIRY_HOME/config/install.env" 2>/dev/null; then
             sed_inplace "s|^AIRY_VERSION=.*|AIRY_VERSION=v${new_ver}|" "$AIRY_HOME/config/install.env"
@@ -812,7 +1002,6 @@ apply_package() {
         fi
         chmod 600 "$AIRY_HOME/config/install.env" 2>/dev/null || true
     fi
-    rm -rf "$TMPD"
     if [ -f "$AIRY_HOME/bin/agentrt-env.sh" ] \
        && ! grep -q 'LD_LIBRARY_PATH' "$AIRY_HOME/bin/agentrt-env.sh" 2>/dev/null; then
         printf '\nexport LD_LIBRARY_PATH="${AIRY_HOME}/lib:${LD_LIBRARY_PATH:-}"\n' \
@@ -831,14 +1020,15 @@ apply_package() {
         else
             log warn "入口启动器重生成失败（可运行 airymaxrt start 或重装修复）"
         fi
-    elif [ ! -x "$_entry" ] && [ -s "$bkup/bin/airymaxrt" ]; then
-        if cp -f "$bkup/bin/airymaxrt" "$_entry" 2>/dev/null && chmod 755 "$_entry"; then
-            log info "入口启动器已从备份恢复（自举源不可用）"
+    elif [ ! -x "$_entry" ] && [ -n "$prev_rel" ] && [ -s "$prev_rel/bin/airymaxrt" ]; then
+        if cp -f "$prev_rel/bin/airymaxrt" "$_entry" 2>/dev/null && chmod 755 "$_entry"; then
+            log info "入口启动器已从上一版本恢复（自举源不可用）"
         else
             log warn "入口启动器恢复失败，请运行 install.sh --reinstall"
         fi
     fi
-    prune_rollback
+    rel_prune
+    upd_lock_rel
     log ok "更新完成: v${new_ver}（重跑 airymaxrt 生效）"
     return 0
 }
@@ -892,28 +1082,25 @@ airymaxrt_update() {
     fi
 
     if [ "$ROLLBACK" = "1" ]; then
-        local rb="$(ls -1dt "$AIRY_HOME"/.rollback/*/ 2>/dev/null | head -1)"
-        [ -n "$rb" ] || { log error "无可用回滚备份（.rollback/ 为空）"; return 1; }
+        migrate_layout || return 1
+        upd_lock_acq || return 1
+        upd_recover || { upd_lock_rel; return 1; }
+        local rb="$(rel_prev)"
+        [ -n "$rb" ] || { log error "无可用回滚目标（releases/ 仅含当前版本）"; upd_lock_rel; return 1; }
+        local from_id="$(rel_cur_id)"
         log info "回滚到: $(basename "$rb")…"
-        if ! restore_from_backup "$rb"; then
-            log error "回滚恢复不完整，请执行 airymaxrt reinstall 修复"
-            return 1
+        if ! rel_commit "$rb"; then
+            log error "回滚失败（current 切换被拒），当前版本未受影响"
+            upd_lock_rel; return 1
         fi
+        upd_env_sync "$rb"
+        upd_intent_clear
         stop_running_daemons
-        if [ -f "$inst_env" ]; then
-            if [ -f "$rb/install.env" ]; then
-                cp -f "$rb/install.env" "$inst_env"
-                chmod 600 "$inst_env" 2>/dev/null || true
-                log info "install.env 已随备份还原（AIRY_VERSION/制品 sha 与回滚前一致）"
-            else
-                local rb_ver="$(basename "$rb")"
-                rb_ver="$(printf '%s' "$rb_ver" | sed -E 's/-[0-9]{14}$//')"
-                if [ "$rb_ver" != "pre-update" ]; then
-                    sed_inplace "s|^AIRY_VERSION=.*|AIRY_VERSION=${rb_ver}|" "$inst_env" || \
-                        printf 'AIRY_VERSION=%s\n' "$rb_ver" >> "$inst_env"
-                fi
-            fi
+        # 回滚是终态动作：移除被放弃版本，防止再次回滚乒乓回切到已知损坏版本
+        if [ -n "$from_id" ]; then
+            rm -rf "${AIRY_HOME}/releases/$from_id" || log warn "被放弃版本目录移除失败（不影响回滚）: $from_id"
         fi
+        upd_lock_rel
         log ok "回滚完成（重新运行 airymaxrt 生效）"
         return 0
     fi
@@ -929,10 +1116,10 @@ airymaxrt_update() {
             return 1
         fi
         log info "应用本地离线包: $(basename "$FILE")（sha256 强制校验）…"
-        apply_package "$FILE" "$expect_sha"
-        local f_rc=$?
+        local f_rc=0
+        apply_package "$FILE" "$expect_sha" || f_rc=$?
         [ "$f_rc" = "0" ] && stop_running_daemons
-        return $f_rc
+        return "$f_rc"
     fi
 
     local TMPD="$AIRY_HOME/tmp/update.$$"
@@ -1091,7 +1278,10 @@ case "$CMD" in
     profile)
         case "${2:-}" in
             ""|status)
-                _HW="$(assess_hardware)"
+                if ! _HW="$(assess_hardware)"; then
+                    log error "硬件探测失败，无法生成硬件快照"
+                    exit 1
+                fi
                 _HW_P="${_HW%%|*}"
                 _HW_REST="${_HW#*|}"
                 _MEM_TOTAL="${_HW_REST%%|*}"
@@ -1106,7 +1296,10 @@ case "$CMD" in
                 ;;
             full|minimal|auto)
                 if [ "$2" = "auto" ]; then
-                    _HW="$(assess_hardware)"
+                    if ! _HW="$(assess_hardware)"; then
+                        log error "硬件探测失败，无法自动评估画像"
+                        exit 2
+                    fi
                     log info "自动评估画像: ${_HW%%|*}"
                     write_profile_state auto
                     AIRYRT_PROFILE="auto"
@@ -1166,7 +1359,11 @@ case "$CMD" in
         _HINTED=""   # 已提示的画像值：差异持续时只提示一次，回归一致后重置
         log info "硬件监控启动（间隔 ${_INT}s，Ctrl+C 退出），当前画像: ${AIRYRT_PROFILE}"
         while true; do
-            _HW="$(assess_hardware)"
+            if ! _HW="$(assess_hardware)"; then
+                log warn "硬件探测失败，本轮跳过重评估（下轮重试）"
+                sleep "$_INT"
+                continue
+            fi
             _CUR="${_HW%%|*}"
             _SNAP="${_HW#*|}"
             _ACCEL_NOW="${_SNAP##*|}"
@@ -1284,20 +1481,24 @@ case "$CMD" in
             miss=1
         fi
         _LD_MISS=""
-        for _b in "$AIRY_HOME"/bin/*_d "$AIRY_HOME"/bin/airy_cli "$AIRY_HOME"/bin/agentrt-tui; do
-            [ -x "$_b" ] || continue
-            _nf="$(ldd "$_b" 2>/dev/null | grep -F 'not found' || true)"
-            if [ -n "$_nf" ]; then
-                _LD_MISS="$_LD_MISS
+        if command -v ldd >/dev/null 2>&1; then
+            for _b in "$AIRY_HOME"/bin/*_d "$AIRY_HOME"/bin/airy_cli "$AIRY_HOME"/bin/agentrt-tui; do
+                [ -x "$_b" ] || continue
+                _nf="$(ldd "$_b" 2>/dev/null | grep -F 'not found' || true)"
+                if [ -n "$_nf" ]; then
+                    _LD_MISS="$_LD_MISS
   $(basename "$_b"): $(echo "$_nf" | sed 's/.*=> not found/缺/' | tr '\n' '; ')"
-                miss=1
+                    miss=1
+                fi
+            done
+            if [ -n "$_LD_MISS" ]; then
+                log warn "运行库缺失（daemon 将无法启动）:$_LD_MISS"
+                log warn "  修复: airymaxrt reinstall（干净重装，保留 config/data）"
+            else
+                log info "运行库: 全部可解析"
             fi
-        done
-        if [ -n "$_LD_MISS" ]; then
-            log warn "运行库缺失（daemon 将无法启动）:$_LD_MISS"
-            log warn "  修复: airymaxrt reinstall（干净重装，保留 config/data）"
         else
-            log info "运行库: 全部可解析"
+            log info "运行库: 平台无 ldd，跳过动态库解析检查"
         fi
         if [ "$miss" = "0" ]; then log info "doctor: 全部就绪"; else log warn "doctor: 存在缺失项"; fi
         exit 0
@@ -1363,10 +1564,39 @@ case "$CMD" in
         ;;
     update)
         shift
-        airymaxrt_update "$@"
-        exit $?
+        airymaxrt_update "$@" || { _u_rc=$?; exit "$_u_rc"; }
+        exit 0
         ;;
 esac
+
+# 运行路径专属注入：管理命令（update 等）不 source 旧制品 env/secrets 脚本，
+# 防止其损坏（含 exit 语句）时更新通道自锁。
+# 外部脚本在宽松标志下 source（半写入截断脚本可致非零返回），
+# 字面 exit 无法在 source 语义下拦截，由管理命令免注入保证自救通道。
+safe_source() {
+    set +e +u
+    . "$1"
+    local _rc=$?
+    set -e -u
+    return "$_rc"
+}
+_SECRET_FILE="$AIRY_HOME/config/secrets.env"
+if [ -f "$_SECRET_FILE" ]; then
+    log info "加载密钥文件: $_SECRET_FILE"
+    set -a
+    safe_source "$_SECRET_FILE" || log warn "密钥文件加载异常，已忽略失败部分: $_SECRET_FILE"
+    set +a
+fi
+if [ -f "$AIRY_HOME/bin/agentrt-env.sh" ]; then
+    log debug "注入运行环境: $AIRY_HOME/bin/agentrt-env.sh"
+    _AIRY_HOME_RESOLVED="$AIRY_HOME"
+    safe_source "$AIRY_HOME/bin/agentrt-env.sh" || log warn "运行环境脚本异常，已忽略注入失败部分"
+    AIRY_HOME="$_AIRY_HOME_RESOLVED"
+    export AIRY_HOME
+    RUNTIME_DIR="${AIRY_HOME}/run"
+    log debug "agentrt-env.sh 注入后恢复 AIRY_HOME=$AIRY_HOME RUNTIME_DIR=$RUNTIME_DIR"
+fi
+upd_boot_recover
 _near=""
 case "$CMD" in
     ""|-*) ;;
@@ -1596,8 +1826,12 @@ else
     _gw_port_available() {
         if command -v python3 >/dev/null 2>&1; then
             python3 -c "import socket,sys; s=socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1); s.bind(('127.0.0.1',int(sys.argv[1]))); s.close()" "$1" 2>/dev/null
+        elif (echo >/dev/tcp/127.0.0.1/"$1") 2>/dev/null; then
+            return 1
+        elif command -v nc >/dev/null 2>&1; then
+            if nc -z 127.0.0.1 "$1" >/dev/null 2>&1; then return 1; fi
+            return 0
         else
-            (echo >/dev/tcp/127.0.0.1/"$1") 2>/dev/null && return 1
             return 0
         fi
     }

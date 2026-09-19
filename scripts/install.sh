@@ -418,7 +418,15 @@ fetch_repo_file() {
     if command -v python3 >/dev/null 2>&1; then
         python3 -c 'import json,sys,base64; sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin).get("content","").replace("\n","")))' < "$tmp" > "$2" || { rm -f "$tmp"; return 1; }
     else
-        sed -n 's/.*"content"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp" | tr -d '\n' | base64 -d > "$2" 2>/dev/null || { rm -f "$tmp"; return 1; }
+        sed -n 's/.*"content"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp" | tr -d '\n' > "${tmp}.b64"
+        if base64 -d < "${tmp}.b64" > "$2" 2>/dev/null \
+           || base64 -D < "${tmp}.b64" > "$2" 2>/dev/null \
+           || openssl base64 -d -A < "${tmp}.b64" > "$2" 2>/dev/null; then
+            rm -f "${tmp}.b64"
+        else
+            rm -f "$tmp" "${tmp}.b64"
+            return 1
+        fi
     fi
     rm -f "$tmp"
     [ -s "$2" ]
@@ -628,41 +636,77 @@ install_binary() {
     extracted="$(find "${AIRY_HOME}/tmp" -maxdepth 1 -type d -name 'agentrt-*' | head -1)"
     [ -n "$extracted" ] || { log_err "release 包结构异常（缺 agentrt-* 顶层目录），制品不完整"; return 2; }
     EXPECTED_DAEMONS="$(daemon_list "${extracted}/bin")"
-    mkdir -p "${AIRY_HOME}/bin"
-    if [ -n "$EXPECTED_DAEMONS" ]; then
-        rm -rf "${AIRY_HOME}"/bin/* 2>/dev/null || true
-        cp -f "${extracted}"/bin/* "${AIRY_HOME}/bin/" 2>/dev/null || true
-        local _binok=1 _d2
-        for _d2 in ${EXPECTED_DAEMONS}; do
-            [ -x "${AIRY_HOME}/bin/${_d2}" ] || { _binok=0; log_err "bin/ 部署失败，缺失: ${_d2}（检查磁盘/权限）"; break; }
-        done
-        [ "$_binok" = "1" ] || return 2
-    else
+    local rel_id rel_dir d
+    rel_id="$(basename "$extracted" | sed 's/^agentrt-//')"
+    rel_dir="${AIRY_HOME}/releases/${rel_id}"
+    if [ -z "$EXPECTED_DAEMONS" ]; then
         log_err "release 包缺失 daemon 二进制（bin/*_d 为空，制品不完整）"
+        return 2
+    fi
+    # B10 版本化布局：存量旧布局（真实目录）先迁移为首个版本目录
+    if [ -d "${AIRY_HOME}/bin" ] && [ ! -L "${AIRY_HOME}/bin" ]; then
+        local _mig _cur_tmp
+        _mig="${AIRY_HOME}/releases/migrate-$(date +%Y%m%d%H%M%S)"
+        mkdir -p "${AIRY_HOME}/releases" "$_mig" || { log_err "releases/ 目录创建失败"; return 2; }
+        for d in bin lib include share; do
+            [ -d "${AIRY_HOME}/$d" ] && cp -rf "${AIRY_HOME}/$d" "$_mig/" 2>/dev/null || true
+        done
+        if [ ! -e "$_mig/bin" ] || [ ! -e "$_mig/lib" ]; then
+            log_err "存量安装迁移失败（复制不完整），中止以免破坏现有安装"
+            rm -rf "$_mig"; return 2
+        fi
+        printf 'AIRY_VERSION=%s\n' "${AIRY_VERSION:-unknown}" > "$_mig/release.env"
+        : > "$_mig/.complete"
+        # -n: dest 为目录符号链接时直接替换链接本身（mv 会移入目录内部）
+        if ! ln -sfn "$_mig" "${AIRY_HOME}/current"; then
+            rm -rf "$_mig"
+            log_err "存量迁移提交失败（current 切换被拒），现有安装未受影响"
+            return 2
+        fi
+        for d in bin lib include share; do
+            [ -d "${AIRY_HOME}/$d" ] || continue
+            if ! mv "${AIRY_HOME}/$d" "${AIRY_HOME}/$d.mig.bak" 2>/dev/null; then
+                log_err "存量迁移失败（$d 重命名被拒），现有安装未受影响"
+                rm -rf "$_mig"; return 2
+            fi
+            if ! ln -s "current/$d" "${AIRY_HOME}/$d" 2>/dev/null; then
+                mv "${AIRY_HOME}/$d.mig.bak" "${AIRY_HOME}/$d" 2>/dev/null || true
+                log_err "存量迁移失败（$d 符号链接建立被拒），现有安装未受影响"
+                rm -rf "$_mig"; return 2
+            fi
+            rm -rf "${AIRY_HOME}/$d.mig.bak"
+        done
+        rm -rf "${AIRY_HOME}/.rollback" 2>/dev/null || true
+        log_ok "存量安装已迁移至版本化目录（releases/$(basename "$_mig")）"
+    fi
+    if [ -e "${AIRY_HOME}/current" ] && [ ! -L "${AIRY_HOME}/current" ]; then
+        log_err "布局异常: ${AIRY_HOME}/current 为真实目录（预期符号链接），请先清理后重装"
+        return 2
+    fi
+    mkdir -p "${AIRY_HOME}/releases"
+    rm -rf "$rel_dir"; mkdir -p "$rel_dir"
+    cp -rf "${extracted}/bin" "${rel_dir}/bin" 2>/dev/null || true
+    local _binok=1 _d2
+    for _d2 in ${EXPECTED_DAEMONS}; do
+        [ -x "${rel_dir}/bin/${_d2}" ] || { _binok=0; log_err "bin/ 部署失败，缺失: ${_d2}（检查磁盘/权限）"; break; }
+    done
+    if [ "$_binok" != "1" ]; then
+        rm -rf "$rel_dir"
         return 2
     fi
     lib_has() {
         ls "$1"/*.so* >/dev/null 2>&1 || ls "$1"/*.dylib* >/dev/null 2>&1
     }
     if [ -d "${extracted}/lib" ] && lib_has "${extracted}/lib"; then
-        mkdir -p "${AIRY_HOME}/lib"
-        rm -rf "${AIRY_HOME}"/lib/* 2>/dev/null || true
-        cp -rf "${extracted}"/lib/* "${AIRY_HOME}/lib/" 2>/dev/null
-        if ! lib_has "${AIRY_HOME}/lib"; then
+        cp -rf "${extracted}/lib" "${rel_dir}/lib" 2>/dev/null || true
+        if ! lib_has "${rel_dir}/lib"; then
             log_err "lib/ 部署失败（.so/.dylib 未就位），二进制将无法启动"
+            rm -rf "$rel_dir"
             return 2
         fi
     fi
-    if [ -d "${extracted}/include" ]; then
-        mkdir -p "${AIRY_HOME}/include"
-        rm -rf "${AIRY_HOME}"/include/* 2>/dev/null || true
-        cp -rf "${extracted}"/include/* "${AIRY_HOME}/include/" 2>/dev/null || true
-    fi
-    if [ -d "${extracted}/share" ]; then
-        mkdir -p "${AIRY_HOME}/share"
-        rm -rf "${AIRY_HOME}"/share/* 2>/dev/null || true
-        cp -rf "${extracted}"/share/* "${AIRY_HOME}/share/" 2>/dev/null || true
-    fi
+    [ -d "${extracted}/include" ] && cp -rf "${extracted}/include" "${rel_dir}/include" 2>/dev/null || true
+    [ -d "${extracted}/share" ] && cp -rf "${extracted}/share" "${rel_dir}/share" 2>/dev/null || true
     if [ -d "${extracted}/config" ]; then
         cp -f "${extracted}"/config/* "${AIRY_HOME}/config/" 2>/dev/null || true
     fi
@@ -674,10 +718,29 @@ install_binary() {
         mkdir -p "${AIRY_HOME}/modules"
         cp -rf "${extracted}/modules/maths-toolkit" "${AIRY_HOME}/modules/" 2>/dev/null || true
     fi
-    local ver_num
-    ver_num="$(basename "$extracted" | sed 's/^agentrt-//')"
-    [ -n "$ver_num" ] && AIRY_VERSION="v${ver_num}"
-    log_ok "完全体二进制包安装完成（v${ver_num:-${AIRY_VERSION}}）"
+    {
+        printf 'AIRY_VERSION=v%s\n' "$rel_id"
+        [ -n "${AIRY_ARTIFACT_SHA256:-}" ] && printf 'AIRY_ARTIFACT_SHA256=%s\n' "$AIRY_ARTIFACT_SHA256"
+        printf 'AIRY_RELEASE_ID=%s\n' "$rel_id"
+    } > "${rel_dir}/release.env"
+    : > "${rel_dir}/.complete"
+    for d in bin lib include share; do
+        if [ -e "${AIRY_HOME}/$d" ] && [ ! -L "${AIRY_HOME}/$d" ]; then
+            log_err "布局异常: ${AIRY_HOME}/$d 为真实目录（预期符号链接），请先清理后重装"
+            rm -rf "$rel_dir"
+            return 2
+        fi
+        [ -L "${AIRY_HOME}/$d" ] || ln -s "current/$d" "${AIRY_HOME}/$d" 2>/dev/null || true
+    done
+    # -n: dest 为目录符号链接时直接替换链接本身（mv 会移入目录内部）
+    if ! ln -sfn "$rel_dir" "${AIRY_HOME}/current"; then
+        rm -rf "$rel_dir"
+        log_err "版本提交失败（current 切换被拒），现有安装未受影响"
+        return 2
+    fi
+    rm -rf "${extracted}"
+    AIRY_VERSION="v${rel_id}"
+    log_ok "完全体二进制包安装完成（${AIRY_VERSION}，版本化布局）"
     return 0
 }
 
@@ -1044,39 +1107,50 @@ detect_accel() {
 }
 
 assess_hardware() {
-    local mem_kib mem_avail_kib nproc_val accel profile
+    local mem_kib="" mem_avail_kib="" nproc_val="" accel profile raw
     if [ -r /proc/meminfo ]; then
-        mem_kib="$(awk '/^MemTotal:/{print $2}' /proc/meminfo 2>/dev/null || echo 0)"
-        mem_avail_kib="$(awk '/^MemAvailable:/{print $2}' /proc/meminfo 2>/dev/null || echo "${mem_kib:-0}")"
+        mem_kib="$(awk '/^MemTotal:/{print $2}' /proc/meminfo 2>/dev/null || true)"
+        mem_avail_kib="$(awk '/^MemAvailable:/{print $2}' /proc/meminfo 2>/dev/null || true)"
     elif command -v sysctl >/dev/null 2>&1; then
-        mem_kib="$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1024 ))"
+        raw="$(sysctl -n hw.memsize 2>/dev/null || true)"
+        case "${raw:-0}" in ''|*[!0-9]*) raw=0 ;; esac
+        mem_kib=$((raw / 1024))
         mem_avail_kib="$mem_kib"
-    else
-        mem_kib=0
-        mem_avail_kib=0
     fi
+    case "${mem_kib:-}" in ''|*[!0-9]*) mem_kib="" ;; esac
+    case "${mem_avail_kib:-}" in ''|*[!0-9]*) mem_avail_kib="$mem_kib" ;; esac
     if command -v nproc >/dev/null 2>&1; then
-        nproc_val="$(nproc 2>/dev/null || echo 1)"
+        nproc_val="$(nproc 2>/dev/null || true)"
     elif command -v sysctl >/dev/null 2>&1; then
-        nproc_val="$(sysctl -n hw.ncpu 2>/dev/null || echo 1)"
-    else
-        nproc_val=1
+        nproc_val="$(sysctl -n hw.ncpu 2>/dev/null || true)"
+    fi
+    case "${nproc_val:-}" in ''|*[!0-9]*) nproc_val="" ;; esac
+    if [ -z "$mem_kib" ] || [ "$mem_kib" -eq 0 ] || [ -z "$nproc_val" ]; then
+        printf 'assess_hardware: 硬件探测失败（内存/核数不可得），拒绝静默降级为 minimal\n' >&2
+        return 1
     fi
     accel="$(detect_accel)"
-    if [ -n "$mem_kib" ] && [ "$mem_kib" -gt 0 ] && \
-       [ "$mem_kib" -ge $((2560 * 1024)) ] && \
+    if [ "$mem_kib" -ge $((2560 * 1024)) ] && \
        [ "$mem_avail_kib" -ge $((1536 * 1024)) ] && \
        [ "$nproc_val" -ge 3 ]; then
         profile="full"
     else
         profile="minimal"
     fi
-    printf '%s|%s|%s|%s|%s' "$profile" "${mem_kib:-0}" "${mem_avail_kib:-0}" "$nproc_val" "$accel"
+    printf '%s|%s|%s|%s|%s' "$profile" "$mem_kib" "${mem_avail_kib:-0}" "$nproc_val" "$accel"
 }
 
 persist_profile() {
     local hw hw_profile mem total avail cores accel
-    hw="$(assess_hardware)"
+    if ! hw="$(assess_hardware)"; then
+        if [ "$AIRY_PROFILE" != "auto" ]; then
+            log_warn "硬件探测失败，按显式画像 ${AIRY_PROFILE} 继续（硬件快照置 0）"
+            hw="${AIRY_PROFILE}|0|0|1|none"
+        else
+            log_err "硬件探测失败，无法自动评估画像；请用 --profile full|minimal 显式指定后重试"
+            exit 1
+        fi
+    fi
     hw_profile="${hw%%|*}"
     mem="${hw#*|}"
     total="${mem%%|*}"; mem="${mem#*|}"
@@ -1142,7 +1216,10 @@ AIRY_ENV_EOF
         mv "${AIRY_HOME}/bin/agentrt-env.sh.tmp" "${AIRY_HOME}/bin/agentrt-env.sh"
     chmod 700 "${AIRY_HOME}/bin/agentrt-env.sh"
 
-    if [ -f "${AIRY_SRC_APP}/sdk/tui/scripts/airymaxrt" ]; then
+    if [ -f "${AIRY_SRC_APP}/agentrt/latest/airymaxrt" ]; then
+        cp -f "${AIRY_SRC_APP}/agentrt/latest/airymaxrt" "${AIRY_HOME}/bin/airymaxrt"
+        chmod 755 "${AIRY_HOME}/bin/airymaxrt"
+    elif [ -f "${AIRY_SRC_APP}/sdk/tui/scripts/airymaxrt" ]; then
         cp -f "${AIRY_SRC_APP}/sdk/tui/scripts/airymaxrt" "${AIRY_HOME}/bin/airymaxrt"
         chmod 755 "${AIRY_HOME}/bin/airymaxrt"
     else
@@ -1239,10 +1316,16 @@ case "\$1" in
                 rm -f "\$_TMP"; exit 1
             }
         else
-            sed -n 's/.*"content"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "\$_TMP" | tr -d '\n' | base64 -d > "\$_FULL" 2>/dev/null || {
+            sed -n 's/.*"content"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "\$_TMP" | tr -d '\n' > "\${_TMP}.b64"
+            if base64 -d < "\${_TMP}.b64" > "\$_FULL" 2>/dev/null \
+               || base64 -D < "\${_TMP}.b64" > "\$_FULL" 2>/dev/null \
+               || openssl base64 -d -A < "\${_TMP}.b64" > "\$_FULL" 2>/dev/null; then
+                rm -f "\${_TMP}.b64"
+            else
                 echo "airymaxrt \$1: 完整启动器解码失败（无 python3，base64 回退失败）" >&2
-                rm -f "\$_TMP"; exit 1
-            }
+                rm -f "\$_TMP" "\${_TMP}.b64"
+                exit 1
+            fi
         fi
         rm -f "\$_TMP"
         chmod 755 "\$_FULL"
