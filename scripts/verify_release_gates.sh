@@ -94,7 +94,7 @@ fi
 
 section "B" "9.3/I-02① 架构检测 + 平台键/标记判定 + 体积渲染三副本逐字节一致（install.sh / latest / sdk）"
 
-for _fn in _uspace_bits _loader_exists _arch_warn_unknown detect_arch \
+for _fn in _uspace_bits _loader_exists _arch_warn_unknown detect_arch assess_hardware detect_accel \
            plat_markers arch_markers_ok human_size plat_name plat_legacy_name; do
     extract_fn "$INSTALL"   "$_fn" "$TMP/a_$_fn"
     extract_fn "$LATEST_RT" "$_fn" "$TMP/b_$_fn"
@@ -111,6 +111,16 @@ for _fn in _uspace_bits _loader_exists _arch_warn_unknown detect_arch \
                     ok "B($_fn) 三副本检测语义一致（呈现设施各异：printf>&2 / log warn，SSoT=文案）"
                 else
                     bad "B($_fn) 告警文案漂移"
+                fi
+            elif [ "$_fn" = "assess_hardware" ]; then
+                _w=0
+                for _g in "$TMP/a_$_fn" "$TMP/b_$_fn" "$TMP/c_$_fn"; do
+                    grep -q 'hw.memsize' "$_g" && grep -q '拒绝静默降级' "$_g" || _w=1
+                done
+                if [ "$_w" -eq 0 ] && cmp -s "$TMP/a_$_fn" "$TMP/b_$_fn" && cmp -s "$TMP/a_$_fn" "$TMP/c_$_fn"; then
+                    ok "B($_fn) 三副本逐字节一致且含 sysctl 回退+显式失败守卫（macOS 探测 SSoT）"
+                else
+                    bad "B($_fn) 副本漂移或缺失 macOS 探测守卫（sysctl 回退/显式失败）"
                 fi
             elif cmp -s "$TMP/a_$_fn" "$TMP/b_$_fn" && cmp -s "$TMP/a_$_fn" "$TMP/c_$_fn"; then
                 ok "B($_fn) 三副本提取 cmp 逐字节一致"
@@ -1105,6 +1115,470 @@ if [ -z "$_t8_bad" ]; then
     ok "T8 垫片与接力禁止（install.sh 无垫片 + $_t8_seen 份启动器零接力残留）"
 else
     bad "T8 垫片或接力残留:$_t8_bad"
+fi
+
+section "U" "B1 会话上下文轮次边界（上下文串轮防复发：历史门控 + 边界标记 + 轮次标注）"
+
+_u_missing=""
+_CTX="$ROOT/../sdk/tui/src/app/context.rs"
+_TASK="$ROOT/../sdk/tui/src/app/task.rs"
+_MEM="$ROOT/../sdk/tui/src/memory.rs"
+_LOOP="$ROOT/daemons/agent_d/src/agent_run_loop.c"
+_ENG="$ROOT/daemons/agent_d/src/agent_run_engine.c"
+for _f in "$_CTX" "$_TASK" "$_MEM" "$_LOOP" "$_ENG"; do
+    [ -f "$_f" ] || _u_missing="$_u_missing $(basename "$_f")"
+done
+if [ -n "$_u_missing" ]; then
+    bad "U0 B1 结构性文件缺失:$_u_missing"
+else
+    _u1_bad=""
+    grep -q 'enum HistoryPolicy' "$_CTX" || _u1_bad="$_u1_bad 无 HistoryPolicy"
+    grep -q 'Gated' "$_CTX" || _u1_bad="$_u1_bad 无 Gated 策略"
+    grep -q 'fn needs_anaphora_history' "$_CTX" || _u1_bad="$_u1_bad 无指代检测"
+    grep -qE 'chars\(\)\.count\(\) <= 8|len\(\) <= 8' "$_CTX" \
+        && _u1_bad="$_u1_bad 纯长度判据回潮（短≠指代，误注入复活串轮）"
+    if [ -z "$_u1_bad" ]; then
+        ok "U1 Gated 历史门控存在且无纯长度判据（V1.1 机制）"
+    else
+        bad "U1 历史门控退化:$_u1_bad"
+    fi
+
+    if grep -q 'HIST_PREFIX' "$_CTX" && grep -q 'HIST_SUFFIX' "$_CTX" \
+        && grep -q '【轮次边界】' "$_CTX"; then
+        ok "U2 历史包裹标记与轮次边界声明存在（V1.3 机制）"
+    else
+        bad "U2 边界标记或轮次声明缺失:$_CTX"
+    fi
+
+    if grep -q '【轮次边界】' "$_LOOP" && grep -q 'cJSON_InsertItemInArray' "$_LOOP" \
+        && grep -q '【轮次边界】' "$_ENG"; then
+        ok "U3 agent_d 轮次约束兜底双侧存在（主对话头插 + GCCP plan 追加）"
+    else
+        bad "U3 agent_d 轮次约束兜底缺失"
+    fi
+
+    if grep -q 'fn mem_push_tagged' "$_TASK" && grep -q 'turn:' "$_MEM"; then
+        ok "U4 记忆写入-召回轮次标注链路存在（turn:N）"
+    else
+        bad "U4 记忆轮次标注链路断裂"
+    fi
+fi
+
+section "V" "B3 控制面/用户面隔离（[MODE:] 协议与内部标识符零泄漏：V3.1~V3.4 机制防回潮）"
+
+_v_missing=""
+_MODE="$ROOT/../sdk/tui/src/app/mode.rs"
+_POLL="$ROOT/../sdk/tui/src/app/poll.rs"
+_DISP="$ROOT/../sdk/tui/src/app/dispatch.rs"
+_TSK="$ROOT/../sdk/tui/src/app/task.rs"
+for _f in "$_MODE" "$_POLL" "$_DISP" "$_TSK"; do
+    [ -f "$_f" ] || _v_missing="$_v_missing $(basename "$_f")"
+done
+if [ -n "$_v_missing" ]; then
+    bad "V0 B3 结构性文件缺失:$_v_missing"
+else
+    if grep -q 'pub struct StreamSanitizer' "$_MODE" \
+        && grep -q 'stream_sanitizer\.feed' "$_POLL"; then
+        ok "V1 流式中间态净化在位（V3.1：SSE 增量过 StreamSanitizer）"
+    else
+        bad "V1 流式净化缺失或未接线（poll.rs 直通上屏回潮）"
+    fi
+
+    if grep -q 'protocol_buf' "$_MODE" && grep -q '协议段已剥离' "$_TSK"; then
+        ok "V2 协议段诊断通道在位（V3.2：剥出文本入 F3 而非删除）"
+    else
+        bad "V2 协议诊断通道断裂（剥出即丢弃，V3.2 退化）"
+    fi
+
+    if grep -q 'pub fn sanitize_reply' "$_MODE" \
+        && grep -q 'fn strip_mode_segments' "$_MODE"; then
+        ok "V3 非流式结构化解析在位（V3.3：前导元话语随标记剥离）"
+    else
+        bad "V3 结构化解析缺失（仅剥标记、保留元话语回潮）"
+    fi
+
+    if grep -q 'TOOL_ACTIONS' "$_DISP" && grep -q '未知工具（已隐藏）' "$_DISP" \
+        && ! grep -rq 'tool\.to_string()' "$ROOT/../sdk/tui/src"; then
+        ok "V4 标识符白名单兜底在位（V3.4：未登记名零透传）"
+    else
+        bad "V4 白名单兜底缺失或 tool.to_string() 裸透传回潮"
+    fi
+fi
+
+_v2_engine="$ROOT/daemons/agent_d/src/agent_run_engine.c"
+_v2_task="$ROOT/../sdk/tui/src/app/task.rs"
+_v2_block="$ROOT/../sdk/tui/src/panels/chat/block.rs"
+_v2_mem="$ROOT/../sdk/tui/src/memory.rs"
+_v2_sess="$ROOT/../sdk/tui/src/app/session.rs"
+_v2_keys="$ROOT/../sdk/tui/src/keys.rs"
+_v2_panel="$ROOT/../sdk/tui/src/app/panel.rs"
+section "V2" "B4 思维链原文泄漏（默认不上屏 / 不落长期记忆 / 恢复不回灌 V4.1~V4.3 防回潮）"
+
+if grep -qF '思考链不再随 result 直出' "$_v2_engine" \
+    && ! grep -qF 'cJSON_AddStringToObject(result, "reasoning"' "$_v2_engine" \
+    && grep -qF '0.1.18 B4 起默认不上屏、不落长期记忆' "$_v2_task" \
+    && grep -qF '0.1.18 B4：思考链不再生成 System 消息' "$_v2_block"; then
+    ok "V2.1 V4.1 思考链默认不上屏（result 零直出 + 不生成 System 消息，含≤6行短链）"
+else
+    bad "V2.1 V4.1 思考链默认上屏回潮（result 直出或 System 消息渲染路径复活）"
+fi
+
+if grep -qF 'fn push(&mut self, role: &str, content: &str, tags: &str)' "$_v2_mem" \
+    && grep -qF '不再提供携带思考链' "$_v2_mem" \
+    && grep -qF 'fn push_never_records_reasoning()' "$_v2_mem" \
+    && grep -qF '恢复会话不得回灌思考链原文' "$_v2_sess" \
+    && ! grep -q 'rec\.reasoning' "$_v2_sess"; then
+    ok "V2.2 V4.2 思考链不落长期记忆且恢复不回灌（写入面无 reasoning 入参 + 恢复仅取 content）"
+else
+    bad "V2.2 V4.2 思考链落长期记忆或恢复回灌回潮（memory.rs 写入面 / session.rs 恢复面）"
+fi
+
+if grep -qF '打开思考链独立视图（Alt+E）' "$_v2_panel" \
+    && grep -qF 'Alt+E：打开思考链独立视图' "$_v2_keys"; then
+    ok "V2.3 V4.3 Alt+E 独立视图在位（能力未丢失：按需取用唯一数据源）"
+else
+    bad "V2.3 V4.3 思考链独立视图缺失（Alt+E 能力回退）"
+fi
+
+section "W" "B11 TUI 滚动/鼠标/焦点交互（滚动契约 SSoT 与判据 V11.1~V11.3 机制防回潮）"
+
+_w_chat="$ROOT/../sdk/tui/src/panels/chat/mod.rs"
+_w_ctrl="$ROOT/../sdk/tui/src/app/control.rs"
+_w_main="$ROOT/../sdk/tui/src/main.rs"
+_w_keys="$ROOT/../sdk/tui/src/keys.rs"
+_w_ui="$ROOT/../sdk/tui/src/ui.rs"
+_w_tests="$ROOT/../sdk/tui/src/app/tests.rs"
+_w_missing=""
+for _f in "$_w_chat" "$_w_ctrl" "$_w_main" "$_w_ui" "$_w_tests"; do
+    [ -f "$_f" ] || _w_missing="$_w_missing $(basename "$_f")"
+done
+if [ -n "$_w_missing" ]; then
+    bad "W0 B11 结构性文件缺失:$_w_missing"
+else
+    if grep -q 'app\.page_step = viewport' "$_w_chat" \
+        && grep -q 'app\.chat_scroll_max = frame\.total' "$_w_chat"; then
+        ok "W1 滚动契约渲染回写在位（V11.2：page_step=视口高度，resize 自动跟随）"
+    else
+        bad "W1 滚动契约回写断裂（渲染→控制面 SSoT 单向流退化）"
+    fi
+
+    if grep -q 'min(self\.chat_scroll_max)' "$_w_ctrl" \
+        && grep -q 'saturating_sub(self\.page_step)' "$_w_ctrl" \
+        && ! grep -q 'self\.scroll_offset = self\.scroll_offset\.saturating_add(10)' "$_w_ctrl"; then
+        ok "W2 控制面钳位翻页在位（V11.3：无滚动量 no-op；固定常量翻页已废除）"
+    else
+        bad "W2 控制面滚动契约退化（钳位缺失或固定常量翻页回潮）"
+    fi
+
+    if grep -q 'let mut mouse_on = app\.mouse_capture' "$_w_main" \
+        && grep -q 'app\.mouse_capture != mouse_on' "$_w_main" \
+        && grep -q 'mouse_capture: false' "$ROOT/../sdk/tui/src/app/mod.rs"; then
+        ok "W3 鼠标捕获唯一执行点在位（V11.1：默认关，Ctrl+M 会话级差分切换）"
+    else
+        bad "W3 鼠标捕获执行点散落或默认态回潮"
+    fi
+
+    if grep -q 'MouseEventKind::ScrollUp' "$_w_main" \
+        && grep -q 'wheel_lines(shift, ctrl)' "$_w_main"; then
+        ok "W4 滚轮事件分派在位（V11.1：修饰键语义 Shift 翻页/Ctrl 单行）"
+    else
+        bad "W4 滚轮事件分派缺失（捕获开启后滚轮无响应）"
+    fi
+
+    if grep -q 'pub fn render_focus' "$_w_chat" \
+        && grep -q 'ActivePanel::Focus => panels::chat::render_focus' "$_w_ui" \
+        && grep -q 'KeyCode::Char(.f.) | KeyCode::Char(.F.)' "$_w_keys"; then
+        ok "W5 焦点视图路由与键位在位（Alt+F 全屏只读 + Esc 返回）"
+    else
+        bad "W5 焦点视图路由或键位断裂"
+    fi
+
+    if grep -q 'fn b11_scroll_clamps_to_chat_scroll_max' "$_w_tests" \
+        && grep -q 'fn b11_wheel_lines_follows_modifiers' "$_w_tests" \
+        && grep -q 'fn b11_focus_open_snapshots_last_reply' "$_w_tests" \
+        && grep -q 'fn b11_hint_covers_position_states' "$_w_chat"; then
+        ok "W6 B11 单元测试防回潮在位（钳位/滚轮/焦点/位置指示契约）"
+    else
+        bad "W6 B11 单元测试缺失（契约回归无守卫）"
+    fi
+fi
+
+_lg="$ROOT/atoms/coreloopthree/src/lang_gateway"
+section "X" "B6 语言网关校准与路由（校准异步化/容量 SSoT/阈值同源 V6.1~V6.3 机制防回潮）"
+
+_lg_missing=""
+for _f in "$_lg/canonical.h" "$_lg/lang_router.c" "$_lg/calibrator.c" \
+          "$_lg/lang_gateway.c" \
+          "$ROOT/atoms/coreloopthree/tests/unit/test_lang_gateway.c"; do
+    [ -f "$_f" ] || _lg_missing="$_lg_missing $(basename "$_f")"
+done
+if [ -n "$_lg_missing" ]; then
+    bad "X0 B6 结构性文件缺失:$_lg_missing"
+else
+    if grep -q 'void cal_worker_post' "$_lg/canonical.h" \
+        && grep -q '懒启动' "$_lg/calibrator.c" \
+        && grep -q 'cal_worker_stop(gw)' "$_lg/lang_gateway.c"; then
+        ok "X1 校准后台 worker 异步化在位（V6.1：懒启动+pending 合并，首轮不阻塞请求路径）"
+    else
+        bad "X1 校准回潮为请求路径同步执行（V6.1 退化）"
+    fi
+
+    if grep -q '_Static_assert' "$_lg/canonical.h" \
+        && grep -q 'AIRY_LANG_PROFILE_MAX \* sizeof' "$_lg/canonical.h" \
+        && grep -q '>= AIRY_LANG_PROFILE_MAX' "$_lg/calibrator.c"; then
+        ok "X2 画像容量 SSoT 统一在位（V6.2：_Static_assert 绑定 + 越界 fail-fast 拒收）"
+    else
+        bad "X2 画像容量绑定断裂（容量宏与结构体数组失去一致性约束）"
+    fi
+
+    if grep -q 'profile->ratio_high > 0.0 ? profile->ratio_high' "$_lg/lang_router.c" \
+        && grep -q 'AIRY_LANG_RATIO_HIGH_DEFAULT' "$_lg/canonical.h" \
+        && ! grep -Eq 'ratio (>|\?) 1\.2|1\.2 .*→ en' "$_lg/lang_router.c"; then
+        ok "X3 路由阈值画像化在位（V6.3：改画像即改阈值，SSoT 宏回退）"
+    else
+        bad "X3 路由阈值硬编码回潮（V6.3 同源同值断裂）"
+    fi
+
+    if grep -q '"version", 2' "$_lg/calibrator.c" \
+        && grep -q 'test_route_threshold_from_profile' \
+            "$ROOT/atoms/coreloopthree/tests/unit/test_lang_gateway.c"; then
+        ok "X4 阈值持久化与测试守卫在位（version 2 契约 + V6.3 单元测试）"
+    else
+        bad "X4 阈值持久化契约或测试守卫缺失"
+    fi
+fi
+
+_tui="$ROOT/../sdk/tui/src/app"
+_ad="$ROOT/daemons/agent_d"
+section "Y" "B2 首字延迟与零反馈（流式契约/零反馈/打字机解耦/分段耗时 V2.1~V2.4 机制防回潮）"
+
+if grep -q 'daemon_rpc_call_stream(llm_sock, "complete_stream"' "$_ad/src/agent_run_loop.c" \
+    && grep -q 'RUN_DELTA_STACK' "$_ad/src/agent_run_loop.c" \
+    && grep -q 'AIRY_MALLOC(dlen + 1)' "$_ad/src/agent_run_loop.c" \
+    && ! grep -q 'daemon_rpc_call(llm_sock, "complete"' "$_ad/src/agent_run_loop.c"; then
+    ok "Y1 流式契约在位（V2.1/V2.2：complete_stream 真实增量，超限堆扩容不截断不丢内容）"
+else
+    bad "Y1 流式契约回潮（退化为非流式 complete 或定长截断）"
+fi
+
+if grep -q 'pub(super) fn begin_busy' "$_tui/control.rs" \
+    && grep -q '已受理' "$_tui/control.rs"; then
+    ok "Y2 零反馈消除在位（V2.3：begin_busy 唯一入口，首 busy 帧即「已受理 · N.Ns」）"
+else
+    bad "Y2 零反馈回潮（请求发出到首字节之间无可见状态）"
+fi
+
+if grep -q 'fn typewriter_enabled' "$_tui/mod.rs" \
+    && grep -q 'AIRY_TUI_TYPEWRITER' "$_tui/mod.rs" \
+    && grep -q 'if !self.typewriter' "$_tui/poll.rs" \
+    && grep -q 'self.streaming_reveal = total' "$_tui/poll.rs"; then
+    ok "Y3 打字机解耦在位（V2.4：默认关、关闭当拍追平全文、动画不门控落定）"
+else
+    bad "Y3 打字机耦合回潮（默认开启或落定被 reveal 进度门控）"
+fi
+
+if grep -q 'AIRY_RS_K_THINK_MS' "$_ad/src/agent_run_engine.c" \
+    && grep -q 'AIRY_RS_K_LLM_MS' "$_ad/src/agent_run_engine.c" \
+    && grep -q 'AIRY_RS_K_TOOL_MS' "$_ad/src/agent_run_engine.c"; then
+    ok "Y4 分段耗时落盘在位（think/llm/tool 三段度量，V2.1 不达标可分段归因）"
+else
+    bad "Y4 分段耗时缺失（首字延迟不可归因）"
+fi
+
+if grep -q '900B payload not truncated' "$_ad/tests/test_run_loop.c" \
+    && grep -q 'fn typewriter_default_off_and_env_gated' "$_tui/tests.rs" \
+    && grep -q 'fn begin_busy_marks_request_start' "$_tui/tests.rs"; then
+    ok "Y5 B2 测试守卫在位（V2.2 截断回归 + V2.3/V2.4 Rust 断言）"
+else
+    bad "Y5 B2 测试守卫缺失"
+fi
+
+_zrr="$ROOT/daemons/sched_d/src/roadmap_rpc.c"
+_zcr="$ROOT/gateway/src/biz/gateway_cap_registry.c"
+section "Z" "B8 架构文档名实一致（V8.3 roadmap_status 实例状态名防回潮）"
+
+if grep -q 'method_dispatcher_register(d, "roadmap_status"' "$_zrr" \
+    && grep -q '"sched.roadmap_status"' "$_zcr" \
+    && grep -q '`roadmap_status`' "$ROOT/daemons/sched_d/README.md" \
+    && grep -q 'roadmap_status' "$ROOT/daemons/gateway_d/README.md" \
+    && ! grep -rq --exclude-dir=.git --include='*.c' --include='*.h' --include='*.rs' --include='*.md' 'roadmap_stats' "$ROOT"; then
+    ok "Z1 roadmap_status 名实一致在位（V8.3：仅就绪态与服务标识，全树旧名零残留）"
+else
+    bad "Z1 roadmap_stats 名实不符回潮（handler/注册表/README 不同步或旧名残留）"
+fi
+
+_wc="$ROOT/daemons/mem_d/src/engine/compress.c"
+_wh="$ROOT/daemons/mem_d/include/compress.h"
+_wch="$ROOT/daemons/mem_d/src/handlers/cache_handlers.c"
+_wsr="$ROOT/daemons/llm_d/src/service_request.c"
+_wlh="$ROOT/daemons/mem_d/src/handlers/ledger_handlers.c"
+section "AA" "B5 压缩/缓存安全门禁（V5.1~V5.3 fail-closed 防回潮）"
+
+if grep -q '\.l2_enabled = 0, /\* 默认关' "$_wc" \
+    && grep -q '\.gate = { \.grayscale_enabled = 0, \.acr = -1\.0, \.ttft_ms = -1\.0 }' "$_wc" \
+    && grep -q 'COMPRESS_GATE_MIN_ACR' "$_wh" \
+    && grep -q 'COMPRESS_GATE_MAX_TTFT_MS' "$_wh"; then
+    ok "AA1 V5.1 L2 默认关 + 门禁默认全关 fail-closed（未过门禁不得生效）"
+else
+    bad "AA1 V5.1 L2/门禁默认值回潮为开（compress.c/compress.h）"
+fi
+
+if grep -q 'mem_cache_admit' "$_wch" \
+    && grep -q '!cacheable' "$_wsr" \
+    && grep -q 'manager->cacheable' "$_wsr"; then
+    ok "AA2 V5.2 缓存双门在位（调用方 cacheable 声明 + mem_d 敏感面 admit 拒绝）"
+else
+    bad "AA2 V5.2 缓存敏感面双门缺失（cache_handlers/service_request）"
+fi
+
+if grep -q 'gate->acr < COMPRESS_GATE_MIN_ACR' "$_wc" \
+    && grep -q 'gate->ttft_ms > COMPRESS_GATE_MAX_TTFT_MS' "$_wc" \
+    && grep -q '"acr"' "$_wlh" \
+    && grep -q '"ttft_ms"' "$_wlh"; then
+    ok "AA3 V5.3 gate 数值语义在位（阈值判定 + acr/ttft JSON 数值暴露，非桩值）"
+else
+    bad "AA3 V5.3 gate 阈值判定或数值暴露链缺失（compress.c/ledger_handlers.c）"
+fi
+
+_wp="$ROOT/atoms/coreloopthree/src/work_hall/work_hall_persist.c"
+_whh="$ROOT/atoms/coreloopthree/include/work_hall.h"
+_whc="$ROOT/atoms/coreloopthree/src/work_hall/work_hall.c"
+_wha="$ROOT/atoms/coreloopthree/src/work_hall/work_hall_agent.c"
+section "AB" "B7 工作大厅超时与重启恢复（V7.1~V7.3 语义防回潮）"
+
+if grep -q 'strcmp(en->state, "skipped") == 0' "$_wp" \
+    && grep -q 'snprintf(en->state, sizeof(en->state), "failed")' "$_wp" \
+    && ! grep -q 'normalize them to canceled' "$_wp"; then
+    ok "AB1 V7.2 非终态中断恢复为 failed（不静默归一化 canceled，skipped 计入终态）"
+else
+    bad "AB1 V7.2 非终态恢复语义回潮（work_hall_persist.c 归一化为 canceled）"
+fi
+
+if grep -q 'cJSON_AddStringToObject(o, "input_json"' "$_wp" \
+    && grep -q 'cJSON_AddNumberToObject(o, "redispatch_count"' "$_wp" \
+    && grep -q 'en->input_json = AIRY_STRDUP(s)' "$_wp" \
+    && grep -q 'en->redispatch_count = (int32_t)it->valuedouble' "$_wp"; then
+    ok "AB2 V7.2 恢复字段持久化（save 输入副本/预算 + load 恢复保真）"
+else
+    bad "AB2 V7.2 恢复字段持久化缺失（input_json/redispatch_count 未落盘或未恢复）"
+fi
+
+if grep -q 'hall->redispatch_max > 0' "$_wp" \
+    && grep -q 'en->redispatch_count < hall->redispatch_max' "$_wp"; then
+    ok "AB3 V7.2 预算内重派重新布防（redispatch_at 按当前时基重算）"
+else
+    bad "AB3 V7.2 重启后重派未重新布防（work_hall_persist.c）"
+fi
+
+if grep -q 'wh_json_language(input_json' "$_wha" \
+    && grep -q '请求输入面（input_json 顶层）优先于节点声明面' "$_wha"; then
+    ok "AB4 V7.3 language 取自请求（请求输入面优先于节点声明面）"
+else
+    bad "AB4 V7.3 language 请求面优先语义缺失（work_hall_agent.c）"
+fi
+
+if grep -q 'AIRY_WORK_HALL_DEFAULT_TIMEOUT_MS 300000' "$_whh" \
+    && grep -q 'AIRY_WORK_HALL_TIMEOUT_MS' "$_whh" \
+    && grep -q 'getenv("AIRY_WORK_HALL_TIMEOUT_MS")' "$_whc"; then
+    ok "AB5 V7.1 超时 SSoT（默认 300000 + AIRY_WORK_HALL_TIMEOUT_MS 覆盖）"
+else
+    bad "AB5 V7.1 超时默认值或 env 覆盖链缺失（work_hall.h/work_hall.c）"
+fi
+
+section "AC" "B10 update 事务化与互斥（版本目录+current 原子切换 / mkdir 互斥 / intent 幂等重放 V10.1~V10.4 防回潮）"
+
+case "$(sdk_ready; echo $?)" in
+    0)
+        _b10="$SDK_AIRYMAXRT"
+        if grep -qF 'TMPD="$AIRY_HOME/releases/.staging.$$"' "$_b10" \
+            && grep -qF 'ln -sfn "$target" "$AIRY_HOME/current"' "$_b10" \
+            && grep -qF 'mv "$extracted" "$rel"' "$_b10" \
+            && grep -q '永不就地改写已发布版本目录' "$_b10"; then
+            ok "AC1 V10.1 事务化消除空窗（staging 临时目录 + rename 就位 + current 符号链接原子切换）"
+        else
+            bad "AC1 V10.1 update 回潮为就地覆盖（staging/rename/current 切换链缺失）"
+        fi
+
+        if grep -qF 'mkdir "$lk" 2>/dev/null' "$_b10" \
+            && grep -q '另一更新进程持锁运行中' "$_b10" \
+            && grep -qF 'upd_lock_rel() {' "$_b10" \
+            && grep -qF 'upd_lock_acq || return 1' "$_b10"; then
+            ok "AC2 V10.2 互斥锁在位（mkdir 独占 + 并发显式拒绝提示 + 全路径释放）"
+        else
+            bad "AC2 V10.2 update 互斥缺失（并发 update 互踩风险）"
+        fi
+
+        if grep -q 'sha256 校验失败，拒绝安装' "$_b10" \
+            && grep -q '缺少 sha256 期望值，拒绝安装（防供应链绕过）' "$_b10" \
+            && grep -q '制品自检失败（bin/ 关键组件缺失）' "$_b10" \
+            && grep -q '制品自检失败（lib/${_py} python 运行时缺失）' "$_b10"; then
+            ok "AC3 V10.3 校验/自检失败显式报错且保留上一可用版本（含失败原因）"
+        else
+            bad "AC3 V10.3 校验/自检失败静默回滚或吞错（用户不可见原因）"
+        fi
+
+        if grep -qF 'upd_intent_set() {' "$_b10" \
+            && grep -qF 'upd_intent_clear() {' "$_b10" \
+            && grep -qF 'upd_boot_recover() {' "$_b10" \
+            && grep -q '在途更新恢复未完成（保留 intent 待下次重试）' "$_b10"; then
+            ok "AC4 V10.4 intent 幂等重放+启动自恢复（中断更新可续、不二义）"
+        else
+            bad "AC4 V10.4 更新 intent 幂等重放/启动自恢复缺失（中断更新不可续）"
+        fi
+
+        if grep -qF 'rm -rf "${AIRY_HOME}/releases/$from_id"' "$_b10" \
+            && grep -q '无可用回滚目标（releases/ 仅含当前版本）' "$_b10" \
+            && grep -q '管理命令（update 等）不 source 旧制品 env/secrets 脚本' "$_b10"; then
+            ok "AC5 V10.4 回滚终态移除被放弃版本（二次回滚显式拒绝）+ 管理命令免注入损坏脚本"
+        else
+            bad "AC5 V10.4 回滚乒乓回切或损坏脚本阻断更新自救通道"
+        fi
+        ;;
+    1)
+        skip "AC B10 事务化断言（sdk airymaxrt 未检出，跳过）"
+        ;;
+    *)
+        bad "AC B10 AIRY_GATE_SDK_AIRYMAXRT 显式指定但文件缺失: $SDK_AIRYMAXRT"
+        ;;
+esac
+
+section "AD" "B9 macOS 平台探测收敛与干净机发布门禁（V9.1~V9.4 防回潮）"
+
+case "$(sdk_ready; echo $?)" in
+    0)
+        _b9="$SDK_AIRYMAXRT"
+        if grep -qF '拒绝静默降级为 minimal' "$_b9" \
+            && grep -qF '硬件探测失败，无法自动评估画像；请显式设置 AIRYRT_PROFILE=full|minimal 后重试' "$_b9"; then
+            ok "AD1 V9.1/V9.2 探测失败显式失败（不伪装成 minimal 降级 → 不裁剪 daemon）"
+        else
+            bad "AD1 V9.1 探测失败静默降级回潮（macOS 恒判 minimal 裁剪 daemon）"
+        fi
+
+        if grep -qF 'if command -v ldd >/dev/null 2>&1; then' "$_b9" \
+            && grep -qF '运行库: 平台无 ldd，跳过动态库解析检查' "$_b9"; then
+            ok "AD2 V9.3 ldd 调用有守卫（非 Linux 平台不误报运行库缺失）"
+        else
+            bad "AD2 V9.3 无守卫调用 ldd 误报（macOS doctor 假缺失）"
+        fi
+        ;;
+    1)
+        skip "AD B9 平台探测断言（sdk airymaxrt 未检出，跳过）"
+        ;;
+    *)
+        bad "AD B9 AIRY_GATE_SDK_AIRYMAXRT 显式指定但文件缺失: $SDK_AIRYMAXRT"
+        ;;
+esac
+
+_mch="$ROOT/.github/workflows/macos-clean-host.yml"
+_mchk="$ROOT/.github/scripts/verify-macos-clean-host.sh"
+if [ -f "$_mch" ] && [ -f "$_mchk" ] \
+    && grep -qF 'macos-latest' "$_mch" \
+    && grep -qF 'macos-15-intel' "$_mch" \
+    && grep -qF 'gateway online' "$_mchk" \
+    && grep -qF '要求 N==M 且 M>0' "$_mchk"; then
+    ok "AD3 V9.4 macOS 干净机发布门禁在位（arm-64/x86-64 双腿 + gateway online N==M 出证）"
+else
+    bad "AD3 V9.4 macOS 干净机发布门禁缺失（V9.4 三平台 smoke 未纳入）"
 fi
 
 printf '\n门禁汇总: PASS=%d FAIL=%d\n' "$PASS" "$FAIL"
