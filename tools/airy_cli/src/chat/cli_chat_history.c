@@ -6,9 +6,10 @@
  * @brief airy_cli chat history buffer / error description / system prompt.
  *
  * 对话历史环形缓冲（FIFO）：容量 30 条（约 15 轮，AIRY_CHAT_HISTORY_ROUNDS
- * 按轮覆盖），满时丢最老一轮（user+assistant 成对）。每轮历史携带思考链
- * （reasoning）——DeepSeek 续轮规范要求 assistant 消息原样回传 reasoning，
- * 缺省会语义断裂。定义 g_history_* 全局（cli_internal.h 声明 extern）。
+ * 按轮覆盖），满时丢最老一轮（user+assistant 成对）。每轮历史只在**会话内**
+ * 携带思考链（reasoning）——DeepSeek 续轮规范要求 assistant 消息原样回传
+ * reasoning，缺省会语义断裂；该缓冲随进程退出释放，既不落盘也不入长期记忆
+ * （0.1.18 B4）。定义 g_history_* 全局（cli_internal.h 声明 extern）。
  *
  * 另含聊天场景错误描述（llm_d 是聊天回复的唯一 RPC 目标，NOT_FOUND 给出
  * 可执行提示）与系统提示词（含宿主机时间注入）。
@@ -89,10 +90,10 @@ void cli_history_clear(void)
 }
 
 /* 2.1.1.6：思考链落盘——交互模式 cli_trace 是 no-op（仅 -p 模式写
- * stderr），思考链此前只在内存折叠展示后即释放。这里独立追加写入
- * $AIRY_HOME/logs/airy_reasoning.log（所有模式生效），思考 token 不丢失。
- * 每轮带时间戳与角色前缀，便于按会话回溯。S-04：写前轮转（保一代 .1），
- * 长期使用不再让日志无界增长。 */
+ * stderr），思考链自 0.1.18 B4 起默认不上屏，本日志即用户按需取用的
+ * 诊断通道。独立追加写入 $AIRY_HOME/logs/airy_reasoning.log（所有模式
+ * 生效），思考 token 不丢失。每轮带时间戳与角色前缀，便于按会话回溯。
+ * S-04：写前轮转（保一代 .1），长期使用不再让日志无界增长。 */
 
 /* S-04：现日志超过 AIRY_REASONING_LOG_MAX_BYTES 时改名为 .1（覆盖旧
  * .1，磁盘占用封顶约两倍阈值）。remove 先行：Windows rename 目标存在

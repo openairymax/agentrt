@@ -11,9 +11,9 @@
  * 则按该角色单条还原（仅 user/assistant 入会话历史，其余跳过）；否则按 CLI
  * 整轮线格式（CLI_TURN_*，见 cli_internal.h）拆成 user/assistant 两条。
  *
- * 装配结果直接写 g_history_*：cli_chat.c 每轮请求按序回灌历史（含 reasoning），
- * cli_tui.c 退出全屏时按同一数组重建三区，main.c 状态行按同一计数显示轮数——
- * 故此处一次装配即全链路生效，无需任何渲染/请求层改动。
+ * 装配结果直接写 g_history_*：cli_chat.c 每轮请求按序回灌历史（0.1.18 B4 起
+ * 不含 reasoning）、cli_tui.c 退出全屏时按同一数组重建三区，main.c 状态行按
+ * 同一计数显示轮数——故此处一次装配即全链路生效，无需任何渲染/请求层改动。
  */
 
 #include "cli_internal.h"
@@ -51,7 +51,9 @@ static int cli_session_blank(const char *s)
 
 /* CLI 整轮记录拆分：三条分支与 Rust 侧 split_cli_turn 对偶（前缀缺失 →
  * 原样 user 单条；有前缀无回复分隔 → 仅用户侧 user 单条；正常 → user +
- * assistant 两条，reasoning 段随 assistant 回传）。 */
+ * assistant 两条）。0.1.18 B4：CLI_TURN_REASON_SEP 段只读——仅用于从旧记录
+ * 正文中剥离思考链（拆除结果丢弃，不回灌），避免历史推理原文经 system 段
+ * 再次进入请求上下文（§12.4 步 4）。 */
 static void cli_session_add_turn(const char *data)
 {
     if (strncmp(data, CLI_TURN_USER_PREFIX, CLI_TURN_USER_PREFIX_LEN) != 0) {
@@ -70,15 +72,13 @@ static void cli_session_add_turn(const char *data)
     const char *rsep = strstr(reply_part, CLI_TURN_REASON_SEP);
     char *reply = rsep ? AIRY_STRNDUP(reply_part, (size_t)(rsep - reply_part))
                        : AIRY_STRDUP(reply_part);
-    char *reason = rsep ? AIRY_STRDUP(rsep + CLI_TURN_REASON_SEP_LEN) : NULL;
 
     if (user && reply) {
         cli_history_add("user", user, NULL);
-        cli_history_add("assistant", reply, reason);
+        cli_history_add("assistant", reply, NULL);
     }
     AIRY_FREE(user);
     AIRY_FREE(reply);
-    AIRY_FREE(reason);
 }
 
 /* 单条记录还原。metadata 在 mem.recent 契约中是字符串形态的 stored JSON，
@@ -101,19 +101,17 @@ static void cli_session_add_record(cJSON *item)
     }
 
     const char *role = NULL;
-    const char *reason = NULL;
     if (md) {
         cJSON *rj = cJSON_GetObjectItem(md, "role");
         if (cJSON_IsString(rj) && rj->valuestring)
             role = rj->valuestring;
-        cJSON *zj = cJSON_GetObjectItem(md, "reasoning");
-        if (cJSON_IsString(zj) && zj->valuestring && zj->valuestring[0])
-            reason = zj->valuestring;
+        /* metadata.reasoning 有意不读：0.1.18 B4 禁止恢复时回灌思考链
+         * （§12.4 步 4）。旧记录中该字段仍存在，忽略即可。 */
     }
 
     if (role) {
         if (strcmp(role, "user") == 0 || strcmp(role, "assistant") == 0)
-            cli_history_add(role, data, reason);
+            cli_history_add(role, data, NULL);
     } else {
         cli_session_add_turn(data);
     }

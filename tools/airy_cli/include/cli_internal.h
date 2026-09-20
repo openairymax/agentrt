@@ -58,10 +58,6 @@ extern "C" {
 #define AIRY_CLI_VERSION "0.1.17"
 #endif
 
-/* 思考链折叠保留行数（2026-08-19：仅折叠思考链，结果完整展示）。
- * 思考链渲染为前 N 行 + 折叠尾，避免碎片刷屏；结果不折叠。 */
-#define CLI_REPLY_FOLD_KEEP 4
-
 /* Startup header height (compact: brand + model slots + blank line).
  * 0.1.7 改版：弃用固定滚动区三区布局，头部打印一次随内容滚动；
  * 仅全屏 TUI 模式退出重建三区时仍以该行数 pin。 */
@@ -75,6 +71,8 @@ extern "C" {
 
 /* CLI 整轮记忆记录的线格式 SSoT：cli_chat_memory.c 写入、cli_chat_session.c
  * 还原、cli_panel.c / airy_cli_cmd_cognition.c 展示剥离共用同一组字面量。
+ * CLI_TURN_REASON_SEP 自 0.1.18 B4 起只读不写：写侧不再产生该段（思考链
+ * 不入长期记忆），保留定义供还原侧从历史记录正文中剥离旧数据。
  * 前缀字节数一律用 (sizeof(X) - 1) 求取，禁止硬编码——"用户: " 在 UTF-8 下
  * 为 8 字节（"用户" 6 + ": " 2），历史上误记为 9，使 "用户: " 前缀过滤分支
  * 永不命中（把字面量 NUL 也纳入比较），自我回灌与面板前缀剥离同时失效。 */
@@ -191,7 +189,7 @@ const char *cli_chat_reasoning_peek(void);
 
 /* cli_chat_memory.c：对话记忆注入/写回（gateway mem_d 优先，L1 回退） */
 void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t out_size);
-void cli_chat_mem_record(const char *input, const char *reply, const char *reasoning);
+void cli_chat_mem_record(const char *input, const char *reply);
 
 /* cli_chat_gccp.c：GCCP 逐问交互（cli_chat_t1p_cached 实现见 cli_chat.c） */
 const char *cli_chat_t1p_cached(void);

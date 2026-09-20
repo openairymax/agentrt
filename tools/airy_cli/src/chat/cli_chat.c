@@ -340,7 +340,8 @@ void cli_chat_reply(const char *input)
             return;
         }
         /* 2.1.1.5/2.1.1.6：累计本轮真实 token/费用与思考链（工具轮与
-         * 最终轮都计入；reasoning 全量保留，折叠展示之外完整进日志）。 */
+         * 最终轮都计入）。思考链仅在进程内累积（续轮回传 + 诊断日志），
+         * 0.1.18 B4 起默认不上屏。 */
         cli_chat_usage_add(resp);
         if (resp->choices[0].reasoning_content)
             cli_chat_reasoning_add(resp->choices[0].reasoning_content);
@@ -372,15 +373,12 @@ void cli_chat_reply(const char *input)
     if (spinner_on)
         cli_spinner_stop(1, NULL);
 
-    /* 2.2.4 对话记忆写入：一轮对话完成且有回复时落盘（用户输入+回复+
-     * 思考链，供下轮/下次会话检索注入；2.1.1.6 起携带 reasoning）。 */
-    if (final_resp && final_resp->choice_count > 0 && final_resp->choices[0].content) {
-        const char *mem_reasoning =
-            (final_resp->choices[0].reasoning_content && final_resp->choices[0].reasoning_content[0])
-                ? final_resp->choices[0].reasoning_content
-                : cli_chat_reasoning_peek();
-        cli_chat_mem_record(input, final_resp->choices[0].content, mem_reasoning);
-    }
+    /* 2.2.4 对话记忆写入：一轮对话完成且有回复时落盘（用户输入+回复，只记
+     * 事实）。0.1.18 B4：思考链不入长期记忆——该库为 CLI 与 TUI 共用，写入
+     * 即等于经 system 段回灌到后续所有会话（§12.4 步 3）；诊断留存走
+     * airy_reasoning.log（cli_chat_reasoning_persist）。 */
+    if (final_resp && final_resp->choice_count > 0 && final_resp->choices[0].content)
+        cli_chat_mem_record(input, final_resp->choices[0].content);
 
     /* 收尾：语言网关输出后处理 + 最终渲染 + 历史写入（cli_chat_finalize.c）。
      * C-01 后 stream_mode 恒 0（网关非流式单发）；final_resp 归本函数释放。 */
