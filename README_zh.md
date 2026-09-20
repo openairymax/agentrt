@@ -1,4 +1,4 @@
-# AgentRT 极境智能体运行底座（AirymaxAgentRT）
+# AgentRT 极境智能体运行底座（AirymaxRT）
 
 > 面向 AI 智能体团队的操作系统级运行底座。它把智能体"如何思考、如何执行、
 > 如何记忆、如何彼此通信"标准化为一套运行时，角色类比于容器运行时之于微服务。
@@ -7,9 +7,9 @@
 
 [![Version](https://img.shields.io/badge/version-0.1.16-5a6b7e)](https://atomgit.com/openairymax/agentrt/releases/tag/v0.1.16)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
-[![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
+[![C11](https://img.shields.io/badge/C-11-00599C?logo=c\&logoColor=white)](https://en.cppreference.com/w/c/11)
 
----
+***
 
 ## 概述
 
@@ -40,21 +40,13 @@
 一行命令，无需编译。安装器自动识别平台、下载匹配的预构建包并完成校验：
 
 ```bash
-curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
-  | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
-  | bash
-```
-
-该入口直接读取 `main` 分支上的安装器，始终是最新版。若环境没有 `python3`，
-可改用随最新发布一同提供的附件脚本：
-
-```bash
 curl -fsSL https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh | bash
 ```
 
+脚本随最新发布一同提供。下载为文件后再执行时，安装器会自动更新自身到最新版本。
+
 注意：请用 `bash`（而非 `sh`）执行管道安装——`sh`（dash）不接收位置参数，
-`--prefix`、`--channel` 等选项会静默失效。附件脚本下载为文件后再执行时，
-安装器会自动更新自身到最新版本。
+`--prefix`、`--channel` 等选项会静默失效。
 
 ### Windows
 
@@ -85,7 +77,7 @@ irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1
 `--prefix` 只在**首次 bootstrap 安装**时才有意义：那一刻还没有安装根可供推断，
 必须由你显式指定。安装根一旦落盘（记录在 `<安装根>/config/install.env`），启动器
 便会自行解析，此后 `airymaxrt update`、`airymaxrt uninstall` 与 `--reinstall`
-都会作用于其自身所属的那份安装，**无需、也不应再带 `--prefix`**。
+都会作用于其自身所属的那份安装，**无需、也不应再带** **`--prefix`**。
 
 ```bash
 airymaxrt update            # 就地更新自定义路径的安装，不需要 --prefix
@@ -99,11 +91,11 @@ airymaxrt update --check    # 只检查，不做任何变更
 
 ### 支持平台
 
-| 平台 | 已发布的架构 |
-|------|-------------|
-| Linux | x86-64、x86-32、arm-64（aarch64）、arm-32（armv7l） |
-| macOS | arm-64（Apple Silicon）、x86-64 |
-| Windows | x86-64、x86-32 |
+| 平台      | 已发布的架构                                       |
+| ------- | -------------------------------------------- |
+| Linux   | x86-64、x86-32、arm-64（aarch64）、arm-32（armv7l） |
+| macOS   | arm-64（Apple Silicon）、x86-64                 |
+| Windows | x86-64、x86-32                                |
 
 Linux 与 macOS 发布 `.tar.gz`，Windows 发布 `.zip`。未列入上表的架构不在
 预构建矩阵内，请从源码构建。
@@ -128,17 +120,17 @@ airymaxrt logs llm_d      # 查看指定守护进程的日志
 
 ## 核心能力
 
-| 能力 | 你得到什么 |
-|------|-----------|
-| **对话与任务双模式** | 面向交流的模式一，面向复杂工作的模式二，均由命令行与终端界面驱动；同一条指令在任务较大时自动进入"先规划、后执行"的闭环。 |
-| **多智能体协作** | 一个主智能体编排多个子智能体，并行拆分工作并汇总结果；智能体之间通过公开定义的协议互通。 |
-| **规划与反思** | 对含糊目标先做交互式澄清，再编译为可执行任务图并调度；执行过程具备自我反思与失败重调度。 |
-| **持久记忆** | 内置免费记忆后端，含 L1 会话级与 L2 跨会话两层，支持检索与遗忘；可插接商业记忆提供方。 |
-| **工具回路** | 聊天回路向模型暴露 `web_search`、`web_fetch` 等真实工具，以 tool 消息回填结果，并将最终回复以 markdown 渲染。 |
-| **安全穹顶** | 四层：沙箱隔离、RBAC 授权、输入输出净化、审计日志。默认姿态为 fail-closed。 |
-| **统一网关** | `gateway_d` 将 HTTP、WebSocket、SSE、MCP、A2A、OpenAI 传输统一为一条 JSON-RPC 2.0 流，外部系统只有唯一一个入口。 |
-| **15 个运行时服务** | 覆盖调度、智能体执行、LLM 桥接、工具分发、双思考认知、记忆、市场、监控、通知、通道、A2A、策略执行、数学与钩子的长驻进程，按依赖顺序启动并可自愈。 |
-| **可观测** | 全局事件流 + 任务看板 + 健康监控，经 `airymaxrt status` 与 `airymaxrt doctor` 呈现，并按进程落盘日志。 |
+| 能力            | 你得到什么                                                                                |
+| ------------- | ------------------------------------------------------------------------------------ |
+| **对话与任务双模式**  | 面向交流的模式一，面向复杂工作的模式二，均由命令行与终端界面驱动；同一条指令在任务较大时自动进入"先规划、后执行"的闭环。                        |
+| **多智能体协作**    | 一个主智能体编排多个子智能体，并行拆分工作并汇总结果；智能体之间通过公开定义的协议互通。                                         |
+| **规划与反思**     | 对含糊目标先做交互式澄清，再编译为可执行任务图并调度；执行过程具备自我反思与失败重调度。                                         |
+| **持久记忆**      | 内置免费记忆后端，含 L1 会话级与 L2 跨会话两层，支持检索与遗忘；可插接商业记忆提供方。                                      |
+| **工具回路**      | 聊天回路向模型暴露 `web_search`、`web_fetch` 等真实工具，以 tool 消息回填结果，并将最终回复以 markdown 渲染。          |
+| **安全穹顶**      | 四层：沙箱隔离、RBAC 授权、输入输出净化、审计日志。默认姿态为 fail-closed。                                       |
+| **统一网关**      | `gateway_d` 将 HTTP、WebSocket、SSE、MCP、A2A、OpenAI 传输统一为一条 JSON-RPC 2.0 流，外部系统只有唯一一个入口。 |
+| **15 个运行时服务** | 覆盖调度、智能体执行、LLM 桥接、工具分发、双思考认知、记忆、市场、监控、通知、通道、A2A、策略执行、数学与钩子的长驻进程，按依赖顺序启动并可自愈。         |
+| **可观测**       | 全局事件流 + 任务看板 + 健康监控，经 `airymaxrt status` 与 `airymaxrt doctor` 呈现，并按进程落盘日志。           |
 
 ## 架构
 
@@ -199,27 +191,27 @@ agentrt/
 
 各组件在独立仓库中开发。递归克隆本仓库即可按固定提交取得全部组件。
 
-| 组件 | 仓库 | 职责 |
-|------|------|------|
-| **atoms** | [openairymax/atoms](https://atomgit.com/openairymax/atoms) | 微核心系统层：`corekern`、`coreloopthree`、`syscall`、`taskflow`、`memory` |
-| **commons** | [openairymax/commons](https://atomgit.com/openairymax/commons) | 类型与错误契约，以及 32 个内聚工具模块 |
-| **cupolas** | [openairymax/cupolas](https://atomgit.com/openairymax/cupolas) | 四层安全穹顶：策略决策点与本地执行点 |
-| **heapstore** | [openairymax/heapstore](https://atomgit.com/openairymax/heapstore) | 运行时数据存储 |
-| **protocols** | [openairymax/protocols](https://atomgit.com/openairymax/protocols) | AgentsIPC（128 字节消息头）、A2A 与 A2T 协议栈 |
-| **gateway** | [openairymax/gateway](https://atomgit.com/openairymax/gateway) | HTTP / WS / SSE / MCP / A2A / OpenAI → JSON-RPC 2.0 |
-| **daemons** | [openairymax/daemons](https://atomgit.com/openairymax/daemons) | `gateway_d`、`agent_d`、`llm_d`、`tool_d`、`sched_d`、`think_d`、`mem_d`、`market_d`、`monit_d`、`notify_d`、`channel_d`、`a2a_d`、`cupolas_d`、`maths_d`、`hook_d` |
+| 组件            | 仓库                                                                 | 职责                                                                                                                                                    |
+| ------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **atoms**     | [openairymax/atoms](https://atomgit.com/openairymax/atoms)         | 微核心系统层：`corekern`、`coreloopthree`、`syscall`、`taskflow`、`memory`                                                                                       |
+| **commons**   | [openairymax/commons](https://atomgit.com/openairymax/commons)     | 类型与错误契约，以及 32 个内聚工具模块                                                                                                                                 |
+| **cupolas**   | [openairymax/cupolas](https://atomgit.com/openairymax/cupolas)     | 四层安全穹顶：策略决策点与本地执行点                                                                                                                                    |
+| **heapstore** | [openairymax/heapstore](https://atomgit.com/openairymax/heapstore) | 运行时数据存储                                                                                                                                               |
+| **protocols** | [openairymax/protocols](https://atomgit.com/openairymax/protocols) | AgentsIPC（128 字节消息头）、A2A 与 A2T 协议栈                                                                                                                    |
+| **gateway**   | [openairymax/gateway](https://atomgit.com/openairymax/gateway)     | HTTP / WS / SSE / MCP / A2A / OpenAI → JSON-RPC 2.0                                                                                                   |
+| **daemons**   | [openairymax/daemons](https://atomgit.com/openairymax/daemons)     | `gateway_d`、`agent_d`、`llm_d`、`tool_d`、`sched_d`、`think_d`、`mem_d`、`market_d`、`monit_d`、`notify_d`、`channel_d`、`a2a_d`、`cupolas_d`、`maths_d`、`hook_d` |
 
 ## 从源码构建
 
 ### 前置条件
 
-| 项目 | 最低要求 |
-|------|---------|
-| 操作系统 | Ubuntu 22.04+、macOS 13+，或带 MSVC 的 Windows |
-| C 编译器 | GCC 11+ 或 Clang 14+（要求 C11） |
-| 构建工具 | CMake 3.20+，Ninja（推荐）或 Make |
-| 依赖库 | SQLite3、cJSON、libyaml、libcurl、OpenSSL；网关另需 libmicrohttpd 与 libwebsockets |
-| 可选 | Rust（终端界面）、Python 3（随包脚本运行时） |
+| 项目    | 最低要求                                                                     |
+| ----- | ------------------------------------------------------------------------ |
+| 操作系统  | Ubuntu 22.04+、macOS 13+，或带 MSVC 的 Windows                                |
+| C 编译器 | GCC 11+ 或 Clang 14+（要求 C11）                                              |
+| 构建工具  | CMake 3.20+，Ninja（推荐）或 Make                                              |
+| 依赖库   | SQLite3、cJSON、libyaml、libcurl、OpenSSL；网关另需 libmicrohttpd 与 libwebsockets |
+| 可选    | Rust（终端界面）、Python 3（随包脚本运行时）                                             |
 
 Windows 上的依赖建议通过 [vcpkg](https://github.com/microsoft/vcpkg) 获取：
 `sqlite3 cjson libyaml curl openssl zlib libmicrohttpd libwebsockets libevent nghttp2`。
@@ -248,22 +240,22 @@ cd ../agentrt-build && ctest --output-on-failure
 
 ### 关键 CMake 选项
 
-| 选项 | 默认值 | 说明 |
-|------|--------|------|
-| `AIRY_BUILD_ALL` | `ON` | 构建全部 AgentRT 组件 |
-| `BUILD_TESTS` | `ON` | 构建单元测试并启用 CTest |
-| `BUILD_SHARED_LIBS` | `OFF` | 构建动态库而非静态库 |
-| `BUILD_ATOMS` / `BUILD_COMMONS` / `BUILD_CUPOLAS` / `BUILD_GATEWAY` / `BUILD_HEAPSTORE` | `ON` | 各组件独立构建开关 |
-| `BUILD_DAEMON` | POSIX `ON`，Windows `OFF` | 构建守护进程集群 |
-| `BUILD_CLI` | POSIX `ON`，Windows `OFF` | 构建交互式 CLI |
-| `BUILD_TOOLKIT` | `OFF` | 构建各语言 SDK 的 toolkit 模块 |
-| `AIRY_MEMORY_BACKEND` | `builtin` | 记忆后端：`builtin` 或 `memoryrovol` |
-| `AIRY_WITH_MEMORYROVOL` | `ON` | 链接商业记忆提供方；当外部源缺失时自动降级为内置后端，不破坏构建 |
-| `AIRY_COMPLIANCE_STRICT` | `ON` | 严格合规模式，投毒 `strcpy` 等不安全函数 |
-| `ENABLE_SANITIZERS` | `OFF` | ASan + LSan + UBSan；排查内存问题时显式开启 |
-| `ENABLE_TSAN` | `OFF` | ThreadSanitizer；与上一项互斥 |
-| `ENABLE_COVERAGE` | `OFF` | 代码覆盖率插桩 |
-| `WARNINGS_AS_ERRORS` | `OFF` | 将编译器警告视为错误 |
+| 选项                                                                                      | 默认值                      | 说明                               |
+| --------------------------------------------------------------------------------------- | ------------------------ | -------------------------------- |
+| `AIRY_BUILD_ALL`                                                                        | `ON`                     | 构建全部 AgentRT 组件                  |
+| `BUILD_TESTS`                                                                           | `ON`                     | 构建单元测试并启用 CTest                  |
+| `BUILD_SHARED_LIBS`                                                                     | `OFF`                    | 构建动态库而非静态库                       |
+| `BUILD_ATOMS` / `BUILD_COMMONS` / `BUILD_CUPOLAS` / `BUILD_GATEWAY` / `BUILD_HEAPSTORE` | `ON`                     | 各组件独立构建开关                        |
+| `BUILD_DAEMON`                                                                          | POSIX `ON`，Windows `OFF` | 构建守护进程集群                         |
+| `BUILD_CLI`                                                                             | POSIX `ON`，Windows `OFF` | 构建交互式 CLI                        |
+| `BUILD_TOOLKIT`                                                                         | `OFF`                    | 构建各语言 SDK 的 toolkit 模块           |
+| `AIRY_MEMORY_BACKEND`                                                                   | `builtin`                | 记忆后端：`builtin` 或 `memoryrovol`   |
+| `AIRY_WITH_MEMORYROVOL`                                                                 | `ON`                     | 链接商业记忆提供方；当外部源缺失时自动降级为内置后端，不破坏构建 |
+| `AIRY_COMPLIANCE_STRICT`                                                                | `ON`                     | 严格合规模式，投毒 `strcpy` 等不安全函数        |
+| `ENABLE_SANITIZERS`                                                                     | `OFF`                    | ASan + LSan + UBSan；排查内存问题时显式开启  |
+| `ENABLE_TSAN`                                                                           | `OFF`                    | ThreadSanitizer；与上一项互斥           |
+| `ENABLE_COVERAGE`                                                                       | `OFF`                    | 代码覆盖率插桩                          |
+| `WARNINGS_AS_ERRORS`                                                                    | `OFF`                    | 将编译器警告视为错误                       |
 
 发布包一律在关闭消毒器的状态下构建。`ENABLE_SANITIZERS` 是排障手段，不是
 部署配置。
@@ -318,14 +310,14 @@ airymaxrt update --rollback   # 回滚到上一版本
 采用 **AGPL-3.0-or-later OR Apache-2.0** 双许可证。你可以任选其一——既不必
 同时遵守两者，也不能两者都不遵守。全文见 [LICENSE](LICENSE)。
 
-| 你的场景 | 建议选择 | 原因 |
-|---------|---------|------|
-| 基于 AgentRT 修改并对外提供网络服务 | AGPL v3 | 网络服务条款要求公开修改后的源码 |
-| 开发开源衍生作品 | AGPL v3 | copyleft 使衍生作品保持开源 |
-| 集成进闭源商业产品 | Apache 2.0 | 宽松许可，允许专有衍生 |
-| 企业内部工具 | Apache 2.0 | 无公开源码义务 |
-| 需要明确的专利授权 | Apache 2.0 | 贡献者显式授予专利权 |
-| 学习与研究 | 任一 | 两者均允许 |
+| 你的场景                   | 建议选择       | 原因                 |
+| ---------------------- | ---------- | ------------------ |
+| 基于 AgentRT 修改并对外提供网络服务 | AGPL v3    | 网络服务条款要求公开修改后的源码   |
+| 开发开源衍生作品               | AGPL v3    | copyleft 使衍生作品保持开源 |
+| 集成进闭源商业产品              | Apache 2.0 | 宽松许可，允许专有衍生        |
+| 企业内部工具                 | Apache 2.0 | 无公开源码义务            |
+| 需要明确的专利授权              | Apache 2.0 | 贡献者显式授予专利权         |
+| 学习与研究                  | 任一         | 两者均允许              |
 
 伞仓中 `products/memoryrovol` 的商业记忆提供方以独立的 SPHARX Ltd. 最终用户
 许可协议单独分发，不受上述双许可证约束。
