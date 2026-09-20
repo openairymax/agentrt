@@ -60,6 +60,13 @@
 !cmake/**
 !scripts/
 !scripts/**
+# ---------------------------------------------------------------------------
+# packaging/: B12（0.1.18）npm 薄壳通道包（@openairymax/agentrt，N-1~N-5）。
+# 发布链 publish-npm job 经 checkout 消费，必须入库；包内零安装逻辑，
+# 唯一网络目标 = atomgit release 附件面（门禁扫描断言）。
+# ---------------------------------------------------------------------------
+!packaging/
+!packaging/**
 !VERSION
 !latest/
 !latest/**

@@ -1186,8 +1186,9 @@ jobs:
         run: |
           set -euo pipefail
           mf="$(mktemp)"
-          curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/latest/manifest.stable.json?ref=main" \
-            | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' > "$mf"
+          # B12（乙）：manifest 取自滚动 latest release 附件面（唯一事实源），
+          # 非 contents API 第二事实源。
+          curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/manifest.stable.json" > "$mf"
           python3 - "$mf" /tmp/u9.env <<'PYEOF'
           import json, sys
           m = json.load(open(sys.argv[1]))
@@ -1222,13 +1223,13 @@ jobs:
           FULL_ARG=""
           if [ -n "${PREV_TARBALL:-}" ]; then
             # 升级路径需要 airymaxrt-full：二进制安装的 bin/airymaxrt 为
-            # thin 包装，管理命令经 full 委托（联网时从 agentrt 仓 main
-            # latest/airymaxrt 拉取）。clean 容器无 curl/python 不可联网——
-            # job 侧（有网）预取同一对象，contents API base64 解码
-            #（~100KB < 1MB 阈值），经 /w 只读挂载传入 e2e 第四参，由 e2e
+            # thin 包装，管理命令经 full 委托（联网时从 agentrt 仓 latest
+            # 附件面拉取）。clean 容器无 curl/python 不可联网——job 侧
+            # （有网）预取同一对象（B12：release 附件面直取，非 contents
+            # API base64 解码），经 /w 只读挂载传入 e2e 第四参，由 e2e
             # 自举 seed。
-            curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/latest/airymaxrt?ref=main" \
-              | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' > dist/airymaxrt-full
+            curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/airymaxrt" \
+              > dist/airymaxrt-full
             chmod +x dist/airymaxrt-full
             FULL_ARG="/w/dist/airymaxrt-full"
             PREV_ARG="/w/$PREV_TARBALL"
@@ -1254,6 +1255,9 @@ jobs:
   #   3) publish-atomgit：SSoT 慢通道上传 + latest/ 指针切换（指针只在
   #      上传完成后才提交，install/update 永远指向已就绪制品）——与 GH
   #      快通道并行，互不阻塞；独立 concurrency 组支持单段重跑续传。
+  #   4) publish-npm：B12（N-5）npm 薄壳通道，needs publish-atomgit——
+  #      附件面（download/latest/）刷新与 npm publish 同 run 强绑定，
+  #      双向杜绝"附件新、npm 旧"与"npm 新、附件旧"漂移。
   #
   # 发布顺序语义（社区面向文档化）：GH 数分钟先行可见 → atomgit SSoT
   # ~1.5h 并行补齐 → Gitee 后台幂等镜像。atomgit 仍是数据权威（SSoT），
@@ -1464,4 +1468,63 @@ jobs:
           # RELEASE_NOTES_FILE 与 finalize 同源（manifest 幂等不重生成）。
           SKIP_SIGN=1 RELEASE_NOTES_FILE="$PWD/dist/notes.txt" \
             bash _tools/scripts/ci/release/publish-release.sh "${{ env.VERSION }}" dist
+
+  # B12（0.1.18，N-5）：npm 薄壳通道 publish。needs publish-atomgit——数据
+  # 权威面（含阶段 4.6 的 download/latest/ 附件刷新）成功后才允许动 npm，
+  # fail-closed 双向防"附件新、npm 旧 / npm 新、附件旧"漂移；publish 失败
+  # 即整条 release 判失败（job 红）。幂等续传与 SSoT 面同语义（精确版本
+  # 已在 registry 即跳过）。dist-tag 按通道分层：stable 占 latest（恒新），
+  # rc/beta 挂各自通道标、不污染 latest。
+  publish-npm:
+    needs: [publish-atomgit]
+    if: success() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: read
+    concurrency:
+      group: publish-npm-${{ github.ref_name }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Publish @openairymax/agentrt
+        working-directory: packaging/npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          ver="${VERSION#v}"
+          case "$ver" in
+            *-rc*)   dist=rc ;;
+            *-beta*) dist=beta ;;
+            *)       dist=latest ;;
+          esac
+          # N-4 版本注入：包版本 = release tag（去 v 前缀，semver 合规）。
+          npm --no-git-tag-version version "$ver"
+          # 幂等续传：单段重跑时精确版本已在 registry → 跳过 publish 仅校验。
+          if [ "$(npm view "@openairymax/agentrt@$ver" version 2>/dev/null || true)" = "$ver" ]; then
+            echo "npm @openairymax/agentrt@${ver} 已存在，跳过 publish（续传语义）"
+          else
+            npm publish --tag "$dist"
+          fi
+          # fail-closed 回验：registry 必须可精确取到本轮版本。
+          [ "$(npm view "@openairymax/agentrt@$ver" version 2>/dev/null || true)" = "$ver" ] || {
+            echo "::error::npm 回验失败：registry 无 @openairymax/agentrt@${ver}"; exit 1; }
+          # N-4 保鲜：stable 发布后 latest dist-tag 必须指向本轮版本。
+          if [ "$dist" = "latest" ]; then
+            [ "$(npm view @openairymax/agentrt dist-tags.latest 2>/dev/null || true)" = "$ver" ] || {
+              echo "::error::dist-tag latest 未指向 ${ver}（npm 面保鲜断裂）"; exit 1; }
+          fi
+
 

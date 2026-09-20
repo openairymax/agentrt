@@ -56,6 +56,17 @@ x86-64 与 x86-32 均提供原生 PowerShell 安装器：
 irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 | iex
 ```
 
+### npm
+
+面向 Node.js 用户提供零逻辑薄壳包：
+
+```bash
+npm install -g @openairymax/agentrt
+```
+
+包内不含任何安装逻辑：优先复用本机已有安装，否则转交上方同一份
+`install.sh` / `install.ps1` 发布附件完成安装（Windows 侧经 PowerShell 转交）。
+
 ### 可选参数
 
 在 `| bash -s --` 之后追加参数（从文件执行脚本时直接传参即可）：

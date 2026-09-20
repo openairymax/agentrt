@@ -50,6 +50,8 @@ $AIRY_VERSION = if ($env:AIRY_VERSION) { $env:AIRY_VERSION }
                 elseif (Test-Path (Join-Path $PSScriptRoot "..\VERSION")) { "v" + ((Get-Content (Join-Path $PSScriptRoot "..\VERSION")).Trim()) }
                 else { "v0.1.17" }
 $AIRY_REPO_URL = if ($env:AIRY_REPO_URL) { $env:AIRY_REPO_URL } else { "https://atomgit.com/openairymax/airymaxhub.git" }
+$AIRY_RELEASE_OWNER = if ($env:AIRY_RELEASE_OWNER) { $env:AIRY_RELEASE_OWNER } else { "openairymax/agentrt" }
+$AIRY_RELEASE_BASE  = if ($env:AIRY_RELEASE_BASE)  { $env:AIRY_RELEASE_BASE }  else { "https://atomgit.com/$AIRY_RELEASE_OWNER/releases/download" }
 $AIRY_CHANNEL = if ($Channel) { $Channel } elseif ($env:AIRY_CHANNEL) { $env:AIRY_CHANNEL } else { "stable" }
 if (@('stable', 'rc', 'beta') -notcontains $AIRY_CHANNEL) {
     Write-Err "非法 -Channel: $AIRY_CHANNEL（支持 stable|rc|beta）"
@@ -138,14 +140,11 @@ if ($Uninstall) {
     exit 0
 }
 
-function Fetch-RepoFile {
-    param([string]$RepoPath, [string]$Dest)
-    $api = "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/$RepoPath?ref=main"
+function Fetch-ReleaseAsset {
+    param([string]$Asset, [string]$Dest, [string]$Tag = "latest")
     try {
-        $resp = Invoke-RestMethod -Uri $api -Headers @{ "User-Agent" = "agentrt-installer" } -TimeoutSec 60
-        if ($null -eq $resp -or $null -eq $resp.content) { return $false }
-        $bytes = [Convert]::FromBase64String(($resp.content -replace "\s", ""))
-        [System.IO.File]::WriteAllBytes($Dest, $bytes)
+        curl.exe -fsSL --max-time 60 -o $Dest "$AIRY_RELEASE_BASE/$Tag/$Asset" 2>$null
+        if ($LASTEXITCODE -ne 0) { return $false }
         return (Test-Path $Dest) -and ((Get-Item $Dest).Length -gt 0)
     } catch { return $false }
 }
@@ -162,7 +161,11 @@ function Install-Binary {
         } else {
             Write-Info "下载通道 manifest: $Url"
             curl.exe -fsSL --max-time 60 -o $man $Url
-            if ($LASTEXITCODE -ne 0) { Write-Warn "manifest 下载失败，回退源码构建"; return $false }
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warn "通道 manifest 拉取失败：可能是网络/服务异常，也可能该通道暂无制品"
+                Write-Warn "当前可用：stable（生产）/ rc（候选），beta 为保留通道；将回退源码构建"
+                return $false
+            }
         }
         $asc = Join-Path $AIRY_HOME "tmp\manifest.json.asc"
         $ascSrc = "$Url.asc"
@@ -170,7 +173,7 @@ function Install-Binary {
         else { curl.exe -fsSL --max-time 30 -o $asc $ascSrc 2>$null }
         if ((Get-Command gpg -ErrorAction SilentlyContinue)) {
             $keyf = Join-Path $AIRY_HOME "tmp\agentrt.asc"
-            if (-not (Fetch-RepoFile "latest/keys/agentrt.asc" $keyf)) {
+            if (-not (Fetch-ReleaseAsset "agentrt.asc" $keyf)) {
                 if (Test-Path (Join-Path $AIRY_HOME "keys\agentrt.asc")) {
                     Copy-Item (Join-Path $AIRY_HOME "keys\agentrt.asc") $keyf -Force
                 }
@@ -431,6 +434,28 @@ function Finalize-Install {
     )
     $envScript | Set-Content -Path (Join-Path $AIRY_HOME "bin\agentrt-env.ps1") -Encoding UTF8
 
+    # 卸载薄壳：本地安装器优先，缺失时回落发布面附件（§12.12 唯一事实源）。
+    # 单一职责——定位 install.ps1 并透传 -Uninstall，不自持任何卸载逻辑。
+    $uninstallStub = (@'
+$ErrorActionPreference = 'Stop'
+$root = '__AIRY_ROOT__'
+$installer = Join-Path $root 'scripts\install.ps1'
+if (-not (Test-Path $installer)) {
+    $installer = Join-Path $env:TEMP ('agentrt-install-' + $PID + '.ps1')
+    Remove-Item $installer -Force -ErrorAction SilentlyContinue
+    curl.exe -fsSL --max-time 60 -o $installer '__RELEASE_BASE__/latest/install.ps1'
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $installer) -or (Get-Item $installer).Length -eq 0) {
+        Remove-Item $installer -Force -ErrorAction SilentlyContinue
+        Write-Host "[FAIL] 卸载器不可用：本地缺失且发布面附件拉取失败"
+        Write-Host "   请重试：irm __RELEASE_BASE__/latest/install.ps1 | iex"
+        exit 1
+    }
+}
+& $installer -Uninstall -Prefix $root
+exit $LASTEXITCODE
+'@).Replace('__AIRY_ROOT__', $AIRY_HOME.Replace("'", "''")).Replace('__RELEASE_BASE__', $AIRY_RELEASE_BASE)
+    $uninstallStub | Set-Content -Path (Join-Path $AIRY_HOME "bin\airymaxrt-uninstall.ps1") -Encoding UTF8
+
     $launcher = Join-Path $AIRY_HOME "bin\airymaxrt.cmd"
     $escapedHome = $AIRY_HOME.Replace('"','""')
     $cmdContent = @(
@@ -441,7 +466,7 @@ function Finalize-Install {
         "  for /f ""tokens=2 delims=="" %%a in ('findstr /b ""AIRY_HOME="" ""%AIRY_HOME%\config\install.env"" 2^>nul') do set ""AIRY_HOME=%%a""",
         ")",
         "if /i ""%~1""==""uninstall"" (",
-        "  powershell -NoProfile -ExecutionPolicy Bypass -Command ""$ErrorActionPreference='Stop'; try { $c=irm 'https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.ps1?ref=main' -TimeoutSec 60; $p=Join-Path $env:TEMP 'agentrt-install.ps1'; [IO.File]::WriteAllBytes($p,[Convert]::FromBase64String(($c.content -replace '\\s',''))); & $p -Uninstall -Prefix '%AIRY_HOME%' } catch { Write-Host ('[FAIL] 卸载器自举失败: '+$_.Exception.Message); exit 1 }""",
+        '  powershell -NoProfile -ExecutionPolicy Bypass -File "%AIRY_HOME%\bin\airymaxrt-uninstall.ps1"',
         "  goto :eof",
         ")",
         "if not exist ""%AIRY_HOME%\bin\airy_cli.exe"" goto :notfound",
@@ -512,16 +537,7 @@ $installed = $false
 $script:BinaryFatal = $false
 $releaseUrl = $env:AIRY_RELEASE_URL
 if (-not $releaseUrl -and $Mode -ne "source") {
-    $manLocal = Join-Path $AIRY_HOME "tmp\manifest.$AIRY_CHANNEL.json"
-    if (Fetch-RepoFile "latest/manifest.$AIRY_CHANNEL.json" $manLocal) {
-        Fetch-RepoFile "latest/manifest.$AIRY_CHANNEL.json.asc" "$manLocal.asc" | Out-Null
-        $releaseUrl = $manLocal
-        Write-Info "通道 manifest 已获取（$AIRY_CHANNEL）"
-    } else {
-        Write-Warn "通道 manifest 获取失败：可能是网络/服务异常，也可能该通道暂无制品"
-        Write-Warn "当前可用：stable（生产）/ rc（候选），beta 为保留通道；将回退源码构建"
-        $releaseUrl = ""
-    }
+    $releaseUrl = "$AIRY_RELEASE_BASE/latest/manifest.$AIRY_CHANNEL.json"
 }
 if ($FromFile) {
     if (-not (Install-Binary $FromFile)) {

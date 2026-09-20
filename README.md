@@ -64,6 +64,18 @@ A native PowerShell installer is published for x86-64 and x86-32:
 irm https://atomgit.com/openairymax/agentrt/releases/download/latest/install.ps1 | iex
 ```
 
+### npm
+
+A thin wrapper package is published for Node.js users:
+
+```bash
+npm install -g @openairymax/agentrt
+```
+
+The package carries no install logic of its own: it locates an existing
+install first, and otherwise delegates to the same `install.sh` /
+`install.ps1` release assets above (Windows hand-off uses PowerShell).
+
 ### Options
 
 Append flags after `| bash -s --` (or pass them directly when running the

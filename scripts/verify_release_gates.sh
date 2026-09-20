@@ -55,7 +55,9 @@ for _f in "$INSTALL" "$INSTALL_PS1" "$LATEST_RT" \
           "$CLI/src/cmd/cli_gw.c" \
           "$CLI/include/cli_internal.h" \
           "$CLI/src/chat/cli_chat_usage.c" \
-          "$CLI/src/chat/cli_chat_history.c"; do
+          "$CLI/src/chat/cli_chat_history.c" \
+          "$ROOT/packaging/npm/package.json" \
+          "$ROOT/packaging/npm/bin/airymaxrt.js"; do
     if [ ! -f "$_f" ]; then
         printf '  [FAIL] 结构性文件缺失: %s\n' "$_f"
         _missing=1
@@ -512,16 +514,20 @@ case "$(sdk_ready; echo $?)" in
     *) bad "I4 AIRY_GATE_SDK_AIRYMAXRT 显式指定但文件缺失: $SDK_AIRYMAXRT" ;;
 esac
 
-section "J" "9.1/U-01 更新器 detect_pending_release（更新问题：manifest 指针落后于发布）"
+section "J" "9.1/U-01 → §12.12（乙）修订：更新器发布面收敛（唯一事实源=release 附件）"
 
+# 原 U-01 判据要求 detect_pending_release 经仓库 API 列举 tag 探测指针窗口，
+# 与 §12.12 裁定冲突（更新面禁止第二事实源）。裁定后语义：latest manifest
+# 即真值，发布窗口由流水线末位翻转指针消除；J1 改为断言更新面收敛。
 case "$(sdk_ready; echo $?)" in
     0)
-        if grep -Fq 'detect_pending_release() {' "$SDK_AIRYMAXRT" \
-           && grep -Fq 'detect_pending_release "$latest"' "$SDK_AIRYMAXRT" \
-           && grep -q 'manifest 指针尚未更新' "$SDK_AIRYMAXRT"; then
-            ok "J1 detect_pending_release 定义 + 接入 + 落后指针告警文案全链在位"
+        if ! grep -Eq 'api\.atomgit\.com|fetch_repo_file' "$SDK_AIRYMAXRT" \
+           && grep -Fq 'fetch_release_asset() {' "$SDK_AIRYMAXRT" \
+           && grep -Fq 'manifest_field() {' "$SDK_AIRYMAXRT" \
+           && grep -Fq 'fetch_release_asset "manifest.${CHANNEL}.json" ' "$SDK_AIRYMAXRT"; then
+            ok "J1 更新器零 API 直读，附件通道 + 平台作用域 manifest 解析全链在位"
         else
-            bad "J1 更新器落后指针检测链破裂（定义/接入/文案至少一项缺失）"
+            bad "J1 更新器发布面收敛破裂（API 直读残留或附件/解析函数缺失）"
         fi
         ;;
     1) skip "J1 sdk 未检出，更新器判据跳过" ;;
@@ -1368,13 +1374,14 @@ else
     bad "Y2 零反馈回潮（请求发出到首字节之间无可见状态）"
 fi
 
-if grep -q 'fn typewriter_enabled' "$_tui/mod.rs" \
-    && grep -q 'AIRY_TUI_TYPEWRITER' "$_tui/mod.rs" \
-    && grep -q 'if !self.typewriter' "$_tui/poll.rs" \
-    && grep -q 'self.streaming_reveal = total' "$_tui/poll.rs"; then
-    ok "Y3 打字机解耦在位（V2.4：默认关、关闭当拍追平全文、动画不门控落定）"
+if grep -q '本地打字机已移除' "$_tui/poll.rs" \
+    && ! grep -q 'typewriter' "$_tui/poll.rs" \
+    && ! grep -q 'typewriter' "$_tui/mod.rs" \
+    && ! grep -q 'streaming_reveal' "$_tui/poll.rs" \
+    && grep -q '结果到达即落定' "$_tui/poll.rs"; then
+    ok "Y3 打字机已移除且落定无 reveal 门控（§5A.3 W4 裁定：合帧/真流式取代打字机）"
 else
-    bad "Y3 打字机耦合回潮（默认开启或落定被 reveal 进度门控）"
+    bad "Y3 本地打字机 reveal 回潮（上屏动画门控落定或为落定引入附加延迟）"
 fi
 
 if grep -q 'AIRY_RS_K_THINK_MS' "$_ad/src/agent_run_engine.c" \
@@ -1386,9 +1393,9 @@ else
 fi
 
 if grep -q '900B payload not truncated' "$_ad/tests/test_run_loop.c" \
-    && grep -q 'fn typewriter_default_off_and_env_gated' "$_tui/tests.rs" \
+    && grep -q 'fn stream_delta_lands_on_arrival_and_settles' "$_tui/tests.rs" \
     && grep -q 'fn begin_busy_marks_request_start' "$_tui/tests.rs"; then
-    ok "Y5 B2 测试守卫在位（V2.2 截断回归 + V2.3/V2.4 Rust 断言）"
+    ok "Y5 B2 测试守卫在位（V2.2 截断回归 + V2.3 零反馈 + V2.4 移除语义 Rust 断言）"
 else
     bad "Y5 B2 测试守卫缺失"
 fi
@@ -1579,6 +1586,169 @@ if [ -f "$_mch" ] && [ -f "$_mchk" ] \
     ok "AD3 V9.4 macOS 干净机发布门禁在位（arm-64/x86-64 双腿 + gateway online N==M 出证）"
 else
     bad "AD3 V9.4 macOS 干净机发布门禁缺失（V9.4 三平台 smoke 未纳入）"
+fi
+
+section "AE" "B12 §12.12（乙）安装/更新唯一事实源（V12.1 三式各一条 + V12.2 第二事实源零命中 + npm 薄壳契约）"
+
+# V12.1：README 双语三式各仅一条——curl/irm/npm 安装入口每式恰一行，
+# 多入口或文案漂移都会稀释"唯一事实源 + 薄壳通道集"语义。
+_ae1_bad=""
+for _rd in "$ROOT/README.md" "$ROOT/README_zh.md"; do
+    [ -f "$_rd" ] || { _ae1_bad="$_ae1_bad $(basename "$_rd")(缺失)"; continue; }
+    [ "$(grep -c 'releases/download/latest/install\.sh | bash' "$_rd")" = "1" ] \
+        || _ae1_bad="$_ae1_bad $(basename "$_rd"):curl"
+    [ "$(grep -c 'releases/download/latest/install\.ps1 | iex' "$_rd")" = "1" ] \
+        || _ae1_bad="$_ae1_bad $(basename "$_rd"):irm"
+    [ "$(grep -c 'npm install -g @openairymax/agentrt' "$_rd")" = "1" ] \
+        || _ae1_bad="$_ae1_bad $(basename "$_rd"):npm"
+done
+if [ -z "$_ae1_bad" ]; then
+    ok "AE1 V12.1 三式各仅一条（README 双语 curl/irm/npm 单行入口）"
+else
+    bad "AE1 三式入口漂移:$_ae1_bad"
+fi
+
+# V12.2（B2 裁决：维持移除 + 修正门禁谓词）：api.atomgit.com 行仅当同行
+# 出现 contents 读取或 base64 解码时判为第二事实源；release 管理面 CRUD
+# 端点（创建 Release/上传/删除附件）是发布链合法职责，不误判。客户端
+# 消费面（install.sh/install.ps1/latest 启动器/npm 薄壳）零 API 直读零豁免。
+_ae2_client="$(grep -rn 'api\.atomgit\.com' \
+    "$ROOT/scripts/install.sh" "$ROOT/scripts/install.ps1" \
+    "$ROOT/latest/airymaxrt" "$ROOT/packaging/npm" 2>/dev/null || true)"
+_ae2_rel="$(grep -n 'api\.atomgit\.com' "$ROOT/.github/workflows/release.yml" 2>/dev/null \
+    | grep -E 'contents|base64' || true)"
+if [ -z "$_ae2_client" ] && [ -z "$_ae2_rel" ]; then
+    ok "AE2 V12.2 第二事实源零命中（客户端面零 API 直读；release.yml 零 contents/base64 消费）"
+else
+    [ -n "$_ae2_client" ] && bad "AE2 客户端消费面 API 直读残留: $(echo "$_ae2_client" | tr '\n' ' ')"
+    [ -n "$_ae2_rel" ] && bad "AE2 release.yml contents/base64 消费残留: $(echo "$_ae2_rel" | tr '\n' ' ')"
+fi
+
+# N-1~N-5：npm 薄壳契约——包名固定、唯一网络目标为 release 附件面、
+# 零安装逻辑复制（解包/校验实现只存在于安装器本体，薄壳仅转交）。
+_ae3_bad=""
+grep -q '"name": "@openairymax/agentrt"' "$ROOT/packaging/npm/package.json" \
+    || _ae3_bad="$_ae3_bad 包名漂移"
+_jsh="$ROOT/packaging/npm/bin/airymaxrt.js"
+grep -qF "const RELEASE_BASE = 'https://atomgit.com/openairymax/agentrt/releases/download'" "$_jsh" \
+    || _ae3_bad="$_ae3_bad RELEASE_BASE 附件面漂移"
+_hosts="$(grep -ohE 'https?://[^"'\'' ]+' "$_jsh" 2>/dev/null \
+    | grep -v '^https://atomgit.com/openairymax/agentrt/releases/download' | sort -u || true)"
+[ -z "$_hosts" ] || _ae3_bad="$_ae3_bad 越界网络目标: $(echo "$_hosts" | tr '\n' ' ')"
+grep -qE 'install\.sh|install\.ps1' "$_jsh" || _ae3_bad="$_ae3_bad 未转交安装器（薄壳语义破裂）"
+if command -v node >/dev/null 2>&1; then
+    node --check "$_jsh" 2>/dev/null || _ae3_bad="$_ae3_bad node --check 语法失败"
+fi
+if [ -z "$_ae3_bad" ]; then
+    ok "AE3 N-1~N-5 npm 薄壳契约（包名/唯一附件面/零越界主机/转交语义/语法）"
+else
+    bad "AE3 npm 薄壳契约破裂:$_ae3_bad"
+fi
+
+# S1/S5 接线入库（hub tools 仓未检出时发布侧降级，与 K 组同口径）：
+# 阶段 4.6 latest 附件强刷 fail-closed + prune latest 保护 + publish-npm
+# needs publish-atomgit（附件刷新与 npm publish 同 run 强绑定）。
+_ae4_bad=""
+if [ -f "$PUBLISH" ]; then
+    grep -q 'AIRY_FORCE_UPLOAD=1 upload_asset' "$PUBLISH" \
+        || _ae4_bad="$_ae4_bad 阶段4.6 latest 强刷缺失"
+    grep -q 'LATEST_FAIL' "$PUBLISH" \
+        || _ae4_bad="$_ae4_bad latest 面 fail-closed 缺失"
+    _prune="$ROOT/../../tools/scripts/ci/release/airy_release_prune.py"
+    if [ -f "$_prune" ]; then
+        grep -qF 'PROTECTED = {"latest"}' "$_prune" \
+            || _ae4_bad="$_ae4_bad prune latest 保护缺失"
+    else
+        _ae4_bad="$_ae4_bad prune 脚本缺失"
+    fi
+else
+    skip "AE4 发布侧断言（hub tools 仓未检出，CI 侧兜底）"
+fi
+_ry="$ROOT/.github/workflows/release.yml"
+grep -q '^  publish-npm:' "$_ry" || _ae4_bad="$_ae4_bad publish-npm job 缺失"
+grep -qF 'needs: [publish-atomgit]' "$_ry" || _ae4_bad="$_ae4_bad publish-npm 未强绑附件刷新 job"
+if [ -z "$_ae4_bad" ]; then
+    ok "AE4 发布链接线在位（4.6 强刷 fail-closed + prune latest 保护 + npm 同 run 强绑定）"
+else
+    bad "AE4 发布链接线断裂:$_ae4_bad"
+fi
+
+section "AF" "B13 §12.13 运行期 supervisor（V13.4 双面单路径 + V13.5 空允许集 + V13.2 接线 + gateway 无端点防回归 + 命名更正留证）"
+
+# AF1（V13.4）：daemon 群唯一拉起路径 = supervisor_d 声明驱动调谐。启动器双面
+# （sdk 开发面 SSoT + latest 发布面）各自 `nohup "` 恰 1 处且目标为 supervisor_d，
+# 双面内容一致防分叉（复刻 latest: refresh the launcher 先例的机器化）。
+_af1_bad=""
+_rt_lu="$ROOT/latest/airymaxrt"
+for _lu in "$_rt_lu"; do
+    [ -f "$_lu" ] || { _af1_bad="$_af1_bad $(basename "$(dirname "$_lu")")(缺失)"; continue; }
+    [ "$(grep -c 'nohup "' "$_lu")" = "1" ] || _af1_bad="$_af1_bad $_lu:nohup非唯一"
+    grep -q 'nohup "$SUPERVISOR_BIN"' "$_lu" || _af1_bad="$_af1_bad $_lu:唯一nohup非supervisor"
+done
+if [ -f "$_rt_lu" ] && [ -f "$SDK_AIRYMAXRT" ]; then
+    cmp -s "$_rt_lu" "$SDK_AIRYMAXRT" || _af1_bad="$_af1_bad latest与sdk启动器分叉"
+fi
+if [ -z "$_af1_bad" ]; then
+    ok "AF1 V13.4 启动双面单路径（nohup 恰 1 且为 supervisor_d；latest≡sdk SSoT 归一）"
+else
+    bad "AF1 启动单路径破裂:$_af1_bad"
+fi
+
+# AF2（V13.5）：supervisor_d 独立 target 且链接允许集为空——监管者零项目内库
+# 链接，白名单条目存在（linkgate 的空值条目即 fail-closed 机器判据）。
+_af2_bad=""
+_wh="$ROOT/link-whitelist.txt"
+grep -q '^supervisor_d:$' "$_wh" || _af2_bad="$_af2_bad 空允许集条目缺失"
+_sd="$ROOT/daemons/supervisor_d"
+[ -f "$_sd/CMakeLists.txt" ] || _af2_bad="$_af2_bad supervisor_d CMakeLists 缺失"
+for _sf in main.c decl.c proc.c probe.c ctrl.c; do
+    [ -f "$_sd/src/$_sf" ] || _af2_bad="$_af2_bad src/$_sf 缺失"
+done
+if [ -z "$_af2_bad" ]; then
+    ok "AF2 V13.5 supervisor_d 独立 target + 空允许集（零业务库链接机器判据）"
+else
+    bad "AF2 supervisor_d 边界失守:$_af2_bad"
+fi
+
+# AF3（V13.2）：gateway 按需激活接线——supactivate 源在位并登记 sources，
+# svcdispatch unreachable 分支发起单向 activate 请求。
+_af3_bad=""
+_gw="$ROOT/gateway"
+[ -f "$_gw/src/biz/gateway_biz_supactivate.c" ] || _af3_bad="$_af3_bad supactivate.c 缺失"
+grep -q 'gateway_biz_supactivate\.c' "$_gw/cmake/gateway-sources.cmake" \
+    || _af3_bad="$_af3_bad sources 未登记"
+grep -q 'gw_sup_notify_activate' "$_gw/src/biz/gateway_biz_svcdispatch.c" \
+    || _af3_bad="$_af3_bad unreachable 分支未接线"
+if [ -z "$_af3_bad" ]; then
+    ok "AF3 V13.2 按需激活接线（supactivate 在位 + sources 登记 + unreachable 单向请求）"
+else
+    bad "AF3 激活接线断裂:$_af3_bad"
+fi
+
+# AF4：gateway_d 无 L2 端点防回归——resolve_ep 对 gateway 置空 sock（走进程
+# 存活腿）；否则盲合成 gateway.sock 会使假死探测永不通过而误杀 CORE。
+_af4_bad=""
+_decl="$ROOT/daemons/supervisor_d/src/decl.c"
+grep -q '"gateway"' "$_decl" || _af4_bad="$_af4_bad gateway 置空分支缺失"
+grep -q 'p->sock\[0\] = ' "$_decl" || _af4_bad="$_af4_bad sock 置空语义缺失"
+if [ -z "$_af4_bad" ]; then
+    ok "AF4 gateway 无端点口径防回归（resolve_ep 置空走进程存活腿，杜绝误杀）"
+else
+    bad "AF4 gateway 端点口径回归:$_af4_bad"
+fi
+
+# AF5：B13 一并清算的命名失实——`sd` 是 ServiceDiscovery 不是 systemd；
+# 守护进程清单含 supervisor_d（治理面入册）。
+_af5_bad=""
+for _rd in "$ROOT/daemons/README_zh.md" "$ROOT/daemons/README.md"; do
+    grep -q 'systemd' "$_rd" && _af5_bad="$_af5_bad $(basename "$_rd"):systemd残留"
+done
+grep -q 'supervisor_d' "$ROOT/daemons/README_zh.md" \
+    || _af5_bad="$_af5_bad README_zh 缺 supervisor_d"
+if [ -z "$_af5_bad" ]; then
+    ok "AF5 命名更正留证（sd=ServiceDiscovery 零 systemd 失实；治理 daemon 入册）"
+else
+    bad "AF5 命名失实回归:$_af5_bad"
 fi
 
 printf '\n门禁汇总: PASS=%d FAIL=%d\n' "$PASS" "$FAIL"

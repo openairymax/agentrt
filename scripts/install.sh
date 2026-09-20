@@ -120,6 +120,9 @@ AIRY_CHANNEL="${AIRY_CHANNEL:-stable}"
 AIRY_FROM_FILE="${AIRY_FROM_FILE:-}"
 case "$AIRY_CHANNEL" in stable|rc|beta) ;; *) log_err "非法 --channel: ${AIRY_CHANNEL}（支持 stable|rc|beta）"; exit 1 ;; esac
 
+AIRY_RELEASE_OWNER="${AIRY_RELEASE_OWNER:-openairymax/agentrt}"
+AIRY_RELEASE_BASE="${AIRY_RELEASE_BASE:-https://atomgit.com/${AIRY_RELEASE_OWNER}/releases/download}"
+
 syscurl() {
     local _ldp="" _seg _rest="${LD_LIBRARY_PATH:-}"
     while [ -n "$_rest" ]; do
@@ -184,20 +187,27 @@ daemon_list() {
 installer_self_bootstrap() {
     [ "${AIRY_INSTALLER_BOOTSTRAPPED:-0}" = "1" ] && return 0
     [ -f "$0" ] || return 0
-    command -v python3 >/dev/null 2>&1 || return 0
     command -v curl >/dev/null 2>&1 || return 0
-    local api="https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main"
-    local tmp remote_content tmp_inst
-    tmp="$(syscurl -fsSL --max-time 30 "$api" 2>/dev/null)" || return 0
-    remote_content="$(printf '%s' "$tmp" | python3 -c 'import sys,json,base64;d=json.load(sys.stdin);sys.stdout.write(base64.b64decode(d.get("content","")).decode())' 2>/dev/null)" || return 0
-    [ -n "$remote_content" ] || return 0
-    [ "$remote_content" = "$(cat "$0")" ] && return 0
-    log_info "检测到安装器新版本，切换到远程最新版执行…"
+    local remote tmp_inst _ls _rs
+    remote="$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/airymaxrt-installer.remote.$$")"
+    syscurl -fsSL --max-time 30 -o "$remote" \
+        "${AIRY_RELEASE_BASE}/latest/install.sh" || { rm -f "$remote"; return 0; }
+    [ -s "$remote" ] || { rm -f "$remote"; return 0; }
+    _rs="$(sha256_file "$remote")"
+    _ls="$(sha256_file "$0")"
+    if [ -z "$_rs" ] || [ "$_rs" = "$_ls" ]; then
+        rm -f "$remote"
+        return 0
+    fi
+    log_info "检测到发布面安装器更新，切换到最新版执行…"
     export AIRY_INSTALLER_BOOTSTRAPPED=1
     tmp_inst="$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/airymaxrt-installer.$$")"
-    printf '%s\n' "$remote_content" > "$tmp_inst" || { rm -f "$tmp_inst"; return 0; }
-    chmod 755 "$tmp_inst"
-    exec "$tmp_inst" "$@"
+    if cp -f "$remote" "$tmp_inst" && chmod 755 "$tmp_inst"; then
+        rm -f "$remote"
+        exec "$tmp_inst" "$@"
+    fi
+    rm -f "$remote" "$tmp_inst"
+    return 0
 }
 
 installer_self_bootstrap "$@"
@@ -410,25 +420,12 @@ QpegwKdM5Y9YiANOL8FODQ==
 =EPz8
 -----END PGP PUBLIC KEY BLOCK-----'
 
-fetch_repo_file() {
-    local api="https://api.atomgit.com/api/v5/repos/${AIRY_RELEASE_OWNER:-openairymax/agentrt}/contents/$1?ref=main"
-    local tmp="${AIRY_HOME}/tmp/contents.$$"
+fetch_release_asset() {
+    local tag="${3:-latest}" tmp
+    tmp="${AIRY_HOME}/tmp/asset.$$"
     mkdir -p "$(dirname "$tmp")" 2>/dev/null
-    syscurl -fsSL --max-time 60 -o "$tmp" "$api" || { rm -f "$tmp"; return 1; }
-    if command -v python3 >/dev/null 2>&1; then
-        python3 -c 'import json,sys,base64; sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin).get("content","").replace("\n","")))' < "$tmp" > "$2" || { rm -f "$tmp"; return 1; }
-    else
-        sed -n 's/.*"content"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp" | tr -d '\n' > "${tmp}.b64"
-        if base64 -d < "${tmp}.b64" > "$2" 2>/dev/null \
-           || base64 -D < "${tmp}.b64" > "$2" 2>/dev/null \
-           || openssl base64 -d -A < "${tmp}.b64" > "$2" 2>/dev/null; then
-            rm -f "${tmp}.b64"
-        else
-            rm -f "$tmp" "${tmp}.b64"
-            return 1
-        fi
-    fi
-    rm -f "$tmp"
+    syscurl -fsSL --max-time 60 -o "$tmp" "${AIRY_RELEASE_BASE}/${tag}/${1}" || { rm -f "$tmp"; return 1; }
+    mv -f "$tmp" "$2" || { rm -f "$tmp"; return 1; }
     [ -s "$2" ]
 }
 
@@ -438,7 +435,7 @@ verify_gpg_sig() {
     mkdir -p "$gnupg" && chmod 700 "$gnupg"
     keyf="$gnupg/agentrt.asc"
     if [ -z "${AIRY_NO_NETWORK:-}" ]; then
-        fetch_repo_file "latest/keys/agentrt.asc" "$keyf" >/dev/null 2>&1 || true
+        fetch_release_asset "agentrt.asc" "$keyf" >/dev/null 2>&1 || true
     fi
     if [ ! -s "$keyf" ] && [ -f "${AIRY_HOME}/keys/agentrt.asc" ]; then
         cp -f "${AIRY_HOME}/keys/agentrt.asc" "$keyf" 2>/dev/null || true
@@ -461,8 +458,10 @@ except Exception:
 PYEOF
         return 0
     fi
-    sed -n "s/.*\"$3\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p
-            s/.*\"$3\"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p" "$1" | head -1
+    sed -n "/\"$2\"[[:space:]]*:[[:space:]]*{/,/^[[:space:]]*}/{
+        s/.*\"$3\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p
+        s/.*\"$3\"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p
+    }" "$1" | head -1
 }
 
 manifest_state() {
@@ -508,21 +507,12 @@ install_binary() {
 
     if [ "${url##*.}" = "json" ]; then
         local man="${AIRY_HOME}/tmp/manifest.json" man_asc="${AIRY_HOME}/tmp/manifest.json.asc"
-        case "$url" in
-            *openairymax/agentrt*)
-                local man_path="latest/${url##*/}"
-                fetch_repo_file "$man_path" "$man" || {
-                    log_err "官方 manifest 拉取失败：${man_path}"
-                    log_err "可能是网络/服务异常；也可能该通道暂无制品——当前可用：stable（生产）/ rc（候选），beta 为保留通道"
-                    return 2
-                }
-                fetch_repo_file "$man_path.asc" "$man_asc" >/dev/null 2>&1 || true
-                ;;
-            *)
-                syscurl -fsSL --max-time 60 -o "$man" "$url" || { log_err "manifest 下载失败（网络/服务异常），请稍候重试"; return 2; }
-                syscurl -fsSL --max-time 60 -o "$man_asc" "${url}.asc" >/dev/null 2>&1 || true
-                ;;
-        esac
+        syscurl -fsSL --max-time 60 -o "$man" "$url" || {
+            log_err "manifest 拉取失败：${url}"
+            log_err "可能是网络/服务异常；也可能该通道暂无制品——当前可用：stable（生产）/ rc（候选），beta 为保留通道"
+            return 2
+        }
+        syscurl -fsSL --max-time 60 -o "$man_asc" "${url}.asc" >/dev/null 2>&1 || true
         verify_gpg_sig "$man" "$man_asc" || { log_err "manifest 验签失败（GPG），拒绝安装——请确认网络环境未被劫持后重试"; return 2; }
         [ -s "$man_asc" ] && log_ok "manifest 验签通过（GPG）"
         if [ "$(manifest_state "$man")" = "reserved" ]; then
@@ -593,7 +583,7 @@ install_binary() {
                     _retry_download=$((_retry_download+1)); continue
                 fi
                 log_err "release 下载失败（已重试）。请检查网络后重新运行一键安装："
-                log_err "  curl -fsSL \"https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main\" | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)[\"content\"]))' | bash"
+                log_err "  curl -fsSL \"${AIRY_RELEASE_BASE}/latest/install.sh\" | bash"
                 return 2
             fi
             log_ok "下载完成: $(human_size "$(wc -c < "${tarball}" 2>/dev/null | tr -d ' ')")"
@@ -1306,30 +1296,16 @@ case "\$1" in
         _TMP="\$AIRY_HOME/tmp/airymaxrt-full.\$\$"
         mkdir -p "\$AIRY_HOME/tmp" || exit 1
         syscurl -fsSL --max-time 60 -o "\$_TMP" \
-            "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/latest/airymaxrt?ref=main" || {
-            echo "airymaxrt \$1: 完整启动器下载失败（api.atomgit.com 不可达）" >&2
+            "${AIRY_RELEASE_BASE}/latest/airymaxrt" || {
+            echo "airymaxrt \$1: 完整启动器下载失败（发布面 releases/download 不可达）" >&2
             rm -f "\$_TMP"; exit 1
         }
-        if command -v python3 >/dev/null 2>&1; then
-            python3 -c 'import json,sys,base64; sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin).get("content","").replace("\n","")))' < "\$_TMP" > "\$_FULL" || {
-                echo "airymaxrt \$1: 完整启动器解码失败" >&2
-                rm -f "\$_TMP"; exit 1
-            }
-        else
-            sed -n 's/.*"content"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "\$_TMP" | tr -d '\n' > "\${_TMP}.b64"
-            if base64 -d < "\${_TMP}.b64" > "\$_FULL" 2>/dev/null \
-               || base64 -D < "\${_TMP}.b64" > "\$_FULL" 2>/dev/null \
-               || openssl base64 -d -A < "\${_TMP}.b64" > "\$_FULL" 2>/dev/null; then
-                rm -f "\${_TMP}.b64"
-            else
-                echo "airymaxrt \$1: 完整启动器解码失败（无 python3，base64 回退失败）" >&2
-                rm -f "\$_TMP" "\${_TMP}.b64"
-                exit 1
-            fi
+        if [ ! -s "\$_TMP" ]; then
+            echo "airymaxrt \$1: 完整启动器下载为空（发布面附件缺失）" >&2
+            rm -f "\$_TMP"; exit 1
         fi
-        rm -f "\$_TMP"
+        mv -f "\$_TMP" "\$_FULL" || { rm -f "\$_TMP"; exit 1; }
         chmod 755 "\$_FULL"
-        [ -s "\$_FULL" ] || { echo "airymaxrt \$1: 完整启动器为空" >&2; exit 1; }
         exec bash "\$_FULL" "\$@"
         ;;
     "")
@@ -1385,15 +1361,9 @@ EOF
     if [ -f "$0" ] && [ -r "$0" ]; then
         cp -f "$0" "${AIRY_HOME}/scripts/install.sh"
     else
-        if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
-            _it_remote="$(syscurl -fsSL --max-time 30 \
-                "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" 2>/dev/null || true)"
-            if [ -n "$_it_remote" ]; then
-                printf '%s' "$_it_remote" | python3 -c 'import sys,json,base64;d=json.load(sys.stdin);sys.stdout.write(base64.b64decode(d.get("content","")).decode())' > "${AIRY_HOME}/scripts/install.sh" 2>/dev/null || true
-            fi
-        fi
+        fetch_release_asset "install.sh" "${AIRY_HOME}/scripts/install.sh" >/dev/null 2>&1 || true
         if [ ! -s "${AIRY_HOME}/scripts/install.sh" ]; then
-            log_warn "安装器自托管失败（管道执行且联网拉取失败）；airymaxrt uninstall 将提示在线兜底"
+            log_warn "安装器自托管失败（管道执行且发布面附件拉取失败）；airymaxrt uninstall 将提示在线兜底"
         fi
     fi
     chmod 755 "${AIRY_HOME}/scripts/install.sh" 2>/dev/null || true
@@ -1588,7 +1558,7 @@ main() {
     stage 2 5 "获取运行时"
     local release_url="${AIRY_RELEASE_URL:-}"
     if [ -z "$release_url" ] && [ "${AIRY_MODE:-auto}" != "source" ]; then
-        release_url="https://atomgit.com/openairymax/agentrt/latest/manifest.${AIRY_CHANNEL}.json"
+        release_url="${AIRY_RELEASE_BASE}/latest/manifest.${AIRY_CHANNEL}.json"
     fi
     if [ -n "$AIRY_FROM_FILE" ]; then
         install_binary "$AIRY_FROM_FILE"; _bin_rc=$?
