@@ -45,23 +45,16 @@ One command, no compilation required. The installer detects the platform,
 downloads the matching prebuilt package, and verifies it:
 
 ```bash
-curl -fsSL "https://api.atomgit.com/api/v5/repos/openairymax/agentrt/contents/scripts/install.sh?ref=main" \
-  | python3 -c 'import json,sys,base64;sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["content"]))' \
-  | bash
-```
-
-This entry reads the installer straight from the `main` branch and is therefore
-always current. If `python3` is not available, use the script attached to the
-latest release instead:
-
-```bash
 curl -fsSL https://atomgit.com/openairymax/agentrt/releases/download/latest/install.sh | bash
 ```
 
+The script is shipped with each release. When the downloaded script is saved
+to a file and executed from disk, the installer self-updates to the newest
+version.
+
 Note: pipe into `bash`, not `sh` — `sh` (dash) does not forward positional
 arguments, so `--prefix`, `--channel` and similar flags would be silently
-dropped. When an attached script is saved to disk and executed there, the
-installer self-updates to the newest version.
+dropped.
 
 ### Windows
 
