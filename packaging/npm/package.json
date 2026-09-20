@@ -1,0 +1,28 @@
+{
+  "name": "@openairymax/agentrt",
+  "version": "0.0.0",
+  "description": "AirymaxRT 安装通道薄壳：抓取 release 附件安装器并转交执行，包内零安装逻辑",
+  "license": "AGPL-3.0-or-later OR Apache-2.0",
+  "bin": {
+    "airymaxrt": "bin/airymaxrt.js"
+  },
+  "files": [
+    "bin/airymaxrt.js"
+  ],
+  "os": [
+    "linux",
+    "darwin",
+    "win32"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://atomgit.com/openairymax/agentrt.git",
+    "directory": "packaging/npm"
+  }
+}
