@@ -567,7 +567,7 @@ fi
 
 section "L" "R-5 provider 默认超时 < 网关 LLM 转发背压（连不上网络：精确诊断先于网关返回）"
 
-PROVIDER_C="$ROOT/daemons/llm_d/src/providers/provider.c"
+PROVIDER_C="$ROOT/daemons/llm_d/src/providers/core/provider.c"
 LLM_METHODS="$ROOT/daemons/llm_d/src/llm_daemon_methods.c"
 GW_INTERNAL="$ROOT/gateway/src/biz/gateway_biz_internal.h"
 
