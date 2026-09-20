@@ -23,6 +23,10 @@ if [ -n "${AIRY_HOME:-}" ] && [ ! -d "${AIRY_HOME}" ]; then
 fi
 AIRY_HOME="${AIRY_HOME:-$HOME/.airymaxrt}"
 export AIRY_HOME
+# §12.12 唯一事实源：安装/更新面只读 release 附件（releases/download），
+# 禁止经由仓库 API 直读分支文件作为第二事实源。
+AIRY_RELEASE_OWNER="${AIRY_RELEASE_OWNER:-openairymax/agentrt}"
+AIRY_RELEASE_BASE="${AIRY_RELEASE_BASE:-https://atomgit.com/${AIRY_RELEASE_OWNER}/releases/download}"
 RUNTIME_DIR="${AIRY_HOME}/run"
 GATEWAY_PORT="${AIRY_GATEWAY_PORT:-8080}"
 GATEWAY_URL="http://127.0.0.1:${GATEWAY_PORT}"
@@ -254,30 +258,20 @@ boot_line() {
 }
 
 diag_daemons() {
-    local spec name sock critical="" degraded=""
-    for spec in "${WAIT_SOCKS[@]}"; do
-        name="${spec%%|*}"; sock="${spec#*|}"
-        case "$name" in
-            llm_d|think_d|agent_d|tool_d)
-                critical="${critical:+$critical }$name"
-                ;;
-            *)
-                degraded="${degraded:+$degraded }$name"
-                ;;
-        esac
+    # 诊断声明 CORE 中未就绪者（supervisor spawn 失败或仍在退避）
+    local n left="" _lines
+    for n in ${CORE_LIST:-}; do
+        [ "$n" = "gateway_d" ] && continue
+        _sock_alive "$RUNTIME_DIR/${n%_d}.sock" && continue
+        left="${left:+$left }$n"
     done
-    if [ -n "$degraded" ]; then
-        log warn "能力 daemon 未就绪（界面可用，能力受限）: ${degraded}；日志: $AIRY_HOME/logs/*.out"
-    fi
-    if [ -n "$critical" ]; then
-        log error "关键 daemon 未就绪: ${critical}（对话/认知/执行链路必需）"
-        local _lines _l
-        for name in $critical; do
-            _lines="$(tail -n 3 "$AIRY_HOME/logs/${name}.out" 2>/dev/null | grep -v 'nohup: ignoring input' | tr '\n' ' ' | sed 's/  */ /g')" || true
-            [ -n "$_lines" ] && log error "  ${name}: ${_lines}"
-        done
-        log error "处理: 'airymaxrt doctor' 检查组件，或删除 $RUNTIME_DIR 残留 socket 后重试"
-    fi
+    [ -n "$left" ] || return 0
+    log error "关键 daemon 未就绪: ${left}（对话/认知/执行链路必需）"
+    for n in $left; do
+        _lines="$(tail -n 3 "$AIRY_HOME/logs/${n}.out" 2>/dev/null | grep -v 'nohup: ignoring input' | tr '\n' ' ' | sed 's/  */ /g')" || true
+        [ -n "$_lines" ] && log error "  ${n}: ${_lines}"
+    done
+    log error "处理: 'airymaxrt doctor' 检查组件，或 'airymaxrt stop' 收摊后重试"
 }
 
 log debug "==== airymaxrt 启动 ===="
@@ -372,10 +366,48 @@ THINK_BIN="$(find_tool AIRY_THINK_BIN think_d \
     "$AIRYRT_HOME/agentrt/build/bin/think_d" \
     "$AIRYRT_HOME/build/bin/think_d")"
 
+AGENT_BIN="$(find_tool AIRY_AGENT_BIN agent_d \
+    "$AIRY_HOME/bin/agent_d" \
+    "$AIRYRT_HOME/agentrt/build/bin/agent_d" \
+    "$AIRYRT_HOME/build/bin/agent_d")"
+
+TOOL_BIN="$(find_tool AIRY_TOOL_BIN tool_d \
+    "$AIRY_HOME/bin/tool_d" \
+    "$AIRYRT_HOME/agentrt/build/bin/tool_d" \
+    "$AIRYRT_HOME/build/bin/tool_d")"
+
+SUPERVISOR_BIN="$(find_tool AIRY_SUPERVISOR_BIN supervisor_d \
+    "$AIRY_HOME/bin/supervisor_d" \
+    "$AIRYRT_HOME/agentrt/build/bin/supervisor_d" \
+    "$AIRYRT_HOME/build/bin/supervisor_d")"
+
+# B13 V13.4：supervisor 声明调谐的 AUX 全集（与 decl.c 内置缺省一致）
+SUPERV_AUX_ALL="hook_d monit_d sched_d channel_d market_d cupolas_d mem_d a2a_d notify_d"
+
+sup_bin_link() {
+    # supervisor 仅认 $AIRY_HOME/bin/<name>（launch 声明只记名字）：
+    # 开发态构建产物以符号链接归位，安装态真实文件不受影响
+    local bin="$1" dst
+    [ -x "$bin" ] || return 0
+    dst="$AIRY_HOME/bin/${bin##*/}"
+    [ -e "$dst" ] && [ ! -L "$dst" ] && return 0
+    [ "$(readlink "$dst" 2>/dev/null)" = "$bin" ] && return 0
+    mkdir -p "$AIRY_HOME/bin" 2>/dev/null || true
+    ln -sfn "$bin" "$dst" 2>/dev/null || true
+}
+
+sup_bin_link "$SUPERVISOR_BIN"
+sup_bin_link "$GATEWAY_BIN"
+sup_bin_link "$LLM_BIN"
+sup_bin_link "$THINK_BIN"
+sup_bin_link "$AGENT_BIN"
+sup_bin_link "$TOOL_BIN"
+
 log debug "组件定位结果: CLI_BIN=${CLI_BIN:-（缺失）}"
 log debug "组件定位结果: GATEWAY_BIN=${GATEWAY_BIN:-（缺失）}"
 log debug "组件定位结果: LLM_BIN=${LLM_BIN:-（缺失）}"
 log debug "组件定位结果: THINK_BIN=${THINK_BIN:-（缺失）}"
+log debug "组件定位结果: SUPERVISOR_BIN=${SUPERVISOR_BIN:-（缺失）}"
 
 wait_for_health() {
     local url="$1" tries="$2" i
@@ -407,39 +439,60 @@ _sock_alive() {
     fi
 }
 
-_ensure_daemon() {
-    local bin="$1" sock="$2" bname
-    [ -x "$bin" ] || return 0
-    bname="${bin##*/}"
-    if _sock_alive "$sock"; then
-        log debug "补齐跳过: $bname 已在运行（${sock}）"
-        return 0
-    fi
-    if [ -S "$sock" ]; then
-        log warn "$bname stale socket（无监听），移除后补齐: $sock"
-        rm -f "$sock"
-    fi
-    nohup "$bin" >"$AIRY_HOME/logs/${bname}.out" 2>&1 &
-    log info "补齐 daemon: ${bname}（PID=$!），日志: $AIRY_HOME/logs/${bname}.out"
-}
-
 ensure_aux_daemons() {
-    _ensure_daemon "$(find_tool AIRY_HOOK_BIN hook_d "$AIRY_HOME/bin/hook_d" "$AIRYRT_HOME/agentrt/build/bin/hook_d" "$AIRYRT_HOME/build/bin/hook_d")" "$RUNTIME_DIR/hook.sock"
-    _ensure_daemon "$(find_tool AIRY_MONIT_BIN monit_d "$AIRY_HOME/bin/monit_d" "$AIRYRT_HOME/agentrt/build/bin/monit_d" "$AIRYRT_HOME/build/bin/monit_d")" "$RUNTIME_DIR/monit.sock"
-    _ensure_daemon "$(find_tool AIRY_SCHED_BIN sched_d "$AIRY_HOME/bin/sched_d" "$AIRYRT_HOME/agentrt/build/bin/sched_d" "$AIRYRT_HOME/build/bin/sched_d")" "$RUNTIME_DIR/sched.sock"
-    _ensure_daemon "$(find_tool AIRY_CHANNEL_BIN channel_d "$AIRY_HOME/bin/channel_d" "$AIRYRT_HOME/agentrt/build/bin/channel_d" "$AIRYRT_HOME/build/bin/channel_d")" "$RUNTIME_DIR/channel.sock"
-    _ensure_daemon "$(find_tool AIRY_MARKET_BIN market_d "$AIRY_HOME/bin/market_d" "$AIRYRT_HOME/agentrt/build/bin/market_d" "$AIRYRT_HOME/build/bin/market_d")" "$RUNTIME_DIR/market.sock"
-    _ensure_daemon "$(find_tool AIRY_CUPOLAS_BIN cupolas_d "$AIRY_HOME/bin/cupolas_d" "$AIRYRT_HOME/agentrt/build/bin/cupolas_d" "$AIRYRT_HOME/build/bin/cupolas_d")" "$RUNTIME_DIR/cupolas.sock"
-    _ensure_daemon "$(find_tool AIRY_MEM_BIN mem_d "$AIRY_HOME/bin/mem_d" "$AIRYRT_HOME/agentrt/build/bin/mem_d" "$AIRYRT_HOME/build/bin/mem_d")" "$RUNTIME_DIR/mem.sock"
-    _ensure_daemon "$(find_tool AIRY_A2A_BIN a2a_d "$AIRY_HOME/bin/a2a_d" "$AIRYRT_HOME/agentrt/build/bin/a2a_d" "$AIRYRT_HOME/build/bin/a2a_d")" "$RUNTIME_DIR/a2a.sock"
-    _ensure_daemon "$(find_tool AIRY_NOTIFY_BIN notify_d "$AIRY_HOME/bin/notify_d" "$AIRYRT_HOME/agentrt/build/bin/notify_d" "$AIRYRT_HOME/build/bin/notify_d")" "$RUNTIME_DIR/notify.sock"
+    # B13 V13.4：aux 按需激活唯一路径 = supervisor.activate 单向请求
+    #（sock 预检：外部已在线实例不受监管，跳过避免 spawn 冲突）
+    local d fail=0
+    for d in $SUPERV_AUX_ALL; do
+        _sock_alive "$RUNTIME_DIR/${d%_d}.sock" && continue
+        if ! _sup_activate "$d"; then
+            fail=$((fail + 1))
+            log warn "$d 激活失败（supervisor 拒绝或控制口不可达）"
+        fi
+    done
+    [ "$fail" -gt 0 ] && return 1
+    return 0
 }
 
 write_profile_state() {
-    mkdir -p "$AIRY_HOME/config"
-    printf 'AIRY_PROFILE=%s\n' "$1" >"$PROFILE_ENV"
-    chmod 600 "$PROFILE_ENV" 2>/dev/null || true
+    # upsert 而非整文件覆盖：profile.env 同时承载 B13 launch 声明段
+    upsert_profile_var AIRY_PROFILE "$1"
     log info "运行画像已持久化: ${PROFILE_ENV}（AIRY_PROFILE=$1）"
+}
+
+# ---- B13 supervisor 控制面（V13.4：daemon 拉起/收摊唯一路径） ----
+_sup_activate() {
+    # 退出码仅反映传输成败：未登记/spawn 失败须检查响应体 error 字段
+    local r
+    [ -x "${SUPERVISOR_BIN:-}" ] || return 1
+    r="$("$SUPERVISOR_BIN" activate "$1" 2>/dev/null)" || return 1
+    case "$r" in *'"error"'*) return 1 ;; esac
+    return 0
+}
+
+_sup_stop_wait() {
+    # 收摊归一：supervisor.shutdown + 宽限轮询（supervisor 退出自清 sock/pid）
+    _sock_alive "$RUNTIME_DIR/supervisor.sock" || return 0
+    if [ -x "${SUPERVISOR_BIN:-}" ]; then
+        "$SUPERVISOR_BIN" stop >/dev/null 2>&1
+    fi
+    local deadline=$((SECONDS + 12))
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        _sock_alive "$RUNTIME_DIR/supervisor.sock" || return 0
+        sleep 0.5
+    done
+    return 1
+}
+
+# launch 声明写入画像（期望态 SSoT；supervisor 启动时只读装载）：
+# CORE 由调用方传入（剔除已在线复用项），AUX 恒为全集（运行态由
+# activate 决定），llm_d 运行参数经 ARGS 声明注入。
+launch_decl_sync() {
+    upsert_profile_var AIRYRT_LAUNCH_CORE "$1"
+    upsert_profile_var AIRYRT_LAUNCH_AUX "$SUPERV_AUX_ALL"
+    if [ -n "${LLM_BIN:-}" ] && [ -f "$MODEL_CONFIG" ]; then
+        upsert_profile_var AIRYRT_LAUNCH_ARGS_llm_d "--manager $MODEL_CONFIG"
+    fi
 }
 
 upsert_profile_var() {
@@ -584,95 +637,41 @@ runtime_platform() {
 
 manifest_get() {
     local f="$1" mode="$2"
-    if command -v python3 >/dev/null 2>&1; then
-        python3 - "$f" "$mode" <<'PYEOF'
-import json, sys
-try:
-    m = json.load(open(sys.argv[1]))
-except Exception:
-    sys.exit(1)
-mode = sys.argv[2]
-if mode == "latest":
-    print(m.get("latest", ""))
-elif mode == "state":
-    print(m.get("state", "active"))
-elif mode.startswith("artifact:"):
-    plat = mode.split(":", 1)[1]
-    rel = m.get("releases", {}).get(m.get("latest", ""), {})
-    art = rel.get("artifacts", {}).get(plat, {})
-    print(art.get("url", ""))
-    print(art.get("sha256", ""))
-    print(art.get("size", ""))
-PYEOF
-        return 0
-    fi
     case "$mode" in
         latest) sed -n 's/.*"latest"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$f" | head -1 ;;
         state)  sed -n 's/.*"state"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$f" | head -1 ;;
-        artifact:*) : ;;
     esac
 }
 
-fetch_repo_file() {
-    local api="https://api.atomgit.com/api/v5/repos/${AIRY_RELEASE_OWNER:-openairymax/agentrt}/contents/$1?ref=main"
-    local tmp="$AIRY_HOME/tmp/contents.$$"
-    mkdir -p "$(dirname "$tmp")" 2>/dev/null
-    syscurl -fsSL --max-time 60 -o "$tmp" "$api" || { rm -f "$tmp"; return 1; }
+# 制品字段按平台键作用域提取：python3 可用时精确解析，缺失时在平台块内 sed 取值，
+# 保证更新通道不依赖本地 python3（V12.1）。
+manifest_field() {
+    local f="$1" plat="$2" field="$3"
     if command -v python3 >/dev/null 2>&1; then
-        python3 -c 'import json,sys,base64; sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin).get("content","").replace("\n","")))' < "$tmp" > "$2" || { rm -f "$tmp"; return 1; }
-    else
-        sed -n 's/.*"content"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$tmp" | tr -d '\n' > "${tmp}.b64"
-        if base64 -d < "${tmp}.b64" > "$2" 2>/dev/null \
-           || base64 -D < "${tmp}.b64" > "$2" 2>/dev/null \
-           || openssl base64 -d -A < "${tmp}.b64" > "$2" 2>/dev/null; then
-            rm -f "${tmp}.b64"
-        else
-            rm -f "$tmp" "${tmp}.b64"
-            return 1
-        fi
-    fi
-    rm -f "$tmp"
-    [ -s "$2" ]
-}
-
-detect_pending_release() {
-    local base="$1" ch="${CHANNEL:-stable}" tmp tags
-    command -v python3 >/dev/null 2>&1 || return 0
-    tmp="$AIRY_HOME/tmp/releases.$$"
-    mkdir -p "$(dirname "$tmp")" 2>/dev/null
-    syscurl -fsSL --max-time 30 -o "$tmp" \
-        "https://api.atomgit.com/api/v5/repos/${AIRY_RELEASE_OWNER:-openairymax/agentrt}/releases?per_page=100" \
-        2>/dev/null || { rm -f "$tmp"; return 0; }
-    tags="$(python3 - "$tmp" <<'PYEOF'
+        python3 - "$f" "$plat" "$field" <<'PYEOF'
 import json, sys
 try:
-    data = json.load(open(sys.argv[1]))
+    m = json.load(open(sys.argv[1]))
+    rel = m.get("releases", {}).get(m.get("latest", ""), {})
+    print(rel.get("artifacts", {}).get(sys.argv[2], {}).get(sys.argv[3], ""))
 except Exception:
-    sys.exit(0)
-if not isinstance(data, list):
-    sys.exit(0)
-for r in data:
-    if isinstance(r, dict) and r.get("tag_name"):
-        print(r["tag_name"])
+    pass
 PYEOF
-)" || { rm -f "$tmp"; return 0; }
-    rm -f "$tmp"
-    local n; n="$(printf '%s\n' "$tags" | grep -c '[^[:space:]]' 2>/dev/null)"; n="${n:-0}"
-    [ "$n" -ge 100 ] && return 0
-    local t peak=""
-    while IFS= read -r t; do
-        [ -n "$t" ] || continue
-        case "$ch" in
-            rc)   case "$t" in *-rc*) ;; *) continue ;; esac ;;
-            beta) case "$t" in *-beta*) ;; *) continue ;; esac ;;
-            *)    case "$t" in *-rc*|*-beta*) continue ;; esac ;;
-        esac
-        if [ -z "$peak" ] || [ "$(ver_cmp "$peak" "$t")" = "-1" ]; then peak="$t"; fi
-    done <<EOF
-$tags
-EOF
-    [ -n "$peak" ] || return 0
-    [ "$(ver_cmp "$base" "$peak")" = "-1" ] && printf '%s\n' "$peak"
+        return 0
+    fi
+    sed -n "/\"$plat\"[[:space:]]*:[[:space:]]*{/,/^[[:space:]]*}/{
+        s/.*\"$field\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p
+        s/.*\"$field\"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p
+    }" "$f" | head -1
+}
+
+fetch_release_asset() {
+    local tag="${3:-latest}" tmp
+    tmp="${AIRY_HOME}/tmp/asset.$$"
+    mkdir -p "$(dirname "$tmp")" 2>/dev/null
+    syscurl -fsSL --max-time 60 -o "$tmp" "${AIRY_RELEASE_BASE}/${tag}/${1}" || { rm -f "$tmp"; return 1; }
+    mv -f "$tmp" "$2" || { rm -f "$tmp"; return 1; }
+    [ -s "$2" ]
 }
 
 verify_gpg_sig() {
@@ -683,7 +682,7 @@ verify_gpg_sig() {
     chmod 700 "$GNUPG"
     local KEYF="$GNUPG/agentrt.asc"
     if [ -z "${AIRY_NO_NETWORK:-}" ]; then
-        fetch_repo_file "latest/keys/agentrt.asc" "$KEYF" >/dev/null 2>&1 || true
+        fetch_release_asset "agentrt.asc" "$KEYF" >/dev/null 2>&1 || true
     fi
     if [ ! -s "$KEYF" ] && [ -f "$AIRY_HOME/keys/agentrt.asc" ]; then
         cp -f "$AIRY_HOME/keys/agentrt.asc" "$KEYF" 2>/dev/null || true
@@ -1034,7 +1033,17 @@ apply_package() {
 }
 
 stop_running_daemons() {
+    # B13 收摊归一：daemon 群生命周期归 supervisor_d，先走 shutdown；
+    # pkill 循环仅兜底清理旧版（B13 前直拉起）残留实例
     local found=0 d n p exe
+    if _sock_alive "$RUNTIME_DIR/supervisor.sock"; then
+        if _sup_stop_wait; then
+            found=1
+            log info "supervisor 已收摊（daemon 群随之退出）"
+        else
+            log warn "supervisor 未能优雅退出，转兜底清理"
+        fi
+    fi
     for d in "$AIRY_HOME"/bin/*_d; do
         [ -f "$d" ] || continue
         d="${d##*/}"
@@ -1125,14 +1134,14 @@ airymaxrt_update() {
     local TMPD="$AIRY_HOME/tmp/update.$$"
     rm -rf "$TMPD"; mkdir -p "$TMPD"
     log info "检查更新（通道: ${CHANNEL}，当前: ${cur_ver:-<未安装>}）…"
-    fetch_repo_file "latest/manifest.${CHANNEL}.json" "$TMPD/manifest.json" \
+    fetch_release_asset "manifest.${CHANNEL}.json" "$TMPD/manifest.json" \
         || {
-            log error "manifest 拉取失败：latest/manifest.${CHANNEL}.json"
+            log error "manifest 拉取失败：${AIRY_RELEASE_BASE}/latest/manifest.${CHANNEL}.json"
             log error "可能是网络/服务异常；也可能该通道暂无制品——当前可用：stable（生产）/ rc（候选），beta 为保留通道"
             log error "切换通道：airymaxrt update --channel stable"
             rm -rf "$TMPD"; return 1
         }
-    fetch_repo_file "latest/manifest.${CHANNEL}.json.asc" "$TMPD/manifest.json.asc" >/dev/null 2>&1 || true
+    fetch_release_asset "manifest.${CHANNEL}.json.asc" "$TMPD/manifest.json.asc" >/dev/null 2>&1 || true
     verify_gpg_sig "$TMPD/manifest.json" "$TMPD/manifest.json.asc" || { log error "manifest 验签失败（GPG），拒绝更新"; rm -rf "$TMPD"; return 1; }
     log info "manifest 验签通过（GPG）"
     if [ "$(manifest_get "$TMPD/manifest.json" state)" = "reserved" ]; then
@@ -1153,34 +1162,21 @@ airymaxrt_update() {
     fi
     local plat="$(runtime_platform)"
     local art_url art_sha art_size=""
-    if command -v python3 >/dev/null 2>&1; then
-        art_url="$(manifest_get "$TMPD/manifest.json" "artifact:${plat}" | sed -n 1p)"
-        art_sha="$(manifest_get "$TMPD/manifest.json" "artifact:${plat}" | sed -n 2p)"
-        art_size="$(manifest_get "$TMPD/manifest.json" "artifact:${plat}" | sed -n 3p)"
-        if [ -z "$art_url" ] && [ -z "$art_sha" ]; then
-            for legacy in $(plat_legacy_name "$plat"); do
-                [ -n "$legacy" ] || continue
-                art_url="$(manifest_get "$TMPD/manifest.json" "artifact:${legacy}" | sed -n 1p)"
-                art_sha="$(manifest_get "$TMPD/manifest.json" "artifact:${legacy}" | sed -n 2p)"
-                art_size="$(manifest_get "$TMPD/manifest.json" "artifact:${legacy}" | sed -n 3p)"
-                { [ -n "$art_url" ] || [ -n "$art_sha" ]; } && { log warn "平台键 ${plat} 未命中，已用兼容命名 ${legacy}"; break; }
-            done
-        fi
-    elif [ "$cmp" != "1" ]; then
-        log error "当前环境缺 python3，无法安全解析远程 manifest 制品字段"
-        log error "请安装 python3 后重试；或使用离线包更新："
-        log error "  airymaxrt update --file <tarball> --sha256 <hash>"
-        rm -rf "$TMPD"; return 1
+    art_url="$(manifest_field "$TMPD/manifest.json" "$plat" url)"
+    art_sha="$(manifest_field "$TMPD/manifest.json" "$plat" sha256)"
+    art_size="$(manifest_field "$TMPD/manifest.json" "$plat" size)"
+    if [ -z "$art_url" ] && [ -z "$art_sha" ]; then
+        for legacy in $(plat_legacy_name "$plat"); do
+            [ -n "$legacy" ] || continue
+            art_url="$(manifest_field "$TMPD/manifest.json" "$legacy" url)"
+            art_sha="$(manifest_field "$TMPD/manifest.json" "$legacy" sha256)"
+            art_size="$(manifest_field "$TMPD/manifest.json" "$legacy" size)"
+            { [ -n "$art_url" ] || [ -n "$art_sha" ]; } && { log warn "平台键 ${plat} 未命中，已用兼容命名 ${legacy}"; break; }
+        done
     fi
     if [ "$cmp" = "0" ]; then
         if [ -z "$art_sha" ] || [ "$art_sha" = "${cur_sha:-}" ]; then
-            local pending; pending="$(detect_pending_release "$latest")"
-            if [ -n "$pending" ]; then
-                log warn "检测到更高版本 ${pending} 已发布，但通道 ${CHANNEL} 的 manifest 指针尚未更新"
-                log warn "（发布流水线先公开 Release、上传全部制品后才翻转指针，窗口通常为数十分钟）"
-                log warn "请稍后重试；或查看发布页: https://atomgit.com/${AIRY_RELEASE_OWNER:-openairymax/agentrt}/releases"
-            fi
-            log info "已是最新: ${cur_ver:-<未安装>}（最新 ${latest}）"
+            log info "已是最新: ${cur_ver:-<未安装>}（最新 ${latest}，发布面 manifest 为唯一事实源）"
             rm -rf "$TMPD"; return 0
         fi
         log info "同版本制品变更: ${cur_ver:-<未安装>}（sha256 与已装记录不同，按修复重发更新）"
@@ -1231,9 +1227,9 @@ ensure_installer() {
     fi
     local fetched="$AIRY_HOME/tmp/install.$$.sh"
     mkdir -p "$AIRY_HOME/tmp" 2>/dev/null || true
-    if fetch_repo_file "scripts/install.sh" "$fetched"; then
+    if fetch_release_asset "install.sh" "$fetched"; then
         chmod 755 "$fetched"
-        log warn "${act}: 本机安装器缺失，已从官方仓在线拉取兜底: $fetched"
+        log warn "${act}: 本机安装器缺失，已从发布面附件在线拉取兜底: $fetched"
         printf '%s\n' "$fetched"
         return 0
     fi
@@ -1253,6 +1249,7 @@ case "$CMD" in
         echo "      airymaxrt monitor   硬件监控：检测到能力增强自动恢复功能"
         echo "                        （monitor --daemon 后台常驻 / --stop 停止）"
         echo "      airymaxrt status      查看运行时状态"
+        echo "      airymaxrt stop        收摊 daemon 群（supervisor.shutdown 唯一收摊入口）"
         echo "      airymaxrt doctor      组件健康检查"
         echo "      airymaxrt logs [N]    查看最近日志（默认 airymaxrt.log 末 50 行；"
         echo "                            logs <name> 看指定 daemon，如 logs llm_d）"
@@ -1271,6 +1268,16 @@ case "$CMD" in
         FRONTEND_TUI=0
         shift
         CLI_ARGS=("$@")
+        ;;
+    stop)
+        # B13 收摊归一唯一入口：supervisor.shutdown（daemon 群随之退出）
+        if _sup_stop_wait; then
+            log ok "运行时已收摊（daemon 群随 supervisor 退出）"
+        else
+            log warn "supervisor 超时未退出（可 'pkill supervisor_d' 兜底）"
+            exit 1
+        fi
+        exit 0
         ;;
     -*)
         CLI_ARGS=("$@")
@@ -1665,64 +1672,15 @@ fi
 log info "确保守护进程群就绪…"
 boot_line "正在启动守护进程群…"
 
-DAEMONS_STARTED=0
-ALL_DAEMON_PIDS=()
-GATEWAY_PID=""
 TUI_PID=""
 
-_stop_all() {
-    local pids=("$@") i j remaining deadline
-    [ "${#pids[@]}" -eq 0 ] && return 0
-    log debug "并行停止 ${#pids[@]} 个进程：发送 TERM"
-    for i in "${!pids[@]}"; do
-        if kill -0 "${pids[$i]}" 2>/dev/null; then
-            kill "${pids[$i]}" 2>/dev/null || true
-        else
-            pids[$i]=""   # 已退出，标记跳过
-        fi
-    done
-    deadline=$((SECONDS + 15))
-    remaining="${#pids[@]}"
-    while [ "$remaining" -gt 0 ] && [ "$SECONDS" -lt "$deadline" ]; do
-        remaining=0
-        for j in "${!pids[@]}"; do
-            [ -n "${pids[$j]}" ] || continue
-            if ! kill -0 "${pids[$j]}" 2>/dev/null; then
-                log info "已停止进程（PID=${pids[$j]}）"
-                pids[$j]=""
-            else
-                remaining=$((remaining + 1))
-            fi
-        done
-        [ "$remaining" -gt 0 ] && sleep 0.5
-    done
-    for j in "${!pids[@]}"; do
-        if [ -n "${pids[$j]}" ] && kill -0 "${pids[$j]}" 2>/dev/null; then
-            log warn "进程（PID=${pids[$j]}）未响应 TERM，强制 KILL"
-            kill -9 "${pids[$j]}" 2>/dev/null || true
-        fi
-    done
-}
-
 cleanup() {
-    if [ "$DAEMONS_STARTED" != "1" ] && [ -z "$TUI_PID" ]; then
-        log debug "清理跳过：本次未拉起任何进程"
-        return 0
+    # B13 集群服务化（§12.13）：daemon 群生命周期归 supervisor_d 持有，
+    # 不随 TUI 会话退出收摊；收摊归一唯一入口为 'airymaxrt stop'
+    if [ -n "$TUI_PID" ] && kill -0 "$TUI_PID" 2>/dev/null; then
+        kill "$TUI_PID" 2>/dev/null || true
+        wait "$TUI_PID" 2>/dev/null || true
     fi
-    log debug "清理开始：停止本次拉起的 TUI 与守护进程"
-    local stop_pids=()
-    [ -n "$TUI_PID" ] && stop_pids+=("$TUI_PID")
-    [ -n "$GATEWAY_PID" ] && stop_pids+=("$GATEWAY_PID")
-    stop_pids+=("${ALL_DAEMON_PIDS[@]}")
-    _stop_all "${stop_pids[@]}"
-    wait 2>/dev/null || true
-    for sock in "${DAEMON_SOCKS[@]:-}"; do
-        if [ -n "$sock" ] && [ -S "$sock" ]; then
-            rm -f "$sock" 2>/dev/null
-            log debug "清理 stale socket: $sock"
-        fi
-    done
-    log debug "清理完成"
 }
 trap cleanup EXIT
 trap 'exit 143' TERM
@@ -1751,77 +1709,46 @@ else
                      \( -name 'agent_*.log' -o -name '*.out' -o -name '*.pid' \) \
                      ! -newermt "@$_CUTOFF" -print 2>/dev/null)
     fi
-    ALL_DAEMON_PIDS=()
-    DAEMONS_STARTED=1
-    REUSED_COUNT=0       # 复用已在线实例数（状态展示用，避免误导"0 个"）
-    declare -a WAIT_SOCKS=()   # 待等待 socket 规格：`名称|socket路径`
-    declare -a DAEMON_SOCKS=()
+    # B13 V13.4：daemon 群唯一拉起路径 = supervisor_d 声明驱动调谐；
+    # 本脚本仅写入期望态声明并拉起 supervisor 本身（唯一 nohup 例外）
+    SUPERV_SOCK="$RUNTIME_DIR/supervisor.sock"
+    CORE_LIST=""
+    REUSED_COUNT=0
+    SUPERV_REUSE=0
+    if _sock_alive "$SUPERV_SOCK"; then
+        SUPERV_REUSE=1
+        log info "supervisor 已在运行（复用 ${SUPERV_SOCK}），daemon 群由其接管"
+    fi
 
-    _launch_daemon() {
-        local bin="$1" sock="$2" bname
-        bname="${bin##*/}"
-        bname="${bname:-daemon}"
-        if [ ! -x "$bin" ]; then
-            log warn "$bname 未找到，跳过"
-            return 0
-        fi
-        if _sock_alive "$sock"; then
-            REUSED_COUNT=$((REUSED_COUNT + 1))
-            log info "$bname 已在运行（复用 ${sock}）"
-            return 0
-        fi
-        if [ -S "$sock" ]; then
-            log warn "$bname 检测到 stale socket（无监听），移除后重新拉起: $sock"
-            rm -f "$sock"
-        fi
-        nohup "$bin" >"$AIRY_HOME/logs/${bname}.out" 2>&1 &
-        ALL_DAEMON_PIDS+=("$!")
-        WAIT_SOCKS+=("$bname|$sock")
-        DAEMON_SOCKS+=("$sock")
-        log info "$bname 已拉起（PID=$!），日志: $AIRY_HOME/logs/${bname}.out"
+    sup_stale_sock_rm() {
+        # stale socket（无监听）清理：避免后续 spawn bind 失败
+        [ -S "$1" ] || return 0
+        _sock_alive "$1" && return 0
+        log warn "检测到 stale socket（无监听），移除: $1"
+        rm -f "$1"
     }
+    sup_stale_sock_rm "$SUPERV_SOCK"
 
-    if [ -x "$LLM_BIN" ]; then
-        if _sock_alive "$RUNTIME_DIR/llm.sock"; then
+    core_decl() {
+        # $1=名字 $2=bin $3=sock：在线复用剔除；二进制缺失告警不声明
+        sup_stale_sock_rm "$3"
+        if _sock_alive "$3"; then
             REUSED_COUNT=$((REUSED_COUNT + 1))
-            log info "llm_d 已在运行（复用 $RUNTIME_DIR/llm.sock）"
-        else
-            if [ -S "$RUNTIME_DIR/llm.sock" ]; then
-                log warn "llm_d 检测到 stale socket（无监听），移除后重新拉起: $RUNTIME_DIR/llm.sock"
-                rm -f "$RUNTIME_DIR/llm.sock"
-            fi
-            if [ -f "$MODEL_CONFIG" ]; then
-                log debug "llm_d 使用模型配置: $MODEL_CONFIG"
-                nohup "$LLM_BIN" --manager "$MODEL_CONFIG" >"$AIRY_HOME/logs/llm_d.out" 2>&1 &
-            else
-                log warn "模型配置不存在（${MODEL_CONFIG}），llm_d 使用默认配置"
-                nohup "$LLM_BIN" >"$AIRY_HOME/logs/llm_d.out" 2>&1 &
-            fi
-            ALL_DAEMON_PIDS+=("$!")
-            WAIT_SOCKS+=("llm_d|$RUNTIME_DIR/llm.sock")
-            DAEMON_SOCKS+=("$RUNTIME_DIR/llm.sock")
-            log info "llm_d 已拉起（PID=$!），日志: $AIRY_HOME/logs/llm_d.out"
+            log info "$1 已在运行（复用 $3）"
+            return 0
         fi
-    fi
-
-    if [ -n "$THINK_BIN" ]; then
-        _launch_daemon "$THINK_BIN" "$RUNTIME_DIR/think.sock"
-    else
-        log warn "think_d 未找到，双思考（GCCP+GRAD）不可用，gateway 将降级直连"
-    fi
-
-    _launch_daemon "$(find_tool AIRY_AGENT_BIN agent_d "$AIRY_HOME/bin/agent_d" "$AIRYRT_HOME/agentrt/build/bin/agent_d" "$AIRYRT_HOME/build/bin/agent_d")" "$RUNTIME_DIR/agent.sock"
-    _launch_daemon "$(find_tool AIRY_TOOL_BIN tool_d "$AIRY_HOME/bin/tool_d" "$AIRYRT_HOME/agentrt/build/bin/tool_d" "$AIRYRT_HOME/build/bin/tool_d")" "$RUNTIME_DIR/tool.sock"
-    for _d in "$AIRY_HOME"/bin/*_d; do
-        [ -f "$_d" ] || continue
-        _b="${_d##*/}"
-        case "$_b" in
-            gateway_d|llm_d|think_d|agent_d|tool_d) continue ;;
-        esac
-        [ "$AIRYRT_PROFILE" = "minimal" ] && continue
-        [ -x "$_d" ] || continue
-        _launch_daemon "$_d" "$RUNTIME_DIR/${_b%_d}.sock"
-    done
+        [ -z "$2" ] && return 1
+        CORE_LIST="$CORE_LIST $1"
+        return 0
+    }
+    core_decl llm_d "$LLM_BIN" "$RUNTIME_DIR/llm.sock" \
+        || log warn "llm_d 未找到，模型接入不可用"
+    core_decl think_d "$THINK_BIN" "$RUNTIME_DIR/think.sock" \
+        || log warn "think_d 未找到，双思考（GCCP+GRAD）不可用，gateway 将降级直连"
+    core_decl agent_d "$AGENT_BIN" "$RUNTIME_DIR/agent.sock" \
+        || log warn "agent_d 未找到"
+    core_decl tool_d "$TOOL_BIN" "$RUNTIME_DIR/tool.sock" \
+        || log warn "tool_d 未找到"
 
     _gw_port_available() {
         if command -v python3 >/dev/null 2>&1; then
@@ -1835,10 +1762,9 @@ else
             return 0
         fi
     }
-    GW_START="yes"   # 默认启动；gateway 已在线或探测到在线实例时置 no 复用
-    if [ "$GATEWAY_ALIVE" = "1" ]; then
-        GW_START="no"
-        log info "gateway 已在线（${GATEWAY_URL}），复用（生命周期不受本次会话管理）"
+    GW_REUSE="$GATEWAY_ALIVE"   # 复用判定：主端口健康或扫描到在线实例
+    if [ "$GW_REUSE" = "1" ]; then
+        log info "gateway 已在线（${GATEWAY_URL}），复用（生命周期归 supervisor/外部持有）"
     else
         for _p in "$GATEWAY_PORT" 8083 8084 8085 8086 8087 8088 8089 8090; do
             if _gw_port_available "$_p"; then
@@ -1855,60 +1781,80 @@ else
                     GATEWAY_PORT="$_p"
                     GATEWAY_URL="http://127.0.0.1:${GATEWAY_PORT}"
                 fi
-                GW_START="no"
+                GW_REUSE=1
                 break
             fi
         done
     fi
-    if [ "$GW_START" = "yes" ]; then
-        log debug "执行: nohup \"$GATEWAY_BIN\" -h 127.0.0.1 -p \"$GATEWAY_PORT\" > \"$AIRY_HOME/logs/gateway_d.out\" 2>&1 &"
-        nohup "$GATEWAY_BIN" -h 127.0.0.1 -p "$GATEWAY_PORT" >"$AIRY_HOME/logs/gateway_d.out" 2>&1 &
-        GATEWAY_PID=$!
-        log info "gateway_d 已拉起（PID=${GATEWAY_PID}），日志: $AIRY_HOME/logs/gateway_d.out"
+    if [ "$GW_REUSE" = "1" ]; then
+        REUSED_COUNT=$((REUSED_COUNT + 1))
+        log info "gateway_d 已在运行（复用 ${GATEWAY_URL}）"
+    elif [ -n "$GATEWAY_BIN" ]; then
+        CORE_LIST="$CORE_LIST gateway_d"
+        # gateway 运行参数经声明注入（supervisor spawn 时下发）
+        upsert_profile_var AIRYRT_LAUNCH_ARGS_gateway_d "-h 127.0.0.1 -p $GATEWAY_PORT"
     else
-        log info "gateway 复用在线实例（${GATEWAY_URL}），本次会话不接管其生命周期"
+        log warn "gateway_d 未找到，对话功能不可用（仅 CLI 降级可用）"
     fi
     mkdir -p "$RUNTIME_DIR" 2>/dev/null || true
     printf '%s\n' "$GATEWAY_PORT" > "$RUNTIME_DIR/gateway.port" 2>/dev/null || true
 
-    wait_all_socks() {
-        [ "${#WAIT_SOCKS[@]}" -eq 0 ] && return 0
-        local deadline=$((SECONDS + 10)) spec name sock
-        local remaining=() all_done
-        while [ "${#WAIT_SOCKS[@]}" -gt 0 ] && [ "$SECONDS" -lt "$deadline" ]; do
-            remaining=()
-            all_done=1
-            for spec in "${WAIT_SOCKS[@]}"; do
-                name="${spec%%|*}"; sock="${spec#*|}"
-                if _sock_alive "$sock"; then
-                    log info "$name 就绪（${sock}）"
-                else
-                    remaining+=("$spec")
-                    all_done=0
-                fi
-            done
-            WAIT_SOCKS=("${remaining[@]}")
-            [ "$all_done" = "1" ] && return 0
+    # 期望态声明写入画像（supervisor 启动时只读装载）
+    launch_decl_sync "$CORE_LIST"
+
+    if [ "$SUPERV_REUSE" != "1" ]; then
+        if [ -z "$SUPERVISOR_BIN" ]; then
+            log error "supervisor_d 未找到，daemon 群无法拉起（B13 拉起唯一路径为 supervisor_d）"
+            log error "构建 daemons：cd \"$AIRYRT_HOME/agentrt\" && cmake -B build && cmake --build build -j"
+            exit 1
+        fi
+        log debug "执行: nohup \"$SUPERVISOR_BIN\" > \"$AIRY_HOME/logs/supervisor_d.out\" 2>&1 &"
+        nohup "$SUPERVISOR_BIN" >"$AIRY_HOME/logs/supervisor_d.out" 2>&1 &
+        log info "supervisor_d 已拉起（PID=$!），日志: $AIRY_HOME/logs/supervisor_d.out"
+        _sup_deadline=$((SECONDS + 10))
+        until _sock_alive "$SUPERV_SOCK"; do
+            if [ "$SECONDS" -ge "$_sup_deadline" ]; then
+                log error "supervisor 控制口未就绪（${SUPERV_SOCK}），查看日志: $AIRY_HOME/logs/supervisor_d.out"
+                exit 1
+            fi
             sleep 0.25
         done
-        for spec in "${WAIT_SOCKS[@]}"; do
-            name="${spec%%|*}"
-            log warn "$name socket 未就绪，查看日志: $AIRY_HOME/logs/${name}.out"
+        log info "supervisor 控制口就绪（${SUPERV_SOCK}）"
+    fi
+
+    sup_wait_core() {
+        # 声明调谐等待：CORE spawn 完成（gateway 无 unix sock，HTTP 健康另行等待）
+        [ -z "$CORE_LIST" ] && return 0
+        local deadline=$((SECONDS + 15)) n left
+        while [ "$SECONDS" -lt "$deadline" ]; do
+            left=0
+            for n in $CORE_LIST; do
+                [ "$n" = "gateway_d" ] && continue
+                _sock_alive "$RUNTIME_DIR/${n%_d}.sock" || left=$((left + 1))
+            done
+            [ "$left" -eq 0 ] && return 0
+            sleep 0.25
         done
+        log warn "CORE daemon 未全部就绪（${left} 个待就绪）: ${CORE_LIST}"
         return 1
     }
-    WAIT_TOTAL="${#WAIT_SOCKS[@]}"   # 本次新拉起的 daemon 数（复用实例不在其中）
-    if wait_all_socks; then
-        if [ "$REUSED_COUNT" -gt 0 ] && [ "$WAIT_TOTAL" -gt 0 ]; then
-            boot_line "守护进程群就绪（复用 ${REUSED_COUNT} 个 + 新拉 ${WAIT_TOTAL} 个）"
-        elif [ "$REUSED_COUNT" -gt 0 ]; then
-            boot_line "守护进程群就绪（在线 ${REUSED_COUNT} 个全部复用）"
+    CORE_PENDING=0
+    sup_wait_core || CORE_PENDING=1
+
+    if [ "$AIRYRT_PROFILE" != "minimal" ]; then
+        ensure_aux_daemons \
+            || log warn "部分 aux daemon 激活失败（'airymaxrt doctor' 可复查）"
+    fi
+
+    if [ "$CORE_PENDING" = "0" ]; then
+        if [ "$REUSED_COUNT" -gt 0 ]; then
+            boot_line "守护进程群就绪（复用 ${REUSED_COUNT} 个 + 声明调谐完成）"
         else
-            boot_line "守护进程群就绪（${WAIT_TOTAL} 个）"
+            boot_line "守护进程群就绪（supervisor 声明调谐完成）"
         fi
     else
         diag_daemons
-        boot_line "守护进程群部分未就绪（未就绪 ${#WAIT_SOCKS[@]} 个，详见上方诊断）"
+        boot_line "守护进程群部分未就绪，详见上方诊断"
     fi
 
     if wait_for_health "$GATEWAY_URL" 15; then
