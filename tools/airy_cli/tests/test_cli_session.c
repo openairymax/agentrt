@@ -358,8 +358,8 @@ static void test_turn_split(void)
     CHECK(g_history_reasonings[1] == NULL, "split: absent reasoning stays NULL");
     CHECK(role_at(2, "user") && content_at(2, "第二个问题"), "split: order is oldest to newest");
     CHECK(role_at(3, "assistant") && content_at(3, "第二个回答"), "split: newest reply last");
-    CHECK(g_history_reasonings[3] && strcmp(g_history_reasonings[3], "第二段思考") == 0,
-          "split: reasoning carried with assistant");
+    /* 0.1.18 B4：旧记录中的 [reasoning] 段被剥离且不回灌（正文截断到分隔符）。 */
+    CHECK(g_history_reasonings[3] == NULL, "split: legacy reasoning stripped, not re-injected");
 }
 
 static void test_role_records(void)
@@ -378,8 +378,8 @@ static void test_role_records(void)
     CHECK(content_at(0, "用户侧记录") && role_at(0, "user"), "role: user record restored");
     CHECK(content_at(1, "助手侧记录") && role_at(1, "assistant"),
           "role: object-form metadata honoured");
-    CHECK(g_history_reasonings[1] && strcmp(g_history_reasonings[1], "思考X") == 0,
-          "role: reasoning from metadata kept");
+    /* 0.1.18 B4：metadata.reasoning 有意不读，恢复时不回灌思考链（§12.4 步 4）。 */
+    CHECK(g_history_reasonings[1] == NULL, "role: metadata reasoning not re-injected (B4)");
 }
 
 static void test_prefix_variants(void)

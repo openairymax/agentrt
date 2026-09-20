@@ -15,6 +15,7 @@
 #include "cli_tui.h"
 
 #include "airy_memory.h"
+#include "logger.h"
 
 extern int g_cli_print_mode;
 
@@ -437,6 +438,13 @@ void cli_render_markdown(const char *text, size_t indent)
 
 /* ---- tool invocation / result ---- */
 
+/* 0.1.18 B3（V3.4）：未登记工具标识符的用户面显示名。
+ *
+ * 内部工具标识符不得越过渲染边界进入用户面：白名单外一律显示本串并记日志，
+ * 禁止原样透传。与 TUI 侧 app/dispatch.rs::tool_action 同源同语义——同一份
+ * 白名单内容、同一个兜底串，两处渲染点收口口径一致。 */
+static const char CLI_TOOL_HIDDEN[] = "未知工具（已隐藏）";
+
 static const char *cli_tool_action(const char *name)
 {
     static const struct { const char *tool; const char *action; } map[] = {
@@ -448,11 +456,15 @@ static const char *cli_tool_action(const char *name)
         {"agent.invoke", "调用智能体"}, {"think.depth", "深度思考"},
         {"memory.get", "读取记忆"}, {"memory.put", "写入记忆"},
     };
+    if (!name || !name[0])
+        return CLI_TOOL_HIDDEN;
     for (size_t i = 0; i < sizeof(map) / sizeof(map[0]); i++) {
         if (strcmp(name, map[i].tool) == 0)
             return map[i].action;
     }
-    return name;
+    /* 只记长度、不记标识符本身：日志不应成为第二处泄漏面（与 TUI 侧一致）。 */
+    AIRY_LOG_WARN("airy_cli: 未登记工具标识符已按白名单隐藏 (len=%zu)", strlen(name));
+    return CLI_TOOL_HIDDEN;
 }
 
 void cli_render_tool_use(const char *name, const char *args)

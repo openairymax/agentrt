@@ -346,7 +346,7 @@ void cli_render_collapsed(const char *text, size_t indent, size_t max_lines, int
 
     if (total > shown) {
         char trailer[96];
-        snprintf(trailer, sizeof(trailer), "└ … %zu more lines (full text in logs)",
+        snprintf(trailer, sizeof(trailer), "└ … %zu more lines (collapsed)",
                  total - shown);
         const char *g = cli_gutter(indent);
         cli_out(g);

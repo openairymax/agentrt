@@ -15,7 +15,8 @@
  * 记忆注入（cli_chat_mem_inject_system）：检索相关历史记忆拼成 system
  * 追加段（最多 3 条、每条截断 200 字符），随本轮消息发送给模型。
  * 记忆写回（cli_chat_mem_record）：一轮对话完成且有回复时落盘（用户输入
- * + 回复 + 思考链），供下轮/下次会话检索注入。
+ * + 回复，只记事实）。0.1.18 B4：思考链不写入共享长期记忆——该库为 CLI
+ * 与 TUI 共用，写入即等于经 system 段回灌到后续所有会话。
  */
 
 #include "cli_internal.h"
@@ -225,8 +226,10 @@ void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t out_siz
     airy_memory_result_free(res);
 }
 
-/* gateway 统一记忆写回（mem_d；失败回退 L1）。 */
-static int cli_chat_mem_record_gw(const char *input, const char *reply, const char *reasoning)
+/* gateway 统一记忆写回（mem_d；失败回退 L1）。0.1.18 B4：只写用户输入与
+ * 回复——思考链不得进入共享长期记忆（§12.4 步 3），否则下轮检索注入会把
+ * 模型内部推导当事实回灌。 */
+static int cli_chat_mem_record_gw(const char *input, const char *reply)
 {
     if (!input || !input[0] || !reply || !reply[0])
         return -1;
@@ -238,11 +241,6 @@ static int cli_chat_mem_record_gw(const char *input, const char *reply, const ch
     int n = snprintf(content, sizeof(content), "用户: %s\nAgentRT: %s", input, reply);
     if (n <= 0)
         return -1;
-    if (reasoning && reasoning[0]) {
-        int rn = snprintf(content + n, (size_t)(sizeof(content) - n), "\n[reasoning] %s", reasoning);
-        if (rn > 0)
-            n += (rn < (int)(sizeof(content) - n - 1)) ? rn : (int)(sizeof(content) - n - 1);
-    }
     /* UTF-8 边界回退：1600 是字节数，直接截断会切坏多字节序列。 */
     n = (int)cli_utf8_safe_len(content, 1600);
     content[n] = '\0';
@@ -269,16 +267,17 @@ static int cli_chat_mem_record_gw(const char *input, const char *reply, const ch
 }
 
 /* 一轮对话完成后写入记忆：用户输入 + 回复（截断防噪声，只记事实）。
- * 2.1.1.6 修订：携带思考链（reasoning）——记忆检索按 content 匹配，
- * 拼接进记录后思考 token 可被下轮/下次会话召回，不再"只存档不可用"）。
+ * 2.1.1.6 曾携带思考链（reasoning）以便被检索召回；0.1.18 B4 撤销该设计：
+ * 共享记忆是 CLI 与 TUI 的共同事实来源，模型内部推导不属于事实，写入后
+ * 还会经 system 段在后续会话持续回灌。诊断留存走 airy_reasoning.log。
  * 统一经 gateway（mem_d）写回；gateway 不可用时
  * 回退进程内 L1 记忆引擎（离线/单机降级）。 */
-void cli_chat_mem_record(const char *input, const char *reply, const char *reasoning)
+void cli_chat_mem_record(const char *input, const char *reply)
 {
     if (!input || !input[0] || !reply || !reply[0])
         return;
 
-    if (cli_chat_mem_record_gw(input, reply, reasoning) == 0)
+    if (cli_chat_mem_record_gw(input, reply) == 0)
         return;
 
     /* ── 回退：进程内 L1 记忆引擎 ── */
@@ -293,11 +292,6 @@ void cli_chat_mem_record(const char *input, const char *reply, const char *reaso
     int n = snprintf(content, sizeof(content), "用户: %s\nAgentRT: %s", input, reply);
     if (n <= 0)
         return;
-    if (reasoning && reasoning[0]) {
-        int rn = snprintf(content + n, (size_t)(sizeof(content) - n), "\n[reasoning] %s", reasoning);
-        if (rn > 0)
-            n += (rn < (int)(sizeof(content) - n - 1)) ? rn : (int)(sizeof(content) - n - 1);
-    }
     /* UTF-8 边界回退：1600 是字节数，直接截断会切坏多字节序列。 */
     n = (int)cli_utf8_safe_len(content, 1600);
 

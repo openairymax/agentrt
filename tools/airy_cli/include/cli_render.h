@@ -98,6 +98,13 @@ size_t cli_render_meter_phys(cli_line_meter_t *m);
  * 前缀，此前被当作完整回复渲染。渲染明确提示，避免用户误判为完整答案。 */
 #define CLI_REPLY_TRUNCATED_HINT "（回复已达输出上限被截断，以上内容不完整；请缩短问题后重试）"
 
+/* 思考链默认隐藏提示（0.1.18 B4）：思考链与对话正文不再共用渲染通道，
+ * 默认不上屏（含 ≤4 行短链）；此处只给可操作指引，不携带任何推理原文。
+ * 完整文本经诊断通道留存，显式取用（-p 的 stderr trace / --json 的
+ * reasoning 字段 / 该日志）。 */
+#define CLI_REPLY_THINK_HIDDEN_HINT \
+    "（思考链已默认隐藏；完整文本见 $AIRY_HOME/logs/airy_reasoning.log）"
+
 /* Opaque TUI engine handle (full definition in cli_tui.h). */
 struct cli_tui_s;
 
@@ -277,15 +284,18 @@ size_t cli_utf8_safe_len(const char *s, size_t max_bytes);
  * @brief Render a long text collapsed to at most `max_lines` lines.
  *
  * Progressive disclosure (Claude Code / Codex convention): only the first
- * lines are shown, followed by a dim "└ … N more lines" trailer so a long
- * reasoning trace or tool output cannot flood the terminal. The full text
- * stays available in the logs.
+ * `max_lines` lines are shown, followed by a dim "└ … N more lines" trailer
+ * so a verbose block cannot flood the terminal. Intended for bounded text the
+ * caller itself chose to display (e.g. the GCCP intent-convergence note);
+ * it must NOT be used to surface the model's raw chain-of-thought — since
+ * 0.1.18 B4 that channel is hidden by default (see cli_chat_finalize.c).
+ * Any retention of the full text is the caller's concern, not this helper's.
  *
  * @param text      raw text (may contain \n and markdown markers)
  * @param indent    left gutter width in spaces
  * @param max_lines maximum fully rendered lines (>= 1)
- * @param weak      non-zero renders the body dim (internal trace, e.g.
- *                  chain-of-thought) so it never competes with the reply
+ * @param weak      non-zero renders the body dim (secondary note that must
+ *                  never compete with the reply)
  */
 void cli_render_collapsed(const char *text, size_t indent, size_t max_lines, int weak);
 

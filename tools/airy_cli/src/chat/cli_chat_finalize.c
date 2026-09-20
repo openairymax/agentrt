@@ -24,9 +24,10 @@
 /* 最终回复渲染与历史写入（cli_chat_reply 的收尾阶段）：
  *   --json  结构化 JSON（Codex exec 约定）
  *   -p      纯文本（Claude Code -p / Codex exec 约定；流式已直出）
- *   交互    TTY 流式：正文已直出即终态，收尾只补思考链折叠
+ *   交互    TTY 流式：正文已直出即终态，收尾只补思考链隐藏提示
  *           （0.1.7 弃用「擦除预览→重绘最终形态」三段式）；
- *           TUI/非流式：markdown 渲染 + 折叠区（浏览展开）
+ *           TUI/非流式：markdown 渲染 + 思考链隐藏提示
+ * 思考链默认不上屏（0.1.18 B4），完整文本走诊断通道。
  * 不释放 final_resp（归调用方）。 */
 void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
                              int stream_mode, int tool_rounds)
@@ -98,7 +99,9 @@ void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
         else
             cJSON_AddStringToObject(root, "error", "reply failed");
         /* 2.1.1.6：--json 结构化输出携带思考链（TUI RunResponse.thinking
-         * 已有先例），思考 token 不随 JSON 输出丢失。 */
+         * 已有先例），思考 token 不随 JSON 输出丢失。0.1.18 B4：--json 属
+         * 显式请求的结构化面（落 stdout 供脚本消费，非默认 chat 区域），
+         * 与「默认不上屏」不冲突，故保留。 */
         const char *json_reasoning = (final_resp->choices && final_resp->choice_count > 0 &&
                                       final_resp->choices[0].reasoning_content)
                                          ? final_resp->choices[0].reasoning_content
@@ -152,32 +155,28 @@ void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
             /* 交互 TTY 流式（0.1.7 终态直出）：正文已随流式逐块上屏，
              * 不再「擦除预览 + 重绘最终形态」——原方案依赖 ANSI 光标
              * 上移计量（g_chat_fold_phys），跨终端/管道易重叠乱码。
-             * 收尾仅两件事：①空回复兜底提示；②思考链折叠附加在
-             * 回复之后（思考过程已隐藏，落定后补上，浏览/日志可见）。 */
+             * 收尾仅两件事：①空回复兜底提示；②思考链隐藏提示（0.1.18
+             * B4：思考链默认不上屏，短链亦不例外，仅留可操作指引）。 */
             if (final_content[0] == '\0') {
                 cli_render_super_agent(CLI_REPLY_EMPTY_HINT);
             } else if (final_resp->choices && final_resp->choice_count > 0 &&
                        final_resp->choices[0].reasoning_content &&
                        final_resp->choices[0].reasoning_content[0]) {
-                /* 正文末尾补空行分层，思考链折叠展示 */
+                /* 正文末尾补空行分层，思考链仅提示不展示原文 */
                 cli_outc('\n');
                 cli_render_role_line(CLI_ROLE_DUAL_THINK, cli_chat_think_actor(),
-                                     "思考", NULL);
-                cli_render_collapsed(final_resp->choices[0].reasoning_content,
-                                     4, CLI_REPLY_FOLD_KEEP, 1);
+                                     "思考", CLI_REPLY_THINK_HIDDEN_HINT);
             }
             if (truncated)
                 cli_render_super_agent(CLI_REPLY_TRUNCATED_HINT);
         } else {
-            /* TUI / 非流式交互：思考链折叠展示（进历史）；结果完整渲染
-             * 进历史（用户要求结果不折叠，长结果经视口滚动浏览）。 */
+            /* TUI / 非流式交互：思考链默认不上屏（0.1.18 B4），仅提示；
+             * 结果完整渲染进历史（用户要求结果不折叠，长结果经视口滚动浏览）。 */
             if (final_resp->choices && final_resp->choice_count > 0 &&
                 final_resp->choices[0].reasoning_content &&
                 final_resp->choices[0].reasoning_content[0]) {
                 cli_render_role_line(CLI_ROLE_DUAL_THINK, cli_chat_think_actor(),
-                                     "思考", NULL);
-                cli_render_collapsed(final_resp->choices[0].reasoning_content,
-                                     4, CLI_REPLY_FOLD_KEEP, 1);
+                                     "思考", CLI_REPLY_THINK_HIDDEN_HINT);
             }
             if (final_content[0] != '\0') {
                 cli_render_super_agent(render_content);
@@ -190,7 +189,9 @@ void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
     }
 
     /* 2.1.1.6：思考链全量保留——历史携带 reasoning（跨轮回传 DeepSeek
-     * 续轮规范）+ 独立日志落盘（所有模式），折叠展示之外的完整文本不丢失。 */
+     * 续轮规范）+ 独立日志落盘（所有模式）。0.1.18 B4 边界：此处仅为
+     * 会话内回传与诊断通道（进程退出即释放 / 日志轮转封顶），不得写入
+     * 长期记忆，也不得上屏。 */
     const char *round_reasoning = (final_resp->choices && final_resp->choice_count > 0 &&
                                    final_resp->choices[0].reasoning_content)
                                       ? final_resp->choices[0].reasoning_content

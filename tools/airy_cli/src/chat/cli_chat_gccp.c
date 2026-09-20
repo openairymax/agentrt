@@ -182,8 +182,11 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
         cJSON_free(answers_json);
         if (serr != AIRY_SUCCESS)
             break;
-        /* 展示 LLM 对上一答的思考（渐进披露：折叠为前 4 行，避免多轮
-         * 推理刷屏；完整文本保留在日志）。 */
+        /* 展示 LLM 对上一答的思考：这是 STEP_PROMPT 显式索取的展示字段
+         * （gccp.h:168「对上一答的简短思考（展示给用户，可选）」，限长
+         * 512B 且要求中文），与 0.1.18 B4 所指「模型原始推理链原文」不是
+         * 同一通道——后者默认不上屏（见 cli_chat_finalize.c）。此处折叠
+         * 仅为版面节制，非隔离手段。 */
         if (step.reasoning[0])
             cli_render_collapsed(step.reasoning, 4, 4, 1);
         if (step.done)
