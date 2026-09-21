@@ -55,7 +55,7 @@ extern "C" {
  * 注入的独立编译（如 IDE 单文件编译）出现未定义宏。版本更新只改
  * VERSION 文件一处，CLI 与 TUI 自动同步。 */
 #ifndef AIRY_CLI_VERSION
-#define AIRY_CLI_VERSION "0.1.17"
+#define AIRY_CLI_VERSION "0.1.18"
 #endif
 
 /* Startup header height (compact: brand + model slots + blank line).
