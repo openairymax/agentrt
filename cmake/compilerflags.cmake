@@ -48,8 +48,12 @@ function(airy_apply_compiler_flags)
         # GCC/Clang 安全选项
         add_compile_options(-Wall -Wextra -Wpedantic
                             -Wno-unused-parameter
-                            -Wno-stringop-overflow
                             -Wno-format-truncation)
+        if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+            # GCC 专有关断项：clang 无 -Wstringop-overflow，未知 -Wno-*
+            # 会被目标级 -Werror 升级为硬错误（macOS/clang 腿实报）
+            add_compile_options(-Wno-stringop-overflow)
+        endif()
         if(WARNINGS_AS_ERRORS)
             add_compile_options(-Werror=all -Werror=extra)
             add_compile_options(-Wno-error=format-truncation)
@@ -68,7 +72,9 @@ function(airy_apply_compiler_flags)
         elseif(APPLE)
             add_link_options(-Wl,-dead_strip)
         endif()
-        add_link_options(-Wno-stringop-overflow)
+        if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+            add_link_options(-Wno-stringop-overflow)
+        endif()
     endif()
 endfunction()
 
