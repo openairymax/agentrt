@@ -569,7 +569,7 @@ section "L" "R-5 provider 默认超时 < 网关 LLM 转发背压（连不上网�
 
 # B16-S3 c3：PROVIDER_DEFAULT_TIMEOUT_SEC 自 provider.c（已删）迁至 registry.c
 PROVIDER_C="$ROOT/daemons/llm_d/src/providers/core/registry.c"
-LLM_METHODS="$ROOT/daemons/llm_d/src/llm_daemon_methods.c"
+LLM_METHODS="$ROOT/daemons/llm_d/src/rpc/llm_daemon_methods.c"
 GW_INTERNAL="$ROOT/gateway/src/biz/gateway_biz_internal.h"
 
 _gate_define() { # <file> <macro>  → 打印宏字面量（无则空）
@@ -1418,7 +1418,7 @@ fi
 _wc="$ROOT/daemons/mem_d/src/engine/compress.c"
 _wh="$ROOT/daemons/mem_d/include/compress.h"
 _wch="$ROOT/daemons/mem_d/src/handlers/cache_handlers.c"
-_wsr="$ROOT/daemons/llm_d/src/service_request.c"
+_wsr="$ROOT/daemons/llm_d/src/rpc/service_request.c"
 _wlh="$ROOT/daemons/mem_d/src/handlers/ledger_handlers.c"
 section "AA" "B5 压缩/缓存安全门禁（V5.1~V5.3 fail-closed 防回潮）"
 
