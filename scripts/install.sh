@@ -1225,10 +1225,18 @@ while [ -L "\$_SELF" ]; do
 done
 _DIR="\$(cd -P "\$(dirname "\$_SELF")" && pwd)"
 _AH=""
-if [ -f "\${_DIR}/../config/install.env" ]; then
-    _AH="\$(sed -n 's/^AIRY_HOME=//p' "\${_DIR}/../config/install.env" 2>/dev/null | head -1)"
-    [ -x "\$_AH/bin/airy_cli" ] || _AH=""
-fi
+# 安装态 bin 为符号链接（bin -> current/bin），cd -P 后的物理父目录是
+# releases/<id>/，顶层 config/install.env 不在其直接上级——沿物理祖先
+# 逐级向上探测，仓库开发态与版本化安装态均收敛。
+_CAND="\$_DIR"
+while [ -n "\$_CAND" ] && [ "\$_CAND" != "/" ]; do
+    if [ -f "\${_CAND}/config/install.env" ]; then
+        _AH="\$(sed -n 's/^AIRY_HOME=//p' "\${_CAND}/config/install.env" 2>/dev/null | head -1)"
+        [ -n "\$_AH" ] && [ -x "\$_AH/bin/airy_cli" ] && break
+        _AH=""
+    fi
+    _CAND="\$(dirname "\$_CAND")"
+done
 if [ -z "\$_AH" ]; then
     _AH="\${AIRY_HOME:-}"
     [ -n "\$_AH" ] && [ -x "\$_AH/bin/airy_cli" ] || _AH=""
@@ -1236,6 +1244,8 @@ fi
 [ -n "\$_AH" ] || _AH="\$HOME/.airymaxrt"
 AIRY_HOME="\$_AH"
 export AIRY_HOME
+AIRY_RELEASE_OWNER="\${AIRY_RELEASE_OWNER:-openairymax/agentrt}"
+AIRY_RELEASE_BASE="\${AIRY_RELEASE_BASE:-https://atomgit.com/\${AIRY_RELEASE_OWNER}/releases/download}"
 syscurl() {
     _sc_ldp=""
     _sc_rest="\${LD_LIBRARY_PATH:-}"
@@ -1333,6 +1343,9 @@ esac
 if [ ! -x "\$AIRY_HOME/bin/airy_cli" ]; then
     echo "airymaxrt: airy_cli 缺失（\$AIRY_HOME/bin/airy_cli），请重新安装" >&2
     exit 1
+fi
+if [ "\$#" -gt 0 ]; then
+    exec "\$AIRY_HOME/bin/airy_cli" "\$@"
 fi
 if [ -t 0 ] && [ -t 1 ]; then
     exec "\$AIRY_HOME/bin/airy_cli" --tui
