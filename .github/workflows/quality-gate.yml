@@ -102,6 +102,14 @@ jobs:
             https://atomgit.com/openairymax/docs-workload.git
           git -C "$UMB/docs" submodule update --init --depth 1 -- docs-workload \
             || echo "::warning::docs docs-workload submodule unavailable, Gate 7 will fail"
+          # docs-workload 的 50-engineering-standards 是指向
+          # ../docs-linux/50-engineering-standards 的 symlink（跨子
+          # 模块依赖），docs-linux 不 init 则 symlink 悬空，Gate 7
+          # 依旧找不到 09-ssot-registry.md。同样覆写 URL 走 https。
+          git -C "$UMB/docs" config submodule.docs-linux.url \
+            https://atomgit.com/openairymax/docs-linux.git
+          git -C "$UMB/docs" submodule update --init --depth 1 -- docs-linux \
+            || echo "::warning::docs docs-linux submodule unavailable, Gate 7 will fail"
           ln -s "$GITHUB_WORKSPACE" "$UMB/agent-workload/agentrt"
           for r in ecosystem sdk products; do
             git clone -q --depth 1 "https://github.com/openairymax/$r.git" \
