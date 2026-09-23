@@ -43,6 +43,15 @@ if [ -z "$SDK_CONSOLE" ]; then
     done
 fi
 
+# tui 源树根（U/V/V2/W/Y 组结构判据的取料基点）：
+# 本地 hub 布局 agentrt 与 sdk 同级；CI 取料物化于 agent-workload/sdk。
+TUI_SRC="${AIRY_GATE_TUI_SRC:-}"
+if [ -z "$TUI_SRC" ]; then
+    for _cand in "$ROOT/../sdk/tui" "$ROOT/agent-workload/sdk/tui"; do
+        if [ -d "$_cand/src" ]; then TUI_SRC="$_cand"; break; fi
+    done
+fi
+
 extract_fn() { # <file> <fnname> <outfile>
     sed -n "/^$2() {/,/^}$/p" "$1" > "$3"
 }
@@ -220,7 +229,10 @@ ln -s "$TMP/b2/root3/bin/airymaxrt" "$TMP/b2/link3/airymaxrt"
 _out="$(env -i HOME="$TMP/b2/home" PATH="$TMP/b2/link3:$_CORE_PATH" \
         DIHLIB="$TMP/homelib_full.sh" \
         sh -c "$_DIH_SCRIPT" "$TMP/b2/other3/tool.sh" 2>/dev/null)"
-if [ "$_out" = "$TMP/b2/root3" ]; then
+# discover_install_home 沿符号链 cd -P 解析，输出物理路径（macOS /var→/private/var）；
+# 期望侧同样物理化归一后再比较，判据本意是「同一根」而非字面同串。
+_root3_phys="$(cd -P "$TMP/b2/root3" 2>/dev/null && pwd)"
+if [ "$_out" = "$_root3_phys" ]; then
     ok "B2-3 PATH 符号链命中既有根 → 复用（跨前缀重装不再另建一套）"
 else
     bad "B2-3 PATH 符号链未复用（out=${_out:-<空>}）"
@@ -1127,9 +1139,9 @@ fi
 section "U" "B1 会话上下文轮次边界（上下文串轮防复发：历史门控 + 边界标记 + 轮次标注）"
 
 _u_missing=""
-_CTX="$ROOT/../sdk/tui/src/app/context.rs"
-_TASK="$ROOT/../sdk/tui/src/app/task.rs"
-_MEM="$ROOT/../sdk/tui/src/memory.rs"
+_CTX="$TUI_SRC/src/app/context.rs"
+_TASK="$TUI_SRC/src/app/task.rs"
+_MEM="$TUI_SRC/src/memory.rs"
 _LOOP="$ROOT/daemons/agent_d/src/agent_run_loop.c"
 _ENG="$ROOT/daemons/agent_d/src/agent_run_engine.c"
 for _f in "$_CTX" "$_TASK" "$_MEM" "$_LOOP" "$_ENG"; do
@@ -1174,10 +1186,10 @@ fi
 section "V" "B3 控制面/用户面隔离（[MODE:] 协议与内部标识符零泄漏：V3.1~V3.4 机制防回潮）"
 
 _v_missing=""
-_MODE="$ROOT/../sdk/tui/src/app/mode.rs"
-_POLL="$ROOT/../sdk/tui/src/app/poll.rs"
-_DISP="$ROOT/../sdk/tui/src/app/dispatch.rs"
-_TSK="$ROOT/../sdk/tui/src/app/task.rs"
+_MODE="$TUI_SRC/src/app/mode.rs"
+_POLL="$TUI_SRC/src/app/poll.rs"
+_DISP="$TUI_SRC/src/app/dispatch.rs"
+_TSK="$TUI_SRC/src/app/task.rs"
 for _f in "$_MODE" "$_POLL" "$_DISP" "$_TSK"; do
     [ -f "$_f" ] || _v_missing="$_v_missing $(basename "$_f")"
 done
@@ -1205,7 +1217,7 @@ else
     fi
 
     if grep -q 'TOOL_ACTIONS' "$_DISP" && grep -q '未知工具（已隐藏）' "$_DISP" \
-        && ! grep -rq 'tool\.to_string()' "$ROOT/../sdk/tui/src"; then
+        && ! grep -rq 'tool\.to_string()' "$TUI_SRC/src"; then
         ok "V4 标识符白名单兜底在位（V3.4：未登记名零透传）"
     else
         bad "V4 白名单兜底缺失或 tool.to_string() 裸透传回潮"
@@ -1213,12 +1225,12 @@ else
 fi
 
 _v2_engine="$ROOT/daemons/agent_d/src/agent_run_engine.c"
-_v2_task="$ROOT/../sdk/tui/src/app/task.rs"
-_v2_block="$ROOT/../sdk/tui/src/panels/chat/block.rs"
-_v2_mem="$ROOT/../sdk/tui/src/memory.rs"
-_v2_sess="$ROOT/../sdk/tui/src/app/session.rs"
-_v2_keys="$ROOT/../sdk/tui/src/keys.rs"
-_v2_panel="$ROOT/../sdk/tui/src/app/panel.rs"
+_v2_task="$TUI_SRC/src/app/task.rs"
+_v2_block="$TUI_SRC/src/panels/chat/block.rs"
+_v2_mem="$TUI_SRC/src/memory.rs"
+_v2_sess="$TUI_SRC/src/app/session.rs"
+_v2_keys="$TUI_SRC/src/keys.rs"
+_v2_panel="$TUI_SRC/src/app/panel.rs"
 section "V2" "B4 思维链原文泄漏（默认不上屏 / 不落长期记忆 / 恢复不回灌 V4.1~V4.3 防回潮）"
 
 if grep -qF '思考链不再随 result 直出' "$_v2_engine" \
@@ -1249,12 +1261,12 @@ fi
 
 section "W" "B11 TUI 滚动/鼠标/焦点交互（滚动契约 SSoT 与判据 V11.1~V11.3 机制防回潮）"
 
-_w_chat="$ROOT/../sdk/tui/src/panels/chat/mod.rs"
-_w_ctrl="$ROOT/../sdk/tui/src/app/control.rs"
-_w_main="$ROOT/../sdk/tui/src/main.rs"
-_w_keys="$ROOT/../sdk/tui/src/keys.rs"
-_w_ui="$ROOT/../sdk/tui/src/ui.rs"
-_w_tests="$ROOT/../sdk/tui/src/app/tests.rs"
+_w_chat="$TUI_SRC/src/panels/chat/mod.rs"
+_w_ctrl="$TUI_SRC/src/app/control.rs"
+_w_main="$TUI_SRC/src/main.rs"
+_w_keys="$TUI_SRC/src/keys.rs"
+_w_ui="$TUI_SRC/src/ui.rs"
+_w_tests="$TUI_SRC/src/app/tests.rs"
 _w_missing=""
 for _f in "$_w_chat" "$_w_ctrl" "$_w_main" "$_w_ui" "$_w_tests"; do
     [ -f "$_f" ] || _w_missing="$_w_missing $(basename "$_f")"
@@ -1279,7 +1291,7 @@ else
 
     if grep -q 'let mut mouse_on = app\.mouse_capture' "$_w_main" \
         && grep -q 'app\.mouse_capture != mouse_on' "$_w_main" \
-        && grep -q 'mouse_capture: false' "$ROOT/../sdk/tui/src/app/mod.rs"; then
+        && grep -q 'mouse_capture: false' "$TUI_SRC/src/app/mod.rs"; then
         ok "W3 鼠标捕获唯一执行点在位（V11.1：默认关，Ctrl+M 会话级差分切换）"
     else
         bad "W3 鼠标捕获执行点散落或默认态回潮"
@@ -1355,7 +1367,7 @@ else
     fi
 fi
 
-_tui="$ROOT/../sdk/tui/src/app"
+_tui="$TUI_SRC/src/app"
 _ad="$ROOT/daemons/agent_d"
 section "Y" "B2 首字延迟与零反馈（流式契约/零反馈/打字机解耦/分段耗时 V2.1~V2.4 机制防回潮）"
 
