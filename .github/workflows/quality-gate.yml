@@ -79,6 +79,7 @@ jobs:
       - name: Assemble gate dataset (tools, docs, agent-workload)
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
         run: |
           if [ -n "${GH_TOKEN:-}" ]; then
             printf 'machine github.com\nlogin x-access-token\npassword %s\n' \
@@ -105,9 +106,18 @@ jobs:
           # docs-workload 的 50-engineering-standards 是指向
           # ../docs-linux/50-engineering-standards 的 symlink（跨子
           # 模块依赖），docs-linux 不 init 则 symlink 悬空，Gate 7
-          # 依旧找不到 09-ssot-registry.md。同样覆写 URL 走 https。
-          git -C "$UMB/docs" config submodule.docs-linux.url \
-            https://atomgit.com/openairymax/docs-linux.git
+          # 依旧找不到 09-ssot-registry.md。docs-linux 在 atomgit 为
+          # 私有仓（匿名 https 被拒：could not read Username），带
+          # ATOMGIT_TOKEN 走 oauth2 basic auth（同 sync-mirror.sh
+          # src_url_authed 的已验证模式）；token 缺失时退回匿名并
+          # 显式告警。Actions 对日志中 secret 自动掩码。
+          if [ -n "${ATOMGIT_TOKEN:-}" ]; then
+            git -C "$UMB/docs" config submodule.docs-linux.url \
+              "https://oauth2:${ATOMGIT_TOKEN}@atomgit.com/openairymax/docs-linux.git"
+          else
+            git -C "$UMB/docs" config submodule.docs-linux.url \
+              https://atomgit.com/openairymax/docs-linux.git
+          fi
           git -C "$UMB/docs" submodule update --init --depth 1 -- docs-linux \
             || echo "::warning::docs docs-linux submodule unavailable, Gate 7 will fail"
           ln -s "$GITHUB_WORKSPACE" "$UMB/agent-workload/agentrt"
