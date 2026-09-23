@@ -34,7 +34,7 @@ concurrency:
 # GATE_SDK_SHA；缺任一环节，CI 取到的仍是未收敛副本，J1 必红。
 env:
   GATE_SDK_SHA: 676fe9c8f07ad121f6407c9adb81ea0160064398
-  GATE_TOOLS_SHA: b237a98e3dd9dac642fde8da1da9aa43957016dd
+  GATE_TOOLS_SHA: 38b06146116a096719a7e6c7c822582e4a91dbdf
 
 jobs:
   # ==================== Linux 全量构建 + 测试 + 覆盖率门禁 ====================

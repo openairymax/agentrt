@@ -660,7 +660,7 @@ else
         while IFS= read -r _t; do
             [ -n "$_t" ] || continue
             grep -qxF "$_t" "$_ext_tools" \
-                || { bad "M3 external 缺工具授权: $_t（/mcp tools/call 将 -32603）"; _miss=1; }
+                || { bad "M3 external 缺工具授权: ${_t}（/mcp tools/call 将 -32603）"; _miss=1; }
         done < "$_mcp_tools"
         if [ "$_miss" -eq 0 ]; then
             ok "M3 external 授权集 ⊇ /mcp tools/list 暴露集（$_mcp_n 个工具全覆盖）"

@@ -91,14 +91,14 @@ jobs:
           git clone -q --depth 1 https://github.com/openairymax/tools.git "$UMB/tools"
           git clone -q --depth 1 https://atomgit.com/openairymax/docs.git "$UMB/docs" \
             || git clone -q --depth 1 https://github.com/openairymax/docs.git "$UMB/docs"
-          # docs 的 AirymaxRT 子模块（docs-workload 仓）承载 SSoT 权威源
-          # 注册表等判据文件；顶层浅克隆不展开子模块工作树，缺席即 Gate 7
-          # 结构性必红。子模块 URL 为 atomgit SCP 形式且 runner 无对应
-          # SSH key，重写为 https 匿名拉取（公开仓，与 docs 主仓同通道）。
+          # docs 的 docs-workload 子模块承载 SSoT 权威源注册表等判据
+          # 文件；顶层浅克隆不展开子模块工作树，缺席即 Gate 7 结构性
+          # 必红。子模块 URL 为 atomgit SCP 形式且 runner 无对应 SSH
+          # key，重写为 https 匿名拉取（公开仓，与 docs 主仓同通道）。
           git -C "$UMB/docs" config \
             url."https://atomgit.com/openairymax/".insteadOf "git@atomgit.com:openairymax/"
-          git -C "$UMB/docs" submodule update --init --depth 1 -- AirymaxRT \
-            || echo "::warning::docs AirymaxRT submodule unavailable, Gate 7 will fail"
+          git -C "$UMB/docs" submodule update --init --depth 1 -- docs-workload \
+            || echo "::warning::docs docs-workload submodule unavailable, Gate 7 will fail"
           ln -s "$GITHUB_WORKSPACE" "$UMB/agent-workload/agentrt"
           for r in ecosystem sdk products; do
             git clone -q --depth 1 "https://github.com/openairymax/$r.git" \
