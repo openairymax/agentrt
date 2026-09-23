@@ -33,8 +33,8 @@ concurrency:
 # 在 tui 落地启动器收敛提交、再由 sdk 前推 tui gitlink，最后 bump
 # GATE_SDK_SHA；缺任一环节，CI 取到的仍是未收敛副本，J1 必红。
 env:
-  GATE_SDK_SHA: 676fe9c8f07ad121f6407c9adb81ea0160064398
-  GATE_TOOLS_SHA: 38b06146116a096719a7e6c7c822582e4a91dbdf
+  GATE_SDK_SHA: 2408ab5bd9b60016d2ca366aaa9011671bb95d4a
+  GATE_TOOLS_SHA: 00c53845ec87e462bcd7b23537d28a38308f2de2
 
 jobs:
   # ==================== Linux 全量构建 + 测试 + 覆盖率门禁 ====================
