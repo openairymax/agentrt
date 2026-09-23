@@ -1181,15 +1181,18 @@ jobs:
       #（取自 stable manifest 的 url/sha256，非文件名猜测），传 e2e 脚本
       # 第三参执行升级阶段（旧版离线安装 → update --file 新版 → config
       # 兼容断言 → rollback 回退断言）。prev 与本次发布同版本（稳定版同版
-      # 重发）时跳过——无升级路径语义。
+      # 重发）时跳过——无升级路径语义；latest 无 stable manifest（首次
+      # 发布，该附件由 publish-atomgit 段首产）时按首版口径跳过——升级
+      # 路径的前提"存在上一稳定版"不成立，与同版跳过同族；跳过须留
+      # ::warning:: 痕迹，防 stable manifest 意外缺失后静默降级。
       - name: Fetch previous stable tarball (upgrade path)
         run: |
           set -euo pipefail
           mf="$(mktemp)"
           # B12（乙）：manifest 取自滚动 latest release 附件面（唯一事实源），
           # 非 contents API 第二事实源。
-          curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/manifest.stable.json" > "$mf"
-          python3 - "$mf" /tmp/u9.env <<'PYEOF'
+          if curl -fsSL "https://atomgit.com/openairymax/agentrt/releases/download/latest/manifest.stable.json" > "$mf"; then
+            python3 - "$mf" /tmp/u9.env <<'PYEOF'
           import json, sys
           m = json.load(open(sys.argv[1]))
           pv = m['latest']
@@ -1198,18 +1201,22 @@ jobs:
           with open(sys.argv[2], 'w') as f:
               f.write("PV=%s\nPVURL=%s\nPVSHA=%s\n" % (pv, art['url'], art['sha256']))
           PYEOF
-          . /tmp/u9.env
-          cur_norm="${VERSION#v}"; pv_norm="${PV#v}"
-          if [ "$cur_norm" = "$pv_norm" ]; then
-            echo "升级路径跳过：prev(${PV}) == 本次发布(${VERSION})"
-            echo "PREV_TARBALL=" >> "$GITHUB_ENV"
+            . /tmp/u9.env
+            cur_norm="${VERSION#v}"; pv_norm="${PV#v}"
+            if [ "$cur_norm" = "$pv_norm" ]; then
+              echo "升级路径跳过：prev(${PV}) == 本次发布(${VERSION})"
+              echo "PREV_TARBALL=" >> "$GITHUB_ENV"
+            else
+              fn="$(basename "$PVURL")"
+              curl -fsSL -o "dist/$fn" "$PVURL"
+              printf '%s  %s\n' "$PVSHA" "$fn" > "dist/$fn.sha256"
+              (cd dist && sha256sum -c "$fn.sha256")
+              echo "PREV_TARBALL=dist/$fn" >> "$GITHUB_ENV"
+              echo "prev stable: $PV -> dist/$fn"
+            fi
           else
-            fn="$(basename "$PVURL")"
-            curl -fsSL -o "dist/$fn" "$PVURL"
-            printf '%s  %s\n' "$PVSHA" "$fn" > "dist/$fn.sha256"
-            (cd dist && sha256sum -c "$fn.sha256")
-            echo "PREV_TARBALL=dist/$fn" >> "$GITHUB_ENV"
-            echo "prev stable: $PV -> dist/$fn"
+            echo "::warning::latest 无 manifest.stable.json（首次发布，publish-atomgit 未曾产出）→ 无升级路径前提，跳过升级 e2e"
+            echo "PREV_TARBALL=" >> "$GITHUB_ENV"
           fi
 
       # 镜像不用 digest 钉版：ubuntu:20.04 已 EOS（standard support 2025-05
