@@ -1764,6 +1764,171 @@ else
     bad "AF5 命名失实回归:$_af5_bad"
 fi
 
+section "AG" "DT-12 版本一致性（VERSION 唯一权威；源码/CMake/工作流零发布号副本）"
+
+# 权威源：VERSION 经顶层 CMakeLists 注入 AIRYRT_VERSION；C 侧 SSoT 头
+# commons/include/airyrt_version.h 只持漂移免疫 marker，不含真实发布号。
+# 本组规则集与伞仓 Gate 17
+# （tools/scripts/ci/quality/gates/version-consistency-check.sh）保持一致：
+# 同一 7 宏集合、同型正则。本组为 agentrt 独立仓的自足判据——不依赖伞仓
+# tools/，故可随 ctest 在 Linux/macOS/Windows 三端直跑。
+_ag_ver="$ROOT/VERSION"
+_ag_ssot="$ROOT/commons/include/airyrt_version.h"
+_ag_macros='AIRYRT_VERSION|AIRY_VERSION_STRING|AIRY_VERSION_MAJOR|AIRY_VERSION_MINOR|AIRY_VERSION_PATCH|GATEWAY_VERSION|AIRY_CLI_VERSION'
+
+# AG1：VERSION 单行且形如 X.Y.Z（允许字母数字后缀，如 0.1.6a）
+_ag1_bad=""
+_ag1_raw=""
+if [ ! -f "$_ag_ver" ]; then
+    _ag1_bad="VERSION 缺失"
+else
+    _ag1_raw="$(tr -d '[:space:]' < "$_ag_ver")"
+    [ "$(grep -c '' "$_ag_ver" 2>/dev/null || true)" = "1" ] || _ag1_bad="非单行"
+    if [ -z "$_ag1_bad" ] \
+        && ! printf '%s' "$_ag1_raw" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([A-Za-z0-9]+)?$'; then
+        _ag1_bad="格式非法($_ag1_raw)"
+    fi
+fi
+if [ -z "$_ag1_bad" ]; then
+    ok "AG1 VERSION 唯一权威在位（单行 X.Y.Z: $_ag1_raw）"
+else
+    bad "AG1 VERSION 结构失守:$_ag1_bad"
+fi
+
+# AG2：C 侧 SSoT 头必须为漂移免疫 marker（源码内零发布号副本；非 CMake
+# 构建时诚实报告「非发布版」，不伪造版本号）
+if [ -f "$_ag_ssot" ] \
+    && grep -Eq '^[[:space:]]*#[[:space:]]*define[[:space:]]+AIRYRT_VERSION[[:space:]]+"0\.0\.0-dev"' "$_ag_ssot"; then
+    ok "AG2 C 侧 SSoT 头为漂移免疫 marker（结构上不可能漂移）"
+else
+    bad "AG2 SSoT 头漂移（源码内出现发布号副本）: $_ag_ssot"
+fi
+
+# AG3：全树 C/H 的 AgentRT 发布号宏不得 #define 为 X.Y.Z 字面量
+# marker "0.0.0-dev" 尾部为 '-'（非引号/空白）而不匹配，天然豁免。
+_ag3_hits="$(grep -rEn --include='*.c' --include='*.h' --exclude-dir=.git \
+    "^[[:space:]]*#[[:space:]]*define[[:space:]]+(${_ag_macros})[[:space:]]+\"?[0-9]+\.[0-9]+\.[0-9]+[\"[:space:]]" \
+    "$ROOT" 2>/dev/null || true)"
+if [ -z "$_ag3_hits" ]; then
+    ok "AG3 C/H 源码零发布号硬编码副本（注入面唯一）"
+else
+    bad "AG3 C/H 存在发布号副本:$(printf '\n%s' "$_ag3_hits")"
+fi
+
+# AG4：全树 CMake 不得 set(<*VERSION*> "X.Y.Z")
+_ag4_hits="$(grep -rEn --include='CMakeLists.txt' --include='*.cmake' --exclude-dir=.git \
+    "^[[:space:]]*set[[:space:]]*\([[:space:]]*[A-Za-z_]*VERSION[A-Za-z_]*[[:space:]]+\"?[0-9]+\.[0-9]+\.[0-9]+" \
+    "$ROOT" 2>/dev/null || true)"
+if [ -z "$_ag4_hits" ]; then
+    ok "AG4 CMake 零版本号硬编码（一律从 VERSION 派生）"
+else
+    bad "AG4 CMake 存在版本硬编码:$(printf '\n%s' "$_ag4_hits")"
+fi
+
+# AG5：工作流 default:/VERSION: 不得含 vX.Y.Z 字面量（工具钉版如
+# lizard==1.23.0、cosign v2.6.5 不在两条正则射程内，不误伤）
+_ag5_hits=""
+for _ag5_pat in \
+    "^[[:space:]]*default:[[:space:]]*['\"]?v[0-9]+\.[0-9]+\.[0-9]+" \
+    "^[[:space:]]*VERSION:[[:space:]]*['\"]?v?[0-9]+\.[0-9]+\.[0-9]+"; do
+    _ag5_one="$(grep -rEn --include='*.yml' --include='*.yaml' "$_ag5_pat" \
+        "$ROOT/.github/workflows" 2>/dev/null || true)"
+    [ -n "$_ag5_one" ] && _ag5_hits="${_ag5_hits}${_ag5_hits:+$'\n'}${_ag5_one}"
+done
+if [ -z "$_ag5_hits" ]; then
+    ok "AG5 工作流零版本号字面量（运行期从 VERSION 派生）"
+else
+    bad "AG5 工作流存在版本字面量:$(printf '\n%s' "$_ag5_hits")"
+fi
+
+# ── AH. daemons/scripts 质量门禁契约（L1: 在而不生效→接线, 游离→纳管） ──
+section "AH" "L1 daemons/scripts 纳管（构建目录外置 + fail-closed + 单树契约）"
+
+_ah_scripts="$ROOT/daemons/scripts"
+
+# AH1：四脚本在位且语法有效
+_ah1_bad=""
+for _ah_f in ci.sh local-ci.sh static-analysis.sh verify-coverage.sh; do
+    if [ ! -f "$_ah_scripts/$_ah_f" ]; then
+        _ah1_bad="${_ah1_bad} $_ah_f(缺失)"
+    elif ! bash -n "$_ah_scripts/$_ah_f" 2>/dev/null; then
+        _ah1_bad="${_ah1_bad} $_ah_f(语法)"
+    fi
+done
+if [ -z "$_ah1_bad" ]; then
+    ok "AH1 四脚本在位且语法有效"
+else
+    bad "AH1 脚本缺失或语法错误:$_ah1_bad"
+fi
+
+# AH2：构建产物必须落在源码区之外（铁律）；历史违例路径零残留
+_ah2_hits="$(grep -rnF --include='*.sh' --include='*.md' \
+    -e 'AgentRT-build' -e 'PROJECT_ROOT' "$_ah_scripts" 2>/dev/null || true)"
+if [ -z "$_ah2_hits" ]; then
+    ok "AH2 零源码区内构建路径（构建目录外置契约）"
+else
+    bad "AH2 存在源码区内构建路径:$(printf '\n%s' "$_ah2_hits")"
+fi
+
+# AH3：fail-closed 契约在位（cppcheck error-exitcode / ctest 零吞错 / awk 数值比较）
+_ah3_bad=""
+if ! grep -qF -- '--error-exitcode=1' "$_ah_scripts/ci.sh"; then
+    _ah3_bad="${_ah3_bad} ci.sh(无error-exitcode)"
+fi
+if ! grep -qF -- '--error-exitcode=1' "$_ah_scripts/local-ci.sh"; then
+    _ah3_bad="${_ah3_bad} local-ci.sh(无error-exitcode)"
+fi
+if grep -Eq 'ctest[^#]*\|\|' "$_ah_scripts/local-ci.sh"; then
+    _ah3_bad="${_ah3_bad} local-ci.sh(ctest吞错)"
+fi
+if grep -rqF 'bc -l' "$_ah_scripts"; then
+    _ah3_bad="${_ah3_bad} 残留bc依赖"
+fi
+if [ -z "$_ah3_bad" ]; then
+    ok "AH3 fail-closed 契约在位（error-exitcode/ctest 零吞错/awk 数值比较）"
+else
+    bad "AH3 fail-closed 契约破缺:$_ah3_bad"
+fi
+
+# AH4：单一构建树契约（cmake 源=agentrt 根，零逐模块/daemons 独立配置残留）
+_ah4_bad=""
+for _ah_f in ci.sh local-ci.sh; do
+    grep -qF 'cmake "${AGENTRT_ROOT}"' "$_ah_scripts/$_ah_f" \
+        || _ah4_bad="${_ah4_bad} $_ah_f(非单树配置)"
+done
+_ah4_hits="$(grep -rnE 'cmake +"\$\{(BACKS_DIR|BACKS_ROOT|module_dir)' \
+    --include='*.sh' "$_ah_scripts" 2>/dev/null || true)"
+[ -n "$_ah4_hits" ] && _ah4_bad="${_ah4_bad} 逐模块配置残留:$(printf '\n%s' "$_ah4_hits")"
+if [ -z "$_ah4_bad" ]; then
+    ok "AH4 单一构建树契约（cmake 源=agentrt 根）"
+else
+    bad "AH4 单树契约破缺:$_ah4_bad"
+fi
+
+# AH5：构建目录默认源码区外（AIRYRT_BUILD_ROOT 可覆盖）
+_ah5_missing=""
+for _ah_f in ci.sh local-ci.sh static-analysis.sh verify-coverage.sh; do
+    grep -qF 'AIRYRT_BUILD_ROOT:-${HOME}/.cache/agentrt/daemons' \
+        "$_ah_scripts/$_ah_f" || _ah5_missing="${_ah5_missing} $_ah_f"
+done
+if [ -z "$_ah5_missing" ]; then
+    ok "AH5 构建目录默认源码区外（AIRYRT_BUILD_ROOT 可覆盖）"
+else
+    bad "AH5 构建目录外置缺失:$_ah5_missing"
+fi
+
+# AH6：scripts README 与脚本契约同步
+_ah6_bad=""
+grep -qF 'AIRYRT_BUILD_ROOT' "$_ah_scripts/README.md" \
+    || _ah6_bad="${_ah6_bad} README缺AIRYRT_BUILD_ROOT"
+grep -qF 'fail-closed' "$_ah_scripts/README.md" \
+    || _ah6_bad="${_ah6_bad} README缺fail-closed语义"
+if [ -z "$_ah6_bad" ]; then
+    ok "AH6 scripts README 与脚本契约同步"
+else
+    bad "AH6 README 契约漂移:$_ah6_bad"
+fi
+
 printf '\n门禁汇总: PASS=%d FAIL=%d\n' "$PASS" "$FAIL"
 if [ "$FAIL" -gt 0 ]; then
     printf '  [GATE] WS-9 社区六类问题修复发布门禁未通过（方案 §4.9 / 9.8）\n'
