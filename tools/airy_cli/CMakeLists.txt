@@ -87,10 +87,8 @@ add_executable(airy_cli
     src/cmd/cli_gw.c
 )
 
-# 链接模式：coreloopthree 与 llm/tool service 存在交叉引用（静态库 + 全局
-# -flto），用 --start-group/--end-group 让链接器循环扫描解析，避免手动排序。
-# --start-group/--end-group 是 GNU ld 专有选项：macOS ld64 与 MSVC 不识别，
-# 这两平台直接链接即可（LTO 符号可见性由顶层 -ffat-lto-objects 保证）。
+# 链接模式：库序即成员级 DAG 拓扑序，单遍左到右解析完备；
+# cognition<->coreloopthree 静态库环由 cognition 目标的显式声明托管。
 # m（libm）仅在非 MSVC 平台存在；uuid 按下方 WIN32/UNIX 平台分支处理。
 # 0.1.9 C2e（M1-1c 后链接收敛，2026-09-02 实测）：airy_cognition /
 # airy_taskflow / svc_common 已无符号引用（本地 cog 装配与本地 DAG 适配
@@ -100,27 +98,14 @@ add_executable(airy_cli
 # 核心）从链接集移除——CLI 是 gateway 纯客户端，任务/查询/规划全量经
 # gateway → daemon 派发，进程内不再实例化微内核（airy_init() 已摘除）。
 if(TARGET airy_llm_service AND TARGET airy_tool_service)
-    if(UNIX AND NOT APPLE)
-        target_link_libraries(airy_cli PRIVATE
-            "-Wl,--start-group"
-            airy_coreloopthree
-            airy_llm_service
-            airy_tool_service
-            airy_core
-            airy_memory
-            airy_common
-            "-Wl,--end-group"
-        )
-    else()
-        target_link_libraries(airy_cli PRIVATE
-            airy_coreloopthree
-            airy_llm_service
-            airy_tool_service
-            airy_core
-            airy_memory
-            airy_common
-        )
-    endif()
+    target_link_libraries(airy_cli PRIVATE
+        airy_coreloopthree
+        airy_llm_service
+        airy_tool_service
+        airy_core
+        airy_memory
+        airy_common
+    )
     target_link_libraries(airy_cli PRIVATE Threads::Threads)
     if(NOT MSVC)
         target_link_libraries(airy_cli PRIVATE m)

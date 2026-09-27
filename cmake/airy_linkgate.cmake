@@ -34,8 +34,8 @@ function(airy_linkgate_collect TARGET_NAME WHITELIST_FILE)
     set(_clean "")
     if(_link_list)
         foreach(_l IN LISTS _link_list)
-            # 过滤生成器表达式（$<TARGET_OBJECTS:...>）、链接器选项
-            # （-Wl,--start-group 等）与空项；系统库留待 airy_depgraph 判定
+            # 过滤生成器表达式（$<TARGET_OBJECTS:...>）、链接器原始
+            # 选项（-Wl 前缀）与空项；系统库留待 airy_depgraph 判定
             if(_l MATCHES "^\\$<" OR _l MATCHES "^-Wl" OR _l STREQUAL "")
                 continue()
             endif()

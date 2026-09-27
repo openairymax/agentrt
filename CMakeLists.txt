@@ -1132,9 +1132,12 @@ if(BUILD_TESTS AND ENABLE_SANITIZERS AND NOT MSVC)
     airy_print_info("Test wrapper script: ${CMAKE_BINARY_DIR}/run_tests.sh")
 endif()
 
-# 系统性修复（v6）：Release 构建全局 -DNDEBUG 会把 assert() 编译为 no-op，
+# 系统性修复（v6.1）：Release 构建全局 -DNDEBUG 会把 assert() 编译为 no-op，
 # 导致全部单元测试的断言失效——测试"通过"只是未崩溃的假象。
 # 对所有测试目标强制 -UNDEBUG，恢复断言有效性（生产 target 不受影响）。
+# 测试 target 判定不依赖命名约定：名字前缀兜底（覆盖定义在产品目录的
+# 测试，如 protocols 的 test_*_adapter），定义目录位于 tests 树为
+# 主判据（覆盖 svc_*/benchmark_*/heapstore_benchmark 等非标命名）。
 if(BUILD_TESTS)
     function(airy_undef_ndebug_for_tests _dir)
         get_property(_tgts DIRECTORY "${_dir}" PROPERTY BUILDSYSTEM_TARGETS)
@@ -1143,7 +1146,12 @@ if(BUILD_TESTS)
             if(_tgt MATCHES "::" )
                 continue()
             endif()
-            if(_tgt MATCHES "^(test_|integ_|check_)")
+            get_target_property(_type "${_tgt}" TYPE)
+            if(_type STREQUAL "INTERFACE_LIBRARY")
+                continue()
+            endif()
+            get_target_property(_srcdir "${_tgt}" SOURCE_DIR)
+            if(_tgt MATCHES "^(test_|integ_|check_)" OR _srcdir MATCHES "/tests(/|$)")
                 target_compile_options("${_tgt}" PRIVATE -UNDEBUG)
             endif()
         endforeach()
