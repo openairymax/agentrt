@@ -5,12 +5,20 @@
 cmake_minimum_required(VERSION 3.20)
 # 版本 SSoT：project() 版本号从根 VERSION 文件注入（与 gateway/commons/CLI
 # 一致）。VERSION 允许字母后缀（如 0.1.6a），而 CMake/CPack 仅接受数字版本，
-# 故剥离尾部字母取数字部分（0.1.6a -> 0.1.6），避免硬编码漂移。
+# 故剥离尾部字母取数字部分（0.1.6a -> 0.1.6）。VERSION 缺失或格式非法时直接
+# FATAL_ERROR（DT-13 大声失败），不再回退硬编码版本号——后者是"构建后才
+# 发现版本漂移"的系统性根因。
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION")
+    message(FATAL_ERROR "版本 SSoT 缺失：${CMAKE_CURRENT_SOURCE_DIR}/VERSION 不存在")
+endif()
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" AIRY_VERSION_RAW LIMIT_COUNT 1)
 string(STRIP "${AIRY_VERSION_RAW}" AIRY_VERSION_RAW)
+if(NOT AIRY_VERSION_RAW MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+")
+    message(FATAL_ERROR "版本 SSoT 非法：VERSION 内容 '${AIRY_VERSION_RAW}' 不符合 X.Y.Z")
+endif()
 string(REGEX REPLACE "([0-9.]+).*" "\\1" AIRY_VERSION_NUM "${AIRY_VERSION_RAW}")
 if(NOT AIRY_VERSION_NUM)
-    set(AIRY_VERSION_NUM "0.1.18")
+    message(FATAL_ERROR "版本 SSoT 非法：无法从 VERSION ('${AIRY_VERSION_RAW}') 解析数字版本")
 endif()
 # 纯 C 项目（全仓无 .cpp/.cc 源文件）；仅声明 C 可避免 CXX 编译器
 # 缺失时（如 aarch64 交叉工具链仅装了 gcc 未装 g++）configure 失败。
@@ -100,23 +108,13 @@ option(AIRY_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider"
 option(AIRY_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe functions)" ON)
 set(AIRY_MEMORY_BACKEND "builtin" CACHE STRING "Memory backend (builtin|memoryrovol)")
 
-# 版本宏 SSoT 注入：commons/include/airyrt_version.h 的
-# AIRYRT_VERSION 此前是无保护手工副本，每次发版须人肉同步 VERSION，是
-# "构建后才发现版本硬编码漂移"的系统性根因。现统一从 VERSION 文件（RAW
-# 含字母后缀，如 0.1.6a）经 add_compile_definitions 注入，覆盖本目录及全部
-# 子目录（各 daemon svc_adapter / gateway / commons）；头文件保留 #ifndef
-# 回退，供未走 CMake 的独立编译（语法检查等）兜底。与 AIRY_CLI_VERSION
-# 注入方式对齐（tools/airy_cli/CMakeLists.txt）。
-set(AIRYRT_VERSION_INJECT "${AIRY_VERSION_RAW}")
-if(NOT AIRYRT_VERSION_INJECT)
-    set(AIRYRT_VERSION_INJECT "${AIRY_VERSION_NUM}")
-endif()
-if(AIRYRT_VERSION_INJECT)
-    add_compile_definitions(AIRYRT_VERSION="${AIRYRT_VERSION_INJECT}")
-    airy_print_ok("AIRYRT_VERSION injected from VERSION SSoT: ${AIRYRT_VERSION_INJECT}")
-else()
-    airy_print_warn("VERSION 文件缺失，AIRYRT_VERSION 回退头文件缺省值")
-endif()
+# 版本宏 SSoT 注入：唯一权威为根 VERSION 文件，经 add_compile_definitions
+# 注入 AIRYRT_VERSION（RAW 含字母后缀，如 0.1.6a；与 AIRY_CLI_VERSION 注入
+# 方式对齐），覆盖本目录及全部子目录（commons / gateway / 各 daemon）。
+# commons/include/airyrt_version.h 仅保留 "0.0.0-dev" 漂移免疫回退，供未走
+# CMake 的独立语法检查兜底；VERSION 缺失/非法已在文件顶部 FATAL_ERROR。
+add_compile_definitions(AIRYRT_VERSION="${AIRY_VERSION_RAW}")
+airy_print_ok("AIRYRT_VERSION injected from VERSION SSoT: ${AIRY_VERSION_RAW}")
 
 # CTest必须在顶级启用（在任何add_subdirectory之前）
 # R-09-SEC: Strict compliance mode and tests are now independent.

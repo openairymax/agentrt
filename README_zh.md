@@ -5,7 +5,7 @@
 
 **语言：** [English](README.md) | 简体中文
 
-[![Version](https://img.shields.io/badge/version-0.1.16-5a6b7e)](https://atomgit.com/openairymax/agentrt/releases/tag/v0.1.16)
+[![Version](https://img.shields.io/badge/version-0.1.18-5a6b7e)](https://atomgit.com/openairymax/agentrt/releases/tag/v0.1.18)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c\&logoColor=white)](https://en.cppreference.com/w/c/11)
 
@@ -287,17 +287,18 @@ airymaxrt update --rollback   # 回滚到上一版本
 每个版本都在 [`latest/`](latest) 中提供 GPG 签名的发布清单，更新器读取的正是
 它。更完整的历史记录见 [CHANGELOG.md](CHANGELOG.md)。
 
-当前版本为 **v0.1.16**，要点如下：
+当前版本为 **v0.1.18**，要点如下：
 
-- 记忆写入与召回的截断改为按 **UTF-8 字符边界**回退，不再按字节下标硬切；
-  含中文或 emoji 的长对话不再破坏记忆库，也不会再触发上游 HTTP 400
-  `invalid unicode code point`。CLI 与 gateway 两条路径同步修复，gateway
-  侧对残余非法字节再做一次清洗。
-- 模型服务拒绝（HTTP 400/422）现在如实上报为「请求被模型服务拒绝」并附带
-  供应商返回的原文，而不再被归入笼统的读写错误。
-- 早期版本已写入的损坏记忆记录已就地清理（保留备份）。
-- CI 在失败时上传 `ctest` 日志为 artifact；跨仓发布门禁 fixture 锁定到显式
-  commit，不再跟随会移动的默认分支。
+- **调度稳定性**：调度器策略引擎重构为表驱动，移除 1,400 余行陈旧策略分支，
+  任务调度路径更短、行为更可判读。
+- **服务结构统一**：模型服务守护进程（llm_d）完成服务面样板化改造，与全部
+  守护进程的服务面结构保持一致，升级后行为更可预期。
+- **体积与洁净度**：清理五处无消费者的历史遗留代码（调度旧策略、监控遗留
+  分支、通用缓存兼容层、工具服务适配桥、孤儿测试文件），安装包与运行时更精简。
+- **质量门禁**：新增四类自动化发布门禁（模块规模上限、链接闭包、头文件遮蔽、
+  传播面死信号），回归在发布前自动阻断。
+- **链接边界**：守护进程间不再隐式互相链接服务库，跨服务调用统一走系统总线，
+  降低升级时的耦合风险。
 
 ## 文档
 

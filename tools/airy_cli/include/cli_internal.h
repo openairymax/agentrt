@@ -49,13 +49,14 @@ extern "C" {
 
 #define CLI_SEP "  ──────────────────────────────────────────────"
 
-/* 版本号 SSoT（2.6.2 Unify Design）：单一来源为 agentrt/VERSION 文件，
+/* 版本号 SSoT（2.6.2 Unify Design）：唯一来源为 agentrt/VERSION 文件，
  * 由 airy_cli/CMakeLists.txt 构建期读取并通过 target_compile_definitions
- * 注入（AIRY_CLI_VERSION="x.y.z"）；此处仅保留缺省回退，防止未走 CMake
- * 注入的独立编译（如 IDE 单文件编译）出现未定义宏。版本更新只改
+ * 注入 AIRY_CLI_VERSION；此处仅作漂移免疫回退，防止未走 CMake 注入的
+ * 独立编译（如 IDE 单文件编译）出现未定义宏。回退值 "0.0.0-dev" 不含
+ * 任何真实发布号，故源码内不存在需人肉同步的版本副本；版本更新只改
  * VERSION 文件一处，CLI 与 TUI 自动同步。 */
 #ifndef AIRY_CLI_VERSION
-#define AIRY_CLI_VERSION "0.1.18"
+#define AIRY_CLI_VERSION "0.0.0-dev"
 #endif
 
 /* Startup header height (compact: brand + model slots + blank line).

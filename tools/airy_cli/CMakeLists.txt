@@ -9,13 +9,18 @@ if(NOT TARGET airy_coreloopthree)
     message(FATAL_ERROR "airy_cli requires airy_coreloopthree target")
 endif()
 
-# 版本号 SSoT（2.6.2 Unify Design）：单一来源 agentrt/VERSION（如 0.1.5）。
-# 构建期读取并注入 AIRY_CLI_VERSION 宏；文件缺失时回退 cli_internal.h 缺省值。
+# 版本号 SSoT（2.6.2 Unify Design）：唯一来源 agentrt/VERSION。构建期读取
+# 并注入 AIRY_CLI_VERSION 宏。VERSION 缺失或为空时 FATAL_ERROR（DT-13 大声
+# 失败），不回退硬编码版本号；cli_internal.h 仅保留 "0.0.0-dev" 漂移免疫
+# 回退，供未走 CMake 的独立语法检查兜底。
 set(AIRY_CLI_VERSION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION")
-set(AIRY_CLI_VERSION "0.1.18")
-if(EXISTS "${AIRY_CLI_VERSION_FILE}")
-    file(STRINGS "${AIRY_CLI_VERSION_FILE}" AIRY_CLI_VERSION_RAW LIMIT_COUNT 1)
-    string(STRIP "${AIRY_CLI_VERSION_RAW}" AIRY_CLI_VERSION)
+if(NOT EXISTS "${AIRY_CLI_VERSION_FILE}")
+    message(FATAL_ERROR "版本 SSoT 缺失：${AIRY_CLI_VERSION_FILE} 不存在")
+endif()
+file(STRINGS "${AIRY_CLI_VERSION_FILE}" AIRY_CLI_VERSION_RAW LIMIT_COUNT 1)
+string(STRIP "${AIRY_CLI_VERSION_RAW}" AIRY_CLI_VERSION)
+if(NOT AIRY_CLI_VERSION)
+    message(FATAL_ERROR "版本 SSoT 非法：${AIRY_CLI_VERSION_FILE} 为空")
 endif()
 message(STATUS "airy_cli version (SSoT): ${AIRY_CLI_VERSION}")
 

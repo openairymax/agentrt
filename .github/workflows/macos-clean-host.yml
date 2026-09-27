@@ -24,9 +24,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '待核验产品版本（如 v0.1.17）'
-        required: true
-        default: 'v0.1.17'
+        description: '待核验产品版本（如 vX.Y.Z；留空则取本树 VERSION，零硬编码）'
+        required: false
 
 permissions:
   contents: read
@@ -34,9 +33,6 @@ permissions:
 concurrency:
   group: macos-clean-host
   cancel-in-progress: false
-
-env:
-  VERSION: ${{ github.event.inputs.version || 'v0.1.17' }}
 
 jobs:
   clean-host-arm64:
@@ -50,6 +46,23 @@ jobs:
         with:
           fetch-depth: 1
           submodules: false
+
+      - name: Resolve product version (SSoT: VERSION file)
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_VERSION}" ]; then
+            VERSION="${INPUT_VERSION}"
+          else
+            VERSION="v$(tr -d '[:space:]' < VERSION)"
+          fi
+          if ! printf '%s' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([a-z0-9]+)?$'; then
+            echo "::error::版本格式非法：${VERSION}（期望 vX.Y.Z）" >&2
+            exit 1
+          fi
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "resolved product version: ${VERSION}"
 
       - name: Download product tarball (atomgit release)
         run: |
@@ -84,6 +97,23 @@ jobs:
         with:
           fetch-depth: 1
           submodules: false
+
+      - name: Resolve product version (SSoT: VERSION file)
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_VERSION}" ]; then
+            VERSION="${INPUT_VERSION}"
+          else
+            VERSION="v$(tr -d '[:space:]' < VERSION)"
+          fi
+          if ! printf '%s' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([a-z0-9]+)?$'; then
+            echo "::error::版本格式非法：${VERSION}（期望 vX.Y.Z）" >&2
+            exit 1
+          fi
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "resolved product version: ${VERSION}"
 
       - name: Download product tarball (atomgit release)
         run: |

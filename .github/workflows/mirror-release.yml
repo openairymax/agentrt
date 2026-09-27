@@ -24,7 +24,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '待回填版本（如 v0.1.17，须已有 atomgit Release + 三端 tag）'
+        description: '待回填版本（如 vX.Y.Z，须已有 atomgit Release + 三端 tag）'
         required: true
         type: string
       fetch_missing:

@@ -6,7 +6,7 @@
 
 **Language:** English | [简体中文](README_zh.md)
 
-[![Version](https://img.shields.io/badge/version-0.1.16-5a6b7e)](https://atomgit.com/openairymax/agentrt/releases/tag/v0.1.16)
+[![Version](https://img.shields.io/badge/version-0.1.18-5a6b7e)](https://atomgit.com/openairymax/agentrt/releases/tag/v0.1.18)
 [![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
 
@@ -316,21 +316,23 @@ Each version ships with a GPG-signed manifest in [`latest/`](latest), which is
 what the updater reads. [CHANGELOG.md](CHANGELOG.md) records the release
 history.
 
-The current release is **v0.1.16**. Highlights:
+The current release is **v0.1.18**. Highlights:
 
-- Memory writes and recall now truncate on a UTF-8 character boundary instead
-  of a byte offset, so long conversations containing CJK text or emoji no
-  longer corrupt the memory store or trip an upstream HTTP 400 `invalid
-  unicode code point`. The same fix is applied on both the CLI and gateway
-  paths, with residual invalid bytes sanitised at the gateway.
-- A model-service rejection (HTTP 400/422) is now reported as what it is —
-  "request rejected by the model service" together with the provider's own
-  message — rather than being folded into a generic read/write error.
-- Memory records already written in a corrupted form by earlier versions are
-  cleaned up in place (backup kept).
-- CI uploads `ctest` logs as artifacts on failure, and the cross-repository
-  release-gate fixtures are pinned to explicit commits instead of a moving
-  default branch.
+- The scheduler policy engine was rebuilt as a table-driven design, dropping
+  more than 1,400 lines of stale policy branches; the scheduling path is now
+  shorter and its behaviour easier to reason about.
+- The model-service daemon (`llm_d`) completed its service-face template
+  conversion: its service surface now matches every other daemon, so upgrades
+  behave more predictably.
+- Five chunks of consumer-less legacy code were removed (old scheduler policy,
+  a leftover monitoring branch, a general-purpose cache compatibility layer, a
+  tool-service adapter bridge and an orphaned test file), leaving the install
+  package and runtime leaner.
+- Four new automated release gates (module-size ceiling, link closure, header
+  shadowing and propagation dead-signal) now block regressions before a
+  release ships.
+- Daemons no longer link service libraries implicitly; every cross-service call
+  goes through the system bus, lowering coupling risk on upgrade.
 
 ## Documentation
 
