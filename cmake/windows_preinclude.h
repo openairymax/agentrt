@@ -56,10 +56,6 @@ typedef SSIZE_T ssize_t;
 typedef int pid_t;
 #endif
 
-#ifndef AIRY_UNUSED
-#define AIRY_UNUSED  __pragma(warning(suppress:4100))
-#endif
-
 #define __attribute__(x)
 
 #ifndef PATH_MAX
