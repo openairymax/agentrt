@@ -42,9 +42,9 @@ inputs:
     required: false
     default: '2408ab5bd9b60016d2ca366aaa9011671bb95d4a'
   tools_sha:
-    description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml）'
+    description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
-    default: '00c53845ec87e462bcd7b23537d28a38308f2de2'
+    default: '7a61f5ef980664c717a9b556f066b4bbeeb33db0'
 runs:
   using: composite
   steps:
