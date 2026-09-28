@@ -164,7 +164,7 @@ set(CLI_INC_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/error
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/sync
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/ipc
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/sd
+    # SD 契约头经 coreloopthree PUBLIC 链 airy_ipc_ops 传播解析
     # airy_dirent.h 等 POSIX 兼容头（Windows MSVC 下无 dirent.h，走
     # FindFirstFileA 实现；#112 实证 cmd_system/tui_complete C2065）
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/compat
