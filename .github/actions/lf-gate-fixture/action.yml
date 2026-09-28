@@ -40,7 +40,7 @@ inputs:
   sdk_sha:
     description: 'sdk 仓锁定 commit（判据消费：tui/scripts/airymaxrt + tui/src 判据面）'
     required: false
-    default: '2408ab5bd9b60016d2ca366aaa9011671bb95d4a'
+    default: '791dfb9770e7f1dcb30e36d0ba5e6ce68f20fca8'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
