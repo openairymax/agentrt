@@ -47,7 +47,7 @@ jobs:
           fetch-depth: 1
           submodules: false
 
-      - name: Resolve product version (SSoT: VERSION file)
+      - name: "Resolve product version (SSoT: VERSION file)"
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
@@ -98,7 +98,7 @@ jobs:
           fetch-depth: 1
           submodules: false
 
-      - name: Resolve product version (SSoT: VERSION file)
+      - name: "Resolve product version (SSoT: VERSION file)"
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
