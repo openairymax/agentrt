@@ -768,6 +768,38 @@ else
     fi
 fi
 
+# P5 全量链接新鲜校验：构建期门禁消费 configure 期 links.txt 快照，增量
+# 构建不重 configure 时存在吃过期快照的 fail-open 窗口——此处对构建树
+# 重 configure 刷新快照，再对全部目标跑全量 depgraph 校验收窄该窗口。
+if [ -n "${AIRY_GATE_BUILD_DIR:-}" ]; then
+    _depgraph="$AIRY_GATE_BUILD_DIR/tools/airy_depgraph/airy_depgraph"
+    if [ ! -x "$_depgraph" ]; then
+        bad "P5 构建树 depgraph 工具缺失: $_depgraph（构建契约破坏）"
+    elif ! command -v cmake >/dev/null 2>&1; then
+        bad "P5 构建树已指定但 cmake 不可用（门禁快照无法刷新）"
+    else
+        cmake -S "$ROOT" -B "$AIRY_GATE_BUILD_DIR" >/dev/null 2>&1 \
+            || bad "P5 重 configure 刷新 linkgate 快照失败: ${AIRY_GATE_BUILD_DIR}"
+        _viol=""
+        for _t in $(grep -vE '^[[:space:]]*(#|$)' "$_whitelist" | sed 's/:.*//'); do
+            [ -f "$AIRY_GATE_BUILD_DIR/linkgate/$_t.links.txt" ] \
+                || _viol="$_viol $_t(缺门禁快照)"
+        done
+        for _lf in "$AIRY_GATE_BUILD_DIR"/linkgate/*.links.txt; do
+            [ -f "$_lf" ] || continue
+            "$_depgraph" --links "$_whitelist" --actual "$_lf" \
+                || _viol="$_viol $(basename "$_lf" .links.txt)"
+        done
+        if [ -z "$_viol" ]; then
+            ok "P5 全量链接门禁新鲜校验通过（快照刷新后零违规）"
+        else
+            bad "P5 全量链接门禁违规（越权/缺登记/缺快照）:$_viol"
+        fi
+    fi
+else
+    skip "P5 未收到 AIRY_GATE_BUILD_DIR，跳过全量链接新鲜校验（构建期门禁为主判据）"
+fi
+
 section "Q" "B6 gateway 零编排（退役 SSE 编排死代码物理移除）"
 
 _q1_dead=""
