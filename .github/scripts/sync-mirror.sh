@@ -173,34 +173,68 @@ enqueue() {
   done < <(parse_submodules "$1")
 }
 
-ensure_github_repo() {
-  gh repo view "${GH_ORG}/$1" >/dev/null 2>&1 && return 0
-  local vis="--public" err
-  is_private "$1" && vis="--private"
-  # gh 2.x 无 --confirm；非交互环境下 create 直接生效
-  if err="$(gh repo create "${GH_ORG}/$1" "$vis" 2>&1 >/dev/null)"; then
-    log "  created github.com/${GH_ORG}/$1"
-    return 0
-  fi
-  echo "::error::repo $1: gh create failed: $(printf '%s' "$err" | tr '\n' ' ' | tail -c 200)"
-  return 1
+# 存在性探测：返回 HTTP code（000=网络级失败）。gh CLI / curl -f 的
+# 失败语义无法区分 404 与网络故障，故直连平台 API 取码判定。
+repo_code() {
+  local label="$1" name="$2" code
+  case "$label" in
+    github) code="$(curl -s -o /dev/null -w '%{http_code}' \
+                -H "Authorization: Bearer ${GH_TOKEN}" \
+                "https://api.github.com/repos/${GH_ORG}/${name}")" ;;
+    gitee)  code="$(curl -s -o /dev/null -w '%{http_code}' \
+                "https://gitee.com/api/v5/repos/${GT_ORG}/${name}?access_token=${GT_TOKEN}")" ;;
+    *) code=000 ;;
+  esac
+  printf '%s' "${code:-000}"
 }
 
-ensure_gitee_repo() {
-  curl -fsS -o /dev/null \
-    "https://gitee.com/api/v5/repos/${GT_ORG}/$1?access_token=${GT_TOKEN}" && return 0
-  local vis="false" err
-  is_private "$1" && vis="true"
-  if err="$(curl -fsS -X POST \
-      "https://gitee.com/api/v5/orgs/${GT_ORG}/repos" \
-      --data-urlencode "access_token=${GT_TOKEN}" \
-      --data-urlencode "name=$1" \
-      --data-urlencode "private=${vis}" \
-      --data-urlencode "auto_init=false" 2>&1)"; then
-    log "  created gitee.com/${GT_ORG}/$1"
-    return 0
-  fi
-  echo "::error::repo $1: gitee create failed: $(printf '%s' "$err" | sed 's/access_token[^&"]*/access_token***/g' | tr '\n' ' ' | tail -c 200)"
+# 缺仓判定只认 HTTP 200 为存在：探测失败（网络瞬断）≠ 仓不存在，
+# 非 200/404 时退避重试，404 才建仓（run 36381608475 实证：探测 GET
+# SSL 超时误判不存在 → create 撞 422 已存在 → 整仓失败）。
+# create 被拒（422 已存在）时回退再探测一次，覆盖"首轮探测恰逢瞬断
+# 而仓实际存在"窗口；两平台同一根因，对称修复。
+ensure_repo() {
+  local label="$1" name="$2" vis err code probe
+  case "$label" in
+    github)
+      vis="--public"; is_private "$name" && vis="--private"
+      for probe in 1 2 3; do
+        code="$(repo_code github "$name")"
+        case "$code" in 200) return 0 ;; 404) break ;; *) sleep $((probe * 5)) ;; esac
+      done
+      [ "$code" = 200 ] && return 0
+      # gh 2.x 无 --confirm；非交互环境下 create 直接生效
+      if err="$(gh repo create "${GH_ORG}/$name" "$vis" 2>&1 >/dev/null)"; then
+        log "  created github.com/${GH_ORG}/$name"
+        return 0
+      fi
+      [ "$(repo_code github "$name")" = 200 ] && {
+        log "  github.com/${GH_ORG}/$name already exists"; return 0
+      }
+      echo "::error::repo $name: gh create failed: $(printf '%s' "$err" | tr '\n' ' ' | tail -c 200)"
+      ;;
+    gitee)
+      vis="false"; is_private "$name" && vis="true"
+      for probe in 1 2 3; do
+        code="$(repo_code gitee "$name")"
+        case "$code" in 200) return 0 ;; 404) break ;; *) sleep $((probe * 5)) ;; esac
+      done
+      [ "$code" = 200 ] && return 0
+      if err="$(curl -fsS -X POST \
+          "https://gitee.com/api/v5/orgs/${GT_ORG}/repos" \
+          --data-urlencode "access_token=${GT_TOKEN}" \
+          --data-urlencode "name=$name" \
+          --data-urlencode "private=${vis}" \
+          --data-urlencode "auto_init=false" 2>&1)"; then
+        log "  created gitee.com/${GT_ORG}/$name"
+        return 0
+      fi
+      [ "$(repo_code gitee "$name")" = 200 ] && {
+        log "  gitee.com/${GT_ORG}/$name already exists"; return 0
+      }
+      echo "::error::repo $name: gitee create failed: $(printf '%s' "$err" | sed 's/access_token[^&"]*/access_token***/g' | tr '\n' ' ' | tail -c 200)"
+      ;;
+  esac
   return 1
 }
 
@@ -224,13 +258,13 @@ sync_repo() {
   rm -f "$gm"
 
   local rc=0
-  if ensure_github_repo "$name"; then
+  if ensure_repo github "$name"; then
     push_mirror "$name" "$dir" \
       "https://x-access-token:${GH_TOKEN}@github.com/${GH_ORG}/${name}.git" github || rc=1
   else
     rc=1
   fi
-  if ensure_gitee_repo "$name"; then
+  if ensure_repo gitee "$name"; then
     push_mirror "$name" "$dir" \
       "https://oauth2:${GT_TOKEN}@gitee.com/${GT_ORG}/${name}.git" gitee || rc=1
   else
