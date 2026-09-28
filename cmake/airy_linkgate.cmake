@@ -3,7 +3,9 @@
 # 架构约束（0.1.9 方案 §2.2）："认知引擎只对 think_d 暴露服务面"——
 # gateway 系目标禁链 coreloopthree/cognition。本模块把该事实固化为
 # 构建期断言：
-#   - link-whitelist.txt（agentrt 根，单一权威）声明 目标 -> 允许库
+#   - link-whitelist.txt（agentrt 根，单一权威）声明 目标 -> 允许库；
+#     其路径由本模块以 CMAKE_SOURCE_DIR 单点定义（SSoT），调用点
+#     零路径知识，文件缺失即 configure 期 fail-closed
 #   - 各 CMakeLists 在目标定义后调用 airy_linkgate_collect() 收集目标
 #     实际链接（get_target_property LINK_LIBRARIES），configure 期写入
 #     ${CMAKE_BINARY_DIR}/linkgate/<target>.links.txt
@@ -19,16 +21,22 @@
 # 已登记目标名列表（INTERNAL cache 跨目录共享）
 # 每次 include 先重置：cache 值跨 configure 累积会重复追加
 unset(AIRY_LINKGATE_TARGETS CACHE)
-unset(AIRY_LINKGATE_WHITELIST CACHE)
 set(AIRY_LINKGATE_TARGETS "" CACHE INTERNAL "linkgate collected targets")
-set(AIRY_LINKGATE_WHITELIST "" CACHE INTERNAL "linkgate whitelist file")
+# 白名单单一权威源：路径知识仅此一处。CMAKE_SOURCE_DIR = agentrt 根
+# （daemons/gateway 均无独立 project()，只作为子目录配置），与各调用点
+# 嵌入层级无关；历史 7 调用点各自硬编码相对路径（../../、../）在此收敛
+set(AIRY_LINKGATE_WHITELIST "${CMAKE_SOURCE_DIR}/link-whitelist.txt"
+    CACHE INTERNAL "linkgate whitelist SSoT")
+if(NOT EXISTS "${AIRY_LINKGATE_WHITELIST}")
+    message(FATAL_ERROR
+        "airy_linkgate: whitelist SSoT missing: ${AIRY_LINKGATE_WHITELIST}")
+endif()
 
 # 收集目标实际链接并生成清单（目标定义后调用）
-function(airy_linkgate_collect TARGET_NAME WHITELIST_FILE)
+function(airy_linkgate_collect TARGET_NAME)
     if(NOT TARGET ${TARGET_NAME})
         message(FATAL_ERROR "airy_linkgate_collect: target '${TARGET_NAME}' not defined yet")
     endif()
-    set(AIRY_LINKGATE_WHITELIST "${WHITELIST_FILE}" CACHE INTERNAL "")
 
     get_target_property(_link_list ${TARGET_NAME} LINK_LIBRARIES)
     set(_clean "")

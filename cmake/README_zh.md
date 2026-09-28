@@ -83,8 +83,10 @@ cmake/
 把模块间链接关系固化为构建期断言，与 `tools/airy_depgraph` 配合工作：
 
 - 白名单文件为仓库根 `link-whitelist.txt`（单一权威），声明
-  目标 → 允许链接的库；
-- `airy_linkgate_collect(TARGET_NAME WHITELIST_FILE)`：在目标定义后调用，
+  目标 → 允许链接的库；路径由 `airy_linkgate.cmake` 以
+  `CMAKE_SOURCE_DIR` 单点解析（调用点零路径知识，文件缺失即
+  configure 期 fail-closed）；
+- `airy_linkgate_collect(TARGET_NAME)`：在目标定义后调用，
   收集目标实际链接（`LINK_LIBRARIES`，过滤生成器表达式与链接器选项），
   写入 `${CMAKE_BINARY_DIR}/linkgate/<target>.links.txt`；
 - `airy_linkgate_install_checks()`：在 `airy_depgraph` 目标就绪后由根

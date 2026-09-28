@@ -88,8 +88,11 @@ Turns module link relationships into build-time assertions, working with
 `tools/airy_depgraph`:
 
 - The whitelist file is `link-whitelist.txt` at the repository root (single
-  source of truth), declaring target → allowed libraries;
-- `airy_linkgate_collect(TARGET_NAME WHITELIST_FILE)`: called after a target
+  source of truth), declaring target → allowed libraries; its path is
+  resolved once inside `airy_linkgate.cmake` via `CMAKE_SOURCE_DIR`
+  (callers carry no path knowledge; a missing file fails the configure
+  step, fail-closed);
+- `airy_linkgate_collect(TARGET_NAME)`: called after a target
   is defined; collects the target's actual links (`LINK_LIBRARIES`,
   filtering generator expressions and linker options) into
   `${CMAKE_BINARY_DIR}/linkgate/<target>.links.txt`;
