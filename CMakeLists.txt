@@ -1078,13 +1078,6 @@ endif()
 
 # 安装配置
 if(AIRY_BUILD_ALL)
-    # 创建安装目标
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs")
-        install(DIRECTORY docs/ DESTINATION share/doc/agentrt
-                PATTERN ".gitignore" EXCLUDE
-                PATTERN "*.pyc" EXCLUDE)
-    endif()
-
     # 安装许可证文件
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
         install(FILES LICENSE DESTINATION share/licenses/agentrt)
