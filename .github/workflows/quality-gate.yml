@@ -185,5 +185,12 @@ jobs:
         with:
           gh_token: ${{ secrets.GH_TOKEN }}
 
+      # python3-yaml 显式声明：门禁 AI1 组解析 CI YAML 硬依赖，此前
+      # 依赖 runner 预装属环境侥幸（三腿统一显式契约）
+      - name: Install gate deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3 python3-yaml
+
       - name: Run release gates (WS-9, A~AH)
         run: bash scripts/verify_release_gates.sh
