@@ -1929,6 +1929,24 @@ else
     bad "AH6 README 契约漂移:$_ah6_bad"
 fi
 
+# AI1：CI YAML 全量可解析（裸标量含 ": " 使 GitHub 判定 workflow 非法，
+# 每次 push 产生 startup_failure 秒败且 dispatch 不可用）
+_ai_bad=""
+_ai_n=0
+for _ai_f in "$ROOT"/.github/workflows/*.yml "$ROOT"/.github/actions/*/action.yml; do
+    [ -f "$_ai_f" ] || continue
+    _ai_n=$((_ai_n + 1))
+    if ! _ai_err="$(python3 -c 'import sys,yaml; yaml.safe_load(open(sys.argv[1]))' "$_ai_f" 2>&1)"; then
+        _ai_bad="${_ai_bad} ${_ai_f#"$ROOT"/}:$(printf '%s' "$_ai_err" | tail -n 1)"
+    fi
+done
+[ "$_ai_n" -gt 0 ] || _ai_bad="$_ai_bad 未找到任何CI YAML"
+if [ -z "$_ai_bad" ]; then
+    ok "AI1 CI YAML 全量可解析（workflow+action）"
+else
+    bad "AI1 YAML 解析失败:$_ai_bad"
+fi
+
 printf '\n门禁汇总: PASS=%d FAIL=%d\n' "$PASS" "$FAIL"
 if [ "$FAIL" -gt 0 ]; then
     printf '  [GATE] WS-9 社区六类问题修复发布门禁未通过（方案 §4.9 / 9.8）\n'
