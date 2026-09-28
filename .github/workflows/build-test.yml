@@ -58,6 +58,9 @@ jobs:
         with:
           gh_token: ${{ secrets.GH_TOKEN }}
 
+      # python3-yaml 显式声明：门禁 AI1 组以 PyYAML 解析 CI YAML，
+      # 此前 Linux 腿依赖 runner 预装属环境侥幸（macOS 腿 #355 实证
+      # ModuleNotFoundError），三腿统一显式契约
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -66,7 +69,7 @@ jobs:
             libsqlite3-dev libcjson-dev libyaml-dev libcurl4-openssl-dev \
             libssl-dev zlib1g-dev libzstd-dev \
             libmicrohttpd-dev libwebsockets-dev libevent-dev \
-            python3 python3-pip
+            python3 python3-pip python3-yaml
 
       - name: Configure (ENABLE_COVERAGE=ON, BUILD_TESTS=ON)
         run: |
@@ -224,10 +227,14 @@ jobs:
         with:
           gh_token: ${{ secrets.GH_TOKEN }}
 
+      # PyYAML 显式声明：门禁 AI1 组解析 CI YAML 硬依赖（macOS #355
+      # 实证 ModuleNotFoundError）；brew python 为 externally-managed，
+      # 需 --break-system-packages 装入 PATH 上的 python3
       - name: Install build dependencies (Homebrew)
         run: |
           brew install cmake ninja pkgconf sqlite cjson libyaml curl openssl zlib zstd \
             libmicrohttpd libwebsockets libevent nghttp2
+          python3 -m pip install --break-system-packages pyyaml
 
       # openssl / zlib / sqlite 为 keg-only，需显式导出 pkg-config 路径供 find_package 使用
       - name: Configure (clang, BUILD_TESTS=ON)
