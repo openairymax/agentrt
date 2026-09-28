@@ -815,8 +815,7 @@ if(AIRY_BUILD_ALL)
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/src/cognition
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/src/cognition/grad
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/src/cognition/foundation
-            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/memory
-            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/memory/builtin
+            ${AIRY_ATOMS_PREBUILT_DIR}/atoms/memory/include
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/taskflow/include
             ${AIRY_ATOMS_PREBUILT_DIR}/atoms/syscall/include
         )
