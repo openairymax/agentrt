@@ -658,7 +658,7 @@ else
         bad "M3 /mcp 暴露工具数 $_mcp_n < 15（内置工具集被删减）"
     elif [ -z "$PERM_TMPL" ]; then
         if [ -n "$_tools_root" ]; then
-            bad "M3 AIRY_GATE_TOOLS_ROOT 显式指定但模板缺失（$AIRY_GATE_TOOLS_ROOT）"
+            bad "M3 AIRY_GATE_TOOLS_ROOT 显式指定但模板缺失（${AIRY_GATE_TOOLS_ROOT}）"
         else
             skip "M3 未取到 tools 仓 permission_rules.yaml（本地无 tools 仓）；CI 侧由取料 step fail-closed 兜底"
         fi
@@ -703,7 +703,7 @@ else
     fi
     for _sym in gw_aipc_call gw_aipc_stream gw_aipc_subscribe; do
         grep -Fq "$_sym" "$_aipc_face" \
-            || bad "N3 统一客户端面缺入口 $_sym（客户端面 API 面被削）"
+            || bad "N3 统一客户端面缺入口 ${_sym}（客户端面 API 面被削）"
     done
     grep -Fq 'gw_aipc_call' "$ROOT/gateway/src/biz/gateway_biz_forward.c" \
         && ok "N3 gw_svc_call 转调统一客户端面（gw_aipc_call）" \
@@ -754,7 +754,7 @@ if [ -n "${AIRY_GATE_BUILD_DIR:-}" ]; then
 fi
 if [ -z "$_cli_bin" ]; then
     if [ -n "${AIRY_GATE_BUILD_DIR:-}" ]; then
-        bad "P4 构建树指定但 airy_cli 产物缺失: $AIRY_GATE_BUILD_DIR（构建契约破坏）"
+        bad "P4 构建树指定但 airy_cli 产物缺失: ${AIRY_GATE_BUILD_DIR}（构建契约破坏）"
     else
         skip "P4 未收到 AIRY_GATE_BUILD_DIR，跳过产物断言（ctest 注入兜底）"
     fi
@@ -1790,7 +1790,7 @@ else
     fi
 fi
 if [ -z "$_ag1_bad" ]; then
-    ok "AG1 VERSION 唯一权威在位（单行 X.Y.Z: $_ag1_raw）"
+    ok "AG1 VERSION 唯一权威在位（单行 X.Y.Z: ${_ag1_raw}）"
 else
     bad "AG1 VERSION 结构失守:$_ag1_bad"
 fi

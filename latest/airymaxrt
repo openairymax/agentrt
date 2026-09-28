@@ -722,7 +722,7 @@ upd_lock_acq() {
     fi
     pid="$(cat "$lk/pid" 2>/dev/null)"
     if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-        [ "$q" = "quiet" ] || log error "另一更新进程持锁运行中（pid $pid），本次操作拒绝"
+        [ "$q" = "quiet" ] || log error "另一更新进程持锁运行中（pid ${pid}），本次操作拒绝"
         return 1
     fi
     [ "$q" = "quiet" ] || log warn "清理残留更新锁（持锁进程 ${pid:-?} 已不存在）"
@@ -880,7 +880,7 @@ upd_recover() {
         if [ -f "$rel/.complete" ]; then
             if rel_commit "$rel"; then
                 upd_env_sync "$rel"
-                log ok "已恢复上次中断的更新（当前版本: $target）"
+                log ok "已恢复上次中断的更新（当前版本: ${target}）"
             else
                 log error "在途更新恢复失败（current 切换被拒），intent 已保留待重试"
                 return 1
