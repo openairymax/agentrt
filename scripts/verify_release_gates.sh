@@ -896,7 +896,6 @@ section "S" "R1-c 执行体角色词汇表 SSoT（字面量零外泄 + 权威点
 for _a in \
     commons/utils/cognition/agent_vocab.h \
     commons/utils/cognition/agent_vocab.c \
-    daemons/common/include/agent_vocab.h \
     atoms/coreloopthree/include/hall_store.h \
     atoms/coreloopthree/src/config/yaml_loader_parse.c \
     daemons/gateway_d/src/main.c \
@@ -923,14 +922,14 @@ grep -q 'agent_vocab_canonical' "$ROOT/commons/utils/cognition/agent_vocab.c" 2>
     || _s2="$_s2 归一化符号缺失"
 grep -q 'agent_vocab_canonical' "$ROOT/atoms/coreloopthree/src/work_hall/work_hall_agent.c" 2>/dev/null \
     || _s2="$_s2 归一化边界缺失"
-grep -q 'agent_vocab.h' "$ROOT/daemons/common/include/agent_vocab.h" 2>/dev/null \
-    || _s2="$_s2 兼容头重导出缺失"
+[ -e "$ROOT/daemons/common/include/agent_vocab.h" ] \
+    && _s2="$_s2 兼容壳头复活（0.1.19 已拆除，裸名 include 须经 -I 直解 commons 权威）"
 grep -q 'agent_vocab_resolve' "$ROOT/commons/utils/cognition/agent_vocab.c" 2>/dev/null \
     || _s2="$_s2 严格解析符号缺失"
 grep -q 'agent_vocab_resolve' "$ROOT/atoms/coreloopthree/src/work_hall/work_hall_auth.c" 2>/dev/null \
     || _s2="$_s2 权限判定未用严格解析（fail-open 风险）"
 if [ -z "$_s2" ]; then
-    ok "S2 SSoT 权威点唯一（commons 实现 + daemons 重导出 + 归一化边界单点 + 权限判定严格解析）"
+    ok "S2 SSoT 权威点唯一（commons 实现 + 兼容壳头已拆除 + 归一化边界单点 + 权限判定严格解析）"
 else
     bad "S2 SSoT 结构异常:$_s2"
 fi
