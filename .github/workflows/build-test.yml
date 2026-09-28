@@ -219,41 +219,10 @@ jobs:
         with:
           groups: agent-workload
           gh_token: ${{ secrets.GH_TOKEN }}
-      - name: Fetch cross-repo gate fixture (sdk airymaxrt)
-        run: |
-          # 门禁跨仓判据取料：release_gates 测试断言 sdk/tui/scripts/
-          # airymaxrt（更新器源）与仓内 install.sh/latest/airymaxrt 三副本
-          # 一致。sdk 不属 agent-workload 检出组（init-submodules.sh），
-          # 此处 sparse 浅克隆仅取 sdk 骨架。tui 在 sdk 内是 gitlink 子模块，
-          # sparse-checkout 不会落盘其内容，必须显式 submodule update 才
-          # 检出 tui/scripts/airymaxrt；末行 test 兜底，取料失败即红
-          # （fail-closed，不得静默降级）。按 SHA 取料（见文件头
-          # GATE_SDK_SHA）——不跟随默认分支 HEAD，上游判据漂移须显式
-          # bump。fetch 后再 checkout，得到 detached 的锁定快照；
-          # submodule update 随该 commit 记录的 gitlink 锁定 tui。
-          git clone -q --filter=blob:none --sparse \
-            "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/openairymax/sdk.git" \
-            agent-workload/sdk
-          git -C agent-workload/sdk fetch -q --depth 1 origin "${{ env.GATE_SDK_SHA }}"
-          git -C agent-workload/sdk checkout -q "${{ env.GATE_SDK_SHA }}"
-          git -C agent-workload/sdk submodule update --init --depth 1 -- tui
-          test -f agent-workload/sdk/tui/scripts/airymaxrt
-
-      - name: Fetch cross-repo gate fixture (tools permission_rules.yaml)
-        run: |
-          # 门禁跨仓判据取料：release_gates 断言 tools 仓
-          # permission_rules.yaml 的 external 授权集 ⊇ /mcp tools/list
-          # 暴露集（防"工具齐列但不可调用"回归）。tools 不属
-          # agent-workload 检出组，此处 sparse 浅克隆仅取模板。末行 test
-          # 兜底，取料失败即红（fail-closed，不得静默降级）。同 sdk 腿，
-          # 按 SHA 取料（见文件头 GATE_TOOLS_SHA）。
-          git clone -q --filter=blob:none --sparse \
-            "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/openairymax/tools.git" \
-            _tools
-          git -C _tools fetch -q --depth 1 origin "${{ env.GATE_TOOLS_SHA }}"
-          git -C _tools checkout -q "${{ env.GATE_TOOLS_SHA }}"
-          git -C _tools sparse-checkout set scripts/ops/templates
-          test -f _tools/scripts/ops/templates/permission_rules.yaml
+      - name: Fetch cross-repo gate fixtures (sdk + tools)
+        uses: ./.github/actions/lf-gate-fixture
+        with:
+          gh_token: ${{ secrets.GH_TOKEN }}
 
       - name: Install build dependencies (Homebrew)
         run: |
