@@ -1947,6 +1947,54 @@ else
     bad "AI1 YAML 解析失败:$_ai_bad"
 fi
 
+# ── AJ. L1 注册面 SSoT（孤儿 tests/CMakeLists 归零 + EXISTS 守卫须指真实路径） ──
+section "AJ" "L1 注册面 SSoT（孤儿纳管 + 死路径 fail-closed + 构建目录守卫零残留）"
+
+# AJ1：每个 tests/CMakeLists.txt 必须被父级 add_subdirectory(tests) 引用，
+# 注册面单一权威，禁止双源残留
+_aj1_bad=""
+while IFS= read -r _aj_t; do
+    _aj_d=$(dirname "$(dirname "$_aj_t")")
+    grep -Eq 'add_subdirectory\(tests\b' "$_aj_d/CMakeLists.txt" 2>/dev/null \
+        || _aj1_bad="${_aj1_bad} ${_aj_t#"$ROOT"/}"
+done < <(find "$ROOT" -type f -path '*/tests/CMakeLists.txt' -not -path '*/.git/*')
+if [ -z "$_aj1_bad" ]; then
+    ok "AJ1 零孤儿 tests/CMakeLists.txt（注册面单一权威）"
+else
+    bad "AJ1 存在孤儿注册面:$_aj1_bad"
+fi
+
+# AJ2：CMakeLists 中以字面路径守卫的 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/x")
+# 必须指向真实存在的文件/目录；死路径=终身静默跳过，缺席须 fail-closed
+_aj2_bad=""
+while IFS= read -r _aj_l; do
+    _aj_f="${_aj_l%%:*}"
+    _aj_rest="${_aj_l#*:}"
+    while [[ "$_aj_rest" =~ \$\{CMAKE_CURRENT_SOURCE_DIR\}/([^\"]+) ]]; do
+        _aj_p="${BASH_REMATCH[1]}"
+        _aj_rest="${_aj_rest#*"${BASH_REMATCH[0]}"}"
+        case "$_aj_p" in *'${'*) continue ;; esac
+        [ -e "$(dirname "$_aj_f")/$_aj_p" ] \
+            || _aj2_bad="${_aj2_bad} ${_aj_p}(缺席)"
+    done
+done < <(grep -rn --include=CMakeLists.txt \
+    -F 'if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/' "$ROOT" | grep -v '/\.git/')
+if [ -z "$_aj2_bad" ]; then
+    ok "AJ2 字面 EXISTS 守卫路径全量在位（零死脚手架）"
+else
+    bad "AJ2 死 EXISTS 守卫:$_aj2_bad"
+fi
+
+# AJ3：禁止以构建目录对象为条件的链接注入（同一源码随构建目录状态产生
+# 不同配置产物，属构建非确定性；LTO 符号问题应以编译单元手段系统解决）
+_aj3_hits="$(grep -rn --include=CMakeLists.txt \
+    -F 'if(EXISTS "${CMAKE_BINARY_DIR}' "$ROOT" | grep -v '/\.git/' || true)"
+if [ -z "$_aj3_hits" ]; then
+    ok "AJ3 零构建目录 EXISTS 注入（链接输入确定性契约）"
+else
+    bad "AJ3 构建目录守卫注入残留:$(printf '\n%s' "$_aj3_hits")"
+fi
+
 printf '\n门禁汇总: PASS=%d FAIL=%d\n' "$PASS" "$FAIL"
 if [ "$FAIL" -gt 0 ]; then
     printf '  [GATE] WS-9 社区六类问题修复发布门禁未通过（方案 §4.9 / 9.8）\n'
