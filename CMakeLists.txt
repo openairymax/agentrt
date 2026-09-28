@@ -769,6 +769,10 @@ if(AIRY_BUILD_ALL)
     # 等会先命中 daemons 重导出兼容头（虽然内部经相对路径到达 commons，但仍构成
     # 编译期 atoms→daemons 反向依赖）。将 daemons/common/include 移至 commons 路径之后，
     # 确保 atoms 直接解析 commons 权威版本。
+    # 0.1.19 g12e 全局面收敛：daemons/common/include 与 gateway/src 已退出全局面。
+    # daemons 各目标经 svc_common PUBLIC 接口继承前者；gateway 库目标 PUBLIC 挂载
+    # src/ 自供，唯一跨域消费者 daemons/gateway_d 亦自带目录级注入。全局面仅保留
+    # commons 权威路径，同名重导出兼容头对所有模块永不命中。
     include_directories(
         ${CMAKE_CURRENT_SOURCE_DIR}/commons
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/include
@@ -795,10 +799,6 @@ if(AIRY_BUILD_ALL)
         # （airy_core/coreloopthree PRIVATE）+ daemons 服务面（daemons/
         # 目录级注入）」。gateway/CLI/cupolas 等客户端面不再看见内核头。
         ${CMAKE_CURRENT_SOURCE_DIR}/protocols/include
-        # daemons/common/include 作为兼容层放在最后（仅 daemons 自己需要，
-        # atoms 应通过上述 commons 权威路径解析已迁移的头文件）
-        ${CMAKE_CURRENT_SOURCE_DIR}/daemons/common/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/gateway/src
     )
 
     # 闭源 atoms 预编译模式：头文件树镜像源码相对结构（atoms/<...>/include 等）。
@@ -838,8 +838,6 @@ if(AIRY_BUILD_ALL)
         commons/utils/sync
         commons/include
         protocols/include
-        daemons/common/include
-        gateway/src
     )
     foreach(_inc ${_global_inc_dirs})
         if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_inc}")
