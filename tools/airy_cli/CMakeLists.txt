@@ -123,6 +123,11 @@ else()
     )
 endif()
 
+# 链接面门禁采集（白名单路径由 airy_linkgate.cmake 单点定义）：airy_cli
+# 已登记于 link-whitelist.txt，采集后其链接清单进入构建期门禁，与发布
+# 门禁 P4 的机制符号 nm 扫描构成链接面双判据。
+airy_linkgate_collect(airy_cli)
+
 # 继承 coreloopthree 的 cJSON 能力
 if(AIRY_HAS_CJSON)
     target_compile_definitions(airy_cli PRIVATE AIRY_HAS_CJSON=1)
