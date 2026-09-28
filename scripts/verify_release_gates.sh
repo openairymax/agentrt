@@ -956,12 +956,16 @@ grep -q 'agent_vocab_canonical' "$ROOT/atoms/coreloopthree/src/work_hall/work_ha
     || _s2="$_s2 归一化边界缺失"
 [ -e "$ROOT/daemons/common/include/agent_vocab.h" ] \
     && _s2="$_s2 兼容壳头复活（0.1.19 已拆除，裸名 include 须经 -I 直解 commons 权威）"
+[ -e "$ROOT/daemons/common/include/platform.h" ] \
+    && _s2="$_s2 平台重导出壳复活（施工线⑦已拆除，consumer 经 -I 直解 commons/platform）"
+[ -e "$ROOT/daemons/common/include/compat.h" ] \
+    && _s2="$_s2 兼容重导出壳复活（施工线⑦已拆除，consumer 应直引 commons/utils/compat）"
 grep -q 'agent_vocab_resolve' "$ROOT/commons/utils/cognition/agent_vocab.c" 2>/dev/null \
     || _s2="$_s2 严格解析符号缺失"
 grep -q 'agent_vocab_resolve' "$ROOT/atoms/coreloopthree/src/work_hall/work_hall_auth.c" 2>/dev/null \
     || _s2="$_s2 权限判定未用严格解析（fail-open 风险）"
 if [ -z "$_s2" ]; then
-    ok "S2 SSoT 权威点唯一（commons 实现 + 兼容壳头已拆除 + 归一化边界单点 + 权限判定严格解析）"
+    ok "S2 SSoT 权威点唯一（commons 实现 + 兼容壳头已拆除 [agent_vocab/platform/compat] + 归一化边界单点 + 权限判定严格解析）"
 else
     bad "S2 SSoT 结构异常:$_s2"
 fi
