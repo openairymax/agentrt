@@ -11,6 +11,10 @@ name: Quality Gates
 #          13 传播面与死信号 · 14 同名头遮蔽 · 15 llm_d 适配注册 · 16 llm_d 样本形态 ·
 #          17 版本一致性（VERSION 唯一权威，源码内零发布号副本）。
 #
+# 双 job 结构：quality-gate 跑伞仓 17 门禁编排器；release-gates 跑本仓
+# WS-9 发布门禁编排器（scripts/verify_release_gates.sh，0.1.19 §3.4
+# 「门禁脚本在而不生效」→ L1 接线 fail-closed，详见该 job 注释）。
+#
 # 纯文档变更跳过；同一 ref 的并发运行自动取消；构建树外化到 runner
 # temp，不落源码区。
 
@@ -146,3 +150,40 @@ jobs:
           QUALITY_GATE_BUILD_DIR: ${{ runner.temp }}/agentrt-quality-gate-build
         run: |
           bash "$RUNNER_TEMP/airymaxhub/tools/scripts/ci/quality/gates/quality-gate.sh"
+
+  # ==================== 本仓 WS-9 发布门禁（fail-closed 接线） ====================
+  # scripts/verify_release_gates.sh（A~AH 组 137 断言）此前仅本地人工执行，
+  # CI 零引用——门禁修复可静默回潮（§3.4 违例表首行「在而不生效」）。
+  # 本作业使其常驻生效：脚本自身 FAIL>0 即 exit 1（末尾 fail-closed，
+  # 无任何 || true 容错路径），step 非零退出即本 job 红。
+  #
+  # 取料语义：跨仓判据（sdk tui 三副本一致 + U/V/W/Y 组 Rust 判据、
+  # tools permission_rules.yaml 的 M3 组断言）经 lf-gate-fixture 锁定
+  # SHA 物化（SSoT 单点在 action，防镜像 HEAD 快照漂移——上游推进即
+  # 一时绿一时红、本地复现不可得）；脚本 M3 组对缺料仅限本地 skip，
+  # CI 侧兜底即该 action 的 test 兜底行。
+  release-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout (agentrt host, minimal)
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      # 结构性文件含 daemons/**（U 组判据 agent_d 源、AH 组四脚本）——
+      # daemons 为叶子子模块（gitlink 钉定），缺席即结构性必败。与本
+      # workflow 上方 job 同一检出脚本，保持检出语义单点。
+      - name: Init submodules (agentrt leaves)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh
+
+      - name: Fetch cross-repo gate fixtures (sdk + tools)
+        uses: ./.github/actions/lf-gate-fixture
+        with:
+          gh_token: ${{ secrets.GH_TOKEN }}
+
+      - name: Run release gates (WS-9, A~AH)
+        run: bash scripts/verify_release_gates.sh

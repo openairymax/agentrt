@@ -1,0 +1,87 @@
+name: 'lf-gate-fixture'
+description: |
+  跨仓门禁判据取料复合 action（0.1.19 §3.4「门禁脚本在而不生效」接线配套）。
+
+  锁定 SHA 物化两腿判据料：
+    - sdk(tui)   → agent-workload/sdk/tui：verify_release_gates.sh 三副本
+                   一致断言与 U/V/W/Y 组 Rust 结构判据。
+    - tools      → _tools/scripts/ops/templates/permission_rules.yaml：
+                   M3 组 MCP 暴露集 ⊆ external 授权集断言
+                   （脚本 L663：本地无仓仅限 skip，CI 侧由本 action fail-closed 兜底）。
+
+  SHA 单点声明：两个消费 workflow（build-test / quality-gate:release-gates）
+  经本 action 共用同一锁定快照。严禁在任何 workflow 内复制 SHA 字面量——
+  双副本 = bump 漏改一处 = 两个 workflow 门禁结论分叉（SSoT 违例）。
+
+  锁 SHA 而非跟随默认分支 HEAD 的论证（build-test 历史注释收编）：门禁
+  断言的是判据文件的**具体内容**，上游 main 一推进判据内容即变，同一
+  agentrt 树会在两次 run 间一时绿一时红，且本地复现不可得。锁 SHA 后
+  上游变更须显式 bump 才生效，漂移由静默转为可见。
+
+  bump 流程（缺任一环节 CI 取到的仍是旧快照或假红）：
+    1. 核对新 commit 与旧 pin 在本门禁消费路径上零差异，否则同步更新
+       verify_release_gates.sh 判据。
+    2. J1（更新面收敛到 release 附件）消费面在 tui 子仓：先在 tui 落地
+       收敛提交，再由 sdk 前推 tui gitlink，最后 bump sdk_sha。
+    3. 取值经 `git ls-remote <repo> refs/heads/main` 核验即为该仓 main
+       当前 HEAD。
+
+  结构约束（同 lf-init-deps，build-test #103 实证）：调用方必须先执行
+  actions/checkout，再调用本 action。
+inputs:
+  gh_token:
+    description: >-
+      GitHub token。composite action manifest 加载期对全部字符串字段做模板
+      求值且无 secrets 上下文——run 中出现 secrets 表达式字面量会直接
+      "Unrecognized named-value" 硬失败（build-test #106/#108 实证）。
+      调用方以 with.gh_token 传入仓库 secret GH_TOKEN，action 内部经
+      env 消费。
+    required: true
+  sdk_sha:
+    description: 'sdk 仓锁定 commit（判据消费：tui/scripts/airymaxrt + tui/src 判据面）'
+    required: false
+    default: '2408ab5bd9b60016d2ca366aaa9011671bb95d4a'
+  tools_sha:
+    description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml）'
+    required: false
+    default: '00c53845ec87e462bcd7b23537d28a38308f2de2'
+runs:
+  using: composite
+  steps:
+    - name: Fetch cross-repo gate fixture (sdk tui)
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.gh_token }}
+      run: |
+        set -euo pipefail
+        # tui 在 sdk 内是 gitlink 子模块，sparse-checkout 不会落盘其内容，
+        # 必须显式 submodule update 才检出 tui/scripts/airymaxrt；末行
+        # test 兜底，取料失败即红（fail-closed，不得静默降级）。按 SHA
+        # fetch 后 checkout，得到 detached 的锁定快照；submodule update
+        # 随该 commit 记录的 gitlink 锁定 tui。
+        git clone -q --filter=blob:none --sparse \
+          "https://x-access-token:${GH_TOKEN}@github.com/openairymax/sdk.git" \
+          agent-workload/sdk
+        git -C agent-workload/sdk fetch -q --depth 1 origin "${{ inputs.sdk_sha }}"
+        git -C agent-workload/sdk checkout -q "${{ inputs.sdk_sha }}"
+        git -C agent-workload/sdk submodule update --init --depth 1 -- tui
+        test -f agent-workload/sdk/tui/scripts/airymaxrt
+
+    - name: Fetch cross-repo gate fixture (tools permission_rules.yaml)
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.gh_token }}
+      run: |
+        set -euo pipefail
+        # sparse 浅克隆仅取判据模板；末行 test 兜底，取料失败即红
+        # （fail-closed，不得静默降级）。落点 _tools/ 对齐
+        # verify_release_gates.sh M3 组候选二与 init-submodules.sh 的
+        # release 腿落点（agentrt 自带顶层 tools/ 为 codegen 等自有面，
+        # 同名会互相遮蔽）。
+        git clone -q --filter=blob:none --sparse \
+          "https://x-access-token:${GH_TOKEN}@github.com/openairymax/tools.git" \
+          _tools
+        git -C _tools fetch -q --depth 1 origin "${{ inputs.tools_sha }}"
+        git -C _tools checkout -q "${{ inputs.tools_sha }}"
+        git -C _tools sparse-checkout set scripts/ops/templates
+        test -f _tools/scripts/ops/templates/permission_rules.yaml
