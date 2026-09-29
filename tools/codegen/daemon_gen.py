@@ -48,6 +48,9 @@
 #     },
 #     "deps": {"required": [], "optional": []},
 #     "modules": [{"name": "core", "sources": ["maths_service.c"]}]
+#                                           # sources 为 src/ 下相对路径，
+#                                           # 可含子目录（如 rpc/methods.c）；
+#                                           # 禁绝对路径与 .. 上跳，须 .c 结尾
 #   }
 #
 # 两种模式:
@@ -57,7 +60,7 @@
 # 仅使用 Python 标准库，无第三方依赖。结构对齐 syscall_gen.py
 # （parse/validate/render 三段式 + gen/check 双模式）。
 #
-# Generator version: 1.5.0
+# Generator version: 1.6.0
 
 import argparse
 import difflib
@@ -66,7 +69,7 @@ import re
 import sys
 from pathlib import Path
 
-GENERATOR_VERSION = "1.5.0"
+GENERATOR_VERSION = "1.6.0"
 
 # 生成产物相对 daemon 目录的固定落点（保持稳定，勿随意改名）
 OUTPUT_MAIN = "src/main.c"
@@ -247,8 +250,10 @@ def validate(data, path):
                            % (path, mod["name"]))
         for src in sources:
             if not isinstance(src, str) or not src.endswith(".c") \
-                    or "/" in src or "\\" in src:
-                raise GenError("%s: modules[%s] 源文件须为 src/ 下相对文件名: %r"
+                    or "\\" in src or src.startswith("/") \
+                    or ".." in src.split("/") or "" in src.split("/"):
+                raise GenError("%s: modules[%s] 源文件须为 src/ 下相对路径"
+                               "（禁绝对路径与上跳，须 .c 结尾）: %r"
                                % (path, mod["name"], src))
             if src in seen:
                 raise GenError("%s: 源文件重复列出: %s" % (path, src))
