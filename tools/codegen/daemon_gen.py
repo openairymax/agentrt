@@ -411,7 +411,7 @@ def render_main(d):
         "    svc_teardown();",
         "    daemon_cleanup_standard(g_bipc_%s, g_bsd_%s," % (daemon, daemon),
         "                            g_event_driver_%s, server_fd," % daemon,
-        "                            %s_SOCKET_UNIX, svc_destroy," % upper,
+        "                            ep.sock_unix, svc_destroy,",
         "                            &g_running_lock_%s);" % daemon,
     ]
     for op in reversed(d["ops"]):
