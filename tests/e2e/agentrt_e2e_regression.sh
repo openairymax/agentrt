@@ -112,8 +112,8 @@ rpc_err tool.approve '{"request_id":"x","decision":"allow"}' -32602 "tool.approv
 rpc_err tool.execute_tool '{"tool_id":"nope","params":{}}' -32603 "tool.execute_tool(未注册, 错误路径)"
 [ "$SKIP_EXTERNAL" = 0 ] && rpc_err tool.register '{"tool":{}}' -32602 "tool.register(缺字段, 错误路径)"
 
-# ── hook_d ─────────────────────────────────────────────────────────────────
-log "[hook_d]"
+# ── hook（notify_d hook 面，R7 并户）────────────────────────────────────────
+log "[hook→notify_d]"
 rpc_match hook.health '{}' '"healthy"' "hook.health"
 rpc_match hook.ping '{}' '"status":"ok"' "hook.ping"
 rpc hook.status '{}' "hook.status"
