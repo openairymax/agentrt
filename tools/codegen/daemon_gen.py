@@ -57,7 +57,7 @@
 # 仅使用 Python 标准库，无第三方依赖。结构对齐 syscall_gen.py
 # （parse/validate/render 三段式 + gen/check 双模式）。
 #
-# Generator version: 1.3.0
+# Generator version: 1.5.0
 
 import argparse
 import difflib
@@ -66,7 +66,7 @@ import re
 import sys
 from pathlib import Path
 
-GENERATOR_VERSION = "1.4.0"
+GENERATOR_VERSION = "1.5.0"
 
 # 生成产物相对 daemon 目录的固定落点（保持稳定，勿随意改名）
 OUTPUT_MAIN = "src/main.c"
@@ -341,13 +341,13 @@ def render_main(d):
         lines.append('    daemon_%s_ops_init("%s");' % (op, daemon))
     lines += [
         "",
-        "    if (svc_prepare_%s(config_path) != 0) {" % daemon,
+        "    if (svc_prepare(config_path) != 0) {",
         "        SVC_LOG_ERROR(\"Service prepare failed\");",
         "        goto fail_svc;",
         "    }",
         "",
         "    daemon_endpoint_t ep;",
-        "    svc_endpoint_%s(&ep, use_tcp);" % daemon,
+        "    svc_endpoint(&ep, use_tcp);",
         "",
         "    airy_sock_t server_fd = daemon_create_server_socket(",
         "        ep.use_tcp, ep.tcp_port, ep.sock_unix, ep.sock_win);",
@@ -384,14 +384,14 @@ def render_main(d):
         "    static const daemon_method_entry_t SVC_METHODS[] = {",
     ]
     for m in rpc["methods"]:
-        lines.append('        {"%s", svc_on_%s_%s},' % (m, m, daemon))
+        lines.append('        {"%s", m_%s},' % (m, m))
     lines += [
         '        {"shutdown", on_shutdown_method_%s},' % daemon,
         "    };",
         "    DAEMON_REGISTER_METHODS(g_dispatcher_%s, SVC_METHODS);" % daemon,
         '    SVC_LOG_INFO("Registered %d RPC methods (%s.* namespace)");'
         % (total_methods, cname),
-        "    svc_attach_%s(g_dispatcher_%s);" % (daemon, daemon),
+        "    svc_attach(g_dispatcher_%s);" % daemon,
         "",
         "    if (daemon_event_driver_add_server_fd(g_event_driver_%s," % daemon,
         "                                          (int)server_fd) != 0) {",
@@ -399,8 +399,8 @@ def render_main(d):
         "        goto fail_driver;",
         "    }",
         "",
-        "    if (svc_activate_%s(g_event_driver_%s, g_bsd_%s) != 0) {"
-        % (daemon, daemon, daemon),
+        "    if (svc_activate(g_event_driver_%s, g_bsd_%s) != 0) {"
+        % (daemon, daemon),
         "        SVC_LOG_ERROR(\"Service activate failed\");",
         "        goto fail_driver;",
         "    }",
@@ -408,10 +408,10 @@ def render_main(d):
         '    SVC_LOG_INFO("%s service running (event-driven mode)");' % cname,
         "    daemon_event_driver_run(g_event_driver_%s);" % daemon,
         "",
-        "    svc_teardown_%s();" % daemon,
+        "    svc_teardown();",
         "    daemon_cleanup_standard(g_bipc_%s, g_bsd_%s," % (daemon, daemon),
         "                            g_event_driver_%s, server_fd," % daemon,
-        "                            %s_SOCKET_UNIX, svc_destroy_%s," % (upper, daemon),
+        "                            %s_SOCKET_UNIX, svc_destroy," % upper,
         "                            &g_running_lock_%s);" % daemon,
     ]
     for op in reversed(d["ops"]):
@@ -425,7 +425,7 @@ def render_main(d):
         "    daemon_event_driver_destroy(g_event_driver_%s);" % daemon,
         "    airy_sock_close(server_fd);",
         "fail_svc:",
-        "    svc_destroy_%s();" % daemon,
+        "    svc_destroy();",
         "    airy_mtx_destroy(&g_running_lock_%s);" % daemon,
         "    airy_sock_cleanup();",
         "    return EXIT_FAILURE;",
@@ -459,30 +459,27 @@ def render_header(d):
         "#define %s_MAX_BUFFER %d" % (upper, rpc["buffer"]),
         "",
         "/* 端点解析钩子：常量户回填上方基线；可配置户在 svc.c 完成",
-        " * config/env 覆盖后与 cmdline use_tcp 融合。实现: src/svc.c。",
-        " * 命名豁免 15 字节（机械对齐户名）。 */",
-        "void svc_endpoint_%s(daemon_endpoint_t *ep, int cmdline_tcp);" % daemon,
+        " * config/env 覆盖后与 cmdline use_tcp 融合。实现: src/svc.c。 */",
+        "void svc_endpoint(daemon_endpoint_t *ep, int cmdline_tcp);",
         "",
         "/* 生命周期钩子（实现: src/svc.c）；activate 收到事件驱动句柄与",
         " * SD bootstrap 句柄，供事件耦合激活策略（如监控采样线程）与",
         " * manifest deps 驱动的依赖探测健康面使用。 */",
-        "int svc_prepare_%s(const char *config_path);" % daemon,
-        "int svc_activate_%s(daemon_event_driver_t *driver, daemon_bootstrap_sd_t *bsd);"
-        % daemon,
-        "void svc_teardown_%s(void);" % daemon,
-        "void svc_destroy_%s(void);" % daemon,
+        "int svc_prepare(const char *config_path);",
+        "int svc_activate(daemon_event_driver_t *driver, daemon_bootstrap_sd_t *bsd);",
+        "void svc_teardown(void);",
+        "void svc_destroy(void);",
         "",
         "/* 策略层附加装配挂点：静态注册表（SVC_METHODS）落库后的动态",
         " * 注册出口（如 roadmap.* 方法族）。实现: src/svc.c；无附加",
-        " * 注册的户提供空实现。dispatcher 为 method_dispatcher_t。",
-        " * 命名 <action>_<daemon> 豁免 15 字节（机械对齐户名）。 */",
-        "void svc_attach_%s(void *dispatcher);" % daemon,
+        " * 注册的户提供空实现。dispatcher 为 method_dispatcher_t。 */",
+        "void svc_attach(void *dispatcher);",
         "",
-        "/* RPC handler 族（实现: src/svc.c）。签名对齐 method_fn；命名",
-        " * <method>_<daemon> 三段式机械对齐注册表，豁免 15 字节。 */",
+        "/* RPC handler 族（实现: src/svc.c）。签名对齐 method_fn；",
+        " * 命名 m_<method>，与 .manifest rpc.methods 一一对应。 */",
     ]
     for m in rpc["methods"]:
-        lines.append("void svc_on_%s_%s(cJSON *params, int id, void *user_data);" % (m, daemon))
+        lines.append("void m_%s(cJSON *params, int id, void *user_data);" % m)
     lines += [
         "",
         "#endif /* %s */" % guard,
