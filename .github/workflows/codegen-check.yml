@@ -1,7 +1,8 @@
 name: Codegen Checks
 
 # 校验类流水线，触发器语义：
-#   - codegen 漂移检查：push/PR 常开（纯 python3，无编译依赖，开销小）；
+#   - codegen 漂移检查（syscall / daemons）：push/PR 常开（纯 python3，
+#     无编译依赖，开销小）；
 #   - ssot registry 校验：仅 workflow_dispatch 手动（较重——clone 伞仓
 #     只读数据源 + 初始化嵌套子模块），不随 push/PR 自动跑。
 
@@ -40,6 +41,30 @@ jobs:
             --input atoms/syscall/include/syscall.xml \
             --output-dir atoms/syscall/include \
             --check
+
+  # daemons 五件套（L3 SSoT）漂移门禁：daemons/<name>/.manifest 为机制层
+  # 装配唯一真值源，main.c / svc_<d>.h / sources.cmake 三件生成产物与它
+  # 做一致性校验。生成器仅依赖 python3 标准库，从自身路径推导仓库根；
+  # .manifest 位于 daemons 叶子子模块内，经 init-submodules.sh 就位。
+  # 任一生成产物与 .manifest 漂移即返回非零，阻止合入。
+  # 独立成 job 而非并入 syscall-codegen-check：job 名即 required check
+  # 名，两套 SSoT 各自语义单一，互不牵连。
+  daemon-codegen-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Init submodules (agentrt leaves)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh
+
+      - name: Verify daemon .manifest SSoT drift (daemons codegen)
+        run: |
+          python3 tools/codegen/daemon_gen.py --check
 
   # 用户态 SSoT 技术点权威源门禁：registry 登记的 agentrt 技术点权威源
   # 与物理宿主路径必须全部存在，登记了不存在的路径即 CI 失败（漂移门禁）。

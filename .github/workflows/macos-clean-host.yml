@@ -13,8 +13,8 @@ name: macOS Clean-Host Verify
 # 触发：
 #   - workflow_dispatch（版本由输入指定）。tag 仅在真正创建发行版时打
 #     （atomgit SSoT 单向同步），核验类运行一律 dispatch。
-# 两条腿：arm-64（macos-latest）与 x86-64（macos-15-intel），各自验证
-# 对应架构发布包。判定全在脚本内 fail-closed：job 结论 success 即出证。
+# 两腿（arm-64 / x86-64）结构完全同构，matrix 收敛；各自验证对应架构
+# 发布包。判定全在脚本内 fail-closed：job 结论 success 即出证。
 #
 # 注意（镜像拓扑）：产品 tar.gz 从 atomgit(SSoT) release 拉取；
 # GitHub-hosted runner 可达 atomgit。断言输出打在步骤日志；
@@ -35,62 +35,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  clean-host-arm64:
-    name: macOS arm-64 clean-host
-    runs-on: macos-latest
+  clean-host:
+    name: macOS ${{ matrix.arch }} clean-host
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm-64
+            runner: macos-latest
+            suffix: macos-arm-64
+          - arch: x86-64
+            runner: macos-15-intel
+            suffix: macos-x86-64
+    runs-on: ${{ matrix.runner }}
     env:
-      SUFFIX: macos-arm-64
-    steps:
-      - name: Checkout (workflow + verify script)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-          submodules: false
-
-      - name: "Resolve product version (SSoT: VERSION file)"
-        env:
-          INPUT_VERSION: ${{ github.event.inputs.version }}
-        run: |
-          set -euo pipefail
-          if [ -n "${INPUT_VERSION}" ]; then
-            VERSION="${INPUT_VERSION}"
-          else
-            VERSION="v$(tr -d '[:space:]' < VERSION)"
-          fi
-          if ! printf '%s' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([a-z0-9]+)?$'; then
-            echo "::error::版本格式非法：${VERSION}（期望 vX.Y.Z）" >&2
-            exit 1
-          fi
-          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
-          echo "resolved product version: ${VERSION}"
-
-      - name: Download product tarball (atomgit release)
-        run: |
-          set -euo pipefail
-          BASE="https://atomgit.com/openairymax/agentrt/releases/download/${VERSION}"
-          curl -fsSL --retry 3 -o "agentrt-${VERSION}-${SUFFIX}.tar.gz" "$BASE/agentrt-${VERSION}-${SUFFIX}.tar.gz" \
-            || { echo "::error::download failed: agentrt-${VERSION}-${SUFFIX}.tar.gz" >&2; exit 1; }
-          curl -fsSL --retry 3 -o "agentrt-${VERSION}-${SUFFIX}.tar.gz.sha256" "$BASE/agentrt-${VERSION}-${SUFFIX}.tar.gz.sha256" \
-            || { echo "::error::download failed: agentrt-${VERSION}-${SUFFIX}.tar.gz.sha256" >&2; exit 1; }
-          ls -la agentrt-*
-
-      - name: Run clean-host verify
-        # AIRY_INSTALLER_BOOTSTRAPPED=1：钉死核验对象为本树 scripts/install.sh
-        # （安装器自举对同内容仍会误切远程 main 重执行；核验语义要求测随版
-        # 发布物，禁止运行时漂移）。
-        env:
-          AIRY_INSTALLER_BOOTSTRAPPED: '1'
-        run: |
-          bash .github/scripts/verify-macos-clean-host.sh \
-            "$PWD/scripts/install.sh" \
-            "$PWD/agentrt-${VERSION}-${SUFFIX}.tar.gz" \
-            "$PWD/latest/airymaxrt"
-
-  clean-host-x86_64:
-    name: macOS x86-64 clean-host
-    runs-on: macos-15-intel
-    env:
-      SUFFIX: macos-x86-64
+      SUFFIX: ${{ matrix.suffix }}
     steps:
       - name: Checkout (workflow + verify script)
         uses: actions/checkout@v4
@@ -128,8 +87,9 @@ jobs:
       - name: Run clean-host verify
         # 必须用 block scalar（|）：plain scalar 多行折叠会把行尾 \ 与折叠
         # 空格合并成转义空格，参数获得前导空格 → [ -f ] false。
-        # AIRY_INSTALLER_BOOTSTRAPPED=1：钉死核验对象为本树 install.sh
-        # （自举对同内容仍会误切远程 main，核验禁止运行时漂移）。
+        # AIRY_INSTALLER_BOOTSTRAPPED=1：钉死核验对象为本树 scripts/install.sh
+        # （安装器自举对同内容仍会误切远程 main 重执行；核验语义要求测随版
+        # 发布物，禁止运行时漂移）。
         env:
           AIRY_INSTALLER_BOOTSTRAPPED: '1'
         run: |
