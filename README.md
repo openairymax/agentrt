@@ -235,7 +235,7 @@ recursively to get all of them at the pinned revisions.
 | **heapstore** | [openairymax/heapstore](https://atomgit.com/openairymax/heapstore) | Heap-backed runtime data persistence |
 | **protocols** | [openairymax/protocols](https://atomgit.com/openairymax/protocols) | AgentsIPC (128-byte header), A2A and A2T protocol stacks |
 | **gateway** | [openairymax/gateway](https://atomgit.com/openairymax/gateway) | HTTP / WS / SSE / MCP / A2A / OpenAI → JSON-RPC 2.0 |
-| **daemons** | [openairymax/daemons](https://atomgit.com/openairymax/daemons) | `gateway_d`, `agent_d`, `llm_d`, `tool_d`, `sched_d`, `think_d`, `mem_d`, `market_d`, `monit_d`, `notify_d`, `channel_d`, `a2a_d`, `cupolas_d`, `maths_d`, `hook_d` |
+| **daemons** | [openairymax/daemons](https://atomgit.com/openairymax/daemons) | `gateway_d`, `agent_d`, `llm_d`, `tool_d`, `sched_d`, `think_d`, `mem_d`, `market_d`, `monit_d`, `notify_d`, `channel_d`, `a2a_d`, `cupolas_d`, `maths_d` |
 
 ## Building from source
 

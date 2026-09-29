@@ -210,7 +210,7 @@ agentrt/
 | **heapstore** | [openairymax/heapstore](https://atomgit.com/openairymax/heapstore) | 运行时数据存储                                                                                                                                               |
 | **protocols** | [openairymax/protocols](https://atomgit.com/openairymax/protocols) | AgentsIPC（128 字节消息头）、A2A 与 A2T 协议栈                                                                                                                    |
 | **gateway**   | [openairymax/gateway](https://atomgit.com/openairymax/gateway)     | HTTP / WS / SSE / MCP / A2A / OpenAI → JSON-RPC 2.0                                                                                                   |
-| **daemons**   | [openairymax/daemons](https://atomgit.com/openairymax/daemons)     | `gateway_d`、`agent_d`、`llm_d`、`tool_d`、`sched_d`、`think_d`、`mem_d`、`market_d`、`monit_d`、`notify_d`、`channel_d`、`a2a_d`、`cupolas_d`、`maths_d`、`hook_d` |
+| **daemons**   | [openairymax/daemons](https://atomgit.com/openairymax/daemons)     | `gateway_d`、`agent_d`、`llm_d`、`tool_d`、`sched_d`、`think_d`、`mem_d`、`market_d`、`monit_d`、`notify_d`、`channel_d`、`a2a_d`、`cupolas_d`、`maths_d` |
 
 ## 从源码构建
 
