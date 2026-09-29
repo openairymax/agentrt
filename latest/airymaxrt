@@ -398,8 +398,9 @@ SUPERVISOR_BIN="$(find_tool AIRY_SUPERVISOR_BIN supervisor_d \
     "$AIRYRT_HOME/agentrt/build/bin/supervisor_d" \
     "$AIRYRT_HOME/build/bin/supervisor_d")"
 
-# B13 V13.4：supervisor 声明调谐的 AUX 全集（与 decl.c 内置缺省一致）
-SUPERV_AUX_ALL="hook_d monit_d sched_d channel_d market_d cupolas_d mem_d a2a_d notify_d"
+# B13 V13.4：supervisor 声明调谐的 AUX 全集（与 decl.c 内置缺省一致；
+# 0.1.19 R7 并户后 hook 面由 notify_d 承载）
+SUPERV_AUX_ALL="monit_d sched_d channel_d market_d cupolas_d mem_d a2a_d notify_d"
 
 sup_bin_link() {
     # supervisor 仅认 $AIRY_HOME/bin/<name>（launch 声明只记名字）：

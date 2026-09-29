@@ -49,7 +49,6 @@ sched_d: airy_platform_libs airy_common svc_common airy_coreloopthree airy_cogni
 market_d: airy_platform_libs airy_market_service airy_core
 channel_d: airy_platform_libs airy_common svc_common airy_core
 notify_d: airy_platform_libs airy_common svc_common airy_core airy_coreloop_hooks
-hook_d: airy_platform_libs airy_coreloop_hooks svc_common cupolas airy_core
 mem_d: airy_platform_libs airy_common airy_mem_service airy_core
 agent_d: airy_platform_libs airy_common airy_agent_service airy_core
 a2a_d: airy_platform_libs airy_common airy_a2a_service airy_protocols airy_core
