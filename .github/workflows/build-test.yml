@@ -532,42 +532,4 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # ==================== MemoryRovol 独立构建门禁（OSS + PRO） ====================
-  # 禁用：memoryrovol 为闭源仓（.gitmodules update=none，GitHub 不存在，
-  # 仅 atomgit 私有可达），GitHub Actions 无法检出源码；旧路径
-  # products/memoryrovol 亦为拆分前布局（现 agent-workload/products/）。
-  # 该门禁由本地构建台执行（tools/scripts/ci 体系），不在 GitHub 镜像侧运行。
-  memoryrovol-build:
-    if: false
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        mode: [oss, pro]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
 
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake lcov libsqlite3-dev libcjson-dev libyaml-dev \
-            libcurl4-openssl-dev libssl-dev zlib1g-dev libzstd-dev
-
-      - name: Configure (${{ matrix.mode }})
-        run: |
-          if [ "${{ matrix.mode }}" = "oss" ]; then
-            CMAKE_EXTRA="-DMEMORYROVOL_OSS=ON"
-          fi
-          cmake -S agent-workload/products/memoryrovol -B build \
-            -DBUILD_TESTS=ON -DWARNINGS_AS_ERRORS=ON ${CMAKE_EXTRA}
-
-      - name: Build
-        run: |
-          cmake --build build --parallel "$(nproc)"
-
-      - name: Run tests (ctest)
-        run: |
-          ctest --test-dir build --output-on-failure

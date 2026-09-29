@@ -82,17 +82,12 @@ jobs:
       #   agentrt ← 本次工作区检出（即触发门禁的提交，最权威）
       #   ecosystem/sdk/products ← GitHub 镜像（Gate 5 跨仓校验的兄弟叶仓；
       #     ecosystem 需再递归其第二层子模块，见下）
-      # 私有嵌套子模块（atoms 等）经 GH_TOKEN（org PAT）~/.netrc 认证。
+      # 私有嵌套子模块（atoms 等）经 ~/.netrc 认证——该文件已由上方
+      # init-submodules.sh 单点写入（检出语义单点），此处不再重复写。
       - name: Assemble gate dataset (tools, docs, agent-workload)
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
         run: |
-          if [ -n "${GH_TOKEN:-}" ]; then
-            printf 'machine github.com\nlogin x-access-token\npassword %s\n' \
-              "$GH_TOKEN" > "$HOME/.netrc"
-            chmod 600 "$HOME/.netrc"
-          fi
           set -euo pipefail
           UMB="$RUNNER_TEMP/airymaxhub"
           mkdir -p "$UMB/agent-workload"
