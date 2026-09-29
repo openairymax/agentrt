@@ -621,7 +621,7 @@ fi
 section "M" "R-6 工具授权面 ⊇ MCP 暴露面（双 Schema 解析防回归）"
 
 PDP_RULE_C="$ROOT/cupolas/src/permission/permission_rule.c"
-MCP_BUILTIN="$ROOT/daemons/tool_d/src/service_builtin.c"
+MCP_BUILTIN="$ROOT/daemons/tool_d/src/rpc/service_builtin.c"
 GW_BACKEND="$ROOT/gateway/src/biz/gateway_biz_backend.c"
 
 if grep -Fq 'cupolas_permission_rule_resource' "$PDP_RULE_C" \
