@@ -530,7 +530,7 @@ static int cli_gw_exchange(const char *method, const char *host, int port, const
  * "invalid unicode code point"）在 llm_d 已归入专用码 AIRY_ERR_LLM_BAD_REQUEST，
  * 经 llm_error_message() 渲染为 "Provider rejected the request body (HTTP
  * 400/422): malformed JSON or invalid UTF-8 in messages; …"（见
- * openai_rate_limit.c / provider_stream.c / llm_rpc.c）。但网关
+ * openai_rate_limit.c / provider_stream.c / rpc/methods.c）。但网关
  * 转发时把 daemon 错误码统一折叠为 -32603，只透传 message 文本，故 CLI 侧
  * 对网关 error.message 做特征分诊，避免把 provider 400 误报为"读写错误/
  * 网络错误"（R-1 已处理 401/403，R-5 已处理超时/连接失败，此处补齐 400/422）。

@@ -149,7 +149,7 @@ static llm_response_t *cli_chat_resp_from_json(const char *json)
 
 /* 单轮对话完成调用：消息缓冲 → llm.complete params → cli_gw_call →
  * llm_response_t。with_tools=0（工具轮次用尽的总结轮）时不携带工具
- * 定义。params 契约（llm_rpc_request.c parse_params 逐字段判据）：
+ * 定义。params 契约（rpc/dispatch.c parse_params 逐字段判据）：
  * messages 非空数组、role/content 须字符串、stream 字段不写（daemon
  * 侧默认非流式）、tool_calls 必须是数组、消息数 ≤ MAX_MESSAGES_PER_REQUEST。
  * 失败返回非 0：可执行原因已写入 g_cli_gw_err（cli_err_desc 一次性消费）。 */
