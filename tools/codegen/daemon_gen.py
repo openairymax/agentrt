@@ -5,8 +5,9 @@
 # daemon_gen.py — agentrt daemon 五件套样板生成器（L3 SSoT）
 #
 # 解析 daemons/<name>/.manifest 契约源（每户唯一真值源），生成机制层三件：
-#   a. src/main.c            入口引导（宏实例化 + 事件驱动装配 + 方法注册）
-#   b. include/svc_<d>.h     唯一私有头（端点常量 + svc 钩子/handler 声明）
+#   a. src/main.c            入口引导（宏实例化 + 事件驱动装配 + 方法表展开）
+#   b. include/svc_<d>.h     唯一私有头（端点常量 + svc 钩子/handler 声明
+#                            + SVC_<D>_METHODS(X) 方法表清单）
 #   c. modules/sources.cmake CMake 真装配源清单
 #
 # 手写层（生成器不碰）：.manifest 本身、src/svc.c（钩子/handler 实现）、
@@ -63,7 +64,7 @@
 # 仅使用 Python 标准库，无第三方依赖。结构对齐 syscall_gen.py
 # （parse/validate/render 三段式 + gen/check 双模式）。
 #
-# Generator version: 1.7.0
+# Generator version: 1.8.0
 
 import argparse
 import difflib
@@ -72,12 +73,17 @@ import re
 import sys
 from pathlib import Path
 
-GENERATOR_VERSION = "1.7.0"
+GENERATOR_VERSION = "1.8.0"
 
 # 生成产物相对 daemon 目录的固定落点（保持稳定，勿随意改名）
 OUTPUT_MAIN = "src/main.c"
 OUTPUT_HEADER = "include/svc_{daemon}.h"
 OUTPUT_CMAKE = "modules/sources.cmake"
+
+# main.c 行数预算（方案 §2.4：入口只做装配与启动，不写逻辑）。
+# 机制层装配与方法数解耦后应恒 ≤ 此值；超限即 fail-closed（生成期与
+# 校验期均生效），防止装配回潮。
+MAX_MAIN_LINES = 150
 
 # 脚本所在目录推导仓库根（agentrt/）：codegen -> tools -> agentrt
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -283,7 +289,7 @@ def _emit_generated_banner():
 
 
 def render_main(d):
-    """渲染 src/main.c：机制层装配（目标 <= 160 行）。"""
+    """渲染 src/main.c：机制层装配（目标 <= 150 行，行数与方法数解耦）。"""
     daemon = d["daemon"]
     cname = d["cname"]
     rpc = d["rpc"]
@@ -393,11 +399,7 @@ def render_main(d):
         "    g_dispatcher_%s = daemon_event_driver_get_dispatcher(" % daemon,
         "        g_event_driver_%s);" % daemon,
         "    static const daemon_method_entry_t SVC_METHODS[] = {",
-    ]
-    for m in rpc["methods"]:
-        lines.append('        {"%s", m_%s},' % (m, m))
-    lines += [
-        '        {"shutdown", on_shutdown_method_%s},' % daemon,
+        "        SVC_%s_METHODS(DAEMON_METHOD_ENTRY)" % upper,
         "    };",
         "    DAEMON_REGISTER_METHODS(g_dispatcher_%s, SVC_METHODS);" % daemon,
         '    SVC_LOG_INFO("Registered %d RPC methods (%s.* namespace)");'
@@ -495,6 +497,18 @@ def render_header(d):
         lines.append("void m_%s(cJSON *params, int id, void *user_data);" % m)
     lines += [
         "",
+        "/* RPC 方法表清单（唯一声明源，源自 .manifest rpc.methods）。",
+        " * main.c 以 X 宏展开为 daemon_method_entry_t[]：",
+        " *   #define X(n, f) {(n), (f)},",
+        " *   static const daemon_method_entry_t T[] = { SVC_%s_METHODS(X) };" % upper,
+        " * 装配行数与方法数解耦（机制层装配，策略数据在此单点维护）。 */",
+        "#define SVC_%s_METHODS(X) \\" % upper,
+    ]
+    for m in rpc["methods"]:
+        lines.append('    X("%s", m_%s) \\' % (m, m))
+    lines.append('    X("shutdown", on_shutdown_method_%s)' % daemon)
+    lines += [
+        "",
         "#endif /* %s */" % guard,
         "",
     ]
@@ -527,17 +541,31 @@ def render_cmake(d):
     return "\n".join(lines)
 
 
+def check_main_budget(contents, daemon):
+    """main.c 行数预算 fail-closed：超 MAX_MAIN_LINES 即报错。
+
+    装配行数应与方法数解耦（方法表经 SVC_<D>_METHODS X 宏展开），任何
+    户超限都是装配回潮的硬信号，--gen/--check 均须阻断。
+    """
+    n = len(contents[OUTPUT_MAIN].splitlines())
+    if n > MAX_MAIN_LINES:
+        raise GenError("%s/%s 超预算：%d 行 > %d 行上限"
+                       % (daemon, OUTPUT_MAIN, n, MAX_MAIN_LINES))
+
+
 def generate(manifest_path):
     """解析并校验 manifest，渲染全部生成产物，返回 {相对路径: 内容}。"""
     manifest_path = Path(manifest_path).resolve()
     daemon_dir = manifest_path.parent
     d = validate(parse_manifest(manifest_path), manifest_path)
     daemon = d["daemon"]
-    return {
+    contents = {
         OUTPUT_MAIN: render_main(d),
         OUTPUT_HEADER.format(daemon=daemon): render_header(d),
         OUTPUT_CMAKE: render_cmake(d),
-    }, daemon_dir
+    }
+    check_main_budget(contents, daemon)
+    return contents, daemon_dir
 
 
 def write_outputs(contents, daemon_dir):
