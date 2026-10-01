@@ -16,6 +16,7 @@
 #include "airy_cli_cmd_internal.h"
 #include "daemon_rpc_client.h"
 #include "cli_gw.h"
+#include "airy_defaults.h"
 #include "airy_memory.h"
 #include "cli_render.h"
 #include "logger.h"
@@ -163,18 +164,21 @@ const char *cli_ns_sock(const char *ns)
 {
     static char buf[512];
 #ifdef _WIN32
-    static const struct { const char *ns; const char *ep; } WIN_NS_TCP[] = {
-        {"llm", "127.0.0.1:8080"},     {"tool", "127.0.0.1:8081"},
-        {"market", "127.0.0.1:8082"},   {"sched", "127.0.0.1:8083"},
-        {"notify", "127.0.0.1:8084"},   {"mem", "127.0.0.1:8085"},
-        {"agent", "127.0.0.1:8086"},    {"a2a", "127.0.0.1:8087"},
-        {"cupolas", "127.0.0.1:8089"},  {"think", "127.0.0.1:8090"},
-        {"hook", "127.0.0.1:8093"},
-        {"channel", "127.0.0.1:8094"},  {"monit", "127.0.0.1:9090"},
+    /* Windows 无命名管道：daemon IPC 走 TCP 回环（daemon_main.h 平台分支
+     * 强制），主机恒为 127.0.0.1，端口取自 airy_defaults.h 私有端口带
+     * SSoT（唯一权威定义，此处禁止复刻字面量）。 */
+    static const struct { const char *ns; unsigned port; } WIN_NS_TCP[] = {
+        {"llm", AIRY_PORT_LLM_D},         {"tool", AIRY_PORT_TOOL_D},
+        {"market", AIRY_PORT_MARKET_D},   {"sched", AIRY_PORT_SCHED_D},
+        {"mem", AIRY_PORT_MEM_D},         {"agent", AIRY_PORT_AGENT_D},
+        {"a2a", AIRY_PORT_A2A_D},         {"maths", AIRY_PORT_MATHS_D},
+        {"cupolas", AIRY_PORT_CUPOLAS_D}, {"think", AIRY_PORT_THINK_D},
+        {"hook", AIRY_PORT_HOOK},         {"channel", AIRY_PORT_CHANNEL_D},
+        {"monit", AIRY_PORT_MONIT_D},     {"notify", AIRY_PORT_NOTIFY_D},
     };
     for (size_t i = 0; i < sizeof(WIN_NS_TCP) / sizeof(WIN_NS_TCP[0]); i++) {
         if (strcmp(ns, WIN_NS_TCP[i].ns) == 0) {
-            snprintf(buf, sizeof(buf), "%s", WIN_NS_TCP[i].ep);
+            snprintf(buf, sizeof(buf), "127.0.0.1:%u", WIN_NS_TCP[i].port);
             return buf;
         }
     }
@@ -286,7 +290,7 @@ int cmd_daemons(const char *arg, void *ctx)
          * 优先，端口漂移兼容），不再裸用 8080——完整启动器漂移到 8083+
          * 后 /daemons 会误报 gateway offline。 */
         char gw_host[128] = "127.0.0.1";
-        int gw_port = 8080;
+        int gw_port = 0; /* cli_gw_endpoint 无条件回填，此处不复刻端口字面量 */
         cli_gw_endpoint(gw_host, sizeof(gw_host), &gw_port);
         int gw_ok = 0;
 #ifdef _WIN32
