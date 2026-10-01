@@ -1,19 +1,21 @@
 name: Quality Gates
 
-# 伞仓 tools/scripts 下的 quality-gate 二十门禁编排器接入本发布平面。
+# 伞仓 tools/scripts 下的 quality-gate 二十三门禁编排器接入本发布平面。
 # 门禁脚本与 SSoT 数据位于伞仓（tools/docs/agent-workload），本作业
 # 按来源直取到临时区、组装出 quality-gate.sh 期望的 PROJECT_ROOT
 # 布局后运行，不递归 clone 伞仓子模块图。
 #
-# 二十门禁：1 编译 · 2 BAN 规则 · 3 安全扫描 · 4 合约版本 · 5 跨仓验证 ·
+# 二十三门禁：1 编译 · 2 BAN 规则 · 3 安全扫描 · 4 合约版本 · 5 跨仓验证 ·
 #          6 圈复杂度 · 7 SSoT 权威源 · 8 头文件重复度 · 9 coreloopthree ABI 冻结 ·
 #          10 corekern 运行时证据 · 11 函数名长度 · 12 daemons LOC 上限 ·
 #          13 传播面与死信号 · 14 同名头遮蔽 · 15 llm_d 适配注册 · 16 llm_d 样本形态 ·
 #          17 版本一致性（VERSION 唯一权威，源码内零发布号副本）·
 #          18 体积硬门禁（G2 里程碑阶梯）· 19 禁桩（G6 零容忍）·
-#          20 文件行数（G24 ≤800 行/文件，基线棘轮）。
+#          20 文件行数（G24 ≤800 行/文件，基线棘轮）·
+#          21 重复率（G26 <3% 目标，棘轮基线）· 22 端口坐标唯一性（G5 带 2026-2100）·
+#          23 策略载荷（G18/G19 机制核零厂商名，棘轮基线）。
 #
-# 双 job 结构：quality-gate 跑伞仓 20 门禁编排器；release-gates 跑本仓
+# 双 job 结构：quality-gate 跑伞仓 23 门禁编排器；release-gates 跑本仓
 # WS-9 发布门禁编排器（scripts/verify_release_gates.sh，0.1.19 §3.4
 # 「门禁脚本在而不生效」→ L1 接线 fail-closed，详见该 job 注释）。
 #
@@ -141,7 +143,7 @@ jobs:
               || echo "::warning::ecosystem nested submodules unavailable, Gate 5/7 will fail"
           fi
 
-      - name: Run quality gates (20 gates)
+      - name: Run quality gates (23 gates)
         env:
           # 构建产物一律树外化（工程铁律 a）：落到 runner temp，不落源码区。
           QUALITY_GATE_BUILD_DIR: ${{ runner.temp }}/agentrt-quality-gate-build
