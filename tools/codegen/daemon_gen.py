@@ -12,9 +12,9 @@
 # 手写层（生成器不碰）：.manifest 本身、src/svc.c（钩子/handler 实现）、
 # modules 内业务源文件、CMakeLists.txt、tests/。
 #
-# .manifest JSON schema v1:
+# .manifest JSON schema v2:
 #   {
-#     "manifest_version": 1,
+#     "manifest_version": 2,
 #     "daemon": "maths_d",                  # ^[a-z][a-z0-9_]*_d$
 #     "cname": "maths",                     # 可缺省，默认去 _d 后缀
 #     "sd_type": "maths",                   # SD 服务类型
@@ -35,7 +35,10 @@
 #     "rpc": {
 #       "unix": "maths.sock",               # ^[a-z][a-z0-9_]*\.sock$
 #       "win_pipe": "airy_maths",           # ^[a-z][a-z0-9_]*$
-#       "tcp": 8087,                        # 1024..65535
+#       "tcp": "AIRY_PORT_MATHS_D",         # SSoT 端口符号
+#                                           # ^AIRY_PORT_[A-Z0-9_]+$；真值
+#                                           # 唯一定义于 commons/include/
+#                                           # airy_defaults.h，此处只登记引用
 #       "tags": "maths,core",               # 逗号分隔小写词
 #       "buffer": 65536,                    # >= 4096（可缺省）
 #       "concurrent": true,                 # 可缺省，默认 false；并发客
@@ -60,7 +63,7 @@
 # 仅使用 Python 标准库，无第三方依赖。结构对齐 syscall_gen.py
 # （parse/validate/render 三段式 + gen/check 双模式）。
 #
-# Generator version: 1.6.0
+# Generator version: 1.7.0
 
 import argparse
 import difflib
@@ -69,7 +72,7 @@ import re
 import sys
 from pathlib import Path
 
-GENERATOR_VERSION = "1.6.0"
+GENERATOR_VERSION = "1.7.0"
 
 # 生成产物相对 daemon 目录的固定落点（保持稳定，勿随意改名）
 OUTPUT_MAIN = "src/main.c"
@@ -81,7 +84,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 AGENTRT_ROOT = SCRIPT_DIR.parents[1]
 DAEMONS_ROOT = AGENTRT_ROOT / "daemons"
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # shutdown：协议保留方法（DAEMON_DECLARE_SHUTDOWN_METHOD 自动注册响应
 # {"status":"shutting_down"}），manifest methods 禁止列入
@@ -125,6 +128,7 @@ RE_IDENT = re.compile(r"^[a-z][a-z0-9_]*$")
 RE_DAEMON = re.compile(r"^[a-z][a-z0-9_]*_d$")
 RE_SOCK = re.compile(r"^[a-z][a-z0-9_]*\.sock$")
 RE_TAGS = re.compile(r"^[a-z][a-z0-9_]*(,[a-z][a-z0-9_]*)*$")
+RE_PORT_SYM = re.compile(r"^AIRY_PORT_[A-Z0-9_]+$")
 
 
 class GenError(Exception):
@@ -196,8 +200,10 @@ def validate(data, path):
         raise GenError("%s: rpc.win_pipe 非法: %r" % (path, win_pipe))
 
     tcp = rpc.get("tcp")
-    if not isinstance(tcp, int) or not 1024 <= tcp <= 65535:
-        raise GenError("%s: rpc.tcp 须在 1024..65535: %r" % (path, tcp))
+    if not isinstance(tcp, str) or not RE_PORT_SYM.match(tcp):
+        raise GenError(
+            "%s: rpc.tcp 须为 SSoT 端口符号（^AIRY_PORT_[A-Z0-9_]+$，真值"
+            "唯一定义于 commons/include/airy_defaults.h）: %r" % (path, tcp))
 
     tags = rpc.get("tags")
     if not isinstance(tags, str) or not RE_TAGS.match(tags):
@@ -454,13 +460,15 @@ def render_header(d):
         "",
         '#include "platform.h"',
         '#include "daemon_main.h"',
+        '#include "airy_defaults.h"',
         "",
         "#include <cjson/cJSON.h>",
         "",
         "/* 端点常量（wire 契约，与 .manifest rpc 段一致；svc_endpoint 缺省基线） */",
         "#define %s_SOCKET_UNIX airy_runtime_dir_socket(\"%s\")" % (upper, rpc["unix"]),
         '#define %s_SOCKET_WIN "\\\\\\\\.\\\\pipe\\\\%s"' % (upper, rpc["win_pipe"]),
-        "#define %s_TCP_PORT %d" % (upper, rpc["tcp"]),
+        "/* TCP 口为 SSoT 引用，真值唯一定义于 airy_defaults.h */",
+        "#define %s_TCP_PORT %s" % (upper, rpc["tcp"]),
         "#define %s_MAX_BUFFER %d" % (upper, rpc["buffer"]),
         "",
         "/* 端点解析钩子：常量户回填上方基线；可配置户在 svc.c 完成",
