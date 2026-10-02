@@ -4,8 +4,10 @@
 #
 # daemon_gen.py — agentrt daemon 五件套样板生成器（L3 SSoT）
 #
-# 解析 daemons/<name>/.manifest 契约源（每户唯一真值源），生成机制层三件：
-#   a. src/main.c            入口引导（宏实例化 + 事件驱动装配 + 方法表展开）
+# 解析 daemons/<name>/.manifest 契约源（每户唯一真值源），生成三件：
+#   a. src/main.c            入口策略面（符号宏实例化 + DAEMON_BOOT_WIRE
+#                            接线 + daemon_boot_t 策略包填充；装配机制
+#                            收敛于 daemon_boot.c）
 #   b. include/svc_<d>.h     唯一私有头（端点常量 + svc 钩子/handler 声明
 #                            + SVC_<D>_METHODS(X) 方法表清单）
 #   c. modules/sources.cmake CMake 真装配源清单
@@ -64,7 +66,7 @@
 # 仅使用 Python 标准库，无第三方依赖。结构对齐 syscall_gen.py
 # （parse/validate/render 三段式 + gen/check 双模式）。
 #
-# Generator version: 1.8.0
+# Generator version: 1.9.0
 
 import argparse
 import difflib
@@ -73,17 +75,17 @@ import re
 import sys
 from pathlib import Path
 
-GENERATOR_VERSION = "1.8.0"
+GENERATOR_VERSION = "1.9.0"
 
 # 生成产物相对 daemon 目录的固定落点（保持稳定，勿随意改名）
 OUTPUT_MAIN = "src/main.c"
 OUTPUT_HEADER = "include/svc_{daemon}.h"
 OUTPUT_CMAKE = "modules/sources.cmake"
 
-# main.c 行数预算（方案 §2.4：入口只做装配与启动，不写逻辑）。
-# 机制层装配与方法数解耦后应恒 ≤ 此值；超限即 fail-closed（生成期与
-# 校验期均生效），防止装配回潮。
-MAX_MAIN_LINES = 150
+# main.c 行数预算（方案 §2.4：入口只保留策略包填充，不写装配逻辑）。
+# 0.1.19 §79 装配骨架上提 daemon_boot() 后入口恒短；超限即 fail-closed
+# （生成期与校验期均生效），防止装配回潮。
+MAX_MAIN_LINES = 100
 
 # 脚本所在目录推导仓库根（agentrt/）：codegen -> tools -> agentrt
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -281,7 +283,8 @@ def _emit_generated_banner():
         "/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */",
         "",
         "/* @generated DO NOT EDIT — daemon_gen.py v%s (L3 SSoT) 生成。" % GENERATOR_VERSION,
-        " * 机制层装配；策略层在 src/svc.c 与 modules（手写域）。",
+        " * manifest 派生产物；装配机制在 daemons/common，策略在 src/svc.c",
+        " * 与 modules（手写域）。",
         " * 改 .manifest 后: python3 agentrt/tools/codegen/daemon_gen.py --gen",
         " */",
         "",
@@ -289,7 +292,8 @@ def _emit_generated_banner():
 
 
 def render_main(d):
-    """渲染 src/main.c：机制层装配（目标 <= 150 行，行数与方法数解耦）。"""
+    """渲染 src/main.c：入口策略面（静态表 + DAEMON_BOOT_WIRE 接线宏 +
+    策略包填充），机制在 daemon_boot.c（daemon_main.h）。"""
     daemon = d["daemon"]
     cname = d["cname"]
     rpc = d["rpc"]
@@ -303,10 +307,6 @@ def render_main(d):
         '#include "airy_rt.h"',
         '#include "svc_%s.h"' % daemon,
         "",
-        "#include <stdio.h>",
-        "#include <stdlib.h>",
-        "#include <string.h>",
-        "",
         '#include "daemon_main.h"',
     ]
     for op in d["ops"]:
@@ -319,129 +319,47 @@ def render_main(d):
         "",
         "DAEMON_DECLARE_SHUTDOWN_METHOD(%s)" % daemon,
         "",
-        "int main(int argc, char **argv)",
-        "{",
-        "    const char *config_path = NULL;",
-        "    int use_tcp = 0;",
+        "static const daemon_method_entry_t SVC_METHODS[] = {",
+        "    SVC_%s_METHODS(DAEMON_METHOD_ENTRY)" % upper,
+        "};",
         "",
-        "    int parse_rc = daemon_parse_args(argc, argv, &config_path, &use_tcp,",
-        "                                     print_usage_%s);" % daemon,
-        "    if (parse_rc > 0) return parse_rc == 1 ? 0 : 1;",
-        "",
-        "    airy_sock_init();",
-        "    airy_mtx_init(&g_running_lock_%s);" % daemon,
-        "",
-        "#ifdef _WIN32",
-        "    SetConsoleCtrlHandler((PHANDLER_ROUTINE)signal_handler_%s, TRUE);" % daemon,
-        "#else",
-        "    DAEMON_SETUP_SIGNALS(%s);" % daemon,
-        "#endif",
-        "",
-        "    airy_logger_config_t log_cfg = {0};",
-        "    const char *dbg = getenv(\"AIRY_%s_DEBUG\");" % upper,
-        "    log_cfg.level = (dbg && dbg[0] == '1') ? (log_level_t)LOG_LEVEL_DEBUG :",
-        "                     (log_level_t)LOG_LEVEL_WARN;",
-        "    airy_log_init(&log_cfg);",
-        "    atexit(log_cleanup);",
-        "",
-        "    int core_ret = airy_init();",
-        "    if (core_ret == AIRY_SUCCESS)",
-        "        SVC_LOG_INFO(\"corekern core initialized (%s runs on corekern)\");" % daemon,
-        # 注：daemon 名已在生成期字面嵌入，无运行期格式符
-        "    else",
-        "        SVC_LOG_WARN(\"corekern init failed (%d), degraded (badge=0)\", core_ret);",
-        "",
-        '    daemon_cupolas_init%s("%s");'
-        % ("_pep" if d["cupolas"] == "pep" else "", daemon),
+        "static const daemon_op_t SVC_OPS[] = {",
     ]
     for op in d["ops"]:
-        lines.append('    daemon_%s_ops_init("%s");' % (op, daemon))
+        lines.append("    { daemon_%s_ops_init, daemon_%s_ops_cleanup }," % (op, op))
     lines += [
+        "};",
         "",
-        "    if (svc_prepare(config_path) != 0) {",
-        "        SVC_LOG_ERROR(\"Service prepare failed\");",
-        "        goto fail_svc;",
-        "    }",
-        "",
-        "    daemon_endpoint_t ep;",
-        "    svc_endpoint(&ep, use_tcp);",
-        "",
-        "    airy_sock_t server_fd = daemon_create_server_socket(",
-        "        ep.use_tcp, ep.tcp_port, ep.sock_unix, ep.sock_win);",
-        "    if (server_fd < 0) {",
-        "        SVC_LOG_ERROR(\"Failed to create server socket\");",
-        "        goto fail_svc;",
-        "    }",
-        "",
-        "    daemon_event_config_t ev_config = {",
-        "        .max_events = %d, .thread_pool_min = %d," % (pool["max_events"], pool["min"]),
-        "        .thread_pool_max = %d, .thread_pool_queue_size = %d," % (pool["max"], pool["queue"]),
-        "        .use_jsonrpc = true,",
+        "int main(int argc, char **argv)",
+        "{",
+        "    daemon_boot_t boot = {",
+        '        .daemon = "%s",' % daemon,
+        '        .cname = "%s",' % cname,
+        '        .env_debug = "AIRY_%s_DEBUG",' % upper,
+        '        .sd_type = "%s",' % d["sd_type"],
+        '        .tags = "%s",' % rpc["tags"],
+        "        .method_total = %d," % total_methods,
+        "        .running_lock = &g_running_lock_%s," % daemon,
+        "        .signal_handler = signal_handler_%s," % daemon,
+        "        .log_toggle = svc_log_toggle_handler_%s," % daemon,
+        "        .print_usage = print_usage_%s," % daemon,
+        "        .on_client = daemon_on_client_%s," % daemon,
+        "        .dispatcher = &g_dispatcher_%s," % daemon,
+        "        .event_driver = &g_event_driver_%s," % daemon,
+        "        .bsd = &g_bsd_%s," % daemon,
+        "        .bipc = &g_bipc_%s," % daemon,
+        "        .pool_max_events = %d," % pool["max_events"],
+        "        .pool_min = %d," % pool["min"],
+        "        .pool_max = %d," % pool["max"],
+        "        .pool_queue = %d," % pool["queue"],
     ]
     if rpc["concurrent"]:
-        lines.append("        .concurrent_clients = true,")
+        lines.append("        .concurrent_clients = 1,")
     lines += [
-        "        .on_client = daemon_on_client_%s," % daemon,
+        "        DAEMON_BOOT_WIRE(SVC_OPS, SVC_METHODS, daemon_cupolas_init%s),"
+        % ("_pep" if d["cupolas"] == "pep" else ""),
         "    };",
-        "",
-        "    const char *sock_addr = ep.use_tcp ? ep.tcp_host : ep.sock_unix;",
-        "    int ret = daemon_init_event_driver(",
-        "        \"%s\", \"%s\", sock_addr," % (daemon, d["sd_type"]),
-        "        ep.use_tcp ? ep.tcp_port : 0, \"%s\"," % rpc["tags"],
-        "        ep.use_tcp, &ev_config, &g_event_driver_%s, &g_bsd_%s," % (daemon, daemon),
-        "        &g_bipc_%s);" % daemon,
-        "    if (ret != AIRY_SUCCESS || !g_event_driver_%s) {" % daemon,
-        "        SVC_LOG_ERROR(\"Failed to create event driver\");",
-        "        airy_sock_close(server_fd);",
-        "        goto fail_svc;",
-        "    }",
-        "",
-        "    g_dispatcher_%s = daemon_event_driver_get_dispatcher(" % daemon,
-        "        g_event_driver_%s);" % daemon,
-        "    static const daemon_method_entry_t SVC_METHODS[] = {",
-        "        SVC_%s_METHODS(DAEMON_METHOD_ENTRY)" % upper,
-        "    };",
-        "    DAEMON_REGISTER_METHODS(g_dispatcher_%s, SVC_METHODS);" % daemon,
-        '    SVC_LOG_INFO("Registered %d RPC methods (%s.* namespace)");'
-        % (total_methods, cname),
-        "    svc_attach(g_dispatcher_%s);" % daemon,
-        "",
-        "    if (daemon_event_driver_add_server_fd(g_event_driver_%s," % daemon,
-        "                                          (int)server_fd) != 0) {",
-        "        SVC_LOG_ERROR(\"Failed to add server fd to event driver\");",
-        "        goto fail_driver;",
-        "    }",
-        "",
-        "    if (svc_activate(g_event_driver_%s, g_bsd_%s) != 0) {"
-        % (daemon, daemon),
-        "        SVC_LOG_ERROR(\"Service activate failed\");",
-        "        goto fail_driver;",
-        "    }",
-        "",
-        '    SVC_LOG_INFO("%s service running (event-driven mode)");' % cname,
-        "    daemon_event_driver_run(g_event_driver_%s);" % daemon,
-        "",
-        "    svc_teardown();",
-        "    daemon_cleanup_standard(g_bipc_%s, g_bsd_%s," % (daemon, daemon),
-        "                            g_event_driver_%s, server_fd," % daemon,
-        "                            ep.sock_unix, svc_destroy,",
-        "                            &g_running_lock_%s);" % daemon,
-    ]
-    for op in reversed(d["ops"]):
-        lines.append("    daemon_%s_ops_cleanup();" % op)
-    lines += [
-        "    daemon_cupolas_cleanup();",
-        "    log_cleanup();",
-        "    return 0;",
-        "",
-        "fail_driver:",
-        "    daemon_event_driver_destroy(g_event_driver_%s);" % daemon,
-        "    airy_sock_close(server_fd);",
-        "fail_svc:",
-        "    svc_destroy();",
-        "    airy_mtx_destroy(&g_running_lock_%s);" % daemon,
-        "    airy_sock_cleanup();",
-        "    return EXIT_FAILURE;",
+        "    return daemon_boot(argc, argv, &boot);",
         "}",
         "",
     ]
