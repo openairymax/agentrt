@@ -1003,7 +1003,9 @@ for _cap in llm.complete think.process think.lang_process think.lang_postprocess
     if [ -z "$_line" ]; then _t2_bad="$_t2_bad $_cap(无网关登记)"; continue; fi
     _ns="$(printf '%s' "$_line" | sed -E 's/.*\{"[^"]*", *"([^"]*)", *"([^"]*)".*/\1/')"
     _m="$(printf '%s' "$_line" | sed -E 's/.*\{"[^"]*", *"([^"]*)", *"([^"]*)".*/\2/')"
-    grep -rq "\"$_m\"" "$ROOT/daemons/${_ns}_d/src" 2>/dev/null \
+    # 服务面方法表 S74 起归位声明面（svc_<d>_d.h SVC_<D>_METHODS 清单，b5ab7f5），
+    # 注册字面量在 include/ 声明面与 src/ 实现面两处均合法，扫描面随归位同步扩为二者。
+    grep -rq "\"$_m\"" "$ROOT/daemons/${_ns}_d/src" "$ROOT/daemons/${_ns}_d/include" 2>/dev/null \
         || _t2_bad="$_t2_bad $_cap(服务面未注册 $_m)"
     if ! grep -rq "cli_gw_call(\"$_cap\"" "$CLI/src" 2>/dev/null; then
         if [ "$_m" != "get_stats" ] || \
