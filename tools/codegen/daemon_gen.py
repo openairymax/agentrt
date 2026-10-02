@@ -33,6 +33,12 @@
 #                                           # PDP cupolas_d 集中持有），full=
 #                                           # PDP 本体全量（四层+vault+
 #                                           # entitlements+net_security）
+#     "activate_noop": true,                # 可缺省，默认 false；true =
+#                                           # 无激活策略户，DAEMON_BOOT_WIRE
+#                                           # 引用机制层 daemon_svc_noop
+#                                           # 缺省（0.1.19 §80），svc_*.h
+#                                           # 不发 svc_activate 声明，
+#                                           # src/svc.c 不再维护空桩
 #     "facades": ["ingress", ...],          # ⊆ FACADES_VOCAB
 #     "slots": ["compute", ...],            # ⊆ SLOTS_VOCAB
 #     "rpc": {
@@ -66,7 +72,7 @@
 # 仅使用 Python 标准库，无第三方依赖。结构对齐 syscall_gen.py
 # （parse/validate/render 三段式 + gen/check 双模式）。
 #
-# Generator version: 1.9.0
+# Generator version: 1.10.0
 
 import argparse
 import difflib
@@ -75,7 +81,7 @@ import re
 import sys
 from pathlib import Path
 
-GENERATOR_VERSION = "1.9.0"
+GENERATOR_VERSION = "1.10.0"
 
 # 生成产物相对 daemon 目录的固定落点（保持稳定，勿随意改名）
 OUTPUT_MAIN = "src/main.c"
@@ -196,6 +202,11 @@ def validate(data, path):
                        % (path, sorted(CUPOLAS_MODES), cupolas))
     data["cupolas"] = cupolas
 
+    activate_noop = data.get("activate_noop", False)
+    if not isinstance(activate_noop, bool):
+        raise GenError("%s: activate_noop 须为布尔: %r" % (path, activate_noop))
+    data["activate_noop"] = activate_noop
+
     rpc = data.get("rpc")
     if not isinstance(rpc, dict):
         raise GenError("%s: 缺 rpc 段" % path)
@@ -300,6 +311,9 @@ def render_main(d):
     pool = rpc["pool"]
     upper = daemon.upper()
     total_methods = len(rpc["methods"]) + 1  # + 协议保留 shutdown
+    # 激活钩子策略面（0.1.19 §80）：实体户传 svc_activate（src/svc.c
+    # 生命周期钩子），无激活策略户传机制层 daemon_svc_noop 缺省。
+    activate = "daemon_svc_noop" if d["activate_noop"] else "svc_activate"
 
     lines = _emit_generated_banner()
     lines += [
@@ -356,8 +370,8 @@ def render_main(d):
     if rpc["concurrent"]:
         lines.append("        .concurrent_clients = 1,")
     lines += [
-        "        DAEMON_BOOT_WIRE(SVC_OPS, SVC_METHODS, daemon_cupolas_init%s),"
-        % ("_pep" if d["cupolas"] == "pep" else ""),
+        "        DAEMON_BOOT_WIRE(SVC_OPS, SVC_METHODS, %s, daemon_cupolas_init%s),"
+        % (activate, "_pep" if d["cupolas"] == "pep" else ""),
         "    };",
         "    return daemon_boot(argc, argv, &boot);",
         "}",
@@ -395,13 +409,29 @@ def render_header(d):
         " * config/env 覆盖后与 cmdline use_tcp 融合。实现: src/svc.c。 */",
         "void svc_endpoint(daemon_endpoint_t *ep, int cmdline_tcp);",
         "",
-        "/* 生命周期钩子（实现: src/svc.c）；activate 收到事件驱动句柄与",
-        " * SD bootstrap 句柄，供事件耦合激活策略（如监控采样线程）与",
-        " * manifest deps 驱动的依赖探测健康面使用。 */",
-        "int svc_prepare(const char *config_path);",
-        "int svc_activate(daemon_event_driver_t *driver, daemon_bootstrap_sd_t *bsd);",
-        "void svc_teardown(void);",
-        "void svc_destroy(void);",
+    ]
+    if d["activate_noop"]:
+        # 无激活策略户：svc.c 无 svc_activate，声明由机制层
+        # daemon_svc_noop 承担（daemon_main.h），此处不再发出。
+        lines += [
+            "/* 生命周期钩子（实现: src/svc.c）；激活钩子无策略需求，由",
+            " * 机制层 daemon_svc_noop 缺省（daemon_main.h，0.1.19 §80），",
+            " * svc.c 不再维护空桩副本。 */",
+            "int svc_prepare(const char *config_path);",
+            "void svc_teardown(void);",
+            "void svc_destroy(void);",
+        ]
+    else:
+        lines += [
+            "/* 生命周期钩子（实现: src/svc.c）；activate 收到事件驱动句柄与",
+            " * SD bootstrap 句柄，供事件耦合激活策略（如监控采样线程）与",
+            " * manifest deps 驱动的依赖探测健康面使用。 */",
+            "int svc_prepare(const char *config_path);",
+            "int svc_activate(daemon_event_driver_t *driver, daemon_bootstrap_sd_t *bsd);",
+            "void svc_teardown(void);",
+            "void svc_destroy(void);",
+        ]
+    lines += [
         "",
         "/* 策略层附加装配挂点：静态注册表（SVC_METHODS）落库后的动态",
         " * 注册出口（如 roadmap.* 方法族）。实现: src/svc.c；无附加",
