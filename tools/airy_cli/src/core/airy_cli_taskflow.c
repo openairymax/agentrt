@@ -34,7 +34,8 @@
 #define CLI_ROADMAP_ABSORB_TIMEOUT_MS 6000
 
 #ifdef AIRY_HAS_CJSON
-/* 序列化 airy_task_plan_t → JSON（字段对齐 sched_d roadmap_plan_parse） */
+/* 序列化 airy_task_plan_t → JSON（字段对齐 airy_plan_parse，SSoT：
+ * atoms/coreloopthree；本函数为反向序列化，与解析器成对） */
 static char *cli_plan_to_json(const airy_task_plan_t *plan)
 {
     if (!plan)
