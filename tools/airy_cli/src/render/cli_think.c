@@ -173,133 +173,6 @@ static int cli_think_gccp_probe_build(const char *questions_json, const char *ra
     return AIRY_SUCCESS;
 }
 
-/* think.process plan segment -> airy_task_plan_t (nodes/goal/depends filled,
-  * then the usual plan -> workflow -> hall chain) */
-static int cli_think_plan_from_json(cJSON *plan_json, airy_task_plan_t **out_plan)
-{
-    if (!plan_json || !out_plan)
-        return AIRY_ERR_INVALID_PARAM;
-    *out_plan = NULL;
-
-    cJSON *nodes = cJSON_GetObjectItem(plan_json, "nodes");
-    int node_n = (nodes && cJSON_IsArray(nodes)) ? cJSON_GetArraySize(nodes) : 0;
-    if (node_n <= 0)
-        return AIRY_ERR_INVALID_PARAM;
-
-    airy_task_plan_t *plan = (airy_task_plan_t *)AIRY_CALLOC(1, sizeof(airy_task_plan_t));
-    if (!plan)
-        return AIRY_ERR_OUT_OF_MEMORY;
-
-    cJSON *pid = cJSON_GetObjectItem(plan_json, "task_plan_id");
-    if (cJSON_IsString(pid) && pid->valuestring && pid->valuestring[0]) {
-        plan->task_plan_id = AIRY_STRDUP(pid->valuestring);
-        plan->task_plan_id_len = plan->task_plan_id ? strlen(plan->task_plan_id) : 0;
-    }
-
-    plan->task_plan_node_count = (size_t)node_n;
-    plan->task_plan_nodes =
-        (airy_task_node_t **)AIRY_CALLOC((size_t)node_n, sizeof(airy_task_node_t *));
-    if (!plan->task_plan_nodes) {
-        plan->task_plan_node_count = 0;
-        goto fail;
-    }
-
-    for (int i = 0; i < node_n; i++) {
-        cJSON *nj = cJSON_GetArrayItem(nodes, i);
-        if (!nj)
-            continue;
-        airy_task_node_t *nd = (airy_task_node_t *)AIRY_CALLOC(1, sizeof(airy_task_node_t));
-        if (!nd)
-            goto fail;
-        plan->task_plan_nodes[i] = nd;
-
-        cJSON *f = cJSON_GetObjectItem(nj, "id");
-        if (cJSON_IsString(f) && f->valuestring && f->valuestring[0]) {
-            nd->task_node_id = AIRY_STRDUP(f->valuestring);
-            nd->task_node_id_len = nd->task_node_id ? strlen(nd->task_node_id) : 0;
-        }
-        f = cJSON_GetObjectItem(nj, "goal");
-        if (cJSON_IsString(f) && f->valuestring)
-            nd->task_node_goal = AIRY_STRDUP(f->valuestring);
-        f = cJSON_GetObjectItem(nj, "handler");
-        if (cJSON_IsString(f) && f->valuestring)
-            nd->task_node_handler_name = AIRY_STRDUP(f->valuestring);
-        f = cJSON_GetObjectItem(nj, "role");
-        if (cJSON_IsString(f) && f->valuestring) {
-            nd->task_node_agent_role = AIRY_STRDUP(f->valuestring);
-            nd->task_node_role_len =
-                nd->task_node_agent_role ? strlen(nd->task_node_agent_role) : 0;
-        }
-
-        cJSON *deps = cJSON_GetObjectItem(nj, "depends");
-        int dep_n = (deps && cJSON_IsArray(deps)) ? cJSON_GetArraySize(deps) : 0;
-        if (dep_n > 0) {
-            nd->task_node_depends_on = (char **)AIRY_CALLOC((size_t)dep_n, sizeof(char *));
-            if (!nd->task_node_depends_on)
-                goto fail;
-            for (int d = 0; d < dep_n; d++) {
-                cJSON *dj = cJSON_GetArrayItem(deps, d);
-                if (!cJSON_IsString(dj) || !dj->valuestring)
-                    continue;
-                nd->task_node_depends_on[nd->task_node_depends_count] =
-                    AIRY_STRDUP(dj->valuestring);
-                if (!nd->task_node_depends_on[nd->task_node_depends_count])
-                    goto fail;
-                nd->task_node_depends_count++;
-            }
-        }
-
-        f = cJSON_GetObjectItem(nj, "cost_time_ms");
-        if (cJSON_IsNumber(f))
-            nd->task_node_cost_time_ms = (int64_t)f->valuedouble;
-        f = cJSON_GetObjectItem(nj, "cost_mem_mb");
-        if (cJSON_IsNumber(f))
-            nd->task_node_cost_mem_mb = (int64_t)f->valuedouble;
-        f = cJSON_GetObjectItem(nj, "invariant_guard");
-        if (f && cJSON_IsTrue(f))
-            nd->task_node_invariant_guard = 1;
-    }
-
-    cJSON *entry = cJSON_GetObjectItem(plan_json, "entry_points");
-    int entry_n = (entry && cJSON_IsArray(entry)) ? cJSON_GetArraySize(entry) : 0;
-    if (entry_n > 0) {
-        plan->task_plan_entry_points = (char **)AIRY_CALLOC((size_t)entry_n, sizeof(char *));
-        if (!plan->task_plan_entry_points)
-            goto fail;
-        for (int e = 0; e < entry_n; e++) {
-            cJSON *ej = cJSON_GetArrayItem(entry, e);
-            if (!cJSON_IsString(ej) || !ej->valuestring)
-                continue;
-            plan->task_plan_entry_points[plan->task_plan_entry_count] =
-                AIRY_STRDUP(ej->valuestring);
-            if (!plan->task_plan_entry_points[plan->task_plan_entry_count])
-                goto fail;
-            plan->task_plan_entry_count++;
-        }
-    } else {
-        plan->task_plan_entry_points = (char **)AIRY_CALLOC((size_t)node_n, sizeof(char *));
-        if (!plan->task_plan_entry_points)
-            goto fail;
-        for (int i = 0; i < node_n; i++) {
-            const airy_task_node_t *nd = plan->task_plan_nodes[i];
-            if (!nd || !nd->task_node_id || nd->task_node_depends_count > 0)
-                continue;
-            plan->task_plan_entry_points[plan->task_plan_entry_count] =
-                AIRY_STRDUP(nd->task_node_id);
-            if (!plan->task_plan_entry_points[plan->task_plan_entry_count])
-                goto fail;
-            plan->task_plan_entry_count++;
-        }
-    }
-
-    *out_plan = plan;
-    return AIRY_SUCCESS;
-
-fail:
-    airy_task_plan_free(plan);
-    return AIRY_ERR_OUT_OF_MEMORY;
-}
-
 /* Remote dual-thinking via gateway → think_d (think.process, 120s timeout).
  * GCCP 两段式交互（P-A）：第一段无 gccp_answers，think_d 判定指令不完整时返回
  * gccp_need_interaction=1 + gccp_questions；本函数转成 airy_gccp_probe_t 交给
@@ -360,10 +233,17 @@ airy_err_t cli_think_process_remote(const char *input, airy_task_plan_t **out_pl
 
     cJSON *plan_json = cJSON_GetObjectItem(inner, "plan");
     int perr = AIRY_SUCCESS;
-    if (!cJSON_IsObject(plan_json))
+    if (!cJSON_IsObject(plan_json)) {
         perr = AIRY_ERR_PARSE_ERROR;
-    else
-        perr = cli_think_plan_from_json(plan_json, out_plan);
+    } else {
+        char *plan_str = cJSON_PrintUnformatted(plan_json);
+        if (!plan_str) {
+            perr = AIRY_ERR_OUT_OF_MEMORY;
+        } else {
+            perr = airy_plan_parse(plan_str, out_plan);
+            AIRY_FREE(plan_str);
+        }
+    }
     if (perr == AIRY_SUCCESS && !*out_plan)
         perr = AIRY_ERR_PARSE_ERROR;
 
