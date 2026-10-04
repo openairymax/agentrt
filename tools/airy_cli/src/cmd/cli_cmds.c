@@ -127,7 +127,7 @@ int cmd_status(const char *arg, void *ctx)
 
 #define CLI_CHAIN_CONTENT_CAP 512
 
-/* 提取 "gseq":<digits>（事件流全局因果序）——导出供 cli_panel.c 事件流面板复用 */
+/* 提取 "gseq":<digits>（事件流全局因果序）——供 /chain 决策链消费 */
 uint64_t cli_chain_extract_gseq(const char *json)
 {
     const char *p = strstr(json, "\"gseq\":");

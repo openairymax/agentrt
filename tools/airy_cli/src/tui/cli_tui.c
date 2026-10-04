@@ -6,7 +6,7 @@
  * @brief TUI 引擎骨架（域拆分后，2026-08-27）。
  *
  * 2026-08-27 域拆分（3988 行 → 7 文件）：
- *   - cli_tui.c              引擎骨架：状态、面板/模式 API、生命周期
+ *   - cli_tui.c              引擎骨架：状态与生命周期
  *   - tui_keys.c             按键读取域（POSIX/Windows + ESC 序列解析）
  *   - tui_input.c            输入编辑域（光标/编辑/Tab 补全/行模式 readline）
  *   - tui_ime.c              内置拼音输入法域
@@ -41,64 +41,6 @@ void tui_sigwinch_handler(int sig)
     g_tui_resize_pending = 1;
 }
 #endif
-
-/* ---- 阶段 4：视图模式（tab）+ 面板数据源 ---- */
-
-void cli_tui_set_panel(cli_tui_t *t, cli_tui_mode_t mode, void *ud,
-                       cli_tui_panel_count_fn count, cli_tui_panel_line_fn line)
-{
-    if (!t || mode < 0 || mode >= CLI_TUI_MODE_MAX)
-        return;
-    t->panel[mode].ud = ud;
-    t->panel[mode].count = count;
-    t->panel[mode].line = line;
-}
-
-void cli_tui_set_panel_action(cli_tui_t *t, cli_tui_mode_t mode,
-                              cli_tui_panel_action_fn fn)
-{
-    if (!t || mode < 0 || mode >= CLI_TUI_MODE_MAX)
-        return;
-    t->panel[mode].action = fn;
-}
-
-cli_tui_mode_t cli_tui_mode(const cli_tui_t *t)
-{
-    return t ? t->mode : CLI_TUI_MODE_CHAT;
-}
-
-void cli_tui_mode_next(cli_tui_t *t)
-{
-    if (!t)
-        return;
-    cli_tui_mode_set(t, (cli_tui_mode_t)(((int)t->mode + 1) % CLI_TUI_MODE_MAX));
-}
-
-void cli_tui_mode_prev(cli_tui_t *t)
-{
-    if (!t)
-        return;
-    cli_tui_mode_set(t,
-                     (cli_tui_mode_t)(((int)t->mode + CLI_TUI_MODE_MAX - 1) %
-                                      CLI_TUI_MODE_MAX));
-}
-
-void cli_tui_mode_set(cli_tui_t *t, cli_tui_mode_t m)
-{
-    if (!t || m < 0 || m >= CLI_TUI_MODE_MAX || m == t->mode)
-        return;
-    t->mode = m;
-    /* 进入任务看板：重置选择与详情（事件流保持跟随/过滤状态） */
-    if (m == CLI_TUI_MODE_BOARD) {
-        t->sel = 0;
-        t->detail_active = 0;
-        t->detail_len = 0;
-    }
-    /* 记忆链：默认尾部实时跟随（新记忆即现） */
-    if (m == CLI_TUI_MODE_MEM)
-        t->follow = 1;
-    t->note[0] = '\0';
-}
 
 /* ---- lifecycle ---- */
 

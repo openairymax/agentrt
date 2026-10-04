@@ -207,7 +207,7 @@ int main(int argc, char *argv[])
 
     airy_err_t err = AIRY_EOK;
     cli_runtime_ctx_t rt;
-    err = cli_setup_runtime(loop, tui, &rt);
+    err = cli_setup_runtime(loop, &rt);
     if (err != AIRY_EOK) {
         airy_loop_destroy(loop);
         return 1;
