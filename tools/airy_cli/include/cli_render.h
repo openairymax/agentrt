@@ -105,19 +105,6 @@ size_t cli_render_meter_phys(cli_line_meter_t *m);
 #define CLI_REPLY_THINK_HIDDEN_HINT \
     "（思考链已默认隐藏；完整文本见 $AIRY_HOME/logs/airy_reasoning.log）"
 
-/* Opaque TUI engine handle (full definition in cli_tui.h). */
-struct cli_tui_s;
-
-/**
- * @brief Attach (or detach, tui=NULL) the full-screen TUI engine.
- *
- * Once attached, every cli_out*() call below routes through the engine so
- * the output lands in the TUI line history (full-screen page). Detaching
- * restores plain stdout streaming. Call before the banner render so the
- * header lines are captured for the pinned header.
- */
-void cli_render_set_tui(struct cli_tui_s *tui);
-
 /**
  * @brief Unified output primitives.
  *
@@ -126,8 +113,8 @@ void cli_render_set_tui(struct cli_tui_s *tui);
  *   - cli_outn(s, n)  writes n bytes
  *   - cli_outc(c)     writes one char
  *   - cli_outf(fmt…)  formatted output
- * With an attached TUI they flow into the full-screen history; otherwise
- * they stream straight to stdout (stream-safe, pipe/log friendly).
+ * Every primitive streams straight to stdout (stream-safe, pipe/log
+ * friendly).
  */
 void cli_out(const char *s);
 void cli_outn(const char *s, size_t n);

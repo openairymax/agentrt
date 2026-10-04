@@ -93,7 +93,6 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
         airy_gccp_question_t local_q;
         __builtin_memset(&local_q, 0, sizeof(local_q));
         const airy_gccp_question_t *q = NULL;
-        int q_from_fixed = 0; /* F8 重试回滚游标用：当前题是否来自固定问题区 */
         if (llm_q_pending) {
             /* 优先消费 LLM 上一步生成的针对性追问 */
             snprintf(local_q.id, sizeof(local_q.id), "followup%zu", round);
@@ -104,7 +103,6 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
             llm_q_pending = 0;
         } else if (base_round < probe->question_count) {
             q = &probe->questions[base_round++];
-            q_from_fixed = 1;
         } else if (g_last_step_q[0]) {
             /* 固定问题问完：消费 LLM 遗留追问 */
             snprintf(local_q.id, sizeof(local_q.id), "followup%zu", round);
@@ -120,28 +118,14 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
                  q->required ? "（建议回答）" : "", q->question);
         if (q->hint[0])
             cli_outf("      %s提示：%s%s\n", cli_c(CLR_GREEN), q->hint, cli_c(CLR_RESET));
-        if (!cli_tui_active(cli_tui_get_default())) {
-            /* Line-oriented mode: print an inline prompt. In full-screen TUI
-             * mode the bottom input line is the prompt itself. */
-            cli_outf("  %s>%s ", cli_c(CLR_GREEN), cli_c(CLR_RESET));
-            fflush(stdout);
-        }
+        cli_outf("  %s>%s ", cli_c(CLR_GREEN), cli_c(CLR_RESET));
+        fflush(stdout);
 
         char line[1024];
         size_t line_len = 0;
         int rl = cli_tui_readline(cli_tui_get_default(), line, sizeof(line), &line_len);
         if (rl == 0)
             break;
-        if (rl != 1) {
-            /* F8 切换请求（切换在主循环处理）：重试当前问题。直接
-             * continue 会让 round++ 静默跳题（固定题游标已 ++ 不可
-             * 重入），按题目来源回滚取题状态保证原题重问。 */
-            if (q_from_fixed)
-                base_round--;
-            else
-                llm_q_pending = 1;
-            continue;
-        }
         int answered = (line_len > 0);
         if (answered) {
             /* 中断指令：放弃意图确认（视为意愿不足），任务按默认约束
@@ -247,24 +231,18 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
     char *p = json;
     int n = snprintf(p, cap, "{");
     p += n;
-    /* while 手动索引：F8（rl != 1）需重试当前问题，for 的 continue
-     * 会 i++ 实际跳题，与提示语义矛盾 */
-    size_t i = 0;
-    while (i < probe->question_count) {
+    for (size_t i = 0; i < probe->question_count; i++) {
         const airy_gccp_question_t *q = &probe->questions[i];
         cli_outf("  Q%zu [%s]%s %s\n", i + 1, q->id, q->required ? "（建议回答）" : "", q->question);
         if (q->hint[0])
             cli_outf("      提示：%s\n", q->hint);
-        if (!cli_tui_active(cli_tui_get_default()))
-            cli_outf("  > ");
+        cli_outf("  > ");
         fflush(stdout);
         char line[1024];
         size_t line_len = 0;
         int rl = cli_tui_readline(cli_tui_get_default(), line, sizeof(line), &line_len);
         if (rl == 0)
             break;
-        if (rl != 1)
-            continue; /* F8 切换请求：重试当前问题（切换在主循环处理） */
         /* 中断指令：放弃意图确认（同 cJSON 分支，避免 quit/stop 当答案） */
         if (strcmp(line, "quit") == 0 || strcmp(line, "exit") == 0 ||
             strcmp(line, "abort") == 0 || strcmp(line, "stop") == 0 ||
@@ -280,7 +258,6 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
             *p++ = ',';
         n = snprintf(p, cap - (size_t)(p - json), "\"%s\":\"%s\"", q->id, line);
         p += n;
-        i++;
     }
     snprintf(p, cap - (size_t)(p - json), "}");
     cli_spinner_resume();

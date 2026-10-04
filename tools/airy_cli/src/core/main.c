@@ -179,11 +179,6 @@ int main(int argc, char *argv[])
     cli_print_system_header(m_s2[0] ? m_s2 : NULL,
                             m_verify[0] ? m_verify : NULL,
                             m_expert[0] ? m_expert : NULL);
-    if (g_cli_print_mode) {
-        (void)0;
-    } else if (cli_tui_active(tui)) {
-        cli_tui_pin_header(tui);
-    }
 
     /* 0.1.16 B2 (design §5.2): the CLI is a pure gateway client — no
      * in-process microkernel (airy_init() withdrawn, 2026-09-14 ruling).
@@ -241,16 +236,6 @@ int main(int argc, char *argv[])
     }
 
     for (;;) {
-        if (cli_tui_active(tui)) {
-            char st[96];
-            const char *mdl = m_verify[0] ? m_verify : "default";
-            uint64_t sess_sec = (cli_now_ms() - g_session_start_ms) / 1000;
-            snprintf(st, sizeof(st), "\u25c7 %zu msgs \u00b7 %02llu:%02llu \u00b7 %s",
-                     g_history_count / 2, (unsigned long long)(sess_sec / 60),
-                     (unsigned long long)(sess_sec % 60),
-                     (mdl && mdl[0]) ? mdl : "default");
-            cli_tui_set_status(tui, st);
-        }
         (void)cli_daemon_lifecycle_reconcile_once();
         /* 0.1.17 R5-G6：/tui 切换到全屏 TUI 渲染层。fork agentrt-tui 子进程
          * （唯一实现 cli_run_tui_frontend），TUI 退出后返回行式对话；不 exec
@@ -259,10 +244,6 @@ int main(int argc, char *argv[])
             switch_tui_flag = 0;
             cli_term_header_unpin();
             (void)cli_run_tui_frontend(0);
-            if (cli_tui_active(tui)) {
-                cli_tui_pin_header(tui);
-                cli_tui_redraw(tui);
-            }
             continue;
         }
         size_t input_len = 0;
@@ -296,14 +277,12 @@ int main(int argc, char *argv[])
                 continue;
             }
         } else {
-            if (!cli_tui_active(tui)) {
-                if (!cli_term_input_begin()) {
-                    if (!cli_term_is_tty())
-                        cli_outf("\n\n%sairy>%s ", cli_c(CLR_CYAN),
-                                 cli_c(CLR_RESET));
-                }
-                fflush(stdout);
+            if (!cli_term_input_begin()) {
+                if (!cli_term_is_tty())
+                    cli_outf("\n\n%sairy>%s ", cli_c(CLR_CYAN),
+                             cli_c(CLR_RESET));
             }
+            fflush(stdout);
             int rl = cli_tui_readline(tui, input, sizeof(input), &input_len);
             if (rl == 0) {
                 cli_term_input_submit();
@@ -427,7 +406,6 @@ int main(int argc, char *argv[])
         llm_svc_adapter_destroy(g_chat_adapter);
     cli_teardown_runtime(&rt);
     airy_loop_destroy(loop);
-    cli_render_set_tui(NULL);
     cli_tui_destroy(tui);
 
     if (!g_cli_print_mode) {

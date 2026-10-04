@@ -348,18 +348,18 @@ else
     ok "D4 cli_chat.c 零 llm_svc_adapter_create（旧 adapter 解耦完成）"
 fi
 
-section "E" "9.6/S-01 TUI 会话历史环形裁剪（长对话问题：无界增长拖垮 TUI）"
+section "E" "9.6/S-01 TUI 命令历史环形裁剪（长对话问题：无界增长拖垮 TUI）"
 
-if grep -Fq '#define TUI_HIST_MAX 1024' "$CLI/src/tui/cli_tui_internal.h"; then
-    ok "E1 TUI_HIST_MAX=1024 上限常量在位"
+if grep -Fq '#define TUI_CMD_HIST_MAX 500' "$CLI/src/tui/cli_tui_internal.h"; then
+    ok "E1 TUI_CMD_HIST_MAX=500 上限常量在位"
 else
-    bad "E1 TUI_HIST_MAX 常量缺失或数值漂移"
+    bad "E1 TUI_CMD_HIST_MAX 常量缺失或数值漂移"
 fi
 
-if grep -Fq 'if (t->hist.count >= TUI_HIST_MAX) {' "$CLI/src/tui/tui_history.c"; then
-    ok "E2 历史超限裁剪分支在位（丢最老行环形窗口）"
+if grep -Fq 'if (t->cmd_hist.count >= TUI_CMD_HIST_MAX) {' "$CLI/src/tui/tui_history.c"; then
+    ok "E2 命令历史超限裁剪分支在位（丢最老行环形窗口）"
 else
-    bad "E2 历史超限裁剪分支缺失（无界增长回归）"
+    bad "E2 命令历史超限裁剪分支缺失（无界增长回归）"
 fi
 
 section "F" "9.7/S-02 长任务可取消 + 超时可诊断（稳定问题：Ctrl+C 假死/超时黑箱）"
