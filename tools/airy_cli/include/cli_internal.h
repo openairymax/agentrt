@@ -71,7 +71,7 @@ extern "C" {
 #define CLI_HISTORY_MAX_MSGS 60
 
 /* CLI 整轮记忆记录的线格式 SSoT：cli_chat_memory.c 写入、cli_chat_session.c
- * 还原、cli_panel.c / airy_cli_cmd_cognition.c 展示剥离共用同一组字面量。
+ * 还原、airy_cli_cmd_cognition.c 展示剥离共用同一组字面量。
  * CLI_TURN_REASON_SEP 自 0.1.18 B4 起只读不写：写侧不再产生该段（思考链
  * 不入长期记忆），保留定义供还原侧从历史记录正文中剥离旧数据。
  * 前缀字节数一律用 (sizeof(X) - 1) 求取，禁止硬编码——"用户: " 在 UTF-8 下
@@ -308,7 +308,7 @@ int cmd_hall(const char *arg, void *ctx);
 int cmd_quit(const char *arg, void *ctx);
 int cmd_tui(const char *arg, void *ctx);
 
-/* 决策链事件解析 helpers（cli_cmds.c 实现；/chain 命令与 cli_panel.c 事件流面板共用） */
+/* 决策链事件解析 helpers（cli_cmds.c 实现；/chain 命令用） */
 uint64_t cli_chain_extract_gseq(const char *json);
 void cli_chain_extract_content(const char *json, char *out, size_t cap);
 int cli_chain_str_field(const char *json, const char *key, char *out, size_t cap);
@@ -316,25 +316,6 @@ int cli_chain_str_field(const char *json, const char *key, char *out, size_t cap
  * (ts_utc, seq) 排序——gseq 为进程内单调，跨进程会撞号） */
 uint32_t cli_chain_extract_seq(const char *json);
 void cli_chain_label(int cat, const char *content, char *out, size_t cap);
-
-/* 阶段 4 面板数据源（cli_panel.c 实现；main.c 绑定到 TUI）。0.1.9 M1-1c：
- * board 面板数据源迁 sched.dag_list 远程查询（不再接收本地 work_hall）。 */
-void cli_panel_board_create(void **out_ud);
-void cli_panel_board_destroy(void *ud);
-void cli_panel_events_create(airy_hall_store_t *hs, void **out_ud);
-void cli_panel_events_destroy(void *ud);
-size_t cli_panel_board_count(void *ud);
-int cli_panel_board_line(void *ud, size_t idx, char *out, size_t cap);
-size_t cli_panel_events_count(void *ud);
-int cli_panel_events_line(void *ud, size_t idx, char *out, size_t cap);
-/* 记忆链面板（2026-08-25）：经 gateway mem.recent 拉取，1s 节流刷新 */
-void cli_panel_mem_create(void **out_ud);
-void cli_panel_mem_destroy(void *ud);
-size_t cli_panel_mem_count(void *ud);
-int cli_panel_mem_line(void *ud, size_t idx, char *out, size_t cap);
-/* 面板可操作动作（2026-08-19）：TUI 引擎按键触发，动作在 CLI 层执行 */
-int cli_panel_board_action(void *ud, int action, size_t sel, char *out, size_t cap);
-int cli_panel_events_action(void *ud, int action, size_t sel, char *out, size_t cap);
 
 #ifdef __cplusplus
 }

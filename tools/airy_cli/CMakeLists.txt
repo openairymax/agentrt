@@ -80,8 +80,6 @@ add_executable(airy_cli
     # tui_input.c 二轮拆分（2026-08-27：835 行 → 3 个职责模块）
     src/tui/tui_complete.c
     src/tui/tui_line_readline.c
-    # 阶段 4: TUI 面板数据源（任务看板 / 事件流）
-    src/tui/cli_panel.c
     # 阶段 4（item 4）: 认知阶段并行子 agent 审查（事实/风险）
     src/cmd/cli_review.c
     # S-5 编排管线：/orch 命令（orchestrator 七阶段流程编排）
