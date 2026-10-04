@@ -4,12 +4,12 @@
 /**
  * @file cli_tui_internal.h
  * @brief TUI 引擎内部共享头（域拆分：engine/keys/input/ime/history/render/
- *        readline/nav）。
+ *        readline）。
  *
  * 原 cli_tui.c（3988 行）按功能域拆分后，跨文件共享的结构体定义与
  * 内部函数声明统一收敛于此，保持 cli_tui.h 公共 API 不变（对外仍为
  * 不透明 cli_tui_t）。2026-08-27 二轮拆分新增 readline 域
- * （tui_readline.c 主循环 / tui_readline_nav.c 导航键分派）。
+ * （tui_readline.c 入口分派）。
  * 此头仅限 airy_cli/src 内部使用。
  */
 
@@ -158,10 +158,6 @@ struct cli_tui_s {
     int search_wrapped;
     int search_forward;
 
-    /* kill-ring */
-    char kill_buf[4096];
-    size_t kill_len;
-
     /* bracketed paste */
     int paste_active;
 
@@ -254,7 +250,6 @@ void tui_schedule_redraw(cli_tui_t *t);
 
 /* keys 域（tui_keys.c） */
 int tui_wait_byte(cli_tui_t *t, char *out, int timeout_ms, int *eof);
-int tui_paste_read_end(cli_tui_t *t);
 int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof);
 
 /* history 域（tui_history.c） */
@@ -265,30 +260,17 @@ void tui_cmd_hist_load(cli_tui_t *t);
 void tui_cmd_hist_save(cli_tui_t *t);
 void tui_cmd_hist_save_draft(cli_tui_t *t);
 void tui_cmd_hist_apply(cli_tui_t *t, size_t idx);
-void tui_search_step(cli_tui_t *t);
-void tui_search_step_forward(cli_tui_t *t);
 
 /* input 域（tui_input.c） */
 void tui_input_append(cli_tui_t *t, char c);
 void tui_input_backspace(cli_tui_t *t);
 void tui_input_delete_fwd(cli_tui_t *t);
-void tui_input_back_word(cli_tui_t *t);
-void tui_input_word_left(cli_tui_t *t);
-void tui_input_word_right(cli_tui_t *t);
-void tui_input_transpose(cli_tui_t *t);
-void tui_input_kill_save(cli_tui_t *t, const char *text, size_t n);
-void tui_input_yank(cli_tui_t *t);
 int tui_tab_complete(cli_tui_t *t);
 int tui_input_utf8_complete(const char *s, size_t len);
 size_t tui_caret_print(cli_tui_t *t);
 void tui_caret_tick(cli_tui_t *t);
 void tui_line_redraw(cli_tui_t *t);
 int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap, size_t *out_len);
-
-/* readline 域（tui_readline.c / tui_readline_nav.c）：全屏 readline 主循环。
- * tui_readline_arrow_keys 返回 0 = 正常处理继续；-1 = 请求终止 readline
- * （粘贴内 EOF），调用方应 return 0。 */
-int tui_readline_arrow_keys(cli_tui_t *t, int key);
 
 /* ime 域（tui_ime.c） */
 void tui_ime_commit_raw(cli_tui_t *t);
@@ -305,8 +287,5 @@ int tui_ime_key_alt_resolve(void);
 
 /* lifecycle 域（cli_tui.c）：rebuild_three_zone 依赖行渲染历史（g_history） */
 void cli_tui_rebuild_three_zone(cli_tui_t *tui);
-
-/* panel dispatch 域（tui_panel_dispatch.c）：面板模式按键分派 */
-int tui_panel_dispatch(cli_tui_t *t, int key);
 
 #endif /* AIRY_CLI_TUI_INTERNAL_H */

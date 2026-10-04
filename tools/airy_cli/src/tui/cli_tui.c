@@ -13,13 +13,11 @@
  *   - tui_ime.c              内置拼音输入法域
  *   - tui_history.c          历史与搜索域
  *   - tui_render.c           渲染域（header/viewport/input/增量重绘/硬件面板）
- *   - tui_panel_dispatch.c   面板按键分派域（硬件信息/任务看板/事件流）
  * 跨文件共享结构体与内部声明见 cli_tui_internal.h；公共 API 见
  * cli_tui.h（对外不透明 cli_tui_t 不变）。
  *
  * 2026-08-27 二轮拆分（1102 行 → 3 个职责模块）：本文件保留引擎骨架与
- * 生命周期；全屏 readline 主循环 → tui_readline.c；方向键/翻页/粘贴等
- * 导航编辑键分派 → tui_readline_nav.c（tui_readline_arrow_keys）。
+ * 生命周期；全屏 readline 主循环 → tui_readline.c。
  *
  * 0.1.17 R5-G2 冻结退役：本文件的备用屏全屏形态（pinned header + 会话视口 +
  * 底部输入条的三区布局）不再可进入——cli_tui_enter() 恒拒绝，全屏渲染唯一由
