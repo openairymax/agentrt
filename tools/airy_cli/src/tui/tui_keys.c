@@ -87,9 +87,6 @@ static void tui_win_enqueue_key(WORD vk, WCHAR wc, DWORD ctl)
     case VK_PRIOR:  seq = "\x1b[5~";     break;
     case VK_NEXT:   seq = "\x1b[6~";     break;
     case VK_DELETE: seq = "\x1b[3~";     break;
-    case VK_F6:     seq = "\x1b[17~";    break;
-    case VK_F7:     seq = "\x1b[18~";    break;
-    case VK_F8:     seq = "\x1b[19~";    break;
     case VK_TAB:    seq = "\t";          break;
     case VK_RETURN: seq = "\r";          break;
     case VK_BACK:   seq = "\x7f";        break; /* termios DEL，与 POSIX 一致 */
@@ -216,7 +213,7 @@ int tui_wait_byte(cli_tui_t *t, char *out, int timeout_ms, int *eof)
  * 消费），读到 BEL(0x07) 或 ST(ESC \) 为止，超时/EOF 亦返回。
  *
  * 0.1.14 修复（社区实证乱码）：终端对 OSC 11 背景色查询等请求的应答可能
- * 迟到（例如 F8 切回 CLI 时），若其落入按键流，`ESC ]` 被当孤立 ESC 丢弃
+ * 迟到（例如终端重绘时），若其落入按键流，`ESC ]` 被当孤立 ESC 丢弃
  * 后，余下的 `11;rgb:ffff/ffff/ffff` 会作为普通字符进入输入行。此处按
  * 控制串整段吞掉，保证应答永不显示为输入。 */
 static void tui_skip_control_string(cli_tui_t *t)
@@ -291,53 +288,10 @@ int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
                 if (tui_wait_byte(t, &b, 120, eof) && b == '~')
                     return TUI_KEY_PGDN;
                 return TUI_KEY_UNKNOWN;
-            case '1': /* ESC[11~=F1；ESC[12~=F2；ESC[13~=F3；ESC[14~=F4；
-                       * ESC[15~=F5；ESC[17~=F6；ESC[18~=F7；ESC[19~=F8 */
+            case '1': /* ESC[1;<mod><dir> = 修饰方向键（Ctrl/Alt） */
             {
                 char semi, mod, dir;
-                if (!tui_wait_byte(t, &semi, 120, eof))
-                    return TUI_KEY_UNKNOWN;
-                if (semi == '1') { /* F1 (linux console): ESC [ 1 1 ~ */
-                    if (!tui_wait_byte(t, &dir, 120, eof) || dir != '~')
-                        return TUI_KEY_UNKNOWN;
-                    return TUI_KEY_F1;
-                }
-                if (semi == '3') { /* F3 (linux console): ESC [ 1 3 ~ */
-                    if (!tui_wait_byte(t, &dir, 120, eof) || dir != '~')
-                        return TUI_KEY_UNKNOWN;
-                    return TUI_KEY_F3;
-                }
-                if (semi == '9') { /* F8: ESC [ 1 9 ~ */
-                    if (!tui_wait_byte(t, &dir, 120, eof) || dir != '~')
-                        return TUI_KEY_UNKNOWN;
-                    return TUI_KEY_F8;
-                }
-                if (semi == '4') { /* F4 (linux console): ESC [ 1 4 ~ */
-                    if (!tui_wait_byte(t, &dir, 120, eof) || dir != '~')
-                        return TUI_KEY_UNKNOWN;
-                    return TUI_KEY_F4;
-                }
-                if (semi == '7') { /* F6: ESC [ 1 7 ~ */
-                    if (!tui_wait_byte(t, &dir, 120, eof) || dir != '~')
-                        return TUI_KEY_UNKNOWN;
-                    return TUI_KEY_F6;
-                }
-                if (semi == '8') { /* F7: ESC [ 1 8 ~ */
-                    if (!tui_wait_byte(t, &dir, 120, eof) || dir != '~')
-                        return TUI_KEY_UNKNOWN;
-                    return TUI_KEY_F7;
-                }
-                if (semi == '2') { /* F2: ESC [ 1 2 ~（xterm 标准 F2 序列） */
-                    if (!tui_wait_byte(t, &dir, 120, eof) || dir != '~')
-                        return TUI_KEY_UNKNOWN;
-                    return TUI_KEY_F2;
-                }
-                if (semi == '5') { /* F5: ESC [ 1 5 ~（xterm 标准 F5 序列） */
-                    if (!tui_wait_byte(t, &dir, 120, eof) || dir != '~')
-                        return TUI_KEY_UNKNOWN;
-                    return TUI_KEY_F5;
-                }
-                if (semi != ';')
+                if (!tui_wait_byte(t, &semi, 120, eof) || semi != ';')
                     return TUI_KEY_UNKNOWN;
                 if (!tui_wait_byte(t, &mod, 120, eof))
                     return TUI_KEY_UNKNOWN;
@@ -394,11 +348,6 @@ int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
             case 'B': return TUI_KEY_DOWN;
             case 'C': return TUI_KEY_RIGHT;
             case 'D': return TUI_KEY_LEFT;
-            case 'Q': return TUI_KEY_F2;  /* F2（应用键区 smkx：ESC O Q） */
-            case 'S': return TUI_KEY_F4;
-            case 'T': return TUI_KEY_F5;  /* F5（应用键区 smkx：ESC O T） */
-            case 'P': return TUI_KEY_F1;  /* F1（macOS Terminal/部分终端 SS3） */
-            case 'R': return TUI_KEY_F3;  /* F3（macOS Terminal/部分终端 SS3） */
             default:  return TUI_KEY_UNKNOWN;
             }
         }
