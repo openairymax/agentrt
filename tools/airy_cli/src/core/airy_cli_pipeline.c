@@ -10,8 +10,8 @@
  * and the three-tier blueprint routing (L1/L2/L3) that short-circuits
  * repeated tasks before the full cognition pipeline.
  * 0.1.9 M1-1c：本地 work_hall/reviewer/governance/validator 装配退役——
- * CLI 任务执行唯一经 gateway → sched_d，运行时只保留事件流 hall_store、
- * 对话 adapter 与 TUI 面板数据源。
+ * CLI 任务执行唯一经 gateway → sched_d，运行时只保留事件流 hall_store
+ * 与对话 adapter。0.1.19 t144：TUI 面板数据源随全屏渲染一并退役。
  */
 
 #include "airy_cli_pipeline.h"
@@ -67,19 +67,18 @@ airy_core_loop_t *cli_setup_core_engines(void)
     return loop;
 }
 
-airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_tui_t *tui,
-                              cli_runtime_ctx_t *rt)
+airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_runtime_ctx_t *rt)
 {
     if (!loop || !rt)
         return AIRY_EINVAL;
     AIRY_MEMSET(rt, 0, sizeof(*rt));
 
     /* 0.1.9 M1-1c：CLI 本地 work_hall/reviewer/governance 已退役——任务
-     * 执行唯一经 gateway → sched_d（C2'），/status 与 TUI board 查询面
-     * 迁 sched.dag_list（C2c）。此处仅装配 chat adapter、事件流
-     * hall_store（/chain 决策链与 TUI 事件流面板）与任务工作目录。 */
+     * 执行唯一经 gateway → sched_d（C2'），/status 查询迁 sched.dag_list
+     * （C2c）。此处仅装配 chat adapter、事件流 hall_store（/chain 决策链）
+     * 与任务工作目录。 */
 
-    /* 决策链事件流底座（/chain、事件流面板与决策点事件写入共用） */
+    /* 决策链事件流底座（/chain 命令与决策点事件写入共用） */
     airy_hall_store_t *hall_store = airy_hall_store_create(NULL);
     if (!hall_store)
         AIRY_LOG_WARN("airy_cli: hall store create failed, full visibility disabled");
@@ -116,32 +115,6 @@ airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_tui_t *tui,
         AIRY_LOG_WARN("airy_cli: chat adapter create failed, "
                       "falling back to task-only mode");
 
-    void *board_ud = NULL;
-    void *events_ud = NULL;
-    void *mem_ud = NULL;
-    if (tui) {
-        cli_panel_board_create(&board_ud);
-        cli_panel_events_create(hall_store, &events_ud);
-        cli_panel_mem_create(&mem_ud);
-        if (board_ud) {
-            cli_tui_set_panel(tui, CLI_TUI_MODE_BOARD, board_ud, cli_panel_board_count,
-                              cli_panel_board_line);
-            cli_tui_set_panel_action(tui, CLI_TUI_MODE_BOARD, cli_panel_board_action);
-        }
-        if (events_ud) {
-            cli_tui_set_panel(tui, CLI_TUI_MODE_EVENTS, events_ud, cli_panel_events_count,
-                              cli_panel_events_line);
-            cli_tui_set_panel_action(tui, CLI_TUI_MODE_EVENTS, cli_panel_events_action);
-        }
-        if (mem_ud) {
-            cli_tui_set_panel(tui, CLI_TUI_MODE_MEM, mem_ud, cli_panel_mem_count,
-                              cli_panel_mem_line);
-        }
-    }
-    rt->board_ud = board_ud;
-    rt->events_ud = events_ud;
-    rt->mem_ud = mem_ud;
-
     /* M1-1c：CLI 不再进程内持有 lang_gateway（推理语言网关服务面化至
      * think_d，经 gateway → think.lang_process 调用）。输入标准化与
      * 输出后处理在 main.c / cli_chat_finalize.c 经 cli_gw_call 完成。 */
@@ -153,12 +126,6 @@ void cli_teardown_runtime(cli_runtime_ctx_t *rt)
 {
     if (!rt)
         return;
-    if (rt->events_ud)
-        cli_panel_events_destroy(rt->events_ud);
-    if (rt->board_ud)
-        cli_panel_board_destroy(rt->board_ud);
-    if (rt->mem_ud)
-        cli_panel_mem_destroy(rt->mem_ud);
     if (rt->hall_store)
         airy_hall_store_destroy(rt->hall_store);
     AIRY_MEMSET(rt, 0, sizeof(*rt));

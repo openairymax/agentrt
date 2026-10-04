@@ -78,23 +78,6 @@ struct cli_tui_s {
     int rows;
     int cols;
 
-    /* ---- 阶段 4：视图模式（tab）+ 面板数据源 ---- */
-    cli_tui_mode_t mode;
-    struct {
-        void *ud;
-        cli_tui_panel_count_fn count;
-        cli_tui_panel_line_fn line;
-        cli_tui_panel_action_fn action;
-    } panel[CLI_TUI_MODE_MAX];
-
-    /* ---- 阶段 4：面板可操作状态 ---- */
-    size_t sel;
-    int detail_active;
-    char detail[4096];
-    size_t detail_len;
-    int follow;
-    char note[160];
-
     /* ---- input line state ---- */
     char *input;
     size_t input_len;

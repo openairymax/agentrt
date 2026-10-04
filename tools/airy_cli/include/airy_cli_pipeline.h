@@ -6,7 +6,7 @@
  * @brief Runtime context assembly/teardown and blueprint fastpath.
  *
  * cli_runtime_ctx_t aggregates every long-lived component the CLI main loop
- * needs (event-stream hall store, TUI panel data sources, task workspace).
+ * needs (event-stream hall store, task workspace).
  * cli_setup_runtime builds them; cli_teardown_runtime releases them.
  *
  * cli_blueprint_fastpath implements the three-tier blueprint routing
@@ -27,7 +27,6 @@
 #include "platform.h"
 #include "cognition.h"
 #include "hall_store.h"
-#include "cli_tui.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -40,13 +39,10 @@ extern "C" {
  * cli_setup_runtime fills it; cli_teardown_runtime releases it.
  * main() owns the struct on its stack and passes it by pointer.
  * 0.1.9 M1-1c：本地 work_hall/reviewer/governance/validator 已退役——
- * 任务执行唯一经 gateway → sched_d，查询面（/status、TUI board）迁
- * sched.dag_list；此处仅保留事件流 hall_store、面板 ud 与任务目录。 */
+ * 任务执行唯一经 gateway → sched_d，查询面（/status）迁 sched.dag_list；
+ * 此处仅保留事件流 hall_store 与任务目录。 */
 typedef struct {
     airy_hall_store_t *hall_store;
-    void *board_ud;
-    void *events_ud;
-    void *mem_ud;
     const char *main_workspace_dir;
 } cli_runtime_ctx_t;
 
@@ -56,10 +52,9 @@ typedef struct {
  * 自动装配。Returns NULL on failure. */
 airy_core_loop_t *cli_setup_core_engines(void);
 
-/* Full runtime assembly: event-stream hall_store → chat adapter → TUI panels.
+/* Full runtime assembly: event-stream hall_store → chat adapter.
  * Returns AIRY_EOK on success, error code on failure (caller must clean up). */
-airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_tui_t *tui,
-                              cli_runtime_ctx_t *rt);
+airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_runtime_ctx_t *rt);
 
 /* Symmetric teardown of cli_setup_runtime.  Idempotent: zeroes the struct
  * after release so repeated calls are safe. */
