@@ -193,13 +193,9 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
     cli_spinner_resume();
     /* 阶段 4：GCCP 意图确认 → 决策链事件（preflight，cognition 角色）。
      * 仅记录结构化信号（问题数），用户回答原文不进事件流（隐私 + JSON 转义安全）。 */
-    if (g_cli_hall_store) {
-        char ev[256];
-        snprintf(ev, sizeof(ev), "{\"event\":\"gccp_confirm\",\"question_count\":%zu}",
-                 probe->question_count);
-        airy_hall_store_write(g_cli_hall_store, "default", "preflight", NULL,
-                              AIRY_HALL_CAT_CHAIN, "cognition", ev, NULL, 0);
-    }
+    cli_hall_emit("preflight", AIRY_HALL_CAT_CHAIN,
+                  "{\"event\":\"gccp_confirm\",\"question_count\":%zu}",
+                  probe->question_count);
     return json;
 }
 
@@ -262,13 +258,9 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
     snprintf(p, cap - (size_t)(p - json), "}");
     cli_spinner_resume();
     /* 阶段 4：GCCP 意图确认 → 决策链事件（同 cJSON 分支，仅记录结构化信号） */
-    if (g_cli_hall_store) {
-        char ev[256];
-        snprintf(ev, sizeof(ev), "{\"event\":\"gccp_confirm\",\"question_count\":%zu}",
-                 probe->question_count);
-        airy_hall_store_write(g_cli_hall_store, "default", "preflight", NULL,
-                              AIRY_HALL_CAT_CHAIN, "cognition", ev, NULL, 0);
-    }
+    cli_hall_emit("preflight", AIRY_HALL_CAT_CHAIN,
+                  "{\"event\":\"gccp_confirm\",\"question_count\":%zu}",
+                  probe->question_count);
     return json;
 }
 

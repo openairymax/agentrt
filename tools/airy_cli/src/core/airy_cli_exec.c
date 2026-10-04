@@ -94,15 +94,14 @@ int cli_task_poll_input(void)
 
 void cli_chain_record_submit(const char *exec_id, const airy_task_plan_t *plan)
 {
-    if (!g_cli_hall_store || !exec_id || !exec_id[0])
+    if (!exec_id || !exec_id[0])
         return;
-    char ev[384];
-    snprintf(ev, sizeof(ev),
-             "{\"dag_id\":\"%s\",\"plan_id\":\"%s\",\"nodes\":%zu,\"edges\":%zu}",
-             exec_id, (plan && plan->task_plan_id) ? plan->task_plan_id : "",
-             plan ? plan->task_plan_node_count : (size_t)0, cli_plan_deps_count(plan));
-    airy_hall_store_write(g_cli_hall_store, "default", exec_id, NULL, AIRY_HALL_CAT_COMMAND,
-                          "cognition", ev, NULL, 0);
+    cli_hall_emit(exec_id, AIRY_HALL_CAT_COMMAND,
+                  "{\"dag_id\":\"%s\",\"plan_id\":\"%s\",\"nodes\":%zu,\"edges\":%zu}",
+                  exec_id,
+                  (plan && plan->task_plan_id) ? plan->task_plan_id : "",
+                  plan ? plan->task_plan_node_count : (size_t)0,
+                  cli_plan_deps_count(plan));
 }
 
 int cli_task_result_render(const char *result, airy_err_t err, const char *exec_id, int canceled)

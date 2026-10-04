@@ -330,6 +330,24 @@ static void cli_think_cfg_path(char *path, size_t cap)
     snprintf(path, cap, "%s/model.yaml", airy_config_dir());
 }
 
+/* env 读取仪式（AIRY_MODEL_T2/T1F/T1P）：清零后逐项覆盖非空值。
+ * 两配置读取路径（load/explicit）共用，避免逐字重复。 */
+static void cli_think_env(char *t2, size_t t2c, char *t1f, size_t t1fc,
+                          char *t1p, size_t t1pc)
+{
+    t2[0] = t1f[0] = t1p[0] = '\0';
+
+    const char *e2 = getenv("AIRY_MODEL_T2");
+    const char *e1f = getenv("AIRY_MODEL_T1F");
+    const char *e1p = getenv("AIRY_MODEL_T1P");
+    if (e2 && e2[0])
+        snprintf(t2, t2c, "%s", e2);
+    if (e1f && e1f[0])
+        snprintf(t1f, t1fc, "%s", e1f);
+    if (e1p && e1p[0])
+        snprintf(t1p, t1pc, "%s", e1p);
+}
+
 /* 双思考三模型配置统一读取，CLI 侧真相源对齐 think_d。
  *
  * 优先级：env AIRY_MODEL_T2/T1F/T1P > $AIRY_MODEL_CONFIG（或
@@ -345,17 +363,7 @@ void cli_think_cfg_load(char *t2, size_t t2c, char *t1f, size_t t1fc,
 {
     if (!t2 || !t1f || !t1p || t2c == 0 || t1fc == 0 || t1pc == 0)
         return;
-    t2[0] = t1f[0] = t1p[0] = '\0';
-
-    const char *e2 = getenv("AIRY_MODEL_T2");
-    const char *e1f = getenv("AIRY_MODEL_T1F");
-    const char *e1p = getenv("AIRY_MODEL_T1P");
-    if (e2 && e2[0])
-        snprintf(t2, t2c, "%s", e2);
-    if (e1f && e1f[0])
-        snprintf(t1f, t1fc, "%s", e1f);
-    if (e1p && e1p[0])
-        snprintf(t1p, t1pc, "%s", e1p);
+    cli_think_env(t2, t2c, t1f, t1fc, t1p, t1pc);
     if (t2[0] && t1f[0] && t1p[0])
         return;
 
@@ -395,17 +403,7 @@ int cli_think_cfg_explicit(char *t2, size_t t2c, char *t1f, size_t t1fc,
 {
     if (!t2 || !t1f || !t1p || t2c == 0 || t1fc == 0 || t1pc == 0)
         return 0;
-    t2[0] = t1f[0] = t1p[0] = '\0';
-
-    const char *e2 = getenv("AIRY_MODEL_T2");
-    const char *e1f = getenv("AIRY_MODEL_T1F");
-    const char *e1p = getenv("AIRY_MODEL_T1P");
-    if (e2 && e2[0])
-        snprintf(t2, t2c, "%s", e2);
-    if (e1f && e1f[0])
-        snprintf(t1f, t1fc, "%s", e1f);
-    if (e1p && e1p[0])
-        snprintf(t1p, t1pc, "%s", e1p);
+    cli_think_env(t2, t2c, t1f, t1fc, t1p, t1pc);
     if (t2[0] && t1f[0] && t1p[0])
         return 1;
 
