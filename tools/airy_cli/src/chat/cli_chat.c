@@ -29,17 +29,7 @@
 #include "cli_gw.h" /* 架构约束：统一经 gateway 派发（C-01 路线 A） */
 #include "llm_service.h" /* llm_response_free（llm_d 公共接口，airy_cli CMake 已含 llm_d/include） */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#else
-#include <unistd.h>
-#include <signal.h>
-#endif
+#include "cli_prelude.h"
 
 #include <cjson/cJSON.h>
 

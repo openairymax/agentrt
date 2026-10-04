@@ -26,22 +26,9 @@
  *   airy_cli_taskflow.c  任务执行管线（规划 → DAG → 提交 → 轮询 → 等待 → 结果）
  */
 
-#include <airy_types.h> /* 0.1.16 B2: userspace error contract (commons SSoT) */
-#include "loop.h"
-#include "cli_gw.h"
-#include "platform.h"
-#include "cognition.h"
-#include "gccp.h"
-#include "hall_store.h"
-#include "plan_to_dag.h"
-#include "llm_svc_adapter.h"
-#include "logger.h"
-#include "logging.h"
-#include "airy_memory.h"
-#include "string_compat.h"
-#include "daemon_rpc_client.h"
-#include "daemon_cmds.h"
-#include "cli_internal.h"
+#include "cli_internal.h" /* 家族公共头：commons/平台/引擎/守护进程客户端面 */
+#include "cli_gw.h"       /* 架构约束：统一经 gateway 派发 */
+
 #include "airy_cli_pipeline.h"
 #include "airy_cli_exec.h"
 
