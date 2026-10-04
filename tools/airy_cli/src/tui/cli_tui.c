@@ -3,33 +3,23 @@
 
 /**
  * @file cli_tui.c
- * @brief Full-screen TUI engine 主引擎（域拆分后，2026-08-27）。
+ * @brief TUI 引擎骨架（域拆分后，2026-08-27）。
  *
  * 2026-08-27 域拆分（3988 行 → 7 文件）：
- *   - cli_tui.c              引擎骨架：状态、面板/模式 API、emit、生命周期、
- *                            全屏 readline 主循环
+ *   - cli_tui.c              引擎骨架：状态、面板/模式 API、生命周期
  *   - tui_keys.c             按键读取域（POSIX/Windows + ESC 序列解析）
  *   - tui_input.c            输入编辑域（光标/编辑/Tab 补全/行模式 readline）
  *   - tui_ime.c              内置拼音输入法域
  *   - tui_history.c          历史与搜索域
- *   - tui_render.c           渲染域（header/viewport/input/增量重绘/硬件面板）
+ *   - tui_render.c           渲染域（行模式终端原语）
  * 跨文件共享结构体与内部声明见 cli_tui_internal.h；公共 API 见
  * cli_tui.h（对外不透明 cli_tui_t 不变）。
  *
- * 2026-08-27 二轮拆分（1102 行 → 3 个职责模块）：本文件保留引擎骨架与
- * 生命周期；全屏 readline 主循环 → tui_readline.c。
- *
- * 0.1.17 R5-G2 冻结退役：本文件的备用屏全屏形态（pinned header + 会话视口 +
- * 底部输入条的三区布局）不再可进入——cli_tui_enter() 恒拒绝，全屏渲染唯一由
- * Rust 侧控制台渲染层（`airy_cli --tui` 调起的 agentrt-tui）提供。本文件
- * 只保留行式渲染所需的引擎骨架、状态与视图查询；渲染/面板域的物理删除见
- * 0.1.18「TUI 渲染引擎化」。
- *
- * ANSI used: cursor home, erase line, cursor movement. The alt-screen (1049)
- * exit sequence survives only in the idempotent teardown path, which can no
- * longer be armed because the entry choke point refuses.
- * No curses — plain POSIX termios + ANSI, consistent with the project's
- * "no curses" rendering philosophy.
+ * 0.1.17 R5-G2 冻结退役：备用屏全屏形态（pinned header + 会话视口 + 底部
+ * 输入条的三区布局）不再可进入，全屏渲染唯一由 Rust 侧控制台渲染层
+ * （`airy_cli --tui` 调起的 agentrt-tui）提供。0.1.19 t143 物理删除全屏
+ * 渲染引擎、emit 流式重绘与引擎死 API，本文件仅保留行式渲染所需的骨架、
+ * 状态与视图查询。
  */
 
 #include "cli_tui_internal.h"
@@ -52,24 +42,6 @@ void tui_sigwinch_handler(int sig)
 }
 #endif
 
-const char *tui_mode_name(cli_tui_mode_t m)
-{
-    switch (m) {
-    case CLI_TUI_MODE_CHAT:
-        return "对话";
-    case CLI_TUI_MODE_BOARD:
-        return "任务看板";
-    case CLI_TUI_MODE_EVENTS:
-        return "事件流";
-    case CLI_TUI_MODE_HW:
-        return "硬件信息";
-    case CLI_TUI_MODE_MEM:
-        return "记忆链";
-    default:
-        return "?";
-    }
-}
-
 /* ---- 阶段 4：视图模式（tab）+ 面板数据源 ---- */
 
 void cli_tui_set_panel(cli_tui_t *t, cli_tui_mode_t mode, void *ud,
@@ -80,7 +52,6 @@ void cli_tui_set_panel(cli_tui_t *t, cli_tui_mode_t mode, void *ud,
     t->panel[mode].ud = ud;
     t->panel[mode].count = count;
     t->panel[mode].line = line;
-    t->dirty = 1;
 }
 
 void cli_tui_set_panel_action(cli_tui_t *t, cli_tui_mode_t mode,
@@ -89,7 +60,6 @@ void cli_tui_set_panel_action(cli_tui_t *t, cli_tui_mode_t mode,
     if (!t || mode < 0 || mode >= CLI_TUI_MODE_MAX)
         return;
     t->panel[mode].action = fn;
-    t->dirty = 1;
 }
 
 cli_tui_mode_t cli_tui_mode(const cli_tui_t *t)
@@ -118,7 +88,6 @@ void cli_tui_mode_set(cli_tui_t *t, cli_tui_mode_t m)
     if (!t || m < 0 || m >= CLI_TUI_MODE_MAX || m == t->mode)
         return;
     t->mode = m;
-    t->scroll_off = 0;
     /* 进入任务看板：重置选择与详情（事件流保持跟随/过滤状态） */
     if (m == CLI_TUI_MODE_BOARD) {
         t->sel = 0;
@@ -129,149 +98,6 @@ void cli_tui_mode_set(cli_tui_t *t, cli_tui_mode_t m)
     if (m == CLI_TUI_MODE_MEM)
         t->follow = 1;
     t->note[0] = '\0';
-    t->dirty = 1;
-}
-
-void cli_tui_set_status(cli_tui_t *t, const char *status)
-{
-    if (!t)
-        return;
-    if (status && status[0])
-        AIRY_STRNCPY_TERM(t->status, status, sizeof(t->status));
-    else
-        t->status[0] = '\0';
-    t->dirty = 1;
-}
-
-/* ---- emit / history model ---- */
-
-void tui_append_byte(cli_tui_t *t, char c)
-{
-    if (t->cur_len + 2 > t->cur_cap) {
-        size_t new_cap = t->cur_cap ? t->cur_cap * 2 : TUI_LINE_INIT_CAP;
-        while (new_cap < t->cur_len + 2)
-            new_cap *= 2;
-        char *grown = (char *)AIRY_REALLOC(t->cur, new_cap);
-        if (!grown)
-            return;
-        t->cur = grown;
-        t->cur_cap = new_cap;
-    }
-    t->cur[t->cur_len++] = c;
-    t->cur[t->cur_len] = '\0';
-}
-
-/* 内容行数：历史（去 header）+ 未提交的 partial 行。增量/全量渲染
- * 共用同一几何口径（与 tui_render_viewport 聊天分支一致）。 */
-size_t tui_content_lines(cli_tui_t *t)
-{
-    size_t total = t->hist.count;
-    int have_partial = t->cur && t->cur_len > 0;
-    return (total > t->hist.pinned ? total - t->hist.pinned : 0) +
-           (have_partial ? 1 : 0);
-}
-
-void cli_tui_emit(cli_tui_t *t, const char *data, size_t len)
-{
-    if (!t || !data) {
-        /* NULL engine: stream-safe passthrough (non-TTY callers). */
-        if (data && len)
-            fwrite(data, 1, len, stdout);
-        return;
-    }
-    if (!t->active) {
-        if (len)
-            fwrite(data, 1, len, stdout);
-        return;
-    }
-
-    size_t c0 = tui_content_lines(t);
-    for (size_t i = 0; i < len; i++) {
-        char c = data[i];
-        if (c == '\r') {
-            /* Rewind the partial line: spinner / status redraws replace the
-             * current line instead of appending. */
-            t->cur_len = 0;
-            if (t->cur)
-                t->cur[0] = '\0';
-            continue;
-        }
-        if (c == '\n') {
-            if (t->cur_len > 0) {
-                tui_commit_line(t, t->cur);
-                t->cur = NULL;
-            } else {
-                /* Blank line: commit an empty marker line. */
-                char *blank = (char *)AIRY_STRDUP("");
-                if (blank)
-                    tui_commit_line(t, blank);
-            }
-            t->cur_len = 0;
-            t->cur_cap = 0;
-            continue;
-        }
-        tui_append_byte(t, c);
-    }
-    /* P1 重绘优化：不再每 chunk 全量重绘。 */
-    if (t->mode != CLI_TUI_MODE_CHAT || t->scroll_off > 0) {
-        t->dirty = 1;
-        return;
-    }
-    if (tui_content_lines(t) - c0 > 1) {
-        cli_tui_redraw(t);
-        return;
-    }
-    tui_schedule_redraw(t);
-}
-
-void cli_tui_emit_flush(cli_tui_t *t)
-{
-    if (!t || !t->active)
-        return;
-    if (t->cur_len > 0) {
-        tui_commit_line(t, t->cur);
-        t->cur = NULL;
-        t->cur_len = 0;
-        t->cur_cap = 0;
-    }
-    /* P1：flush 提交了部分行 → 立即增量重绘（跳过节流窗口）。 */
-    if (t->mode != CLI_TUI_MODE_CHAT || t->scroll_off > 0) {
-        t->dirty = 1;
-        return;
-    }
-    t->redraw_pending = 0;
-    tui_redraw_tail(t);
-}
-
-size_t cli_tui_hist_count(cli_tui_t *t)
-{
-    return t ? t->hist.count : 0;
-}
-
-void cli_tui_pin_header(cli_tui_t *t)
-{
-    if (!t)
-        return;
-    /* Commit any partial header line, then fix the header boundary. */
-    if (t->active && t->cur_len > 0) {
-        tui_commit_line(t, t->cur);
-        t->cur = NULL;
-        t->cur_len = 0;
-        t->cur_cap = 0;
-    }
-    t->hist.pinned = t->hist.count;
-    t->dirty = 1;
-}
-
-void cli_tui_redraw(cli_tui_t *t)
-{
-    if (!t || !t->active)
-        return;
-    tui_render_header(t);
-    tui_render_viewport(t);
-    tui_render_input(t);
-    t->dirty = 0;
-    fflush(stdout);
 }
 
 /* ---- lifecycle ---- */
@@ -299,7 +125,7 @@ void cli_tui_set_header_models(cli_tui_t *t, const char *t2, const char *t1f,
  * readline 的 SIGWINCH 处理。 */
 void cli_tui_rebuild_three_zone(cli_tui_t *t)
 {
-    if (!t || !cli_term_is_tty() || t->active)
+    if (!t || !cli_term_is_tty())
         return;
     cli_term_header_unpin();
     cli_out("\033[2J\033[H");
@@ -351,107 +177,14 @@ int cli_tui_create(cli_tui_t **out_tui)
     return 0;
 }
 
-int cli_tui_enter(cli_tui_t *t)
-{
-    (void)t;
-    /* 0.1.17 R5-G2：C 侧全屏套件冻结退役——备用屏 / 原始输入 / SIGWINCH
-     * 接管全部收回，终端改性只由控制台渲染层（`airy_cli --tui` 调起的
-     * agentrt-tui）持有。此处恒拒绝，全屏能力的唯一入口是 --tui 模式；
-     * 本套件的物理删除见 0.1.18。 */
-    return -1;
-}
-
-int cli_tui_leave(cli_tui_t *t)
-{
-    if (!t || !t->active)
-        return 0;
-#ifndef _WIN32
-    if (t->termios_saved) {
-        tcsetattr(STDIN_FILENO, TCSANOW, &t->saved_termios);
-        cli_term_note_raw_leave(); /* T-19 崩溃守卫注销 */
-    }
-    signal(SIGWINCH, SIG_DFL);
-    /* termios_saved/saved_termios 字段仅 POSIX 编译（cli_tui_internal.h
-     * 已 #ifndef _WIN32 守卫）；清零须在守卫内，#112 实证 C2039 */
-    t->termios_saved = 0;
-#endif
-    /* 恢复全屏滚动区（\x1b[r），随后退出 alt screen。
-     * 2.2.1.5：退出前恢复硬件光标。 */
-    fputs("\033[r\033[?2004l\033[?25h\033[?1049l", stdout);
-    fflush(stdout);
-    t->active = 0;
-    t->scr_set = 0;
-    return 0;
-}
-
-void cli_tui_replay_history(cli_tui_t *t)
-{
-    if (!t || !t->active)
-        return;
-    for (size_t i = 0; i < g_history_count; i++) {
-        const char *role = g_history_roles[i];
-        const char *content = g_history_contents[i];
-        if (!role || !content)
-            continue;
-        const char *tag = (strcmp(role, "user") == 0) ? "[For Thee]" : "[Super Agent]";
-        size_t cap = 64 + strlen(tag) + strlen(content);
-        char *line = (char *)AIRY_MALLOC(cap);
-        if (!line)
-            continue;
-        int n = snprintf(line, cap, "  %s  %s", tag, content);
-        if (n < 0) {
-            AIRY_FREE(line);
-            continue;
-        }
-        tui_commit_line(t, line);
-    }
-    t->dirty = 1;
-}
-
-void cli_tui_reset_history(cli_tui_t *t)
-{
-    if (!t || !t->active)
-        return;
-    tui_history_reset(&t->hist);
-    t->cur_len = 0;
-    if (t->cur)
-        t->cur[0] = '\0';
-    t->scroll_off = 0;
-    t->dirty = 1;
-}
-
 void cli_tui_destroy(cli_tui_t *t)
 {
     if (!t)
         return;
-    if (t->active)
-        cli_tui_leave(t);
-    tui_history_reset(&t->hist);
     tui_cmd_hist_reset(t);
-    AIRY_FREE(t->cur);
     AIRY_FREE(t->input);
     airy_ime_destroy(t->ime); /* 可为 NULL */
     if (g_default_tui == t)
         g_default_tui = NULL;
     AIRY_FREE(t);
-}
-
-int cli_tui_active(const cli_tui_t *t)
-{
-    return t && t->active;
-}
-
-/* 任务执行期间（wait 循环）TUI 模式非阻塞按键读取：
- *   - 0   无输入（未激活 / 超时）
- *   - -1  EOF（*eof=1）
- *   - 其他 按键码（0x03 = Ctrl+C 等，与 readline 同语义）
- * 供 main.c 的 cli_task_poll_input 在 TUI 全屏下开放中断能力。 */
-int cli_tui_poll_key(cli_tui_t *t, int *eof)
-{
-    if (!t || !cli_tui_active(t)) {
-        if (eof)
-            *eof = 0;
-        return 0;
-    }
-    return tui_read_key(t, 0, eof);
 }

@@ -16,7 +16,6 @@
  */
 
 #include "cli_render.h"
-#include "cli_tui.h"
 
 #include "airy_memory.h"
 #include "cli_gw.h"
@@ -37,14 +36,6 @@ extern int g_cli_print_mode;
 
 #define CLI_GUTTER_MAX 64
 #define CLI_DEFAULT_WIDTH 100
-
-/* Attached full-screen TUI engine (NULL = plain stdout streaming). */
-static struct cli_tui_s *g_cli_tui;
-
-void cli_render_set_tui(struct cli_tui_s *tui)
-{
-    g_cli_tui = tui;
-}
 
 void cli_out(const char *s)
 {
@@ -131,19 +122,13 @@ void cli_outn(const char *s, size_t n)
 {
     if (!s || n == 0) return;
     if (g_active_meter) cli_meter_feed(g_active_meter, s, n);
-    if (g_cli_tui && cli_tui_active(g_cli_tui))
-        cli_tui_emit(g_cli_tui, s, n);
-    else
-        fwrite(s, 1, n, stdout);
+    fwrite(s, 1, n, stdout);
 }
 
 void cli_outc(char c)
 {
     if (g_active_meter) cli_meter_feed(g_active_meter, &c, 1);
-    if (g_cli_tui && cli_tui_active(g_cli_tui))
-        cli_tui_emit(g_cli_tui, &c, 1);
-    else
-        fputc(c, stdout);
+    fputc(c, stdout);
 }
 
 void cli_outf(const char *fmt, ...)
@@ -483,7 +468,7 @@ int cli_spinner_start(const char *title)
     AIRY_STRNCPY_TERM(g_spinner.title, title, sizeof(g_spinner.title));
     g_spinner.start_ns = cli_time_ns();
 
-    if (!cli_term_is_tty() || cli_tui_active(cli_tui_get_default())) {
+    if (!cli_term_is_tty()) {
         g_spinner.degraded = 1;
         g_spinner.active = 1;
         const char *g = cli_gutter(2);

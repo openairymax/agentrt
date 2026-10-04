@@ -7,8 +7,8 @@
  *
  * cli_tui_readline 的入口分派：非 TTY 走 fgets，TTY 走行式
  * tui_readline_line_mode——这是 CLI 唯一的交互形态。全屏分支的循环骨架
- * （面板实时刷新、视图模式切换、面板按键分派、Ctrl+R/S 反向搜索等）
- * 随全屏套件一并退役：cli_tui_enter 恒拒绝、t->active 恒 0，分支不可达。
+ * （面板实时刷新、视图模式切换、面板按键分派等）已随全屏套件于 0.1.19
+ * t143 物理删除，本文件只余上述两条通路。
  * 共享声明见 cli_tui_internal.h。
  */
 

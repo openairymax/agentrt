@@ -76,7 +76,6 @@ int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
     t->tab_active = 0;
     t->tab_count = 0;
     t->tab_sel = 0;
-    t->scroll_off = 0;
     t->search_active = 0;
     t->search_query_len = 0;
     t->search_match = -1;

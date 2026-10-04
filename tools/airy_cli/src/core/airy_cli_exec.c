@@ -51,20 +51,6 @@ int cli_task_poll_input(void)
 {
     if (g_cli_print_mode || g_cli_json_mode)
         return 0;
-    cli_tui_t *tui = cli_tui_get_default();
-    if (tui && cli_tui_active(tui)) {
-        int eof = 0;
-        int key = cli_tui_poll_key(tui, &eof);
-        if (eof) {
-            g_cli_cancel = 1;
-            return -1;
-        }
-        if (key == 0x03) {
-            g_cli_cancel = 1;
-            return -1;
-        }
-        return 0;
-    }
 #ifndef _WIN32
     struct pollfd pfd;
     pfd.fd = STDIN_FILENO;

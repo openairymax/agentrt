@@ -6,7 +6,7 @@
  * @brief 聊天域回复最终化（域拆分自 cli_chat.c，2026-08-27）。
  *
  * cli_chat_reply 的收尾阶段：语言网关输出后处理、最终回复渲染
- * （--json / -p / 交互流式折叠 / TUI 非流式）、历史写入与思考链持久化。
+ * （--json / -p / 交互流式折叠 / 非流式折叠）、历史写入与思考链持久化。
  * 共享声明见 cli_chat_internal.h。
  */
 
@@ -26,7 +26,7 @@
  *   -p      纯文本（Claude Code -p / Codex exec 约定；流式已直出）
  *   交互    TTY 流式：正文已直出即终态，收尾只补思考链隐藏提示
  *           （0.1.7 弃用「擦除预览→重绘最终形态」三段式）；
- *           TUI/非流式：markdown 渲染 + 思考链隐藏提示
+ *           非流式：markdown 渲染 + 思考链隐藏提示
  * 思考链默认不上屏（0.1.18 B4），完整文本走诊断通道。
  * 不释放 final_resp（归调用方）。 */
 void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
@@ -149,8 +149,6 @@ void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
             fprintf(stderr, "[chat] warning: reply truncated at the output token cap; "
                             "the text above is incomplete\n");
     } else {
-        cli_tui_t *r_tui = cli_tui_get_default();
-        (void)r_tui;
         if (stream_mode) {
             /* 交互 TTY 流式（0.1.7 终态直出）：正文已随流式逐块上屏，
              * 不再「擦除预览 + 重绘最终形态」——原方案依赖 ANSI 光标
