@@ -125,6 +125,17 @@ extern int g_cli_lang_output;
  * 以 "cognition" 角色写入 CHAIN/COMMAND 事件，供 /chain 决策链可视化回放。 */
 extern airy_hall_store_t *g_cli_hall_store;
 
+/* 决策链事件发射唯一机制件（cli_hall.c）：调用方声明「会话 + 类别 + 内容
+ * 格式」，固定面（tenant="default"、node=NULL、role="cognition"、无 out
+ * 参数）由机制独占。句柄为空时静默丢弃。fmt 须产出合法 JSON 对象字面量。 */
+#if defined(__GNUC__)
+void cli_hall_emit(const char *task_id, airy_hall_category_t cat,
+                   const char *fmt, ...) __attribute__((format(printf, 3, 4)));
+#else
+void cli_hall_emit(const char *task_id, airy_hall_category_t cat,
+                   const char *fmt, ...);
+#endif
+
 /* Server one-shot mode (-p/--print): no banner/prompt/TUI, single-turn
  * execution then exit. --json switches the final result to JSON. Defined
  * in main.c; read by the render layer to keep output clean. */

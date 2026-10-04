@@ -31,16 +31,6 @@ void tui_input_append(cli_tui_t *t, char c)
     if (t->input_col >= t->input_len) {
         t->input[t->input_len++] = c;
     } else {
-        if (t->input_len + 2 > t->input_cap) {
-            size_t new_cap = t->input_cap ? t->input_cap * 2 : 256;
-            while (new_cap < t->input_len + 2)
-                new_cap *= 2;
-            char *grown = (char *)AIRY_REALLOC(t->input, new_cap);
-            if (!grown)
-                return;
-            t->input = grown;
-            t->input_cap = new_cap;
-        }
         AIRY_MEMMOVE(t->input + t->input_col + 1, t->input + t->input_col,
                 t->input_len - t->input_col);
         t->input[t->input_col] = c;

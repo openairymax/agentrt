@@ -230,6 +230,59 @@ static int cli_gw_connect(const char *host, int port, int timeout_ms)
 }
 
 /* ── HTTP 请求发送 + 响应体读取（返回 malloc'd body，调用方 AIRY_FREE）── */
+
+/* 接收缓冲喂入统一机制（Windows/POSIX 两腿共用）：追加 n 字节后按需扩容，
+ * 解析响应头（Content-Length / chunked），并判定 body 是否读满。返回
+ * 0=继续、1=读满、-1=失败（*presp 已释放并置 NULL，调用方只需关连接）。
+ * 完成判定统一为 (rlen - body_off) >= content_len，body_off 为头结束偏移；
+ * 修正旧 POSIX 腿以固定 4 近似 body_off 的判定——大响应头下会提前 break。 */
+static int gw_recv_feed(char **presp, size_t *pcap, size_t *prlen, size_t n,
+                        int *pheader_done, size_t *pcontent_len, size_t *pbody_off,
+                        int *pis_chunked)
+{
+    *prlen += n;
+    if (*prlen >= *pcap) {
+        size_t cap = *pcap * 2;
+        if (cap > CLI_GW_MAX_BODY) {
+            AIRY_FREE(*presp);
+            *presp = NULL;
+            return -1;
+        }
+        char *nb = (char *)AIRY_REALLOC(*presp, cap);
+        if (!nb) {
+            AIRY_FREE(*presp);
+            *presp = NULL;
+            return -1;
+        }
+        *presp = nb;
+        *pcap = cap;
+    }
+
+    if (!*pheader_done) {
+        char *he = memmem(*presp, *prlen, "\r\n\r\n", 4);
+        if (!he)
+            return 0;
+        *pheader_done = 1;
+        size_t hlen = (size_t)(he - *presp) + 4;
+        *pbody_off = hlen;
+        char *cl = memmem(*presp, hlen, "Content-Length:", 15);
+        if (!cl)
+            cl = memmem(*presp, hlen, "content-length:", 15);
+        if (cl)
+            *pcontent_len = (size_t)strtoull(cl + 15, NULL, 10);
+        if (memmem(*presp, hlen, "Transfer-Encoding:", 18) &&
+            memmem(*presp, hlen, "chunked", 7))
+            *pis_chunked = 1;
+    }
+
+    if (!*pis_chunked && *pcontent_len > 0 &&
+        (*prlen - *pbody_off) >= *pcontent_len)
+        return 1;
+    if (!*pis_chunked && *pcontent_len == 0 && *pbody_off && *prlen > *pbody_off)
+        return 1;
+    return 0;
+}
+
 static int cli_gw_exchange(const char *method, const char *host, int port, const char *path,
                            const char *body, int timeout_ms, char **out_body, size_t *out_body_len)
 {
@@ -317,6 +370,7 @@ static int cli_gw_exchange(const char *method, const char *host, int port, const
     size_t rlen = 0;
     int header_done = 0;
     size_t content_len = 0;
+    size_t body_off = 0;
     int is_chunked = 0;
     int canceled = 0; /* S-02：两腿共用，Ctrl+C 命中即置位 */
     long long total_timeout = (long long)timeout_ms;
@@ -338,49 +392,15 @@ static int cli_gw_exchange(const char *method, const char *host, int port, const
             }
             break;
         }
-        rlen += (size_t)n;
-        if (rlen >= cap) {
-            cap *= 2;
-            if (cap > CLI_GW_MAX_BODY) {
-                AIRY_FREE(resp);
-                closesocket(fd);
-                WSACleanup();
-                return -1;
-            }
-            char *nb = (char *)AIRY_REALLOC(resp, cap);
-            if (!nb) {
-                AIRY_FREE(resp);
-                closesocket(fd);
-                WSACleanup();
-                return -1;
-            }
-            resp = nb;
+        int rc = gw_recv_feed(&resp, &cap, &rlen, (size_t)n, &header_done,
+                              &content_len, &body_off, &is_chunked);
+        if (rc < 0) {
+            closesocket(fd);
+            WSACleanup();
+            return -1;
         }
-        if (!header_done) {
-            char *he = memmem(resp, rlen, "\r\n\r\n", 4);
-            if (he) {
-                header_done = 1;
-                size_t hlen = (size_t)(he - resp) + 4;
-                /* 解析 Content-Length */
-                char *cl = memmem(resp, hlen, "Content-Length:", 15);
-                if (!cl)
-                    cl = memmem(resp, hlen, "content-length:", 15);
-                if (cl) {
-                    content_len = (size_t)strtoull(cl + 15, NULL, 10);
-                }
-                if (memmem(resp, hlen, "Transfer-Encoding:", 18) &&
-                    memmem(resp, hlen, "chunked", 7))
-                    is_chunked = 1;
-                /* 剩余可读量判断完成 */
-                if (!is_chunked && content_len > 0 && (rlen - hlen) >= content_len)
-                    break;
-                if (!is_chunked && content_len == 0 && (rlen - hlen) > 0)
-                    break;
-            }
-        } else {
-            if (!is_chunked && content_len > 0 && (rlen - (rlen > 0 ? 1 : 0)) >= content_len)
-                break;
-        }
+        if (rc > 0)
+            break;
     }
 #else
     while (total_timeout > 0) {
@@ -415,43 +435,14 @@ static int cli_gw_exchange(const char *method, const char *host, int port, const
                 continue;
             break;
         }
-        rlen += (size_t)n;
-        if (rlen >= cap) {
-            cap *= 2;
-            if (cap > CLI_GW_MAX_BODY) {
-                AIRY_FREE(resp);
-                close(fd);
-                return -1;
-            }
-            char *nb = (char *)AIRY_REALLOC(resp, cap);
-            if (!nb) {
-                AIRY_FREE(resp);
-                close(fd);
-                return -1;
-            }
-            resp = nb;
+        int rc = gw_recv_feed(&resp, &cap, &rlen, (size_t)n, &header_done,
+                              &content_len, &body_off, &is_chunked);
+        if (rc < 0) {
+            close(fd);
+            return -1;
         }
-        if (!header_done) {
-            char *he = memmem(resp, rlen, "\r\n\r\n", 4);
-            if (he) {
-                header_done = 1;
-                size_t hlen = (size_t)(he - resp) + 4;
-                char *cl = memmem(resp, hlen, "Content-Length:", 15);
-                if (!cl)
-                    cl = memmem(resp, hlen, "content-length:", 15);
-                if (cl)
-                    content_len = (size_t)strtoull(cl + 15, NULL, 10);
-                if (memmem(resp, hlen, "Transfer-Encoding:", 18) &&
-                    memmem(resp, hlen, "chunked", 7))
-                    is_chunked = 1;
-                if (!is_chunked && content_len > 0 && (rlen - hlen) >= content_len)
-                    break;
-                if (!is_chunked && content_len == 0 && (rlen - hlen) > 0)
-                    break;
-            }
-        } else if (!is_chunked && content_len > 0 && rlen >= 4 && (rlen - 4) >= content_len) {
+        if (rc > 0)
             break;
-        }
     }
 #endif
 #ifdef _WIN32

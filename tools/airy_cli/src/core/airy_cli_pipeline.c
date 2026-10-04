@@ -221,14 +221,9 @@ int cli_blueprint_fastpath(const char *input, uint64_t turn_start)
                                  line);
             cli_trace("blueprint", "%s", line);
         }
-        if (g_cli_hall_store) {
-            char ev[512];
-            snprintf(ev, sizeof(ev),
-                     "{\"event\":\"blueprint_hit\",\"layer\":\"L1\",\"result\":%s}",
-                     rs_out ? rs_out : "null");
-            airy_hall_store_write(g_cli_hall_store, "default", "preflight", NULL,
-                                  AIRY_HALL_CAT_CHAIN, "cognition", ev, NULL, 0);
-        }
+        cli_hall_emit("preflight", AIRY_HALL_CAT_CHAIN,
+                      "{\"event\":\"blueprint_hit\",\"layer\":\"L1\",\"result\":%s}",
+                      rs_out ? rs_out : "null");
         AIRY_FREE(rs_out);
         if (!g_cli_json_mode)
             cli_render_turn_separator(cli_now_ms() - turn_start,
@@ -279,14 +274,9 @@ int cli_blueprint_fastpath(const char *input, uint64_t turn_start)
             cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
                                  line);
         }
-        if (g_cli_hall_store) {
-            char ev[512];
-            snprintf(ev, sizeof(ev),
-                     "{\"event\":\"blueprint_hit\",\"layer\":\"L2\",\"result\":%s}",
-                     rs_out ? rs_out : "null");
-            airy_hall_store_write(g_cli_hall_store, "default", "preflight", NULL,
-                                  AIRY_HALL_CAT_CHAIN, "cognition", ev, NULL, 0);
-        }
+        cli_hall_emit("preflight", AIRY_HALL_CAT_CHAIN,
+                      "{\"event\":\"blueprint_hit\",\"layer\":\"L2\",\"result\":%s}",
+                      rs_out ? rs_out : "null");
         AIRY_FREE(rs_out);
         if (!g_cli_json_mode)
             cli_render_turn_separator(cli_now_ms() - turn_start,
