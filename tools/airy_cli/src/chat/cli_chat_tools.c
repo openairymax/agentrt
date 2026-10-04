@@ -24,16 +24,7 @@
 
 #include "cli_gw.h" /* 架构约束 2026-08-25：统一经 gateway 派发 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
+#include "cli_prelude.h"
 
 #ifdef AIRY_HAS_CJSON
 #include <cjson/cJSON.h>
