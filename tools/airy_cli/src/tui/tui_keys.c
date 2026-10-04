@@ -212,22 +212,6 @@ int tui_wait_byte(cli_tui_t *t, char *out, int timeout_ms, int *eof)
 #endif
 }
 
-/* 读取 bracketed-paste 结束序列的剩余字节（ESC 已被调用方消费，
- * 这里只读 "[201~" 5 字节）。返回 1 = 完整结束序列；0 = 不匹配。 */
-int tui_paste_read_end(cli_tui_t *t)
-{
-    char want[] = {'[', '2', '0', '1', '~'};
-    char got[sizeof(want)];
-    for (size_t i = 0; i < sizeof(want); i++) {
-        int eof = 0;
-        if (!tui_wait_byte(t, &got[i], 50, &eof))
-            return 0;
-        if (got[i] != want[i])
-            return 0;
-    }
-    return 1;
-}
-
 /* 丢弃一个控制字符串序列（OSC/DCS/SOS/PM/APC；ESC 与类型字节已被调用方
  * 消费），读到 BEL(0x07) 或 ST(ESC \) 为止，超时/EOF 亦返回。
  *
