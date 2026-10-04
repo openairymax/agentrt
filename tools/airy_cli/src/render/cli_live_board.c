@@ -16,8 +16,8 @@
  * 看板块（header + N 节点 + footer）打印后，spinner 紧跟其下；轮询循环在
  * spinner 暂停间隙按「相对行距」擦除并重绘整块，节点图标随状态翻转
  * （□ → ◐ → ✓/✗/⊘）。任务运行期间看板块下方不再有新行，相对几何稳定，
- * 即使区域滚动也只整体位移，不影响相对导航。非 TTY / TUI 激活时退化为
- * 静态计划（cli_print_plan_list）+ 追加看板行（cli_board_line）。
+ * 即使区域滚动也只整体位移，不影响相对导航。非 TTY 时退化为静态计划
+ * （cli_print_plan_list）+ 追加看板行（cli_board_line）。
  *
  * 自 2026-08-27 起从 cli_display.c 拆出：本文件只承载看板会话状态与重绘；
  * 结果/计划列表/进度回调在 cli_display.c，hero 横幅在 cli_banner.c。
@@ -141,7 +141,7 @@ void cli_live_board_begin(const airy_task_plan_t *plan)
     AIRY_MEMSET(&g_live_board, 0, sizeof(g_live_board));
     if (g_cli_print_mode || !plan || plan->task_plan_node_count == 0)
         return;
-    if (!cli_term_is_tty() || cli_tui_active(cli_tui_get_default())) {
+    if (!cli_term_is_tty()) {
         /* 退化：静态计划（原 cli_print_plan_list 语义），不开启原位重绘。 */
         cli_print_plan_list(plan);
         return;

@@ -132,24 +132,6 @@ static void tui_ime_print_bar(const cli_tui_t *t, size_t used, size_t limit)
     }
 }
 
-/* 绘制拼音候选条（输入行上方一行，绝对定位；全屏 TUI 布局专用，微信式
- * 分页）。返回 1=已绘制（占用该行）；0=无拼音态（调用方继续画分隔线等）。 */
-int tui_ime_draw_cands(cli_tui_t *t, int input_row)
-{
-    if (!t->ime || !t->ime_active || t->ime_buf_len == 0)
-        return 0;
-    char num[16];
-    size_t brow = input_row > 1 ? (size_t)input_row - 1 : 1;
-    tui_write_literal("\033[");
-    snprintf(num, sizeof(num), "%zu", brow);
-    tui_write_literal(num);
-    tui_write_literal(";1H");
-    tui_clear_line();
-    tui_ime_print_bar(t, 0, (size_t)(t->cols > 0 ? t->cols : 80));
-    fflush(stdout);
-    return 1;
-}
-
 /* 行渲染模式候选条（内联于输入行末）：底部固定输入条（三区布局）已于
  * 0.1.7 弃用，cli_term_header_pin() 无任何调用点 → cli_term_input_on()
  * 恒为 0 → 原绝对定位候选条在默认 REPL 下不可达，拼音输入没有任何可见

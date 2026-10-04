@@ -5,63 +5,15 @@
  * @file tui_history.c
  * @brief TUI 引擎历史与搜索域（域拆分自 cli_tui.c，2026-08-27）。
  *
- * 包含会话历史（committed lines + 视图 pin）、已提交命令历史
- * （Up/Down 浏览 + Ctrl+R/Ctrl+S 增量搜索）与跨会话持久化。
+ * 包含已提交命令历史（Up/Down 浏览 + Ctrl+R/Ctrl+S 增量搜索）
+ * 与跨会话持久化。
  */
 
 #include "cli_tui_internal.h"
 
-/* ---- history / viewport model ---- */
+/* ---- submitted-command history (Ctrl+R search / Up browse) ---- */
 
 #define TUI_HISTORY_REL_PATH "agentrt/cli/history"
-
-static void tui_grow_history(tui_history_t *h)
-{
-    if (h->count >= h->cap) {
-        size_t new_cap = h->cap ? h->cap * 2 : TUI_HIST_INIT_CAP;
-        char **grown = (char **)AIRY_REALLOC(h->lines, new_cap * sizeof(char *));
-        if (!grown)
-            return;
-        h->lines = grown;
-        h->cap = new_cap;
-    }
-}
-
-void tui_commit_line(cli_tui_t *t, char *line)
-{
-    /* S-01：会话历史环形窗口——对齐 tui_cmd_hist_push 的丢最老行策略，
-     * hist.count 恒不超过 TUI_HIST_MAX。pinned 是 lines 的绝对行索引，
-     * 裁剪头部行须同步回退；增量渲染缓存按绝对索引判定，一并失效。 */
-    if (t->hist.count >= TUI_HIST_MAX) {
-        AIRY_FREE(t->hist.lines[0]);
-        for (size_t i = 1; i < t->hist.count; i++)
-            t->hist.lines[i - 1] = t->hist.lines[i];
-        t->hist.count--;
-        if (t->hist.pinned > 0)
-            t->hist.pinned--;
-        t->vp_start_valid = 0;
-    }
-    tui_grow_history(&t->hist);
-    if (t->hist.count < t->hist.cap)
-        t->hist.lines[t->hist.count++] = line;
-    else
-        AIRY_FREE(line);
-    /* Commit growth never resets the pin: header lines were committed
-     * before pin_header() ran. */
-}
-
-void tui_history_reset(tui_history_t *h)
-{
-    for (size_t i = 0; i < h->count; i++)
-        AIRY_FREE(h->lines[i]);
-    AIRY_FREE(h->lines);
-    h->lines = NULL;
-    h->count = 0;
-    h->cap = 0;
-    h->pinned = 0;
-}
-
-/* ---- submitted-command history (Ctrl+R search / Up browse) ---- */
 
 void tui_cmd_hist_push(cli_tui_t *t, const char *line)
 {

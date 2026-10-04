@@ -9,7 +9,8 @@
  * 原 cli_tui.c（3988 行）按功能域拆分后，跨文件共享的结构体定义与
  * 内部函数声明统一收敛于此，保持 cli_tui.h 公共 API 不变（对外仍为
  * 不透明 cli_tui_t）。2026-08-27 二轮拆分新增 readline 域
- * （tui_readline.c 入口分派）。
+ * （tui_readline.c 入口分派）。0.1.19 t143 全屏渲染引擎退役，同步收敛
+ * 渲染域字段与声明。
  * 此头仅限 airy_cli/src 内部使用。
  */
 
@@ -57,34 +58,16 @@ extern volatile sig_atomic_t g_tui_resize_pending;
 void tui_sigwinch_handler(int sig);
 #endif
 
-/* 视图模式名（engine 域，render 面板标题使用） */
-const char *tui_mode_name(cli_tui_mode_t m);
-
 /* ---- 常量 ---- */
-#define TUI_HIST_INIT_CAP 256
-#define TUI_LINE_INIT_CAP 128
-#define TUI_BOTTOM_INPUT_LINES 2 /* input line + one spare row */
-
 #define TUI_TAB_CAND_MAX 64      /* Tab 补全候选上限 */
 #define TUI_TAB_NAME_MAX 192     /* 文件/目录候选字符串长度上限 */
 #define TUI_CMD_HIST_MAX 500
-#define TUI_HIST_MAX 1024 /* 会话历史行数上限：环形窗口，超出丢最老行（S-01） */
 #define TUI_SEARCH_QUERY_MAX 256
 #define TUI_INPUT_PREFIX "airy> " /* input prompt, width tracked in bytes */
-
-/* P1 重绘节流窗口（毫秒） */
-#define TUI_REDRAW_MIN_MS 16
 
 #define CLI_CARET_BLINK_MS 265u /* 半周期 ≈ Word 默认光标闪烁频率（530ms 全周期） */
 
 /* ---- 内部类型 ---- */
-typedef struct {
-    char **lines;    /* committed history lines (no trailing '\n') */
-    size_t count;    /* number of committed lines */
-    size_t cap;      /* allocated slots */
-    size_t pinned;   /* lines [0, pinned) form the fixed header */
-} tui_history_t;
-
 typedef struct {
     char **entries;  /* submitted input lines, oldest first */
     size_t count;
@@ -92,33 +75,8 @@ typedef struct {
 } tui_cmd_history_t;
 
 struct cli_tui_s {
-    int active;      /* full-screen page active */
-    int dirty;       /* a redraw is pending */
-
     int rows;
     int cols;
-
-    tui_history_t hist;
-    char *cur;       /* partial line being accumulated */
-    size_t cur_len;
-    size_t cur_cap;
-
-    size_t viewport_rows; /* rows usable by the middle viewport */
-    size_t scroll_off;    /* history lines scrolled back (0 = live tail) */
-
-    /* 增量渲染状态（P1 重绘优化） */
-    size_t vp_start_rendered;
-    int vp_start_valid;
-    size_t vp_content_rendered;
-
-    /* P1 滚动区（DECSTBM）状态 */
-    size_t scr_top;
-    size_t scr_bottom;
-    int scr_set;
-
-    /* P1 重绘节流 */
-    long long redraw_last_ms;
-    int redraw_pending;
 
     /* ---- 阶段 4：视图模式（tab）+ 面板数据源 ---- */
     cli_tui_mode_t mode;
@@ -169,8 +127,6 @@ struct cli_tui_s {
     size_t tab_cands[TUI_TAB_CAND_MAX];
     char tab_cand_strs[TUI_TAB_CAND_MAX][TUI_TAB_NAME_MAX];
 
-    char status[96];
-
     /* ---- 内置拼音输入法（airy_ime，2.2.3） ---- */
     airy_ime_t *ime;
     int ime_active;
@@ -192,11 +148,6 @@ struct cli_tui_s {
     char hdr_t2[128];
     char hdr_t1f[128];
     char hdr_t1p[128];
-
-#ifndef _WIN32
-    struct termios saved_termios;
-    int termios_saved;
-#endif
 };
 
 /* ---- 按键码（keys 域） ---- */
@@ -232,28 +183,16 @@ enum {
 
 /* ---- 跨文件内部函数声明（按域） ---- */
 
-/* engine 域（cli_tui.c） */
-void tui_commit_line(cli_tui_t *t, char *line);
-size_t tui_content_lines(cli_tui_t *t);
-void tui_append_byte(cli_tui_t *t, char c);
-void tui_render_input(cli_tui_t *t);      /* 实现在 render 域，供 engine/readline 调用 */
-
-/* render 域（tui_render.c） */
+/* render 域（tui_render.c）：行模式终端原语 */
 void tui_get_size(cli_tui_t *t);
 void tui_write_literal(const char *s);
-size_t tui_middle_rows(cli_tui_t *t);
 void tui_clear_line(void);
-void tui_render_header(cli_tui_t *t);
-void tui_render_viewport(cli_tui_t *t);
-void tui_redraw_tail(cli_tui_t *t);
-void tui_schedule_redraw(cli_tui_t *t);
 
 /* keys 域（tui_keys.c） */
 int tui_wait_byte(cli_tui_t *t, char *out, int timeout_ms, int *eof);
 int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof);
 
 /* history 域（tui_history.c） */
-void tui_history_reset(tui_history_t *h);
 void tui_cmd_hist_push(cli_tui_t *t, const char *line);
 void tui_cmd_hist_reset(cli_tui_t *t);
 void tui_cmd_hist_load(cli_tui_t *t);
@@ -278,7 +217,6 @@ void tui_ime_commit_cand(cli_tui_t *t, const char *text);
 void tui_ime_refresh(cli_tui_t *t);
 int tui_ime_sel_index(const cli_tui_t *t);
 void tui_ime_page_flip(cli_tui_t *t, int dir);
-int tui_ime_draw_cands(cli_tui_t *t, int input_row);
 int tui_ime_draw_cands_inline(const cli_tui_t *t, size_t col);
 int tui_ime_key_hit(const cli_tui_t *t, int key);
 airy_ime_t *tui_ime_load_dict(void);

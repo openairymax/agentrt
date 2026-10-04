@@ -21,7 +21,6 @@
 #include "daemon_cmds.h"
 #include "cli_gw.h"
 #include "cli_render.h"
-#include "cli_tui.h"
 
 #include <arpa/inet.h>
 #include <cjson/cJSON.h>
@@ -35,29 +34,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-/* CLI 全局模式量与 TUI 附着面：正常由 main.c / cli_tui.c 拥有。本测试走
- * 无 TUI 的端到端路径（cli_render.c 的 TUI 句柄恒为 NULL），故只需符号
- * 闭合，语义与「未附着 TUI」的真实分支一致（非活跃 → 直写 stdout）。 */
+/* CLI 全局模式量：正常由 main.c 拥有。本测试走端到端路径，只需符号闭合
+ * （cli_render.c 直写 stdout，无 TUI 附着面）。 */
 volatile sig_atomic_t g_cli_cancel = 0;
 int g_cli_print_mode = 0;
-
-int cli_tui_active(const cli_tui_t *tui)
-{
-    (void)tui;
-    return 0;
-}
-
-cli_tui_t *cli_tui_get_default(void)
-{
-    return NULL;
-}
-
-void cli_tui_emit(cli_tui_t *tui, const char *data, size_t len)
-{
-    (void)tui;
-    (void)data;
-    (void)len;
-}
 
 static int g_run = 0;
 static int g_pass = 0;
