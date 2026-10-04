@@ -37,6 +37,8 @@ add_executable(airy_cli
     src/core/airy_cli_taskflow.c
     # 0.1.17 R5-G6 入口唯一化：TUI 前端子进程唯一入口（--tui 模式 / /tui 切换）
     src/core/airy_cli_frontend.c
+    # 0.1.19：决策链事件发射唯一机制件（收敛各决策点重抄的落写仪式）
+    src/core/cli_hall.c
     # daemon_cmds.c 域拆分（2026-08-27：1480 行 → 3 个命名空间模块）
     src/cmd/airy_cli_cmd_system.c
     src/cmd/airy_cli_cmd_cognition.c

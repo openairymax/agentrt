@@ -162,12 +162,11 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
     cli_trace("plan", "plan_id=%s nodes=%zu entry=%zu",
               plan->task_plan_id ? plan->task_plan_id : "?",
               plan->task_plan_node_count, plan->task_plan_entry_count);
-    if (g_cli_hall_store && plan && plan->task_plan_id) {
-        char ev[256];
-        snprintf(ev, sizeof(ev), "{\"plan_id\":\"%s\",\"nodes\":%zu,\"entry\":%zu}",
-                 plan->task_plan_id, plan->task_plan_node_count, plan->task_plan_entry_count);
-        airy_hall_store_write(g_cli_hall_store, "default", "preflight", NULL,
-                              AIRY_HALL_CAT_BLUEPRINT, "cognition", ev, NULL, 0);
+    if (plan && plan->task_plan_id) {
+        cli_hall_emit("preflight", AIRY_HALL_CAT_BLUEPRINT,
+                      "{\"plan_id\":\"%s\",\"nodes\":%zu,\"entry\":%zu}",
+                      plan->task_plan_id, plan->task_plan_node_count,
+                      plan->task_plan_entry_count);
     }
 
     /* 认知阶段并行子 agent 审查 */
@@ -180,15 +179,11 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
                       "parallel cognition review (fact+risk) merged");
             cli_render_sub_agent_line(CLI_ROLE_TRACE, "cognition",
                                       "Parallel sub-agent review completed");
-            if (g_cli_hall_store) {
-                const char *plan_id = (plan && plan->task_plan_id) ? plan->task_plan_id : "";
-                char ev[512];
-                snprintf(ev, sizeof(ev), "{\"plan_id\":\"%s\",\"reviews\":%s}",
-                         plan_id, review_report);
-                airy_hall_store_write(g_cli_hall_store, "default",
-                                      plan_id[0] ? plan_id : "preflight", NULL,
-                                      AIRY_HALL_CAT_VERIFY, "cognition", ev, NULL, 0);
-            }
+            const char *plan_id =
+                (plan && plan->task_plan_id) ? plan->task_plan_id : "";
+            cli_hall_emit(plan_id[0] ? plan_id : "preflight", AIRY_HALL_CAT_VERIFY,
+                          "{\"plan_id\":\"%s\",\"reviews\":%s}",
+                          plan_id, review_report);
             AIRY_FREE(review_report);
         }
     }
