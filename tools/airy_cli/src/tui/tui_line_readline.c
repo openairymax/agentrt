@@ -295,7 +295,6 @@ int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
         }
         if (key == 0x15) { /* Ctrl+U */
             if (t->input_col > 0) {
-                tui_input_kill_save(t, t->input, t->input_col);
                 AIRY_MEMMOVE(t->input, t->input + t->input_col,
                              t->input_len - t->input_col + 1);
                 t->input_len -= t->input_col;
@@ -306,8 +305,6 @@ int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
         }
         if (key == 0x0b) { /* Ctrl+K */
             if (t->input_col < t->input_len) {
-                tui_input_kill_save(t, t->input + t->input_col,
-                                    t->input_len - t->input_col);
                 t->input[t->input_col] = '\0';
                 t->input_len = t->input_col;
             }

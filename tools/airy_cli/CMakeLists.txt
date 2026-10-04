@@ -75,10 +75,8 @@ add_executable(airy_cli
     src/tui/tui_ime.c
     src/tui/tui_history.c
     src/tui/tui_render.c
-    src/tui/tui_panel_dispatch.c
     # cli_tui.c 二轮拆分（2026-08-27：1102 行 → 3 个职责模块）
     src/tui/tui_readline.c
-    src/tui/tui_readline_nav.c
     # tui_input.c 二轮拆分（2026-08-27：835 行 → 3 个职责模块）
     src/tui/tui_complete.c
     src/tui/tui_line_readline.c
