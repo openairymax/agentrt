@@ -19,6 +19,7 @@
 
 #include "airy_memory.h"
 #include "cli_gw.h"
+#include "platform.h"
 
 extern int g_cli_print_mode;
 
@@ -26,13 +27,6 @@ extern int g_cli_print_mode;
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#else
-#include <time.h>
-#endif
 
 #define CLI_GUTTER_MAX 64
 #define CLI_DEFAULT_WIDTH 100
@@ -434,22 +428,9 @@ static const char *const CLI_SPINNER_FRAMES[] = {
 #define CLI_SPINNER_AMBER_MS 10000
 #define CLR_AMBER "\033[33;1m"
 
-static uint64_t cli_time_ns(void)
-{
-#ifdef _WIN32
-    FILETIME ft;
-    GetSystemTimeAsFileTime(&ft);
-    return ((((uint64_t)ft.dwHighDateTime << 32) | ft.dwLowDateTime) - 116444736000000000ULL) * 100;
-#else
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
-#endif
-}
-
 uint64_t cli_now_ms(void)
 {
-    return cli_time_ns() / 1000000ULL;
+    return airy_time_ns() / 1000000ULL;
 }
 
 static void cli_spinner_erase(void)
@@ -466,7 +447,7 @@ int cli_spinner_start(const char *title)
     AIRY_MEMSET(&g_spinner, 0, sizeof(g_spinner));
     if (!title || !title[0]) return 0;
     AIRY_STRNCPY_TERM(g_spinner.title, title, sizeof(g_spinner.title));
-    g_spinner.start_ns = cli_time_ns();
+    g_spinner.start_ns = airy_time_ns();
 
     if (!cli_term_is_tty()) {
         g_spinner.degraded = 1;
@@ -486,7 +467,7 @@ void cli_spinner_tick(void)
 {
     if (!g_spinner.active || g_spinner.degraded) return;
 
-    uint64_t elapsed = (cli_time_ns() - g_spinner.start_ns) / 1000000ULL;
+    uint64_t elapsed = (airy_time_ns() - g_spinner.start_ns) / 1000000ULL;
     const char *frame = CLI_SPINNER_FRAMES[g_spinner.frame % CLI_SPINNER_FRAMES_COUNT];
     g_spinner.frame++;
 
@@ -527,7 +508,7 @@ void cli_spinner_stop(int ok, const char *detail)
 {
     if (!g_spinner.active) return;
 
-    uint64_t elapsed = (cli_time_ns() - g_spinner.start_ns) / 1000000ULL;
+    uint64_t elapsed = (airy_time_ns() - g_spinner.start_ns) / 1000000ULL;
     uint64_t secs = elapsed / 1000;
     char elapsed_s[32];
     if (secs < 1)
