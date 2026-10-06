@@ -803,7 +803,7 @@ if(AIRY_BUILD_ALL)
 
     # 闭源 atoms 预编译模式：头文件树镜像源码相对结构（atoms/<...>/include 等）。
     # 追加在全局 include 末尾（不做 BEFORE）：commons 等公开源码路径优先，
-    # 避免 atoms 与 commons 同名头（如 tcache.h）被遮蔽；atoms 公共头由
+    # 避免 atoms 与 commons 同名头（如 export.h）被遮蔽；atoms 公共头由
     # prebuilt 路径补缺。源码路径缺失时编译器自动忽略对应 -I，
     # 因此该注入对源码构建零影响（仅当 AIRY_ATOMS_PREBUILT_DIR 设置时生效）。
     if(AIRY_ATOMS_PREBUILT_DIR)
