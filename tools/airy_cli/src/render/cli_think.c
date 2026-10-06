@@ -393,27 +393,3 @@ void cli_think_cfg_load(char *t2, size_t t2c, char *t1f, size_t t1fc,
             snprintf(t1p, t1pc, "%s", def_model);
     }
 }
-
-/* 仅显式配置：env AIRY_MODEL_T2/T1F/T1P + model.yaml think 段，不回填
- * llm.model 默认。执行复核等场景须区分"用户显式指定"与"默认回填"——
- * 默认回填意味着与主生成同模型，复核会自审自签，必须降级而非采用。
- * 返回是否至少一个字段显式配置（输出为对应模型名，未配置为空串）。 */
-int cli_think_cfg_explicit(char *t2, size_t t2c, char *t1f, size_t t1fc,
-                           char *t1p, size_t t1pc)
-{
-    if (!t2 || !t1f || !t1p || t2c == 0 || t1fc == 0 || t1pc == 0)
-        return 0;
-    cli_think_env(t2, t2c, t1f, t1fc, t1p, t1pc);
-    if (t2[0] && t1f[0] && t1p[0])
-        return 1;
-
-    char path[AIRY_PATH_MAX];
-    cli_think_cfg_path(path, sizeof(path));
-    if (t2[0] == '\0')
-        cli_think_cfg_yaml_get(path, "think", "think2_slow_model", t2, t2c);
-    if (t1f[0] == '\0')
-        cli_think_cfg_yaml_get(path, "think", "think1_fast_model", t1f, t1fc);
-    if (t1p[0] == '\0')
-        cli_think_cfg_yaml_get(path, "think", "think1_prof_model", t1p, t1pc);
-    return (t2[0] || t1f[0] || t1p[0]) ? 1 : 0;
-}

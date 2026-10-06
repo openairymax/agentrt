@@ -556,11 +556,6 @@ void cli_theme_init(void)
 #endif
 }
 
-cli_theme_mode_t cli_theme_mode(void)
-{
-    return g_theme_mode;
-}
-
 const char *cli_theme_seq(cli_theme_t th)
 {
     if ((int)th < 0 || (int)th >= CLI_TH_COUNT)
