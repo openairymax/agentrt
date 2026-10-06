@@ -54,41 +54,6 @@ extern int g_cli_json_mode;
  * 完成后折叠为前几行 + 折叠尾，避免占屏（Linux 工程哲学：最小输出，
  * 全量保留在日志/历史中）。 */
 
-/* 一次回复渲染/流式输出的物理行数计量器（历史遗留，0.1.7 起无调用方：
- * 流式正文直出即终态，弃用「ANSI 上移擦除重绘」三段式，原 TTY 折叠
- * 计量职责随之移除。保留结构以防其它路径引用，勿新增使用）。 */
-typedef struct cli_line_meter_s {
-    int active;       /* begin 后为 1，end 清 0 */
-    int done;         /* phys 已结算（残行已 flush） */
-    size_t lines;     /* 逻辑行数（'\n' 计数） */
-    size_t phys_lines;/* 物理行数（软换行感知，TTY 擦除量） */
-    size_t col;       /* 当前行已用列宽 */
-    size_t cols;      /* 终端宽度（0 = 未知，不计算软换行） */
-    char *row;        /* 当前行字节缓冲（UTF-8 宽度结算用） */
-    size_t row_len;
-    size_t row_cap;
-    int in_esc;       /* 处于 ANSI 转义序列中（不计入输出） */
-} cli_line_meter_t;
-
-/**
- * @brief 开始计量：挂接后续 cli_out*() 输出到 meter，并探测终端宽度。
- * @param m   meter（调用方持有，begin 前应清零）
- */
-void cli_render_meter_begin(cli_line_meter_t *m);
-
-/**
- * @brief 结束计量：解除挂接（后续输出不再计入）。
- */
-void cli_render_meter_end(cli_line_meter_t *m);
-
-/**
- * @brief 结算并返回已输出的物理行数（幂等，可多次调用）。
- *
- * 残留的末行（无 '\n' 结尾）一并计入。（0.1.7：TTY 擦除重绘已弃用，
- * 该接口随计量器一并保留仅作历史兼容，无调用方。）
- */
-size_t cli_render_meter_phys(cli_line_meter_t *m);
-
 /* 空回复占位（2026-08-17）：模型未产生文本回复（thinking 模型可能
  * 只输出 reasoning_content，或 provider 异常）时渲染明确提示，避免
  * 对话中出现"空返回"却无任何说明。 */
@@ -338,16 +303,6 @@ void cli_render_role_line(cli_role_t role, cli_actor_t actor, const char *tag,
 void cli_render_super_agent(const char *content);
 
 /**
- * @brief Begin a streaming super-agent reply: print the role header without
- * a newline so streamed chunks can follow on the same line.
- *
- * The header renders exactly like cli_render_role_line's "[Super Agent]" but
- * the trailing newline is omitted; the caller then prints the streamed text
- * and finishes the line itself (newline or fold trailer).
- */
-void cli_render_super_agent_begin(void);
-
-/**
  * @brief Print the user's own message: "[For Thee] › text".
  *
  * Uses the CLI_ICON_USER prefix and cyan accent so the human side of the
@@ -409,17 +364,6 @@ uint64_t cli_now_ms(void);
 void cli_render_turn_separator(uint64_t elapsed_ms, const char *metrics);
 
 /**
- * @brief Render a horizontal progress bar of `width` cells.
- *
- *   [████████████░░░░░░░░]  62%
- *
- * @param progress 0.0 .. 1.0 (clamped)
- * @param width    bar width in cells (>= 4)
- * @param label    optional short label shown left of the bar ("" to skip)
- */
-void cli_render_progress_bar(double progress, size_t width, const char *label);
-
-/**
  * @brief Print a compact task line for the work-hall board:
  *
  *   ◇ <id>  <state>  [██████████] 100%
@@ -476,16 +420,6 @@ void cli_spinner_resume(void);
  * @param detail optional trailing detail text appended dim after the elapsed
  */
 void cli_spinner_stop(int ok, const char *detail);
-
-/**
- * @brief Cancel the status line silently (no completion line).
- *
- * Erases the animated line (or leaves the degraded static line in place) and
- * clears the spinner state without printing a ✓/✗ line. Used by the
- * streaming chat path, where the spinner hands over to the streamed reply
- * and a separate completion line would duplicate the output.
- */
-void cli_spinner_cancel(void);
 
 /**
  * @brief Render a phase indicator line for task execution stages.

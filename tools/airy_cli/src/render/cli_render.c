@@ -37,91 +37,14 @@ void cli_out(const char *s)
     cli_outn(s, strlen(s));
 }
 
-/* ---- reply folding meter ---- */
-
-static cli_line_meter_t *g_active_meter;
-
-static void cli_meter_feed(cli_line_meter_t *m, const char *s, size_t n)
-{
-    if (!m) return;
-    for (size_t i = 0; i < n; i++) {
-        unsigned char c = (unsigned char)s[i];
-        if (c == 0x1B) { m->in_esc = 1; continue; }
-        if (m->in_esc) {
-            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))
-                m->in_esc = 0;
-            continue;
-        }
-        if (c == '\n') {
-            if (m->cols > 0 && m->row_len > 0) {
-                size_t w = cli_disp_width(m->row);
-                if (w > m->cols) m->phys_lines += (w - 1) / m->cols;
-            }
-            m->phys_lines += 1;
-            m->lines += 1;
-            m->row_len = 0;
-            continue;
-        }
-        if (c == '\r') { m->row_len = 0; continue; }
-        if (c < 0x20) continue;
-        if (m->row_len + 1 >= m->row_cap) {
-            size_t new_cap = m->row_cap ? m->row_cap * 2 : 256;
-            char *grown = (char *)AIRY_REALLOC(m->row, new_cap);
-            if (!grown) continue;
-            m->row = grown;
-            m->row_cap = new_cap;
-        }
-        m->row[m->row_len++] = (char)c;
-        m->row[m->row_len] = '\0';
-    }
-}
-
-void cli_render_meter_begin(cli_line_meter_t *m)
-{
-    if (!m) return;
-    AIRY_MEMSET(m, 0, sizeof(*m));
-    int rows = 0, cols = 0;
-    cli_term_size(&rows, &cols);
-    m->cols = cols > 0 ? (size_t)cols : 0;
-    m->active = 1;
-    g_active_meter = m;
-}
-
-void cli_render_meter_end(cli_line_meter_t *m)
-{
-    if (!m) return;
-    if (g_active_meter == m) g_active_meter = NULL;
-    m->active = 0;
-    AIRY_FREE(m->row);
-    m->row = NULL;
-    m->row_len = 0;
-    m->row_cap = 0;
-}
-
-size_t cli_render_meter_phys(cli_line_meter_t *m)
-{
-    if (!m) return 0;
-    if (!m->done) {
-        if (m->cols > 0 && m->row_len > 0) {
-            size_t w = cli_disp_width(m->row);
-            if (w > m->cols) m->phys_lines += (w - 1) / m->cols;
-        }
-        if (m->row_len > 0) m->phys_lines += 1;
-        m->done = 1;
-    }
-    return m->phys_lines;
-}
-
 void cli_outn(const char *s, size_t n)
 {
     if (!s || n == 0) return;
-    if (g_active_meter) cli_meter_feed(g_active_meter, s, n);
     fwrite(s, 1, n, stdout);
 }
 
 void cli_outc(char c)
 {
-    if (g_active_meter) cli_meter_feed(g_active_meter, &c, 1);
     fputc(c, stdout);
 }
 
@@ -527,13 +450,6 @@ void cli_spinner_stop(int ok, const char *detail)
         cli_outf(" %s%s%s", cli_c(CLR_DIM), detail, cli_c(CLR_RESET));
     cli_outc('\n');
     fflush(stdout);
-    AIRY_MEMSET(&g_spinner, 0, sizeof(g_spinner));
-}
-
-void cli_spinner_cancel(void)
-{
-    if (!g_spinner.active) return;
-    cli_spinner_erase();
     AIRY_MEMSET(&g_spinner, 0, sizeof(g_spinner));
 }
 

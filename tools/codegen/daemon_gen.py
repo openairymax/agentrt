@@ -72,7 +72,7 @@
 # 仅使用 Python 标准库，无第三方依赖。结构对齐 syscall_gen.py
 # （parse/validate/render 三段式 + gen/check 双模式）。
 #
-# Generator version: 1.10.0
+# Generator version: 1.11.0
 
 import argparse
 import difflib
@@ -81,7 +81,7 @@ import re
 import sys
 from pathlib import Path
 
-GENERATOR_VERSION = "1.10.0"
+GENERATOR_VERSION = "1.11.0"
 
 # 生成产物相对 daemon 目录的固定落点（保持稳定，勿随意改名）
 OUTPUT_MAIN = "src/main.c"
@@ -361,7 +361,6 @@ def render_main(d):
         "        .dispatcher = &g_dispatcher_%s," % daemon,
         "        .event_driver = &g_event_driver_%s," % daemon,
         "        .bsd = &g_bsd_%s," % daemon,
-        "        .bipc = &g_bipc_%s," % daemon,
         "        .pool_max_events = %d," % pool["max_events"],
         "        .pool_min = %d," % pool["min"],
         "        .pool_max = %d," % pool["max"],
