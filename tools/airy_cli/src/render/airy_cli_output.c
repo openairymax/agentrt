@@ -80,22 +80,6 @@ void cli_render_super_agent(const char *content)
     cli_render_role_line(CLI_ROLE_SUPER_AGENT, CLI_ACTOR_SUPER_AGENT, NULL, content);
 }
 
-void cli_render_super_agent_begin(void)
-{
-    const char *g = cli_gutter(2);
-    const char *col = cli_render_role_color(CLI_ROLE_SUPER_AGENT);
-    const char *name = cli_render_actor_name(CLI_ACTOR_SUPER_AGENT);
-    char hdr[CLI_ROLE_HDR_W + 1];
-
-    cli_build_role_header(hdr, sizeof(hdr), name, NULL);
-
-    cli_out(g);
-    cli_out(col);
-    cli_out(hdr);
-    cli_out(cli_c(CLR_RESET));
-    cli_pad_role_header(hdr);
-}
-
 void cli_render_user_message(const char *content)
 {
     if (g_cli_print_mode)
@@ -208,35 +192,6 @@ void cli_render_turn_separator(uint64_t elapsed_ms, const char *metrics)
         cli_out("─");
     cli_out(cli_c(CLR_RESET));
     cli_outc('\n');
-}
-
-/* ---- progress bar ---- */
-
-void cli_render_progress_bar(double progress, size_t width, const char *label)
-{
-    if (g_cli_print_mode)
-        return;
-    if (width < 4) width = 4;
-    if (progress < 0.0) progress = 0.0;
-    if (progress > 1.0) progress = 1.0;
-
-    size_t filled = (size_t)(progress * (double)width);
-    if (filled > width) filled = width;
-
-    const char *g = cli_gutter(4);
-    cli_out(g);
-    if (label && label[0]) {
-        cli_out(cli_c(CLR_DIM));
-        cli_out(CLI_ICON_BRANCH " ");
-        cli_out(label);
-        cli_out(cli_c(CLR_RESET));
-        cli_out(": ");
-    }
-
-    cli_out("[");
-    for (size_t i = 0; i < width; i++)
-        cli_out(i < filled ? "█" : "░");
-    cli_outf("] %3.0f%%\n", progress * 100.0);
 }
 
 /* ---- compact task line for the work-hall board ---- */

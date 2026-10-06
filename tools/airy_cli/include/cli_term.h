@@ -77,9 +77,6 @@ typedef enum {
 /* One-time theme probe; call after cli_term_init(). Idempotent. */
 void cli_theme_init(void);
 
-/* Resolved theme mode (valid after cli_theme_init). */
-cli_theme_mode_t cli_theme_mode(void);
-
 /* ANSI sequence for a themed token; "" when color output is disabled. */
 const char *cli_theme_seq(cli_theme_t th);
 

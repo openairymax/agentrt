@@ -306,12 +306,6 @@ int cmd_orch(const char *arg, void *ctx);
  * string means "unset" (callers render "默认" or pass NULL). */
 void cli_think_cfg_load(char *t2, size_t t2c, char *t1f, size_t t1fc,
                         char *t1p, size_t t1pc);
-/* Env + model.yaml think section only (no llm.model backfill). Returns 1
- * when at least one role is explicitly configured. Used by exec review to
- * keep the no-self-review guarantee (a backfilled default equals the main
- * generator model). */
-int cli_think_cfg_explicit(char *t2, size_t t2c, char *t1f, size_t t1fc,
-                           char *t1p, size_t t1pc);
 int cmd_clear(const char *arg, void *ctx);
 int cmd_status(const char *arg, void *ctx);
 int cmd_chain(const char *arg, void *ctx);
@@ -323,9 +317,6 @@ int cmd_tui(const char *arg, void *ctx);
 uint64_t cli_chain_extract_gseq(const char *json);
 void cli_chain_extract_content(const char *json, char *out, size_t cap);
 int cli_chain_str_field(const char *json, const char *key, char *out, size_t cap);
-/* 提取 "seq":<digits>（事件文件序号，header 首现；供跨进程事件流按
- * (ts_utc, seq) 排序——gseq 为进程内单调，跨进程会撞号） */
-uint32_t cli_chain_extract_seq(const char *json);
 void cli_chain_label(int cat, const char *content, char *out, size_t cap);
 
 #ifdef __cplusplus

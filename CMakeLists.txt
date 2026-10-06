@@ -765,8 +765,8 @@ if(AIRY_BUILD_ALL)
     # P0.17 IRON-6 跨层耦合禁令修复:
     # commons 权威路径必须声明在 daemons/common/include 之前。
     # include_directories() 是全局命令，影响所有目标，路径顺序决定 -I 查找顺序。
-    # 若 daemons/common/include 在前，atoms 源代码 #include "daemon_bootstrap_ipc.h"
-    # 等会先命中 daemons 重导出兼容头（虽然内部经相对路径到达 commons，但仍构成
+    # 若 daemons/common/include 在前，atoms 源代码 #include 的 daemon 框架重导出头
+    # 会先命中 daemons 侧同名头（虽然内部经相对路径到达 commons，但仍构成
     # 编译期 atoms→daemons 反向依赖）。将 daemons/common/include 移至 commons 路径之后，
     # 确保 atoms 直接解析 commons 权威版本。
     # 0.1.19 g12e 全局面收敛：daemons/common/include 与 gateway/src 已退出全局面。
@@ -782,8 +782,9 @@ if(AIRY_BUILD_ALL)
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/logging
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/error
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/platform/include
-        # P0.17 阶段 3: svc_common.h、ipc_service_bus.h 迁移至 commons/utils/ipc
-        # P0.17 阶段 4: daemon_bootstrap_ipc.h、ipc_bus_helper.h、ipc_backpressure.h 迁移至 commons/utils/ipc
+        # P0.17 阶段 3/4: svc_common.h / daemon_rpc_client.h 等经 commons/utils/ipc
+        # （IPC Bus 族 ipc_service_bus.h / daemon_bootstrap_ipc.h / ipc_bus_helper.h
+        #  已随 0.1.19 t213 退役删除）
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/ipc
         # P0.17 阶段 4: daemon_bootstrap_sd.h、service_discovery.h、service_discovery_helper.h 迁移至 commons/utils/sd
         ${CMAKE_CURRENT_SOURCE_DIR}/commons/utils/sd
