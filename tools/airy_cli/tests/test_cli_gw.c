@@ -22,6 +22,7 @@
 #include "cli_gw.h"
 
 #include "error_codes.h"
+#include "platform.h"
 
 #include <arpa/inet.h>
 #include <cjson/cJSON.h>
@@ -191,7 +192,7 @@ static void mock_handle(int fd)
         return;
     }
     if (mode == MOCK_MODE_SILENT) {
-        usleep(800 * 1000); /* 静默至客户端预算耗尽 */
+        airy_sleep_ms(800); /* 静默至客户端预算耗尽 */
         return;
     }
     if (mode == MOCK_MODE_ERROR) {
