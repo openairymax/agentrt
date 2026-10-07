@@ -32,10 +32,7 @@
 #
 # 事实基线（gateway 与各 daemon CMakeLists.txt 的 target_link_libraries
 #   实测；configure 期 linkgate/*.links.txt 快照为门禁输入）:
-# 注记：gateway 链 daemon_l1_server 系 WS-8 8.3.3 L2 先行路（L2 通道
-#   服务端先行落于 gateway 进程内），登记为事实基线；L2 独立进程化后
-#   可收紧该允许集。
-gateway: svc_common airy_syscall airy_protocols airy_common airy_memory daemon_l1_server
+gateway: svc_common airy_syscall airy_protocols airy_common airy_memory
 airy_gateway_service: svc_common airy_protocols airy_platform_libs
 gateway_d: airy_gateway_service airy_syscall airy_platform_libs
 # daemon 节点（configure 期 linkgate/*.links.txt 实测）。
