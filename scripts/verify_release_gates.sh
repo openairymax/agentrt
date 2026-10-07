@@ -930,7 +930,7 @@ for _a in \
     commons/utils/cognition/agent_vocab.c \
     atoms/coreloopthree/include/hall_store.h \
     atoms/coreloopthree/src/config/yaml_loader_parse.c \
-    daemons/gateway_d/src/main.c \
+    daemons/gateway_d/src/gw_boot.c \
     tools/airy_cli/src/cmd/cli_review.c; do
     printf '%s:\n' "$ROOT/$_a"
 done > "$TMP/s_allow"
