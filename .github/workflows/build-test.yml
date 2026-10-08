@@ -462,7 +462,7 @@ jobs:
           } else {
             # 从 ctest rerun-failed 记录解析失败测试名 → 反推可执行文件：
             # ctest 注册名带 commons_test_ 前缀（对应 exe test_platform 等，
-            # hardcode candidates 用 ctest 名找不到 exe），atoms/cupolas/
+            # hardcode candidates 用 ctest 名找不到 exe），cupolas/
             # heapstore/taskflow 的 ctest 名即 exe 名。
             $names = @()
             try {

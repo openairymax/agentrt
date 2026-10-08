@@ -621,6 +621,10 @@ fi
 section "M" "R-6 工具授权面 ⊇ MCP 暴露面（双 Schema 解析防回归）"
 
 PDP_RULE_C="$ROOT/cupolas/src/permission/permission_rule.c"
+# §254a：cupolas 叶子仓挂点迁出核心树至 products 装配仓，伞仓布局下源位于
+# agentrt 同级 products/cupolas；独立检出（无 products）时保留本仓探测。
+# 两条路径皆缺时 PDP_RULE_C 悬空 → 下述 grep fail-closed 判红，符合门禁语义。
+[ -f "$PDP_RULE_C" ] || PDP_RULE_C="$ROOT/../products/cupolas/src/permission/permission_rule.c"
 MCP_BUILTIN="$ROOT/daemons/tool_d/src/rpc/service_builtin.c"
 GW_BACKEND="$ROOT/gateway/src/biz/gateway_biz_backend.c"
 

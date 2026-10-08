@@ -6,20 +6,22 @@
 # 语义差异：
 #   原伞仓：在伞仓工作树初始化 umbrella 子模块（agent-workload/tools），
 #           agentrt 只是 agent-workload 的嵌套子模块，需递归两层。
-#   现 agentrt 仓：agentrt 即工作树根，其 .gitmodules 直接列出 7 个叶子
-#           （atoms/commons/cupolas/daemons/gateway/heapstore/protocols），
-#           在根上执行 submodule update 一次即可。
+#   现 agentrt 仓：agentrt 即工作树根，其 .gitmodules 直接列出 6 个叶子
+#           （atoms/commons/daemons/gateway/heapstore/protocols），
+#           在根上执行 submodule update 一次即可（§254a 起 cupolas 挂点
+#           迁出至 products 装配仓，不在本树列出）。
 #
 # 私有子仓（atoms 在 GitHub 为 private）：GH_TOKEN（org PAT）写入 ~/.netrc，
 # 避免匿名 404（与伞仓方案一致，见原 init-submodules.sh）。
 #
 # 用法（保持伞仓 workflow 的调用形式不变，脚本内部按参数重映射）：
 #   bash .github/scripts/init-submodules.sh agent-workload
-#        → 仅初始化 7 个叶子子模块（build-test / codegen-check 用）。
+#        → 仅初始化 6 个叶子子模块（build-test / codegen-check 用）。
 #   bash .github/scripts/init-submodules.sh agent-workload tools
 #        → 初始化叶子 + 克隆 release 打包所需的 sibling 数据到历史相对路径：
 #          tools/（发布/签名脚本、bootstrap、config 模板）、
-#          agent-workload/{sdk,ecosystem}（TUI 源、Python 运行时、manager 配置）。
+#          agent-workload/{sdk,ecosystem,products}（TUI 源、Python 运行时、
+#          manager 配置、cupolas 安全穹顶源）。
 #          —— sdk/ecosystem/tools 在 agentrt 树外（分属独立仓），以镜像期数据
 #          补齐，使打包/发布脚本的路径引用无需改动。
 
@@ -93,13 +95,15 @@ clone_sibling() {
 }
 
 if [ "$want_layout" = true ]; then
-  echo "layout: cloning release sibling repos (_tools/sdk/ecosystem)"
+  echo "layout: cloning release sibling repos (_tools/sdk/ecosystem/products)"
   # 注意：tools 克隆到 _tools/ —— agentrt 自带顶层 tools/（codegen 等），
   # 若同名会跳过克隆导致 release 脚本缺失（linux job 实证）。
   clone_sibling tools _tools
   mkdir -p agent-workload
   clone_sibling sdk agent-workload/sdk
   clone_sibling ecosystem agent-workload/ecosystem
+  # §254a：cupolas 叶子挂点迁出至 products 装配仓，发布布局需其源码在位
+  clone_sibling products agent-workload/products
 fi
 
 echo "--- submodule status ---"

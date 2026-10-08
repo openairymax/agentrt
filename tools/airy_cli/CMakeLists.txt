@@ -172,7 +172,7 @@ set(CLI_INC_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/llm_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/tool_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/common/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../cupolas/include
+    ${CUPOLAS_SRC_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/memory
     ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/memory/src
 )

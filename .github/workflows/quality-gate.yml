@@ -52,8 +52,8 @@ jobs:
           submodules: false
           fetch-depth: 1
 
-      # 数据集完整性：agentrt 为 workflow 宿主仓，其 7 个叶子子模块
-      # （atoms/commons/cupolas/daemons/gateway/heapstore/protocols，SHA 由
+      # 数据集完整性：agentrt 为 workflow 宿主仓，其 6 个叶子子模块
+      # （atoms/commons/daemons/gateway/heapstore/protocols，SHA 由
       # agentrt 树 gitlink 钉定）是本作业的源码底料——门禁
       #   Gate 1 编译（airy_cli 依赖 atoms 的 airy_coreloopthree 目标）、
       #   Gate 2（扫 atoms/coreloopthree 契约）、
@@ -143,6 +143,13 @@ jobs:
           if [ -d "$UMB/agent-workload/ecosystem" ]; then
             git -C "$UMB/agent-workload/ecosystem" submodule update --init --recursive \
               || echo "::warning::ecosystem nested submodules unavailable, Gate 5/7 will fail"
+          fi
+          # §254a：cupolas 叶子挂点迁出至 products 装配仓，Gate M（R-6 PDP
+          # 双 Schema）直接消费 products/cupolas/src/permission/。顶层浅克隆
+          # 不含子模块工作树，须显式初始化；memoryrovol（update=none）自动豁免。
+          if [ -d "$UMB/agent-workload/products" ]; then
+            git -C "$UMB/agent-workload/products" submodule update --init --recursive \
+              || echo "::warning::products nested submodules unavailable, Gate M will fail"
           fi
 
       - name: Run quality gates (25 gates)
