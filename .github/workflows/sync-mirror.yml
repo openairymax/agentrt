@@ -39,7 +39,8 @@ jobs:
           ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
         # gh CLI 自动读取 GH_TOKEN 环境变量认证，无需 gh auth login
         # （login 在令牌无效时会直接中断整个 step，掩盖真实错误）。
-        # agentrt 为 workflow 宿主仓：本工作流把 agentrt + 7 个叶子子模块
-        # （atoms/commons/cupolas/daemons/gateway/heapstore/protocols）从
-        # atomgit(SSoT) 同步到 GitHub / Gitee 镜像。
+        # agentrt 为 workflow 宿主仓：本工作流把 agentrt + 6 个叶子子模块
+        # （atoms/commons/daemons/gateway/heapstore/protocols）及 sibling 数据仓
+        # （含 §254a 迁出的 products/cupolas）从 atomgit(SSoT) 同步到
+        # GitHub / Gitee 镜像。
         run: bash .github/scripts/sync-mirror.sh
