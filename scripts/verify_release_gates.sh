@@ -1751,8 +1751,12 @@ _wh="$ROOT/link-whitelist.txt"
 grep -q '^supervisor_d:$' "$_wh" || _af2_bad="$_af2_bad 空允许集条目缺失"
 _sd="$ROOT/daemons/supervisor_d"
 [ -f "$_sd/CMakeLists.txt" ] || _af2_bad="$_af2_bad supervisor_d CMakeLists 缺失"
-for _sf in main.c decl.c proc.c probe.c ctrl.c; do
-    [ -f "$_sd/src/$_sf" ] || _af2_bad="$_af2_bad src/$_sf 缺失"
+# 源件在位性以 sources.cmake 为 SSoT 动态推导，防硬编码文件名随架构演进失真
+_sd_srcs=$(sed -n '/set(SUPERVISOR_D_SOURCES/,/^)/p' "$_sd/modules/sources.cmake" \
+    | grep -o 'src/[a-z_]*\.c')
+[ -n "$_sd_srcs" ] || _af2_bad="$_af2_bad sources.cmake 源件清单缺失"
+for _sf in $_sd_srcs; do
+    [ -f "$_sd/$_sf" ] || _af2_bad="$_af2_bad $_sf 缺失"
 done
 if [ -z "$_af2_bad" ]; then
     ok "AF2 V13.5 supervisor_d 独立 target + 空允许集（零业务库链接机器判据）"
