@@ -159,7 +159,7 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
 
 # 关键路径验证：确认核心目录存在
 airy_print_info("Path check: Source root = ${CMAKE_CURRENT_SOURCE_DIR}")
-foreach(_dir atoms commons protocols gateway daemons cupolas heapstore)
+foreach(_dir atoms commons protocols gateway daemons heapstore)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_dir}")
         airy_print_ok("  ${_dir}/")
     else()
@@ -965,6 +965,27 @@ if(AIRY_BUILD_ALL)
         set(AIRY_COREKERN_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/atoms/corekern/include")
     endif()
 
+    # cupolas 源目录探测（叶子仓挂点已迁出核心树至 products 装配仓）。
+    # CUPOLAS_SRC_DIR 必须先于 add_subdirectory(atoms) 就绪：taskflow/
+    # coreloopthree 在配置期引用 cupolas 源码路径；随后 add_subdirectory
+    # 以 ${CMAKE_BINARY_DIR}/cupolas 为 binary dir 直挂，维持 arc03 断言
+    # 契约（atoms/standalone check_no_daemons.cmake -DCUPOLAS_DIR=）。
+    # 优先级：显式 -D 变量 → CUPOLAS_ROOT 环境 → 伞仓内 products/ →
+    # workspace 同级 products/（standalone 平铺布局）。
+    if(NOT CUPOLAS_SRC_DIR AND DEFINED ENV{CUPOLAS_ROOT})
+        set(CUPOLAS_SRC_DIR "$ENV{CUPOLAS_ROOT}")
+    endif()
+    if(NOT CUPOLAS_SRC_DIR)
+        foreach(_cup_cand
+            "${CMAKE_CURRENT_SOURCE_DIR}/../products/cupolas"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../../products/cupolas")
+            if(EXISTS "${_cup_cand}/CMakeLists.txt")
+                set(CUPOLAS_SRC_DIR "${_cup_cand}")
+                break()
+            endif()
+        endforeach()
+    endif()
+
     if(BUILD_COMMONS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/commons/CMakeLists.txt")
         add_subdirectory(commons)
     else()
@@ -981,10 +1002,10 @@ if(AIRY_BUILD_ALL)
         add_subdirectory(protocols)
     endif()
 
-    if(BUILD_CUPOLAS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cupolas/CMakeLists.txt")
-        add_subdirectory(cupolas)
+    if(BUILD_CUPOLAS AND CUPOLAS_SRC_DIR AND EXISTS "${CUPOLAS_SRC_DIR}/CMakeLists.txt")
+        add_subdirectory("${CUPOLAS_SRC_DIR}" cupolas)
     else()
-        airy_print_warn("cupolas module not found or disabled")
+        airy_print_warn("cupolas module not mounted (products/cupolas or -DCUPOLAS_SRC_DIR)")
     endif()
 
     if(BUILD_DAEMON AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/daemons/CMakeLists.txt")
