@@ -100,11 +100,12 @@ add_executable(airy_cli
 # 0.1.16 B2（CLI 进程内 corekern 收回，2026-09-14 裁决）：airy_atoms（微
 # 核心）从链接集移除——CLI 是 gateway 纯客户端，任务/查询/规划全量经
 # gateway → daemon 派发，进程内不再实例化微内核（airy_init() 已摘除）。
-if(TARGET airy_llm_service AND TARGET airy_tool_service)
+# 0.1.19 §250 fan 收敛：airy_tool_service 边删除——逐边真值表实测该归档
+# 对本目标 pulls=0（零成员拉取、零符号需求）；tool 能力全经 gateway 派发。
+if(TARGET airy_llm_service)
     target_link_libraries(airy_cli PRIVATE
         airy_coreloopthree
         airy_llm_service
-        airy_tool_service
         airy_core
         airy_memory
         airy_common
