@@ -40,9 +40,9 @@ gateway_d: airy_gateway_service airy_syscall airy_platform_libs
 #   原语链事实基线（main.c 经 airy_init() 完成进程原语初始化）；后续以
 #   总线化进程原语服务收敛后可收紧对应允许集。
 llm_d: airy_platform_libs airy_llm_service airy_core
-tool_d: airy_platform_libs airy_common airy_tool_service airy_coreloopthree airy_cognition airy_core airy_memory airy_atoms airy_llm_service
+tool_d: airy_platform_libs airy_common airy_tool_service airy_coreloopthree airy_atoms airy_llm_service
 monit_d: airy_platform_libs airy_monit_service airy_core
-sched_d: airy_platform_libs airy_common svc_common airy_coreloopthree airy_cognition airy_core airy_memory airy_atoms airy_llm_service airy_tool_service
+sched_d: airy_platform_libs airy_common airy_coreloopthree airy_cognition airy_core airy_atoms airy_llm_service airy_tool_service
 market_d: airy_platform_libs airy_market_service airy_core
 channel_d: airy_platform_libs airy_common svc_common airy_core
 notify_d: airy_platform_libs airy_common svc_common airy_core airy_coreloop_hooks
