@@ -1014,6 +1014,19 @@ if(AIRY_BUILD_ALL)
         airy_print_warn("daemons module not found or disabled")
     endif()
 
+    # 0.1.19 §254b：cupolas_d 策略宿主（含 airy_security_dome 策略单元）
+    # 构建位上移至顶层装配区——须在 cupolas 产品与 svc_common 机制核双双
+    # 就绪之后挂载；任一缺失即不装配（fail-closed，仅警告不产出该 daemon）。
+    # 链接白名单收集（cupolas_d / airy_security_dome）随构建位由本块自持，
+    # daemons 目录不感知。
+    if(TARGET cupolas AND TARGET svc_common)
+        add_subdirectory(daemons/cupolas_d)
+        airy_linkgate_collect(cupolas_d)
+        airy_linkgate_collect(airy_security_dome)
+    else()
+        airy_print_warn("cupolas_d not assembled (requires cupolas product + svc_common core)")
+    endif()
+
     if(BUILD_GATEWAY AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/gateway/CMakeLists.txt")
         add_subdirectory(gateway)
     else()
