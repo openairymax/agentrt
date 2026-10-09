@@ -211,7 +211,7 @@ agentrt/
 ├── cmake/                # build-system modules
 ├── scripts/              # installers: install.sh, install.ps1
 ├── tests/                # smoke tests and toolchain self-tests
-├── tools/                # developer tooling (airy_cli, airy_depgraph, codegen)
+├── tools/                # developer tooling (airy_cli, codegen)
 ├── latest/               # rolling release manifests and signing keys
 ├── LICENSES/             # additional license texts
 ├── CMakeLists.txt        # top-level build entry point

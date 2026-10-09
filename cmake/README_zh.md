@@ -80,7 +80,8 @@ cmake/
 
 ### 2. airy_linkgate.cmake — 链接白名单构建期门禁
 
-把模块间链接关系固化为构建期断言，与 `tools/airy_depgraph` 配合工作：
+把模块间链接关系固化为构建期断言，与顶层 `tools` 仓的 `airy_depgraph`
+（经跨仓 `add_subdirectory` 引入）配合工作：
 
 - 白名单文件为仓库根 `link-whitelist.txt`（单一权威），声明
   目标 → 允许链接的库；路径由 `airy_linkgate.cmake` 以

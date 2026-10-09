@@ -187,7 +187,7 @@ agentrt/
 ├── cmake/                # 构建系统模块
 ├── scripts/              # 安装器 install.sh / install.ps1
 ├── tests/                # 冒烟测试与工具链自测
-├── tools/                # 开发者工具（airy_cli、airy_depgraph、codegen）
+├── tools/                # 开发者工具（airy_cli、codegen）
 ├── latest/               # 滚动发布清单与签名密钥
 ├── LICENSES/             # 附加许可证全文
 ├── CMakeLists.txt        # 顶层构建入口
