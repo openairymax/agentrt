@@ -51,8 +51,6 @@
 tools/codegen/__pycache__/
 !tools/airy_cli/
 !tools/airy_cli/**
-!tools/airy_depgraph/
-!tools/airy_depgraph/**
 # ---------------------------------------------------------------------------
 # 管理仓直属设施（IRON-9 [IND] 独立层，随仓入库）：
 # - cmake/: 构建系统模块（compilerflags/platform/dependencies/sanitizers/utils 等）

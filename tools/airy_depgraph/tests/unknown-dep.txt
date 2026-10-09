@@ -1,3 +1,0 @@
-# 环检测用例：引用未声明子域（期望退出码 2）
-alpha: ghost_domain
-beta:
