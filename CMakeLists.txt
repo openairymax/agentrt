@@ -897,6 +897,7 @@ if(AIRY_BUILD_ALL)
     option(BUILD_ATOMS "Build atoms module (core kernel components)" ON)
     option(BUILD_COMMONS "Build commons module (common utilities)" ON)
     option(BUILD_CUPOLAS "Build cupolas module (security framework)" ON)
+    option(BUILD_LANG_GATEWAY "Build lang_gateway module (inference language gateway)" ON)
     # Windows 支持矩阵：daemons 子系统（svc/ipc/
     # discovery/各 *_d 服务）现为 POSIX 绑定——DIR/strings.h/sys/socket/
     # unistd 直引（MSVC 下 C1083/C2065 大面积失败），Windows 侧默认
@@ -922,6 +923,7 @@ if(AIRY_BUILD_ALL)
     airy_print_info("[MODULE]   atoms:    ${BUILD_ATOMS}")
     airy_print_info("[MODULE]   commons:  ${BUILD_COMMONS}")
     airy_print_info("[MODULE]   cupolas:  ${BUILD_CUPOLAS}")
+    airy_print_info("[MODULE]   lang_gw:  ${BUILD_LANG_GATEWAY}")
     airy_print_info("[MODULE]   daemon:   ${BUILD_DAEMON}")
     airy_print_info("[MODULE]   gateway:  ${BUILD_GATEWAY}")
     airy_print_info("[MODULE]   heapstore: ${BUILD_HEAPSTORE}")
@@ -986,6 +988,32 @@ if(AIRY_BUILD_ALL)
         endforeach()
     endif()
 
+    # lang_gateway 源目录探测（M5-2 策略载荷迁出，台账 §256；与 cupolas
+    # 同构三态：显式 -D 变量 → LANG_GW_ROOT 环境 → 伞仓内 products/ →
+    # workspace 同级 products/）。LANG_GW_SRC_DIR 必须先于
+    # add_subdirectory(atoms) 就绪：coreloopthree 桥接块在配置期以变量门
+    # 探测（TARGET 门在本目录时序恒假，见 coreloopthree 桥接注释）。
+    # LANG_GW_CONTRACT_DIR 为产品库消费机制核契约头的锚点，随
+    # AIRY_ATOMS_PREBUILT_DIR 双态（同 AIRY_COREKERN_INCLUDE_DIR 形态）。
+    if(NOT LANG_GW_SRC_DIR AND DEFINED ENV{LANG_GW_ROOT})
+        set(LANG_GW_SRC_DIR "$ENV{LANG_GW_ROOT}")
+    endif()
+    if(NOT LANG_GW_SRC_DIR)
+        foreach(_lgw_cand
+            "${CMAKE_CURRENT_SOURCE_DIR}/../products/lang_gateway"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../../products/lang_gateway")
+            if(EXISTS "${_lgw_cand}/CMakeLists.txt")
+                set(LANG_GW_SRC_DIR "${_lgw_cand}")
+                break()
+            endif()
+        endforeach()
+    endif()
+    if(AIRY_ATOMS_PREBUILT_DIR)
+        set(LANG_GW_CONTRACT_DIR "${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/include")
+    else()
+        set(LANG_GW_CONTRACT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/atoms/coreloopthree/include")
+    endif()
+
     if(BUILD_COMMONS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/commons/CMakeLists.txt")
         add_subdirectory(commons)
     else()
@@ -1006,6 +1034,15 @@ if(AIRY_BUILD_ALL)
         add_subdirectory("${CUPOLAS_SRC_DIR}" cupolas)
     else()
         airy_print_warn("cupolas module not mounted (products/cupolas or -DCUPOLAS_SRC_DIR)")
+    endif()
+
+    # lang_gateway 产品库挂载（M5-2，台账 §256）：须在 atoms 之后
+    # （airy_common/airy_ipc_ops 目标就绪——产品库 PUBLIC 链接二者）、
+    # daemons 之前（think_d 经链接核传递获得产品库与头传播）。
+    if(BUILD_LANG_GATEWAY AND LANG_GW_SRC_DIR AND EXISTS "${LANG_GW_SRC_DIR}/CMakeLists.txt")
+        add_subdirectory("${LANG_GW_SRC_DIR}" lang_gateway)
+    else()
+        airy_print_warn("lang_gateway module not mounted (products/lang_gateway or -DLANG_GW_SRC_DIR)")
     endif()
 
     if(BUILD_DAEMON AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/daemons/CMakeLists.txt")
