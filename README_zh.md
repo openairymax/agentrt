@@ -149,11 +149,11 @@ AgentRT 采用分层结构，每一层只依赖其下的层。SDK 层在栈顶�
 
 ```
 SDK 层      — 命令行、终端界面、Python / Go / Rust / TypeScript 绑定
-服务层      — 15 个守护进程，负责运行时编排                     (daemons/)
+服务层      — 14 个守护进程，负责运行时编排                     (daemons/)
 协议层      — AgentsIPC 与 A2A / A2T 协议栈                     (protocols/)
 网关层      — 各类传输 → JSON-RPC 2.0                           (gateway/)
 存储层      — 运行时数据存储                                    (heapstore/)
-安全层      — 四层穹顶：策略决策点与各进程本地执行点            (cupolas/)
+安全层      — 四层穹顶：策略决策点与各进程本地执行点       (cupolas 产品仓)
 微核心系统层 — 5 个机制模块                                      (atoms/)
 支撑层      — 32 个内聚工具模块 + 共享头文件                    (commons/)
 ```
@@ -170,7 +170,8 @@ SDK 层      — 命令行、终端界面、Python / Go / Rust / TypeScript 绑�
   进程边界。
 - **协议层（`protocols`）** — AgentsIPC 使用固定 128 字节消息头，用于进程内与
   跨进程消息传递；另含智能体互联（A2A）与智能体-工具（A2T）协议栈。
-- **服务层（`daemons`）** — 15 个长驻进程，使运行时成为一个真正在跑的系统。
+- **服务层（`daemons`）** — 14 个长驻进程，使运行时成为一个真正在跑的系统；
+  cupolas 产品仓另携策略壳 `cupolas_d`（0.1.19 §255）。
 - **SDK 层** — 位于同级 [`sdk/`](../sdk) 目录，把下层能力重新暴露给应用开发者。
 
 ## 仓库结构
@@ -179,11 +180,10 @@ SDK 层      — 命令行、终端界面、Python / Go / Rust / TypeScript 绑�
 agentrt/
 ├── atoms/                # 微核心系统层原语（submodule）
 ├── commons/              # 共享基础库（submodule）
-├── cupolas/              # 安全穹顶（submodule）
 ├── gateway/              # 协议网关（submodule）
 ├── heapstore/            # 运行时数据存储（submodule）
 ├── protocols/            # AgentsIPC、A2A / A2T（submodule）
-├── daemons/              # 15 个运行时守护进程 + 框架（submodule）
+├── daemons/              # 14 个运行时守护进程 + 框架（submodule）
 ├── cmake/                # 构建系统模块
 ├── scripts/              # 安装器 install.sh / install.ps1
 ├── tests/                # 冒烟测试与工具链自测
@@ -205,11 +205,11 @@ agentrt/
 | ------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **atoms**     | [openairymax/atoms](https://atomgit.com/openairymax/atoms)         | 微核心系统层：`corekern`、`coreloopthree`、`syscall`、`taskflow`、`memory`                                                                                       |
 | **commons**   | [openairymax/commons](https://atomgit.com/openairymax/commons)     | 类型与错误契约，以及 32 个内聚工具模块                                                                                                                                 |
-| **cupolas**   | [openairymax/cupolas](https://atomgit.com/openairymax/cupolas)     | 四层安全穹顶：策略决策点与本地执行点                                                                                                                                    |
+| **cupolas**   | [openairymax/cupolas](https://atomgit.com/openairymax/cupolas)     | 四层安全穹顶：策略决策点与本地执行点；并承载 `cupolas_d` 策略壳（0.1.19 §255）                                                                                                                                    |
 | **heapstore** | [openairymax/heapstore](https://atomgit.com/openairymax/heapstore) | 运行时数据存储                                                                                                                                               |
 | **protocols** | [openairymax/protocols](https://atomgit.com/openairymax/protocols) | AgentsIPC（128 字节消息头）、A2A 与 A2T 协议栈                                                                                                                    |
 | **gateway**   | [openairymax/gateway](https://atomgit.com/openairymax/gateway)     | HTTP / WS / SSE / MCP / A2A / OpenAI → JSON-RPC 2.0                                                                                                   |
-| **daemons**   | [openairymax/daemons](https://atomgit.com/openairymax/daemons)     | `gateway_d`、`agent_d`、`llm_d`、`tool_d`、`sched_d`、`think_d`、`mem_d`、`market_d`、`monit_d`、`notify_d`、`channel_d`、`a2a_d`、`cupolas_d`、`maths_d` |
+| **daemons**   | [openairymax/daemons](https://atomgit.com/openairymax/daemons)     | `gateway_d`、`agent_d`、`llm_d`、`tool_d`、`sched_d`、`think_d`、`mem_d`、`market_d`、`monit_d`、`notify_d`、`channel_d`、`a2a_d`、`maths_d` |
 
 ## 从源码构建
 

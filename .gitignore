@@ -79,8 +79,6 @@ tools/codegen/__pycache__/
 !atoms/**
 !commons/
 !commons/**
-!cupolas/
-!cupolas/**
 !daemons/
 !daemons/**
 !gateway/

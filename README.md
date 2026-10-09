@@ -165,11 +165,11 @@ the dependency graph is drawn as a cycle.
 
 ```
 SDK Layer        — CLI, terminal UI, Python / Go / Rust / TypeScript bindings
-Service Layer    — 15 daemons that orchestrate the runtime        (daemons/)
+Service Layer    — 14 daemons that orchestrate the runtime        (daemons/)
 Protocol Layer   — AgentsIPC and the A2A / A2T stacks             (protocols/)
 Gateway Layer    — transports → JSON-RPC 2.0                      (gateway/)
 Storage Layer    — heap-backed runtime persistence                (heapstore/)
-Security Layer   — four-layer dome, policy decision and           (cupolas/)
+Security Layer   — four-layer dome, policy decision and    (cupolas product)
                    enforcement points
 Kernel Layer     — 5 atomic micro-kernel modules                  (atoms/)
 Support Layer    — 32 cohesive utility modules + shared headers   (commons/)
@@ -192,8 +192,9 @@ Support Layer    — 32 cohesive utility modules + shared headers   (commons/)
 - **Protocol layer (`protocols`)** — AgentsIPC with a fixed 128-byte message
   header for in-process and cross-process messaging, plus agent-to-agent (A2A)
   and agent-to-tool (A2T) stacks.
-- **Service layer (`daemons`)** — the fifteen long-running processes that make
-  the runtime an actual running system.
+- **Service layer (`daemons`)** — the fourteen long-running processes that
+  make the runtime an actual running system; the cupolas product ships its
+  own `cupolas_d` policy shell on top (0.1.19 §255).
 - **SDK layer** — lives in the sibling [`sdk/`](../sdk) tree and re-exports the
   layers below to application developers.
 
@@ -203,11 +204,10 @@ Support Layer    — 32 cohesive utility modules + shared headers   (commons/)
 agentrt/
 ├── atoms/                # micro-kernel primitives (submodule)
 ├── commons/              # shared foundation library (submodule)
-├── cupolas/              # security dome (submodule)
 ├── gateway/              # protocol gateway (submodule)
 ├── heapstore/            # heap-backed persistence (submodule)
 ├── protocols/            # AgentsIPC, A2A / A2T (submodule)
-├── daemons/              # 15 runtime daemons + daemon framework (submodule)
+├── daemons/              # 14 runtime daemons + daemon framework (submodule)
 ├── cmake/                # build-system modules
 ├── scripts/              # installers: install.sh, install.ps1
 ├── tests/                # smoke tests and toolchain self-tests
@@ -231,11 +231,11 @@ recursively to get all of them at the pinned revisions.
 |-----------|-----------|----------------|
 | **atoms** | [openairymax/atoms](https://atomgit.com/openairymax/atoms) | Micro-kernel layer: `corekern`, `coreloopthree`, `syscall`, `taskflow`, `memory` |
 | **commons** | [openairymax/commons](https://atomgit.com/openairymax/commons) | Type and error contracts, plus 32 cohesive utility modules |
-| **cupolas** | [openairymax/cupolas](https://atomgit.com/openairymax/cupolas) | Four-layer security dome: policy decision point and enforcement points |
+| **cupolas** | [openairymax/cupolas](https://atomgit.com/openairymax/cupolas) | Four-layer security dome: policy decision point and enforcement points; hosts the `cupolas_d` daemon shell (0.1.19 §255) |
 | **heapstore** | [openairymax/heapstore](https://atomgit.com/openairymax/heapstore) | Heap-backed runtime data persistence |
 | **protocols** | [openairymax/protocols](https://atomgit.com/openairymax/protocols) | AgentsIPC (128-byte header), A2A and A2T protocol stacks |
 | **gateway** | [openairymax/gateway](https://atomgit.com/openairymax/gateway) | HTTP / WS / SSE / MCP / A2A / OpenAI → JSON-RPC 2.0 |
-| **daemons** | [openairymax/daemons](https://atomgit.com/openairymax/daemons) | `gateway_d`, `agent_d`, `llm_d`, `tool_d`, `sched_d`, `think_d`, `mem_d`, `market_d`, `monit_d`, `notify_d`, `channel_d`, `a2a_d`, `cupolas_d`, `maths_d` |
+| **daemons** | [openairymax/daemons](https://atomgit.com/openairymax/daemons) | `gateway_d`, `agent_d`, `llm_d`, `tool_d`, `sched_d`, `think_d`, `mem_d`, `market_d`, `monit_d`, `notify_d`, `channel_d`, `a2a_d`, `maths_d` |
 
 ## Building from source
 
