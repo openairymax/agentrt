@@ -72,7 +72,7 @@
 # 仅使用 Python 标准库，无第三方依赖。结构对齐 syscall_gen.py
 # （parse/validate/render 三段式 + gen/check 双模式）。
 #
-# Generator version: 1.11.0
+# Generator version: 1.12.0
 
 import argparse
 import difflib
@@ -81,7 +81,7 @@ import re
 import sys
 from pathlib import Path
 
-GENERATOR_VERSION = "1.11.0"
+GENERATOR_VERSION = "1.12.0"
 
 # 生成产物相对 daemon 目录的固定落点（保持稳定，勿随意改名）
 OUTPUT_MAIN = "src/main.c"
@@ -109,9 +109,10 @@ RESERVED_METHODS = frozenset({"shutdown"})
 OPS_VOCAB = frozenset({"ipc", "llm", "tool"})
 OPS_ORDER = ("ipc", "llm", "tool")
 
-# cupolas 安全穹顶引导模式（daemon_cupolas_bootstrap.c cupolas_bootstrap
-# 的 pep_mode 参数声明化）：pep=PEP 最小 guard（消费方 16 户缺省），
-# full=PDP 本体全量（仅 cupolas_d——vault/net/entitlements RPC 的承载者）
+# cupolas 安全穹顶引导模式（策略单元 security_dome.c dome_bootstrap 的
+# pep_mode 参数声明化，0.1.19 §254b）：pep=PEP 最小 guard（消费户缺省，
+# daemon_dome_init_pep），full=PDP 本体全量（仅 cupolas_d——
+# vault/net/entitlements RPC 的承载者，daemon_dome_init）
 CUPOLAS_MODES = frozenset({"pep", "full"})
 
 # UDS slots 词表（Unify Design SSoT）：facades 4 + slots 28（25 基础 + 3 补充）
@@ -322,6 +323,7 @@ def render_main(d):
         '#include "svc_%s.h"' % daemon,
         "",
         '#include "daemon_main.h"',
+        '#include "daemon_security_dome.h"',
     ]
     for op in d["ops"]:
         lines.append('#include "daemon_%s_ops_bootstrap.h"' % op)
@@ -369,7 +371,8 @@ def render_main(d):
     if rpc["concurrent"]:
         lines.append("        .concurrent_clients = 1,")
     lines += [
-        "        DAEMON_BOOT_WIRE(SVC_OPS, SVC_METHODS, %s, daemon_cupolas_init%s),"
+        "        DAEMON_BOOT_WIRE(SVC_OPS, SVC_METHODS, %s, "
+        "daemon_dome_init%s, daemon_dome_cleanup),"
         % (activate, "_pep" if d["cupolas"] == "pep" else ""),
         "    };",
         "    return daemon_boot(argc, argv, &boot);",
