@@ -34,27 +34,33 @@
 #   实测；configure 期 linkgate/*.links.txt 快照为门禁输入）:
 gateway: svc_common airy_syscall airy_protocols airy_common
 airy_gateway_service: svc_common airy_protocols airy_platform_libs
-gateway_d: airy_gateway_service airy_syscall airy_platform_libs
+gateway_d: airy_gateway_service airy_syscall airy_platform_libs airy_security_dome
 # daemon 节点（configure 期 linkgate/*.links.txt 实测）。
 # 注记：除 think_d 外的 daemon 链 airy_core 系 WS-8 8.4.1 corekern 进程
 #   原语链事实基线（main.c 经 airy_init() 完成进程原语初始化）；后续以
 #   总线化进程原语服务收敛后可收紧对应允许集。
-llm_d: airy_platform_libs airy_llm_service airy_core
-tool_d: airy_platform_libs airy_common airy_tool_service airy_coreloopthree airy_atoms airy_llm_service
-monit_d: airy_platform_libs airy_monit_service airy_core
-sched_d: airy_platform_libs airy_common airy_coreloopthree airy_cognition airy_core airy_atoms airy_llm_service airy_tool_service
-market_d: airy_platform_libs airy_market_service airy_core
-channel_d: airy_platform_libs airy_common svc_common airy_core
-notify_d: airy_platform_libs airy_common svc_common airy_core airy_coreloop_hooks
-mem_d: airy_platform_libs airy_common airy_mem_service airy_core
-agent_d: airy_platform_libs airy_common airy_agent_service airy_core
+llm_d: airy_platform_libs airy_llm_service airy_core airy_security_dome
+tool_d: airy_platform_libs airy_common airy_tool_service airy_coreloopthree airy_atoms airy_llm_service airy_security_dome
+monit_d: airy_platform_libs airy_monit_service airy_core airy_security_dome
+sched_d: airy_platform_libs airy_common airy_coreloopthree airy_cognition airy_core airy_atoms airy_llm_service airy_tool_service airy_security_dome
+market_d: airy_platform_libs airy_market_service airy_core airy_security_dome
+channel_d: airy_platform_libs airy_common svc_common airy_core airy_security_dome
+notify_d: airy_platform_libs airy_common svc_common airy_core airy_coreloop_hooks airy_security_dome
+mem_d: airy_platform_libs airy_common airy_mem_service airy_core airy_security_dome
+agent_d: airy_platform_libs airy_common airy_agent_service airy_core airy_security_dome
 # a2a_d（0.1.19 §250）：允许集对齐 linkgate 直接捕获集——airy_common /
 # airy_protocols 从未在 a2a_d 直接声明，系经 airy_a2a_service PUBLIC
 # （svc_common→airy_common、airy_protocols）传播的历史闭包快照残留。
-a2a_d: airy_platform_libs airy_a2a_service airy_core
-think_d: airy_platform_libs airy_common airy_think_service airy_coreloopthree airy_cognition airy_llm_service airy_tool_service
+a2a_d: airy_platform_libs airy_a2a_service airy_core airy_security_dome
+think_d: airy_platform_libs airy_common airy_think_service airy_coreloopthree airy_cognition airy_llm_service airy_tool_service airy_security_dome
+# 0.1.19 §254b：airy_security_dome 为 daemon_security 机制核的 vault provider
+# 策略单元（cupolas 身份/口令/存储后端全部收拢于此）。13 个 daemon 二进制
+# 显式 PRIVATE 直链（boot 接线 daemon_dome_* 符号面）；cupolas_d 经
+# airy_cupolas_service PUBLIC 传递取 dome，linkgate 只捕直接链接故其行不另
+# 登记；cupolas 非项目库前缀（airy_/svc_/daemon_ 等）自动忽略不入行。
+airy_security_dome: svc_common airy_platform_libs
 cupolas_d: airy_platform_libs airy_common airy_cupolas_service airy_core
-maths_d: airy_platform_libs airy_common svc_common airy_core
+maths_d: airy_platform_libs airy_common svc_common airy_core airy_security_dome
 # supervisor_d（0.1.18 §12.13 B13）：监管者自身零项目内库链接（V13.5，
 # 允许集为空）——UDS/TCP、进程原语、JSON、日志全部自持，仅链接系统库，
 # 保证监管者不随业务库劣化而失效（构建期 fail-closed 机器判据）。
