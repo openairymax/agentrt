@@ -898,6 +898,7 @@ if(AIRY_BUILD_ALL)
     option(BUILD_COMMONS "Build commons module (common utilities)" ON)
     option(BUILD_CUPOLAS "Build cupolas module (security framework)" ON)
     option(BUILD_LANG_GATEWAY "Build lang_gateway module (inference language gateway)" ON)
+    option(BUILD_COGNITION_STRATEGY "Build cognition dispatch strategy product library" ON)
     # Windows 支持矩阵：daemons 子系统（svc/ipc/
     # discovery/各 *_d 服务）现为 POSIX 绑定——DIR/strings.h/sys/socket/
     # unistd 直引（MSVC 下 C1083/C2065 大面积失败），Windows 侧默认
@@ -924,6 +925,7 @@ if(AIRY_BUILD_ALL)
     airy_print_info("[MODULE]   commons:  ${BUILD_COMMONS}")
     airy_print_info("[MODULE]   cupolas:  ${BUILD_CUPOLAS}")
     airy_print_info("[MODULE]   lang_gw:  ${BUILD_LANG_GATEWAY}")
+    airy_print_info("[MODULE]   cog_strat:${BUILD_COGNITION_STRATEGY}")
     airy_print_info("[MODULE]   daemon:   ${BUILD_DAEMON}")
     airy_print_info("[MODULE]   gateway:  ${BUILD_GATEWAY}")
     airy_print_info("[MODULE]   heapstore: ${BUILD_HEAPSTORE}")
@@ -1014,6 +1016,29 @@ if(AIRY_BUILD_ALL)
         set(LANG_GW_CONTRACT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/atoms/coreloopthree/include")
     endif()
 
+    # cognition 分发策略产品库源目录探测（M5-4 策略载荷迁出，台账 §261；
+    # 与 lang_gateway 同构三态：显式 -D 变量 → COG_ROOT 环境 → 伞仓内
+    # products/ → workspace 同级 products/）。COG_CONTRACT_DIR 为产品库
+    # 消费机制核契约头的锚点，随 AIRY_ATOMS_PREBUILT_DIR 双态。
+    if(NOT COG_SRC_DIR AND DEFINED ENV{COG_ROOT})
+        set(COG_SRC_DIR "$ENV{COG_ROOT}")
+    endif()
+    if(NOT COG_SRC_DIR)
+        foreach(_cog_cand
+            "${CMAKE_CURRENT_SOURCE_DIR}/../products/cognition"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../../products/cognition")
+            if(EXISTS "${_cog_cand}/CMakeLists.txt")
+                set(COG_SRC_DIR "${_cog_cand}")
+                break()
+            endif()
+        endforeach()
+    endif()
+    if(AIRY_ATOMS_PREBUILT_DIR)
+        set(COG_CONTRACT_DIR "${AIRY_ATOMS_PREBUILT_DIR}/atoms/coreloopthree/include")
+    else()
+        set(COG_CONTRACT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/atoms/coreloopthree/include")
+    endif()
+
     if(BUILD_COMMONS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/commons/CMakeLists.txt")
         add_subdirectory(commons)
     else()
@@ -1043,6 +1068,15 @@ if(AIRY_BUILD_ALL)
         add_subdirectory("${LANG_GW_SRC_DIR}" lang_gateway)
     else()
         airy_print_warn("lang_gateway module not mounted (products/lang_gateway or -DLANG_GW_SRC_DIR)")
+    endif()
+
+    # cognition 分发策略产品库挂载（M5-4，台账 §261）：须在 atoms 之后
+    # （airy_common 目标与机制核契约头就绪）、daemons 之前。策略载荷可拔插：
+    # 缺席仅告警，机制核 airy_cognition 不依赖本库（注入缝在 cognition.h）。
+    if(BUILD_COGNITION_STRATEGY AND COG_SRC_DIR AND EXISTS "${COG_SRC_DIR}/CMakeLists.txt")
+        add_subdirectory("${COG_SRC_DIR}" cognition)
+    else()
+        airy_print_warn("cognition module not mounted (products/cognition or -DCOG_SRC_DIR)")
     endif()
 
     if(BUILD_DAEMON AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/daemons/CMakeLists.txt")
