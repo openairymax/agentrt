@@ -87,7 +87,7 @@ endif()
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/airy_print.cmake)
 
 # M1-1b：模块链接白名单门禁函数（collect 阶段在 gateway 子目录配置前
-# 就绪；install_checks 阶段在 tools/airy_depgraph 配置后调用）
+# 就绪；install_checks 阶段在 airy_depgraph 配置后调用，见下文）
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/airy_linkgate.cmake)
 
 # 项目范围选项
@@ -1090,9 +1090,14 @@ if(AIRY_BUILD_ALL)
     endif()
 
     # 依赖图门禁工具：commons 子域依赖声明 + Kahn 拓扑排序 +
-    # 环检测（fail-closed）+ 依赖图报告；复用 taskflow graph_engine
-    if(BUILD_COMMONS AND BUILD_ATOMS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/airy_depgraph/CMakeLists.txt")
-        add_subdirectory(tools/airy_depgraph)
+    # 环检测（fail-closed）+ 依赖图报告；复用 taskflow graph_engine。
+    # 0.1.19 M5-3：执行器已迁出至顶层 tools 仓（v0.1.4 由 devtools 更名），
+    # 经跨仓 add_subdirectory 纳入；commons 源根经父作用域变量传入。
+    if(BUILD_COMMONS AND BUILD_ATOMS
+       AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/airy_depgraph/CMakeLists.txt")
+        set(AIRY_DEPGRAPH_COMMONS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/commons")
+        add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../tools/airy_depgraph"
+                         tools/airy_depgraph)
         # M1-1b：airy_depgraph 配置完成后安装链接白名单门禁（gateway 系
         # 禁链 coreloopthree/cognition，fail-closed）
         airy_linkgate_install_checks()

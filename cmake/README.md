@@ -85,7 +85,8 @@ the `AIRY_BUILD_COLOR=1/0` environment variable.
 ### 2. airy_linkgate.cmake — Build-Time Link-Whitelist Gate
 
 Turns module link relationships into build-time assertions, working with
-`tools/airy_depgraph`:
+`airy_depgraph` (top-level `tools` repository, imported via cross-repo
+`add_subdirectory`):
 
 - The whitelist file is `link-whitelist.txt` at the repository root (single
   source of truth), declaring target → allowed libraries; its path is

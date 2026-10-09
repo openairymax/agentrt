@@ -14,7 +14,8 @@
 #     --links <whitelist> --actual <links>，越权/未登记项目库即
 #     fail-closed（退出码 2 阻断构建）
 #
-# 延迟安装原因：airy_depgraph target 在 tools/airy_depgraph 定义
+# 延迟安装原因：airy_depgraph target 在顶层 tools 仓（0.1.19 M5-3 迁出；
+# v0.1.4 由 devtools 更名）定义，经跨仓 add_subdirectory 载入
 # （晚于 daemons/gateway 子目录），add_dependencies(ALL ...) 要求
 # 被依赖 target 已存在，故拆分 collect/install 两阶段。
 
