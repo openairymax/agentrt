@@ -15,6 +15,11 @@
 # 手写层（生成器不碰）：.manifest 本身、src/svc.c（钩子/handler 实现）、
 # modules 内业务源文件、CMakeLists.txt、tests/。
 #
+# 外户（0.1.19 §255）：随产品离核迁出的策略壳 daemon（如 cupolas_d →
+# products/cupolas/daemon/）经 EXTERNAL_DAEMONS 登记三态解析——env
+# CUPOLAS_ROOT → 伞仓内 products/ → workspace 同级 products/，与 agentrt
+# 顶层 CMake 的 CUPOLAS_SRC_DIR 探测同语义。
+#
 # .manifest JSON schema v2:
 #   {
 #     "manifest_version": 2,
@@ -77,6 +82,7 @@
 import argparse
 import difflib
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -98,6 +104,11 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 AGENTRT_ROOT = SCRIPT_DIR.parents[1]
 DAEMONS_ROOT = AGENTRT_ROOT / "daemons"
 
+# 外户登记表（0.1.19 §255）：daemon 名 -> (根目录环境变量, 产品名,
+# 产品仓内 daemon 子目录)。全扫时解析得到即入列，解析不得即警告跳过
+# （CI codegen-check job 经 clone 注入 CUPOLAS_ROOT，保证门禁全覆盖）。
+EXTERNAL_DAEMONS = {"cupolas_d": ("CUPOLAS_ROOT", "cupolas", "daemon")}
+
 SCHEMA_VERSION = 2
 
 # shutdown：协议保留方法（DAEMON_DECLARE_SHUTDOWN_METHOD 自动注册响应
@@ -112,7 +123,8 @@ OPS_ORDER = ("ipc", "llm", "tool")
 # cupolas 安全穹顶引导模式（策略单元 security_dome.c dome_bootstrap 的
 # pep_mode 参数声明化，0.1.19 §254b）：pep=PEP 最小 guard（消费户缺省，
 # daemon_dome_init_pep），full=PDP 本体全量（仅 cupolas_d——
-# vault/net/entitlements RPC 的承载者，daemon_dome_init）
+# vault/net/entitlements RPC 的承载者，daemon_dome_init；该户 §255 起
+# 为外户，源随产品壳位于 products/cupolas/daemon/）
 CUPOLAS_MODES = frozenset({"pep", "full"})
 
 # UDS slots 词表（Unify Design SSoT）：facades 4 + slots 28（25 基础 + 3 补充）
@@ -557,16 +569,46 @@ def check_outputs(contents, daemon_dir):
     return rc
 
 
+def external_home(name):
+    """外户 .manifest 三态解析（§255）：env 根目录 → 伞仓 products/ →
+    workspace 同级 products/；解析不得返回 None。"""
+    env_key, product, subdir = EXTERNAL_DAEMONS[name]
+    roots = []
+    if os.environ.get(env_key):
+        roots.append(Path(os.environ[env_key]))
+    roots += [AGENTRT_ROOT.parent / "products" / product,
+              AGENTRT_ROOT.parent.parent / "products" / product]
+    for root in roots:
+        path = root / subdir / ".manifest"
+        if path.is_file():
+            return path
+    return None
+
+
 def discover_manifests(daemon):
-    """定位 .manifest：指定 daemon 时取单户，否则扫描全部 daemons。"""
+    """定位 .manifest：指定 daemon 时取单户（树内/外户），否则扫描全部
+    daemons 并追补外户。"""
     if daemon:
         path = DAEMONS_ROOT / daemon / ".manifest"
-        if not path.exists():
-            raise GenError(".manifest 不存在: %s" % path)
-        return [path]
+        if path.exists():
+            return [path]
+        if daemon in EXTERNAL_DAEMONS:
+            ext = external_home(daemon)
+            if ext is None:
+                raise GenError("外户 %s 不可解析（设 %s 或在位 products/%s）"
+                               % (daemon, EXTERNAL_DAEMONS[daemon][0],
+                                  EXTERNAL_DAEMONS[daemon][1]))
+            return [ext]
+        raise GenError(".manifest 不存在: %s" % path)
     paths = sorted(DAEMONS_ROOT.glob("*/.manifest"))
     if not paths:
         raise GenError("daemons/ 下未发现任何 .manifest")
+    for name in sorted(EXTERNAL_DAEMONS):
+        ext = external_home(name)
+        if ext is None:
+            print("SKIP (external home not in place): %s" % name)
+            continue
+        paths.append(ext)
     return paths
 
 

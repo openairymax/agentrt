@@ -58,6 +58,8 @@ think_d: airy_platform_libs airy_common airy_think_service airy_coreloopthree ai
 # 显式 PRIVATE 直链（boot 接线 daemon_dome_* 符号面）；cupolas_d 经
 # airy_cupolas_service PUBLIC 传递取 dome，linkgate 只捕直接链接故其行不另
 # 登记；cupolas 非项目库前缀（airy_/svc_/daemon_ 等）自动忽略不入行。
+# 0.1.19 §255：cupolas_d 为外户（源随产品壳位于 products/cupolas/daemon/，
+# 由顶层装配块挂载），目标名与链接结构不变，白名单行照旧。
 airy_security_dome: svc_common airy_platform_libs
 cupolas_d: airy_platform_libs airy_common airy_cupolas_service airy_core
 maths_d: airy_platform_libs airy_common svc_common airy_core airy_security_dome

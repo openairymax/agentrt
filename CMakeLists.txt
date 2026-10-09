@@ -1014,17 +1014,23 @@ if(AIRY_BUILD_ALL)
         airy_print_warn("daemons module not found or disabled")
     endif()
 
-    # 0.1.19 §254b：cupolas_d 策略宿主（含 airy_security_dome 策略单元）
-    # 构建位上移至顶层装配区——须在 cupolas 产品与 svc_common 机制核双双
-    # 就绪之后挂载；任一缺失即不装配（fail-closed，仅警告不产出该 daemon）。
-    # 链接白名单收集（cupolas_d / airy_security_dome）随构建位由本块自持，
-    # daemons 目录不感知。
-    if(TARGET cupolas AND TARGET svc_common)
-        add_subdirectory(daemons/cupolas_d)
+    # 0.1.19 §254b/§255：cupolas_d 策略壳（含 airy_security_dome 策略单元）
+    # 构建位上移至顶层装配区——源随产品壳落 products/cupolas/daemon/
+    # （CUPOLAS_SRC_DIR 前段已三态探测），本块注入机制核锚点
+    # AGENTRT_DAEMONS_ROOT / AGENTRT_COMMONS_ROOT 供其消费。须在 cupolas
+    # 产品、svc_common 机制核与产品壳 daemon 面三者齐备之后挂载；
+    # 任一缺失即不装配（fail-closed，仅警告不产出该 daemon）。链接白名单
+    # 收集（cupolas_d / airy_security_dome）随构建位由本块自持，daemons
+    # 目录不感知。
+    if(TARGET cupolas AND TARGET svc_common
+       AND EXISTS "${CUPOLAS_SRC_DIR}/daemon/CMakeLists.txt")
+        set(AGENTRT_DAEMONS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/daemons")
+        set(AGENTRT_COMMONS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/commons")
+        add_subdirectory("${CUPOLAS_SRC_DIR}/daemon" cupolas_d)
         airy_linkgate_collect(cupolas_d)
         airy_linkgate_collect(airy_security_dome)
     else()
-        airy_print_warn("cupolas_d not assembled (requires cupolas product + svc_common core)")
+        airy_print_warn("cupolas_d not assembled (requires cupolas product + svc_common core + product-shell daemon/)")
     endif()
 
     if(BUILD_GATEWAY AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/gateway/CMakeLists.txt")
