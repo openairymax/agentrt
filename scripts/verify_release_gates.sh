@@ -1364,12 +1364,19 @@ else
 fi
 
 _lg="$ROOT/atoms/coreloopthree/src/lang_gateway"
+# §256：lang_gateway 策略载荷已迁出机制核至生态层 products/lang_gateway
+# （数据契约经 airy_lang_gw_ops.h 入核）；伞仓布局下源位于 agentrt 同级
+# products 下。两条路径皆缺时 _lg 悬空 → X0 结构性判红 fail-closed，
+# 符合门禁语义。
+[ -d "$_lg" ] || _lg="$ROOT/../products/lang_gateway/src"
+_lg_tests="$ROOT/atoms/coreloopthree/tests/unit/test_lang_gateway.c"
+[ -f "$_lg_tests" ] || _lg_tests="$ROOT/../products/lang_gateway/tests/unit/test_lang_gateway.c"
 section "X" "B6 语言网关校准与路由（校准异步化/容量 SSoT/阈值同源 V6.1~V6.3 机制防回潮）"
 
 _lg_missing=""
 for _f in "$_lg/canonical.h" "$_lg/lang_router.c" "$_lg/calibrator.c" \
           "$_lg/lang_gateway.c" \
-          "$ROOT/atoms/coreloopthree/tests/unit/test_lang_gateway.c"; do
+          "$_lg_tests"; do
     [ -f "$_f" ] || _lg_missing="$_lg_missing $(basename "$_f")"
 done
 if [ -n "$_lg_missing" ]; then
@@ -1400,8 +1407,7 @@ else
     fi
 
     if grep -q '"version", 2' "$_lg/calibrator.c" \
-        && grep -q 'test_route_threshold_from_profile' \
-            "$ROOT/atoms/coreloopthree/tests/unit/test_lang_gateway.c"; then
+        && grep -q 'test_route_threshold_from_profile' "$_lg_tests"; then
         ok "X4 阈值持久化与测试守卫在位（version 2 契约 + V6.3 单元测试）"
     else
         bad "X4 阈值持久化契约或测试守卫缺失"
