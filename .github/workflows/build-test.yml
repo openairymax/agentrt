@@ -344,7 +344,8 @@ jobs:
     # 超时护栏：同 macOS，防 ctest/构建挂死到 6h
     timeout-minutes: 90
     # windows ctest 全绿，本 job 为 required 门禁；Windows 完整产品
-    # （daemons 15 + airy_cli）构建链持续绿，release.yml windows leg 以
+    # （daemons 14 + airy_cli，cupolas_d 策略壳不在本 CI 装配）构建链持续绿，
+    # release.yml windows leg 以
     # publish REQUIRED_BIN 预检为入 needs 判据。
     env:
       # 构建目录位于源码树外（工作区上级目录）

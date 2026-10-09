@@ -46,6 +46,11 @@ jobs:
   # 装配唯一真值源，main.c / svc_<d>.h / sources.cmake 三件生成产物与它
   # 做一致性校验。生成器仅依赖 python3 标准库，从自身路径推导仓库根；
   # .manifest 位于 daemons 叶子子模块内，经 init-submodules.sh 就位。
+  # 外户（0.1.19 §255，策略壳随产品离核，如 cupolas_d →
+  # products/cupolas/daemon/）经 products 装配仓钉定的 cupolas gitlink
+  # 解析 CUPOLAS_ROOT 入列——与 init-submodules.sh 发布布局同 SSoT
+  # 语义（不硬编码分支，随 gitlink bump 自动跟随）。sync-mirror 为
+  # atomgit→github 单向同步，镜像存在竞态窗口，clone 带退避重试。
   # 任一生成产物与 .manifest 漂移即返回非零，阻止合入。
   # 独立成 job 而非并入 syscall-codegen-check：job 名即 required check
   # 名，两套 SSoT 各自语义单一，互不牵连。
@@ -62,7 +67,31 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: bash .github/scripts/init-submodules.sh
 
+      - name: Clone cupolas shell via products gitlink (external daemon host)
+        run: |
+          # netrc 已由 init-submodules.sh 写入；镜像上 products/cupolas
+          # 均为公开仓，匿名 clone 即可。.gitmodules 相对 URL
+          # （../cupolas.git）在镜像下解析到 github org，checkout 落在
+          # products 钉定的 cupolas SHA 上。
+          for attempt in 1 2 3; do
+            rm -rf "$RUNNER_TEMP/cupolas-host"
+            if git clone -q --depth 1 \
+              https://github.com/openairymax/products.git \
+              "$RUNNER_TEMP/cupolas-host" &&
+               git -C "$RUNNER_TEMP/cupolas-host" submodule update \
+                 --init --depth 1 cupolas; then
+              break
+            fi
+            if [ "$attempt" = 3 ]; then
+              echo "::error::cupolas shell unavailable (mirror sync race?)"
+              exit 1
+            fi
+            sleep 20
+          done
+
       - name: Verify daemon .manifest SSoT drift (daemons codegen)
+        env:
+          CUPOLAS_ROOT: ${{ runner.temp }}/cupolas-host/cupolas
         run: |
           python3 tools/codegen/daemon_gen.py --check
 
