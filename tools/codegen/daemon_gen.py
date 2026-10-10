@@ -20,9 +20,9 @@
 # CUPOLAS_ROOT → 伞仓内 products/ → workspace 同级 products/，与 agentrt
 # 顶层 CMake 的 CUPOLAS_SRC_DIR 探测同语义。
 #
-# .manifest JSON schema v2:
+# .manifest JSON schema v3:
 #   {
-#     "manifest_version": 2,
+#     "manifest_version": 3,
 #     "daemon": "maths_d",                  # ^[a-z][a-z0-9_]*_d$
 #     "cname": "maths",                     # 可缺省，默认去 _d 后缀
 #     "sd_type": "maths",                   # SD 服务类型
@@ -38,11 +38,13 @@
 #                                           # PDP cupolas_d 集中持有），full=
 #                                           # PDP 本体全量（四层+vault+
 #                                           # entitlements+net_security）
-#     "activate_noop": true,                # 可缺省，默认 false；true =
-#                                           # 无激活策略户，DAEMON_BOOT_WIRE
-#                                           # 引用机制层 daemon_svc_noop
-#                                           # 缺省（0.1.19 §80），svc_*.h
-#                                           # 不发 svc_activate 声明，
+#     "noop_hooks": ["attach", ...],        # 可缺省，默认 []；⊆
+#                                           # NOOP_HOOKS_VOCAB。列出无策略
+#                                           # 需求的钩子（activate/attach/
+#                                           # teardown），DAEMON_BOOT_WIRE
+#                                           # 相应位引用机制层 daemon_svc_
+#                                           # <hook>_noop 缺省（0.1.19 §80），
+#                                           # svc_*.h 不发对应声明，
 #                                           # src/svc.c 不再维护空桩
 #     "facades": ["ingress", ...],          # ⊆ FACADES_VOCAB
 #     "slots": ["compute", ...],            # ⊆ SLOTS_VOCAB
@@ -84,7 +86,7 @@
 # 仅使用 Python 标准库，无第三方依赖。结构对齐 syscall_gen.py
 # （parse/validate/render 三段式 + gen/check 双模式）。
 #
-# Generator version: 1.12.0
+# Generator version: 1.13.0
 
 import argparse
 import difflib
@@ -94,7 +96,7 @@ import re
 import sys
 from pathlib import Path
 
-GENERATOR_VERSION = "1.12.0"
+GENERATOR_VERSION = "1.13.0"
 
 # 生成产物相对 daemon 目录的固定落点（保持稳定，勿随意改名）
 OUTPUT_MAIN = "src/main.c"
@@ -116,7 +118,14 @@ DAEMONS_ROOT = AGENTRT_ROOT / "daemons"
 # （CI codegen-check job 经 clone 注入 CUPOLAS_ROOT，保证门禁全覆盖）。
 EXTERNAL_DAEMONS = {"cupolas_d": ("CUPOLAS_ROOT", "cupolas", "daemon")}
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
+
+# noop_hooks 词表（0.1.19 §80 null object）：可缺省钩子（svc_activate/
+# svc_attach/svc_teardown）中无策略需求的子集，列出即引用机制层
+# daemon_svc_<hook>_noop 缺省，svc.c 不再维护空桩副本。
+NOOP_HOOKS_VOCAB = frozenset({"activate", "attach", "teardown"})
+# noop_hooks 规范化序（声明为集合语义，与书写顺序无关）
+NOOP_HOOKS_ORDER = ("activate", "attach", "teardown")
 
 # shutdown：协议保留方法（DAEMON_DECLARE_SHUTDOWN_METHOD 自动注册响应
 # {"status":"shutting_down"}），manifest methods 禁止列入
@@ -181,7 +190,7 @@ def parse_manifest(path):
 
 
 def validate(data, path):
-    """校验 manifest 契约一致性（schema v1 全量规则，见文件头注释）。"""
+    """校验 manifest 契约一致性（schema v3 全量规则，见文件头注释）。"""
     if data.get("manifest_version") != SCHEMA_VERSION:
         raise GenError("%s: manifest_version 必须为 %d" % (path, SCHEMA_VERSION))
 
@@ -222,10 +231,16 @@ def validate(data, path):
                        % (path, sorted(CUPOLAS_MODES), cupolas))
     data["cupolas"] = cupolas
 
-    activate_noop = data.get("activate_noop", False)
-    if not isinstance(activate_noop, bool):
-        raise GenError("%s: activate_noop 须为布尔: %r" % (path, activate_noop))
-    data["activate_noop"] = activate_noop
+    noop_hooks = data.get("noop_hooks") or []
+    if not isinstance(noop_hooks, list):
+        raise GenError("%s: noop_hooks 必须为数组: %r" % (path, noop_hooks))
+    bad = [h for h in noop_hooks if h not in NOOP_HOOKS_VOCAB]
+    if bad:
+        raise GenError("%s: noop_hooks 含词表外钩子 %s（⊆ %s）"
+                       % (path, bad, sorted(NOOP_HOOKS_VOCAB)))
+    if len(set(noop_hooks)) != len(noop_hooks):
+        raise GenError("%s: noop_hooks 存在重复: %s" % (path, noop_hooks))
+    data["noop_hooks"] = [h for h in NOOP_HOOKS_ORDER if h in noop_hooks]
 
     rpc = data.get("rpc")
     if not isinstance(rpc, dict):
@@ -381,9 +396,15 @@ def render_main(d):
     pool = rpc["pool"]
     upper = daemon.upper()
     total_methods = len(rpc["methods"]) + 1  # + 协议保留 shutdown
-    # 激活钩子策略面（0.1.19 §80）：实体户传 svc_activate（src/svc.c
-    # 生命周期钩子），无激活策略户传机制层 daemon_svc_noop 缺省。
-    activate = "daemon_svc_noop" if d["activate_noop"] else "svc_activate"
+    # svc 可缺省钩子策略面（0.1.19 §80）：有策略户传 src/svc.c 生命周期
+    # 钩子，noop_hooks 列出者传机制层 daemon_svc_<hook>_noop 缺省，svc.c
+    # 不再逐户维护空桩副本。
+    noop = frozenset(d["noop_hooks"])
+    activate = ("daemon_svc_activate_noop" if "activate" in noop
+                else "svc_activate")
+    attach = "daemon_svc_attach_noop" if "attach" in noop else "svc_attach"
+    teardown = ("daemon_svc_teardown_noop" if "teardown" in noop
+                else "svc_teardown")
 
     lines = _emit_generated_banner()
     lines += [
@@ -440,9 +461,11 @@ def render_main(d):
     if rpc["concurrent"]:
         lines.append("        .concurrent_clients = 1,")
     lines += [
-        "        DAEMON_BOOT_WIRE(SVC_OPS, SVC_METHODS, %s, "
-        "daemon_dome_init%s, daemon_dome_cleanup),"
-        % (activate, "_pep" if d["cupolas"] == "pep" else ""),
+        "        DAEMON_BOOT_WIRE(SVC_OPS, SVC_METHODS,",
+        "                         %s, %s," % (activate, attach),
+        "                         %s, daemon_dome_init%s,"
+        % (teardown, "_pep" if d["cupolas"] == "pep" else ""),
+        "                         daemon_dome_cleanup),",
         "    };",
         "    return daemon_boot(argc, argv, &boot);",
         "}",
@@ -481,33 +504,25 @@ def render_header(d):
         "void svc_endpoint(daemon_endpoint_t *ep, int cmdline_tcp);",
         "",
     ]
-    if d["activate_noop"]:
-        # 无激活策略户：svc.c 无 svc_activate，声明由机制层
-        # daemon_svc_noop 承担（daemon_main.h），此处不再发出。
-        lines += [
-            "/* 生命周期钩子（实现: src/svc.c）；激活钩子无策略需求，由",
-            " * 机制层 daemon_svc_noop 缺省（daemon_main.h，0.1.19 §80），",
-            " * svc.c 不再维护空桩副本。 */",
-            "int svc_prepare(const char *config_path);",
-            "void svc_teardown(void);",
-            "void svc_destroy(void);",
-        ]
-    else:
-        lines += [
-            "/* 生命周期钩子（实现: src/svc.c）；activate 收到事件驱动句柄与",
-            " * SD bootstrap 句柄，供事件耦合激活策略（如监控采样线程）与",
-            " * manifest deps 驱动的依赖探测健康面使用。 */",
-            "int svc_prepare(const char *config_path);",
-            "int svc_activate(daemon_event_driver_t *driver, daemon_bootstrap_sd_t *bsd);",
-            "void svc_teardown(void);",
-            "void svc_destroy(void);",
-        ]
+    noop = frozenset(d["noop_hooks"])
     lines += [
-        "",
-        "/* 策略层附加装配挂点：静态注册表（SVC_METHODS）落库后的动态",
-        " * 注册出口（如 roadmap.* 方法族）。实现: src/svc.c；无附加",
-        " * 注册的户提供空实现。dispatcher 为 method_dispatcher_t。 */",
-        "void svc_attach(void *dispatcher);",
+        "/* 生命周期钩子（实现: src/svc.c）。prepare/destroy 恒有策略；",
+        " * activate/attach/teardown 无策略需求者（noop_hooks，0.1.19",
+        " * §80）由机制层 daemon_svc_<hook>_noop 缺省（daemon_main.h），",
+        " * 此处不发声明，svc.c 不维护空桩副本。activate 收到事件驱动与",
+        " * SD bootstrap 句柄；attach 为 SVC_METHODS 落库后的动态注册",
+        " * 出口（dispatcher 为 method_dispatcher_t）。 */",
+        "int svc_prepare(const char *config_path);",
+    ]
+    if "activate" not in noop:
+        lines.append("int svc_activate(daemon_event_driver_t *driver, "
+                     "daemon_bootstrap_sd_t *bsd);")
+    if "attach" not in noop:
+        lines.append("void svc_attach(void *dispatcher);")
+    if "teardown" not in noop:
+        lines.append("void svc_teardown(void);")
+    lines += [
+        "void svc_destroy(void);",
         "",
         "/* RPC handler 族（实现: src/svc.c）。签名对齐 method_fn；",
         " * 命名 m_<method>，与 .manifest rpc.methods 一一对应。 */",
