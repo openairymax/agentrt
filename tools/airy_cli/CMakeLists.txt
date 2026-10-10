@@ -58,7 +58,9 @@ add_executable(airy_cli
     # 0.1.17 R5-G5 会话视图：--continue/--resume 读 mem.recent 装配 g_history_*
     src/chat/cli_chat_session.c
     src/cmd/cli_classify.c
-    src/render/cli_think.c
+    # M5-4 §266：cli_think.c 归位 core 域（远端两段式 P-A 主链是引擎壳
+    # 机制，非渲染职责；render 域仅保留展示模块）
+    src/core/cli_think.c
     src/core/cli_dag.c
     # cli_display.c 域拆分（2026-08-27：963 行 → 3 个展示职责模块）
     src/render/cli_display.c
