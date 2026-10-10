@@ -97,15 +97,14 @@ static cJSON *cli_think_rpc_round(const char *prompt, const char *gccp_answers, 
 }
 
 /* think_d 返回的 gccp_questions JSON 数组 -> airy_gccp_probe_t。
- * 问题集来自远端引擎（与本地 probe 同构），prefill.raw_prompt 回填原始
- * 指令供 cli_gccp_interact 的逐问追问使用。OWNER：airy_gccp_probe_free。 */
-static int cli_think_gccp_probe_build(const char *questions_json, const char *raw_prompt,
-                                      airy_gccp_probe_t **out_probe)
+ * 问题集来自远端引擎（与本地 probe 同构）；逐问展示与答案收集是纯
+ * 机制面（cli_gccp_interact），不再回填 prefill。OWNER：airy_gccp_probe_free。 */
+static int cli_think_gccp_probe_build(const char *questions_json, airy_gccp_probe_t **out_probe)
 {
     if (!out_probe)
         return AIRY_ERR_INVALID_PARAM;
     *out_probe = NULL;
-    if (!questions_json || !questions_json[0] || !raw_prompt)
+    if (!questions_json || !questions_json[0])
         return AIRY_ERR_INVALID_PARAM;
 
     cJSON *arr = cJSON_Parse(questions_json);
@@ -121,13 +120,6 @@ static int cli_think_gccp_probe_build(const char *questions_json, const char *ra
         cJSON_Delete(arr);
         return AIRY_ERR_OUT_OF_MEMORY;
     }
-    probe->prefill = (airy_gccp_goal_t *)AIRY_CALLOC(1, sizeof(airy_gccp_goal_t));
-    if (!probe->prefill) {
-        AIRY_FREE(probe);
-        cJSON_Delete(arr);
-        return AIRY_ERR_OUT_OF_MEMORY;
-    }
-    probe->prefill->raw_prompt = AIRY_STRDUP(raw_prompt);
     probe->question_count = (size_t)n;
     probe->questions = (airy_gccp_question_t *)AIRY_CALLOC(
         n > 0 ? (size_t)n : 1u, sizeof(airy_gccp_question_t));
@@ -189,7 +181,7 @@ airy_err_t cli_think_process_remote(const char *input, airy_task_plan_t **out_pl
                                qjson->valuestring :
                                "";
         airy_gccp_probe_t *probe = NULL;
-        int perr = cli_think_gccp_probe_build(qstr, input, &probe);
+        int perr = cli_think_gccp_probe_build(qstr, &probe);
         cJSON_Delete(inner);
         inner = NULL;
         if (perr != AIRY_SUCCESS || !probe)
