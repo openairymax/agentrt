@@ -246,9 +246,27 @@ assess_hardware() {
     printf '%s|%s|%s|%s|%s' "$profile" "$mem_kib" "${mem_avail_kib:-0}" "$nproc_val" "$accel"
 }
 
+# profile.env 为声明式数据（KEY=VALUE，值可含空格），消费侧按数据逐行解析，
+# 绝不 source：空格值会被 shell 逐词求值致第二个词当命令执行（§3.5 缺陷1）。
+profile_load() {
+    local _line _key _val
+    while IFS= read -r _line || [ -n "$_line" ]; do
+        case "$_line" in ''|'#'*) continue ;; esac
+        case "$_line" in *=*) ;; *) continue ;; esac
+        _key="${_line%%=*}"
+        _val="${_line#*=}"
+        case "$_key" in ''|[0-9]*|*[!A-Za-z0-9_]*) continue ;; esac
+        case "$_val" in
+            \"*\") _val="${_val#\"}"; _val="${_val%\"}" ;;
+            \'*\') _val="${_val#\'}"; _val="${_val%\'}" ;;
+        esac
+        export "$_key=$_val"
+    done <"$PROFILE_ENV"
+}
+
 PROFILE_ENV="$AIRY_HOME/config/profile.env"
 if [ -f "$PROFILE_ENV" ]; then
-    . "$PROFILE_ENV"
+    profile_load
 fi
 
 AIRYRT_PROFILE_RAW="${AIRYRT_PROFILE:-${AIRY_PROFILE:-auto}}"
