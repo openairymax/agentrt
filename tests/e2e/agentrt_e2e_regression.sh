@@ -83,6 +83,26 @@ rpc_err() {
     fi
 }
 
+# rpc_biz <ns.method> <params_json> [desc] —— 断言 result 信封内的业务层失败
+# 错误分层契约（缺陷 #2）：JSON-RPC error 信封仅承载协议/传输失败；工具业务
+# 结果（含 success:0）必须走 result 信封并透传 error_code，绝不能被误报为
+# -32603 "Service unreachable"。此断言刻意不复检顶层 "error" 键——业务结果
+# 自身就带 "error" 文案字段。
+rpc_biz() {
+    local method="$1" params="$2" desc="${3:-$1}"
+    local resp
+    resp=$(curl -fsS -m 10 -X POST -H 'Content-Type: application/json' \
+        -d "{\"jsonrpc\":\"2.0\",\"method\":\"$method\",\"params\":$params,\"id\":1}" "$GW" 2>/dev/null)
+    if [ -z "$resp" ]; then
+        fail "$desc: 无响应"
+    elif echo "$resp" | grep -q '"result"' && echo "$resp" | grep -q '"success":0' \
+         && echo "$resp" | grep -q '"error_code"'; then
+        ok "$desc"
+    else
+        fail "$desc => $(echo "$resp" | head -c 200)"
+    fi
+}
+
 log "=== agentrt E2E 回归开始（gateway: ${GW}, 时间戳: ${TS}）==="
 
 # ── gateway ────────────────────────────────────────────────────────────────
@@ -109,7 +129,7 @@ rpc tool.health_check '{}' "tool.health_check"
 rpc tool.get_stats '{}' "tool.get_stats"
 rpc tool.pending '{}' "tool.pending"
 rpc_err tool.approve '{"request_id":"x","decision":"allow"}' -32602 "tool.approve(无审批请求, 错误路径)"
-rpc_err tool.execute_tool '{"tool_id":"nope","params":{}}' -32603 "tool.execute_tool(未注册, 错误路径)"
+rpc_biz tool.execute_tool '{"tool_id":"nope","params":{}}' "tool.execute_tool(未注册, 业务错误透传非 unreachable)"
 [ "$SKIP_EXTERNAL" = 0 ] && rpc_err tool.register '{"tool":{}}' -32602 "tool.register(缺字段, 错误路径)"
 
 # ── hook（notify_d hook 面，R7 并户）────────────────────────────────────────
