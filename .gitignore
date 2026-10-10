@@ -39,6 +39,9 @@
 !LICENSES/**
 # M1-1b 模块链接白名单单一权威（airy_depgraph --links 构建期门禁消费）
 !link-whitelist.txt
+# 0.1.19 G1 公开功能面符号基线（tools 门禁 Gate 26 功能守恒判据 SSoT，
+# 与工件同宿：改面随 PR 记账，双向 fail-closed 自包含）
+!g1-symbol-baseline.txt
 # ---------------------------------------------------------------------------
 # 管理仓必要工具（CMake/README/CHANGELOG 正式引用，须入库）：
 # - tools/codegen: syscall.xml SSoT codegen 生成器（CMake 构建与 CI 防漂移校验依赖）
