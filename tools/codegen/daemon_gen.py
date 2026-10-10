@@ -96,7 +96,7 @@ import re
 import sys
 from pathlib import Path
 
-GENERATOR_VERSION = "1.13.0"
+GENERATOR_VERSION = "1.13.1"
 
 # 生成产物相对 daemon 目录的固定落点（保持稳定，勿随意改名）
 OUTPUT_MAIN = "src/main.c"
@@ -122,7 +122,7 @@ SCHEMA_VERSION = 3
 
 # noop_hooks 词表（0.1.19 §80 null object）：可缺省钩子（svc_activate/
 # svc_attach/svc_teardown）中无策略需求的子集，列出即引用机制层
-# daemon_svc_<hook>_noop 缺省，svc.c 不再维护空桩副本。
+# svc_<hook>_noop 缺省，svc.c 不再维护空桩副本。
 NOOP_HOOKS_VOCAB = frozenset({"activate", "attach", "teardown"})
 # noop_hooks 规范化序（声明为集合语义，与书写顺序无关）
 NOOP_HOOKS_ORDER = ("activate", "attach", "teardown")
@@ -397,14 +397,12 @@ def render_main(d):
     upper = daemon.upper()
     total_methods = len(rpc["methods"]) + 1  # + 协议保留 shutdown
     # svc 可缺省钩子策略面（0.1.19 §80）：有策略户传 src/svc.c 生命周期
-    # 钩子，noop_hooks 列出者传机制层 daemon_svc_<hook>_noop 缺省，svc.c
+    # 钩子，noop_hooks 列出者传机制层 svc_<hook>_noop 缺省，svc.c
     # 不再逐户维护空桩副本。
     noop = frozenset(d["noop_hooks"])
-    activate = ("daemon_svc_activate_noop" if "activate" in noop
-                else "svc_activate")
-    attach = "daemon_svc_attach_noop" if "attach" in noop else "svc_attach"
-    teardown = ("daemon_svc_teardown_noop" if "teardown" in noop
-                else "svc_teardown")
+    activate = "svc_activate_noop" if "activate" in noop else "svc_activate"
+    attach = "svc_attach_noop" if "attach" in noop else "svc_attach"
+    teardown = "svc_teardown_noop" if "teardown" in noop else "svc_teardown"
 
     lines = _emit_generated_banner()
     lines += [
@@ -508,7 +506,7 @@ def render_header(d):
     lines += [
         "/* 生命周期钩子（实现: src/svc.c）。prepare/destroy 恒有策略；",
         " * activate/attach/teardown 无策略需求者（noop_hooks，0.1.19",
-        " * §80）由机制层 daemon_svc_<hook>_noop 缺省（daemon_main.h），",
+        " * §80）由机制层 svc_<hook>_noop 缺省（daemon_main.h），",
         " * 此处不发声明，svc.c 不维护空桩副本。activate 收到事件驱动与",
         " * SD bootstrap 句柄；attach 为 SVC_METHODS 落库后的动态注册",
         " * 出口（dispatcher 为 method_dispatcher_t）。 */",
