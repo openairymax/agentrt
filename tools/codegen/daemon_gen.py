@@ -70,6 +70,13 @@
 #                                           # 禁绝对路径与 .. 上跳，须 .c 结尾
 #   }
 #
+# 组合代数（门禁 G14，装配期 fail-closed）: 装配声明即 ⊗ 的操作数清单
+# ——facades=形态面 F、modules=原子件 A/C、slots=能力格、deps=⊙ 编排
+# 目标。⊗ 五性质在此一次判定：幂等律（面/格/件名去重）、类型律（件名
+# 合法 + 源文件真实存在）、地位律（F⊗F 非法，件名不得与形态面同名）、
+# 闭合律（⊙ 目标须为合法 daemon 名且非自依赖）、结合律（装配为无序
+# 并集语义，分组不改结果）。
+#
 # 两种模式:
 #   --gen   重新生成并写回产物（修改 .manifest 后使用）
 #   --check 与仓库现有产物 diff，不一致返回非零退出码（CI 防漂移）
@@ -300,6 +307,56 @@ def validate(data, path):
     return data
 
 
+def check_algebra(data, path, daemon_dir):
+    """组合代数 ⊗ 五性质装配期判定（门禁 G14，fail-closed，勿降级告警）。
+
+    装配声明即 ⊗ 的操作数清单：facades=形态面 F、modules=原子件 A/C、
+    slots=能力格、deps=⊙ 编排目标。五性质一次判定——幂等律（同件重复
+    装配无额外语义：面/格/件名不得重复）、类型律（A×A→C/F：件名须为
+    标识符、源文件须真实存在）、地位律（F⊗F 非法：件名不得与形态面
+    同名，面间只能 ⊙）、闭合律（⊙ 目标须为合法 daemon 名且非自依赖）、
+    结合律（装配为无序并集，分组不改结果，由幂等去重与无序判定共同
+    保证）。
+    """
+    facades = data["facades"]
+    if len(set(facades)) != len(facades):
+        raise GenError("%s: 幂等律违例──形态面重复装配: %s" % (path, facades))
+    slots = data["slots"]
+    if len(set(slots)) != len(slots):
+        raise GenError("%s: 幂等律违例──能力格重复装配: %s" % (path, slots))
+
+    daemon = data["daemon"]
+    names = set()
+    for mod in data["modules"]:
+        name = mod["name"]
+        if not isinstance(name, str) or not RE_IDENT.match(name):
+            raise GenError("%s: 类型律违例──原子件名非法（小写下划线标识符）: %r"
+                           % (path, name))
+        if name in FACADES_VOCAB:
+            raise GenError("%s: 地位律违例──F⊗F 非法，原子件名 %r 与形态面"
+                           "同名（面之间只能 ⊙ 编排）" % (path, name))
+        if name in names:
+            raise GenError("%s: 幂等律违例──原子件重复装配: %s" % (path, name))
+        names.add(name)
+        for src in mod["sources"]:
+            if not (Path(daemon_dir) / "src" / src).is_file():
+                raise GenError("%s: 类型律违例──原子件源文件不存在: src/%s"
+                               % (path, src))
+
+    deps = data.get("deps") or {}
+    for group in ("required", "optional"):
+        targets = deps.get(group) or []
+        if not isinstance(targets, list):
+            raise GenError("%s: 闭合律违例──deps.%s 必须为数组" % (path, group))
+        for dep in targets:
+            if not isinstance(dep, str) or not RE_DAEMON.match(dep):
+                raise GenError("%s: 闭合律违例──deps.%s 含非法 daemon 名: %r"
+                               % (path, group, dep))
+            if dep == daemon:
+                raise GenError("%s: 闭合律违例──deps.%s 自依赖: %s"
+                               % (path, group, dep))
+
+
 def _emit_generated_banner():
     """生成产物头（SPDX + @generated 标记，禁止手工修改）。"""
     return [
@@ -520,6 +577,7 @@ def generate(manifest_path):
     manifest_path = Path(manifest_path).resolve()
     daemon_dir = manifest_path.parent
     d = validate(parse_manifest(manifest_path), manifest_path)
+    check_algebra(d, manifest_path, daemon_dir)
     daemon = d["daemon"]
     contents = {
         OUTPUT_MAIN: render_main(d),

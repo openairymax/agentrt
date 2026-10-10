@@ -95,6 +95,16 @@ jobs:
         run: |
           python3 tools/codegen/daemon_gen.py --check
 
+      # G14 组合代数 ⊗ 五性质用例（0.1.19 台账 L8713）：类型/地位/闭合/
+      # 结合/幂等 + ⊙ 单位元，正反双向断言，末段以真实 .manifest 端到端
+      # 复核。纯 python3 标准库，复用上一步已就位的 .manifest 与
+      # CUPOLAS_ROOT 外户，无需额外克隆。
+      - name: Verify composition algebra (G14 ⊗ five laws)
+        env:
+          CUPOLAS_ROOT: ${{ runner.temp }}/cupolas-host/cupolas
+        run: |
+          python3 tools/codegen/tests/test_algebra.py
+
   # 用户态 SSoT 技术点权威源门禁：registry 登记的 agentrt 技术点权威源
   # 与物理宿主路径必须全部存在，登记了不存在的路径即 CI 失败（漂移门禁）。
   # registry 与校验脚本位于伞仓数据（docs / tools / agent-workload），
