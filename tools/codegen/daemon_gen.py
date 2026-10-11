@@ -5,8 +5,8 @@
 # daemon_gen.py — agentrt daemon 五件套样板生成器（L3 SSoT）
 #
 # 解析 daemons/<name>/.manifest 契约源（每户唯一真值源），生成三件：
-#   a. src/main.c            入口策略面（符号宏实例化 + DAEMON_BOOT_WIRE
-#                            接线 + daemon_boot_t 策略包填充；装配机制
+#   a. src/main.c            入口策略面（符号宏实例化 + DAEMON_BOOT_FILL
+#                            策略包填充 + DAEMON_BOOT_WIRE 接线；装配机制
 #                            收敛于 daemon_boot.c）
 #   b. include/svc_<d>.h     唯一私有头（端点常量 + svc 钩子/handler 声明
 #                            + SVC_<D>_METHODS(X) 方法表清单）
@@ -96,7 +96,7 @@ import re
 import sys
 from pathlib import Path
 
-GENERATOR_VERSION = "1.13.1"
+GENERATOR_VERSION = "1.13.2"
 
 # 生成产物相对 daemon 目录的固定落点（保持稳定，勿随意改名）
 OUTPUT_MAIN = "src/main.c"
@@ -388,8 +388,8 @@ def _emit_generated_banner():
 
 
 def render_main(d):
-    """渲染 src/main.c：入口策略面（静态表 + DAEMON_BOOT_WIRE 接线宏 +
-    策略包填充），机制在 daemon_boot.c（daemon_main.h）。"""
+    """渲染 src/main.c：入口策略面（静态表 + DAEMON_BOOT_FILL 策略包
+    填充 + DAEMON_BOOT_WIRE 接线），机制在 daemon_boot.c（daemon_main.h）。"""
     daemon = d["daemon"]
     cname = d["cname"]
     rpc = d["rpc"]
@@ -437,28 +437,11 @@ def render_main(d):
         "int main(int argc, char **argv)",
         "{",
         "    daemon_boot_t boot = {",
-        '        .daemon = "%s",' % daemon,
-        '        .cname = "%s",' % cname,
-        '        .env_debug = "AIRY_%s_DEBUG",' % upper,
-        '        .sd_type = "%s",' % d["sd_type"],
-        '        .tags = "%s",' % rpc["tags"],
-        "        .method_total = %d," % total_methods,
-        "        .running_lock = &g_running_lock_%s," % daemon,
-        "        .signal_handler = signal_handler_%s," % daemon,
-        "        .log_toggle = svc_log_toggle_handler_%s," % daemon,
-        "        .print_usage = print_usage_%s," % daemon,
-        "        .on_client = daemon_on_client_%s," % daemon,
-        "        .dispatcher = &g_dispatcher_%s," % daemon,
-        "        .event_driver = &g_event_driver_%s," % daemon,
-        "        .bsd = &g_bsd_%s," % daemon,
-        "        .pool_max_events = %d," % pool["max_events"],
-        "        .pool_min = %d," % pool["min"],
-        "        .pool_max = %d," % pool["max"],
-        "        .pool_queue = %d," % pool["queue"],
-    ]
-    if rpc["concurrent"]:
-        lines.append("        .concurrent_clients = 1,")
-    lines += [
+        '        DAEMON_BOOT_FILL(%s, "%s", "AIRY_%s_DEBUG",' % (daemon, cname, upper),
+        '                         "%s", "%s", %d, %d, %d, %d, %d, %d)'
+        % (d["sd_type"], rpc["tags"], total_methods,
+           pool["max_events"], pool["min"], pool["max"], pool["queue"],
+           1 if rpc["concurrent"] else 0),
         "        DAEMON_BOOT_WIRE(SVC_OPS, SVC_METHODS,",
         "                         %s, %s," % (activate, attach),
         "                         %s, daemon_dome_init%s,"
