@@ -231,52 +231,6 @@ void cli_print_plain(const char *text, size_t indent)
     }
 }
 
-/* ---- progressive disclosure ---- */
-
-void cli_render_collapsed(const char *text, size_t indent, size_t max_lines, int weak)
-{
-    if (!text) return;
-    if (max_lines < 1) max_lines = 1;
-
-    const char *cut = text;
-    size_t shown = 0;
-    while (shown < max_lines && *cut) {
-        const char *nl = strchr(cut, '\n');
-        if (!nl) { cut = cut + strlen(cut); shown++; break; }
-        cut = nl + 1;
-        shown++;
-    }
-
-    size_t total = shown;
-    if (*cut) {
-        for (const char *q = cut; *q; q++)
-            if (*q == '\n') total++;
-        if (*cut) total++;
-    }
-
-    if (weak) cli_out(cli_c(CLR_DIM));
-    if (cut > text) {
-        size_t plen = (size_t)(cut - text);
-        char *prefix = (char *)AIRY_MALLOC(plen + 1);
-        if (!prefix) return;
-        AIRY_MEMCPY(prefix, text, plen);
-        prefix[plen] = '\0';
-        cli_print_plain(prefix, indent);
-        AIRY_FREE(prefix);
-    }
-
-    if (total > shown) {
-        char trailer[96];
-        snprintf(trailer, sizeof(trailer), "└ … %zu more lines (collapsed)",
-                 total - shown);
-        const char *g = cli_gutter(indent);
-        cli_out(g);
-        cli_out(trailer);
-        cli_outc('\n');
-    }
-    if (weak) cli_out(cli_c(CLR_RESET));
-}
-
 /* ---- status helpers ---- */
 
 /* 单一事实源：执行体的终态与失败态判定。sched_d 与工作大厅的终态串为
