@@ -19,7 +19,7 @@ void tui_get_size(cli_tui_t *t)
     if (!t)
         return;
     /* 复用 cli_term_size 的完整回退链（ioctl → COLUMNS/LINES → 默认
-     * 24/80），与 cli_term_header_pin 的 rows 计算保持同步。 */
+     * 24/80）。 */
     int rows = 0, cols = 0;
     cli_term_size(&rows, &cols);
     t->rows = (rows > 0) ? rows : 24;

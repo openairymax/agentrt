@@ -397,22 +397,6 @@ const char *cli_chat_t1f_cached(void)
     return s_t1f;
 }
 
-/* 2.1.1.2 修复：t1-p（PROF）模型缓存——GCCP 意图确认（[Dual Prof Think]）
- * 使用该模型槽，与 CLI 渲染标签一致。配置源与 t1f 同（cli_think_cfg_load：
- * env > model.yaml think 段 > 默认）。非 static：cli_chat_gccp.c 的
- * cli_gccp_interact 逐问确认调用（原型见 cli_internal.h）。 */
-const char *cli_chat_t1p_cached(void)
-{
-    static char s_t1p[128];
-    static int s_loaded = 0;
-    if (!s_loaded) {
-        s_loaded = 1;
-        char t2[128], t1f[128];
-        cli_think_cfg_load(t2, sizeof(t2), t1f, sizeof(t1f), s_t1p, sizeof(s_t1p));
-    }
-    return s_t1p;
-}
-
 cli_actor_t cli_chat_think_actor(void)
 {
     const char *t1f = cli_chat_t1f_cached();

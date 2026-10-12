@@ -95,20 +95,6 @@ const char *cli_theme_seq(cli_theme_t th);
 void cli_term_size(int *out_rows, int *out_cols);
 
 /**
- * @brief Lock the scrolling region below the fixed header.
- *
- * Prints "\033[<top>;<bottom>r" then homes the cursor to the first line of
- * the region, so every subsequent newline scrolls only inside the region and
- * the header lines above it stay pinned. No-op when stdout is not a TTY.
- *
- * @param header_lines number of pinned header lines (>= 1)
- * @param footer_lines lines reserved below the scroll region (>= 0); a
- *        positive value keeps a fixed bottom strip (e.g. the input line in
- *        the three-zone layout) that the dialogue never scrolls over.
- */
-void cli_term_header_pin(int header_lines, int footer_lines);
-
-/**
  * @brief Release the pinned header: restore full-screen scrolling.
  *
  * Prints "\033[r" (entire screen scrolls again). No-op when stdout is not a
@@ -126,7 +112,7 @@ void cli_term_cursor_to(int row, int col);
 
 /* ---- fixed bottom input strip (three-zone layout helpers) ----
  *
- * cli_term_header_pin() 保留的 footer 行构成输入区：对话滚动区在其上方，
+ * 底部输入条由 scroll region 之下的 footer 行构成：对话滚动区在其上方，
  * 底部输入行固定可见。以下助手仅当「TTY + 底部条已保留」时生效，否则
  * no-op / 返回 0，piped / logged 输出保持传统换行提示符布局。
  */

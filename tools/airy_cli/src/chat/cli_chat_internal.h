@@ -7,7 +7,7 @@
  *
  * 原 cli_chat.c（802 行）按功能域拆分后，跨文件共享的内部函数声明
  * 统一收敛于此；cli_internal.h 的公共 API 不变
- * （cli_classify_input / cli_chat_t1p_cached 等公共原型仍在 cli_internal.h）。
+ * （cli_classify_input 等公共原型仍在 cli_internal.h）。
  * 此头仅限 airy_cli/src 内部使用。
  */
 

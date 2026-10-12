@@ -233,25 +233,6 @@ size_t cli_disp_width_of(const char *s, size_t n);
 size_t cli_utf8_safe_len(const char *s, size_t max_bytes);
 
 /**
- * @brief Render a long text collapsed to at most `max_lines` lines.
- *
- * Progressive disclosure (Claude Code / Codex convention): only the first
- * `max_lines` lines are shown, followed by a dim "└ … N more lines" trailer
- * so a verbose block cannot flood the terminal. Intended for bounded text the
- * caller itself chose to display (e.g. the GCCP intent-convergence note);
- * it must NOT be used to surface the model's raw chain-of-thought — since
- * 0.1.18 B4 that channel is hidden by default (see cli_chat_finalize.c).
- * Any retention of the full text is the caller's concern, not this helper's.
- *
- * @param text      raw text (may contain \n and markdown markers)
- * @param indent    left gutter width in spaces
- * @param max_lines maximum fully rendered lines (>= 1)
- * @param weak      non-zero renders the body dim (secondary note that must
- *                  never compete with the reply)
- */
-void cli_render_collapsed(const char *text, size_t indent, size_t max_lines, int weak);
-
-/**
  * @brief Return a left gutter of `indent` spaces (shared static buffer).
  */
 const char *cli_gutter(size_t indent);
