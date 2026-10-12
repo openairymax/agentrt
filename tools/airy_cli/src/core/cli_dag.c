@@ -621,34 +621,3 @@ int cli_dag_node_board_tick(cli_dag_board_t *b, const cli_dag_snapshot_t *snap)
 
     return terminal ? 1 : 0;
 }
-
-/* Remote DAG per-node state snapshot (live plan board feeder): parses
- * dag_status and reports every node's (id, state) through cb without
- * printing anything — the live plan board renders the block itself.
- * Returns 1 once a terminal state is observed, 0 otherwise. */
-int cli_dag_board_snapshot(const cli_dag_snapshot_t *snap,
-                           void (*cb)(const char *node_id, const char *state))
-{
-    if (!snap || !snap->root || !cb)
-        return 0;
-
-    const char *status = cli_dag_snapshot_state(snap);
-    int terminal = cli_state_terminal(status);
-
-    cJSON *nodes = cJSON_GetObjectItem(snap->root, "nodes");
-    int nsz = (nodes && cJSON_IsArray(nodes)) ? cJSON_GetArraySize(nodes) : 0;
-    for (int i = 0; i < nsz; i++) {
-        cJSON *nj = cJSON_GetArrayItem(nodes, i);
-        if (!nj)
-            continue;
-        cJSON *nid = cJSON_GetObjectItem(nj, "id");
-        cJSON *nst = cJSON_GetObjectItem(nj, "status");
-        if (cJSON_IsString(nid) && nid->valuestring) {
-            const char *st_s = (cJSON_IsString(nst) && nst->valuestring) ? nst->valuestring
-                                                                         : "pending";
-            cb(nid->valuestring, st_s);
-        }
-    }
-
-    return terminal ? 1 : 0;
-}
