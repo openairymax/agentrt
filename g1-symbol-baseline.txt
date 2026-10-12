@@ -381,10 +381,8 @@ heapstore_syscall_session_save
 heapstore_syscall_trace_export
 heapstore_syscall_trace_save
 jsonrpc_build_error
-jsonrpc_build_error_with_data
 jsonrpc_build_notification
 jsonrpc_build_success
-jsonrpc_build_success_string
 jsonrpc_get_array_param
 jsonrpc_get_bool_param
 jsonrpc_get_error_message
