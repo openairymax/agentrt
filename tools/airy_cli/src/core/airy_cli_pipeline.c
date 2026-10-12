@@ -258,7 +258,7 @@ int cli_blueprint_fastpath(const char *input, uint64_t turn_start)
             } else if (g_cli_print_mode) {
                 cli_trace("blueprint",
                           "L2 semantic cache hit (low token): replaying last result");
-                cli_render_markdown(sugg, 0);
+                cli_print_plain(sugg, 0);
             } else {
                 cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
                                      "L2 semantic cache hit (low token): replaying last result");

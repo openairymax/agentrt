@@ -45,9 +45,9 @@ void cli_print_result(const char *result)
         cJSON *agent = cJSON_GetObjectItem(root, "agent_id");
         if (output && cJSON_IsString(output)) {
             /* One-shot server mode (-p)：stdout 保持纯净可管道，跳过角色行
-             * 前缀，直接渲染结果内容（markdown 归一化，[code] 归一为 ```）。 */
+             * 前缀，模型原始文本 plain 直印（0.1.19 直印化，不做显示期归一）。 */
             if (g_cli_print_mode) {
-                cli_render_markdown(output->valuestring, 0);
+                cli_print_plain(output->valuestring, 0);
                 cJSON_Delete(root);
                 return;
             }
@@ -59,7 +59,7 @@ void cli_print_result(const char *result)
                 cli_render_role_line(CLI_ROLE_SUPER_AGENT, CLI_ACTOR_SUPER_AGENT, "result",
                                      "Execution finished.");
             }
-            cli_render_markdown(output->valuestring, 4);
+            cli_print_plain(output->valuestring, 4);
             cJSON_Delete(root);
             return;
         }
