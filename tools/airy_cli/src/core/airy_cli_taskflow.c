@@ -204,7 +204,7 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
     }
 
     /* 提交唯一通路：plan → gateway → sched_d；失败即错误可见化，不做本地降级 */
-    cli_live_board_begin(plan);
+    cli_print_plan_list(plan);
     char *exec_id = NULL;
     err = cli_dag_submit_remote(plan, input, rt->main_workspace_dir, &exec_id);
     if (err != AIRY_EOK || !exec_id) {
@@ -230,9 +230,6 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
     double last_progress = -1.0;
     for (;;) {
         int input_rc = cli_task_poll_input();
-        if (input_rc == 1) {
-            cli_live_board_done();
-        }
         if (input_rc < 0) {
             cli_spinner_stop(0, "aborted");
             spin_running = 0;
@@ -267,13 +264,9 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
         AIRY_FREE(final_result);
         if (node_board) {
             cli_spinner_pause();
-            if (cli_board_active())
-                cli_dag_board_snapshot(snap, cli_live_board_set_node);
-            else {
-                int nb_terminal = cli_dag_node_board_tick(node_board, snap);
-                if (nb_terminal)
-                    cli_dag_node_board_destroy(node_board), node_board = NULL;
-            }
+            int nb_terminal = cli_dag_node_board_tick(node_board, snap);
+            if (nb_terminal)
+                cli_dag_node_board_destroy(node_board), node_board = NULL;
             cli_spinner_resume();
         }
         cli_dag_snapshot_free(snap);
@@ -282,8 +275,7 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
              * failed / canceled 一并按失败呈现，避免把「无产出」误报为成功。 */
             run_failed = cli_state_failed(cur_state);
             cli_spinner_pause();
-            if (!cli_live_board_refresh(cur_state, cur_progress))
-                cli_board_line("sched_d", exec_id, cur_state, cur_progress);
+            cli_board_line("sched_d", exec_id, cur_state, cur_progress);
             cli_spinner_stop(!run_failed, NULL);
             spin_running = 0;
             done = 1;
@@ -294,8 +286,7 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
             (cur_progress - last_progress) >= 0.01 || (cur_progress - last_progress) <= -0.01;
         if (state_changed || prog_changed) {
             cli_spinner_pause();
-            if (!cli_live_board_refresh(cur_state, cur_progress))
-                cli_board_line("sched_d", exec_id, cur_state, cur_progress);
+            cli_board_line("sched_d", exec_id, cur_state, cur_progress);
             cli_spinner_resume();
             snprintf(last_state, sizeof(last_state), "%s", cur_state);
             last_progress = cur_progress;
@@ -325,7 +316,6 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
     if (spin_running) {
         if (board_polls > 0 && stale_polls >= 10) {
             cli_spinner_pause();
-            cli_live_board_extra();
             cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_THINK, "sched_d",
                                  "still running, waiting for completion ...");
             cli_spinner_resume();
@@ -344,9 +334,6 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
     if (wait_threaded) {
         while (!wctx.done && !g_cli_cancel) {
             int input_rc = cli_task_poll_input();
-            if (input_rc == 1) {
-                cli_live_board_done();
-            }
             if (input_rc < 0)
                 break;
             airy_sleep_ms(200);
@@ -360,17 +347,6 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
     }
     cli_trace("wait", "%s done err=%d has_result=%d", CLI_ICON_DONE, (int)err,
               result ? 1 : 0);
-    if (spin_running && cli_board_active() && !g_cli_cancel) {
-        cli_dag_snapshot_t *snap = cli_dag_snapshot_fetch(exec_id);
-        if (snap) {
-            cli_dag_board_snapshot(snap, cli_live_board_set_node);
-            cli_dag_snapshot_free(snap);
-        }
-        cli_spinner_pause();
-        cli_live_board_refresh((err == AIRY_EOK && result) ? "completed" : "failed",
-                               1.0);
-        cli_spinner_resume();
-    }
     if (spin_running) {
         if (g_cli_cancel)
             cli_spinner_stop(0, "aborted");
