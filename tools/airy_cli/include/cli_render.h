@@ -266,22 +266,16 @@ const char *cli_gutter_pad(size_t indent);
 const char *cli_render_actor_name(cli_actor_t actor);
 
 /**
- * @brief Render a lightweight markdown subset to stdout with a left gutter.
+ * @brief Print raw text verbatim with a left gutter (plain mode).
  *
- * Supported while keeping the output clean over plain terminals:
- *   - headings  (# / ## / ###)
- *   - bullets   (- / * items)
- *   - GFM task checkboxes (- [ ] / - [x])
- *   - numbered lists (1. 2. ...)
- *   - quotes    (> line)
- *   - inline    **bold**, *emph*, `code`
- *   - fenced code blocks (``` ... ```) printed verbatim with a gray gutter
- *   - pipe tables degrade to aligned key/value rows
+ * Line-oriented pass-through: no markdown parsing, no ANSI styling, no
+ * protocol normalization. 0.1.19 直印化：行式 REPL 的内容输出为 plain 直印，
+ * markdown 排版体验由 agentrt-tui（sdk/tui）承接。
  *
- * @param text   raw text (may contain \n and markdown markers)
+ * @param text   raw text (may contain \n)
  * @param indent left gutter width in spaces
  */
-void cli_render_markdown(const char *text, size_t indent);
+void cli_print_plain(const char *text, size_t indent);
 
 /**
  * @brief Print a role-tagged line: "[<actor>] <content>".

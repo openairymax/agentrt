@@ -7,8 +7,10 @@
  *
  * Split layout (2026-08-27):
  *   cli_render.c         — output primitives, color, meter, status helpers, spinner
- *   airy_cli_markdown.c  — markdown parser, inline formatting, tool rendering
- *   airy_cli_output.c    — role lines, progress bars, turn separators
+ *   airy_cli_output.c    — role lines, tool cards, progress bars, turn separators
+ *
+ * 0.1.19 直印化：markdown 排版渲染（原 airy_cli_markdown.c）清退，内容输出
+ * 收口为 cli_print_plain 的 plain 直印，排版体验由 agentrt-tui（sdk/tui）承接。
  *
  * A stream-safe, line-oriented renderer. No TTY capture and no curses: every
  * function prints directly to stdout so the CLI behaves identically on a
@@ -212,6 +214,23 @@ const char *cli_render_actor_name(cli_actor_t actor)
     }
 }
 
+/* ---- plain text emitter ---- */
+
+void cli_print_plain(const char *text, size_t indent)
+{
+    if (!text) return;
+    const char *g = cli_gutter(indent);
+    const char *p = text;
+    while (p && *p) {
+        const char *nl = strchr(p, '\n');
+        size_t len = nl ? (size_t)(nl - p) : strlen(p);
+        cli_out(g);
+        cli_outn(p, len);
+        cli_outc('\n');
+        p = nl ? nl + 1 : NULL;
+    }
+}
+
 /* ---- progressive disclosure ---- */
 
 void cli_render_collapsed(const char *text, size_t indent, size_t max_lines, int weak)
@@ -242,7 +261,7 @@ void cli_render_collapsed(const char *text, size_t indent, size_t max_lines, int
         if (!prefix) return;
         AIRY_MEMCPY(prefix, text, plen);
         prefix[plen] = '\0';
-        cli_render_markdown(prefix, indent);
+        cli_print_plain(prefix, indent);
         AIRY_FREE(prefix);
     }
 
