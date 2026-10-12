@@ -383,15 +383,9 @@ heapstore_syscall_trace_save
 jsonrpc_build_error
 jsonrpc_build_notification
 jsonrpc_build_success
-jsonrpc_get_array_param
-jsonrpc_get_bool_param
 jsonrpc_get_error_message
-jsonrpc_get_int_param
 jsonrpc_get_object_param
 jsonrpc_get_string_param
-jsonrpc_is_batch_request
-jsonrpc_is_notification
-jsonrpc_parse_request
 jsonrpc_parse_request_ptr
 jsonrpc_route_response
 jsonrpc_validate_request
