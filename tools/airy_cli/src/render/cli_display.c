@@ -7,16 +7,14 @@
  *
  * 结果呈现门面：执行结果 pretty-print（JSON 提取 output/agent_id）、静态
  * 执行计划列表（拓扑序）、节点级进度回调分发与降级看板行。自 2026-08-27
- * 起本文件只保留这三块职责：live plan board（TTY 原位重绘）拆至
- * cli_live_board.c，启动横幅（蓝框 hero）拆至 cli_banner.c。跨文件的
- * 拓扑序 helper（cli_plan_topo_build）与 UTF-8 安全截断
- * （cli_hero_clip）经 cli_display_internal.h 共享，保证静态计划与重绘
- * 看板的节点次序、截断观感一致。所有终端输出仍走角色化渲染层
+ * 起本文件只保留这三块职责：live plan board（TTY 原位重绘）已于 0.1.19
+ * 随 sdk/tui 承接该能力格而清退，启动横幅（蓝框 hero）拆至
+ * cli_banner.c。拓扑序 helper（cli_plan_topo_build）为本文件私有
+ * static，保证静态计划的节点次序确定。所有终端输出仍走角色化渲染层
  * （cli_render.c），整个 CLI 共享一套视觉语言。
  */
 
 #include "cli_internal.h"
-#include "cli_display_internal.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -130,14 +128,14 @@ static int cli_plan_ready(const airy_task_plan_t *plan, size_t idx,
 
 /**
  * @brief Fill `order` with the topological order of the first `count`
- *        plan nodes (see cli_display_internal.h for the contract).
+ *        plan nodes (dependencies first, cycles/missing sources fall
+ *        back to natural order so the render never stalls).
  *
- * Kahn-free greedy selection identical to the original duplicated loops in
- * cli_print_plan_list()/cli_live_board_begin(); cycles fall back to natural
- * order so the render never stalls.
+ * Greedy selection; `scratch` is a caller-provided zero-initialized
+ * `count`-byte workspace. Returns 1 on success, 0 to skip rendering.
  */
-int cli_plan_topo_build(const airy_task_plan_t *plan, size_t count, size_t *order,
-                        unsigned char *scratch)
+static int cli_plan_topo_build(const airy_task_plan_t *plan, size_t count, size_t *order,
+                               unsigned char *scratch)
 {
     if (!plan || !order || !scratch || count == 0 || plan->task_plan_node_count == 0)
         return 0;
