@@ -67,9 +67,9 @@ add_executable(airy_cli
     src/render/cli_display.c
     src/render/cli_banner.c
     src/cmd/cli_cmds.c
-    # cli_render.c 域拆分（2026-08-27：1695 行 → 3 个渲染职责模块）
+    # cli_render.c 域拆分（2026-08-27：1695 行 → 3 个渲染职责模块；
+    # 0.1.19 直印化：airy_cli_markdown.c 清退 → 2 个）
     src/render/cli_render.c
-    src/render/airy_cli_markdown.c
     src/render/airy_cli_output.c
     src/core/cli_term.c
     # TUI 引擎（2026-08-27 域拆分：cli_tui.c 3988 行 → 7 文件）
@@ -254,8 +254,8 @@ if(BUILD_TESTS)
     if(NOT WIN32)
         add_executable(test_cli_approval tests/test_cli_approval.c
                        src/cmd/airy_cli_cmd_approval.c src/cmd/cli_gw.c
-                       src/render/cli_render.c src/render/airy_cli_markdown.c
-                       src/render/airy_cli_output.c src/core/cli_term.c)
+                       src/render/cli_render.c src/render/airy_cli_output.c
+                       src/core/cli_term.c)
         target_include_directories(test_cli_approval PRIVATE ${CLI_INC_DIRS})
         target_compile_definitions(test_cli_approval PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
         if(AIRY_CJSON_INCLUDE_DIRS)
@@ -281,8 +281,7 @@ if(BUILD_TESTS)
         add_executable(test_cli_session tests/test_cli_session.c
                        src/chat/cli_chat_session.c src/chat/cli_chat_history.c
                        src/cmd/cli_gw.c src/render/cli_render.c
-                       src/render/airy_cli_markdown.c src/render/airy_cli_output.c
-                       src/core/cli_term.c)
+                       src/render/airy_cli_output.c src/core/cli_term.c)
         target_include_directories(test_cli_session PRIVATE ${CLI_INC_DIRS})
         target_compile_definitions(test_cli_session PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
         if(AIRY_CJSON_INCLUDE_DIRS)
