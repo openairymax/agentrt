@@ -16,59 +16,13 @@
  * 头部打印一次后随内容自然滚动，不再 pin；对话、工具卡片、思考链均
  * 在同一滚动流中（Claude Code / ChatGPT CLI 惯例）。系统状态信息仍可
  * 随时经 /models、/help 查看。
- *
- * cli_hero_clip（UTF-8 安全宽度截断）经 cli_display_internal.h 导出，
- * 由 cli_live_board.c 的节点行复用。
  */
 
 #include "cli_internal.h"
-#include "cli_display_internal.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-/**
- * @brief Width-aware, UTF-8-safe truncation of `s` into buf (cap bytes) so
- *        it fits max_w cells; appends "…" (1 cell) when text was cut.
- *        Returns the display width of what was emitted.
- *
- * Exposed via cli_display_internal.h (see there for the cross-file usage).
- */
-size_t cli_hero_clip(const char *s, size_t max_w, char *buf, size_t cap)
-{
-    size_t len = strlen(s);
-    size_t n = 0, w = 0;
-    while (n < len) {
-        unsigned char c = (unsigned char)s[n];
-        size_t cbytes = (c < 0x80) ? 1
-                      : ((c & 0xE0) == 0xC0) ? 2
-                      : ((c & 0xF0) == 0xE0) ? 3
-                      : ((c & 0xF8) == 0xF0) ? 4 : 1;
-        if (n + cbytes >= cap)
-            break; /* keep room for the terminator */
-        /* width of the current character only (not the rest of the
-         * string): pass cbytes, otherwise the whole remaining tail is
-         * counted and every row gets clipped to its first glyph */
-        size_t cw = cli_disp_width_of(s + n, cbytes);
-        if (w + cw > max_w)
-            break;
-        AIRY_MEMCPY(buf + n, s + n, cbytes);
-        n += cbytes;
-        w += cw;
-    }
-    if (n < len && w + 1 <= max_w && n + 3 < cap) {
-        /* cut: append "…" (U+2026, 3 bytes, 1 cell) */
-        buf[n] = '\xE2';
-        buf[n + 1] = '\x80';
-        buf[n + 2] = '\xA6';
-        buf[n + 3] = '\0';
-        w += 1;
-    } else {
-        buf[n] = '\0';
-    }
-    return w;
-}
 
 /* 一个 "key=model" 段（紧凑头部模型槽行用）：青 key · dim "=" · 黄 model。
  * lead_sep 为 1 时前置两个空格分隔。 */

@@ -62,9 +62,9 @@ add_executable(airy_cli
     # 机制，非渲染职责；render 域仅保留展示模块）
     src/core/cli_think.c
     src/core/cli_dag.c
-    # cli_display.c 域拆分（2026-08-27：963 行 → 3 个展示职责模块）
+    # cli_display.c 域拆分（2026-08-27：963 行 → 2 个展示职责模块；
+    # live board 于 0.1.19 随 sdk/tui 承接能力格而清退）
     src/render/cli_display.c
-    src/render/cli_live_board.c
     src/render/cli_banner.c
     src/cmd/cli_cmds.c
     # cli_render.c 域拆分（2026-08-27：1695 行 → 3 个渲染职责模块）
