@@ -46,8 +46,8 @@
 /* 0.1.9 M1-1c：CLI 退役本地 cog 装配——认知规划唯一经 gateway → think_d
  * （think.process），GCCP 交互/TC3 模型注入/GRAD 反馈（cli_grad_feedback_cb）
  * 等本地认知引擎接线随 0.1.9 C2d-2 一并退役。loop 内引擎集仍由
- * airy_loop_create 自动装配（含 mem engine/chat adapter 底座），此处仅
- * 注入对话记忆句柄供 cli_chat.c 消费。 */
+ * airy_loop_create 自动装配。0.1.19 C3：对话记忆收敛为 gateway mem_d
+ * 单轨，进程内 L1 句柄注入随双栈塌缩退役。 */
 airy_core_loop_t *cli_setup_core_engines(void)
 {
     airy_core_loop_t *loop = NULL;
@@ -55,13 +55,6 @@ airy_core_loop_t *cli_setup_core_engines(void)
     if (err != AIRY_EOK || !loop) {
         AIRY_LOG_ERROR("airy_cli: loop create failed (err=%d)", (int)err);
         return NULL;
-    }
-
-    airy_memory_engine_t *mem = NULL;
-    airy_loop_get_engines(loop, NULL, &mem);
-    if (mem) {
-        g_cli_memory_engine = mem;
-        AIRY_LOG_INFO("airy_cli: chat memory engine attached");
     }
 
     return loop;
