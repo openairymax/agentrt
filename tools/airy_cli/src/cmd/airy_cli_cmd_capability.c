@@ -42,14 +42,12 @@ int cmd_notify(const char *arg, void *ctx)
 {
     (void)ctx;
     if (!arg || arg[0] == '\0') {
-        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
-                              "/notify <topic> <message>");
+        cli_print_status("Sub Agent:usage", "/notify <topic> <message>");
         return 0;
     }
     const char *space = strchr(arg, ' ');
     if (!space) {
-        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
-                              "/notify <topic> <message>");
+        cli_print_status("Sub Agent:usage", "/notify <topic> <message>");
         return 0;
     }
     char topic[128];
@@ -78,8 +76,7 @@ int cmd_perm(const char *arg, void *ctx)
 {
     (void)ctx;
     if (!arg || arg[0] == '\0') {
-        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
-                              "/perm <agent_id> <action> <resource>");
+        cli_print_status("Sub Agent:usage", "/perm <agent_id> <action> <resource>");
         cli_outf("    例: /perm agent-1 read fs:///tmp/x\n");
         return 0;
     }
@@ -88,8 +85,7 @@ int cmd_perm(const char *arg, void *ctx)
     const char *r1 = arg;
     const char *s1 = strchr(r1, ' ');
     if (!s1) {
-        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
-                              "/perm <agent_id> <action> <resource>");
+        cli_print_status("Sub Agent:usage", "/perm <agent_id> <action> <resource>");
         return 0;
     }
     size_t a1 = (size_t)(s1 - r1);
@@ -98,8 +94,7 @@ int cmd_perm(const char *arg, void *ctx)
     const char *r2 = s1 + 1;
     const char *s2 = strchr(r2, ' ');
     if (!s2) {
-        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
-                              "/perm <agent_id> <action> <resource>");
+        cli_print_status("Sub Agent:usage", "/perm <agent_id> <action> <resource>");
         return 0;
     }
     size_t a2 = (size_t)(s2 - r2);
@@ -117,7 +112,7 @@ int cmd_sanitize(const char *arg, void *ctx)
 {
     (void)ctx;
     if (!arg || arg[0] == '\0') {
-        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage", "/sanitize <input>");
+        cli_print_status("Sub Agent:usage", "/sanitize <input>");
         return 0;
     }
     char params[2048];

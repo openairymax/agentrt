@@ -56,20 +56,20 @@ int cmd_apikey(const char *arg, void *ctx)
     (void)ctx;
     char path[AIRY_PATH_MAX];
     if (!cli_secrets_path(path, sizeof(path))) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey",
-                             "无法定位 secrets.env（未设置 AIRY_HOME/AIRY_CONFIG_DIR）");
+        cli_print_line("Sub Agent:apikey",
+                       "无法定位 secrets.env（未设置 AIRY_HOME/AIRY_CONFIG_DIR）");
         return 0;
     }
     if (!arg || arg[0] == '\0' || strncmp(arg, "list", 4) == 0) {
         FILE *f = fopen(path, "r");
         if (!f) {
-            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey",
-                                 "无法读取 secrets.env（文件不存在或不可读）");
+            cli_print_line("Sub Agent:apikey",
+                           "无法读取 secrets.env（文件不存在或不可读）");
             return 0;
         }
         char line[1024]; int found = 0;
-        cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_SUB_AGENT, "apikey",
-                             "已配置模型 Key 位（值打码，完整值见 secrets.env）:");
+        cli_print_status("Sub Agent:apikey",
+                         "已配置模型 Key 位（值打码，完整值见 secrets.env）:");
         while (fgets(line, sizeof(line), f)) {
             char *eq = strchr(line, '=');
             if (!eq) continue;
@@ -78,47 +78,44 @@ int cmd_apikey(const char *arg, void *ctx)
             while (vlen > 0 && (val[vlen - 1] == '\n' || val[vlen - 1] == '\r')) val[--vlen] = '\0';
             if (strncmp(line, "MODEL_", 6) == 0 && strstr(line, "_API_KEY") != NULL) {
                 char masked[64]; cli_secret_masked(val, masked, sizeof(masked));
-                cli_outf("  %s %s %s= %s%s\n", cli_c(CLR_GREEN), line, cli_c(CLR_RESET),
-                         cli_c(CLR_DIM), masked);
-                cli_outf("%s", cli_c(CLR_RESET));
+                cli_outf("  %s = %s\n", line, masked);
                 found = 1;
             }
         }
         fclose(f);
-        if (!found) cli_outf("  %s（无 Key 位；使用 /apikey set <N> <key> 添加）%s\n",
-                             cli_c(CLR_DIM), cli_c(CLR_RESET));
+        if (!found) cli_outf("  （无 Key 位；使用 /apikey set <N> <key> 添加）\n");
         return 0;
     }
     if (strncmp(arg, "set ", 4) != 0) {
-        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
-                             "/apikey list | set <N> <key>（N = model.yaml 连接表行号）");
+        cli_print_status("Sub Agent:usage",
+                         "/apikey list | set <N> <key>（N = model.yaml 连接表行号）");
         return 0;
     }
     const char *rest = arg + 4;
     char *sp = strchr(rest, ' ');
     if (!sp) {
-        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage", "/apikey set <N> <key>");
+        cli_print_status("Sub Agent:usage", "/apikey set <N> <key>");
         return 0;
     }
     size_t nlen = (size_t)(sp - rest);
     if (nlen == 0 || nlen > 4) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey", "行号 N 非法（1-64）");
+        cli_print_line("Sub Agent:apikey", "行号 N 非法（1-64）");
         return 0;
     }
     char num[8]; __builtin_memcpy(num, rest, nlen); num[nlen] = '\0';
     for (size_t i = 0; i < nlen; i++) {
         if (num[i] < '0' || num[i] > '9') {
-            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey", "行号 N 非法（须为数字）");
+            cli_print_line("Sub Agent:apikey", "行号 N 非法（须为数字）");
             return 0;
         }
     }
     int idx = atoi(num);
     if (idx < 1 || idx > 64) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey", "行号 N 超出范围（1-64）");
+        cli_print_line("Sub Agent:apikey", "行号 N 超出范围（1-64）");
         return 0;
     }
     const char *key = sp + 1;
-    if (!key[0]) { cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey", "key 为空"); return 0; }
+    if (!key[0]) { cli_print_line("Sub Agent:apikey", "key 为空"); return 0; }
 
     FILE *f = fopen(path, "r");
     char **lines = NULL; size_t line_count = 0;
@@ -127,7 +124,7 @@ int cmd_apikey(const char *arg, void *ctx)
         while (fgets(lbuf, sizeof(lbuf), f)) {
             char **nl = (char **)AIRY_REALLOC(lines, (line_count + 1) * sizeof(char *));
             if (!nl) { for (size_t i = 0; i < line_count; i++) AIRY_FREE(lines[i]); AIRY_FREE(lines); fclose(f);
-                       cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey", "OOM"); return 0; }
+                       cli_print_line("Sub Agent:apikey", "OOM"); return 0; }
             lines = nl; lines[line_count++] = AIRY_STRDUP(lbuf);
         }
         fclose(f);
@@ -140,7 +137,7 @@ int cmd_apikey(const char *arg, void *ctx)
     if (!wf) {
         for (size_t i = 0; i < line_count; i++) AIRY_FREE(lines[i]);
         AIRY_FREE(lines);
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey", "无法写入 secrets.env"); return 0;
+        cli_print_line("Sub Agent:apikey", "无法写入 secrets.env"); return 0;
     }
     for (size_t i = 0; i < line_count; i++) {
         const char *src = lines[i]; const char *p = src;
@@ -153,7 +150,7 @@ int cmd_apikey(const char *arg, void *ctx)
     if (fclose(wf) != 0) {
         for (size_t i = 0; i < line_count; i++) AIRY_FREE(lines[i]);
         AIRY_FREE(lines);
-        remove(tmp_path); cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey", "写入失败"); return 0;
+        remove(tmp_path); cli_print_line("Sub Agent:apikey", "写入失败"); return 0;
     }
 #if defined(_WIN32)
     _chmod(tmp_path, _S_IREAD | _S_IWRITE);
@@ -164,14 +161,14 @@ int cmd_apikey(const char *arg, void *ctx)
         remove(tmp_path);
         for (size_t i = 0; i < line_count; i++) AIRY_FREE(lines[i]);
         AIRY_FREE(lines);
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "apikey", "写回失败"); return 0;
+        cli_print_line("Sub Agent:apikey", "写回失败"); return 0;
     }
     for (size_t i = 0; i < line_count; i++) AIRY_FREE(lines[i]);
     AIRY_FREE(lines);
 
     char ok[128];
     snprintf(ok, sizeof(ok), "%s 已%s（%s，权限 600）", var_name, replaced ? "更新" : "添加", path);
-    cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "apikey", ok);
+    cli_print_status("Sub Agent:apikey", ok);
     return 0;
 }
 
@@ -214,18 +211,10 @@ static void cli_mem_render_item(size_t idx, cJSON *item)
     char timestr[32], sum[64];
     cli_mem_time(created, timestr, sizeof(timestr));
     cli_mem_summary(d, sum, sizeof(sum));
-    cli_out(cli_c(CLR_DIM));
-    cli_outf("  %-2zu%s", idx, CLI_ICON_BULLET);
-    cli_out(cli_c(CLR_RESET));
-    cli_out(cli_c(CLR_DIM));
-    cli_outf(" [%s] ", timestr);
-    cli_out(cli_c(CLR_RESET));
+    cli_outf("  %-2zu [%s] ", idx, timestr);
     cli_out(sum);
     if (dlen > 60) cli_outf("…");
-    cli_out(cli_c(CLR_DIM));
-    cli_outf("  (%ldB %.*s)", dlen, 8, id);
-    cli_out(cli_c(CLR_RESET));
-    cli_outc('\n');
+    cli_outf("  (%ldB %.*s)\n", dlen, 8, id);
 }
 
 static void cli_mem_render_chain(void)
@@ -235,19 +224,19 @@ static void cli_mem_render_chain(void)
         cJSON *r = cJSON_Parse(res);
         if (r) { cJSON *c = cJSON_GetObjectItem(r, "count"); if (cJSON_IsNumber(c)) total = (int)c->valuedouble; cJSON_Delete(r); }
         AIRY_FREE(res);
-    } else { AIRY_FREE(res); cli_render_sub_agent_line(CLI_ROLE_ERROR, "mem", "记忆服务不可用（mem.count）"); return; }
+    } else { AIRY_FREE(res); cli_print_line("Sub mem Agent", "记忆服务不可用（mem.count）"); return; }
 
     char hdr[160]; snprintf(hdr, sizeof(hdr), "记忆链 · 共 %d 条（最近 %d 条）", total, 6);
-    cli_render_sub_agent_line(CLI_ROLE_STATUS, "mem", hdr);
+    cli_print_status("Sub mem Agent", hdr);
 
     if (cli_gw_call("mem.recent", "{\"limit\":6}", CLI_RPC_TIMEOUT_MS, &res) != 0 || !res) {
-        AIRY_FREE(res); cli_render_sub_agent_line(CLI_ROLE_ERROR, "mem", "记忆链读取失败（mem.recent）"); return;
+        AIRY_FREE(res); cli_print_line("Sub mem Agent", "记忆链读取失败（mem.recent）"); return;
     }
     cJSON *root = cJSON_Parse(res); AIRY_FREE(res);
-    if (!root) { cli_render_sub_agent_line(CLI_ROLE_ERROR, "mem", "记忆链响应解析失败"); return; }
+    if (!root) { cli_print_line("Sub mem Agent", "记忆链响应解析失败"); return; }
     cJSON *records = cJSON_GetObjectItem(root, "records");
     size_t n = cJSON_IsArray(records) ? (size_t)cJSON_GetArraySize(records) : 0;
-    if (n == 0) { cli_outf("  %s 暂无记忆记录，对话一次即可生成记忆\n", CLI_ICON_INFO); cJSON_Delete(root); return; }
+    if (n == 0) { cli_outf("  暂无记忆记录，对话一次即可生成记忆\n"); cJSON_Delete(root); return; }
     for (size_t i = 0; i < n; i++) cli_mem_render_item(i + 1, cJSON_GetArrayItem(records, (int)i));
     cJSON_Delete(root);
 }
@@ -257,14 +246,14 @@ static void cli_mem_render_search(const char *query)
     char params[1024]; snprintf(params, sizeof(params), "{\"query\":\"%s\",\"limit\":5}", query);
     char *res = NULL;
     if (cli_gw_call("mem.search", params, CLI_RPC_TIMEOUT_MS, &res) != 0 || !res) {
-        AIRY_FREE(res); cli_render_sub_agent_line(CLI_ROLE_ERROR, "mem", "记忆检索失败（mem.search）"); return;
+        AIRY_FREE(res); cli_print_line("Sub mem Agent", "记忆检索失败（mem.search）"); return;
     }
     cJSON *root = cJSON_Parse(res); AIRY_FREE(res);
-    if (!root) { cli_render_sub_agent_line(CLI_ROLE_ERROR, "mem", "记忆检索响应解析失败"); return; }
+    if (!root) { cli_print_line("Sub mem Agent", "记忆检索响应解析失败"); return; }
     cJSON *results = cJSON_GetObjectItem(root, "results");
     size_t n = cJSON_IsArray(results) ? (size_t)cJSON_GetArraySize(results) : 0;
     char hdr[192]; snprintf(hdr, sizeof(hdr), "检索记忆 '%s' · %zu 条命中", query, n);
-    cli_render_sub_agent_line(CLI_ROLE_STATUS, "mem", hdr);
+    cli_print_status("Sub mem Agent", hdr);
 
     for (size_t i = 0; i < n; i++) {
         cJSON *hit = cJSON_GetArrayItem(results, (int)i);
@@ -283,10 +272,11 @@ static void cli_mem_render_search(const char *query)
             cJSON_Delete(detail);
         }
         char sum[64]; cli_mem_summary(dcopy, sum, sizeof(sum));
-        cli_out(cli_c(CLR_DIM)); cli_outf("  %-2zu%s", i + 1, CLI_ICON_BULLET); cli_out(cli_c(CLR_RESET));
-        cli_outf(" %.3f  ", cJSON_IsNumber(cJSON_GetObjectItem(hit, "score")) ? cJSON_GetObjectItem(hit, "score")->valuedouble : 0.0);
+        cli_outf("  %-2zu %.3f  ", i + 1,
+                 cJSON_IsNumber(cJSON_GetObjectItem(hit, "score"))
+                     ? cJSON_GetObjectItem(hit, "score")->valuedouble : 0.0);
         cli_out(sum); if (dlen > 60) cli_outf("…");
-        cli_out(cli_c(CLR_DIM)); cli_outf("  (%.*s)", 8, id); cli_out(cli_c(CLR_RESET)); cli_outc('\n');
+        cli_outf("  (%.*s)\n", 8, id);
     }
     cJSON_Delete(root);
 }
@@ -296,19 +286,21 @@ static void cli_mem_render_get(const char *record_id)
     char params[512]; snprintf(params, sizeof(params), "{\"record_id\":\"%s\"}", record_id);
     char *res = NULL;
     if (cli_gw_call("mem.get", params, CLI_RPC_TIMEOUT_MS, &res) != 0 || !res) {
-        AIRY_FREE(res); cli_render_sub_agent_line(CLI_ROLE_ERROR, "mem", "记忆读取失败（mem.get）"); return;
+        AIRY_FREE(res); cli_print_line("Sub mem Agent", "记忆读取失败（mem.get）"); return;
     }
     cJSON *root = cJSON_Parse(res); AIRY_FREE(res);
-    if (!root) { cli_render_sub_agent_line(CLI_ROLE_ERROR, "mem", "记忆响应解析失败"); return; }
+    if (!root) { cli_print_line("Sub mem Agent", "记忆响应解析失败"); return; }
     cJSON *data = cJSON_GetObjectItem(root, "data");
     cJSON *lenj = cJSON_GetObjectItem(root, "length");
     cJSON *meta = cJSON_GetObjectItem(root, "metadata");
     char hdr[160]; snprintf(hdr, sizeof(hdr), "记忆 %s · %ldB", record_id,
                             cJSON_IsNumber(lenj) ? (long)lenj->valuedouble : 0L);
-    cli_render_sub_agent_line(CLI_ROLE_STATUS, "mem", hdr);
-    if (cJSON_IsString(meta)) { cli_out(cli_c(CLR_DIM)); cli_outf("  元数据: %s\n", meta->valuestring); cli_out(cli_c(CLR_RESET)); }
-    if (cJSON_IsString(data) && data->valuestring) { cli_out(cli_c(CLR_RESET)); cli_outf("%s\n", data->valuestring); }
-    else { cli_outf("  %s 记录为空或已删除\n", CLI_ICON_INFO); }
+    cli_print_status("Sub mem Agent", hdr);
+    if (cJSON_IsString(meta)) cli_outf("  元数据: %s\n", meta->valuestring);
+    if (cJSON_IsString(data) && data->valuestring)
+        cli_outf("%s\n", data->valuestring);
+    else
+        cli_outf("  记录为空或已删除\n");
     cJSON_Delete(root);
 }
 
