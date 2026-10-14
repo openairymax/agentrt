@@ -25,10 +25,10 @@ endif()
 project(AgentRT VERSION ${AIRY_VERSION_NUM} LANGUAGES C)
 
 # macOS 链接：coreloopthree 以 weak 引用 MemoryRovol 闭源符号
-# （memoryrovol_provider / rs_semantic_cache）。ELF 下未定义弱符号自动
-# 置 NULL 可链接；Mach-O 默认 -undefined error 会报 "Undefined symbols
-# for architecture arm64"（release run #4 实证）。加 dynamic_lookup 允许
-# 弱导入运行期解析（调用侧以 NULL 判空，安全降级为 builtin）。
+# （rs_semantic_cache）。ELF 下未定义弱符号自动置 NULL 可链接；Mach-O
+# 默认 -undefined error 会报 "Undefined symbols for architecture
+# arm64"（release run #4 实证）。加 dynamic_lookup 允许弱导入运行期
+# 解析（调用侧以 NULL 判空，安全降级到 bigram Jaccard P0 通路）。
 if(APPLE)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-undefined,dynamic_lookup")
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-undefined,dynamic_lookup")
@@ -101,12 +101,11 @@ option(ENABLE_COVERAGE "Enable code coverage reporting" OFF)
 # 需要检测时显式传 -DENABLE_SANITIZERS=ON。
 option(ENABLE_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
 option(AIRY_BUILD_ALL "Build all AgentRT components" ON)
-# IRON-8 生产就绪：MemoryRovol 为默认记忆提供商（L1-L4 四层记忆卷载），
+# IRON-8 生产就绪：MemoryRovol 为商业记忆增强库（L1-L4 四层记忆卷载），
 # 默认启用而非显式开关。外部源缺失时 atoms/memory/memoryrovol/CMakeLists.txt
-# 自动降级为 builtin provider，不会破坏构建。
+# 跳过链接，不会破坏构建。
 option(AIRY_WITH_MEMORYROVOL "Build with MemoryRovol commercial memory provider" ON)
 option(AIRY_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe functions)" ON)
-set(AIRY_MEMORY_BACKEND "builtin" CACHE STRING "Memory backend (builtin|memoryrovol)")
 
 # 版本宏 SSoT 注入：唯一权威为根 VERSION 文件，经 add_compile_definitions
 # 注入 AIRYRT_VERSION（RAW 含字母后缀，如 0.1.6a；与 AIRY_CLI_VERSION 注入
@@ -145,7 +144,6 @@ airy_print_info("Compiler:         ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VER
 airy_print_info("Shared libs:      ${BUILD_SHARED_LIBS}")
 airy_print_info("Build tests:      ${BUILD_TESTS}")
 airy_print_info("Compliance strict:${AIRY_COMPLIANCE_STRICT}")
-airy_print_info("Memory backend:   ${AIRY_MEMORY_BACKEND}")
 airy_print_info("MemoryRovol Pro:  ${AIRY_WITH_MEMORYROVOL}")
 airy_print_info("Sanitizers:       ${ENABLE_SANITIZERS}")
 
@@ -184,9 +182,8 @@ if(MSVC)
     # _CRT_DECLARE_NONSTDC_NAMES：/std:c11 下恢复 POSIX 系声明（_access/
     # S_ISDIR 等，#116 C4013 根因；windows_preinclude.h 已同款定义，此处
     # 为叶子仓独立构建（不走 /FI 预包含）时的命令行级双保险）。
-    # _CRT_RAND_S：rand_s 声明开关，preinclude stdlib.h 时序同理。
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_WARNINGS
-                            _CRT_DECLARE_NONSTDC_NAMES=1 _CRT_RAND_S=1)
+                            _CRT_DECLARE_NONSTDC_NAMES=1)
     add_compile_options(/GS /sdl- /guard:cf /utf-8)  # 安全选项
 
     # 禁用特定警告
@@ -930,7 +927,6 @@ if(AIRY_BUILD_ALL)
     airy_print_info("[MODULE]   gateway:  ${BUILD_GATEWAY}")
     airy_print_info("[MODULE]   heapstore: ${BUILD_HEAPSTORE}")
     airy_print_info("[MODULE]   toolkit:  ${BUILD_TOOLKIT}")
-    airy_print_info("[MODULE]   Memory backend: ${AIRY_MEMORY_BACKEND}")
     airy_print_info("[MODULE]   With MemoryRovol: ${AIRY_WITH_MEMORYROVOL}")
 
     # 全局特性测试宏定义 - 必须在所有其他配置之前
@@ -1180,11 +1176,11 @@ if(AIRY_BUILD_ALL)
     endif()
 
     # 集成测试：当从伞仓构建时，包含 tools（由 devtools 改名）中的
-    # 连接线集成测试（12 条 C-L 测试 + 端到端测试）
-    # 将 tools/tests/integration/c/ 的 12 个连接线测试纳入构建系统
+    # 连接线集成测试（8 条 C-L 测试 + 端到端测试）
+    # 将 tools/tests/integration/c/ 的 8 个连接线测试纳入构建系统
     if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/tests/integration/c/CMakeLists.txt")
         add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../tools/tests/integration/c integration_c_tests)
-        airy_print_ok("Integration tests (tools/tests/integration/c) included — 12 C-L link tests + E2E")
+        airy_print_ok("Integration tests (tools/tests/integration/c) included — 8 C-L link tests + E2E")
     else()
         airy_print_info("Integration tests skipped: tools/tests/integration/c not found (standalone agentrt build)")
     endif()
