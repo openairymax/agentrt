@@ -3,35 +3,37 @@
 
 /**
  * @file cli_render.c
- * @brief airy_cli rendering core: output primitives, color gate, meter, spinner.
+ * @brief airy_cli 终端输出机制层：原语、色门、宽度、直印、状态辅助与
+ *        结果/计划/看板呈现。
  *
- * Split layout (2026-08-27):
- *   cli_render.c         — output primitives, color, meter, status helpers, spinner
- *   airy_cli_output.c    — role lines, tool cards, progress bars, turn separators
+ * 0.1.19 M5-3 清退收口：直印化完成后，体验渲染（role 卡片、spinner、
+ * phase 指示）整体删除，排版体验由 agentrt-tui（sdk/tui）承接；原
+ * cli_banner.c（启动头部）与 cli_display.c（结果/计划列表/看板行）
+ * 收编于此，render 域收缩为单一机制文件。
  *
- * 0.1.19 直印化：markdown 排版渲染（原 airy_cli_markdown.c）清退，内容输出
- * 收口为 cli_print_plain 的 plain 直印，排版体验由 agentrt-tui（sdk/tui）承接。
- *
- * A stream-safe, line-oriented renderer. No TTY capture and no curses: every
- * function prints directly to stdout so the CLI behaves identically on a
- * local terminal, over SSH or when output is piped to a log file.
+ * 面向流安全、行式输出：无 TTY 捕获、无 curses，所有函数直写 stdout，
+ * 本地终端、SSH 与管道日志行为完全一致。
  */
 
 #include "cli_render.h"
+#include "cli_internal.h"
 
 #include "airy_memory.h"
 #include "cli_gw.h"
 #include "platform.h"
-
-extern int g_cli_print_mode;
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef AIRY_HAS_CJSON
+#include <cjson/cJSON.h>
+#endif
+
 #define CLI_GUTTER_MAX 64
-#define CLI_DEFAULT_WIDTH 100
+
+/* ---- 输出原语 ---- */
 
 void cli_out(const char *s)
 {
@@ -72,7 +74,7 @@ void cli_outf(const char *fmt, ...)
     AIRY_FREE(big);
 }
 
-/* ---- error description ---- */
+/* ---- 错误描述 ---- */
 
 const char *cli_err_desc(int err)
 {
@@ -98,7 +100,7 @@ const char *cli_err_desc(int err)
     }
 }
 
-/* ---- trace (server -p mode progress channel) ---- */
+/* ---- -p 模式进度通道（stderr） ---- */
 
 void cli_trace(const char *tag, const char *fmt, ...)
 {
@@ -128,7 +130,7 @@ void cli_trace(const char *tag, const char *fmt, ...)
     fputc('\n', stderr);
 }
 
-/* ---- color gate ---- */
+/* ---- 色门与缩进槽 ---- */
 
 const char *cli_c(const char *seq)
 {
@@ -145,12 +147,7 @@ const char *cli_gutter(size_t indent)
     return buf;
 }
 
-const char *cli_gutter_pad(size_t indent)
-{
-    return cli_gutter(indent);
-}
-
-/* ---- UTF-8 width helpers ---- */
+/* ---- UTF-8 显示宽度 ---- */
 
 size_t cli_disp_width(const char *s)
 {
@@ -183,38 +180,7 @@ size_t cli_utf8_safe_len(const char *s, size_t max_bytes)
     return n;
 }
 
-/* ---- role / actor names ---- */
-
-const char *cli_render_role_color(cli_role_t role)
-{
-    if (!cli_color_enabled()) return "";
-    switch (role) {
-    case CLI_ROLE_USER:         return CLR_CYAN;
-    case CLI_ROLE_SUPER_AGENT:  return CLR_GREEN;
-    case CLI_ROLE_DUAL_THINK:   return CLR_YELLOW;
-    case CLI_ROLE_SUB_AGENT:    return CLR_MAGENTA;
-    case CLI_ROLE_STATUS:       return CLR_DIM;
-    case CLI_ROLE_TRACE:        return CLR_DIM;
-    case CLI_ROLE_ERROR:        return CLR_RED;
-    default:                    return CLR_RESET;
-    }
-}
-
-const char *cli_render_actor_name(cli_actor_t actor)
-{
-    switch (actor) {
-    case CLI_ACTOR_USER:            return "For Thee";
-    case CLI_ACTOR_SUPER_AGENT:     return "Super Agent";
-    case CLI_ACTOR_DUAL_THINK:      return "Dual Think";
-    case CLI_ACTOR_DUAL_SLOW_THINK: return "Dual Slow Think";
-    case CLI_ACTOR_DUAL_FAST_THINK: return "Dual Fast Think";
-    case CLI_ACTOR_DUAL_PROF_THINK: return "Dual Prof Think";
-    case CLI_ACTOR_SUB_AGENT:       return "Sub Agent";
-    default:                        return "AgentRT";
-    }
-}
-
-/* ---- plain text emitter ---- */
+/* ---- plain 直印（0.1.19 统一出口） ---- */
 
 void cli_print_plain(const char *text, size_t indent)
 {
@@ -230,8 +196,6 @@ void cli_print_plain(const char *text, size_t indent)
         p = nl ? nl + 1 : NULL;
     }
 }
-
-/* ---- plain conversation line (0.1.19 直印化统一出口) ---- */
 
 void cli_print_line(const char *header, const char *content)
 {
@@ -276,13 +240,17 @@ void cli_print_turn(uint64_t elapsed_ms, const char *metrics)
     cli_print_status("turn", line);
 }
 
-/* ---- status helpers ---- */
+uint64_t cli_now_ms(void)
+{
+    return airy_time_ns() / 1000000ULL;
+}
 
-/* 单一事实源：执行体的终态与失败态判定。sched_d 与工作大厅的终态串为
- * completed / semantic_failed / failed / canceled，其中 semantic_failed
- * （节点进程成功但没有可交付产物）同样是终态，且必须按失败呈现，否则会把
- * 「无产出」渲染成绿勾。轮询、看板、快照与任务流多处共用本函数，避免新增
- * 状态时各写一遍而漂移。 */
+/* ---- 执行体状态辅助（单一事实源） ---- */
+
+/* 终态串为 completed / semantic_failed / failed / canceled，其中
+ * semantic_failed（节点进程成功但没有可交付产物）同样是终态，且必须按
+ * 失败呈现，否则会把「无产出」渲染成绿勾。轮询、看板、快照与任务流
+ * 多处共用本函数，避免新增状态时各写一遍而漂移。 */
 int cli_state_terminal(const char *state)
 {
     if (!state) return 0;
@@ -351,143 +319,306 @@ void cli_compact_bar(char *out, size_t cap, double progress, size_t cells)
     out[o] = '\0';
 }
 
-/* ---- spinner ---- */
+/* ---- 启动头部（原 cli_banner.c 收编） ---- */
 
-static struct {
-    int active;
-    int degraded;
-    char title[96];
-    uint64_t start_ns;
-    unsigned int frame;
-    int printed;
-} g_spinner;
-
-static const char *const CLI_SPINNER_FRAMES[] = {
-    "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏",
-};
-#define CLI_SPINNER_FRAMES_COUNT (sizeof(CLI_SPINNER_FRAMES) / sizeof(CLI_SPINNER_FRAMES[0]))
-#define CLI_SPINNER_AMBER_MS 10000
-#define CLR_AMBER "\033[33;1m"
-
-uint64_t cli_now_ms(void)
+/* 一个 "key=model" 段（紧凑头部模型槽行用）：青 key · dim "=" · 黄 model。
+ * lead_sep 为 1 时前置两个空格分隔。 */
+static void cli_hero_model_seg(const char *key, const char *model, int lead_sep)
 {
-    return airy_time_ns() / 1000000ULL;
+    if (lead_sep) {
+        cli_out("  ");
+    }
+    cli_out(cli_c(CLR_CYAN));
+    cli_out(key);
+    cli_out(cli_c(CLR_RESET));
+    cli_out(cli_c(CLR_DIM));
+    cli_out("=");
+    cli_out(cli_c(CLR_RESET));
+    cli_out(cli_c(CLR_YELLOW));
+    cli_out(model);
+    cli_out(cli_c(CLR_RESET));
 }
 
-static void cli_spinner_erase(void)
+/* 紧凑启动头部（3 行，普通滚动，不再 pin）。行数与 CLI_HDR_LINES=3 严格
+ * 对应（cli_tui.c 退出全屏 TUI 重建三区时依赖该行数）。-p 单轮模式不打印
+ * （stdout 保持纯净）。 */
+void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
 {
-    if (g_spinner.printed) {
-        cli_out("\r\033[K");
-        fflush(stdout);
+    if (g_cli_print_mode)
+        return;
+
+    const char *g = cli_gutter(2);
+    /* 行 1：品牌 + 版本 */
+    cli_out(g);
+    cli_out(cli_c(CLR_BOLD));
+    cli_out(cli_c(CLR_CYAN));
+    cli_out("◆ Airymax AgentRT");
+    cli_out(cli_c(CLR_RESET));
+    cli_out(cli_c(CLR_DIM));
+    cli_outf(" · v%s", AIRY_CLI_VERSION);
+    cli_out(cli_c(CLR_RESET));
+    cli_outc('\n');
+    /* 行 2：三模型槽（空值回落"默认"） */
+    const char *a = (t2 && t2[0]) ? t2 : "默认";
+    const char *b = (t1f && t1f[0]) ? t1f : "默认";
+    const char *c = (t1p && t1p[0]) ? t1p : "默认";
+    cli_out(g);
+    cli_hero_model_seg("A·t2", a, 0);
+    cli_hero_model_seg("B·t1-f", b, 1);
+    cli_hero_model_seg("C·t1-p", c, 1);
+    cli_outc('\n');
+    /* 行 3：分界线（保持 CLI_HDR_LINES=3 契约） */
+    cli_out(g);
+    cli_out(cli_c(CLR_DIM));
+    {
+        char rule[192];
+        size_t rw = 56, rn = 0;
+        while (rn < rw && rn + 3 < sizeof(rule)) {
+            rule[rn++] = '\xE2';
+            rule[rn++] = '\x94';
+            rule[rn++] = '\x80';   /* U+2500 ─（1 cell） */
+        }
+        rule[rn] = '\0';
+        cli_out(rule);
     }
+    cli_out(cli_c(CLR_RESET));
+    cli_outc('\n');
+    fflush(stdout);
 }
 
-int cli_spinner_start(const char *title)
-{
-    if (g_cli_print_mode) return 0;
-    AIRY_MEMSET(&g_spinner, 0, sizeof(g_spinner));
-    if (!title || !title[0]) return 0;
-    AIRY_STRNCPY_TERM(g_spinner.title, title, sizeof(g_spinner.title));
-    g_spinner.start_ns = airy_time_ns();
+/* ---- 执行结果呈现 ---- */
 
-    if (!cli_term_is_tty()) {
-        g_spinner.degraded = 1;
-        g_spinner.active = 1;
-        const char *g = cli_gutter(2);
-        cli_outf("%s%s%s %s\n", g, cli_c(CLR_DIM), CLI_ICON_BULLET, title);
-        return 0;
+void cli_print_result(const char *result)
+{
+    if (!result) {
+        cli_print_line("Super Agent:result", "No result was produced.");
+        return;
     }
 
-    g_spinner.active = 1;
-    g_spinner.frame = 0;
-    cli_spinner_tick();
+#ifdef AIRY_HAS_CJSON
+    cJSON *root = cJSON_Parse(result);
+    if (root) {
+        cJSON *output = cJSON_GetObjectItem(root, "output");
+        cJSON *agent = cJSON_GetObjectItem(root, "agent_id");
+        if (output && cJSON_IsString(output)) {
+            /* -p 模式：stdout 保持纯净可管道，跳过角色行前缀，模型原始
+             * 文本 plain 直印（0.1.19 直印化，不做显示期归一）。 */
+            if (g_cli_print_mode) {
+                cli_print_plain(output->valuestring, 0);
+                cJSON_Delete(root);
+                return;
+            }
+            if (agent && cJSON_IsString(agent)) {
+                char line[160];
+                snprintf(line, sizeof(line), "Execution finished by %s.", agent->valuestring);
+                cli_print_line("Super Agent:result", line);
+            } else {
+                cli_print_line("Super Agent:result", "Execution finished.");
+            }
+            cli_print_plain(output->valuestring, 4);
+            cJSON_Delete(root);
+            return;
+        }
+        cJSON_Delete(root);
+    }
+#endif /* AIRY_HAS_CJSON */
+
+    if (g_cli_print_mode) {
+        cli_outf("%s\n", result ? result : "");
+        return;
+    }
+
+    char truncated[640];
+    /* 回落到 UTF-8 边界，长结果的截断预览不出现半个多字节字符 */
+    size_t keep = cli_utf8_safe_len(result, 600);
+    snprintf(truncated, sizeof(truncated), "%.*s%s", (int)keep, result,
+             strlen(result) > keep ? "..." : "");
+    cli_print_line("Super Agent:result", truncated);
+}
+
+/* ---- 静态执行计划列表 ---- */
+
+/* 按 id 在计划内查找节点下标（不存在返回 -1）。 */
+static int cli_plan_node_index(const airy_task_plan_t *plan, const char *id)
+{
+    for (size_t i = 0; i < plan->task_plan_node_count; i++) {
+        const airy_task_node_t *nd = plan->task_plan_nodes ? plan->task_plan_nodes[i] : NULL;
+        if (nd && nd->task_node_id && strcmp(nd->task_node_id, id) == 0)
+            return (int)i;
+    }
+    return -1;
+}
+
+/* 节点 idx 的全部依赖是否都来自已排序节点。计划外依赖、自环、空 id 或
+ * 窗口 [0, count) 外的源视为已满足，保证排序必然终止；窗口守卫避免只排
+ * 前 count 个节点的调用方越界读。 */
+static int cli_plan_ready(const airy_task_plan_t *plan, size_t idx,
+                          const unsigned char *ordered, size_t count)
+{
+    const airy_task_node_t *nd =
+        plan->task_plan_nodes ? plan->task_plan_nodes[idx] : NULL;
+    if (!nd || !nd->task_node_id)
+        return 1;
+    const char *target = nd->task_node_id;
+    for (size_t d = 0; nd->task_node_depends_on && d < nd->task_node_depends_count; d++) {
+        const char *src_id = nd->task_node_depends_on[d];
+        if (!src_id || src_id[0] == '\0')
+            continue;
+        if (strcmp(src_id, target) == 0)
+            continue;
+        int src = cli_plan_node_index(plan, src_id);
+        if (src >= 0 && (size_t)src < count && !ordered[src])
+            return 0;
+    }
     return 1;
 }
 
-void cli_spinner_tick(void)
+/* 贪心拓扑排序：依赖在前，环/缺失源回落自然次序，渲染永不卡死。
+ * scratch 为调用方提供的 count 字节零初始化工作区。返回 0 表示跳过渲染。 */
+static int cli_plan_topo_build(const airy_task_plan_t *plan, size_t count, size_t *order,
+                               unsigned char *scratch)
 {
-    if (!g_spinner.active || g_spinner.degraded) return;
+    if (!plan || !order || !scratch || count == 0 || plan->task_plan_node_count == 0)
+        return 0;
 
-    uint64_t elapsed = (airy_time_ns() - g_spinner.start_ns) / 1000000ULL;
-    const char *frame = CLI_SPINNER_FRAMES[g_spinner.frame % CLI_SPINNER_FRAMES_COUNT];
-    g_spinner.frame++;
+    size_t placed = 0;
+    for (size_t step = 0; step < count; step++) {
+        size_t pick = (size_t)-1;
+        for (size_t i = 0; i < count; i++) {
+            if (scratch[i])
+                continue;
+            if (cli_plan_ready(plan, i, scratch, count)) {
+                pick = i;
+                break;
+            }
+        }
+        if (pick == (size_t)-1)
+            break;
+        order[placed++] = pick;
+        scratch[pick] = 1;
+    }
+    for (size_t i = 0; i < count && placed < count; i++) {
+        if (!scratch[i]) {
+            order[placed++] = i;
+            scratch[i] = 1;
+        }
+    }
+    return placed == count;
+}
 
-    char elapsed_s[32];
-    uint64_t secs = elapsed / 1000;
-    if (secs < 1)
-        snprintf(elapsed_s, sizeof(elapsed_s), "0s");
-    else if (secs < 60)
-        snprintf(elapsed_s, sizeof(elapsed_s), "%llus", (unsigned long long)secs);
-    else
-        snprintf(elapsed_s, sizeof(elapsed_s), "%llum %02llus",
-                 (unsigned long long)(secs / 60), (unsigned long long)(secs % 60));
+void cli_print_plan_list(const airy_task_plan_t *plan)
+{
+    if (g_cli_print_mode)
+        return;
+    if (!plan || plan->task_plan_node_count == 0) {
+        cli_print_line("Sub plan Agent", "Empty plan, nothing to execute.");
+        return;
+    }
 
+    const size_t n = plan->task_plan_node_count;
     const char *g = cli_gutter(2);
-    cli_spinner_erase();
-    cli_outf("%s%s%s %s%s %s(%s)%s", g,
-           cli_c(elapsed >= CLI_SPINNER_AMBER_MS ? CLR_AMBER : CLR_YELLOW), frame,
-           cli_c(CLR_RESET), g_spinner.title, cli_c(CLR_DIM), elapsed_s, cli_c(CLR_RESET));
-    fflush(stdout);
-    g_spinner.printed = 1;
-}
 
-void cli_spinner_pause(void)
-{
-    if (!g_spinner.active || g_spinner.degraded) return;
-    cli_spinner_erase();
-    g_spinner.printed = 0;
-}
-
-void cli_spinner_resume(void)
-{
-    if (!g_spinner.active || g_spinner.degraded) return;
-    g_spinner.frame = 0;
-    cli_spinner_tick();
-}
-
-void cli_spinner_stop(int ok, const char *detail)
-{
-    if (!g_spinner.active) return;
-
-    uint64_t elapsed = (airy_time_ns() - g_spinner.start_ns) / 1000000ULL;
-    uint64_t secs = elapsed / 1000;
-    char elapsed_s[32];
-    if (secs < 1)
-        snprintf(elapsed_s, sizeof(elapsed_s), "0s");
-    else if (secs < 60)
-        snprintf(elapsed_s, sizeof(elapsed_s), "%llus", (unsigned long long)secs);
-    else
-        snprintf(elapsed_s, sizeof(elapsed_s), "%llum %02llus",
-                 (unsigned long long)(secs / 60), (unsigned long long)(secs % 60));
-
-    cli_spinner_erase();
-    cli_outf("%s%s%s%s %s", cli_gutter(2), ok ? cli_c(CLR_GREEN) : cli_c(CLR_RED),
-           ok ? CLI_ICON_CHECK : CLI_ICON_CROSS, cli_c(CLR_RESET), g_spinner.title);
-    cli_outf(" %s(%s)%s", cli_c(CLR_DIM), elapsed_s, cli_c(CLR_RESET));
-    if (detail && detail[0])
-        cli_outf(" %s%s%s", cli_c(CLR_DIM), detail, cli_c(CLR_RESET));
-    cli_outc('\n');
-    fflush(stdout);
-    AIRY_MEMSET(&g_spinner, 0, sizeof(g_spinner));
-}
-
-/* ---- phase indicator ---- */
-
-void cli_render_phase(const char *label)
-{
-    if (!label || !label[0] || g_cli_print_mode) return;
-    const char *g = cli_gutter(2);
-    cli_outf("\n%s%s%s %s%s%s %s",
+    cli_outf("%s%s%s %s执行计划%s %s(%zu nodes, %zu deps)%s\n",
              g, cli_c(CLR_CYAN), CLI_ICON_DIAMOND,
-             cli_c(CLR_CYAN), label, cli_c(CLR_RESET),
-             cli_c(CLR_DIM));
-    int rows = 0, cols = 0;
-    cli_term_size(&rows, &cols);
-    size_t used = 4 + 2 + strlen(label);
-    size_t ccols = (size_t)(cols > 0 ? cols : 80);
-    size_t dash = ccols > used + 4 ? ccols - used - 4 : 20;
-    if (dash > 50) dash = 50;
-    for (size_t i = 0; i < dash; i++)
-        cli_out("─");
-    cli_outf("%s\n", cli_c(CLR_RESET));
+             cli_c(CLR_RESET), cli_c(CLR_DIM), cli_c(CLR_DIM),
+             n, cli_plan_deps_count(plan), cli_c(CLR_RESET));
+
+    size_t *order = (size_t *)AIRY_MALLOC(n * sizeof(size_t));
+    unsigned char *scratch = (unsigned char *)AIRY_CALLOC(n, 1);
+    if (!order || !scratch || !cli_plan_topo_build(plan, n, order, scratch)) {
+        AIRY_FREE(order);
+        AIRY_FREE(scratch);
+        return;
+    }
+
+    const char *ig = cli_gutter(4);
+    for (size_t r = 0; r < n; r++) {
+        const airy_task_node_t *nd = plan->task_plan_nodes ? plan->task_plan_nodes[order[r]] : NULL;
+        if (!nd)
+            continue;
+        const char *nid = (nd->task_node_id && nd->task_node_id[0]) ? nd->task_node_id : "node";
+        char handler[96] = "";
+        cli_node_handler(nd, handler, sizeof(handler));
+        const char *goal = nd->task_node_goal ? nd->task_node_goal : "";
+
+        cli_outf("%s%s%s%s %zu. %s%s%s  %s%s[%s]%s",
+                 ig, cli_c(CLR_DIM), CLI_ICON_TODO, cli_c(CLR_RESET),
+                 r + 1,
+                 cli_c(CLR_RESET), goal, cli_c(CLR_DIM),
+                 cli_c(CLR_DIM), handler[0] ? handler : "?", cli_c(CLR_DIM), cli_c(CLR_RESET));
+
+        char deps[128];
+        size_t dlen = 0;
+        int has_dep = 0;
+        for (size_t d = 0; nd->task_node_depends_on && d < nd->task_node_depends_count; d++) {
+            const char *src_id = nd->task_node_depends_on[d];
+            if (!src_id || src_id[0] == '\0')
+                continue;
+            if (strcmp(src_id, nid) == 0)
+                continue;
+            if (has_dep && dlen < sizeof(deps) - 2)
+                dlen += (size_t)snprintf(deps + dlen, sizeof(deps) - dlen, ", ");
+            if (!has_dep) {
+                dlen = (size_t)snprintf(deps, sizeof(deps), "  %s←%s ",
+                                        cli_c(CLR_DIM), cli_c(CLR_RESET));
+                has_dep = 1;
+            }
+            if (dlen < sizeof(deps) - 2)
+                dlen += (size_t)snprintf(deps + dlen, sizeof(deps) - dlen, "%s%s%s",
+                                         cli_c(CLR_CYAN), src_id, cli_c(CLR_DIM));
+        }
+        cli_outf("%s\n", has_dep ? deps : "");
+    }
+
+    AIRY_FREE(order);
+    AIRY_FREE(scratch);
+}
+
+/* ---- 看板行 ---- */
+
+void cli_board_line(const char *tag, const char *id, const char *state, double progress)
+{
+    if (g_cli_print_mode)
+        return;
+    if (progress < 0.0) progress = 0.0;
+    if (progress > 1.0) progress = 1.0;
+
+    size_t filled = (size_t)(progress * 10.0);
+    if (filled > 10) filled = 10;
+    char bar[32];
+    size_t bo = 0;
+    for (size_t b = 0; b < 10; b++) {
+        bo += (size_t)snprintf(bar + bo, sizeof(bar) - bo, "%s", b < filled ? "█" : "░");
+    }
+
+    const char *st = state ? state : "?";
+    const char *st_col = cli_c(CLR_DIM);
+    const char *st_icon = CLI_ICON_BULLET;
+    int bar_bright = 0;
+    if (strcmp(st, "completed") == 0) {
+        st_col = cli_c(CLR_GREEN); st_icon = CLI_ICON_CHECK; bar_bright = 1;
+    } else if (strcmp(st, "failed") == 0) {
+        st_col = cli_c(CLR_RED); st_icon = CLI_ICON_CROSS; bar_bright = 0;
+    } else if (strcmp(st, "semantic_failed") == 0) {
+        st_col = cli_c(CLR_YELLOW); st_icon = CLI_ICON_CROSS; bar_bright = 0;
+    } else if (strcmp(st, "running") == 0 || strcmp(st, "active") == 0 ||
+               strcmp(st, "queued") == 0) {
+        st_col = cli_c(CLR_DIM); st_icon = CLI_ICON_DIAMOND;
+    } else if (strcmp(st, "pending") == 0) {
+        st_col = cli_c(CLR_DIM); st_icon = CLI_ICON_TODO;
+    } else if (strcmp(st, "scheduled") == 0) {
+        st_col = cli_c(CLR_CYAN); st_icon = CLI_ICON_CLOCK;
+    } else if (strcmp(st, "canceled") == 0) {
+        st_col = cli_c(CLR_DIM); st_icon = CLI_ICON_CANCEL;
+    }
+
+    const char *g = cli_gutter(2);
+    if (tag && tag[0])
+        cli_outf("%s%s[%s]%s ", g, cli_c(CLR_DIM), tag, cli_c(CLR_RESET));
+    cli_outf("%s%s %s%s%s ", st_col, st_icon, cli_c(CLR_RESET), cli_c(CLR_DIM),
+             id ? id : "?");
+    cli_outf("%s%s%s ", st_col, cli_state_cn(st), cli_c(CLR_RESET));
+    cli_outf("%s[%s]%s %s%3.0f%%%s\n", cli_c(bar_bright ? CLR_GREEN : CLR_DIM), bar,
+             cli_c(CLR_RESET), cli_c(bar_bright ? CLR_GREEN : CLR_DIM), progress * 100.0,
+             cli_c(CLR_RESET));
 }

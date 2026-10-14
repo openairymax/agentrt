@@ -550,7 +550,7 @@ static void cli_dag_board_print(cli_dag_board_node_t *n, const char *goal)
 {
     const char *icon, *color;
     cli_dag_board_icon_color(n->status, &icon, &color);
-    cli_outf("%s%s%s%s %s%s%s %s%s%s\n", cli_gutter_pad(4), cli_c(color), icon,
+    cli_outf("%s%s%s%s %s%s%s %s%s%s\n", cli_gutter(4), cli_c(color), icon,
            cli_c(CLR_RESET), cli_c(CLR_CYAN), n->id, cli_c(CLR_RESET), cli_c(CLR_DIM),
            goal ? goal : "", cli_c(CLR_RESET));
 }

@@ -62,15 +62,10 @@ add_executable(airy_cli
     # 机制，非渲染职责；render 域仅保留展示模块）
     src/core/cli_think.c
     src/core/cli_dag.c
-    # cli_display.c 域拆分（2026-08-27：963 行 → 2 个展示职责模块；
-    # live board 于 0.1.19 随 sdk/tui 承接能力格而清退）
-    src/render/cli_display.c
-    src/render/cli_banner.c
     src/cmd/cli_cmds.c
-    # cli_render.c 域拆分（2026-08-27：1695 行 → 3 个渲染职责模块；
-    # 0.1.19 直印化：airy_cli_markdown.c 清退 → 2 个）
+    # cli_render.c：渲染域唯一机制件（0.1.19 M5-3：直印化后体验渲染三件
+    # cli_display/cli_banner/airy_cli_output 活代码收编于此，全部清退）
     src/render/cli_render.c
-    src/render/airy_cli_output.c
     src/core/cli_term.c
     # TUI 引擎（2026-08-27 域拆分：cli_tui.c 3988 行 → 7 文件）
     src/tui/cli_tui.c
@@ -251,17 +246,21 @@ if(BUILD_TESTS)
     # mock 网关承接出站派发，断言 tool.approve 的 request_id/decision 逐字
     # 抵达、本地自检不出站、pending 三形态解析容错。与 cli_gw_e2e 同策略
     # （mock 服务端直引 POSIX 头面 + pthread），Windows 腿不参与。
+    # 0.1.19 M5-3：cli_render.c 收编后经 cli_internal.h 依赖 cognition.h
+    # （→ corekern airy_rt.h），链接面对齐 test_cli_usage（coreloopthree
+    # 传递 usage requirements 承载解析链）。
     if(NOT WIN32)
         add_executable(test_cli_approval tests/test_cli_approval.c
                        src/cmd/airy_cli_cmd_approval.c src/cmd/cli_gw.c
-                       src/render/cli_render.c src/render/airy_cli_output.c
+                       src/render/cli_render.c src/core/cli_dag.c
                        src/core/cli_term.c)
         target_include_directories(test_cli_approval PRIVATE ${CLI_INC_DIRS})
         target_compile_definitions(test_cli_approval PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
         if(AIRY_CJSON_INCLUDE_DIRS)
             target_include_directories(test_cli_approval PRIVATE ${AIRY_CJSON_INCLUDE_DIRS})
         endif()
-        target_link_libraries(test_cli_approval PRIVATE airy_common Threads::Threads)
+        target_link_libraries(test_cli_approval PRIVATE airy_coreloopthree airy_common
+                                                        Threads::Threads)
         if(TARGET cJSON OR TARGET cjson)
             target_link_libraries(test_cli_approval PRIVATE $<IF:$<TARGET_EXISTS:cJSON>,cJSON,cjson>)
         elseif(AIRY_CJSON_LIBRARIES)
@@ -281,7 +280,7 @@ if(BUILD_TESTS)
         add_executable(test_cli_session tests/test_cli_session.c
                        src/chat/cli_chat_session.c src/chat/cli_chat_history.c
                        src/cmd/cli_gw.c src/render/cli_render.c
-                       src/render/airy_cli_output.c src/core/cli_term.c)
+                       src/core/cli_dag.c src/core/cli_term.c)
         target_include_directories(test_cli_session PRIVATE ${CLI_INC_DIRS})
         target_compile_definitions(test_cli_session PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
         if(AIRY_CJSON_INCLUDE_DIRS)
