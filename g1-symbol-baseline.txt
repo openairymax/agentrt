@@ -33,7 +33,6 @@ airy_cognition_set_grad_enabled
 airy_cognition_set_llm_adapter
 airy_cognition_set_llm_service
 airy_cognition_set_llm_streaming
-airy_cognition_set_memory
 airy_cognition_set_memory_provider
 airy_cognition_set_plan_strategy
 airy_cognition_set_tc3_models
@@ -122,17 +121,6 @@ airy_mem_realloc_ex
 airy_mem_stats
 airy_memcpy_s
 airy_memmove_s
-airy_memory_create
-airy_memory_destroy
-airy_memory_evolve
-airy_memory_get
-airy_memory_health_check
-airy_memory_mount
-airy_memory_query
-airy_memory_record_free
-airy_memory_result_free
-airy_memory_set_provider
-airy_memory_write
 airy_memset_s
 airy_metric_counter_create
 airy_metric_counter_inc
