@@ -310,8 +310,8 @@ int cli_cognition_review(const char *agent_sock, const char *task, const airy_ta
     int hc_rc = cli_gw_call("agent.health_check", NULL, CLI_REVIEW_HEALTH_TIMEOUT_MS, &hc);
     if (hc_rc != 0) {
         AIRY_FREE(hc);
-        cli_render_sub_agent_line(CLI_ROLE_ERROR, "review",
-                                  "cognition review unavailable: agent_d health check failed");
+        cli_print_line("Sub review Agent",
+                       "cognition review unavailable: agent_d health check failed");
         return 0;
     }
     AIRY_FREE(hc);
@@ -359,13 +359,14 @@ int cli_cognition_review(const char *agent_sock, const char *task, const airy_ta
             produced++;
         } else {
             /* Rendering happens here (main thread) — never inside workers. */
-            cli_render_sub_agent_line(CLI_ROLE_ERROR, cli_review_topics[i].name,
-                                      cli_review_err_str(jobs[i].status));
+            char hdr[24];
+            snprintf(hdr, sizeof(hdr), "Sub %s Agent", cli_review_topics[i].name);
+            cli_print_line(hdr, cli_review_err_str(jobs[i].status));
         }
     }
     if (produced == 0) {
-        cli_render_sub_agent_line(CLI_ROLE_ERROR, "review",
-                                  "cognition review produced no verdicts");
+        cli_print_line("Sub review Agent",
+                       "cognition review produced no verdicts");
         AIRY_FREE(jobs);
         AIRY_FREE(threads);
         return 0;

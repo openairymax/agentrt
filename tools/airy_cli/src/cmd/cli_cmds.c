@@ -30,23 +30,19 @@ int cmd_help(const char *arg, void *ctx)
         {CLI_CAT_RESOURCE, "资源"},
         {CLI_CAT_SECURITY, "安全"},
     };
-    cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, NULL, "可用命令（按类别）");
+    cli_print_status("Super Agent", "可用命令（按类别）");
     size_t ncmds = cli_commands_count();
     for (size_t g = 0; g < sizeof(groups) / sizeof(groups[0]); g++) {
-        cli_outf("  %s── %s ──%s\n", cli_c(CLR_YELLOW), groups[g].title, cli_c(CLR_RESET));
+        cli_outf("  ── %s ──\n", groups[g].title);
         for (size_t i = 0; i < ncmds; i++) {
             if (CLI_COMMANDS[i].category != groups[g].cat)
                 continue;
-            cli_outf("    %s%-8s%s  %s\n", cli_c(CLR_CYAN), CLI_COMMANDS[i].name,
-                     cli_c(CLR_RESET), CLI_COMMANDS[i].desc);
+            cli_outf("    %-8s  %s\n", CLI_COMMANDS[i].name, CLI_COMMANDS[i].desc);
         }
     }
-    cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, NULL,
-                         "普通输入直接对话或下达任务指令。");
-    cli_outf("  %s快捷键：%sF8%s 全屏↔行渲染切换 · %sF10/F9%s 内置输入法"
-             "中/英切换（AIRY_IME_KEY=f9/f10/both 可配置）\n",
-             cli_c(CLR_DIM), cli_c(CLR_CYAN), cli_c(CLR_RESET),
-             cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_print_status("Super Agent", "普通输入直接对话或下达任务指令。");
+    cli_outf("  快捷键：F8 全屏↔行渲染切换 · F10/F9 内置输入法"
+             "中/英切换（AIRY_IME_KEY=f9/f10/both 可配置）\n");
     return 0;
 }
 
@@ -81,7 +77,7 @@ int cmd_status(const char *arg, void *ctx)
     if (err != AIRY_EOK) {
         char line[128];
         snprintf(line, sizeof(line), "任务列表查询失败：%s", cli_err_desc((int)err));
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "状态", line);
+        cli_print_line("Super Agent:状态", line);
         return 0;
     }
 
@@ -89,8 +85,8 @@ int cmd_status(const char *arg, void *ctx)
         if (g_cli_print_mode) {
             cli_outf("sched idle\n");
         } else {
-            cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "status",
-                                 "调度器空闲，无活动任务");
+            cli_print_status("Super Agent:status",
+                             "调度器空闲，无活动任务");
         }
         return 0;
     }
@@ -100,17 +96,22 @@ int cmd_status(const char *arg, void *ctx)
     if (g_cli_print_mode) {
         cli_outf("sched dags=%zu\n", count);
     } else {
-        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "status", line);
+        cli_print_status("Super Agent:status", line);
     }
     for (size_t i = 0; i < count; i++) {
         cli_dag_item_t *it = &items[i];
         double prog = (it->node_count > 0)
                           ? ((double)it->done / (double)it->node_count)
                           : 0.0;
-        if (g_cli_print_mode)
+        if (g_cli_print_mode) {
             cli_outf("  %s %s %.0f%%\n", it->dag_id, it->status, prog * 100.0);
-        else
-            cli_render_task_line("sched_d", it->dag_id, it->status, prog);
+        } else {
+            char hdr[96], txt[64];
+            snprintf(hdr, sizeof(hdr), "sched_d:%s", it->dag_id);
+            snprintf(txt, sizeof(txt), "%s %.0f%%", cli_state_cn(it->status),
+                     prog * 100.0);
+            cli_print_status(hdr, txt);
+        }
     }
     return 0;
 }
@@ -293,7 +294,7 @@ static int cli_chain_render_task(const char *task_id)
         if (g_cli_print_mode)
             cli_outf("chain task=%s events=0\n", task_id);
         else
-            cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "chain", line);
+            cli_print_status("Super Agent:chain", line);
         return 0;
     }
 
@@ -323,15 +324,13 @@ static int cli_chain_render_task(const char *task_id)
 
     char head[256];
     snprintf(head, sizeof(head), "决策链 %s · %zu 事件（gseq 全局因果序）", task_id, nev);
-    cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "chain", head);
+    cli_print_status("Super Agent:chain", head);
     for (size_t i = 0; i < nev; i++) {
         char label[256];
         cli_chain_label(evs[i].cat, evs[i].content, label, sizeof(label));
         const char *catn = airy_hall_category_name((airy_hall_category_t)evs[i].cat);
-        cli_outf("  %s●%s [%s:%03llu] %s%s%s\n", cli_c(CLR_CYAN), cli_c(CLR_RESET), catn,
-                 (unsigned long long)evs[i].gseq, cli_c(CLR_BOLD), label, cli_c(CLR_RESET));
-        cli_outf("      %s%s%s\n", cli_c(CLR_DIM), cli_chain_trim(evs[i].content),
-                 cli_c(CLR_RESET));
+        cli_outf("  [%s:%03llu] %s\n", catn, (unsigned long long)evs[i].gseq, label);
+        cli_outf("      %s\n", cli_chain_trim(evs[i].content));
     }
     for (size_t i = 0; i < nev; i++)
         AIRY_FREE(evs[i].content);
@@ -342,8 +341,8 @@ int cmd_chain(const char *arg, void *ctx)
 {
     (void)ctx;
     if (!g_cli_hall_store) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "事件流",
-                             "事件流不可用（hall store 未创建）");
+        cli_print_line("Super Agent:事件流",
+                       "事件流不可用（hall store 未创建）");
         return 0;
     }
     if (arg && arg[0])
@@ -356,15 +355,15 @@ int cmd_chain(const char *arg, void *ctx)
     if (err != AIRY_SUCCESS) {
         char line[128];
         snprintf(line, sizeof(line), "任务枚举失败：%s", cli_err_desc((int)err));
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "事件流", line);
+        cli_print_line("Super Agent:事件流", line);
         return 0;
     }
     if (n == 0) {
         if (g_cli_print_mode)
             cli_outf("chain tasks=0\n");
         else
-            cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "chain",
-                                 "事件流为空：执行过任务后可用 /chain 查看真实决策链");
+            cli_print_status("Super Agent:chain",
+                             "事件流为空：执行过任务后可用 /chain 查看真实决策链");
         return 0;
     }
     if (g_cli_print_mode) {
@@ -376,13 +375,11 @@ int cmd_chain(const char *arg, void *ctx)
     }
     char line[128];
     snprintf(line, sizeof(line), "事件流任务 · %zu 个", n);
-    cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "chain", line);
+    cli_print_status("Super Agent:chain", line);
     for (size_t i = 0; i < n; i++) {
-        cli_outf("    %s◇%s %s%s%s\n", cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_BOLD),
-                 tasks[i], cli_c(CLR_RESET));
+        cli_outf("    %s\n", tasks[i]);
     }
-    cli_outf("    %s查看单任务决策链：/chain <task_id>（如 /chain preflight）%s\n",
-             cli_c(CLR_DIM), cli_c(CLR_RESET));
+    cli_outf("    查看单任务决策链：/chain <task_id>（如 /chain preflight）\n");
     airy_hall_store_free_strings(tasks, n);
     return 0;
 }
@@ -391,8 +388,8 @@ int cmd_hall(const char *arg, void *ctx)
 {
     (void)ctx;
     if (!g_cli_hall_store) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "事件流",
-                             "事件流不可用（hall store 未创建）");
+        cli_print_line("Super Agent:事件流",
+                       "事件流不可用（hall store 未创建）");
         return 0;
     }
 
@@ -409,7 +406,7 @@ int cmd_hall(const char *arg, void *ctx)
         if (err != AIRY_SUCCESS) {
             char line[160];
             snprintf(line, sizeof(line), "审计失败：%s", cli_err_desc((int)err));
-            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "事件流", line);
+            cli_print_line("Super Agent:事件流", line);
             return 0;
         }
         if (g_cli_print_mode) {
@@ -423,7 +420,7 @@ int cmd_hall(const char *arg, void *ctx)
                      (au.missing == 0 && au.corrupted == 0 && au.indexed == au.verified)
                          ? "（append-only 完整，已记录⟺可见）"
                          : "（存在异常，见缺失/损坏计数）");
-            cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "hall", line);
+            cli_print_status("Super Agent:hall", line);
         }
         return 0;
     }
@@ -436,7 +433,7 @@ int cmd_hall(const char *arg, void *ctx)
         if (err != AIRY_SUCCESS) {
             char line[160];
             snprintf(line, sizeof(line), "回放失败：%s", cli_err_desc((int)err));
-            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "事件流", line);
+            cli_print_line("Super Agent:事件流", line);
             return 0;
         }
         size_t limit = 8;
@@ -453,12 +450,11 @@ int cmd_hall(const char *arg, void *ctx)
             char line[192];
             snprintf(line, sizeof(line), "事件流全局回放 · 共 %zu 条（gseq 全局因果序，显示 %zu）",
                      gc, limit);
-            cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "hall", line);
+            cli_print_status("Super Agent:hall", line);
             for (size_t i = 0; i < limit; i++) {
                 char content[CLI_CHAIN_CONTENT_CAP];
                 cli_chain_extract_content(glob[i], content, sizeof(content));
-                cli_outf("  %s[%s] %s\n", cli_c(CLR_CYAN), cli_c(CLR_RESET),
-                         cli_chain_trim(content));
+                cli_outf("  %s\n", cli_chain_trim(content));
             }
         }
         airy_hall_store_free_strings(glob, gc);
@@ -478,7 +474,7 @@ int cmd_hall(const char *arg, void *ctx)
         snprintf(line, sizeof(line),
                  "事件流任务 %zu 个 · /hall audit 审计完整性 /hall replay [n] 全局回放",
                  n);
-        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "hall", line);
+        cli_print_status("Super Agent:hall", line);
     }
     return 0;
 }

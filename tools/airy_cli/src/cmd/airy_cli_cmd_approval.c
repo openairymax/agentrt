@@ -58,33 +58,18 @@ static void cli_approval_item(size_t idx, cJSON *item)
     cli_approval_time(cJSON_IsNumber(ts) ? (uint64_t)ts->valuedouble : 0, timestr,
                       sizeof(timestr));
 
-    cli_out(cli_c(CLR_DIM));
-    cli_outf("  %-2zu%s", idx, CLI_ICON_TODO);
-    cli_out(cli_c(CLR_RESET));
-    cli_out(cli_c(CLR_DIM));
-    cli_outf(" [%s] ", timestr);
-    cli_out(cli_c(CLR_RESET));
-    cli_out(cli_c(CLR_CYAN));
-    cli_out(tool);
-    cli_out(cli_c(CLR_RESET));
-    cli_out(cli_c(CLR_DIM));
-    cli_outf("  (%s)\n", agent);
-    cli_out(cli_c(CLR_RESET));
-
-    cli_outf("     %s%s\n", CLI_ICON_BRANCH, id);
+    cli_outf("  %-2zu [%s] %s  (%s)\n", idx, timestr, tool, agent);
+    cli_outf("     %s\n", id);
     if (params[0]) {
         size_t plen = cli_utf8_safe_len(params, 88);
-        cli_out(cli_c(CLR_DIM));
-        cli_outf("     %s %.*s%s\n", CLI_ICON_BRANCH, (int)plen, params,
-                 params[plen] ? "…" : "");
-        cli_out(cli_c(CLR_RESET));
+        cli_outf("     %.*s%s\n", (int)plen, params, params[plen] ? "…" : "");
     }
 }
 
 static void cli_approval_usage(void)
 {
-    cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
-                         "/approve <request_id> allow|always|deny");
+    cli_print_status("Sub Agent:usage",
+                     "/approve <request_id> allow|always|deny");
     cli_outf("    allow=允许本次 · always=始终允许 · deny=拒绝\n");
 }
 
@@ -96,13 +81,13 @@ int cmd_pending(const char *arg, void *ctx)
     char *res = NULL;
     if (cli_gw_call("tool.pending", NULL, CLI_RPC_TIMEOUT_MS, &res) != 0 || !res) {
         AIRY_FREE(res);
-        cli_render_sub_agent_line(CLI_ROLE_ERROR, "approval", "审批服务不可用（tool.pending）");
+        cli_print_line("Sub approval Agent", "审批服务不可用（tool.pending）");
         return 0;
     }
     cJSON *root = cli_approval_unwrap(cJSON_Parse(res));
     AIRY_FREE(res);
     if (!root) {
-        cli_render_sub_agent_line(CLI_ROLE_ERROR, "approval", "审批响应解析失败");
+        cli_print_line("Sub approval Agent", "审批响应解析失败");
         return 0;
     }
 
@@ -113,16 +98,16 @@ int cmd_pending(const char *arg, void *ctx)
 
     char hdr[128];
     snprintf(hdr, sizeof(hdr), "待批工具调用 · %zu 项", n);
-    cli_render_sub_agent_line(CLI_ROLE_STATUS, "approval", hdr);
+    cli_print_status("Sub approval Agent", hdr);
 
     if (n == 0) {
-        cli_outf("  %s 当前无待审批请求\n", CLI_ICON_INFO);
+        cli_outf("  当前无待审批请求\n");
         cJSON_Delete(root);
         return 0;
     }
     for (size_t i = 0; i < n; i++)
         cli_approval_item(i + 1, cJSON_GetArrayItem(arr, (int)i));
-    cli_outf("  %s 决议：/approve <request_id> allow|always|deny\n", CLI_ICON_INFO);
+    cli_outf("  决议：/approve <request_id> allow|always|deny\n");
     cJSON_Delete(root);
     return 0;
 }
@@ -154,7 +139,7 @@ int cmd_approve(const char *arg, void *ctx)
     char request_id[192];
     size_t idlen = (size_t)(sp - arg);
     if (idlen == 0 || idlen >= sizeof(request_id)) {
-        cli_render_sub_agent_line(CLI_ROLE_ERROR, "approval", "request_id 非法");
+        cli_print_line("Sub approval Agent", "request_id 非法");
         return 0;
     }
     AIRY_MEMCPY(request_id, arg, idlen);
@@ -170,8 +155,8 @@ int cmd_approve(const char *arg, void *ctx)
 
     if (strcmp(decision, "allow") != 0 && strcmp(decision, "always") != 0 &&
         strcmp(decision, "deny") != 0) {
-        cli_render_sub_agent_line(CLI_ROLE_ERROR, "approval",
-                                  "决议非法（allow / always / deny）");
+        cli_print_line("Sub approval Agent",
+                       "决议非法（allow / always / deny）");
         return 0;
     }
 
@@ -182,13 +167,13 @@ int cmd_approve(const char *arg, void *ctx)
     char *res = NULL;
     if (cli_gw_call("tool.approve", params, CLI_RPC_TIMEOUT_MS, &res) != 0 || !res) {
         AIRY_FREE(res);
-        cli_render_sub_agent_line(CLI_ROLE_ERROR, "approval", "审批决议回传失败（tool.approve）");
+        cli_print_line("Sub approval Agent", "审批决议回传失败（tool.approve）");
         return 0;
     }
     cJSON *root = cli_approval_unwrap(cJSON_Parse(res));
     AIRY_FREE(res);
     if (!root) {
-        cli_render_sub_agent_line(CLI_ROLE_ERROR, "approval", "审批决议响应解析失败");
+        cli_print_line("Sub approval Agent", "审批决议响应解析失败");
         return 0;
     }
     cJSON *resolved = cJSON_GetObjectItem(root, "resolved");
@@ -198,7 +183,10 @@ int cmd_approve(const char *arg, void *ctx)
     snprintf(line, sizeof(line), "决议%s：%s（%s）", ok ? "已回传" : "未生效",
              cli_approval_label(decision),
              (cJSON_IsString(rid) && rid->valuestring) ? rid->valuestring : request_id);
-    cli_render_sub_agent_line(ok ? CLI_ROLE_STATUS : CLI_ROLE_ERROR, "approval", line);
+    if (ok)
+        cli_print_status("Sub approval Agent", line);
+    else
+        cli_print_line("Sub approval Agent", line);
     cJSON_Delete(root);
     return 0;
 }

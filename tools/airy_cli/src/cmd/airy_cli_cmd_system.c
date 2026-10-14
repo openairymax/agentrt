@@ -190,6 +190,19 @@ const char *cli_ns_sock(const char *ns)
 #endif
 }
 
+/* 0.1.19 直印化：Sub <ns> Agent 动态头（ns 运行期可变，无法字面量直印）。
+ * ERROR 走 cli_print_line（-p 下保留），其余走 cli_print_status（-p 下静默），
+ * 与原 cli_render_sub_agent_line 的 -p 语义逐点等价。 */
+static void cli_sub_print(cli_role_t role, const char *ns, const char *text)
+{
+    char hdr[80];
+    snprintf(hdr, sizeof(hdr), "Sub %s Agent", ns);
+    if (role == CLI_ROLE_ERROR)
+        cli_print_line(hdr, text);
+    else
+        cli_print_status(hdr, text);
+}
+
 void cli_rpc_print(const char *ns, const char *method, const char *params_json)
 {
     char *result = NULL;
@@ -199,7 +212,7 @@ void cli_rpc_print(const char *ns, const char *method, const char *params_json)
     if (rc != 0 || !result) {
         char line[160];
         snprintf(line, sizeof(line), "%s.%s 调用失败：%s", ns, method, cli_err_desc(rc));
-        cli_render_sub_agent_line(CLI_ROLE_ERROR, ns, line);
+        cli_sub_print(CLI_ROLE_ERROR, ns, line);
         AIRY_FREE(result);
         return;
     }
@@ -208,7 +221,7 @@ void cli_rpc_print(const char *ns, const char *method, const char *params_json)
         AIRY_FREE(result);
         return;
     }
-    cli_render_sub_agent(ns, result);
+    cli_sub_print(CLI_ROLE_SUB_AGENT, ns, result);
     AIRY_FREE(result);
 }
 
@@ -218,8 +231,7 @@ int cmd_rpc(const char *arg, void *ctx)
 {
     (void)ctx;
     if (!arg || arg[0] == '\0') {
-        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUB_AGENT, "usage",
-                              "/rpc <ns>.<method> [json参数]");
+        cli_print_status("Sub Agent:usage", "/rpc <ns>.<method> [json参数]");
         cli_outf("    例: /rpc mem.search {\"query\":\"hello\"}\n");
         cli_outf("        /rpc cupolas.check_permission {\"agent_id\":\"a\",\"action\":\"read\","
                "\"resource\":\"fs:///tmp/x\"}\n");
@@ -227,8 +239,7 @@ int cmd_rpc(const char *arg, void *ctx)
     }
     const char *dot = strchr(arg, '.');
     if (!dot) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "用法",
-                              "需要 <ns>.<method> 形式");
+        cli_print_line("Sub Agent:用法", "需要 <ns>.<method> 形式");
         return 0;
     }
     char ns[64];
@@ -239,8 +250,8 @@ int cmd_rpc(const char *arg, void *ctx)
 
     char ns_resolved[64];
     if (cli_ns_resolve(ns, ns_resolved, sizeof(ns_resolved)) != 0) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "RPC",
-                             "未知 daemon 命名空间，/daemons 查看在线列表");
+        cli_print_line("Sub Agent:RPC",
+                       "未知 daemon 命名空间，/daemons 查看在线列表");
         return 0;
     }
 
@@ -268,19 +279,18 @@ int cmd_daemons(const char *arg, void *ctx)
     size_t dcount = cli_daemons_discover(dyn, 32);
     size_t total = dcount ? dcount : CLI_DAEMONS_COUNT;
     const cli_daemon_desc_t *tab = dcount ? dyn : CLI_DAEMONS;
-    if (!g_cli_print_mode)
-        cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "daemon", "health check");
+    cli_print_status("Super Agent:daemon", "health check");
     for (size_t i = 0; i < total; i++) {
         char *result = NULL;
         int rc = daemon_rpc_call(cli_ns_sock(tab[i].ns), tab[i].health_method,
                                  NULL, &result, 6000);
         if (rc == 0 && result) {
             if (g_cli_print_mode) cli_outf("%s online\n", tab[i].ns);
-            else cli_render_task_line(NULL, tab[i].ns, "online", 1.0);
+            else cli_print_status(tab[i].ns, "在线 100%");
             online++;
         } else {
             if (g_cli_print_mode) cli_outf("%s offline\n", tab[i].ns);
-            else cli_render_task_line(NULL, tab[i].ns, "offline", 0.0);
+            else cli_print_status(tab[i].ns, "离线 0%");
         }
         AIRY_FREE(result);
     }
@@ -344,15 +354,17 @@ int cmd_daemons(const char *arg, void *ctx)
             close(s);
         }
 #endif
-        if (g_cli_print_mode) cli_outf("gateway %s\n", gw_ok ? "online" : "offline");
-        else cli_render_task_line(NULL, "gateway", gw_ok ? "online" : "offline", gw_ok ? 1.0 : 0.0);
+        if (g_cli_print_mode)
+            cli_outf("gateway %s\n", gw_ok ? "online" : "offline");
+        else
+            cli_print_status("gateway", gw_ok ? "在线 100%" : "离线 0%");
         if (gw_ok) online++;
     }
     {
         char line[64];
         snprintf(line, sizeof(line), "online %d/%zu", online, total + 1);
         if (g_cli_print_mode) cli_outf("%s\n", line);
-        else cli_render_role_line(CLI_ROLE_STATUS, CLI_ACTOR_SUPER_AGENT, "daemon", line);
+        else cli_print_status("Super Agent:daemon", line);
     }
     return 0;
 }
@@ -389,12 +401,13 @@ static int cli_daemon_start(const char *ns)
 {
     char bin[512];
     if (!cli_daemon_bin(ns, bin, sizeof(bin))) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, ns,
-                             "二进制不存在（$AIRY_HOME/bin 下未找到），先安装/构建");
+        char hdr[80];
+        snprintf(hdr, sizeof(hdr), "Sub Agent:%s", ns);
+        cli_print_line(hdr, "二进制不存在（$AIRY_HOME/bin 下未找到），先安装/构建");
         return -1;
     }
     if (cli_daemon_online(ns)) {
-        cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, "already online");
+        cli_sub_print(CLI_ROLE_TRACE, ns, "already online");
         return 0;
     }
     char logf[640];
@@ -463,7 +476,7 @@ static int cli_daemon_wait_online(const char *ns, int timeout_ms)
 static int cli_daemon_stop(const char *ns)
 {
     if (!cli_daemon_online(ns)) {
-        cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, "already offline");
+        cli_sub_print(CLI_ROLE_TRACE, ns, "already offline");
         return 0;
     }
     char *result = NULL;
@@ -556,12 +569,12 @@ int cli_daemon_lifecycle_reconcile_once(void)
         char bin[512];
         if (!cli_daemon_bin(a->ns, bin, sizeof(bin))) continue;
         if (cli_daemon_start(a->ns) != 0) {
-            cli_render_sub_agent_line(CLI_ROLE_ERROR, a->ns, "self-heal restart failed"); continue;
+            cli_sub_print(CLI_ROLE_ERROR, a->ns, "self-heal restart failed"); continue;
         }
         a->restarts++; a->last_restart_ms = now; restarted++;
         char line[128];
         snprintf(line, sizeof(line), "offline → auto-restarted (%d/%d)", a->restarts, g_selfheal.max_restarts);
-        cli_render_sub_agent_line(CLI_ROLE_ERROR, a->ns, line);
+        cli_sub_print(CLI_ROLE_ERROR, a->ns, line);
     }
     return restarted;
 }
@@ -594,8 +607,11 @@ int cmd_daemon(const char *arg, void *ctx)
             char resolved[64];
             if (cli_ns_resolve(tokbuf, resolved, sizeof(resolved)) == 0)
                 ns_list[ns_count++] = AIRY_STRDUP(resolved);
-            else
-                cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, tokbuf, "未知 daemon 命名空间，已忽略");
+            else {
+                char hdr[80];
+                snprintf(hdr, sizeof(hdr), "Sub Agent:%s", tokbuf);
+                cli_print_line(hdr, "未知 daemon 命名空间，已忽略");
+            }
             p = tok + tlen;
             while (*p == ' ') p++;
         }
@@ -609,24 +625,24 @@ int cmd_daemon(const char *arg, void *ctx)
         for (size_t i = 0; i < ns_count; i++) {
             int up = cli_daemon_online(ns_list[i]);
             if (g_cli_print_mode) cli_outf("%s %s\n", ns_list[i], up ? "online" : "offline");
-            else cli_render_task_line(NULL, ns_list[i], up ? "online" : "offline", up ? 1.0 : 0.0);
+            else cli_print_status(ns_list[i], up ? "在线 100%" : "离线 0%");
         }
     } else if (strcmp(action, "start") == 0) {
         for (size_t i = 0; i < ns_count; i++) {
             if (cli_daemon_start(ns_list[i]) == 0) {
                 const char *st = cli_daemon_wait_online(ns_list[i], 8000) ? "started" : "starting";
                 if (g_cli_print_mode) cli_outf("%s %s\n", ns_list[i], st);
-                else cli_render_sub_agent_line(CLI_ROLE_TRACE, ns_list[i], st);
+                else cli_sub_print(CLI_ROLE_TRACE, ns_list[i], st);
             }
         }
     } else if (strcmp(action, "stop") == 0) {
         for (size_t i = 0; i < ns_count; i++) {
             if (cli_daemon_stop(ns_list[i]) == 0) {
                 if (g_cli_print_mode) cli_outf("%s stopped\n", ns_list[i]);
-                else cli_render_sub_agent_line(CLI_ROLE_TRACE, ns_list[i], "stopped");
+                else cli_sub_print(CLI_ROLE_TRACE, ns_list[i], "stopped");
             } else {
                 if (g_cli_print_mode) cli_outf("%s stop failed (timeout)\n", ns_list[i]);
-                else cli_render_sub_agent_line(CLI_ROLE_ERROR, ns_list[i], "stop failed (timeout)");
+                else cli_sub_print(CLI_ROLE_ERROR, ns_list[i], "stop failed (timeout)");
             }
         }
     } else if (strcmp(action, "restart") == 0) {
@@ -635,12 +651,12 @@ int cmd_daemon(const char *arg, void *ctx)
             if (cli_daemon_start(ns_list[i]) == 0) {
                 const char *st = cli_daemon_wait_online(ns_list[i], 8000) ? "restarted" : "restarting";
                 if (g_cli_print_mode) cli_outf("%s %s\n", ns_list[i], st);
-                else cli_render_sub_agent_line(CLI_ROLE_TRACE, ns_list[i], st);
+                else cli_sub_print(CLI_ROLE_TRACE, ns_list[i], st);
             }
         }
     } else {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUB_AGENT, "usage",
-                             "/daemon start|stop|restart|status [ns...]（默认全部）");
+        cli_print_line("Sub Agent:usage",
+                       "/daemon start|stop|restart|status [ns...]（默认全部）");
     }
 
     for (size_t i = 0; i < ns_count; i++) {
@@ -660,7 +676,7 @@ static void cli_mem_stats_show(const char *ns, const char *json)
 {
     cJSON *root = cJSON_Parse(json);
     if (!root) {
-        cli_render_sub_agent(ns, json);
+        cli_sub_print(CLI_ROLE_SUB_AGENT, ns, json);
         return;
     }
 
@@ -670,7 +686,7 @@ static void cli_mem_stats_show(const char *ns, const char *json)
     if (cJSON_IsNumber(records)) {
         snprintf(line, sizeof(line), "records %d / %d",
                  records->valueint, cJSON_IsNumber(max_records) ? max_records->valueint : 0);
-        cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, line);
+        cli_sub_print(CLI_ROLE_TRACE, ns, line);
     }
 
     const cJSON *cache = cJSON_GetObjectItem(root, "cache");
@@ -690,7 +706,7 @@ static void cli_mem_stats_show(const char *ns, const char *json)
                  "semantic cache: entries=%d hits=%d misses=%d hit_rate=%s evictions=%d",
                  e ? e->valueint : 0, h ? h->valueint : 0, m ? m->valueint : 0, rate,
                  v ? v->valueint : 0);
-        cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, line);
+        cli_sub_print(CLI_ROLE_TRACE, ns, line);
     }
 
     const cJSON *ledger = cJSON_GetObjectItem(root, "ledger");
@@ -700,7 +716,7 @@ static void cli_mem_stats_show(const char *ns, const char *json)
         const cJSON *t = cJSON_GetObjectItem(ledger, "total_tokens");
         snprintf(line, sizeof(line), "ledger: sessions=%d entries=%d total_tokens=%d",
                  s ? s->valueint : 0, e ? e->valueint : 0, t ? t->valueint : 0);
-        cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, line);
+        cli_sub_print(CLI_ROLE_TRACE, ns, line);
     }
 
     cJSON_Delete(root);
@@ -711,7 +727,7 @@ static void cli_llm_stats_show(const char *ns, const char *json)
 {
     cJSON *root = cJSON_Parse(json);
     if (!root) {
-        cli_render_sub_agent(ns, json);
+        cli_sub_print(CLI_ROLE_SUB_AGENT, ns, json);
         return;
     }
 
@@ -726,7 +742,7 @@ static void cli_llm_stats_show(const char *ns, const char *json)
                  "llm cache: size=%d/%d hits=%d misses=%d hit_rate=%.1f%%",
                  size ? size->valueint : 0, cap ? cap->valueint : 0, h ? h->valueint : 0,
                  m ? m->valueint : 0, r ? r->valuedouble * 100.0 : 0.0);
-        cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, line);
+        cli_sub_print(CLI_ROLE_TRACE, ns, line);
     }
 
     const cJSON *cost = cJSON_GetObjectItem(root, "cost");
@@ -741,7 +757,7 @@ static void cli_llm_stats_show(const char *ns, const char *json)
             snprintf(line, sizeof(line), "usage %s: in=%d out=%d cost=$%.6f",
                      cJSON_IsString(name) ? name->valuestring : "?", in ? in->valueint : 0,
                      out ? out->valueint : 0, usd ? usd->valuedouble : 0.0);
-            cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, line);
+            cli_sub_print(CLI_ROLE_TRACE, ns, line);
         }
     }
 
@@ -754,7 +770,7 @@ static void cli_lang_stats_show(const char *ns, const char *json)
 {
     cJSON *root = cJSON_Parse(json);
     if (!root) {
-        cli_render_sub_agent(ns, json);
+        cli_sub_print(CLI_ROLE_SUB_AGENT, ns, json);
         return;
     }
 
@@ -766,7 +782,7 @@ static void cli_lang_stats_show(const char *ns, const char *json)
     snprintf(line, sizeof(line), "lang gateway: process=%d calibrate=%d drift=%d interval=%d",
              pc ? pc->valueint : 0, cc ? cc->valueint : 0,
              dd ? dd->valueint : 0, ri ? ri->valueint : 0);
-    cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, line);
+    cli_sub_print(CLI_ROLE_TRACE, ns, line);
 
     const cJSON *profiles = cJSON_GetObjectItem(root, "profiles");
     if (cJSON_IsArray(profiles)) {
@@ -784,7 +800,7 @@ static void cli_lang_stats_show(const char *ns, const char *json)
                      cJSON_IsString(nl) ? nl->valuestring : "?",
                      ratio ? ratio->valuedouble : 0.0,
                      conf ? conf->valuedouble : 0.0);
-            cli_render_sub_agent_line(CLI_ROLE_TRACE, ns, line);
+            cli_sub_print(CLI_ROLE_TRACE, ns, line);
         }
     }
 
