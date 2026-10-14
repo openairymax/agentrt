@@ -330,13 +330,6 @@ am_resolve
 am_set_rule_enabled
 am_shutdown
 am_state_to_string
-are_ipc_checksum_compute
-are_ipc_header_init
-are_ipc_header_validate
-are_ipc_message_create
-are_ipc_message_destroy
-are_ipc_msg_type_str
-are_ipc_proto_str
 cb_allow_request
 cb_count
 cb_create
