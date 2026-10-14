@@ -231,6 +231,28 @@ void cli_print_plain(const char *text, size_t indent)
     }
 }
 
+/* ---- plain conversation line (0.1.19 直印化统一出口) ---- */
+
+void cli_print_line(const char *header, const char *content)
+{
+    cli_out("  [");
+    cli_out(header && header[0] ? header : "AgentRT");
+    cli_out("] ");
+    if (!content || !content[0]) {
+        cli_outc('\n');
+        return;
+    }
+    const char *nl = strchr(content, '\n');
+    if (!nl) {
+        cli_out(content);
+        cli_outc('\n');
+        return;
+    }
+    cli_outn(content, (size_t)(nl - content));
+    cli_outc('\n');
+    cli_print_plain(nl + 1, 2);
+}
+
 /* ---- status helpers ---- */
 
 /* 单一事实源：执行体的终态与失败态判定。sched_d 与工作大厅的终态串为

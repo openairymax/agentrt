@@ -259,6 +259,18 @@ const char *cli_render_actor_name(cli_actor_t actor);
 void cli_print_plain(const char *text, size_t indent);
 
 /**
+ * @brief Print a plain conversation line: "  [<header>] <content>".
+ *
+ * 0.1.19 直印化统一出口：role/tool 过程行在此收口。无色、无列对齐、
+ * 无 icon（排版体验由 agentrt-tui 承接）；首行接在头后，续行回落
+ * gutter，多行内容逐行原样。无模式判断——-p 抑制语义由调用点保持。
+ *
+ * @param header  bracket header (e.g. "Super Agent:对话")
+ * @param content message text (plain, may contain \n); NULL prints header only
+ */
+void cli_print_line(const char *header, const char *content);
+
+/**
  * @brief Print a role-tagged line: "[<actor>] <content>".
  *
  * The bracket is colored by role, content is rendered with markdown support.

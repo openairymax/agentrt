@@ -282,22 +282,11 @@ void cli_chat_reply(const char *input)
                         g_history_reasonings[hi]);
     cli_msgbuf_push(&buf, "user", input, NULL, NULL, NULL);
 
-    /* "思考中"状态行（spinner）。C-01 路线 A：对话主路径统一经 gateway
-     * llm.complete 非流式单发，交互 TTY 亦走 spinner + 完整渲染（打字机
-     * 直出随 cli_chat_stream.c 一并退役）。-p/--json 抑制 chrome。 */
-    int spinner_on = !g_cli_print_mode && !g_cli_json_mode;
-    if (spinner_on) {
-        char think_title[128];
-        /* 2.3.14：思考角色细分——t1-f 思考中显示 [Dual Fast Think] */
-        snprintf(think_title, sizeof(think_title), "%s (%s)",
-                 cli_render_actor_name(cli_chat_think_actor()),
-                 t1f_model ? t1f_model : "default");
-        cli_spinner_start(think_title);
-    }
-
     /* 工具回路：每轮 cli_chat_gw_round → gateway llm.complete 非流式单发。
      * 模型返回 tool_calls → 渲染过程卡片 + 执行 + 回填 → 续轮；
-     * 不再调用工具 → final_resp 即最终回复。护栏：轮次上限。 */
+     * 不再调用工具 → final_resp 即最终回复。护栏：轮次上限。
+     * 0.1.19 直印化：spinner 动画随体验面清退（agentrt-tui 承接），
+     * -p 进度走 cli_trace；行式 REPL 静默等待回复。 */
     llm_response_t *final_resp = NULL;
     int tool_rounds = 0;
     int force_summary = 0; /* 工具轮次用尽：撤下工具定义，强制基于已有结果总结 */
@@ -308,8 +297,6 @@ void cli_chat_reply(const char *input)
             if (resp)
                 llm_response_free(resp);
             int canceled = (ret == AIRY_ERR_CANCELED);
-            if (spinner_on)
-                cli_spinner_stop(0, canceled ? "canceled" : "reply failed");
             /* 人类可读的错误描述（数字码对用户无意义）。C-01 ③：gateway
              * 路径下 cli_gw_call / cli_chat_gw_round 已把可执行原因写入
              * g_cli_gw_err，cli_err_desc 一次性消费。S-02：取消码直通时
@@ -325,7 +312,7 @@ void cli_chat_reply(const char *input)
             char line[384];
             snprintf(line, sizeof(line), "%s：%s",
                      canceled ? "已取消" : "回复失败", err_desc);
-            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "对话", line);
+            cli_print_line("Super Agent:对话", line);
             cli_msgbuf_free(&buf);
             return;
         }
@@ -359,9 +346,6 @@ void cli_chat_reply(const char *input)
         final_resp = resp;
         break;
     }
-
-    if (spinner_on)
-        cli_spinner_stop(1, NULL);
 
     /* 2.2.4 对话记忆写入：一轮对话完成且有回复时落盘（用户输入+回复，只记
      * 事实）。0.1.18 B4：思考链不入长期记忆——该库为 CLI 与 TUI 共用，写入
