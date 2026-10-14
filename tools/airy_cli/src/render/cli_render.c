@@ -253,6 +253,13 @@ void cli_print_line(const char *header, const char *content)
     cli_print_plain(nl + 1, 2);
 }
 
+void cli_print_status(const char *header, const char *content)
+{
+    if (g_cli_print_mode)
+        return;
+    cli_print_line(header, content);
+}
+
 /* ---- status helpers ---- */
 
 /* 单一事实源：执行体的终态与失败态判定。sched_d 与工作大厅的终态串为
