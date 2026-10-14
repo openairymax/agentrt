@@ -3,30 +3,15 @@
 
 /**
  * @file cli_render.h
- * @brief airy_cli rendering layer: roles, colors, markdown and progress display.
+ * @brief airy_cli 终端输出机制层公共接口。
  *
- * Unified terminal rendering for the AgentRT CLI. Every conversation line is
- * tagged with a speaker role so the user can tell actors apart at a glance:
+ * 0.1.19 M5-3 清退收口后的 render 域唯一头：输出原语、-p 进度通道、
+ * 主题色门、UTF-8 宽度、缩进槽、plain 直印出口与执行体状态辅助。
+ * role 卡片 / spinner / phase 等体验渲染已整体删除，排版体验由
+ * agentrt-tui（sdk/tui）承接。
  *
- *   - [For Thee]     the human operator (cyan)
- *   - [Super Agent]  agentrt itself, replies and decisions (green)
- *   - [Dual Think]   dual-thinking system traces (yellow); chain variants
- *                    [Dual Slow Think] (t2) / [Dual Fast Think] (t1-f) /
- *                    [Dual Prof Think] (t1-p) tag the active thinking track
- *   - [Sub xxx Agent] sub-agents and executors running nodes (magenta)
- *
- * Design follows the Claude Code / Codex CLI conventions:
- *   - everything left-aligned on a shared gutter
- *   - a small icon set (› • ✓ ✗ ◇ □ ✔ ⚠ ⓘ) encodes status at a glance
- *   - a one-line status indicator (spinner + title + elapsed) during work
- *   - a thin turn separator after each finished turn
- *   - lightweight markdown (headings, lists, checkboxes, quotes, code blocks,
- *     inline bold/emph/code); tables degrade to key/value rows
- *
- * The renderer is line-oriented and stream-safe (no TTY capture, no curses):
- * it prints to stdout, keeps the Linux "small tools that do one thing" spirit
- * and works identically over SSH / plain terminals / logged output. When
- * stdout is not a TTY the animated status line degrades to a static line.
+ * 面向流安全、行式输出：无 TTY 捕获、无 curses，直写 stdout，本地
+ * 终端、SSH 与管道日志行为完全一致。
  */
 
 #ifndef AIRY_CLI_RENDER_H
@@ -48,23 +33,16 @@ extern "C" {
 extern int g_cli_print_mode;
 extern int g_cli_json_mode;
 
-/* ---- reply folding (2026-08-17) ----
- *
- * 对话不再暴露工具参数与结果内容，只展示"过程"（动作名）；长回复在
- * 完成后折叠为前几行 + 折叠尾，避免占屏（Linux 工程哲学：最小输出，
- * 全量保留在日志/历史中）。 */
-
-/* 空回复占位（2026-08-17）：模型未产生文本回复（thinking 模型可能
- * 只输出 reasoning_content，或 provider 异常）时渲染明确提示，避免
- * 对话中出现"空返回"却无任何说明。 */
+/* 空回复占位：模型未产生文本回复（thinking 模型可能只输出
+ * reasoning_content，或 provider 异常）时渲染明确提示，避免对话中出现
+ * "空返回"却无任何说明。 */
 #define CLI_REPLY_EMPTY_HINT "（未产生回复：模型可能仅生成了思考内容，请重试）"
 
-/* 截断提示（0.1.17）：finish_reason=length 表示收到的正文只是模型答案的
- * 前缀，此前被当作完整回复渲染。渲染明确提示，避免用户误判为完整答案。 */
+/* 截断提示：finish_reason=length 表示收到的正文只是模型答案的前缀，
+ * 渲染明确提示，避免用户误判为完整答案。 */
 #define CLI_REPLY_TRUNCATED_HINT "（回复已达输出上限被截断，以上内容不完整；请缩短问题后重试）"
 
-/* 思考链默认隐藏提示（0.1.18 B4）：思考链与对话正文不再共用渲染通道，
- * 默认不上屏（含 ≤4 行短链）；此处只给可操作指引，不携带任何推理原文。
+/* 思考链默认隐藏提示：思考链与对话正文不共用渲染通道，默认不上屏；
  * 完整文本经诊断通道留存，显式取用（-p 的 stderr trace / --json 的
  * reasoning 字段 / 该日志）。 */
 #define CLI_REPLY_THINK_HIDDEN_HINT \
@@ -107,13 +85,9 @@ void cli_trace(const char *tag, const char *fmt, ...) __attribute__((format(prin
 void cli_trace(const char *tag, const char *fmt, ...);
 #endif
 
-/* Shortcuts mirroring the historical fputs/fputc(stdout) call sites. */
-#define cli_puts(s) cli_out(s)
-#define cli_putc(c) cli_outc(c)
-
-/* ANSI color helpers. 2026-08-25：经 cli_theme_seq() 解析，随终端背景
- * 在浅色 / 深色主题间自动切换（见 cli_term.h theme 段；调用点零改动，
- * 编译期常量场景不可用，仅用于 printf 参数）。 */
+/* ANSI color helpers. 经 cli_theme_seq() 解析，随终端背景在浅色 / 深色
+ * 主题间自动切换（见 cli_term.h theme 段；调用点零改动，编译期常量场景
+ * 不可用，仅用于 printf 参数）。 */
 #define CLR_BOLD cli_theme_seq(CLI_TH_BOLD)
 #define CLR_DIM cli_theme_seq(CLI_TH_DIM)
 #define CLR_UNDERLINE cli_theme_seq(CLI_TH_UNDERLINE)
@@ -145,20 +119,18 @@ void cli_trace(const char *tag, const char *fmt, ...);
 #define CLI_ICON_TOOL "\u26CF"          /* ⛏ tool invocation */
 #define CLI_ICON_HALF "\u25D0"          /* ◐ in-progress (live plan board) */
 
-/* 非 TTY 状态行辅助（2026-08-16）：状态图标 + 紧凑进度条，供 -p 模式下
+/* 非 TTY 状态行辅助：状态图标 + 紧凑进度条，供 -p 模式下
  * [progress]/[status]/[result] 等 cli_trace 行使用，让管道/CI 输出同样
  * 一眼可读（Linux 工程哲学：最小但完整的结构化信号）。 */
 const char *cli_icon_for_state(const char *state);
 void cli_compact_bar(char *out, size_t cap, double progress, size_t cells);
 
-/* 用户可读的错误描述（2026-08-17）：内部错误码（AIRY_ERR_* 负值）对用户
- * 无意义，统一映射为可理解的中文描述；未识别码返回通用描述。返回值指向
- * 静态字符串，调用方直接用于打印即可。 */
+/* 用户可读的错误描述：内部错误码（AIRY_ERR_* 负值）对用户无意义，统一
+ * 映射为可理解的中文描述；未识别码返回通用描述。返回值指向静态字符串。 */
 const char *cli_err_desc(int err);
 
-/* 任务状态中文化（2026-08-17）：内部状态机字符串（completed/running/...）
- * 对用户无意义，统一映射为简短中文；未识别状态返回原文。返回值指向静态
- * 字符串，直接用于进度行展示即可。 */
+/* 任务状态中文化：内部状态机字符串（completed/running/...）对用户无
+ * 意义，统一映射为简短中文；未识别状态返回原文。返回值指向静态字符串。 */
 const char *cli_state_cn(const char *state);
 
 /* 执行体终态 / 失败态判定（单一事实源）：completed / semantic_failed /
@@ -167,34 +139,6 @@ const char *cli_state_cn(const char *state);
  * 时判定漂移。 */
 int cli_state_terminal(const char *state);
 int cli_state_failed(const char *state);
-
-typedef enum {
-    CLI_ROLE_USER = 0,        /* [For Thee]     cyan     */
-    CLI_ROLE_SUPER_AGENT,     /* [Super Agent]  green    */
-    CLI_ROLE_DUAL_THINK,      /* [Dual Think]   yellow   */
-    CLI_ROLE_SUB_AGENT,       /* [Sub xxx Agent] magenta  */
-    CLI_ROLE_STATUS,          /* status / info  dim      */
-    CLI_ROLE_TRACE,           /* internal trace  dim-gray */
-    CLI_ROLE_ERROR,           /* error / warn   red      */
-} cli_role_t;
-
-/* Conversation actor label used inside the bracket header.
- * Dual-thinking chain（2026-08-17）：t2=慢思考、t1-f=快思考、t1-p=专业
- * 思考，展示时按实时思考链区分，通用场景回落 CLI_ACTOR_DUAL_THINK。 */
-typedef enum {
-    CLI_ACTOR_USER = 0,
-    CLI_ACTOR_SUPER_AGENT,
-    CLI_ACTOR_DUAL_THINK,
-    CLI_ACTOR_DUAL_SLOW_THINK,  /* t2     [Dual Slow Think] */
-    CLI_ACTOR_DUAL_FAST_THINK,  /* t1-f   [Dual Fast Think] */
-    CLI_ACTOR_DUAL_PROF_THINK,  /* t1-p   [Dual Prof Think] */
-    CLI_ACTOR_SUB_AGENT,
-} cli_actor_t;
-
-/**
- * @brief Return the ANSI color sequence for a role ("" on Windows).
- */
-const char *cli_render_role_color(cli_role_t role);
 
 /**
  * @brief Runtime color gate: return `seq` when color is enabled, "" otherwise.
@@ -236,15 +180,6 @@ size_t cli_utf8_safe_len(const char *s, size_t max_bytes);
  * @brief Return a left gutter of `indent` spaces (shared static buffer).
  */
 const char *cli_gutter(size_t indent);
-const char *cli_gutter_pad(size_t indent);
-
-/**
- * @brief Return the display name of an actor (e.g. "Super Agent").
- *
- * The user role renders as "For Thee" (the human operator addressed by the
- * agent), matching the four-role conversation scheme.
- */
-const char *cli_render_actor_name(cli_actor_t actor);
 
 /**
  * @brief Print raw text verbatim with a left gutter (plain mode).
@@ -281,164 +216,15 @@ void cli_print_status(const char *header, const char *content);
 /**
  * @brief Print the end-of-turn metrics line, silenced under -p.
  *
- * 轮次收口（原 cli_render_turn_separator 直印化收口）：耗时格式化在此
- * 单一事实源化（<1s "完成" / <60s "耗时 Ns" / 其余 "耗时 Nm NS"），
- * metrics 可选附注。装饰破折线由 agentrt-tui 承接。
+ * 轮次收口：耗时格式化在此单一事实源化（<1s "完成" / <60s "耗时 Ns" /
+ * 其余 "耗时 Nm NS"），metrics 可选附注。装饰破折线由 agentrt-tui 承接。
  */
 void cli_print_turn(uint64_t elapsed_ms, const char *metrics);
-
-/**
- * @brief Print a role-tagged line: "[<actor>] <content>".
- *
- * The bracket is colored by role, content is rendered with markdown support.
- *
- * @param role    which role owns the line (drives bracket color)
- * @param actor   actor label shown inside the brackets
- * @param tag     optional extra tag (e.g. node id); pass "" or NULL to skip
- * @param content message text (markdown)
- */
-void cli_render_role_line(cli_role_t role, cli_actor_t actor, const char *tag,
-                          const char *content);
-
-/**
- * @brief Print a bare markdown block as the super agent's final answer.
- * Shortcut for cli_render_role_line(CLI_ROLE_SUPER_AGENT, ...).
- */
-void cli_render_super_agent(const char *content);
-
-/**
- * @brief Print the user's own message: "[For Thee] › text".
- *
- * Uses the CLI_ICON_USER prefix and cyan accent so the human side of the
- * conversation is instantly recognizable (Claude Code caret convention).
- */
-void cli_render_user_message(const char *content);
-
-/**
- * @brief Print a sub-agent report: "[Sub <tag> Agent] ◇ <content>".
- *
- * The tag names the sub-agent role (e.g. "exec", "code", "review", "search");
- * the header renders as `[Sub exec Agent]` so every executor type is visible.
- */
-void cli_render_sub_agent(const char *tag, const char *content);
-
-/**
- * @brief Print a sub-agent line with an explicit role color.
- *
- * Same header as cli_render_sub_agent, but the caller picks the role:
- * pass CLI_ROLE_ERROR to render failures in red with a "✗" marker while
- * keeping the "[Sub <tag> Agent]" identity.
- */
-void cli_render_sub_agent_line(cli_role_t role, const char *tag, const char *content);
-
-/**
- * @brief Render an LLM tool invocation (Claude Code tool-use card):
- *
- *   ⛏ web_search("agentrt")        (magenta icon + cyan name + dim args)
- *
- * @param name tool name (web_search / web_fetch)
- * @param args preview of the tool arguments (single line, trimmed)
- */
-void cli_render_tool_use(const char *name, const char *args);
-
-/**
- * @brief Render a tool-execution result, folded to a summary line:
- *
- *   [Sub search Agent] ✓ web_search — <first line of output>
- *   [Sub search Agent] ✗ web_search — <error>
- *
- * @param name   tool name
- * @param text   result output / error text
- * @param ok     true when the tool returned success
- */
-void cli_render_tool_result(const char *name, const char *text, int ok);
 
 /**
  * @brief Monotonic wall-clock in milliseconds (for turn separators).
  */
 uint64_t cli_now_ms(void);
-
-/**
- * @brief Print a thin turn separator: "─ Worked for 5s ──────────".
- *
- * Marks the end of one agent turn and shows how long it took, following the
- * Claude Code "Worked for Ns" convention. Metrics (optional) are appended
- * dim after the elapsed text.
- */
-void cli_render_turn_separator(uint64_t elapsed_ms, const char *metrics);
-
-/**
- * @brief Print a compact task line for the work-hall board:
- *
- *   ◇ <id>  <state>  [██████████] 100%
- *
- * @param tag    section tag (e.g. "exec", "sched_d")
- * @param id     task / dag id
- * @param state  current state string (completed/running/...)
- * @param progress 0.0 .. 1.0
- */
-void cli_render_task_line(const char *tag, const char *id, const char *state,
-                          double progress);
-
-/* ---- one-line status indicator (spinner) ---- */
-
-/**
- * @brief Begin an animated one-line status indicator.
- *
- * Renders "<frame> <title> (<elapsed>)" on a single line. When stdout is not
- * a TTY (piped / logged / SSH without a terminal) the line is printed once
- * without carriage-return animation, so the log stays readable. Non-zero
- * return means animation is disabled (caller should print its own line).
- *
- * @param title short activity title (e.g. "Thinking", "Running")
- * @return 1 if animation started (call cli_spinner_stop when done),
- *         0 if degraded to static (caller prints and skips spinner calls)
- */
-int cli_spinner_start(const char *title);
-
-/**
- * @brief Refresh the status line (called by the polling loop or a timer).
- * No-op when animation was not started.
- */
-void cli_spinner_tick(void);
-
-/**
- * @brief Erase the status line before printing other full lines.
- *
- * The animated line occupies the current cursor row; any printf before
- * cli_spinner_resume() would otherwise append to it. No-op when the
- * spinner is not animating (static/non-TTY mode).
- */
-void cli_spinner_pause(void);
-
-/**
- * @brief Re-render the status line after other output has been printed.
- * Pair with cli_spinner_pause; no-op in static/non-TTY mode.
- */
-void cli_spinner_resume(void);
-
-/**
- * @brief Stop the status line and print a completion line.
- *
- * @param ok   1 -> "✓ title (elapsed)" in green; 0 -> "✗ title (elapsed)" red
- * @param detail optional trailing detail text appended dim after the elapsed
- */
-void cli_spinner_stop(int ok, const char *detail);
-
-/**
- * @brief Render a phase indicator line for task execution stages.
- *
- * Displays a dim separator with a cyan diamond and the phase label:
- *
- *   ◇ 认知规划 ─────────────────────────────
- *
- * Provides clear visual hierarchy during multi-phase task execution so the
- * user can track progression at a glance (Claude Code phase convention).
- * No-op in -p server mode (stdout stays clean for piping).
- *
- * @param label short phase name (e.g. "认知规划", "执行提交", "结果汇总")
- */
-void cli_render_phase(const char *label);
 
 #ifdef __cplusplus
 }
