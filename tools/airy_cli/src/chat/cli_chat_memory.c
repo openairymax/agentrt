@@ -5,12 +5,10 @@
  * @file cli_chat_memory.c
  * @brief airy_cli chat memory sub-module: memory inject and record.
  *
- * 2.2.4 对话记忆读写（2026-08-25 统一）：CLI 对话路径的记忆统一经
- * gateway mem_d，失败回退进程内 L1 记忆引擎。此前 CLI 直接写进程内
- * coreloop L1 记忆引擎，与 gateway mem_d 是两套存储——统一后 CLI 与
- * gateway/mem_d 共享同一记忆库（CLI 内多轮、跨会话可持续召回）。
- * 0.1.16 起 TUI 记忆后端亦收敛到 gateway mem.*，不再持有独立本地库，
- * 故 CLI 与 TUI 共享同一 mem_d 记忆库（架构级：TUI 为 CLI 的可选渲染层）。
+ * 2.2.4 对话记忆读写（2026-08-25 统一）：CLI 对话路径记忆唯一经
+ * gateway mem_d。0.1.19 C3 双栈塌缩后进程内 L1 回退通道退役——gateway
+ * 不可达即无注入/无写回，绝不做本地伪存储。CLI 与 gateway/mem_d/TUI
+ * 共享同一记忆库（架构级：TUI 为 CLI 的可选渲染层）。
  *
  * 记忆注入（cli_chat_mem_inject_system）：检索相关历史记忆拼成 system
  * 追加段（最多 3 条、每条截断 200 字符），随本轮消息发送给模型。
@@ -23,17 +21,12 @@
 
 #include "cli_gw.h" /* 架构约束 2026-08-25：统一经 gateway 派发 */
 
-#include "memory.h" /* 对话记忆引擎 API（2.2.4 对话路径读写） */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #ifdef AIRY_HAS_CJSON
 #include <cjson/cJSON.h>
-
-/* 对话记忆引擎（2.2.4）：main.c 在 loop 创建后注入，见 cli_internal.h */
-airy_memory_engine_t *g_cli_memory_engine = NULL;
 
 /* 2.2.2.1：无信息量寒暄启发式——此类对话不应进记忆，避免垃圾累积
  * 污染语义检索（匹配时返回 1）。仅作写入门槛，不做强制语义判断。 */
@@ -56,10 +49,8 @@ static int cli_chat_is_greeting(const char *s)
     return 0;
 }
 
-/* gateway 统一记忆注入（mem_d；失败回退 L1）。CLI 曾直接写进程内
- * coreloop L1 记忆引擎（memoryrovol），与 gateway 的 mem_d 是两套存储——
- * 统一后 CLI 与 gateway/mem_d 共享同一记忆库。
- * 注：TUI（0.1.16 起）经 gateway mem.* 访问同一 mem_d，参与此共享。 */
+/* gateway 统一记忆注入（mem_d）。0.1.19 C3 起进程内 L1 回退通道退役，
+ * gateway 不可达即不注入——记忆唯一事实源为 mem_d，不做本地伪存储。 */
 static int cli_chat_mem_inject_gw(const char *input, char *out_buf, size_t out_size)
 {
     if (!input || !input[0] || !out_buf || out_size < 16)
@@ -152,78 +143,14 @@ static int cli_chat_mem_inject_gw(const char *input, char *out_buf, size_t out_s
 }
 
 /* 检索相关历史记忆，拼成 system 追加段（最多 3 条、每条截断 200 字符）。
- * 统一经 gateway（mem_d）召回；gateway 不可用时回退
- * 进程内 L1 记忆引擎（离线/单机降级）。 */
+ * 唯一经 gateway（mem_d）召回；gateway 不可达降级为无注入（0.1.19 C3 单轨）。 */
 void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t out_size)
 {
     out_buf[0] = '\0';
     if (!input || !input[0] || out_size < 16)
         return;
 
-    if (cli_chat_mem_inject_gw(input, out_buf, out_size) == 0)
-        return;
-
-    /* ── 回退：进程内 L1 记忆引擎（gateway/mem_d 不可用） ── */
-    if (!g_cli_memory_engine)
-        return;
-
-    airy_memory_query_t q;
-    __builtin_memset(&q, 0, sizeof(q));
-    q.memory_query_text = (char *)input;
-    q.memory_query_text_len = strlen(input);
-    q.memory_query_limit = 3;
-    q.memory_query_include_raw = 1;
-
-    airy_memory_result_ext_t *res = NULL;
-    if (airy_memory_query(g_cli_memory_engine, &q, &res) != AIRY_EOK || !res)
-        return;
-
-    size_t off = 0;
-    /* P3-3：snprintf 返回"应写长度"，钳制累加防 pos 越过容量（无符号
-     * 下溢越界写） */
-    if (out_size > 0) {
-        int w0 = snprintf(out_buf + off, out_size - off, "\n\n[相关历史记忆]");
-        if (w0 > 0)
-            off += ((size_t)w0 < out_size - off) ? (size_t)w0 : (out_size - off - 1);
-    }
-    /* 2.2.2.1：防自我回灌——跳过与当前输入相同/几乎相同的记忆（CLI 把
-     * 整轮写为 "用户: <input>\nAgentRT: <reply>"，查询常命中上一条自身）。 */
-    size_t input_prefix_len = strlen(input) + 9; /* "用户: "(9 字节 UTF-8) + input */
-    for (size_t i = 0; i < res->memory_result_count; i++) {
-        airy_memory_result_item_t *it =
-            (res->memory_result_items && i < res->memory_result_count)
-                ? res->memory_result_items[i]
-                : NULL;
-        if (!it || !it->memory_result_item_record)
-            continue;
-        airy_memory_record_t *r = it->memory_result_item_record;
-        if (!r->memory_record_data || r->memory_record_data_len == 0)
-            continue;
-        const char *data = (const char *)r->memory_record_data;
-        size_t dlen = r->memory_record_data_len;
-        /* "用户: " 在 UTF-8 下为 9 字节（"用户"=6 字节 + 空格冒号空格=3）。
-         * 前缀比较与偏移必须用 9，否则过滤分支永不命中，自我回灌继续发生。 */
-        if (dlen >= input_prefix_len &&
-            strncmp(data, "用户: ", 9) == 0 &&
-            strncmp(data + 9, input, strlen(input)) == 0)
-            continue;
-        /* memory_record_data 是长度前缀缓冲区（非 NUL 结尾），不能用内部
-         * 走 strlen 的 cli_utf8_safe_len()；按 dlen 做 UTF-8 边界回退。 */
-        size_t n = dlen;
-        if (n > 200) {
-            n = 200;
-            while (n > 0 && ((unsigned char)data[n] & 0xC0) == 0x80)
-                n--;
-        }
-        if (off < out_size - 1) {
-            int w1 = snprintf(out_buf + off, out_size - off, "\n- %.*s", (int)n, data);
-            if (w1 > 0)
-                off += ((size_t)w1 < out_size - off) ? (size_t)w1 : (out_size - off - 1);
-        }
-        if (off >= out_size - 1)
-            break;
-    }
-    airy_memory_result_free(res);
+    (void)cli_chat_mem_inject_gw(input, out_buf, out_size);
 }
 
 /* gateway 统一记忆写回（mem_d；失败回退 L1）。0.1.18 B4：只写用户输入与
@@ -270,41 +197,13 @@ static int cli_chat_mem_record_gw(const char *input, const char *reply)
  * 2.1.1.6 曾携带思考链（reasoning）以便被检索召回；0.1.18 B4 撤销该设计：
  * 共享记忆是 CLI 与 TUI 的共同事实来源，模型内部推导不属于事实，写入后
  * 还会经 system 段在后续会话持续回灌。诊断留存走 airy_reasoning.log。
- * 统一经 gateway（mem_d）写回；gateway 不可用时
- * 回退进程内 L1 记忆引擎（离线/单机降级）。 */
+ * 唯一经 gateway（mem_d）写回；gateway 不可达则本轮跳过写入（0.1.19 C3 单轨）。 */
 void cli_chat_mem_record(const char *input, const char *reply)
 {
     if (!input || !input[0] || !reply || !reply[0])
         return;
 
-    if (cli_chat_mem_record_gw(input, reply) == 0)
-        return;
-
-    /* ── 回退：进程内 L1 记忆引擎 ── */
-    if (!g_cli_memory_engine)
-        return;
-
-    /* 2.2.2.1：寒暄/无信息量回复不写记忆（避免垃圾条目累积抬高检索噪声） */
-    if (strlen(reply) < 8 || cli_chat_is_greeting(input))
-        return;
-
-    char content[1800];
-    int n = snprintf(content, sizeof(content), "用户: %s\nAgentRT: %s", input, reply);
-    if (n <= 0)
-        return;
-    /* UTF-8 边界回退：1600 是字节数，直接截断会切坏多字节序列。 */
-    n = (int)cli_utf8_safe_len(content, 1600);
-
-    airy_memory_record_t rec;
-    __builtin_memset(&rec, 0, sizeof(rec));
-    rec.memory_record_type = AIRY_MEMTYPE_TEXT;
-    rec.memory_record_data = content;
-    rec.memory_record_data_len = (size_t)n;
-    rec.memory_record_importance = 0.6f;
-
-    char *rid = NULL;
-    (void)airy_memory_write(g_cli_memory_engine, &rec, &rid);
-    AIRY_FREE(rid);
+    (void)cli_chat_mem_record_gw(input, reply);
 }
 
 #endif /* AIRY_HAS_CJSON */
