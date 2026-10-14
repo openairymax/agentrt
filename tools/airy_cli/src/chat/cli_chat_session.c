@@ -149,18 +149,16 @@ void cli_session_restore(void)
         cli_session_add_record(cJSON_GetArrayItem(records, i));
     cJSON_Delete(root);
 
-    /* 状态提示属 STATUS 面：-p 模式静默（保持原 sub_agent_line 抑制语义） */
-    if (g_cli_print_mode)
-        return;
+    /* 状态提示属 STATUS 面：-p 模式静默（cli_print_status 收口模式分流） */
     if (g_history_count == 0) {
-        cli_print_line("Sub session Agent",
-                       "无历史会话可恢复（mem.recent 为空）");
+        cli_print_status("Sub session Agent",
+                         "无历史会话可恢复（mem.recent 为空）");
         return;
     }
     char msg[96];
     snprintf(msg, sizeof(msg), "已恢复上次会话（%zu 条历史），继续对话或发送新消息",
              g_history_count);
-    cli_print_line("Sub session Agent", msg);
+    cli_print_status("Sub session Agent", msg);
 }
 
 #endif /* AIRY_HAS_CJSON */

@@ -271,6 +271,14 @@ void cli_print_plain(const char *text, size_t indent);
 void cli_print_line(const char *header, const char *content);
 
 /**
+ * @brief Print a status/trace hint line, silenced under -p.
+ *
+ * STATUS/TRACE 面统一分流：-p 管道模式静默（stdout 只留最终答案与错误），
+ * 交互模式同 cli_print_line。模式判断在此收口，调用点不再内联。
+ */
+void cli_print_status(const char *header, const char *content);
+
+/**
  * @brief Print a role-tagged line: "[<actor>] <content>".
  *
  * The bracket is colored by role, content is rendered with markdown support.
