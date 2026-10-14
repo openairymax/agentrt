@@ -55,16 +55,11 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
 
     /* GCCP 意图确认是对用户需求的结构化约束验证（目标/起点/瓶颈/受众），
      * 属 t1-p 验证者（PROF）职责，而非 t1-f 仲裁者的对话生成链。 */
-    cli_render_role_line(CLI_ROLE_DUAL_THINK, CLI_ACTOR_DUAL_PROF_THINK, "意图确认",
-                         "我将逐问确认意图（Enter 跳过当前问题）：");
-    /* The planning spinner may be animating; pause it so the questions
-     * render on clean lines, then resume after the answers. */
-    cli_spinner_pause();
+    cli_print_line("Dual Prof Think:意图确认",
+                   "我将逐问确认意图（Enter 跳过当前问题）：");
     cJSON *answers = cJSON_CreateObject();
-    if (!answers) {
-        cli_spinner_resume();
+    if (!answers)
         return NULL;
-    }
 
     for (size_t i = 0; i < probe->question_count; i++) {
         const airy_gccp_question_t *q = &probe->questions[i];
@@ -89,9 +84,8 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
             strcmp(line, "cancel") == 0 || strcmp(line, "打断") == 0 ||
             strcmp(line, "停止") == 0 || strcmp(line, "取消") == 0) {
             cJSON_Delete(answers);
-            cli_spinner_resume();
-            cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_THINK, "意图确认",
-                                 "已放弃意图确认，任务按默认约束继续执行。");
+            cli_print_line("Dual Think:意图确认",
+                           "已放弃意图确认，任务按默认约束继续执行。");
             return NULL;
         }
         cJSON_AddStringToObject(answers, q->id, line);
@@ -99,7 +93,6 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
 
     char *json = cJSON_PrintUnformatted(answers);
     cJSON_Delete(answers);
-    cli_spinner_resume();
     /* 阶段 4：GCCP 意图确认 → 决策链事件（preflight，cognition 角色）。
      * 仅记录结构化信号（问题数），用户回答原文不进事件流（隐私 + JSON 转义安全）。 */
     cli_hall_emit("preflight", AIRY_HALL_CAT_CHAIN,
@@ -126,15 +119,14 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
         return json;
     }
 
-    cli_spinner_pause();
+    cli_print_line("Dual Prof Think:意图确认",
+                   "我将逐问确认意图（Enter 跳过当前问题）：");
     size_t cap = 512;
     for (size_t i = 0; i < probe->question_count; i++)
         cap += strlen(probe->questions[i].id) + 1024;
     char *json = (char *)AIRY_MALLOC(cap);
-    if (!json) {
-        cli_spinner_resume();
+    if (!json)
         return NULL;
-    }
     char *p = json;
     int n = snprintf(p, cap, "{");
     p += n;
@@ -156,9 +148,8 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
             strcmp(line, "cancel") == 0 || strcmp(line, "打断") == 0 ||
             strcmp(line, "停止") == 0 || strcmp(line, "取消") == 0) {
             AIRY_FREE(json);
-            cli_spinner_resume();
-            cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_THINK, "意图确认",
-                                 "已放弃意图确认，任务按默认约束继续执行。");
+            cli_print_line("Dual Think:意图确认",
+                           "已放弃意图确认，任务按默认约束继续执行。");
             return NULL;
         }
         if (i > 0)
@@ -167,7 +158,6 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
         p += n;
     }
     snprintf(p, cap - (size_t)(p - json), "}");
-    cli_spinner_resume();
     /* 阶段 4：GCCP 意图确认 → 决策链事件（同 cJSON 分支，仅记录结构化信号） */
     cli_hall_emit("preflight", AIRY_HALL_CAT_CHAIN,
                   "{\"event\":\"gccp_confirm\",\"question_count\":%zu}",

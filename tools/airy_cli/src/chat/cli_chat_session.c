@@ -128,16 +128,16 @@ void cli_session_restore(void)
     char *res = NULL;
     if (cli_gw_call("mem.recent", params, CLI_SESSION_GW_TIMEOUT_MS, &res) != 0 || !res) {
         AIRY_FREE(res);
-        cli_render_sub_agent_line(CLI_ROLE_ERROR, "session",
-                                  "会话恢复失败：记忆服务不可达（mem.recent）");
+        cli_print_line("Sub session Agent",
+                       "会话恢复失败：记忆服务不可达（mem.recent）");
         return;
     }
 
     cJSON *root = cJSON_Parse(res);
     AIRY_FREE(res);
     if (!root) {
-        cli_render_sub_agent_line(CLI_ROLE_ERROR, "session",
-                                  "会话恢复失败：mem.recent 响应无法解析");
+        cli_print_line("Sub session Agent",
+                       "会话恢复失败：mem.recent 响应无法解析");
         return;
     }
 
@@ -149,15 +149,18 @@ void cli_session_restore(void)
         cli_session_add_record(cJSON_GetArrayItem(records, i));
     cJSON_Delete(root);
 
+    /* 状态提示属 STATUS 面：-p 模式静默（保持原 sub_agent_line 抑制语义） */
+    if (g_cli_print_mode)
+        return;
     if (g_history_count == 0) {
-        cli_render_sub_agent_line(CLI_ROLE_STATUS, "session",
-                                  "无历史会话可恢复（mem.recent 为空）");
+        cli_print_line("Sub session Agent",
+                       "无历史会话可恢复（mem.recent 为空）");
         return;
     }
     char msg[96];
     snprintf(msg, sizeof(msg), "已恢复上次会话（%zu 条历史），继续对话或发送新消息",
              g_history_count);
-    cli_render_sub_agent_line(CLI_ROLE_STATUS, "session", msg);
+    cli_print_line("Sub session Agent", msg);
 }
 
 #endif /* AIRY_HAS_CJSON */

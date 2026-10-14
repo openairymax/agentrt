@@ -397,6 +397,87 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
     return out_json;
 }
 
+/* ---- 工具过程直印（0.1.19 自 airy_cli_output.c 迁入消费点） ----
+ *
+ * 0.1.18 B3（V3.4）：未登记工具标识符不得越过渲染边界进入用户面——
+ * 白名单外一律显示兜底串并记日志，禁止原样透传。与 TUI 侧
+ * app/dispatch.rs::tool_action 同源同语义；机制跟消费走，render 面不再
+ * 持有工具领域知识。 */
+
+static const char CLI_TOOL_HIDDEN[] = "未知工具（已隐藏）";
+
+static const char *cli_tool_action(const char *name)
+{
+    static const struct { const char *tool; const char *action; } map[] = {
+        {"web_search", "搜索网络"}, {"web_fetch", "抓取网页"},
+        {"fs_read", "读取文件"},   {"fs_write", "写入文件"},
+        {"fs_list", "列出目录"},   {"fs_ls", "列出目录"},
+        {"fs_info", "查看文件信息"}, {"fs_mkdir", "创建目录"},
+        {"fs_rm", "删除文件"},     {"agent.spawn", "派生智能体"},
+        {"agent.invoke", "调用智能体"}, {"think.depth", "深度思考"},
+        {"memory.get", "读取记忆"}, {"memory.put", "写入记忆"},
+    };
+    if (!name || !name[0])
+        return CLI_TOOL_HIDDEN;
+    for (size_t i = 0; i < sizeof(map) / sizeof(map[0]); i++) {
+        if (strcmp(name, map[i].tool) == 0)
+            return map[i].action;
+    }
+    /* 只记长度、不记标识符本身：日志不应成为第二处泄漏面（与 TUI 侧一致）。 */
+    AIRY_LOG_WARN("airy_cli: 未登记工具标识符已按白名单隐藏 (len=%zu)", strlen(name));
+    return CLI_TOOL_HIDDEN;
+}
+
+/* 失败摘要：常见网络错误映射为可读中文，其余取首行（plain 直印单行语义）。 */
+static void cli_tool_error_summary(const char *raw, char *out, size_t cap)
+{
+    if (!out || cap == 0) return;
+    out[0] = '\0';
+    if (!raw || !raw[0]) return;
+    const char *p = raw;
+    if (strncmp(p, "Web fetch failed", 16) == 0) {
+        const char *close = strchr(p, ')');
+        if (close && close[1] == ':') p = close + 2;
+        while (*p == ' ') p++;
+    }
+    const char *mapped = NULL;
+    if (strstr(p, "timed out") || strstr(p, "Timeout") || strstr(p, "timeout"))
+        mapped = "连接超时";
+    else if (strstr(p, "refused") || strstr(p, "Failed to connect") || strstr(p, "couldn't connect"))
+        mapped = "连接被拒绝";
+    else if (strstr(p, "Could not resolve") || strstr(p, "getaddrinfo") || strstr(p, "resolve host"))
+        mapped = "无法解析域名";
+    else if (strstr(p, "404") || strstr(p, "Not Found"))
+        mapped = "页面不存在 (404)";
+    if (mapped) {
+        snprintf(out, cap, "%s", mapped);
+        return;
+    }
+    size_t o = 0;
+    for (; p[o] && o + 1 < cap; o++) {
+        if (p[o] == '\n' || p[o] == '\r') break;
+        out[o] = p[o];
+    }
+    out[o] = '\0';
+}
+
+/* 工具过程行：-p 走 stderr trace（stdout 留给最终答案，脚本可解析）；
+ * 交互 plain 直印（无 icon 无色，0.1.19 体验面清退）。 */
+static void cli_print_tool(const char *name, const char *detail, int ok, int done)
+{
+    const char *action = cli_tool_action(name);
+    char line[192];
+    if (!done)
+        snprintf(line, sizeof(line), "%s…", action);
+    else if (ok || !detail || !detail[0])
+        snprintf(line, sizeof(line), "%s%s", action, ok ? " 完成" : " 失败");
+    else
+        snprintf(line, sizeof(line), "%s — %s", action, detail);
+    cli_trace("tool", "%s", line);
+    if (!g_cli_print_mode)
+        cli_print_line("Tool", line);
+}
+
 /* 解析一轮 LLM 返回的 tool_calls，渲染 + 执行 + 回填消息缓冲。
  * 返回 0 = 本轮已消费（调用方应继续下一轮）；-1 = 终止（解析失败/无工具）。 */
 int cli_chat_tool_round(cli_chat_msgbuf_t *b, const llm_response_t *resp)
@@ -437,17 +518,18 @@ int cli_chat_tool_round(cli_chat_msgbuf_t *b, const llm_response_t *resp)
         if (!name)
             name = "unknown";
 
-        /* 工具调用过程卡片：⚙ 动作名…（参数/返回内容不暴露在对话中；
+        /* 工具调用过程行：动作名…（参数/返回内容不暴露在对话中；
          * 操作细节经 cli_trace 留档供 -p 管道与日志诊断）。 */
         cli_trace("chat", "tool call %s args=%.*s", name, (int)cli_utf8_safe_len(args, 160), args ? args : "{}");
-        cli_render_tool_use(name, args);
+        cli_print_tool(name, NULL, 0, 0);
 
         int ok = 0;
         char *result_json = cli_chat_exec_tool(name, args ? args : "{}", &ok);
         if (!result_json)
             result_json = AIRY_STRDUP("{\"ok\":false,\"error\":\"tool failed\"}");
 
-        /* 折叠摘要渲染（全量文本已回填模型上下文） */
+        /* 折叠摘要（全量文本已回填模型上下文）；失败摘要经白名单动作名
+         * + 可读错误直印（icon/色彩体验随 0.1.19 清退）。 */
         const char *detail = NULL;
 #ifdef AIRY_HAS_CJSON
         cJSON *rroot = cJSON_Parse(result_json);
@@ -462,10 +544,14 @@ int cli_chat_tool_round(cli_chat_msgbuf_t *b, const llm_response_t *resp)
         detail = ok ? NULL : result_json;
 #endif
         /* UAF 修复（2026-08-16，ASan heap-use-after-free）：detail 指向
-         * cJSON 树内字符串（out->valuestring），必须在渲染消费完之后再
-         * 释放树；此前 cJSON_Delete(rroot) 先于 cli_render_tool_result
-         * 执行，工具回路偶发崩溃。 */
-        cli_render_tool_result(name, detail, ok);
+         * cJSON 树内字符串（out->valuestring），必须在直印消费完之后再
+         * 释放树；此前 cJSON_Delete(rroot) 先于过程行输出执行，工具回路
+         * 偶发崩溃。 */
+        char err_sum[128];
+        err_sum[0] = '\0';
+        if (!ok)
+            cli_tool_error_summary(detail, err_sum, sizeof(err_sum));
+        cli_print_tool(name, err_sum, ok, 1);
 #ifdef AIRY_HAS_CJSON
         if (rroot)
             cJSON_Delete(rroot);

@@ -37,6 +37,12 @@ void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
                                     ? final_resp->choices[0].content
                                     : "";
 
+    /* 思考提示行头（0.1.19 直印化）：actor 经 cli_render_actor_name 运行时
+     * 解析（t1-f → Dual Fast Think / 未配置回落 Dual Think）。 */
+    char think_hdr[48];
+    snprintf(think_hdr, sizeof(think_hdr), "%s:思考",
+             cli_render_actor_name(cli_chat_think_actor()));
+
     /* finish_reason 走全栈 canonical 词汇表（llm_service_types.h SSoT）：
      * 截断（length）时收到的正文只是模型答案的前缀，必须在用户面可判读。 */
     const char *final_reason =
@@ -156,33 +162,31 @@ void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
              * 收尾仅两件事：①空回复兜底提示；②思考链隐藏提示（0.1.18
              * B4：思考链默认不上屏，短链亦不例外，仅留可操作指引）。 */
             if (final_content[0] == '\0') {
-                cli_render_super_agent(CLI_REPLY_EMPTY_HINT);
+                cli_print_line("Super Agent", CLI_REPLY_EMPTY_HINT);
             } else if (final_resp->choices && final_resp->choice_count > 0 &&
                        final_resp->choices[0].reasoning_content &&
                        final_resp->choices[0].reasoning_content[0]) {
                 /* 正文末尾补空行分层，思考链仅提示不展示原文 */
                 cli_outc('\n');
-                cli_render_role_line(CLI_ROLE_DUAL_THINK, cli_chat_think_actor(),
-                                     "思考", CLI_REPLY_THINK_HIDDEN_HINT);
+                cli_print_line(think_hdr, CLI_REPLY_THINK_HIDDEN_HINT);
             }
             if (truncated)
-                cli_render_super_agent(CLI_REPLY_TRUNCATED_HINT);
+                cli_print_line("Super Agent", CLI_REPLY_TRUNCATED_HINT);
         } else {
             /* TUI / 非流式交互：思考链默认不上屏（0.1.18 B4），仅提示；
              * 结果完整渲染进历史（用户要求结果不折叠，长结果经视口滚动浏览）。 */
             if (final_resp->choices && final_resp->choice_count > 0 &&
                 final_resp->choices[0].reasoning_content &&
                 final_resp->choices[0].reasoning_content[0]) {
-                cli_render_role_line(CLI_ROLE_DUAL_THINK, cli_chat_think_actor(),
-                                     "思考", CLI_REPLY_THINK_HIDDEN_HINT);
+                cli_print_line(think_hdr, CLI_REPLY_THINK_HIDDEN_HINT);
             }
             if (final_content[0] != '\0') {
-                cli_render_super_agent(render_content);
+                cli_print_line("Super Agent", render_content);
             } else {
-                cli_render_super_agent(CLI_REPLY_EMPTY_HINT);
+                cli_print_line("Super Agent", CLI_REPLY_EMPTY_HINT);
             }
             if (truncated)
-                cli_render_super_agent(CLI_REPLY_TRUNCATED_HINT);
+                cli_print_line("Super Agent", CLI_REPLY_TRUNCATED_HINT);
         }
     }
 
