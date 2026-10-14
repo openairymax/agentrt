@@ -259,8 +259,7 @@ cd ../agentrt-build && ctest --output-on-failure
 | `BUILD_DAEMON`                                                                          | POSIX `ON`，Windows `OFF` | 构建守护进程集群                         |
 | `BUILD_CLI`                                                                             | POSIX `ON`，Windows `OFF` | 构建交互式 CLI                        |
 | `BUILD_TOOLKIT`                                                                         | `OFF`                    | 构建各语言 SDK 的 toolkit 模块           |
-| `AIRY_MEMORY_BACKEND`                                                                   | `builtin`                | 记忆后端：`builtin` 或 `memoryrovol`   |
-| `AIRY_WITH_MEMORYROVOL`                                                                 | `ON`                     | 链接商业记忆提供方；当外部源缺失时自动降级为内置后端，不破坏构建 |
+| `AIRY_WITH_MEMORYROVOL`                                                                 | `ON`                     | 经构建桥链接商业 MemoryRovol 增强；外部源缺失时跳过链接，不破坏构建 |
 | `AIRY_COMPLIANCE_STRICT`                                                                | `ON`                     | 严格合规模式，投毒 `strcpy` 等不安全函数        |
 | `ENABLE_SANITIZERS`                                                                     | `OFF`                    | ASan + LSan + UBSan；排查内存问题时显式开启  |
 | `ENABLE_TSAN`                                                                           | `OFF`                    | ThreadSanitizer；与上一项互斥           |

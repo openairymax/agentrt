@@ -288,8 +288,7 @@ default there.
 | `BUILD_DAEMON` | `ON` (POSIX), `OFF` (Windows) | Build the daemon fleet |
 | `BUILD_CLI` | `ON` (POSIX), `OFF` (Windows) | Build the interactive CLI |
 | `BUILD_TOOLKIT` | `OFF` | Build the language-SDK toolkit modules |
-| `AIRY_MEMORY_BACKEND` | `builtin` | Memory backend: `builtin` or `memoryrovol` |
-| `AIRY_WITH_MEMORYROVOL` | `ON` | Build against the commercial memory provider; falls back to the built-in backend when the provider source is absent |
+| `AIRY_WITH_MEMORYROVOL` | `ON` | Link the commercial MemoryRovol enhancement via the build bridge; skipped when the provider source is absent |
 | `AIRY_COMPLIANCE_STRICT` | `ON` | Strict compliance mode; poisons unsafe functions such as `strcpy` |
 | `ENABLE_SANITIZERS` | `OFF` | ASan + LSan + UBSan; enable explicitly when diagnosing memory bugs |
 | `ENABLE_TSAN` | `OFF` | ThreadSanitizer; mutually exclusive with the above |

@@ -11,12 +11,6 @@
 #ifndef _CRT_DECLARE_NONSTDC_NAMES
 #define _CRT_DECLARE_NONSTDC_NAMES 1
 #endif
-/* rand_s 声明要求 _CRT_RAND_S 在 stdlib.h 首次展开前定义（本文件下方
- * 即 #include <stdlib.h>，include guard 使后续源文件的重复包含失效）。
- * #116 实证：atoms/memory/builtin_storage.c C4013 'rand_s'。 */
-#ifndef _CRT_RAND_S
-#define _CRT_RAND_S 1
-#endif
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
