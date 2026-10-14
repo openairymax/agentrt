@@ -43,9 +43,9 @@ int cli_run_tui_frontend(int resume)
     char tui_bin[AIRY_PATH_MAX];
     snprintf(tui_bin, sizeof(tui_bin), "%s/agentrt-tui", airy_bin_dir());
     if (!tui_bin_present(tui_bin)) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "tui",
-                             "agentrt-tui 未安装（$AIRY_HOME/bin/agentrt-tui 缺失），"
-                             "请重新执行安装。");
+        cli_print_line("Super Agent:tui",
+                       "agentrt-tui 未安装（$AIRY_HOME/bin/agentrt-tui 缺失），"
+                       "请重新执行安装。");
         return 126;
     }
 
@@ -71,8 +71,7 @@ int cli_run_tui_frontend(int resume)
     fflush(NULL);
     pid_t pid = fork();
     if (pid < 0) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "tui",
-                             "无法创建 TUI 子进程（fork 失败）。");
+        cli_print_line("Super Agent:tui", "无法创建 TUI 子进程（fork 失败）。");
         return 126;
     }
     if (pid == 0) {
@@ -84,8 +83,7 @@ int cli_run_tui_frontend(int resume)
     int st = 0;
     while (waitpid(pid, &st, 0) < 0) {
         if (errno != EINTR) {
-            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "tui",
-                                 "等待 TUI 子进程失败。");
+            cli_print_line("Super Agent:tui", "等待 TUI 子进程失败。");
             return 126;
         }
     }
@@ -93,14 +91,14 @@ int cli_run_tui_frontend(int resume)
         char msg[128];
         snprintf(msg, sizeof(msg), "TUI 异常终止（信号 %d），日志: logs/agentrt-tui.log",
                  WTERMSIG(st));
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "tui", msg);
+        cli_print_line("Super Agent:tui", msg);
         return 128 + WTERMSIG(st);
     }
     int rc = WIFEXITED(st) ? WEXITSTATUS(st) : 126;
     if (rc != 0) {
         char msg[160];
         snprintf(msg, sizeof(msg), "TUI 退出码 %d，日志: logs/agentrt-tui.log", rc);
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "tui", msg);
+        cli_print_line("Super Agent:tui", msg);
     }
     return rc;
 #else
@@ -121,8 +119,8 @@ int cli_run_tui_frontend(int resume)
     si.cb = sizeof(si);
     ZeroMemory(&pi, sizeof(pi));
     if (!CreateProcessA(tui_bin, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi)) {
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "tui",
-                             "无法创建 TUI 子进程（CreateProcess 失败）。");
+        cli_print_line("Super Agent:tui",
+                       "无法创建 TUI 子进程（CreateProcess 失败）。");
         return 126;
     }
     WaitForSingleObject(pi.hProcess, INFINITE);
@@ -134,7 +132,7 @@ int cli_run_tui_frontend(int resume)
         char msg[160];
         snprintf(msg, sizeof(msg), "TUI 退出码 %lu，日志: logs/agentrt-tui.log",
                  (unsigned long)code);
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "tui", msg);
+        cli_print_line("Super Agent:tui", msg);
     }
     return (int)code;
 #endif

@@ -260,6 +260,22 @@ void cli_print_status(const char *header, const char *content)
     cli_print_line(header, content);
 }
 
+void cli_print_turn(uint64_t elapsed_ms, const char *metrics)
+{
+    uint64_t secs = elapsed_ms / 1000;
+    char line[256];
+    if (secs < 1)
+        snprintf(line, sizeof(line), "完成");
+    else if (secs < 60)
+        snprintf(line, sizeof(line), "耗时 %llus", (unsigned long long)secs);
+    else
+        snprintf(line, sizeof(line), "耗时 %llum %02llus",
+                 (unsigned long long)(secs / 60), (unsigned long long)(secs % 60));
+    if (metrics && metrics[0])
+        snprintf(line + strlen(line), sizeof(line) - strlen(line), " · %s", metrics);
+    cli_print_status("turn", line);
+}
+
 /* ---- status helpers ---- */
 
 /* 单一事实源：执行体的终态与失败态判定。sched_d 与工作大厅的终态串为

@@ -279,6 +279,15 @@ void cli_print_line(const char *header, const char *content);
 void cli_print_status(const char *header, const char *content);
 
 /**
+ * @brief Print the end-of-turn metrics line, silenced under -p.
+ *
+ * 轮次收口（原 cli_render_turn_separator 直印化收口）：耗时格式化在此
+ * 单一事实源化（<1s "完成" / <60s "耗时 Ns" / 其余 "耗时 Nm NS"），
+ * metrics 可选附注。装饰破折线由 agentrt-tui 承接。
+ */
+void cli_print_turn(uint64_t elapsed_ms, const char *metrics);
+
+/**
  * @brief Print a role-tagged line: "[<actor>] <content>".
  *
  * The bracket is colored by role, content is rendered with markdown support.

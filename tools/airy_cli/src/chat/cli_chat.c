@@ -381,8 +381,8 @@ const char *cli_chat_t1f_cached(void)
     return s_t1f;
 }
 
-cli_actor_t cli_chat_think_actor(void)
+const char *cli_chat_think_name(void)
 {
     const char *t1f = cli_chat_t1f_cached();
-    return (t1f && t1f[0]) ? CLI_ACTOR_DUAL_FAST_THINK : CLI_ACTOR_DUAL_THINK;
+    return (t1f && t1f[0]) ? "Dual Fast Think" : "Dual Think";
 }

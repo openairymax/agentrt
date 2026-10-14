@@ -33,8 +33,7 @@
 void cli_print_result(const char *result)
 {
     if (!result) {
-        cli_render_role_line(CLI_ROLE_SUPER_AGENT, CLI_ACTOR_SUPER_AGENT, "result",
-                             "No result was produced.");
+        cli_print_line("Super Agent:result", "No result was produced.");
         return;
     }
 
@@ -54,10 +53,9 @@ void cli_print_result(const char *result)
             if (agent && cJSON_IsString(agent)) {
                 char line[160];
                 snprintf(line, sizeof(line), "Execution finished by %s.", agent->valuestring);
-                cli_render_role_line(CLI_ROLE_SUPER_AGENT, CLI_ACTOR_SUPER_AGENT, "result", line);
+                cli_print_line("Super Agent:result", line);
             } else {
-                cli_render_role_line(CLI_ROLE_SUPER_AGENT, CLI_ACTOR_SUPER_AGENT, "result",
-                                     "Execution finished.");
+                cli_print_line("Super Agent:result", "Execution finished.");
             }
             cli_print_plain(output->valuestring, 4);
             cJSON_Delete(root);
@@ -78,7 +76,7 @@ void cli_print_result(const char *result)
     size_t keep = cli_utf8_safe_len(result, 600);
     snprintf(truncated, sizeof(truncated), "%.*s%s", (int)keep, result,
              strlen(result) > keep ? "..." : "");
-    cli_render_role_line(CLI_ROLE_SUPER_AGENT, CLI_ACTOR_SUPER_AGENT, "result", truncated);
+    cli_print_line("Super Agent:result", truncated);
 }
 
 /* ---- execution plan ordering (shared by plan list and live board) ---- */
@@ -180,8 +178,7 @@ void cli_print_plan_list(const airy_task_plan_t *plan)
     if (g_cli_print_mode)
         return;
     if (!plan || plan->task_plan_node_count == 0) {
-        cli_render_sub_agent_line(CLI_ROLE_ERROR, "plan",
-                                  "Empty plan, nothing to execute.");
+        cli_print_line("Sub plan Agent", "Empty plan, nothing to execute.");
         return;
     }
 
@@ -244,7 +241,51 @@ void cli_print_plan_list(const airy_task_plan_t *plan)
     AIRY_FREE(scratch);
 }
 
+/* ---- board line（原 airy_cli_output.c cli_render_task_line 原地收口）---- */
+
 void cli_board_line(const char *tag, const char *id, const char *state, double progress)
 {
-    cli_render_task_line(tag, id, state, progress);
+    if (g_cli_print_mode)
+        return;
+    if (progress < 0.0) progress = 0.0;
+    if (progress > 1.0) progress = 1.0;
+
+    size_t filled = (size_t)(progress * 10.0);
+    if (filled > 10) filled = 10;
+    char bar[32];
+    size_t bo = 0;
+    for (size_t b = 0; b < 10; b++) {
+        bo += (size_t)snprintf(bar + bo, sizeof(bar) - bo, "%s", b < filled ? "█" : "░");
+    }
+
+    const char *st = state ? state : "?";
+    const char *st_col = cli_c(CLR_DIM);
+    const char *st_icon = CLI_ICON_BULLET;
+    int bar_bright = 0;
+    if (strcmp(st, "completed") == 0) {
+        st_col = cli_c(CLR_GREEN); st_icon = CLI_ICON_CHECK; bar_bright = 1;
+    } else if (strcmp(st, "failed") == 0) {
+        st_col = cli_c(CLR_RED); st_icon = CLI_ICON_CROSS; bar_bright = 0;
+    } else if (strcmp(st, "semantic_failed") == 0) {
+        st_col = cli_c(CLR_YELLOW); st_icon = CLI_ICON_CROSS; bar_bright = 0;
+    } else if (strcmp(st, "running") == 0 || strcmp(st, "active") == 0 ||
+               strcmp(st, "queued") == 0) {
+        st_col = cli_c(CLR_DIM); st_icon = CLI_ICON_DIAMOND;
+    } else if (strcmp(st, "pending") == 0) {
+        st_col = cli_c(CLR_DIM); st_icon = CLI_ICON_TODO;
+    } else if (strcmp(st, "scheduled") == 0) {
+        st_col = cli_c(CLR_CYAN); st_icon = CLI_ICON_CLOCK;
+    } else if (strcmp(st, "canceled") == 0) {
+        st_col = cli_c(CLR_DIM); st_icon = CLI_ICON_CANCEL;
+    }
+
+    const char *g = cli_gutter_pad(2);
+    if (tag && tag[0])
+        cli_outf("%s%s[%s]%s ", g, cli_c(CLR_DIM), tag, cli_c(CLR_RESET));
+    cli_outf("%s%s %s%s%s ", st_col, st_icon, cli_c(CLR_RESET), cli_c(CLR_DIM),
+             id ? id : "?");
+    cli_outf("%s%s%s ", st_col, cli_state_cn(st), cli_c(CLR_RESET));
+    cli_outf("%s[%s]%s %s%3.0f%%%s\n", cli_c(bar_bright ? CLR_GREEN : CLR_DIM), bar,
+             cli_c(CLR_RESET), cli_c(bar_bright ? CLR_GREEN : CLR_DIM), progress * 100.0,
+             cli_c(CLR_RESET));
 }
