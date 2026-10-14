@@ -76,9 +76,9 @@ void cli_tui_rebuild_three_zone(cli_tui_t *t)
                             t->hdr_t1p[0] ? t->hdr_t1p : NULL);
     for (size_t i = 0; i < g_history_count; i++) {
         if (strcmp(g_history_roles[i], "user") == 0)
-            cli_render_user_message(g_history_contents[i]);
+            cli_print_status("For Thee", g_history_contents[i]);
         else
-            cli_render_super_agent(g_history_contents[i]);
+            cli_print_line("Super Agent", g_history_contents[i]);
     }
     fflush(stdout);
 }

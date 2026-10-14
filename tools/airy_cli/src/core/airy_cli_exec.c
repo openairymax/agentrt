@@ -81,10 +81,8 @@ int cli_task_poll_input(void)
         g_cli_cancel = 1;
         return -1;
     }
-    cli_spinner_pause();
-    cli_render_user_message(line);
+    cli_print_line("For Thee", line);
     cli_chat_reply(line);
-    cli_spinner_resume();
     return 1;
 #else
     (void)0;
@@ -135,11 +133,11 @@ int cli_task_result_render(const char *result, airy_err_t err, const char *exec_
 #endif
     }
     if (canceled) {
-        cli_render_sub_agent_line(CLI_ROLE_ERROR, "cancel",
-                                  "Task aborted (stopped after the current node).");
+        cli_print_line("Sub cancel Agent",
+                       "Task aborted (stopped after the current node).");
         cli_trace("result", "%s canceled", CLI_ICON_CROSS);
     } else if (err == AIRY_EOK && result) {
-        cli_render_phase("结果汇总");
+        cli_print_status("phase", "结果汇总");
         if (g_cli_json_mode) {
 #ifdef AIRY_HAS_CJSON
             cJSON *jroot = cJSON_CreateObject();
@@ -188,7 +186,7 @@ int cli_task_result_render(const char *result, airy_err_t err, const char *exec_
         } else {
             char line[128];
             snprintf(line, sizeof(line), "任务执行无结果：%s", cli_err_desc((int)err));
-            cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_SUPER_AGENT, "执行结果", line);
+            cli_print_line("Super Agent:执行结果", line);
         }
     }
     return task_succeeded;

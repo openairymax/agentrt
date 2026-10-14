@@ -37,11 +37,10 @@ void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,
                                     ? final_resp->choices[0].content
                                     : "";
 
-    /* 思考提示行头（0.1.19 直印化）：actor 经 cli_render_actor_name 运行时
-     * 解析（t1-f → Dual Fast Think / 未配置回落 Dual Think）。 */
+    /* 思考提示行头（0.1.19 直印化）：名称直出（t1-f → Dual Fast Think /
+     * 未配置回落 Dual Think），不再经体验段枚举间接。 */
     char think_hdr[48];
-    snprintf(think_hdr, sizeof(think_hdr), "%s:思考",
-             cli_render_actor_name(cli_chat_think_actor()));
+    snprintf(think_hdr, sizeof(think_hdr), "%s:思考", cli_chat_think_name());
 
     /* finish_reason 走全栈 canonical 词汇表（llm_service_types.h SSoT）：
      * 截断（length）时收到的正文只是模型答案的前缀，必须在用户面可判读。 */

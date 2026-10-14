@@ -19,7 +19,7 @@
 /* ---- 模型槽缓存（实现见 cli_chat.c；C-01 ⑤：cli_chat_stream.c 已退役，
  * 对话主路径改经网关 llm.complete 非流式单发，流式归一化/回调随域消亡） ---- */
 const char *cli_chat_t1f_cached(void);
-cli_actor_t cli_chat_think_actor(void);
+const char *cli_chat_think_name(void);
 
 /* finalize 域（cli_chat_finalize.c）：最终回复渲染 / 历史写入 */
 void cli_chat_reply_finalize(llm_response_t *final_resp, const char *input,

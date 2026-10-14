@@ -140,20 +140,18 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
     g_cli_cancel = 0;
 
     /* === 认知规划（唯一经 gateway → think_d）→ 提交 → 轮询 → 等待 → 结果汇总 === */
-    cli_render_phase("认知规划");
+    cli_print_status("phase", "认知规划");
     airy_task_plan_t *plan = NULL;
-    cli_spinner_start("Remote dual-thinking (think_d)");
+    cli_print_status("think_d", "Remote dual-thinking (think_d)");
     err = cli_think_process_remote(input, &plan);
     if (err != AIRY_EOK || !plan) {
-        cli_spinner_stop(0, "planning failed");
         cli_trace("plan", "failed err=%d", (int)err);
         char line[128];
         snprintf(line, sizeof(line), "规划失败：%s", cli_err_desc((int)err));
-        cli_render_role_line(CLI_ROLE_ERROR, CLI_ACTOR_DUAL_SLOW_THINK, "认知规划", line);
+        cli_print_line("Dual Slow Think:认知规划", line);
         return 1;
     }
-    cli_spinner_stop(1, NULL);
-    cli_render_sub_agent_line(CLI_ROLE_TRACE, "think_d", "Remote plan generated.");
+    cli_print_status("Sub think_d Agent", "Remote plan generated.");
 #ifdef AIRY_HAS_CJSON
     /* 0.1.9 M3：蓝图注册回灌 sched_d（sched.absorb 模式 A），L2 语义
      * 缓存由 sched_d 唯一持有；网关不可达静默跳过。 */
@@ -177,8 +175,8 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
             review_report) {
             cli_trace("review",
                       "parallel cognition review (fact+risk) merged");
-            cli_render_sub_agent_line(CLI_ROLE_TRACE, "cognition",
-                                      "Parallel sub-agent review completed");
+            cli_print_status("Sub cognition Agent",
+                             "Parallel sub-agent review completed");
             const char *plan_id =
                 (plan && plan->task_plan_id) ? plan->task_plan_id : "";
             cli_hall_emit(plan_id[0] ? plan_id : "preflight", AIRY_HALL_CAT_VERIFY,
@@ -210,7 +208,7 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
     if (err != AIRY_EOK || !exec_id) {
         char line[128];
         snprintf(line, sizeof(line), "任务提交失败：%s", cli_err_desc((int)err));
-        cli_render_sub_agent_line(CLI_ROLE_ERROR, "sched_d", line);
+        cli_print_line("Sub sched_d Agent", line);
         AIRY_FREE(exec_id);
         airy_task_plan_free(plan);
         return 1;
@@ -219,32 +217,27 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
     cli_chain_record_submit(exec_id, plan);
 
     /* 4.4 Board polling */
-    cli_spinner_start("Running (sched_d)");
+    cli_print_status("sched_d", "Running");
     cli_dag_board_t *node_board = cli_dag_node_board_create();
     int board_polls = 0;
     int stale_polls = 0;
-    int done = 0;
-    int run_failed = 0;
-    int spin_running = 1;
+    int poll_live = 1;
     char last_state[16] = "";
     double last_progress = -1.0;
     for (;;) {
         int input_rc = cli_task_poll_input();
         if (input_rc < 0) {
-            cli_spinner_stop(0, "aborted");
-            spin_running = 0;
-            cli_render_sub_agent_line(CLI_ROLE_ERROR, "cancel",
-                                      "Abort requested, stopping the task ...");
+            poll_live = 0;
+            cli_print_line("Sub cancel Agent",
+                           "Abort requested, stopping the task ...");
             break;
         }
         airy_sleep_ms(200);
-        cli_spinner_tick();
 
         if (g_cli_cancel) {
-            cli_spinner_stop(0, "aborted");
-            spin_running = 0;
-            cli_render_sub_agent_line(CLI_ROLE_ERROR, "cancel",
-                                      "Abort requested, stopping the task ...");
+            poll_live = 0;
+            cli_print_line("Sub cancel Agent",
+                           "Abort requested, stopping the task ...");
             break;
         }
         char cur_state[16];
@@ -254,51 +247,37 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
          * 份快照。此前两条路径各发一次 RPC，200ms 节拍下形成短连接洪泛。 */
         cli_dag_snapshot_t *snap = cli_dag_snapshot_fetch(exec_id);
         if (!snap) {
-            cli_spinner_stop(0, "status query failed");
-            spin_running = 0;
-            cli_render_sub_agent_line(CLI_ROLE_ERROR, "sched_d", "Status query failed.");
+            poll_live = 0;
+            cli_print_line("Sub sched_d Agent", "Status query failed.");
             break;
         }
         cli_dag_poll_rc_t prc = cli_dag_snapshot_poll(snap, &cur_progress, cur_state,
                                                       sizeof(cur_state), &final_result);
         AIRY_FREE(final_result);
         if (node_board) {
-            cli_spinner_pause();
             int nb_terminal = cli_dag_node_board_tick(node_board, snap);
             if (nb_terminal)
                 cli_dag_node_board_destroy(node_board), node_board = NULL;
-            cli_spinner_resume();
         }
         cli_dag_snapshot_free(snap);
         if (prc == CLI_DAG_POLL_DONE) {
             /* 终态即停止轮询；semantic_failed（节点进程成功但无产出）与
              * failed / canceled 一并按失败呈现，避免把「无产出」误报为成功。 */
-            run_failed = cli_state_failed(cur_state);
-            cli_spinner_pause();
             cli_board_line("sched_d", exec_id, cur_state, cur_progress);
-            cli_spinner_stop(!run_failed, NULL);
-            spin_running = 0;
-            done = 1;
+            poll_live = 0;
             break;
         }
         int state_changed = (strcmp(cur_state, last_state) != 0);
         double prog_changed =
             (cur_progress - last_progress) >= 0.01 || (cur_progress - last_progress) <= -0.01;
         if (state_changed || prog_changed) {
-            cli_spinner_pause();
             cli_board_line("sched_d", exec_id, cur_state, cur_progress);
-            cli_spinner_resume();
             snprintf(last_state, sizeof(last_state), "%s", cur_state);
             last_progress = cur_progress;
             char sbar[16];
             cli_compact_bar(sbar, sizeof(sbar), cur_progress, 8);
             cli_trace("status", "%s sched_d state=%s %s %3.0f%%",
                       cli_icon_for_state(cur_state), cur_state, sbar, cur_progress * 100.0);
-        }
-        if (done) {
-            cli_spinner_stop(!run_failed, NULL);
-            spin_running = 0;
-            break;
         }
         board_polls++;
         if (!state_changed && !prog_changed) {
@@ -313,14 +292,9 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
         cli_dag_node_board_destroy(node_board);
         node_board = NULL;
     }
-    if (spin_running) {
-        if (board_polls > 0 && stale_polls >= 10) {
-            cli_spinner_pause();
-            cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_THINK, "sched_d",
-                                 "still running, waiting for completion ...");
-            cli_spinner_resume();
-        }
-    }
+    if (poll_live && board_polls > 0 && stale_polls >= 10)
+        cli_print_status("Dual Think:sched_d",
+                         "still running, waiting for completion ...");
 
     char *result = NULL;
     cli_trace("wait", "%s exec=%s awaiting completion (polls=%d)", CLI_ICON_DIAMOND, exec_id,
@@ -337,7 +311,6 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
             if (input_rc < 0)
                 break;
             airy_sleep_ms(200);
-            cli_spinner_tick();
         }
         airy_thread_join(wthr, NULL);
         err = wctx.err;
@@ -347,15 +320,6 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
     }
     cli_trace("wait", "%s done err=%d has_result=%d", CLI_ICON_DONE, (int)err,
               result ? 1 : 0);
-    if (spin_running) {
-        if (g_cli_cancel)
-            cli_spinner_stop(0, "aborted");
-        else if (err == AIRY_EOK && result)
-            cli_spinner_stop(1, NULL);
-        else
-            cli_spinner_stop(0, "no result");
-        spin_running = 0;
-    }
     int task_succeeded = cli_task_result_render(result, err, exec_id, g_cli_cancel);
 #ifdef AIRY_HAS_CJSON
     if (!g_cli_cancel && err == AIRY_EOK && result && input[0]) {
@@ -374,7 +338,7 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
         else
             snprintf(metrics, sizeof(metrics), "nodes=%zu deps=%zu",
                      plan->task_plan_node_count, cli_plan_deps_count(plan));
-        cli_render_turn_separator(cli_now_ms() - turn_start, metrics);
+        cli_print_turn(cli_now_ms() - turn_start, metrics);
     }
 
     if (result)

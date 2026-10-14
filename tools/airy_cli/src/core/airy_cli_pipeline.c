@@ -200,18 +200,16 @@ int cli_blueprint_fastpath(const char *input, uint64_t turn_start)
         } else if (next_buf[0]) {
             char line[1024];
             snprintf(line, sizeof(line), "L1 blueprint state machine: advance to step "
-                                         "%s%s%s (zero token)",
-                     cli_c(CLR_CYAN), next_buf, cli_c(CLR_RESET));
-            cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
-                                 line);
+                                         "%s (zero token)",
+                     next_buf);
+            cli_print_status("Dual Prof Think:blueprint", line);
         } else
 #endif
         {
             char line[1024];
             snprintf(line, sizeof(line), "L1 state machine hit (zero token): %s",
                      rs_out ? rs_out : "{}");
-            cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
-                                 line);
+            cli_print_status("Dual Prof Think:blueprint", line);
             cli_trace("blueprint", "%s", line);
         }
         cli_hall_emit("preflight", AIRY_HALL_CAT_CHAIN,
@@ -219,8 +217,7 @@ int cli_blueprint_fastpath(const char *input, uint64_t turn_start)
                       rs_out ? rs_out : "null");
         AIRY_FREE(rs_out);
         if (!g_cli_json_mode)
-            cli_render_turn_separator(cli_now_ms() - turn_start,
-                                      cli_fastpath_metrics());
+            cli_print_turn(cli_now_ms() - turn_start, cli_fastpath_metrics());
         return 1;
     }
     if (strcmp(tier, "l2") == 0) {
@@ -253,9 +250,9 @@ int cli_blueprint_fastpath(const char *input, uint64_t turn_start)
                           "L2 semantic cache hit (low token): replaying last result");
                 cli_print_plain(sugg, 0);
             } else {
-                cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
-                                     "L2 semantic cache hit (low token): replaying last result");
-                cli_render_super_agent(sugg);
+                cli_print_status("Dual Prof Think:blueprint",
+                                 "L2 semantic cache hit (low token): replaying last result");
+                cli_print_line("Super Agent", sugg);
             }
             AIRY_FREE(sugg);
         } else
@@ -264,16 +261,14 @@ int cli_blueprint_fastpath(const char *input, uint64_t turn_start)
             char line[1024];
             snprintf(line, sizeof(line), "L2 semantic cache hit (low token): %s",
                      rs_out ? rs_out : "{}");
-            cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK, "blueprint",
-                                 line);
+            cli_print_status("Dual Prof Think:blueprint", line);
         }
         cli_hall_emit("preflight", AIRY_HALL_CAT_CHAIN,
                       "{\"event\":\"blueprint_hit\",\"layer\":\"L2\",\"result\":%s}",
                       rs_out ? rs_out : "null");
         AIRY_FREE(rs_out);
         if (!g_cli_json_mode)
-            cli_render_turn_separator(cli_now_ms() - turn_start,
-                                      cli_fastpath_metrics());
+            cli_print_turn(cli_now_ms() - turn_start, cli_fastpath_metrics());
         return 1;
     }
     if (rs_out && rs_out[0]) {
@@ -296,8 +291,7 @@ int cli_blueprint_fastpath(const char *input, uint64_t turn_start)
             if (!g_cli_print_mode && !g_cli_json_mode) {
                 char line[512];
                 snprintf(line, sizeof(line), "检测到相似历史任务，可参考：%s", hint);
-                cli_render_role_line(CLI_ROLE_TRACE, CLI_ACTOR_DUAL_PROF_THINK,
-                                     "blueprint", line);
+                cli_print_status("Dual Prof Think:blueprint", line);
             }
             AIRY_FREE(hint);
         }

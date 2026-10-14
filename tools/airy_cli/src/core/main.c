@@ -315,7 +315,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        cli_render_user_message(input);
+        cli_print_status("For Thee", input);
 
         uint64_t turn_start = cli_now_ms();
 
@@ -352,7 +352,7 @@ int main(int argc, char *argv[])
                     snprintf(lg_line, sizeof(lg_line), "推理语言: %s · 输出语言: %s · %s",
                              cli_lang_name(r_lang), cli_lang_name(g_cli_lang_output),
                              cJSON_IsString(dr) && dr->valuestring ? dr->valuestring : "");
-                    cli_render_sub_agent_line(CLI_ROLE_TRACE, "lang", lg_line);
+                    cli_print_status("Sub lang Agent", lg_line);
                     cli_trace("lang", "reasoning=%s output=%s", cli_lang_name(r_lang),
                               cli_lang_name(g_cli_lang_output));
                     cJSON_Delete(lr);
@@ -377,8 +377,8 @@ int main(int argc, char *argv[])
             cli_chat_reply(input);
             char chat_metrics[192];
             cli_chat_usage_metrics(chat_metrics, sizeof(chat_metrics));
-            cli_render_turn_separator(cli_now_ms() - turn_start,
-                                      chat_metrics[0] ? chat_metrics : NULL);
+            cli_print_turn(cli_now_ms() - turn_start,
+                           chat_metrics[0] ? chat_metrics : NULL);
             continue;
         }
 
@@ -400,8 +400,8 @@ int main(int argc, char *argv[])
             cli_term_input_submit();
         else
             cli_outc('\n');
-        cli_render_role_line(CLI_ROLE_SUPER_AGENT, CLI_ACTOR_SUPER_AGENT, NULL,
-                             "AgentRT has exited. Thank you for using it.");
+        cli_print_line("Super Agent",
+                       "AgentRT has exited. Thank you for using it.");
     }
     cli_term_header_unpin();
     return 0;
