@@ -364,6 +364,7 @@ heapstore_syscall_trace_save
 jsonrpc_build_error
 jsonrpc_build_notification
 jsonrpc_build_success
+jsonrpc_check_strict
 jsonrpc_create_error_response
 jsonrpc_create_success_response
 jsonrpc_get_error_message
@@ -372,7 +373,6 @@ jsonrpc_get_string_param
 jsonrpc_parse_request_ptr
 jsonrpc_route_response
 jsonrpc_validate_request
-jsonrpc_validate_strict
 localtime_r
 mac_framework_collect_results
 mac_framework_complete_task
