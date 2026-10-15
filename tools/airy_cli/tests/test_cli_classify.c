@@ -12,8 +12,6 @@
  *   - 两表未命中 → -1（交 LLM 兜底）。
  */
 
-#define _POSIX_C_SOURCE 199309L
-
 #include "cli_internal.h"
 
 #include <stdio.h>

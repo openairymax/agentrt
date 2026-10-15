@@ -10,8 +10,6 @@
  * cost_usd；展示串与厂商字段逐项对照；零消耗回合不产出指标串；reset 清零。
  */
 
-#define _POSIX_C_SOURCE 200809L
-
 #include "cli_internal.h"
 
 #include <signal.h>
