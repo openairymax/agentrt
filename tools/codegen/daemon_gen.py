@@ -20,12 +20,22 @@
 # CUPOLAS_ROOT → 伞仓内 products/ → workspace 同级 products/，与 agentrt
 # 顶层 CMake 的 CUPOLAS_SRC_DIR 探测同语义。
 #
-# .manifest JSON schema v3:
+# .manifest JSON schema v4:
 #   {
-#     "manifest_version": 3,
+#     "manifest_version": 4,
 #     "daemon": "maths_d",                  # ^[a-z][a-z0-9_]*_d$
 #     "cname": "maths",                     # 可缺省，默认去 _d 后缀
 #     "sd_type": "maths",                   # SD 服务类型
+#     "endpoint": "base",                   # 必填（v4，0.1.19 §222）：
+#                                           # svc_endpoint 生成模式——
+#                                           # base=生成头常量直填
+#                                           # （daemon_ep_base，无 config
+#                                           # 户）；apply=进程端点槽装配
+#                                           # （daemon_ep_apply，svc_
+#                                           # prepare 已 daemon_ep_load
+#                                           # 装入）。生成头据此发射
+#                                           # static inline 机制壳，
+#                                           # svc.c 不再手写端点钩子
 #     "codegen": true,                      # 可缺省，默认 true；false =
 #                                           # 仅登记声明（G17），不渲染
 #                                           # 生成三件（形态特殊户：如零
@@ -86,7 +96,7 @@
 # 仅使用 Python 标准库，无第三方依赖。结构对齐 syscall_gen.py
 # （parse/validate/render 三段式 + gen/check 双模式）。
 #
-# Generator version: 1.13.0
+# Generator version: 1.14.0
 
 import argparse
 import difflib
@@ -96,7 +106,7 @@ import re
 import sys
 from pathlib import Path
 
-GENERATOR_VERSION = "1.13.2"
+GENERATOR_VERSION = "1.14.0"
 
 # 生成产物相对 daemon 目录的固定落点（保持稳定，勿随意改名）
 OUTPUT_MAIN = "src/main.c"
@@ -118,7 +128,7 @@ DAEMONS_ROOT = AGENTRT_ROOT / "daemons"
 # （CI codegen-check job 经 clone 注入 CUPOLAS_ROOT，保证门禁全覆盖）。
 EXTERNAL_DAEMONS = {"cupolas_d": ("CUPOLAS_ROOT", "cupolas", "daemon")}
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # noop_hooks 词表（0.1.19 §80 null object）：可缺省钩子（svc_activate/
 # svc_attach/svc_teardown）中无策略需求的子集，列出即引用机制层
@@ -135,6 +145,11 @@ RESERVED_METHODS = frozenset({"shutdown"})
 # OPS_ORDER 固定序装配（manifest 声明为集合语义，与书写顺序无关）。
 OPS_VOCAB = frozenset({"ipc", "llm", "tool"})
 OPS_ORDER = ("ipc", "llm", "tool")
+
+# endpoint 词表（0.1.19 §222 u78-1）：svc_endpoint 生成模式二选一，
+# 必填。base=生成头常量直填（daemon_ep_base）；apply=进程端点槽装配
+# （daemon_ep_apply）。监听地址日志统一由 daemon_boot 机制发射。
+ENDPOINT_MODES = frozenset({"base", "apply"})
 
 # cupolas 安全穹顶引导模式（策略单元 security_dome.c dome_bootstrap 的
 # pep_mode 参数声明化，0.1.19 §254b）：pep=PEP 最小 guard（消费户缺省，
@@ -190,7 +205,7 @@ def parse_manifest(path):
 
 
 def validate(data, path):
-    """校验 manifest 契约一致性（schema v3 全量规则，见文件头注释）。"""
+    """校验 manifest 契约一致性（schema v4 全量规则，见文件头注释）。"""
     if data.get("manifest_version") != SCHEMA_VERSION:
         raise GenError("%s: manifest_version 必须为 %d" % (path, SCHEMA_VERSION))
 
@@ -224,6 +239,12 @@ def validate(data, path):
     if len(set(ops)) != len(ops):
         raise GenError("%s: ops 存在重复" % path)
     data["ops"] = [op for op in OPS_ORDER if op in ops]
+
+    endpoint = data.get("endpoint")
+    if endpoint not in ENDPOINT_MODES:
+        raise GenError("%s: endpoint 须为 %s 之一（v4 必填：base=生成头"
+                       "常量直填 / apply=端点槽装配）: %r"
+                       % (path, sorted(ENDPOINT_MODES), endpoint))
 
     cupolas = data.get("cupolas", "pep")
     if cupolas not in CUPOLAS_MODES:
@@ -456,7 +477,8 @@ def render_main(d):
 
 
 def render_header(d):
-    """渲染 include/svc_<d>.h：端点常量 + svc 钩子/handler 声明。"""
+    """渲染 include/svc_<d>.h：端点常量 + static inline svc_endpoint 机制壳
+    + svc 钩子声明 + RPC 方法双清单（RPC_METHODS/METHODS）+ 原型单展开。"""
     daemon = d["daemon"]
     rpc = d["rpc"]
     upper = daemon.upper()
@@ -473,20 +495,30 @@ def render_header(d):
         "",
         "#include <cjson/cJSON.h>",
         "",
-        "/* 端点常量（wire 契约，与 .manifest rpc 段一致；svc_endpoint 缺省基线） */",
+        "/* 端点常量（wire 契约，与 .manifest rpc 段一致） */",
         "#define %s_SOCKET_UNIX airy_runtime_dir_socket(\"%s\")" % (upper, rpc["unix"]),
         '#define %s_SOCKET_WIN "\\\\\\\\.\\\\pipe\\\\%s"' % (upper, rpc["win_pipe"]),
         "/* TCP 口为 SSoT 引用，真值唯一定义于 airy_defaults.h */",
         "#define %s_TCP_PORT %s" % (upper, rpc["tcp"]),
         "#define %s_MAX_BUFFER %d" % (upper, rpc["buffer"]),
         "",
-        "/* 端点解析钩子：常量户回填上方基线；可配置户在 svc.c 完成",
-        " * config/env 覆盖后与 cmdline use_tcp 融合。实现: src/svc.c。 */",
-        "void svc_endpoint(daemon_endpoint_t *ep, int cmdline_tcp);",
-        "",
+        "/* 端点解析钩子（.manifest endpoint=%s 派生的机制壳；机制体单点" % d["endpoint"],
+        " * 在 daemon_ep_base/daemon_ep_apply，daemon_cfg_file.c）。cmdline",
+        " * use_tcp 融合与监听地址日志由 daemon_boot 机制层承载。 */",
+        "static inline void svc_endpoint(daemon_endpoint_t *ep, int cmdline_tcp)",
+        "{",
     ]
+    if d["endpoint"] == "base":
+        lines += [
+            "    daemon_ep_base(ep, cmdline_tcp, %s_SOCKET_UNIX," % upper,
+            "                   %s_SOCKET_WIN, %s_TCP_PORT);" % (upper, upper),
+        ]
+    else:
+        lines.append("    daemon_ep_apply(ep, cmdline_tcp);")
     noop = frozenset(d["noop_hooks"])
     lines += [
+        "}",
+        "",
         "/* 生命周期钩子（实现: src/svc.c）。prepare/destroy 恒有策略；",
         " * activate/attach/teardown 无策略需求者（noop_hooks，0.1.19",
         " * §80）由机制层 svc_<hook>_noop 缺省（daemon_main.h），",
@@ -505,24 +537,25 @@ def render_header(d):
     lines += [
         "void svc_destroy(void);",
         "",
-        "/* RPC handler 族（实现: src/svc.c）。签名对齐 method_fn；",
-        " * 命名 m_<method>，与 .manifest rpc.methods 一一对应。 */",
+        "/* RPC 方法清单（唯一声明源，源自 .manifest rpc.methods）。",
+        " * RPC_METHODS 只含策略方法；METHODS 追加协议保留 shutdown",
+        " * （main.c DAEMON_DECLARE_SHUTDOWN_METHOD 生成为 static inline，",
+        " * 不可对外发原型）。main.c 以 DAEMON_METHOD_ENTRY 展开 METHODS",
+        " * 为 daemon_method_entry_t[]，本头以 DAEMON_M_DECL 展开",
+        " * RPC_METHODS 为 m_<method> 原型（逐户声明块副本消解）。 */",
+        "#define SVC_%s_RPC_METHODS(X) \\" % upper,
     ]
-    for m in rpc["methods"]:
-        lines.append("void m_%s(cJSON *params, int id, void *user_data);" % m)
+    for m in rpc["methods"][:-1]:
+        lines.append('    X("%s", m_%s) \\' % (m, m))
+    lines.append('    X("%s", m_%s)' % (rpc["methods"][-1], rpc["methods"][-1]))
     lines += [
         "",
-        "/* RPC 方法表清单（唯一声明源，源自 .manifest rpc.methods）。",
-        " * main.c 以 X 宏展开为 daemon_method_entry_t[]：",
-        " *   #define X(n, f) {(n), (f)},",
-        " *   static const daemon_method_entry_t T[] = { SVC_%s_METHODS(X) };" % upper,
-        " * 装配行数与方法数解耦（机制层装配，策略数据在此单点维护）。 */",
         "#define SVC_%s_METHODS(X) \\" % upper,
-    ]
-    for m in rpc["methods"]:
-        lines.append('    X("%s", m_%s) \\' % (m, m))
-    lines.append('    X("shutdown", on_shutdown_method_%s)' % daemon)
-    lines += [
+        "    SVC_%s_RPC_METHODS(X) \\" % upper,
+        '    X("shutdown", on_shutdown_method_%s)' % daemon,
+        "",
+        "/* RPC handler 族原型（实现: src/svc.c，壳经 DAEMON_RPC_SHELL 族）。 */",
+        "SVC_%s_RPC_METHODS(DAEMON_M_DECL)" % upper,
         "",
         "#endif /* %s */" % guard,
         "",
