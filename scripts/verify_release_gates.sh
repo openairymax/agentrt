@@ -647,7 +647,10 @@ if [ ! -f "$MCP_BUILTIN" ]; then
     bad "M3 缺失 MCP 工具 SSoT: $MCP_BUILTIN"
 else
     _mcp_tools="$TMP/mcp_tools.txt"
-    sed -n 's/^[[:space:]]*\.id = "\([^"]*\)".*/\1/p' "$MCP_BUILTIN" > "$_mcp_tools"
+    # The builtin tool id set is the data-ified capability grid, whose SSoT is
+    # one BTOOL("id", ...) row per tool. Extract the leading id literal of each
+    # row (ids always sit on the BTOOL( line even when the row wraps).
+    sed -n 's/^[[:space:]]*BTOOL("\([^"]*\)".*/\1/p' "$MCP_BUILTIN" > "$_mcp_tools"
     _mcp_n="$(wc -l < "$_mcp_tools" | tr -d ' ')"
 
     PERM_TMPL=""
