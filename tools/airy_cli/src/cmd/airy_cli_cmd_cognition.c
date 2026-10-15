@@ -92,8 +92,9 @@ int cmd_apikey(const char *arg, void *ctx)
         return 0;
     }
     const char *rest = arg + 4;
-    char *sp = strchr(rest, ' ');
-    if (!sp) {
+    const char *sp = rest;
+    while (*sp != '\0' && *sp != ' ') sp++;
+    if (*sp == '\0') {
         cli_print_status("Sub Agent:usage", "/apikey set <N> <key>");
         return 0;
     }
