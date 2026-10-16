@@ -475,6 +475,56 @@ _sock_alive() {
     fi
 }
 
+# D5 模型端点健康：与 _sock_alive（只判连接性）互补——读 llm.sock 的
+# health_check 全响应并解析 endpoints[]，回答"能力是否真的可用、代价多大"。
+# 退出码：0 = 有端点且已打印；2 = 无匹配端点（未配置 local provider）；
+# 1 = 探测不可用（llm.sock 不可达、响应不可解析，或 llm_d 侧探测视图降级）。
+_ep_health() {
+    local path="$1"
+    [ -S "$path" ] || return 1
+    command -v python3 >/dev/null 2>&1 || return 1
+    python3 - "$path" <<'PY' 2>/dev/null
+import json, socket, sys
+s = socket.socket(socket.AF_UNIX)
+s.settimeout(1.5)
+try:
+    s.connect(sys.argv[1])
+except OSError:
+    sys.exit(1)
+s.sendall(b'{"jsonrpc":"2.0","method":"health_check","params":{},"id":1}\n')
+buf, resp = b"", None
+for _ in range(16):
+    try:
+        chunk = s.recv(4096)
+    except OSError:
+        break
+    if not chunk:
+        break
+    buf += chunk
+    try:
+        resp = json.loads(buf.decode("utf-8", "replace").strip())
+        break
+    except ValueError:
+        continue
+if resp is None:
+    sys.exit(1)
+result = resp.get("result") or {}
+if result.get("endpoint_probe") is False:
+    sys.exit(1)
+eps = result.get("endpoints")
+if not eps:
+    sys.exit(2)
+for ep in eps:
+    line = "  - %s [%s] latency=%.0fms http=%s" % (
+        ep.get("provider", "?"), ep.get("status", "unknown"),
+        float(ep.get("latency_ms", 0) or 0), ep.get("http_code", 0))
+    if ep.get("cold"):
+        line += " cold(first_ms=%.0f model=%s)" % (
+            float(ep.get("first_ms", 0) or 0), ep.get("cold_model", "-"))
+    print(line)
+PY
+}
+
 ensure_aux_daemons() {
     # B13 V13.4：aux 按需激活唯一路径 = supervisor.activate 单向请求
     #（sock 预检：外部已在线实例不受监管，跳过避免 spawn 冲突）
@@ -1486,6 +1536,18 @@ case "$CMD" in
         else
             log warn "daemon 群: 核心链路未全部就绪（运行 airymaxrt 拉起，或查看 logs/ 诊断）"
         fi
+        # D5：模型端点健康（可达性/延迟/冷加载）。_sock_alive 只证明 llm_d
+        # 在线，不证明所配端点此刻可用——此项补齐"能力存在 ≠ 能力可用"。
+        _ep_out="$(_ep_health "$RUNTIME_DIR/llm.sock")"
+        _ep_rc=$?
+        case "$_ep_rc" in
+            0)
+                log info "模型端点健康:"
+                printf '%s\n' "$_ep_out" | while IFS= read -r _el; do log info "$_el"; done
+                ;;
+            2) log info "模型端点健康: 无本地端点（未配置 local provider）" ;;
+            *) log warn "模型端点健康: 探测不可用（llm.sock 未就绪、响应异常或 llm_d 侧探测降级）" ;;
+        esac
         exit 0
         ;;
     doctor)
