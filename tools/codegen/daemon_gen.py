@@ -5,9 +5,9 @@
 # daemon_gen.py — agentrt daemon 五件套样板生成器（L3 SSoT）
 #
 # 解析 daemons/<name>/.manifest 契约源（每户唯一真值源），生成三件：
-#   a. src/main.c            入口策略面（符号宏实例化 + DAEMON_BOOT_FILL
-#                            策略包填充 + DAEMON_BOOT_WIRE 接线；装配机制
-#                            收敛于 daemon_boot.c）
+#   a. src/main.c            入口策略面（DAEMON_DECLARE_COMMON 符号宏实例化
+#                            + ops 表 + DAEMON_MAIN 一次展开 shutdown/方法表/
+#                            main() 恒定骨架；装配机制收敛于 daemon_boot.c）
 #   b. include/svc_<d>.h     唯一私有头（端点常量 + svc 钩子/handler 声明
 #                            + SVC_<D>_METHODS(X) 方法表清单）
 #   c. modules/sources.cmake CMake 真装配源清单
@@ -96,7 +96,7 @@
 # 仅使用 Python 标准库，无第三方依赖。结构对齐 syscall_gen.py
 # （parse/validate/render 三段式 + gen/check 双模式）。
 #
-# Generator version: 1.14.0
+# Generator version: 1.15.0
 
 import argparse
 import difflib
@@ -106,7 +106,7 @@ import re
 import sys
 from pathlib import Path
 
-GENERATOR_VERSION = "1.14.0"
+GENERATOR_VERSION = "1.15.0"
 
 # 生成产物相对 daemon 目录的固定落点（保持稳定，勿随意改名）
 OUTPUT_MAIN = "src/main.c"
@@ -399,18 +399,15 @@ def _emit_generated_banner():
         "/* SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd. */",
         "/* SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0 */",
         "",
-        "/* @generated DO NOT EDIT — daemon_gen.py v%s (L3 SSoT) 生成。" % GENERATOR_VERSION,
-        " * manifest 派生产物；装配机制在 daemons/common，策略在 src/svc.c",
-        " * 与 modules（手写域）。",
-        " * 改 .manifest 后: python3 agentrt/tools/codegen/daemon_gen.py --gen",
-        " */",
+        "/* @generated DO NOT EDIT — daemon_gen.py v%s (L3 SSoT)；"
+        "改 .manifest 后重跑 --gen。 */" % GENERATOR_VERSION,
         "",
     ]
 
 
 def render_main(d):
-    """渲染 src/main.c：入口策略面（静态表 + DAEMON_BOOT_FILL 策略包
-    填充 + DAEMON_BOOT_WIRE 接线），机制在 daemon_boot.c（daemon_main.h）。"""
+    """渲染 src/main.c：入口策略面（符号宏实例化 + ops 表 + DAEMON_MAIN
+    收敛一次展开），机制在 daemon_boot.c（daemon_main.h）。"""
     daemon = d["daemon"]
     cname = d["cname"]
     rpc = d["rpc"]
@@ -438,15 +435,7 @@ def render_main(d):
         lines.append('#include "daemon_%s_ops_bootstrap.h"' % op)
     lines += [
         "",
-        "DAEMON_DECLARE_COMMON(%s, %s," % (daemon, cname),
-        "                      %s_SOCKET_UNIX, %s_SOCKET_WIN," % (upper, upper),
-        "                      %s_TCP_PORT, %s_MAX_BUFFER)" % (upper, upper),
-        "",
-        "DAEMON_DECLARE_SHUTDOWN_METHOD(%s)" % daemon,
-        "",
-        "static const daemon_method_entry_t SVC_METHODS[] = {",
-        "    SVC_%s_METHODS(DAEMON_METHOD_ENTRY)" % upper,
-        "};",
+        "DAEMON_DECLARE_COMMON(%s, %s, %s_TCP_PORT)" % (daemon, cname, upper),
         "",
         "static const daemon_op_t SVC_OPS[] = {",
     ]
@@ -455,22 +444,15 @@ def render_main(d):
     lines += [
         "};",
         "",
-        "int main(int argc, char **argv)",
-        "{",
-        "    daemon_boot_t boot = {",
-        '        DAEMON_BOOT_FILL(%s, "%s", "AIRY_%s_DEBUG",' % (daemon, cname, upper),
-        '                         "%s", "%s", %d, %d, %d, %d, %d, %d)'
+        'DAEMON_MAIN(%s, %s, "%s", "AIRY_%s_DEBUG",'
+        % (daemon, upper, cname, upper),
+        '            "%s", "%s", %d, %d, %d, %d, %d, %d,'
         % (d["sd_type"], rpc["tags"], total_methods,
            pool["max_events"], pool["min"], pool["max"], pool["queue"],
            1 if rpc["concurrent"] else 0),
-        "        DAEMON_BOOT_WIRE(SVC_OPS, SVC_METHODS,",
-        "                         %s, %s," % (activate, attach),
-        "                         %s, daemon_dome_init%s,"
-        % (teardown, "_pep" if d["cupolas"] == "pep" else ""),
-        "                         daemon_dome_cleanup),",
-        "    };",
-        "    return daemon_boot(argc, argv, &boot);",
-        "}",
+        "            %s, %s, %s," % (activate, attach, teardown),
+        "            daemon_dome_init%s, daemon_dome_cleanup)"
+        % ("_pep" if d["cupolas"] == "pep" else ""),
         "",
     ]
     return "\n".join(lines)
