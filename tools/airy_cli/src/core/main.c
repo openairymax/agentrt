@@ -28,6 +28,7 @@
 
 #include "cli_internal.h" /* 家族公共头：commons/平台/引擎/守护进程客户端面 */
 #include "cli_gw.h"       /* 架构约束：统一经 gateway 派发 */
+#include "cli_live.h"     /* N4 会话存活：后端重启后提示并重建会话视图 */
 
 #include "airy_cli_pipeline.h"
 #include "airy_cli_exec.h"
@@ -208,6 +209,11 @@ int main(int argc, char *argv[])
      * 装配（mem.recent → g_history_*），此后请求/渲染路径自动同源生效。 */
     if (g_cli_resume_mode)
         cli_session_restore();
+
+    /* N4：绑定后端重启后的会话重建入口，并启用空闲节拍探活。首次 tick
+     * 只建立代次/可用性基线，不触发重建。 */
+    cli_live_bind(cli_session_rebind);
+    cli_live_init();
 
     char input[8192];
     int quit_flag = 0;

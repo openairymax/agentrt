@@ -14,6 +14,8 @@
 
 #include "cli_tui_internal.h"
 
+#include "cli_live.h"
+
 void tui_line_redraw(cli_tui_t *t)
 {
     char num[16];
@@ -130,6 +132,7 @@ int tui_readline_line_mode(cli_tui_t *t, char *buf, size_t cap,
                 cli_tui_rebuild_three_zone(t);
             }
 #endif
+            cli_live_tick();
             tui_caret_tick(t);
             tui_line_redraw(t);
             continue;

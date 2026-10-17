@@ -63,6 +63,16 @@ void cli_gw_err_set(const char *msg);
 int cli_gw_health(int timeout_ms);
 
 /**
+ * @brief gateway 可达性 + 传输代次探测（HTTP /health）。
+ * @param timeout_ms 超时毫秒（>0）
+ * @param epoch_out  [out] 网关启动代次（秒级；0 表示响应未携带）
+ * @return 1 在线；0 离线
+ *
+ * epoch 每次网关进程重建都会变化，调用方据此判定既有会话是否已失效。
+ */
+int cli_gw_probe(int timeout_ms, unsigned long long *epoch_out);
+
+/**
  * @brief 解析网关端点（AIRY_GATEWAY_URL 或默认 127.0.0.1:8080）。
  * @param host      [out] 主机名
  * @param host_len  host 缓冲区大小

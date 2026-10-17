@@ -283,11 +283,29 @@ static int gw_recv_feed(char **presp, size_t *pcap, size_t *prlen, size_t n,
     return 0;
 }
 
+/* 解析状态行 "HTTP/1.x NNN ..."（仅头部区间，resp 未必以 NUL 结尾）。
+ * 返回 100~599；无法识别返回 0（由调用方按未知处理）。 */
+static int cli_gw_status_line(const char *resp, size_t hlen)
+{
+    if (!resp || hlen < 12 || memcmp(resp, "HTTP/", 5) != 0)
+        return 0;
+    const char *sp = (const char *)memchr(resp, ' ', hlen);
+    if (!sp || (size_t)(sp - resp) + 4 > hlen)
+        return 0;
+    const char *c = sp + 1;
+    if (c[0] < '1' || c[0] > '5' || c[1] < '0' || c[1] > '9' || c[2] < '0' || c[2] > '9')
+        return 0;
+    return (c[0] - '0') * 100 + (c[1] - '0') * 10 + (c[2] - '0');
+}
+
 static int cli_gw_exchange(const char *method, const char *host, int port, const char *path,
-                           const char *body, int timeout_ms, char **out_body, size_t *out_body_len)
+                           const char *body, int timeout_ms, char **out_body, size_t *out_body_len,
+                           int *out_status)
 {
     *out_body = NULL;
     *out_body_len = 0;
+    if (out_status)
+        *out_status = 0;
     int fd = cli_gw_connect(host, port, timeout_ms);
     if (fd < 0)
         return -1;
@@ -475,6 +493,8 @@ static int cli_gw_exchange(const char *method, const char *host, int port, const
     size_t hlen = (size_t)(he - resp) + 4;
     char *body_start = resp + hlen;
     size_t body_len = rlen - hlen;
+    if (out_status)
+        *out_status = cli_gw_status_line(resp, (size_t)(he - resp));
     if (is_chunked) {
         /* 简单 chunked 解码（CLI 侧 SSE 场景） */
         char *out = (char *)AIRY_MALLOC(body_len + 1);
@@ -586,7 +606,9 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
 
     char *resp = NULL;
     size_t rlen = 0;
-    int exchange_err = cli_gw_exchange("POST", host, port, "/", body, timeout_ms, &resp, &rlen);
+    int status = 0;
+    int exchange_err = cli_gw_exchange("POST", host, port, "/", body, timeout_ms, &resp, &rlen,
+                                       &status);
     AIRY_FREE(body);
     if (exchange_err == CLI_GW_EXCH_CANCELED) {
         AIRY_FREE(resp);
@@ -619,6 +641,18 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
         snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
                  "网关响应为空，请检查 %s 服务状态", host);
         return AIRY_ERR_PROTOCOL;
+    }
+    /* 上游 5xx：网关自身或其后端不可用（典型为 daemon 重启期间的空体
+     * 503）。此前状态行被丢弃，空体降级为"响应不是合法 JSON"，用户无法
+     * 分辨"后端重启"与"协议损坏"；此处按 N1 传输层具名。 */
+    if (status >= 500) {
+        snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
+                 "网关上游不可用（HTTP %d，method=%s）：服务可能正在重启，请稍后重试",
+                 status, method);
+        AIRY_LOG_WARN("cli_gw: upstream unavailable (HTTP %d, method=%s) at %s:%d", status, method,
+                      host, port);
+        AIRY_FREE(resp);
+        return AIRY_ERR_SVC_NOT_READY;
     }
     /* 提取 JSON-RPC result（忽略 id 字段） */
     cJSON *root = cJSON_Parse(resp);
@@ -684,21 +718,34 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
     return 0;
 }
 
-/* ── /health 可达性 ───────────────────────────────────────────────── */
-int cli_gw_health(int timeout_ms)
+/* ── /health 可达性 + 传输代次 ────────────────────────────────────── */
+int cli_gw_probe(int timeout_ms, unsigned long long *epoch_out)
 {
+    if (epoch_out)
+        *epoch_out = 0;
     char host[128];
     int port = 0;
     cli_gw_endpoint(host, sizeof(host), &port);
     char *resp = NULL;
     size_t rlen = 0;
+    int status = 0;
     /* /health 仅支持 GET；此前误用 POST 得 404，导致网关健康时仍误报
      * "gateway unreachable"（v0.1.16 现场缺陷根因）。 */
-    if (cli_gw_exchange("GET", host, port, "/health", NULL, timeout_ms, &resp, &rlen) != 0) {
+    if (cli_gw_exchange("GET", host, port, "/health", NULL, timeout_ms, &resp, &rlen, &status) != 0) {
         AIRY_FREE(resp);
         return 0;
     }
-    int ok = (resp && strstr(resp, "\"healthy\"")) ? 1 : 0;
+    int ok = (status == 200 && resp && strstr(resp, "\"healthy\"")) ? 1 : 0;
+    if (ok && epoch_out) {
+        const char *p = strstr(resp, "\"epoch\":");
+        if (p)
+            *epoch_out = strtoull(p + 8, NULL, 10);
+    }
     AIRY_FREE(resp);
     return ok;
+}
+
+int cli_gw_health(int timeout_ms)
+{
+    return cli_gw_probe(timeout_ms, NULL);
 }

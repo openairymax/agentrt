@@ -161,4 +161,12 @@ void cli_session_restore(void)
     cli_print_status("Sub session Agent", msg);
 }
 
+void cli_session_rebind(void)
+{
+    /* mem_d 持久化在重启后仍持有完整记录，直接重放会与既有历史重复；
+     * 先清空再按权威视图重装，等价于一次干净的 --resume。 */
+    cli_history_clear();
+    cli_session_restore();
+}
+
 #endif /* AIRY_HAS_CJSON */

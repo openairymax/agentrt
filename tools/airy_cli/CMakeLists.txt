@@ -85,6 +85,8 @@ add_executable(airy_cli
     src/core/cli_orch.c
     # 架构约束（2026-08-25）：统一网关客户端（所有客户端必须经 gateway 派发）
     src/cmd/cli_gw.c
+    # 0.1.19 N4：会话存活节拍（代次比对 + stale 重建）
+    src/cmd/cli_live.c
 )
 
 # 链接模式：库序即成员级 DAG 拓扑序，单遍左到右解析完备；
@@ -316,5 +318,29 @@ if(BUILD_TESTS)
             target_link_libraries(test_cli_errdesc PRIVATE ${AIRY_CJSON_LIBRARIES})
         endif()
         add_test(NAME cli_errdesc_unit COMMAND test_cli_errdesc)
+    endif()
+
+    # 0.1.19 N4：会话存活节拍端到端——mock 网关驱动 /health 代次与服务
+    # health_check，覆盖基线不误判、代次重建恰一次、down→up 兜底、超时
+    # 不改视图且不污染业务诊断、网关断连后凭代次重建、AIRY_CLI_LIVE_MS=0
+    # 零请求。与 cli_gw_e2e 同策略（POSIX mock + pthread），Windows 不参与。
+    if(NOT WIN32)
+        add_executable(test_cli_live tests/test_cli_live.c
+                       src/cmd/cli_live.c src/cmd/cli_gw.c
+                       src/render/cli_render.c src/core/cli_dag.c
+                       src/core/cli_term.c)
+        target_include_directories(test_cli_live PRIVATE ${CLI_INC_DIRS})
+        target_compile_definitions(test_cli_live PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
+        if(AIRY_CJSON_INCLUDE_DIRS)
+            target_include_directories(test_cli_live PRIVATE ${AIRY_CJSON_INCLUDE_DIRS})
+        endif()
+        target_link_libraries(test_cli_live PRIVATE airy_coreloopthree airy_common
+                                                      Threads::Threads)
+        if(TARGET cJSON OR TARGET cjson)
+            target_link_libraries(test_cli_live PRIVATE $<IF:$<TARGET_EXISTS:cJSON>,cJSON,cjson>)
+        elseif(AIRY_CJSON_LIBRARIES)
+            target_link_libraries(test_cli_live PRIVATE ${AIRY_CJSON_LIBRARIES})
+        endif()
+        add_test(NAME cli_live_e2e COMMAND test_cli_live)
     endif()
 endif()
