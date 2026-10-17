@@ -1327,6 +1327,47 @@ ensure_installer() {
 FRONTEND_TUI=1
 CLI_ARGS=()
 CMD="${1:-}"
+# 0.1.19 A1 安装后自检：机器可读完整性快照（--json）。退出码只锚定安装
+# 完整性——核心链与网关二进制全部在位且 install.env 就绪；gateway/daemon
+# 运行态为信息字段不参与判定（安装末尾 daemon 群按设计为停机态，运行态
+# 活性由 e2e clean-room 把关）。JSON 走 stdout，诊断走 stderr，零污染。
+status_json() {
+    local ok=1 k v
+    local comp="" dm=""
+    for k in cli:CLI_BIN gateway:GATEWAY_BIN llm:LLM_BIN think:THINK_BIN agent:AGENT_BIN tool:TOOL_BIN; do
+        v="${k#*:}"
+        k="${k%%:*}"
+        if [ -n "${!v:-}" ] && [ -x "${!v}" ]; then
+            comp="${comp}\"${k}\":true,"
+        else
+            comp="${comp}\"${k}\":false,"
+            ok=0
+        fi
+    done
+    comp="${comp%,}"
+    local env_ok=true
+    if [ ! -f "$AIRY_HOME/config/install.env" ]; then
+        env_ok=false
+        ok=0
+    fi
+    local ver=""
+    [ -f "$AIRY_HOME/config/install.env" ] && ver="$(sed -n 's/^AIRY_VERSION=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
+    for k in llm think agent tool; do
+        if _sock_alive "$RUNTIME_DIR/$k.sock"; then
+            dm="${dm}\"${k}\":true,"
+        else
+            dm="${dm}\"${k}\":false,"
+        fi
+    done
+    dm="${dm%,}"
+    local gw=offline
+    wait_for_health "$GATEWAY_URL" 1 && gw=online
+    [ "$ok" = 1 ] && ok=true || ok=false
+    printf '{"ok":%s,"version":"%s","home":"%s","profile":"%s","components":{%s},"config":{"install_env":%s},"gateway":"%s","daemons":{%s}}\n' \
+        "$ok" "$ver" "$AIRY_HOME" "${AIRYRT_PROFILE:-auto}" "$comp" "$env_ok" "$gw" "$dm"
+    [ "$ok" = true ] || return 1
+}
+
 case "$CMD" in
     --help|-h|help)
         echo "用法: airymaxrt [airy_cli 参数]（默认进入 TUI 渲染层）"
@@ -1497,6 +1538,10 @@ case "$CMD" in
         done
         ;;
     status)
+        if [ "${2:-}" = "--json" ]; then
+            status_json
+            exit $?
+        fi
         log info "AIRY_HOME=$AIRY_HOME"
         log info "画像: ${AIRYRT_PROFILE:-auto} · 架构: $(detect_arch) · 加速器: $(detect_accel)"
         log info "组件: CLI=${CLI_BIN:-缺失} GATEWAY=${GATEWAY_BIN:-缺失} LLM=${LLM_BIN:-缺失}"
