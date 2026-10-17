@@ -174,6 +174,9 @@ void cli_history_clear(void);
  * 任何本地会话状态。cli_history_capacity 为消息预算 SSoT（cli_chat_history.c），
  * 恢复时按"每记录最多展开两条消息"的保守口径裁剪。 */
 void cli_session_restore(void);
+/* N4 会话存活：后端重启后先清空本地视图再按 mem.recent 重装，
+ * 避免持久化记录与既有历史重复（cli_live 的 stale 重建入口）。 */
+void cli_session_rebind(void);
 size_t cli_history_capacity(void);
 /* 2.5.x 意图分辨：纯字符串启发式（consult > task > chat 三级优先），
  * 返回 1=task / 0=chat / -1=未命中（调用方交 LLM 兜底） */

@@ -65,6 +65,7 @@ static int g_tests_passed = 0;
 #define MOCK_MODE_SILENT 2 /* 收完请求后保持静默，用于驱动客户端超时 */
 #define MOCK_MODE_BADJSON 3 /* POST / → 响应体非合法 JSON */
 #define MOCK_MODE_NORESULT 4 /* POST / → 合法 JSON 但既无 result 也无 error */
+#define MOCK_MODE_503    5 /* POST / → 空体 503（daemon 重启窗口的网关应答） */
 
 static int g_srv_fd = -1;
 static int g_srv_port = 0;
@@ -206,6 +207,11 @@ static void mock_handle(int fd)
     }
     if (mode == MOCK_MODE_NORESULT) {
         mock_send(fd, 200, "{\"jsonrpc\":\"2.0\",\"id\":1}");
+        return;
+    }
+    if (mode == MOCK_MODE_503) {
+        /* daemon 重启窗口：网关返回空体 503（N4 现场根因形态） */
+        mock_send(fd, 503, "");
         return;
     }
     char resp[512];
@@ -447,6 +453,21 @@ static void test_call_noresult(void)
     g_mode = MOCK_MODE_OK;
 }
 
+static void test_call_upstream_503(void)
+{
+    mock_reset();
+    g_mode = MOCK_MODE_503;
+    set_url_port(g_srv_port);
+    char *out = NULL;
+    int rc = cli_gw_call("mem.health_check", "{}", 3000, &out);
+    CHECK(rc == AIRY_ERR_SVC_NOT_READY, "call_503 rc==AIRY_ERR_SVC_NOT_READY");
+    CHECK(out == NULL, "call_503 out==NULL");
+    CHECK(strstr(cli_gw_last_err(), "HTTP 503") != NULL, "call_503 err mentions HTTP 503");
+    /* 空体 503 不得降级为"响应不是合法 JSON"（N4 根因） */
+    CHECK(strstr(cli_gw_last_err(), "不是合法 JSON") == NULL, "call_503 not misreported as bad json");
+    g_mode = MOCK_MODE_OK;
+}
+
 static void test_call_offline(void)
 {
     setenv("AIRY_GATEWAY_URL", "http://127.0.0.1:1", 1); /* 1 端口不可达 */
@@ -531,6 +552,7 @@ int main(void)
     test_call_error_32601();
     test_call_badjson();
     test_call_noresult();
+    test_call_upstream_503();
     test_call_offline();
     test_call_timeout();
     test_call_canceled();
