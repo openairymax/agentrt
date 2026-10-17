@@ -548,13 +548,16 @@ static int cli_gw_provider_state(const char *m)
 }
 
 /* ── JSON-RPC over HTTP POST / ─────────────────────────────────────── */
+/* 失败返回真实 AIRY_ERR_*（0.1.19 §3.7.2 N1）：呈现层据此按 class 分诊，
+ * 不再靠字符串嗅探；g_cli_gw_err 保留可读原文，二者互补。全部调用面均按
+ * 非 0 判失败（cli_err_desc 消费文本），返回码细化不改变控制流。 */
 int cli_gw_call(const char *method, const char *params_json, int timeout_ms, char **out_result)
 {
     if (!method || !out_result) {
         snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
                  "网关调用参数非法（method%s，out_result%s）",
                  method ? " 已给出" : " 为空", out_result ? " 已给出" : " 为空");
-        return -1;
+        return AIRY_ERR_INVALID_PARAM;
     }
     *out_result = NULL;
     char host[128];
@@ -570,7 +573,7 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
     if (!body) {
         snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
                  "请求缓冲分配失败（method=%s，%zu 字节）", method, blen);
-        return -1;
+        return AIRY_ERR_OUT_OF_MEMORY;
     }
     int bn = snprintf(body, blen, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"%s\",\"params\":%s}",
                       method, (params_json && *params_json) ? params_json : "{}");
@@ -578,7 +581,7 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
         snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
                  "请求信封构造失败（method=%s），参数过长", method);
         AIRY_FREE(body);
-        return -1;
+        return AIRY_ERR_INVALID_PARAM;
     }
 
     char *resp = NULL;
@@ -604,18 +607,18 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
                      timeout_ms / 1000, method);
             AIRY_LOG_WARN("cli_gw: response timeout after %dms (method=%s) at %s:%d",
                           timeout_ms, method, host, port);
-            return -1;
+            return AIRY_ERR_TIMEOUT;
         }
         /* 0.1.6h 友好化：网关不可达给出可执行提示（原仅日志 WARN） */
         snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
                  "网关不在线（%s:%d），请运行 airymaxrt 启动服务", host, port);
         AIRY_LOG_WARN("cli_gw: gateway unreachable at %s:%d (method=%s)", host, port, method);
-        return -1;
+        return AIRY_ERR_SYS_SOCKET;
     }
     if (!resp) {
         snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
                  "网关响应为空，请检查 %s 服务状态", host);
-        return -1;
+        return AIRY_ERR_PROTOCOL;
     }
     /* 提取 JSON-RPC result（忽略 id 字段） */
     cJSON *root = cJSON_Parse(resp);
@@ -625,7 +628,7 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
                  "网关响应不是合法 JSON（method=%s），请查看 %s/logs/gateway_d.out",
                  method, getenv("AIRY_HOME") ? getenv("AIRY_HOME") : "~/.airymaxrt");
         AIRY_LOG_WARN("cli_gw: malformed json response (method=%s) at %s:%d", method, host, port);
-        return -1;
+        return AIRY_ERR_PROTOCOL;
     }
     cJSON *err = cJSON_GetObjectItem(root, "error");
     if (err) {
@@ -635,6 +638,9 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
         int c = code && cJSON_IsNumber(code) ? (int)code->valuedouble : 0;
         const char *m = msg && cJSON_IsString(msg) ? msg->valuestring : "";
         int pr = cli_gw_provider_state(m);
+        /* 网关已应答即链路可达：错误对象按 JSON-RPC 码保持语义，归类为
+         * 业务/参数/不支持，绝不外溢为 transport（N1 三层责任）。 */
+        int rc = AIRY_ERR_GENERIC_FAIL;
         if (pr > 0)
             /* N-3：provider 请求被拒（400/422）不再表现为"读写/网络错误"，
              * 并保留网关 error.message 原文供自助定位。 */
@@ -646,14 +652,18 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
             snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
                      "网关服务内部错误（%s），请查看 %s/logs/gateway_d.out",
                      m[0] ? m : "Internal error", getenv("AIRY_HOME") ? getenv("AIRY_HOME") : "~/.airymaxrt");
-        else if (c == -32601)
+        else if (c == -32601) {
             snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
                      "网关不支持该方法（%s）", method);
-        else
+            rc = AIRY_ERR_NOT_SUPPORTED;
+        } else {
+            if (c == -32600 || c == -32602)
+                rc = AIRY_ERR_INVALID_PARAM;
             snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
                      "网关服务异常（code=%d%s%s）", c, m[0] ? " " : "", m);
+        }
         cJSON_Delete(root);
-        return -1;
+        return rc;
     }
     cJSON *result = cJSON_GetObjectItem(root, "result");
     if (!result) {
@@ -661,14 +671,14 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
                  "网关响应缺少 result 字段（method=%s），服务面实现异常", method);
         AIRY_LOG_WARN("cli_gw: response without result (method=%s) at %s:%d", method, host, port);
         cJSON_Delete(root);
-        return -1;
+        return AIRY_ERR_PROTOCOL;
     }
     char *out = cJSON_PrintUnformatted(result);
     cJSON_Delete(root);
     if (!out) {
         snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
                  "网关响应序列化失败（method=%s）", method);
-        return -1;
+        return AIRY_ERR_OUT_OF_MEMORY;
     }
     *out_result = out;
     return 0;
