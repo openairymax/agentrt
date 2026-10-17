@@ -1331,6 +1331,18 @@ CMD="${1:-}"
 # 完整性——核心链与网关二进制全部在位且 install.env 就绪；gateway/daemon
 # 运行态为信息字段不参与判定（安装末尾 daemon 群按设计为停机态，运行态
 # 活性由 e2e clean-room 把关）。JSON 走 stdout，诊断走 stderr，零污染。
+# 0.1.19 §3.5 缺陷5：daemon 请求侧检出 model.yaml 漂移后落标记文件，
+# 此处汇总待重启 daemon 名（空格分隔），供 status 面提示。
+_cfg_stale() {
+    local f out=""
+    for f in "$RUNTIME_DIR"/model_yaml_stale_*; do
+        if [ -f "$f" ]; then
+            out="$out ${f##*model_yaml_stale_}"
+        fi
+    done
+    printf '%s' "${out# }"
+}
+
 status_json() {
     local ok=1 k v
     local comp="" dm=""
@@ -1361,10 +1373,15 @@ status_json() {
     done
     dm="${dm%,}"
     local gw=offline
+    local stale="" sd
+    for sd in $(_cfg_stale); do
+        stale="${stale}\"${sd}\","
+    done
+    stale="${stale%,}"
     wait_for_health "$GATEWAY_URL" 1 && gw=online
     [ "$ok" = 1 ] && ok=true || ok=false
-    printf '{"ok":%s,"version":"%s","home":"%s","profile":"%s","components":{%s},"config":{"install_env":%s},"gateway":"%s","daemons":{%s}}\n' \
-        "$ok" "$ver" "$AIRY_HOME" "${AIRYRT_PROFILE:-auto}" "$comp" "$env_ok" "$gw" "$dm"
+    printf '{"ok":%s,"version":"%s","home":"%s","profile":"%s","components":{%s},"config":{"install_env":%s},"gateway":"%s","daemons":{%s},"config_stale":[%s]}\n' \
+        "$ok" "$ver" "$AIRY_HOME" "${AIRYRT_PROFILE:-auto}" "$comp" "$env_ok" "$gw" "$dm" "$stale"
     [ "$ok" = true ] || return 1
 }
 
@@ -1580,6 +1597,10 @@ case "$CMD" in
             log info "daemon 群: 核心链路（llm/think/agent/tool）全部就绪"
         else
             log warn "daemon 群: 核心链路未全部就绪（运行 airymaxrt 拉起，或查看 logs/ 诊断）"
+        fi
+        _stale="$(_cfg_stale)"
+        if [ -n "$_stale" ]; then
+            log warn "配置漂移: model.yaml 在 daemon 启动后被修改（$_stale），重启后生效"
         fi
         # D5：模型端点健康（可达性/延迟/冷加载）。_sock_alive 只证明 llm_d
         # 在线，不证明所配端点此刻可用——此项补齐"能力存在 ≠ 能力可用"。
