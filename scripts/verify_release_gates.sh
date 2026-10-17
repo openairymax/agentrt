@@ -1468,7 +1468,7 @@ else
     bad "Y5 B2 测试守卫缺失"
 fi
 
-_zrr="$ROOT/daemons/sched_d/src/roadmap_rpc.c"
+_zrr="$ROOT/daemons/sched_d/src/roadmap/roadmap_rpc.c"
 _zcr="$ROOT/gateway/src/biz/gateway_cap_registry.c"
 section "Z" "B8 架构文档名实一致（V8.3 roadmap_status 实例状态名防回潮）"
 
