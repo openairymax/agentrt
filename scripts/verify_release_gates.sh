@@ -1483,7 +1483,7 @@ else
 fi
 
 _wc="$ROOT/daemons/mem_d/src/engine/compress.c"
-_wh="$ROOT/daemons/mem_d/include/compress.h"
+_wh="$ROOT/daemons/mem_d/src/engine/compress.h"
 _wch="$ROOT/daemons/mem_d/src/handlers/cache_handlers.c"
 _wsr="$ROOT/daemons/llm_d/src/rpc/service_request.c"
 _wlh="$ROOT/daemons/mem_d/src/handlers/ledger_handlers.c"
