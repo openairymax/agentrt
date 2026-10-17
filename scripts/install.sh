@@ -1463,6 +1463,28 @@ post_install_selfcheck() {
     fi
 }
 
+# 0.1.19 A1 安装后自检：安装末尾以 airymaxrt status --json 做机器可读
+# 完整性门禁，非零即打印诊断并中止安装（杜绝静默半成品）。gateway/daemon
+# 运行态字段仅作信息呈现，不参与判定——安装收尾时 daemon 群按设计为停机态，
+# 运行态活性由 e2e clean-room 把关。
+install_status_gate() {
+    local launch="${AIRY_HOME}/bin/airymaxrt"
+    if [ ! -x "$launch" ]; then
+        log_err "安装自检失败：启动器 ${launch} 不存在或不可执行——已中止安装"
+        exit 1
+    fi
+    local out rc
+    out="$(AIRYRT_TERM_LOG=quiet "$launch" status --json 2>&1)"
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        log_err "安装自检未通过（status --json 退出码 ${rc}）——已中止安装"
+        printf '%s\n' "$out"
+        log_err "请根据 components/config 字段补齐缺失组件后重试安装"
+        exit 1
+    fi
+    log_ok "安装自检通过（完整性校验 ok=true）"
+}
+
 print_banner() {
     cat <<EOF
 ${C_CYAN}
@@ -1638,6 +1660,7 @@ main() {
         verify_daemons
     fi
     post_install_selfcheck
+    install_status_gate
     print_summary
     print_path_guidance
     log_ok "安装完成"
