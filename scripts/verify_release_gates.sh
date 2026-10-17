@@ -981,6 +981,7 @@ section "T" "§8 交付防复发判据（DR-1 能力接线 / DR-4 失败可判�
 
 REG="$ROOT/gateway/src/biz/gateway_cap_registry.c"
 ERRS="$ROOT/commons/utils/error/error_codes.h"
+ERRC="$ROOT/commons/utils/error/err_class.h"
 ERRN="$ROOT/commons/utils/error/handler.c"
 
 _t1_n=0
@@ -1063,8 +1064,12 @@ _t4_n=0
 _t4_bad=""
 for _code in $(grep -rhoE 'AIRY_ERR_[A-Z0-9_]+' "$CLI/src" 2>/dev/null | sort -u); do
     _t4_n=$((_t4_n+1))
-    grep -qE "^#define $_code\b" "$ERRS" 2>/dev/null \
-        || { _t4_bad="$_t4_bad $_code(未登记契约)"; continue; }
+    # 契约头有两处权威：error_codes.h 的数值码（#define）与 err_class.h 的
+    # 分类伪码（枚举成员，0.1.19 N1 ErrorModel v1 SSoT）；任一登记即合规。
+    if ! grep -qE "^#define $_code\b" "$ERRS" 2>/dev/null && \
+       ! grep -qE "^[[:space:]]*$_code[[:space:]]*=[[:space:]]*[0-9]+" "$ERRC" 2>/dev/null; then
+        _t4_bad="$_t4_bad $_code(未登记契约)"; continue
+    fi
     if ! grep -qE "\{ *$_code," "$ERRN" 2>/dev/null && \
        ! grep -rqE "case $_code:" "$CLI/src" 2>/dev/null; then
         _t4_bad="$_t4_bad $_code(无可读名称)"

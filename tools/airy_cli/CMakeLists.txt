@@ -295,4 +295,26 @@ if(BUILD_TESTS)
         endif()
         add_test(NAME cli_session_restore COMMAND test_cli_session)
     endif()
+
+    # 0.1.19 N1：L2 呈现层错误文案分诊——transport/policy/config/internal
+    # 必须各自成句，网关原文优先且一次性消费。与 cli_approval_e2e 同源集，
+    # 仅替换测试 TU；Windows 腿随 cli_gw 的 POSIX mock 策略一致不参与。
+    if(NOT WIN32)
+        add_executable(test_cli_errdesc tests/test_cli_errdesc.c
+                       src/cmd/cli_gw.c src/render/cli_render.c
+                       src/core/cli_dag.c src/core/cli_term.c)
+        target_include_directories(test_cli_errdesc PRIVATE ${CLI_INC_DIRS})
+        target_compile_definitions(test_cli_errdesc PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
+        if(AIRY_CJSON_INCLUDE_DIRS)
+            target_include_directories(test_cli_errdesc PRIVATE ${AIRY_CJSON_INCLUDE_DIRS})
+        endif()
+        target_link_libraries(test_cli_errdesc PRIVATE airy_coreloopthree airy_common
+                                                        Threads::Threads)
+        if(TARGET cJSON OR TARGET cjson)
+            target_link_libraries(test_cli_errdesc PRIVATE $<IF:$<TARGET_EXISTS:cJSON>,cJSON,cjson>)
+        elseif(AIRY_CJSON_LIBRARIES)
+            target_link_libraries(test_cli_errdesc PRIVATE ${AIRY_CJSON_LIBRARIES})
+        endif()
+        add_test(NAME cli_errdesc_unit COMMAND test_cli_errdesc)
+    endif()
 endif()

@@ -25,6 +25,7 @@
 #include "cli_gw.h" /* 架构约束 2026-08-25：统一经 gateway 派发 */
 
 #include "cli_prelude.h"
+#include "err_class.h" /* 0.1.19 N1：工具失败按 class/code/diag 透传 */
 
 #ifdef AIRY_HAS_CJSON
 #include <cjson/cJSON.h>
@@ -276,6 +277,22 @@ static void cli_tool_absolutize_path(cJSON *args, const char *key)
 #endif
 }
 
+/* 统一工具失败载荷（0.1.19 N1 L2）：失败必须携带 err 三元组供上层按
+ * class 分诊；用 cJSON 构造，避免原文含引号破坏 JSON（原 snprintf 拼接
+ * 在网关文案带引号时会产出非法 JSON）。 */
+static char *chat_tool_fail(airy_err_t code, const char *diag)
+{
+    cJSON *r = cJSON_CreateObject();
+    if (!r)
+        return AIRY_STRDUP("{\"ok\":false,\"error\":\"out of memory\"}");
+    cJSON_AddBoolToObject(r, "ok", 0);
+    cJSON_AddStringToObject(r, "error", diag);
+    airy_err_json_put(r, airy_err_class_of(code), code, diag, NULL);
+    char *s = cJSON_PrintUnformatted(r);
+    cJSON_Delete(r);
+    return s ? s : AIRY_STRDUP("{\"ok\":false,\"error\":\"out of memory\"}");
+}
+
 /* 执行一个工具调用，返回回填模型的 result JSON（OWNER，AIRY_FREE）。
  * 架构约束（2026-08-25）：统一经 gateway 派发（tool.execute → gateway →
  * SYS_SVC_CALL → tool_d，带 ACL fail-closed），与 gateway agent.run 同一
@@ -307,7 +324,7 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
         cJSON_Delete(params);
         if (out_ok)
             *out_ok = 0;
-        return AIRY_STRDUP("{\"ok\":false,\"error\":\"invalid tool arguments\"}");
+        return chat_tool_fail(AIRY_ERR_INVALID_PARAM, "invalid tool arguments");
     }
     /* 相对路径绝对化（基于 CLI cwd；tool_d 按自身 cwd 解析）：
      * fs 工具的 path 参数与 fs_glob 的 base 参数。 */
@@ -334,7 +351,7 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
     if (!params_json) {
         if (out_ok)
             *out_ok = 0;
-        return AIRY_STRDUP("{\"ok\":false,\"error\":\"out of memory\"}");
+        return chat_tool_fail(AIRY_ERR_OUT_OF_MEMORY, "out of memory");
     }
 
     char *result_json = NULL;
@@ -347,16 +364,11 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
         AIRY_FREE(result_json);
         if (out_ok)
             *out_ok = 0;
-        /* cli_gw_call 的 g_cli_gw_err 已区分真实原因（网关不在线/内部错误/
-         * 方法不支持/响应异常）；原硬编码 "tool_d unreachable" 把工具层
-         * 失败也误报为网关不可达，误导排障方向。 */
-        char fallback[256];
-        snprintf(fallback, sizeof(fallback), "tool rpc failed (via gateway)");
+        /* cli_gw_call 已返回真实 AIRY 码（0.1.19 N1）：此处只补人类可读
+         * 原文，网关未应答与工具业务失败由 class 分诊，不再统一误报不可达。 */
         const char *gw_err = cli_gw_last_err();
-        const char *err_desc = gw_err[0] ? gw_err : fallback;
-        char msg[512];
-        snprintf(msg, sizeof(msg), "{\"ok\":false,\"error\":\"%s\"}", err_desc);
-        return AIRY_STRDUP(msg);
+        const char *desc = gw_err[0] ? gw_err : "tool rpc failed (via gateway)";
+        return chat_tool_fail(rpc_ret != 0 ? rpc_ret : AIRY_ERR_PROTOCOL, desc);
     }
 
     /* daemon_rpc_call 已解包 JSON-RPC 的 result 字段：result_json 即
@@ -383,13 +395,18 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
                                     (err && cJSON_IsString(err) && err->valuestring)
                                         ? err->valuestring
                                         : "tool failed");
+            /* L0 产出的 err 三元组原样透传，上层据此分诊（N1 契约）。 */
+            cJSON *eobj = cJSON_GetObjectItem(root, "err");
+            cJSON *dup = cJSON_IsObject(eobj) ? cJSON_Duplicate(eobj, 1) : NULL;
+            if (dup)
+                cJSON_AddItemToObject(r, "err", dup);
         }
         out_json = cJSON_PrintUnformatted(r);
         cJSON_Delete(r);
         cJSON_Delete(root);
     }
     if (!out_json)
-        out_json = AIRY_STRDUP("{\"ok\":false,\"error\":\"tool response parse failed\"}");
+        out_json = chat_tool_fail(AIRY_ERR_PROTOCOL, "tool response parse failed");
     cli_trace("chat", "%s tool exec tool=%s ok=%d resp=%.*s", ok ? CLI_ICON_CHECK : CLI_ICON_CROSS,
               tool_id, ok, (int)cli_utf8_safe_len(out_json, 120), out_json ? out_json : "");
     if (out_ok)

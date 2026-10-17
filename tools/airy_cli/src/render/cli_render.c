@@ -20,6 +20,7 @@
 
 #include "airy_memory.h"
 #include "cli_gw.h"
+#include "err_class.h"
 #include "platform.h"
 
 #include <stdarg.h>
@@ -76,12 +77,10 @@ void cli_outf(const char *fmt, ...)
 
 /* ---- 错误描述 ---- */
 
-const char *cli_err_desc(int err)
+/* 逐码文案：语义明确的常用错误给出精确指引，未列出的交给 class 分诊
+ * （0.1.19 §3.7.2 N1）——禁止把传输类与业务类合并成同一句通用话术。 */
+static const char *cli_err_known(int err)
 {
-    /* 网关失败原因优先且一次性消费（cli_gw_err_take 内已清零） */
-    const char *gw_desc = cli_gw_err_take();
-    if (gw_desc[0] != '\0')
-        return gw_desc;
     switch (err) {
     case AIRY_ERR_TIMEOUT:          return "请求超时，请检查网络或服务状态";
     case AIRY_ERR_NOT_FOUND:        return "目标不存在或未找到";
@@ -96,8 +95,29 @@ const char *cli_err_desc(int err)
     /* GCCP 两段式交互哨兵：正常流程在 CLI 内部闭环；漏出即交互未收敛，
      * 给出可读文案而非"发生错误"误导为引擎故障 */
     case AIRY_ERR_GCCP_INTERACTION: return "意图信息不完整，GCCP 确认未收敛，请补充任务描述";
-    default:                        return "发生错误";
+    default:                        return NULL;
     }
+}
+
+static const char *cli_class_desc(airy_err_class_t cls)
+{
+    switch (cls) {
+    case AIRY_ERR_CLASS_TRANSPORT: return "服务不可达：请确认守护进程已启动且 socket 可用";
+    case AIRY_ERR_CLASS_POLICY:    return "被安全策略拒绝：请检查权限或沙箱范围";
+    case AIRY_ERR_CLASS_CONFIG:    return "配置错误：请检查配置文件路径与取值";
+    case AIRY_ERR_CLASS_INTERNAL:  return "内部错误：请保留日志并反馈";
+    default:                       return "操作失败，请稍后重试";
+    }
+}
+
+const char *cli_err_desc(int err)
+{
+    /* 网关失败原因优先且一次性消费（cli_gw_err_take 内已清零） */
+    const char *gw_desc = cli_gw_err_take();
+    if (gw_desc[0] != '\0')
+        return gw_desc;
+    const char *known = cli_err_known(err);
+    return known ? known : cli_class_desc(airy_err_class_of(err));
 }
 
 /* ---- -p 模式进度通道（stderr） ---- */
