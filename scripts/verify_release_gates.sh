@@ -1191,8 +1191,8 @@ _u_missing=""
 _CTX="$TUI_SRC/src/app/context.rs"
 _TASK="$TUI_SRC/src/app/task.rs"
 _MEM="$TUI_SRC/src/memory.rs"
-_LOOP="$ROOT/daemons/agent_d/src/agent_run_loop.c"
-_ENG="$ROOT/daemons/agent_d/src/agent_run_engine.c"
+_LOOP="$ROOT/daemons/agent_d/src/run/agent_run_loop.c"
+_ENG="$ROOT/daemons/agent_d/src/run/agent_run_engine.c"
 for _f in "$_CTX" "$_TASK" "$_MEM" "$_LOOP" "$_ENG"; do
     [ -f "$_f" ] || _u_missing="$_u_missing $(basename "$_f")"
 done
@@ -1273,7 +1273,7 @@ else
     fi
 fi
 
-_v2_engine="$ROOT/daemons/agent_d/src/agent_run_engine.c"
+_v2_engine="$ROOT/daemons/agent_d/src/run/agent_run_engine.c"
 _v2_task="$TUI_SRC/src/app/task.rs"
 _v2_block="$TUI_SRC/src/panels/chat/block.rs"
 _v2_mem="$TUI_SRC/src/memory.rs"
@@ -1426,10 +1426,10 @@ _tui="$TUI_SRC/src/app"
 _ad="$ROOT/daemons/agent_d"
 section "Y" "B2 首字延迟与零反馈（流式契约/零反馈/打字机解耦/分段耗时 V2.1~V2.4 机制防回潮）"
 
-if grep -q 'daemon_rpc_call_stream(llm_sock, "complete_stream"' "$_ad/src/agent_run_loop.c" \
-    && grep -q 'RUN_DELTA_STACK' "$_ad/src/agent_run_loop.c" \
-    && grep -q 'AIRY_MALLOC(dlen + 1)' "$_ad/src/agent_run_loop.c" \
-    && ! grep -q 'daemon_rpc_call(llm_sock, "complete"' "$_ad/src/agent_run_loop.c"; then
+if grep -q 'daemon_rpc_call_stream(llm_sock, "complete_stream"' "$_ad/src/run/agent_run_loop.c" \
+    && grep -q 'RUN_DELTA_STACK' "$_ad/src/run/agent_run_loop.c" \
+    && grep -q 'AIRY_MALLOC(dlen + 1)' "$_ad/src/run/agent_run_loop.c" \
+    && ! grep -q 'daemon_rpc_call(llm_sock, "complete"' "$_ad/src/run/agent_run_loop.c"; then
     ok "Y1 流式契约在位（V2.1/V2.2：complete_stream 真实增量，超限堆扩容不截断不丢内容）"
 else
     bad "Y1 流式契约回潮（退化为非流式 complete 或定长截断）"
@@ -1452,9 +1452,9 @@ else
     bad "Y3 本地打字机 reveal 回潮（上屏动画门控落定或为落定引入附加延迟）"
 fi
 
-if grep -q 'AIRY_RS_K_THINK_MS' "$_ad/src/agent_run_engine.c" \
-    && grep -q 'AIRY_RS_K_LLM_MS' "$_ad/src/agent_run_engine.c" \
-    && grep -q 'AIRY_RS_K_TOOL_MS' "$_ad/src/agent_run_engine.c"; then
+if grep -q 'AIRY_RS_K_THINK_MS' "$_ad/src/run/agent_run_engine.c" \
+    && grep -q 'AIRY_RS_K_LLM_MS' "$_ad/src/run/agent_run_engine.c" \
+    && grep -q 'AIRY_RS_K_TOOL_MS' "$_ad/src/run/agent_run_engine.c"; then
     ok "Y4 分段耗时落盘在位（think/llm/tool 三段度量，V2.1 不达标可分段归因）"
 else
     bad "Y4 分段耗时缺失（首字延迟不可归因）"
