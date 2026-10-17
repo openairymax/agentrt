@@ -412,7 +412,7 @@ static void test_call_error_32601(void)
     set_url_port(g_srv_port);
     char *out = NULL;
     int rc = cli_gw_call("no.such.method", "{}", 3000, &out);
-    CHECK(rc == -1, "call_error_32601 rc==-1");
+    CHECK(rc == AIRY_ERR_NOT_SUPPORTED, "call_error_32601 rc==AIRY_ERR_NOT_SUPPORTED");
     CHECK(out == NULL, "call_error_32601 out==NULL");
     CHECK(strstr(cli_gw_last_err(), "不支持该方法") != NULL,
           "call_error_32601 err mentions 不支持该方法");
@@ -426,7 +426,7 @@ static void test_call_badjson(void)
     set_url_port(g_srv_port);
     char *out = NULL;
     int rc = cli_gw_call("echo", "{}", 3000, &out);
-    CHECK(rc == -1, "call_badjson rc==-1");
+    CHECK(rc == AIRY_ERR_PROTOCOL, "call_badjson rc==AIRY_ERR_PROTOCOL");
     CHECK(out == NULL, "call_badjson out==NULL");
     CHECK(strstr(cli_gw_last_err(), "不是合法 JSON") != NULL,
           "call_badjson err mentions 不是合法 JSON");
@@ -440,7 +440,7 @@ static void test_call_noresult(void)
     set_url_port(g_srv_port);
     char *out = NULL;
     int rc = cli_gw_call("echo", "{}", 3000, &out);
-    CHECK(rc == -1, "call_noresult rc==-1");
+    CHECK(rc == AIRY_ERR_PROTOCOL, "call_noresult rc==AIRY_ERR_PROTOCOL");
     CHECK(out == NULL, "call_noresult out==NULL");
     CHECK(strstr(cli_gw_last_err(), "缺少 result") != NULL,
           "call_noresult err mentions 缺少 result");
@@ -452,7 +452,7 @@ static void test_call_offline(void)
     setenv("AIRY_GATEWAY_URL", "http://127.0.0.1:1", 1); /* 1 端口不可达 */
     char *out = NULL;
     int rc = cli_gw_call("echo", "{}", 1000, &out);
-    CHECK(rc == -1, "call_offline rc==-1");
+    CHECK(rc == AIRY_ERR_SYS_SOCKET, "call_offline rc==AIRY_ERR_SYS_SOCKET");
     CHECK(out == NULL, "call_offline out==NULL");
     CHECK(strstr(cli_gw_last_err(), "网关不在线") != NULL, "call_offline err mentions 网关不在线");
 }
@@ -464,7 +464,7 @@ static void test_call_timeout(void)
     set_url_port(g_srv_port);
     char *out = NULL;
     int rc = cli_gw_call("slow.method", "{}", 400, &out);
-    CHECK(rc == -1, "call_timeout rc==-1");
+    CHECK(rc == AIRY_ERR_TIMEOUT, "call_timeout rc==AIRY_ERR_TIMEOUT");
     CHECK(out == NULL, "call_timeout out==NULL");
     CHECK(strstr(cli_gw_last_err(), "响应超时") != NULL, "call_timeout err mentions 响应超时");
     /* 超时 ≠ 离线：文案不得误报"网关不在线" */
