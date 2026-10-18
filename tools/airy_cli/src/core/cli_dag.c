@@ -44,7 +44,7 @@ static const char *cli_handler_role(const char *handler)
     return handler;
 }
 
-/* 节点 handler 归一（与 plan_to_dag 蓝图语义一致）：显式 handler_name 优先，
+/* 节点 handler 归一（与 DAG 蓝图语义一致）：显式 handler_name 优先，
  * 缺省由 agent_role 派生；无 "agent:" 前缀则补齐。buf 置空串表示无 handler。 */
 void cli_node_handler(const airy_task_node_t *nd, char *buf, size_t cap)
 {
