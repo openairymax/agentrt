@@ -115,6 +115,20 @@ option(AIRY_COMPLIANCE_STRICT "Enable strict compliance mode (poison unsafe func
 add_compile_definitions(AIRYRT_VERSION="${AIRY_VERSION_RAW}")
 airy_print_ok("AIRYRT_VERSION injected from VERSION SSoT: ${AIRY_VERSION_RAW}")
 
+# suppression 文件随 ecosystem 策略仓寄宿，落点随布局而异：本地伞仓为
+# <agentrt>/../ecosystem，CI 取料为 <agentrt>/agent-workload/ecosystem。
+# 缺席时留空，sanitizer 环境变量不注入 suppressions（空路径会让 LSan 报错）。
+set(AIRY_LSAN_SUP "")
+foreach(_eco IN ITEMS
+        "${CMAKE_SOURCE_DIR}/../ecosystem"
+        "${CMAKE_SOURCE_DIR}/agent-workload/ecosystem"
+        "${CMAKE_SOURCE_DIR}/../../ecosystem")
+    if(EXISTS "${_eco}/manager/sanitizer/lsan-suppressions")
+        set(AIRY_LSAN_SUP "${_eco}/manager/sanitizer/lsan-suppressions")
+        break()
+    endif()
+endforeach()
+
 # CTest必须在顶级启用（在任何add_subdirectory之前）
 # R-09-SEC: Strict compliance mode and tests are now independent.
 # Tests MUST run under strict compliance to catch BAN violations at compile time.
@@ -131,8 +145,12 @@ if(BUILD_TESTS)
     # 为所有测试设置 sanitizer 环境变量（set(ENV{}) 不会传递给 ctest）
     if(ENABLE_SANITIZERS AND NOT MSVC)
         set(AIRY_ASAN_OPTIONS "halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1:allocator_may_return_null=1")
-        set(AIRY_LSAN_OPTIONS "suppressions=${CMAKE_SOURCE_DIR}/../ecosystem/manager/sanitizer/lsan-suppressions:print_suppressions=0")
         set(AIRY_UBSAN_OPTIONS "halt_on_error=1:print_stacktrace=1")
+        if(AIRY_LSAN_SUP)
+            set(AIRY_LSAN_OPTIONS "suppressions=${AIRY_LSAN_SUP}:print_suppressions=0")
+        else()
+            set(AIRY_LSAN_OPTIONS "print_suppressions=0")
+        endif()
     endif()
 endif()
 
@@ -261,7 +279,11 @@ if(ENABLE_SANITIZERS AND NOT MSVC)
         # CI环境变量：halt_on_error确保任何检测到的问题立即阻断
         set(ENV{ASAN_OPTIONS} "halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1")
         if(NOT APPLE)
-            set(ENV{LSAN_OPTIONS} "suppressions=${CMAKE_SOURCE_DIR}/../ecosystem/manager/sanitizer/lsan-suppressions")
+            if(AIRY_LSAN_SUP)
+                set(ENV{LSAN_OPTIONS} "suppressions=${AIRY_LSAN_SUP}")
+            else()
+                set(ENV{LSAN_OPTIONS} "print_suppressions=0")
+            endif()
         endif()
         set(ENV{UBSAN_OPTIONS} "halt_on_error=1:print_stacktrace=1")
         if(APPLE)
@@ -926,43 +948,48 @@ if(AIRY_BUILD_ALL)
         set(AIRY_COREKERN_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/atoms/corekern/include")
     endif()
 
+    # products 装配仓落点候选（唯一事实源，全部产品件探测共用）：
+    #   1) 伞仓本地布局   <agentrt>/../products
+    #   2) CI 取料落点   <agentrt>/agent-workload/products（init-submodules.sh
+    #                    与 lf-gate-fixture 均把跨仓料物化到 checkout 根的
+    #                    agent-workload/ 之下）
+    #   3) workspace 平铺 <agentrt>/../../products
+    set(AIRY_PRODUCTS_CANDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/../products"
+        "${CMAKE_CURRENT_SOURCE_DIR}/agent-workload/products"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../products")
+
     # cupolas 源目录探测（叶子仓挂点已迁出核心树至 products 装配仓）。
     # CUPOLAS_SRC_DIR 必须先于 add_subdirectory(atoms) 就绪：taskflow/
     # coreloopthree 在配置期引用 cupolas 源码路径；随后 add_subdirectory
     # 以 ${CMAKE_BINARY_DIR}/cupolas 为 binary dir 直挂，维持 arc03 断言
     # 契约（atoms/standalone check_no_daemons.cmake -DCUPOLAS_DIR=）。
-    # 优先级：显式 -D 变量 → CUPOLAS_ROOT 环境 → 伞仓内 products/ →
-    # workspace 同级 products/（standalone 平铺布局）。
+    # 优先级：显式 -D 变量 → CUPOLAS_ROOT 环境 → AIRY_PRODUCTS_CANDS。
     if(NOT CUPOLAS_SRC_DIR AND DEFINED ENV{CUPOLAS_ROOT})
         set(CUPOLAS_SRC_DIR "$ENV{CUPOLAS_ROOT}")
     endif()
     if(NOT CUPOLAS_SRC_DIR)
-        foreach(_cup_cand
-            "${CMAKE_CURRENT_SOURCE_DIR}/../products/cupolas"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../../products/cupolas")
-            if(EXISTS "${_cup_cand}/CMakeLists.txt")
-                set(CUPOLAS_SRC_DIR "${_cup_cand}")
+        foreach(_prod IN LISTS AIRY_PRODUCTS_CANDS)
+            if(EXISTS "${_prod}/cupolas/CMakeLists.txt")
+                set(CUPOLAS_SRC_DIR "${_prod}/cupolas")
                 break()
             endif()
         endforeach()
     endif()
 
     # lang_gateway 源目录探测（M5-2 策略载荷迁出，台账 §256；与 cupolas
-    # 同构三态：显式 -D 变量 → LANG_GW_ROOT 环境 → 伞仓内 products/ →
-    # workspace 同级 products/）。LANG_GW_SRC_DIR 必须先于
-    # add_subdirectory(atoms) 就绪：coreloopthree 桥接块在配置期以变量门
-    # 探测（TARGET 门在本目录时序恒假，见 coreloopthree 桥接注释）。
-    # LANG_GW_CONTRACT_DIR 为产品库消费机制核契约头的锚点，随
-    # AIRY_ATOMS_PREBUILT_DIR 双态（同 AIRY_COREKERN_INCLUDE_DIR 形态）。
+    # 同构：显式 -D 变量 → LANG_GW_ROOT 环境 → AIRY_PRODUCTS_CANDS）。
+    # LANG_GW_SRC_DIR 必须先于 add_subdirectory(atoms) 就绪：coreloopthree
+    # 桥接块在配置期以变量门探测（TARGET 门在本目录时序恒假，见
+    # coreloopthree 桥接注释）。LANG_GW_CONTRACT_DIR 为产品库消费机制核
+    # 契约头的锚点，随 AIRY_ATOMS_PREBUILT_DIR 双态（同 AIRY_COREKERN_INCLUDE_DIR）。
     if(NOT LANG_GW_SRC_DIR AND DEFINED ENV{LANG_GW_ROOT})
         set(LANG_GW_SRC_DIR "$ENV{LANG_GW_ROOT}")
     endif()
     if(NOT LANG_GW_SRC_DIR)
-        foreach(_lgw_cand
-            "${CMAKE_CURRENT_SOURCE_DIR}/../products/lang_gateway"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../../products/lang_gateway")
-            if(EXISTS "${_lgw_cand}/CMakeLists.txt")
-                set(LANG_GW_SRC_DIR "${_lgw_cand}")
+        foreach(_prod IN LISTS AIRY_PRODUCTS_CANDS)
+            if(EXISTS "${_prod}/lang_gateway/CMakeLists.txt")
+                set(LANG_GW_SRC_DIR "${_prod}/lang_gateway")
                 break()
             endif()
         endforeach()
@@ -974,18 +1001,16 @@ if(AIRY_BUILD_ALL)
     endif()
 
     # cognition 分发策略产品库源目录探测（M5-4 策略载荷迁出，台账 §261；
-    # 与 lang_gateway 同构三态：显式 -D 变量 → COG_ROOT 环境 → 伞仓内
-    # products/ → workspace 同级 products/）。COG_CONTRACT_DIR 为产品库
-    # 消费机制核契约头的锚点，随 AIRY_ATOMS_PREBUILT_DIR 双态。
+    # 与 lang_gateway 同构：显式 -D 变量 → COG_ROOT 环境 →
+    # AIRY_PRODUCTS_CANDS）。COG_CONTRACT_DIR 为产品库消费机制核契约头
+    # 的锚点，随 AIRY_ATOMS_PREBUILT_DIR 双态。
     if(NOT COG_SRC_DIR AND DEFINED ENV{COG_ROOT})
         set(COG_SRC_DIR "$ENV{COG_ROOT}")
     endif()
     if(NOT COG_SRC_DIR)
-        foreach(_cog_cand
-            "${CMAKE_CURRENT_SOURCE_DIR}/../products/cognition"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../../products/cognition")
-            if(EXISTS "${_cog_cand}/CMakeLists.txt")
-                set(COG_SRC_DIR "${_cog_cand}")
+        foreach(_prod IN LISTS AIRY_PRODUCTS_CANDS)
+            if(EXISTS "${_prod}/cognition/CMakeLists.txt")
+                set(COG_SRC_DIR "${_prod}/cognition")
                 break()
             endif()
         endforeach()
@@ -998,18 +1023,16 @@ if(AIRY_BUILD_ALL)
 
     # gateway_d 业务面源目录探测（0.1.19 刀H：gateway/src/biz 迁出）。
     # 业务处理器依赖 daemon 公共层与 gateway_d 协议适配头，归属产品/daemon
-    # 面而非 gateway 机制核，故寄宿 products/gateway_biz。三态：显式 -D
-    # 变量 → GATEWAY_BIZ_ROOT 环境 → 伞仓内 products/ → workspace 同级
-    # products/。缺席时 gateway_d 整体不装配（不产生桩实现）。
+    # 面而非 gateway 机制核，故寄宿 products/gateway_biz。优先级：显式 -D
+    # 变量 → GATEWAY_BIZ_ROOT 环境 → AIRY_PRODUCTS_CANDS。缺席时 gateway_d
+    # 整体不装配（不产生桩实现）。
     if(NOT GATEWAY_BIZ_SRC_DIR AND DEFINED ENV{GATEWAY_BIZ_ROOT})
         set(GATEWAY_BIZ_SRC_DIR "$ENV{GATEWAY_BIZ_ROOT}")
     endif()
     if(NOT GATEWAY_BIZ_SRC_DIR)
-        foreach(_gbiz_cand
-            "${CMAKE_CURRENT_SOURCE_DIR}/../products/gateway_biz"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../../products/gateway_biz")
-            if(EXISTS "${_gbiz_cand}/CMakeLists.txt")
-                set(GATEWAY_BIZ_SRC_DIR "${_gbiz_cand}")
+        foreach(_prod IN LISTS AIRY_PRODUCTS_CANDS)
+            if(EXISTS "${_prod}/gateway_biz/CMakeLists.txt")
+                set(GATEWAY_BIZ_SRC_DIR "${_prod}/gateway_biz")
                 break()
             endif()
         endforeach()
@@ -1103,11 +1126,22 @@ if(AIRY_BUILD_ALL)
     # 环检测（fail-closed）+ 依赖图报告；复用 taskflow graph_engine。
     # 0.1.19 M5-3：执行器已迁出至顶层 tools 仓（v0.1.4 由 devtools 更名），
     # 经跨仓 add_subdirectory 纳入；commons 源根经父作用域变量传入。
-    if(BUILD_COMMONS AND BUILD_ATOMS
-       AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/airy_depgraph/CMakeLists.txt")
+    # tools 落点候选（与 verify_release_gates.sh 的 _tools 取值同源）：
+    # 本地伞仓 <hub>/tools、同层 <agent-workload>/tools、CI 取料 _tools。
+    set(AIRY_TOOLS_CANDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../tools"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../tools"
+        "${CMAKE_CURRENT_SOURCE_DIR}/_tools")
+    set(AIRY_DEPGRAPH_DIR "")
+    foreach(_troot IN LISTS AIRY_TOOLS_CANDS)
+        if(EXISTS "${_troot}/airy_depgraph/CMakeLists.txt")
+            set(AIRY_DEPGRAPH_DIR "${_troot}/airy_depgraph")
+            break()
+        endif()
+    endforeach()
+    if(BUILD_COMMONS AND BUILD_ATOMS AND AIRY_DEPGRAPH_DIR)
         set(AIRY_DEPGRAPH_COMMONS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/commons")
-        add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../tools/airy_depgraph"
-                         tools/airy_depgraph)
+        add_subdirectory("${AIRY_DEPGRAPH_DIR}" tools/airy_depgraph)
         # M1-1b：airy_depgraph 配置完成后安装链接白名单门禁（gateway 系
         # 禁链 coreloopthree/cognition，fail-closed）
         airy_linkgate_install_checks()
@@ -1156,11 +1190,21 @@ if(AIRY_BUILD_ALL)
     endif()
 
     # 集成测试：当从伞仓构建时，包含 tools（由 devtools 改名）中的
-    # 连接线集成测试（8 条 C-L 测试 + 端到端测试）
-    # 将 tools/tests/integration/c/ 的 8 个连接线测试纳入构建系统
-    if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/tests/integration/c/CMakeLists.txt")
-        add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../tools/tests/integration/c integration_c_tests)
-        airy_print_ok("Integration tests (tools/tests/integration/c) included — 8 C-L link tests + E2E")
+    # 连接线集成测试（8 条 C-L 测试 + 端到端测试）。落点与 depgraph 同源
+    # （AIRY_TOOLS_CANDS），CI 取料为 _tools。
+    set(AIRY_INTEG_DIR "")
+    foreach(_troot IN LISTS AIRY_TOOLS_CANDS)
+        if(EXISTS "${_troot}/tests/integration/c/CMakeLists.txt")
+            set(AIRY_INTEG_DIR "${_troot}/tests/integration/c")
+            break()
+        endif()
+    endforeach()
+    if(BUILD_TESTS AND AIRY_INTEG_DIR)
+        # tools 仓与 agentrt 的相对深度随取料落点变化（伞仓 ../../tools、
+        # CI _tools），RT 源根由本层下发，测试侧不自行推导。
+        set(AIRY_INTEG_RT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
+        add_subdirectory("${AIRY_INTEG_DIR}" integration_c_tests)
+        airy_print_ok("Integration tests (${AIRY_INTEG_DIR}) included — 8 C-L link tests + E2E")
     else()
         airy_print_info("Integration tests skipped: tools/tests/integration/c not found (standalone agentrt build)")
     endif()
