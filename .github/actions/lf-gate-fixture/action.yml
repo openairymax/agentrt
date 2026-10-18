@@ -119,9 +119,10 @@ runs:
       run: |
         set -euo pipefail
         # sparse 浅克隆取四件装配输入与判据源；落点与 verify_release_gates.sh
-        # 的候选二一致（$ROOT/agent-workload/products/<件>）。cupolas 在
-        # products 内是 gitlink 子模块，sparse-checkout 只落目录占位，必须
-        # 显式 submodule update 才检出策略单元源；memoryrovol 声明
+        # 的候选二一致（$ROOT/agent-workload/products/<件>）。cone 模式的
+        # sparse-checkout 把 gitlink 索引项当作文件而非目录，对 cupolas 直接
+        # 判 "not a directory"（run #555 实证），故显式 --skip-checks；其后
+        # 仍需 submodule update 才检出策略单元源。memoryrovol 声明
         # update=none，按路径限定不触发。末行四件 test 兜底，取料失败即红
         # （fail-closed，不得静默降级——缺席会使 cupolas_d 静默不装配）。
         git clone -q --filter=blob:none --sparse \
@@ -129,7 +130,7 @@ runs:
           agent-workload/products
         git -C agent-workload/products fetch -q --depth 1 origin "${{ inputs.products_sha }}"
         git -C agent-workload/products checkout -q "${{ inputs.products_sha }}"
-        git -C agent-workload/products sparse-checkout set \
+        git -C agent-workload/products sparse-checkout set --skip-checks \
           gateway_biz cupolas lang_gateway cognition
         git -C agent-workload/products submodule update --init --depth 1 -- cupolas
         for _face in gateway_biz cupolas lang_gateway cognition; do
