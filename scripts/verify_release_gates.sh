@@ -56,6 +56,19 @@ extract_fn() { # <file> <fnname> <outfile>
     sed -n "/^$2() {/,/^}$/p" "$1" > "$3"
 }
 
+# 0.1.19 刀H：gateway 业务面已迁出机制核，寄宿 products/gateway_biz 产品件
+# （hub 布局下 agentrt 与 products 同级）。独立检出缺产品件时，相关判据
+# 以双路径探测兜底，缺一即 fail-closed。
+GW_BIZ="$ROOT/../products/gateway_biz"
+[ -d "$GW_BIZ" ] || GW_BIZ="$ROOT/gateway/src/biz"
+BIZ_FACE() { # <相对路径> → 业务面文件绝对路径（产品件优先，旧位兜底）
+    if [ -f "$ROOT/../products/gateway_biz/$1" ]; then
+        printf '%s' "$ROOT/../products/gateway_biz/$1"
+    else
+        printf '%s' "$ROOT/gateway/src/biz/$1"
+    fi
+}
+
 _missing=0
 for _f in "$INSTALL" "$INSTALL_PS1" "$LATEST_RT" \
           "$CLI/src/chat/cli_chat.c" \
@@ -582,7 +595,7 @@ section "L" "R-5 provider 默认超时 < 网关 LLM 转发背压（连不上网�
 # B16-S3 c3：PROVIDER_DEFAULT_TIMEOUT_SEC 自 provider.c（已删）迁至 registry.c
 PROVIDER_C="$ROOT/daemons/llm_d/src/providers/core/registry.c"
 LLM_METHODS="$ROOT/daemons/llm_d/src/rpc/methods.c"
-GW_INTERNAL="$ROOT/gateway/src/biz/gateway_biz_internal.h"
+GW_INTERNAL="$(BIZ_FACE include/gateway_biz_internal.h)"
 
 _gate_define() { # <file> <macro>  → 打印宏字面量（无则空）
     sed -n "s/^#define $2[[:space:]]*\([0-9][0-9.]*\).*/\1/p" "$1" | head -1
@@ -626,7 +639,7 @@ PDP_RULE_C="$ROOT/cupolas/src/permission/permission_rule.c"
 # 两条路径皆缺时 PDP_RULE_C 悬空 → 下述 grep fail-closed 判红，符合门禁语义。
 [ -f "$PDP_RULE_C" ] || PDP_RULE_C="$ROOT/../products/cupolas/src/permission/permission_rule.c"
 MCP_BUILTIN="$ROOT/daemons/tool_d/src/rpc/service_builtin.c"
-GW_BACKEND="$ROOT/gateway/src/biz/gateway_biz_backend.c"
+GW_BACKEND="$(BIZ_FACE src/gateway_biz_backend.c)"
 
 if grep -Fq 'cupolas_permission_rule_resource' "$PDP_RULE_C" \
    && grep -Fq 'cupolas_permission_rule_allow' "$PDP_RULE_C" \
@@ -697,9 +710,9 @@ fi
 
 section "N" "B3 南向 A-IPC 客户端面归一（gateway/src AF_UNIX 白名单）"
 
-_aipc_face="$ROOT/gateway/src/biz/gateway_aipc_client.c"
+_aipc_face="$ROOT/gateway/src/gateway/gateway_aipc_client.c"
 if [ ! -f "$_aipc_face" ]; then
-    bad "N1 缺失南向统一客户端面: gateway/src/biz/gateway_aipc_client.c（客户端面被删除）"
+    bad "N1 缺失南向统一客户端面: gateway/src/gateway/gateway_aipc_client.c（客户端面被删除）"
 else
     _aipc_offenders="$(grep -rl 'socket(AF_UNIX' "$ROOT/gateway/src" --include='*.c' \
         | grep -v 'gateway_aipc_client.c' || true)"
@@ -712,7 +725,7 @@ else
         grep -Fq "$_sym" "$_aipc_face" \
             || bad "N3 统一客户端面缺入口 ${_sym}（客户端面 API 面被削）"
     done
-    grep -Fq 'gw_aipc_call' "$ROOT/gateway/src/biz/gateway_biz_forward.c" \
+    grep -Fq 'gw_aipc_call' "$(BIZ_FACE src/gateway_biz_forward.c)" \
         && ok "N3 gw_svc_call 转调统一客户端面（gw_aipc_call）" \
         || bad "N3 gw_svc_call 未转调 gw_aipc_call（第二套传输实现回归）"
 fi
@@ -1790,12 +1803,14 @@ fi
 
 # AF3（V13.2）：gateway 按需激活接线——supactivate 源在位并登记 sources，
 # svcdispatch unreachable 分支发起单向 activate 请求。
+# 0.1.19 刀H：业务面迁出 products/gateway_biz，登记点随之移入产品件 CMake。
 _af3_bad=""
 _gw="$ROOT/gateway"
-[ -f "$_gw/src/biz/gateway_biz_supactivate.c" ] || _af3_bad="$_af3_bad supactivate.c 缺失"
-grep -q 'gateway_biz_supactivate\.c' "$_gw/cmake/gateway-sources.cmake" \
+_af3_src="$(BIZ_FACE src/gateway_biz_supactivate.c)"
+[ -f "$_af3_src" ] || _af3_bad="$_af3_bad supactivate.c 缺失"
+grep -q 'gateway_biz_supactivate\.c' "$ROOT/../products/gateway_biz/CMakeLists.txt" \
     || _af3_bad="$_af3_bad sources 未登记"
-grep -q 'gw_sup_notify_activate' "$_gw/src/biz/gateway_biz_svcdispatch.c" \
+grep -q 'gw_sup_notify_activate' "$(BIZ_FACE src/gateway_biz_svcdispatch.c)" \
     || _af3_bad="$_af3_bad unreachable 分支未接线"
 if [ -z "$_af3_bad" ]; then
     ok "AF3 V13.2 按需激活接线（supactivate 在位 + sources 登记 + unreachable 单向请求）"

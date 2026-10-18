@@ -996,6 +996,25 @@ if(AIRY_BUILD_ALL)
         set(COG_CONTRACT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/atoms/coreloopthree/include")
     endif()
 
+    # gateway_d 业务面源目录探测（0.1.19 刀H：gateway/src/biz 迁出）。
+    # 业务处理器依赖 daemon 公共层与 gateway_d 协议适配头，归属产品/daemon
+    # 面而非 gateway 机制核，故寄宿 products/gateway_biz。三态：显式 -D
+    # 变量 → GATEWAY_BIZ_ROOT 环境 → 伞仓内 products/ → workspace 同级
+    # products/。缺席时 gateway_d 整体不装配（不产生桩实现）。
+    if(NOT GATEWAY_BIZ_SRC_DIR AND DEFINED ENV{GATEWAY_BIZ_ROOT})
+        set(GATEWAY_BIZ_SRC_DIR "$ENV{GATEWAY_BIZ_ROOT}")
+    endif()
+    if(NOT GATEWAY_BIZ_SRC_DIR)
+        foreach(_gbiz_cand
+            "${CMAKE_CURRENT_SOURCE_DIR}/../products/gateway_biz"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../../products/gateway_biz")
+            if(EXISTS "${_gbiz_cand}/CMakeLists.txt")
+                set(GATEWAY_BIZ_SRC_DIR "${_gbiz_cand}")
+                break()
+            endif()
+        endforeach()
+    endif()
+
     if(BUILD_COMMONS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/commons/CMakeLists.txt")
         add_subdirectory(commons)
     else()
