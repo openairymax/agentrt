@@ -41,13 +41,14 @@ jobs:
       # allocator 直接终止。
       ASAN_OPTIONS: halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1:allocator_may_return_null=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-      # 目标子集：commons 16 个 + gateway 6 个 + corekern 5 个。
+      # 目标子集：commons 13 个 + gateway 6 个 + corekern 5 个。
       # 显式列目标而非全量构建，把不相关模块（daemons/CLI/集成）排除在
       # sanitizer 插桩编译之外，缩短流水线。
+      # 目标名必须与当前 CMake 注册名严格一致：test_cost/test_print/
+      # test_airy_effect 已在历史收敛中合并删除，保留会造成 build 步骤失败。
       SANITIZER_TARGETS: >-
         test_platform test_platform_time test_error test_logger test_token
-        test_cost test_print test_cancel_token
-        test_airy_effect test_airy_ext test_airy_id test_airy_regex test_ime
+        test_cancel_token test_airy_ext test_airy_id test_airy_regex test_ime
         test_io test_ipc
         test_gateway test_syscall_router test_jsonrpc
         test_rpc_handler test_gateway_auth
@@ -83,12 +84,29 @@ jobs:
       # Debug 构建保留符号与行号，栈回溯可读（sanitizer 报告落源码行）。
       - name: Configure (ENABLE_SANITIZERS=ON, BUILD_TESTS=ON)
         run: |
+          set +e
           cmake -S . -B ${{ env.BUILD_DIR }} \
             -DCMAKE_BUILD_TYPE=Debug \
             -DBUILD_TESTS=ON \
             -DENABLE_SANITIZERS=ON \
             -DAIRY_BUILD_ALL=ON \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            > /tmp/sanitizer-configure.log 2>&1
+          rc=$?
+          if [ $rc -ne 0 ]; then
+            echo "::error::sanitizer configure FAILED rc=$rc"
+            grep -E 'CMake Error|CMake Warning|Configuring incomplete' \
+              /tmp/sanitizer-configure.log | sort -u | head -40 | sed 's/^/::error::  /'
+            tail -n 40 /tmp/sanitizer-configure.log | sed 's/^/::error::  /'
+            exit $rc
+          fi
+          tail -n 5 /tmp/sanitizer-configure.log
+
+      - name: Dump configure log to ci-debug issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/ci-debug-dump.sh "sanitizer configure" "/tmp/sanitizer-configure.log"
 
       - name: Build (sanitizer instrumented subset)
         run: |
