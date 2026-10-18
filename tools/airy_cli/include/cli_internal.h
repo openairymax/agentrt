@@ -23,7 +23,6 @@
 #include "cognition.h"
 #include "gccp.h"
 #include "hall_store.h"
-#include "plan_to_dag.h"
 #include "llm_svc_adapter.h"
 #include "logger.h"
 #include "logging.h"
