@@ -937,7 +937,7 @@ for _a in \
     commons/utils/cognition/agent_vocab.c \
     atoms/coreloopthree/include/hall_store.h \
     atoms/coreloopthree/src/config/yaml_loader_parse.c \
-    daemons/gateway_d/src/gw_boot.c \
+    daemons/gateway_d/src/bootstrap/gw_boot.c \
     tools/airy_cli/src/cmd/cli_review.c; do
     printf '%s:\n' "$ROOT/$_a"
 done > "$TMP/s_allow"
@@ -1800,7 +1800,7 @@ fi
 # AF4：gateway_d 无 L2 端点防回归——resolve_ep 对 gateway 置空 sock（走进程
 # 存活腿）；否则盲合成 gateway.sock 会使假死探测永不通过而误杀 CORE。
 _af4_bad=""
-_decl="$ROOT/daemons/supervisor_d/src/decl.c"
+_decl="$ROOT/daemons/supervisor_d/src/decl/decl.c"
 grep -q '"gateway"' "$_decl" || _af4_bad="$_af4_bad gateway 置空分支缺失"
 grep -q 'p->sock\[0\] = ' "$_decl" || _af4_bad="$_af4_bad sock 置空语义缺失"
 if [ -z "$_af4_bad" ]; then
