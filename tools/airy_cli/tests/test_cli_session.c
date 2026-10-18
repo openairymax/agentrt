@@ -39,11 +39,6 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-/* CLI 全局模式量：正常由 main.c 拥有。本测试走端到端路径，只需符号闭合
- * （cli_render.c 直写 stdout，无 TUI 附着面）。 */
-volatile sig_atomic_t g_cli_cancel = 0;
-int g_cli_print_mode = 0;
-
 static int g_run = 0;
 static int g_pass = 0;
 

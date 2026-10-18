@@ -206,7 +206,8 @@ if(BUILD_TESTS)
     # dirent，无 pthread shim），移植无低成本路径。覆盖由 POSIX 腿
     # （linux/macos）保障；Windows 侧只跑可移植的 cli_classify_heuristic。
     if(NOT WIN32)
-        add_executable(test_cli_gw tests/test_cli_gw.c src/cmd/cli_gw.c)
+        add_executable(test_cli_gw tests/test_cli_gw.c tests/cli_test_globals.c
+                       src/cmd/cli_gw.c)
         target_include_directories(test_cli_gw PRIVATE ${CLI_INC_DIRS})
         # AIRY_COMPLIANCE_IMPL：测试 TU 的 mock 服务端使用裸 memset/sscanf/free，
         # 需豁免全局 banned_functions.h 毒化（与 gateway/tests 同策略）。
@@ -227,7 +228,7 @@ if(BUILD_TESTS)
     # 指向已关闭端口，令 llm.get_stats 必失败，从而走"回退本轮 chat 累计"路径
     # ——该路径的累计字段即厂商 usage 字段，可逐项断言映射关系。
     if(NOT WIN32)
-        add_executable(test_cli_usage tests/test_cli_usage.c
+        add_executable(test_cli_usage tests/test_cli_usage.c tests/cli_test_globals.c
                        src/chat/cli_chat_usage.c src/cmd/cli_gw.c)
         target_include_directories(test_cli_usage PRIVATE ${CLI_INC_DIRS})
         target_compile_definitions(test_cli_usage PRIVATE AIRY_HAS_CJSON=1)
@@ -253,6 +254,7 @@ if(BUILD_TESTS)
     # 传递 usage requirements 承载解析链）。
     if(NOT WIN32)
         add_executable(test_cli_approval tests/test_cli_approval.c
+                       tests/cli_test_globals.c
                        src/cmd/airy_cli_cmd_approval.c src/cmd/cli_gw.c
                        src/render/cli_render.c src/core/cli_dag.c
                        src/core/cli_term.c)
@@ -280,6 +282,7 @@ if(BUILD_TESTS)
     # g_history_*，历史缓冲语义必须是被测实现本体，不用测试替身。
     if(NOT WIN32)
         add_executable(test_cli_session tests/test_cli_session.c
+                       tests/cli_test_globals.c
                        src/chat/cli_chat_session.c src/chat/cli_chat_history.c
                        src/cmd/cli_gw.c src/render/cli_render.c
                        src/core/cli_dag.c src/core/cli_term.c)
@@ -303,6 +306,7 @@ if(BUILD_TESTS)
     # 仅替换测试 TU；Windows 腿随 cli_gw 的 POSIX mock 策略一致不参与。
     if(NOT WIN32)
         add_executable(test_cli_errdesc tests/test_cli_errdesc.c
+                       tests/cli_test_globals.c
                        src/cmd/cli_gw.c src/render/cli_render.c
                        src/core/cli_dag.c src/core/cli_term.c)
         target_include_directories(test_cli_errdesc PRIVATE ${CLI_INC_DIRS})
@@ -326,6 +330,7 @@ if(BUILD_TESTS)
     # 零请求。与 cli_gw_e2e 同策略（POSIX mock + pthread），Windows 不参与。
     if(NOT WIN32)
         add_executable(test_cli_live tests/test_cli_live.c
+                       tests/cli_test_globals.c
                        src/cmd/cli_live.c src/cmd/cli_gw.c
                        src/render/cli_render.c src/core/cli_dag.c
                        src/core/cli_term.c)

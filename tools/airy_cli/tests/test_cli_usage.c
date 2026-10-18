@@ -17,9 +17,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* cli_gw.c 引用的跨 TU 符号（正常由 main.c 拥有）。 */
-volatile sig_atomic_t g_cli_cancel = 0;
-
 static int g_run = 0;
 static int g_pass = 0;
 
