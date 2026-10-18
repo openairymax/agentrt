@@ -2,12 +2,18 @@ name: 'lf-gate-fixture'
 description: |
   跨仓门禁判据取料复合 action（0.1.19 §3.4「门禁脚本在而不生效」接线配套）。
 
-  锁定 SHA 物化两腿判据料：
+  锁定 SHA 物化三腿跨仓料：
     - sdk(tui)   → agent-workload/sdk/tui：verify_release_gates.sh 三副本
                    一致断言与 U/V/W/Y 组 Rust 结构判据。
     - tools      → _tools/scripts/ops/templates/permission_rules.yaml：
                    M3 组 MCP 暴露集 ⊆ external 授权集断言
                    （脚本 L663：本地无仓仅限 skip，CI 侧由本 action fail-closed 兜底）。
+    - products   → agent-workload/products/gateway_biz：0.1.19 刀H 起 gateway
+                   业务面寄宿产品件，release-gates 的 AI/AM/AF 组直接读取其
+                   源文件；同时是 gateway_d 的装配输入（缺席即该 daemon 不装配）。
+
+  取料腿可按调用方裁剪（inputs.legs）；构建腿只取 products 时与门禁腿共用
+  同一 pin，保证「门禁验证的产品件」即「构建装配的产品件」。
 
   SHA 单点声明：两个消费 workflow（build-test / quality-gate:release-gates）
   经本 action 共用同一锁定快照。严禁在任何 workflow 内复制 SHA 字面量——
@@ -45,10 +51,22 @@ inputs:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
     default: '7a61f5ef980664c717a9b556f066b4bbeeb33db0'
+  products_sha:
+    description: 'products 仓锁定 commit（判据消费：gateway_biz 业务面源文件）'
+    required: false
+    default: 'c837992b4a396c8d3c248db11759deb91e6435d6'
+  legs:
+    description: >-
+      取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
+      的构建腿可裁剪以省时（SHA 仍由本 action 单点持有，不得在 workflow
+      内复制字面量）。
+    required: false
+    default: 'sdk tools products'
 runs:
   using: composite
   steps:
     - name: Fetch cross-repo gate fixture (sdk tui)
+      if: contains(inputs.legs, 'sdk')
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.gh_token }}
@@ -68,6 +86,7 @@ runs:
         test -f agent-workload/sdk/tui/scripts/airymaxrt
 
     - name: Fetch cross-repo gate fixture (tools permission_rules.yaml)
+      if: contains(inputs.legs, 'tools')
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.gh_token }}
@@ -85,3 +104,21 @@ runs:
         git -C _tools checkout -q "${{ inputs.tools_sha }}"
         git -C _tools sparse-checkout set scripts/ops/templates
         test -f _tools/scripts/ops/templates/permission_rules.yaml
+
+    - name: Fetch cross-repo gate fixture (products gateway_biz)
+      if: contains(inputs.legs, 'products')
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.gh_token }}
+      run: |
+        set -euo pipefail
+        # sparse 浅克隆仅取业务面产品件；落点与 verify_release_gates.sh 的
+        # 候选二一致（$ROOT/agent-workload/products/gateway_biz）。末行 test
+        # 兜底，取料失败即红（fail-closed，不得静默降级）。
+        git clone -q --filter=blob:none --sparse \
+          "https://x-access-token:${GH_TOKEN}@github.com/openairymax/products.git" \
+          agent-workload/products
+        git -C agent-workload/products fetch -q --depth 1 origin "${{ inputs.products_sha }}"
+        git -C agent-workload/products checkout -q "${{ inputs.products_sha }}"
+        git -C agent-workload/products sparse-checkout set gateway_biz
+        test -f agent-workload/products/gateway_biz/CMakeLists.txt

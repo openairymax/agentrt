@@ -20,11 +20,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# 跨仓门禁判据取料（sdk tui + tools permission_rules.yaml）收敛至复合
-# action lf-gate-fixture：SHA 单点在其 input default，锁定语义、bump
-# 流程与 fail-closed 兜底契约均见该 action 注释。本 workflow 与
-# quality-gate 的 release-gates 作业共用同一快照——严禁在本文件内
-# 复制 SHA 字面量（双副本 = bump 漏改 = 两 workflow 门禁结论分叉）。
+# 跨仓门禁判据取料（sdk tui + tools permission_rules.yaml + products
+# gateway_biz）收敛至复合 action lf-gate-fixture：SHA 单点在其 input
+# default，锁定语义、bump 流程与 fail-closed 兜底契约均见该 action 注释。
+# 本 workflow 与 quality-gate 的 release-gates 作业共用同一快照——严禁在
+# 本文件内复制 SHA 字面量（双副本 = bump 漏改 = 两 workflow 门禁结论分叉）。
+# products 腿同时是 gateway_d 的装配输入：Linux/macOS 腿取全三腿，Windows
+# 腿以 legs=products 只取产品件，使 gateway_d 覆盖不因产品寄宿而缺席。
 
 jobs:
   # ==================== Linux 全量构建 + 测试 + 覆盖率门禁 ====================
@@ -53,7 +55,7 @@ jobs:
         with:
           groups: agent-workload
           gh_token: ${{ secrets.GH_TOKEN }}
-      - name: Fetch cross-repo gate fixtures (sdk + tools)
+      - name: Fetch cross-repo gate fixtures (sdk + tools + products)
         uses: ./.github/actions/lf-gate-fixture
         with:
           gh_token: ${{ secrets.GH_TOKEN }}
@@ -222,7 +224,7 @@ jobs:
         with:
           groups: agent-workload
           gh_token: ${{ secrets.GH_TOKEN }}
-      - name: Fetch cross-repo gate fixtures (sdk + tools)
+      - name: Fetch cross-repo gate fixtures (sdk + tools + products)
         uses: ./.github/actions/lf-gate-fixture
         with:
           gh_token: ${{ secrets.GH_TOKEN }}
@@ -363,6 +365,14 @@ jobs:
         with:
           groups: agent-workload
           gh_token: ${{ secrets.GH_TOKEN }}
+
+      # gateway_d 的装配输入 products/gateway_biz：与门禁腿共用同一 pin，
+      # 只取产品件（sdk/tools 腿在 Windows 无消费面，不取以省时）。
+      - name: Fetch gateway_biz product (pinned)
+        uses: ./.github/actions/lf-gate-fixture
+        with:
+          gh_token: ${{ secrets.GH_TOKEN }}
+          legs: products
 
       # vcpkg 二进制缓存恢复（须在 install 之前；key 随 workflow 内容变化
       # 自动失效并回退前缀 key；加性缓存由 vcpkg 自身保证正确性）

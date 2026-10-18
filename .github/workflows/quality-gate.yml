@@ -166,11 +166,11 @@ jobs:
   # 本作业使其常驻生效：脚本自身 FAIL>0 即 exit 1（末尾 fail-closed，
   # 无任何 || true 容错路径），step 非零退出即本 job 红。
   #
-  # 取料语义：跨仓判据（sdk tui 三副本一致 + U/V/W/Y 组 Rust 判据、
-  # tools permission_rules.yaml 的 M3 组断言）经 lf-gate-fixture 锁定
-  # SHA 物化（SSoT 单点在 action，防镜像 HEAD 快照漂移——上游推进即
-  # 一时绿一时红、本地复现不可得）；脚本 M3 组对缺料仅限本地 skip，
-  # CI 侧兜底即该 action 的 test 兜底行。
+  # 跨仓判据（sdk tui 三副本 + U/V/W/Y 组 Rust 判据、tools
+  # permission_rules.yaml 的 M3 组断言、products/gateway_biz 业务面
+  # 判据）经 lf-gate-fixture 锁定 SHA 物化（SSoT 单点在 action，防镜像
+  # HEAD 快照漂移——上游推进即一时绿一时红、本地复现不可得）；脚本对
+  # 缺料仅限本地 skip，CI 侧兜底即该 action 的 test 兜底行。
   release-gates:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -189,7 +189,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: bash .github/scripts/init-submodules.sh
 
-      - name: Fetch cross-repo gate fixtures (sdk + tools)
+      - name: Fetch cross-repo gate fixtures (sdk + tools + products)
         uses: ./.github/actions/lf-gate-fixture
         with:
           gh_token: ${{ secrets.GH_TOKEN }}
