@@ -638,9 +638,14 @@ section "M" "R-6 工具授权面 ⊇ MCP 暴露面（双 Schema 解析防回归�
 
 PDP_RULE_C="$ROOT/cupolas/src/permission/permission_rule.c"
 # §254a：cupolas 叶子仓挂点迁出核心树至 products 装配仓，伞仓布局下源位于
-# agentrt 同级 products/cupolas；独立检出（无 products）时保留本仓探测。
-# 两条路径皆缺时 PDP_RULE_C 悬空 → 下述 grep fail-closed 判红，符合门禁语义。
-[ -f "$PDP_RULE_C" ] || PDP_RULE_C="$ROOT/../products/cupolas/src/permission/permission_rule.c"
+# agentrt 同级 products/cupolas；CI 取料落点为 agent-workload/products（与
+# GW_BIZ 三候选同构，禁止单点布局分歧）。全部缺失时保留本仓悬空路径 →
+# 下述 grep fail-closed 判红，符合门禁语义。
+for _pdp_cand in "$ROOT/cupolas/src/permission/permission_rule.c" \
+                 "$ROOT/../products/cupolas/src/permission/permission_rule.c" \
+                 "$ROOT/agent-workload/products/cupolas/src/permission/permission_rule.c"; do
+    if [ -f "$_pdp_cand" ]; then PDP_RULE_C="$_pdp_cand"; break; fi
+done
 MCP_BUILTIN="$ROOT/daemons/tool_d/src/rpc/service_builtin.c"
 GW_BACKEND="$(BIZ_FACE src/gateway_biz_backend.c)"
 
@@ -1397,11 +1402,19 @@ fi
 _lg="$ROOT/atoms/coreloopthree/src/lang_gateway"
 # §256：lang_gateway 策略载荷已迁出机制核至生态层 products/lang_gateway
 # （数据契约经 airy_lang_gw_ops.h 入核）；伞仓布局下源位于 agentrt 同级
-# products 下。两条路径皆缺时 _lg 悬空 → X0 结构性判红 fail-closed，
-# 符合门禁语义。
-[ -d "$_lg" ] || _lg="$ROOT/../products/lang_gateway/src"
+# products 下，CI 取料落点为 agent-workload/products。全部缺失时 _lg 悬空
+# → X0 结构性判红 fail-closed，符合门禁语义。
+for _lg_cand in "$ROOT/atoms/coreloopthree/src/lang_gateway" \
+                "$ROOT/../products/lang_gateway/src" \
+                "$ROOT/agent-workload/products/lang_gateway/src"; do
+    if [ -d "$_lg_cand" ]; then _lg="$_lg_cand"; break; fi
+done
 _lg_tests="$ROOT/atoms/coreloopthree/tests/unit/test_lang_gateway.c"
-[ -f "$_lg_tests" ] || _lg_tests="$ROOT/../products/lang_gateway/tests/unit/test_lang_gateway.c"
+for _lg_cand in "$ROOT/atoms/coreloopthree/tests/unit/test_lang_gateway.c" \
+                "$ROOT/../products/lang_gateway/tests/unit/test_lang_gateway.c" \
+                "$ROOT/agent-workload/products/lang_gateway/tests/unit/test_lang_gateway.c"; do
+    if [ -f "$_lg_cand" ]; then _lg_tests="$_lg_cand"; break; fi
+done
 section "X" "B6 语言网关校准与路由（校准异步化/容量 SSoT/阈值同源 V6.1~V6.3 机制防回潮）"
 
 _lg_missing=""
@@ -1811,7 +1824,7 @@ _af3_bad=""
 _gw="$ROOT/gateway"
 _af3_src="$(BIZ_FACE src/gateway_biz_supactivate.c)"
 [ -f "$_af3_src" ] || _af3_bad="$_af3_bad supactivate.c 缺失"
-grep -q 'gateway_biz_supactivate\.c' "$ROOT/../products/gateway_biz/CMakeLists.txt" \
+grep -q 'gateway_biz_supactivate\.c' "$(BIZ_FACE CMakeLists.txt)" \
     || _af3_bad="$_af3_bad sources 未登记"
 grep -q 'gw_sup_notify_activate' "$(BIZ_FACE src/gateway_biz_svcdispatch.c)" \
     || _af3_bad="$_af3_bad unreachable 分支未接线"
