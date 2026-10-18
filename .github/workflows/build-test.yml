@@ -66,7 +66,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build gcovr \
-            libsqlite3-dev libcjson-dev libyaml-dev libcurl4-openssl-dev \
+            libsqlite3-dev libcjson-dev libcurl4-openssl-dev \
             libssl-dev zlib1g-dev libzstd-dev \
             libmicrohttpd-dev libwebsockets-dev libevent-dev \
             python3 python3-pip python3-yaml
@@ -232,7 +232,7 @@ jobs:
       # 需 --break-system-packages 装入 PATH 上的 python3
       - name: Install build dependencies (Homebrew)
         run: |
-          brew install cmake ninja pkgconf sqlite cjson libyaml curl openssl zlib zstd \
+          brew install cmake ninja pkgconf sqlite cjson curl openssl zlib zstd \
             libmicrohttpd libwebsockets libevent nghttp2
           python3 -m pip install --break-system-packages pyyaml
 
@@ -247,7 +247,7 @@ jobs:
           # （-lmicrohttpd 等）需显式 -I/-L，否则 build-test 与 release 环境
           # 漂移，门禁绿但发布红
           # arm64 Homebrew 头文件在 $(brew --prefix)/include，clang 不自动搜索：
-          # 缺该 -I 时 yaml.h/microhttpd.h 等非 keg-only 头同样报 file not found。
+          # 缺该 -I 时 microhttpd.h 等非 keg-only 头同样报 file not found。
           export CFLAGS="-I$(brew --prefix)/include -I$(brew --prefix openssl)/include"
           export LDFLAGS="-L$(brew --prefix)/lib -L$(brew --prefix openssl)/lib"
           cmake -S . -B ${{ env.BUILD_DIR }} \
@@ -385,7 +385,7 @@ jobs:
           # vcpkg 包名：curl（port 名为 curl 而非 libcurl）；
           # GNU libmicrohttpd 与 libwebsockets 的 port 名带 lib- 前缀，
           # 旧写法 microhttpd/websockets/libcurl 会直接 vcpkg install 失败（Windows 构建阻塞）
-          vcpkg install sqlite3 cjson libyaml curl openssl zlib libmicrohttpd libwebsockets libevent --triplet x64-windows
+          vcpkg install sqlite3 cjson curl openssl zlib libmicrohttpd libwebsockets libevent --triplet x64-windows
 
       - name: Configure (MSVC)
         shell: pwsh

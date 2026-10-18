@@ -125,7 +125,7 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          brew install cmake ninja pkgconf sqlite cjson libyaml curl openssl zlib zstd \
+          brew install cmake ninja pkgconf sqlite cjson curl openssl zlib zstd \
             libmicrohttpd libwebsockets libevent nghttp2
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
 
@@ -222,7 +222,7 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          brew install cmake ninja pkgconf sqlite cjson libyaml curl openssl zlib zstd \
+          brew install cmake ninja pkgconf sqlite cjson curl openssl zlib zstd \
             libmicrohttpd libwebsockets libevent nghttp2
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
 
@@ -329,7 +329,7 @@ jobs:
           VCPKG_BINARY_SOURCES: "clear;files,${{ runner.temp }}/vcpkg-cache,readwrite"
         run: |
           # vcpkg 包名：curl（非 libcurl）、libmicrohttpd/libwebsockets（带 lib- 前缀）
-          vcpkg install sqlite3 cjson libyaml curl openssl zlib libmicrohttpd libwebsockets libevent nghttp2 --triplet x64-windows
+          vcpkg install sqlite3 cjson curl openssl zlib libmicrohttpd libwebsockets libevent nghttp2 --triplet x64-windows
           # Rust 工具链（agentrt-tui 完全体包组件）
           Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile "$env:TEMP\rustup-init.exe"
           & "$env:TEMP\rustup-init.exe" -y --profile minimal --default-toolchain stable
@@ -473,7 +473,7 @@ jobs:
         run: |
           # port 清单与 x64 腿一致（nghttp2：HTTP/2 在 Windows 禁用仍入清单
           # 保持两腿依赖面同构），仅 triplet 换 x86-windows
-          vcpkg install sqlite3 cjson libyaml curl openssl zlib libmicrohttpd libwebsockets libevent nghttp2 --triplet x86-windows
+          vcpkg install sqlite3 cjson curl openssl zlib libmicrohttpd libwebsockets libevent nghttp2 --triplet x86-windows
           # Rust 工具链（宿主 x64）+ i686-pc-windows-msvc target（TUI 32 位产物）
           # i586（tier 2）在 hotfix 发行常缺 std 二进制；i686 为 tier 1 随
           # 每个发行必发，部署面无差
@@ -615,7 +615,7 @@ jobs:
             apt-get update -qq
             apt-get install -y -qq \
               build-essential make perl curl python3 python3-pip \
-              libsqlite3-dev libyaml-dev libcurl4-openssl-dev \
+              libsqlite3-dev libcurl4-openssl-dev \
               libssl-dev zlib1g-dev libzstd-dev libmicrohttpd-dev \
               libwebsockets-dev libevent-dev libnghttp2-dev
             # cmake/cJSON/OpenSSL/libcurl/libwebsockets 自编译收敛到

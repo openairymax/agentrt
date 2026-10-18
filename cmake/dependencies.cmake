@@ -101,34 +101,6 @@ function(airy_find_optional_deps)
         message(WARNING "cJSON not found, JSON features may be limited")
     endif()
 
-    # ---- libyaml ----
-    find_package(YAML QUIET)
-    if(NOT YAML_FOUND AND PkgConfig_FOUND)
-        pkg_check_modules(YAML QUIET yaml-0.1)
-    endif()
-    if(NOT YAML_FOUND AND PkgConfig_FOUND)
-        pkg_check_modules(YAML QUIET libyaml)
-    endif()
-    if(YAML_FOUND)
-        # libyaml keg-only 安装（Homebrew）只把目录给 pkg-config，-L 到不了
-        # 链接行，下游裸 ${YAML_LIBRARIES}（-lyaml）链接失败；提升为绝对
-        # 路径后所有消费点无需 -L（镜像根形态）。
-        if(NOT IS_ABSOLUTE "${YAML_LIBRARIES}")
-            find_library(YAML_ABSOLUTE_LIBRARY
-                         NAMES yaml yaml-0.1
-                         HINTS ${YAML_LIBRARY_DIRS}
-                         PATH_SUFFIXES lib)
-            if(YAML_ABSOLUTE_LIBRARY)
-                set(YAML_LIBRARIES "${YAML_ABSOLUTE_LIBRARY}")
-            endif()
-        endif()
-        set(AIRY_HAS_YAML TRUE CACHE BOOL "libyaml available" FORCE)
-        message(STATUS "libyaml found: ${YAML_LIBRARIES}")
-    else()
-        set(AIRY_HAS_YAML FALSE CACHE BOOL "libyaml available" FORCE)
-        message(WARNING "libyaml not found, YAML features may be limited")
-    endif()
-
     # ---- OpenSSL ----
     find_package(OpenSSL QUIET)
     if(OpenSSL_FOUND)
@@ -206,11 +178,7 @@ function(airy_find_optional_deps)
 
     # ---- 提升调用者作用域 ----
     # pkg_check_modules 系宏，函数内产生的 normal 变量不外泄；目录作用域
-    # 消费者（产品壳层 / commons 条件）直读 ${YAML_*} ${CJSON_*}，须显式提升。
-    set(YAML_FOUND "${YAML_FOUND}" PARENT_SCOPE)
-    set(YAML_LIBRARIES "${YAML_LIBRARIES}" PARENT_SCOPE)
-    set(YAML_INCLUDE_DIRS "${YAML_INCLUDE_DIRS}" PARENT_SCOPE)
-    set(YAML_LIBRARY_DIRS "${YAML_LIBRARY_DIRS}" PARENT_SCOPE)
+    # 消费者（产品壳层 / commons 条件）直读 ${CJSON_*}，须显式提升。
     set(CJSON_FOUND "${CJSON_FOUND}" PARENT_SCOPE)
     set(CJSON_LIBRARIES "${CJSON_LIBRARIES}" PARENT_SCOPE)
     set(CJSON_INCLUDE_DIRS "${CJSON_INCLUDE_DIRS}" PARENT_SCOPE)
@@ -263,7 +231,6 @@ function(airy_print_deps_summary)
     message(STATUS "PkgConfig:       ${PkgConfig_FOUND}")
     message(STATUS "SQLite3:         ${SQLite3_FOUND}")
     message(STATUS "cJSON:           ${cJSON_FOUND}")
-    message(STATUS "libyaml:         ${YAML_FOUND}")
     message(STATUS "OpenSSL:         ${OpenSSL_FOUND}")
     message(STATUS "libcurl:         ${CURL_FOUND}")
     message(STATUS "libmicrohttpd:   ${libmicrohttpd_FOUND}")

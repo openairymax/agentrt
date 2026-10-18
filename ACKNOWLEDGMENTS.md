@@ -64,13 +64,6 @@ AgentRT 集成了许多优秀的开源项目，在此表示诚挚的感谢：
 - **链接**: https://opentelemetry.io/
 - **感谢**: 提供了统一的观测性标准
 
-#### PyYAML
-- **用途**: YAML 文件解析
-- **作者**: Kirill Simonov（libyaml 作者）；PyYAML 维护团队
-- **许可证**: MIT License
-- **链接**: https://pyyaml.org/
-- **感谢**: 简化了配置文件管理
-
 #### Requests
 - **用途**: HTTP 客户端库
 - **作者**: Kenneth Reitz（创始者）；现由 Python Software Foundation 维护

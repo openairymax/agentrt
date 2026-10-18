@@ -164,7 +164,6 @@ corresponding `AIRY_HAS_*` compile definitions.
 | Threads | — | multithreading (required) |
 | SQLite3 | `AIRY_HAS_SQLITE3` | embedded database |
 | cJSON | `AIRY_HAS_CJSON` | JSON parsing |
-| libyaml | `AIRY_HAS_YAML` | YAML config parsing |
 | OpenSSL | `AIRY_HAS_OPENSSL` | TLS/crypto |
 | libcurl | `AIRY_HAS_CURL` | HTTP client |
 | libmicrohttpd | `AIRY_HAS_MICROHTTPD` | embedded HTTP server |
