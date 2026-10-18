@@ -54,7 +54,9 @@ inputs:
   products_sha:
     description: 'products 仓锁定 commit（判据消费：gateway_biz 业务面源文件）'
     required: false
-    default: 'c837992b4a396c8d3c248db11759deb91e6435d6'
+    # ab77b9e：cupolas daemon 壳显式锚定 corekern 头，镜像已追平；
+    # 与刀H 的 gateway_biz 内容同源，bump 后门禁与装配读到同一快照。
+    default: 'ab77b9e6d9d444f86d30bda7a0a26555e131f58e'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
