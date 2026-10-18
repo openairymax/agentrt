@@ -38,9 +38,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-/* cli_gw.c 依赖的跨 TU 符号：SIGINT 取消标志由 main.c 拥有（S-02），本测试
- * 作为独立可执行体定义它；失败原因经 cli_gw_last_err() 读取断言。 */
-volatile sig_atomic_t g_cli_cancel = 0;
+/* SIGINT 取消标志（main.c 拥有，cli_internal.h SSoT 声明 extern）：与
+ * cli_gw.c 同域同约定，文件内 extern 引用；本目标刻意不链 coreloopthree，
+ * 不 include cli_internal.h（其头森林需 corekern include 面）。 */
+extern volatile sig_atomic_t g_cli_cancel;
 
 /* ── 极简测试框架 ─────────────────────────────────────────────────── */
 

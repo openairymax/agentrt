@@ -36,9 +36,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-/* cli_gw.c 依赖的跨 TU 符号：SIGINT 取消标志由 main.c 拥有（S-02）。 */
-volatile sig_atomic_t g_cli_cancel = 0;
-
 /* ── 极简测试框架 ─────────────────────────────────────────────────── */
 
 static int g_tests_run = 0;
