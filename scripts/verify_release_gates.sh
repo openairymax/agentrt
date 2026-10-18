@@ -979,7 +979,14 @@ fi
 
 section "T" "§8 交付防复发判据（DR-1 能力接线 / DR-4 失败可判读 / DR-5 码值契约 / DR-6 运行态门禁 / 判据6 命令面唯一）"
 
-REG="$ROOT/gateway/src/biz/gateway_cap_registry.c"
+# 0.1.19：能力/命名空间/wire 策略唯一权威源为 gateway/.manifest，
+# 注册表改由构建期生成；门禁经生成器查询面取证（不再 grep .c 字面量）。
+GW_GEN="$ROOT/tools/codegen/gateway_gen.py"
+GW_MANIFEST="$ROOT/gateway/.manifest"
+gw_cap_row() {
+    python3 "$GW_GEN" --manifest "$GW_MANIFEST" --dump-caps 2>/dev/null \
+        | awk -F'\t' -v c="$1" '$1==c{print; exit}'
+}
 ERRS="$ROOT/commons/utils/error/error_codes.h"
 ERRC="$ROOT/commons/utils/error/err_class.h"
 ERRN="$ROOT/commons/utils/error/handler.c"
@@ -989,7 +996,7 @@ _t1_bad=""
 for _cap in $(grep -rhoE 'cli_gw_call\("[a-z_]+\.[a-z_0-9]+"' "$CLI/src" 2>/dev/null \
               | sed 's/.*("//' | tr -d '"' | sort -u); do
     _t1_n=$((_t1_n+1))
-    grep -q "{\"$_cap\"," "$REG" 2>/dev/null || _t1_bad="$_t1_bad $_cap"
+    [ -n "$(gw_cap_row "$_cap")" ] || _t1_bad="$_t1_bad $_cap"
 done
 if [ "$_t1_n" -gt 0 ] && [ -z "$_t1_bad" ]; then
     ok "T1 DR-1 用户面能力串全部登记于网关能力表（$_t1_n 项）"
@@ -1007,10 +1014,10 @@ for _cap in llm.complete think.process think.lang_process think.lang_postprocess
             sched.plan sched.absorb sched.dag_submit sched.dag_status \
             sched.dag_list sched.dag_cancel tool.execute; do
     _t2_n=$((_t2_n+1))
-    _line="$(grep -m1 "{\"$_cap\"," "$REG" 2>/dev/null)"
+    _line="$(gw_cap_row "$_cap")"
     if [ -z "$_line" ]; then _t2_bad="$_t2_bad $_cap(无网关登记)"; continue; fi
-    _ns="$(printf '%s' "$_line" | sed -E 's/.*\{"[^"]*", *"([^"]*)", *"([^"]*)".*/\1/')"
-    _m="$(printf '%s' "$_line" | sed -E 's/.*\{"[^"]*", *"([^"]*)", *"([^"]*)".*/\2/')"
+    _ns="$(printf '%s' "$_line" | cut -f2)"
+    _m="$(printf '%s' "$_line" | cut -f3)"
     # 服务面方法表 S74 起归位声明面（svc_<d>_d.h SVC_<D>_METHODS 清单，b5ab7f5），
     # 注册字面量在 include/ 声明面与 src/ 实现面两处均合法，扫描面随归位同步扩为二者。
     grep -rq "\"$_m\"" "$ROOT/daemons/${_ns}_d/src" "$ROOT/daemons/${_ns}_d/include" 2>/dev/null \
@@ -1469,11 +1476,10 @@ else
 fi
 
 _zrr="$ROOT/daemons/sched_d/src/roadmap/roadmap_rpc.c"
-_zcr="$ROOT/gateway/src/biz/gateway_cap_registry.c"
 section "Z" "B8 架构文档名实一致（V8.3 roadmap_status 实例状态名防回潮）"
 
 if grep -q 'method_dispatcher_register(d, "roadmap_status"' "$_zrr" \
-    && grep -q '"sched.roadmap_status"' "$_zcr" \
+    && [ -n "$(gw_cap_row "sched.roadmap_status")" ] \
     && grep -q '`roadmap_status`' "$ROOT/daemons/sched_d/README.md" \
     && grep -q 'roadmap_status' "$ROOT/daemons/gateway_d/README.md" \
     && ! grep -rq --exclude-dir=.git --include='*.c' --include='*.h' --include='*.rs' --include='*.md' 'roadmap_stats' "$ROOT"; then
