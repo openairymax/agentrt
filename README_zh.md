@@ -220,11 +220,11 @@ agentrt/
 | 操作系统  | Ubuntu 22.04+、macOS 13+，或带 MSVC 的 Windows                                |
 | C 编译器 | GCC 11+ 或 Clang 14+（要求 C11）                                              |
 | 构建工具  | CMake 3.20+，Ninja（推荐）或 Make                                              |
-| 依赖库   | SQLite3、cJSON、libyaml、libcurl、OpenSSL；网关另需 libmicrohttpd 与 libwebsockets |
+| 依赖库   | SQLite3、cJSON、libcurl、OpenSSL；网关另需 libmicrohttpd 与 libwebsockets |
 | 可选    | Rust（终端界面）、Python 3（随包脚本运行时）                                             |
 
 Windows 上的依赖建议通过 [vcpkg](https://github.com/microsoft/vcpkg) 获取：
-`sqlite3 cjson libyaml curl openssl zlib libmicrohttpd libwebsockets libevent nghttp2`。
+`sqlite3 cjson curl openssl zlib libmicrohttpd libwebsockets libevent nghttp2`。
 
 ### 构建步骤
 

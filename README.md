@@ -246,12 +246,12 @@ recursively to get all of them at the pinned revisions.
 | Operating system | Ubuntu 22.04+, macOS 13+, or Windows with MSVC |
 | C compiler | GCC 11+ or Clang 14+ (C11) |
 | Build tool | CMake 3.20+, Ninja (recommended) or Make |
-| Libraries | SQLite3, cJSON, libyaml, libcurl, OpenSSL; libmicrohttpd and libwebsockets for the gateway |
+| Libraries | SQLite3, cJSON, libcurl, OpenSSL; libmicrohttpd and libwebsockets for the gateway |
 | Optional | Rust (terminal UI), Python 3 (bundled script runtime) |
 
 On Windows, dependencies are most easily obtained through
 [vcpkg](https://github.com/microsoft/vcpkg):
-`sqlite3 cjson libyaml curl openssl zlib libmicrohttpd libwebsockets libevent nghttp2`.
+`sqlite3 cjson curl openssl zlib libmicrohttpd libwebsockets libevent nghttp2`.
 
 ### Steps
 

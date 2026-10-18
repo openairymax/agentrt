@@ -154,7 +154,6 @@ cmake/
 | Threads | — | 多线程（必需） |
 | SQLite3 | `AIRY_HAS_SQLITE3` | 嵌入式数据库 |
 | cJSON | `AIRY_HAS_CJSON` | JSON 解析 |
-| libyaml | `AIRY_HAS_YAML` | YAML 配置解析 |
 | OpenSSL | `AIRY_HAS_OPENSSL` | TLS/加密 |
 | libcurl | `AIRY_HAS_CURL` | HTTP 客户端 |
 | libmicrohttpd | `AIRY_HAS_MICROHTTPD` | 嵌入式 HTTP 服务器 |

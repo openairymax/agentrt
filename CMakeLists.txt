@@ -420,35 +420,6 @@ if(CJSON_INCLUDE_DIRS)
     include_directories(${CJSON_INCLUDE_DIRS})
 endif()
 
-# --- libyaml ---
-find_package(YAML QUIET)
-if(NOT YAML_FOUND AND PkgConfig_FOUND)
-    pkg_check_modules(YAML QUIET yaml-0.1)
-endif()
-if(NOT YAML_FOUND AND PkgConfig_FOUND)
-    pkg_check_modules(YAML QUIET libyaml)
-endif()
-if(YAML_FOUND)
-    # 下游一律以裸 ${YAML_LIBRARIES}（"yaml"→-lyaml）链接；keg-only 安装
-    # （Homebrew libyaml）只把目录给到 pkg-config，-L 到不了链接行，
-    # macOS 报 "ld: library 'yaml' not found"。提升为绝对路径后所有
-    # 消费点（commons/cupolas/daemons）无需 -L 即可链接。
-    if(NOT IS_ABSOLUTE "${YAML_LIBRARIES}")
-        find_library(YAML_ABSOLUTE_LIBRARY
-                     NAMES yaml yaml-0.1
-                     HINTS ${YAML_LIBRARY_DIRS}
-                     PATH_SUFFIXES lib)
-        if(YAML_ABSOLUTE_LIBRARY)
-            set(YAML_LIBRARIES "${YAML_ABSOLUTE_LIBRARY}")
-        endif()
-    endif()
-    set(AIRY_HAS_YAML TRUE CACHE BOOL "libyaml available")
-    airy_print_ok("libyaml found: ${YAML_LIBRARIES}")
-else()
-    set(AIRY_HAS_YAML FALSE CACHE BOOL "libyaml available")
-    airy_print_warn("libyaml not found, YAML config features disabled")
-endif()
-
 # --- OpenSSL ---
 find_package(OpenSSL QUIET)
 if(OpenSSL_FOUND)
@@ -637,9 +608,6 @@ endif()
 if(AIRY_HAS_CJSON)
     target_compile_definitions(airy_compile_defs INTERFACE AIRY_HAS_CJSON)
 endif()
-if(AIRY_HAS_YAML)
-    target_compile_definitions(airy_compile_defs INTERFACE AIRY_HAS_YAML)
-endif()
 if(AIRY_HAS_OPENSSL)
     target_compile_definitions(airy_compile_defs INTERFACE AIRY_HAS_OPENSSL)
 endif()
@@ -665,9 +633,6 @@ if(AIRY_HAS_SQLITE3)
 endif()
 if(AIRY_HAS_CJSON)
     add_compile_definitions(AIRY_HAS_CJSON)
-endif()
-if(AIRY_HAS_YAML)
-    add_compile_definitions(AIRY_HAS_YAML)
 endif()
 if(AIRY_HAS_OPENSSL)
     add_compile_definitions(AIRY_HAS_OPENSSL)
@@ -850,7 +815,6 @@ if(AIRY_BUILD_ALL)
     foreach(_dep_info
             "SQLite3:       ${AIRY_HAS_SQLITE3}"
             "cJSON:         ${AIRY_HAS_CJSON}"
-            "libyaml:       ${AIRY_HAS_YAML}"
             "OpenSSL:       ${AIRY_HAS_OPENSSL}"
             "libcurl:       ${AIRY_HAS_CURL}"
             "libmicrohttpd: ${AIRY_HAS_MICROHTTPD}"
@@ -872,9 +836,6 @@ if(AIRY_BUILD_ALL)
     endif()
     if(AIRY_HAS_CURL)
         set(AIRY_HAS_CURL TRUE CACHE BOOL "CURL available for agentrt")
-    endif()
-    if(AIRY_HAS_YAML)
-        set(AIRY_HAS_YAML TRUE CACHE BOOL "libyaml available for agentrt")
     endif()
     if(AIRY_HAS_OPENSSL)
         set(AIRY_HAS_OPENSSL TRUE CACHE BOOL "OpenSSL available for agentrt")

@@ -39,7 +39,7 @@ RUN printf "%s\n" \
  && apt-get update -qq \
  && apt-get install -y -qq --no-install-recommends \
       build-essential make perl curl python3 python3-pip python3-venv \
-      libsqlite3-dev libyaml-dev libcurl4-openssl-dev libssl-dev zlib1g-dev \
+      libsqlite3-dev libcurl4-openssl-dev libssl-dev zlib1g-dev \
       libzstd-dev libmicrohttpd-dev libwebsockets-dev libevent-dev \
       libnghttp2-dev ca-certificates git pkg-config \
  && rm -rf /var/lib/apt/lists/*
