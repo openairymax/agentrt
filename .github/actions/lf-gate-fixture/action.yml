@@ -48,19 +48,26 @@ inputs:
   sdk_sha:
     description: 'sdk 仓锁定 commit（判据消费：tui/scripts/airymaxrt + tui/src 判据面）'
     required: false
-    default: '791dfb9770e7f1dcb30e36d0ba5e6ce68f20fca8'
+    # b688680：tui gitlink 前推至 871ee38，启动器与 agentrt/latest/airymaxrt
+    # 内容一致（AF1 双面单路径）。旧 pin 的启动器缺 profile_load 逐行解析，
+    # 与 latest 分叉（run #556 实证）。
+    default: 'b688680923c53f5044d395d0cdefe8bd1802c4fa'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
-    default: '7a61f5ef980664c717a9b556f066b4bbeeb33db0'
+    # 8e1f3cd：0.1.19 M5-3 起 airy_depgraph 执行器在 tools 仓，agentrt 经
+    # _tools/airy_depgraph 跨仓装配；旧 pin 早于迁出，构建腿取不到该工具，
+    # release-gates P5（全量链接新鲜校验）结构性红（run #556 实证）。
+    default: '8e1f3cdb9724d0993f5d124177bc4c304bfccc66'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
       cupolas 策略单元（子模块）、lang_gateway 语言网关、cognition 认知件）
     required: false
-    # ab77b9e：cupolas daemon 壳显式锚定 corekern 头，镜像已追平；
-    # 与刀H 的 gateway_biz 内容同源，bump 后门禁与装配读到同一快照。
-    default: 'ab77b9e6d9d444f86d30bda7a0a26555e131f58e'
+    # a56d530：cupolas 去掉 C11 原子量的花括号初始化（clang 拒绝，
+    # macOS 构建腿因此编译失败，run #556 实证）；本 pin 与镜像同步后
+    # 门禁与装配读到同一份可跨编译器构建的快照。
+    default: 'a56d53029275e410aacedc589d79834a5a9d4f05'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
@@ -98,18 +105,21 @@ runs:
         GH_TOKEN: ${{ inputs.gh_token }}
       run: |
         set -euo pipefail
-        # sparse 浅克隆仅取判据模板；末行 test 兜底，取料失败即红
-        # （fail-closed，不得静默降级）。落点 _tools/ 对齐
+        # sparse 浅克隆仅取判据模板与构建装配件；末行 test 兜底，取料失败
+        # 即红（fail-closed，不得静默降级）。落点 _tools/ 对齐
         # verify_release_gates.sh M3 组候选二与 init-submodules.sh 的
         # release 腿落点（agentrt 自带顶层 tools/ 为 codegen 等自有面，
-        # 同名会互相遮蔽）。
+        # 同名会互相遮蔽）。airy_depgraph 是 agentrt CMake 的跨仓装配输入
+        # （AIRY_TOOLS_CANDS 第三候选 _tools），缺席则 P5 链接新鲜校验无
+        # 工具可用（run #556 实证）。
         git clone -q --filter=blob:none --sparse \
           "https://x-access-token:${GH_TOKEN}@github.com/openairymax/tools.git" \
           _tools
         git -C _tools fetch -q --depth 1 origin "${{ inputs.tools_sha }}"
         git -C _tools checkout -q "${{ inputs.tools_sha }}"
-        git -C _tools sparse-checkout set scripts/ops/templates
+        git -C _tools sparse-checkout set scripts/ops/templates airy_depgraph
         test -f _tools/scripts/ops/templates/permission_rules.yaml
+        test -f _tools/airy_depgraph/CMakeLists.txt
 
     - name: Fetch cross-repo gate fixture (products faces)
       if: contains(inputs.legs, 'products')

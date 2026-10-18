@@ -135,6 +135,14 @@ jobs:
               "$UMB/agent-workload/$r" \
               || echo "::warning::$r mirror unavailable, cross-repo check will skip it"
           done
+          # sdk 的 tui 子模块承载启动器与 TUI 判据面：G38-4 的
+          # launcher_profile_parse 直接读取 tui/scripts/airymaxrt。顶层
+          # 浅克隆不含子模块工作树，缺席即该探针结构性红（run #369 实证）。
+          # tui 为公开仓，相对 URL 经 https 匿名解析，与 sdk 主仓同通道。
+          if [ -d "$UMB/agent-workload/sdk" ]; then
+            git -C "$UMB/agent-workload/sdk" submodule update --init --depth 1 -- tui \
+              || echo "::warning::sdk tui submodule unavailable, G38 launcher probe will fail"
+          fi
           # ecosystem 的第二层子模块（agents/manager/…）承载门禁的直接数据源：
           #   Gate 5 工具 schema 双源之一 agents/airymax_agents/base.py，
           #   Gate 7 TP-012 物理宿主 manager/schema/plugin-manifest.schema.json。
