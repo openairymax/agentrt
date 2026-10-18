@@ -58,15 +58,18 @@ extract_fn() { # <file> <fnname> <outfile>
 
 # 0.1.19 刀H：gateway 业务面已迁出机制核，寄宿 products/gateway_biz 产品件
 # （hub 布局下 agentrt 与 products 同级）。独立检出缺产品件时，相关判据
-# 以双路径探测兜底，缺一即 fail-closed。
-GW_BIZ="$ROOT/../products/gateway_biz"
-[ -d "$GW_BIZ" ] || GW_BIZ="$ROOT/gateway/src/biz"
-BIZ_FACE() { # <相对路径> → 业务面文件绝对路径（产品件优先，旧位兜底）
-    if [ -f "$ROOT/../products/gateway_biz/$1" ]; then
-        printf '%s' "$ROOT/../products/gateway_biz/$1"
-    else
-        printf '%s' "$ROOT/gateway/src/biz/$1"
-    fi
+# 以三路径探测兜底（hub 同级 / CI 取料物化 agent-workload/products / 历史
+# gateway/src/biz），缺一即 fail-closed。
+GW_BIZ="${AIRY_GATE_PRODUCTS_BIZ:-}"
+if [ -z "$GW_BIZ" ]; then
+    for _cand in "$ROOT/../products/gateway_biz" \
+                 "$ROOT/agent-workload/products/gateway_biz" \
+                 "$ROOT/gateway/src/biz"; do
+        if [ -d "$_cand" ]; then GW_BIZ="$_cand"; break; fi
+    done
+fi
+BIZ_FACE() { # <相对路径> → 业务面文件绝对路径（探测基点内直取）
+    printf '%s' "${GW_BIZ:-$ROOT/gateway/src/biz}/$1"
 }
 
 _missing=0
