@@ -56,6 +56,14 @@ runs:
           # 脚本，位于 tools 子仓，cmake --install 不会带入），host 侧显式部署
           cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
         fi
+        # 管理面 full 启动器随包内置（0.1.19 洁净环境 e2e 根因）：缺此文件时
+        # 安装器生成的 thin 包装只能用 curl 下载 latest/airymaxrt；离线或
+        # 无 curl 的环境（e2e-clean-room 按设计如此）status 门禁恒失败，
+        # 安装被中止。full 启动器为纯 bash，离线完成 status/update 全部
+        # 管理命令。sdk 由 init-submodules 检出，缺失即检出故障 → fail-closed。
+        cp -f agent-workload/sdk/tui/scripts/airymaxrt "${PKG_DIR}/bin/airymaxrt-full" \
+          || { echo "::error::full 启动器缺失（agent-workload/sdk 未检出）"; exit 1; }
+        chmod +x "${PKG_DIR}/bin/airymaxrt-full"
         # 运行时 .so 收集/校验已在构建容器内由 finalize-linux-libs.sh 完成
         #（host 无容器 /usr/local 自编译库，ldd 收集必 not found）
         # 平台标记勿回退 uname 原始名（platform-x86_64 会触发更新器
