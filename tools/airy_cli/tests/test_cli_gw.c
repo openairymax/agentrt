@@ -8,8 +8,9 @@
  * 覆盖 CLI 组织面访问微核心服务的唯一合规通路：JSON-RPC over HTTP POST
  * → gateway。测试用本进程内 mock HTTP/1.1 服务端（AF_INET 127.0.0.1:0
  * 真实 socket，非桩函数）验证：
- *   - 端点发现：默认 127.0.0.1:8080 / AIRY_GATEWAY_URL 两形态（http://
- *     host:port 与裸 host:port）/ 运行时端口文件 $AIRY_HOME/run/gateway.port；
+ *   - 端点发现：默认 127.0.0.1:AIRY_PORT_GATEWAY_HTTP（端口 SSoT）/
+ *     AIRY_GATEWAY_URL 两形态（http://host:port 与裸 host:port）/
+ *     运行时端口文件 $AIRY_HOME/run/gateway.port；
  *   - 调用往返：envelope（jsonrpc=2.0 / id=1 / method / params）逐字段
  *     抵达服务端，result 原文返回（OWNER AIRY_FREE）；
  *   - 失败分诊：JSON-RPC -32601 → "不支持该方法"；连接拒绝 → "网关不在线"；
@@ -21,6 +22,7 @@
 
 #include "cli_gw.h"
 
+#include "airy_defaults.h"
 #include "error_codes.h"
 #include "platform.h"
 
@@ -316,7 +318,7 @@ static void test_endpoint_default(const char *tmpdir)
     int port = 0;
     cli_gw_endpoint(host, sizeof(host), &port);
     CHECK(strcmp(host, "127.0.0.1") == 0, "endpoint_default host=127.0.0.1");
-    CHECK(port == 8080, "endpoint_default port=8080");
+    CHECK(port == AIRY_PORT_GATEWAY_HTTP, "endpoint_default port=SSoT");
 }
 
 static void test_endpoint_url_http_prefix(void)
@@ -377,7 +379,7 @@ static void test_endpoint_runtime_port_invalid(const char *tmpdir)
     char host[128];
     int port = 0;
     cli_gw_endpoint(host, sizeof(host), &port);
-    CHECK(port == 8080, "endpoint_runtime invalid port -> 8080");
+    CHECK(port == AIRY_PORT_GATEWAY_HTTP, "endpoint_runtime invalid -> SSoT");
 }
 
 /* ── 用例 6-10：调用往返与失败分诊 ────────────────────────────────── */
