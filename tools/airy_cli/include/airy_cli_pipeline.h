@@ -23,7 +23,6 @@
 /* 0.1.16 B2：CLI 为 gateway 纯客户端，仅依赖 commons 用户态错误码契约，
  * 不再引用 corekern 总伞头 airy_rt.h（进程内微内核已收回）。 */
 #include "airy_types.h"
-#include "loop.h"
 #include "platform.h"
 #include "cognition.h"
 #include "hall_store.h"
@@ -46,15 +45,11 @@ typedef struct {
     const char *main_workspace_dir;
 } cli_runtime_ctx_t;
 
-/* Core loop assembly: loop create + chat memory engine attach.
- * 0.1.9 M1-1c：CLI 退役本地 cog 装配（GCCP/TC3/GRAD 接线随 C2d-2 移除，
- * 认知规划唯一经 gateway → think_d），loop 内引擎集由 airy_loop_create
- * 自动装配。Returns NULL on failure. */
-airy_core_loop_t *cli_setup_core_engines(void);
-
 /* Full runtime assembly: event-stream hall_store → chat adapter.
+ * 0.1.16 B2：CLI 为 gateway 纯客户端，进程内不装配 core loop（0.1.19
+ * 退役残留的 loop 实例——认知规划唯一经 gateway → think_d）。
  * Returns AIRY_EOK on success, error code on failure (caller must clean up). */
-airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_runtime_ctx_t *rt);
+airy_err_t cli_setup_runtime(cli_runtime_ctx_t *rt);
 
 /* Symmetric teardown of cli_setup_runtime.  Idempotent: zeroes the struct
  * after release so repeated calls are safe. */

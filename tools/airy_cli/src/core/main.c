@@ -189,21 +189,11 @@ int main(int argc, char *argv[])
         }
     }
 
-    airy_core_loop_t *loop = cli_setup_core_engines();
-    if (!loop)
-        return 1;
-
     airy_err_t err = AIRY_EOK;
     cli_runtime_ctx_t rt;
-    err = cli_setup_runtime(loop, &rt);
-    if (err != AIRY_EOK) {
-        airy_loop_destroy(loop);
-        return 1;
-    }
-
-    err = airy_loop_dag_set_cancel_flag(loop, &g_cli_cancel);
+    err = cli_setup_runtime(&rt);
     if (err != AIRY_EOK)
-        AIRY_LOG_WARN("airy_cli: set cancel flag failed (err=%d)", (int)err);
+        return 1;
 
     /* 0.1.17 R5-G5：--continue/--resume 会话恢复视图——启动时一次性只读
      * 装配（mem.recent → g_history_*），此后请求/渲染路径自动同源生效。 */
@@ -398,7 +388,6 @@ int main(int argc, char *argv[])
     if (g_chat_adapter)
         llm_svc_adapter_destroy(g_chat_adapter);
     cli_teardown_runtime(&rt);
-    airy_loop_destroy(loop);
     cli_tui_destroy(tui);
 
     if (!g_cli_print_mode) {
