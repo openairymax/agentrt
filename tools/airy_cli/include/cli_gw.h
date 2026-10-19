@@ -73,7 +73,8 @@ int cli_gw_health(int timeout_ms);
 int cli_gw_probe(int timeout_ms, unsigned long long *epoch_out);
 
 /**
- * @brief 解析网关端点（AIRY_GATEWAY_URL 或默认 127.0.0.1:8080）。
+ * @brief 解析网关端点（AIRY_GATEWAY_URL、$AIRY_HOME/run/gateway.port，
+ *        或端口 SSoT 默认 AIRY_PORT_GATEWAY_HTTP）。
  * @param host      [out] 主机名
  * @param host_len  host 缓冲区大小
  * @param port      [out] 端口

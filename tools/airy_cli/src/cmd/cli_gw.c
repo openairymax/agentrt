@@ -13,6 +13,7 @@
  */
 
 #include "airy_memory.h"
+#include "airy_defaults.h"
 #include "cli_gw.h"
 #include "error_codes.h" /* AIRY_ERR_CANCELED（S-02：取消语义与 sched.dag_cancel 对齐） */
 #include "logger.h"
@@ -40,7 +41,8 @@
 #endif
 
 #define CLI_GW_DEFAULT_HOST "127.0.0.1"
-#define CLI_GW_DEFAULT_PORT 8080
+/* 端口 SSoT：commons airy_defaults.h 为唯一权威（禁止复刻字面量）。 */
+#define CLI_GW_DEFAULT_PORT AIRY_PORT_GATEWAY_HTTP
 #define CLI_GW_RECV_CHUNK 8192
 #define CLI_GW_MAX_BODY (64u * 1024u * 1024u) /* 64MiB 响应上限 */
 
@@ -76,8 +78,8 @@ void cli_gw_err_set(const char *msg)
 extern volatile sig_atomic_t g_cli_cancel;
 
 /* 读取 $AIRY_HOME/run/gateway.port（完整启动器在端口漂移后固化实际端口）。
- * 0.1.6h：gateway 被占漂移 8083+ 后，CLI 硬编码 8080 会"网关不在线"；
- * 与 TUI/轻量启动器同源读取，根治端口漂移断连。 */
+ * 0.1.6h：gateway 被占漂移后，CLI 回退默认端口若与监听不一致会误报
+ * "网关不在线"；与 TUI/轻量启动器同源读取，根治端口漂移断连。 */
 static int cli_gw_read_runtime_port(void)
 {
     const char *home = getenv("AIRY_HOME");
