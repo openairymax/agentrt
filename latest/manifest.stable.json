@@ -2,152 +2,152 @@
   "schema": 1,
   "channel": "stable",
   "state": "active",
-  "latest": "v0.1.18",
-  "updated_at": "2026-09-23T11:33:15Z",
+  "latest": "v0.1.19",
+  "updated_at": "2026-10-19T05:57:42Z",
   "releases": {
-    "v0.1.18": {
+    "v0.1.19": {
       "yanked": false,
-      "notes": "AgentRT v0.1.18\n\n## 2. 平台支持\n\n- Linux（主力平台）：x86-64 / x86-32 / arm-64 / arm-32\n- macOS：arm-64（Apple Silicon）/ x86-64（Intel）\n- Windows：x86-64 / x86-32\n\n## 3. 安装\n\n```bash\ncurl -fsSL https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/install.sh | bash\n```\n\nWindows（PowerShell）：\n```powershell\nirm https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/install.ps1 | iex\n```\n\n## 4. 本版变更\n\n* latest: restore supervisor launcher and bump gate pins\n* launcher: fix AIRY_HOME discovery under versioned install layout\n* cmake: gate GCC-only stringop-overflow opt-out to GNU\n* daemons: converge three SSE parsers into core/sse.c\n* llm_d: sink provider secrets into core/secrets.c\n* daemons: advance pointer for llm_d provider header split\n* daemons: advance pointer for llm_d providers core/adapters reshuffle\n* daemons: advance pointer after llm_d B16-S2 inner de-dependency\n* daemons: advance pointer for B16-S1 hub header split\n* daemons: advance pointer for B16-S0 include-face collapse\n* gateway: advance for on-demand daemon activation\n* install: converge install face onto release assets and add npm\n* launcher: route daemon lifecycle through supervisor_d\n* cli: hide chain-of-thought from render and memory channels",
+      "notes": "AgentRT v0.1.19\n\n## 2. 平台支持\n\n- Linux（主力平台）：x86-64 / x86-32 / arm-64 / arm-32\n- macOS：arm-64（Apple Silicon）/ x86-64（Intel）\n- Windows：x86-64 / x86-32\n\n## 3. 安装\n\n```bash\ncurl -fsSL https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/install.sh | bash\n```\n\nWindows（PowerShell）：\n```powershell\nirm https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/install.ps1 | iex\n```\n\n## 4. 本版变更\n\n* airy_cli: derive chat tools json from schema ssot macros\n* commons: advance for the windows uuid probe fix\n* agentrt: advance daemons for the registry cleanup\n* agentrt: advance atoms for the MSVC unused-variable fix\n* scripts: resolve product faces under the CI workspace layout\n* gateway: 登记业务面产品件为装配根链接边\n* gateway: sync handler error path and build comment\n* gateway: generate policy tables from gateway/.manifest\n* scripts: follow gateway_d and supervisor_d domain sinks\n* daemons: sync llm_d shared usage parser extraction\n* daemons: sync llm_d router strategy unification\n* scripts: follow the mem_d header sink in release gates\n* scripts: follow the sched_d domain fold in release gates\n* scripts: follow the agent_d domain fold in release gates\n* scripts: gate the installer on the status self-check\n* agentrt: advance the atoms and commons pointers for the error model landing\n* agentrt: advance the daemons pointer for the tool availability landing\n* agentrt: advance the commons and gateway pointers for the IPC backoff landing\n* agentrt: surface model endpoint health in the airymaxrt status output\n* agentrt: advance the daemons pointer for the endpoint health probe\n* agentrt: advance the daemons pointer for the Ollama keep_alive pass\n* agentrt: advance the daemons pointer for the lightweight mode\n* agentrt: advance the daemons pointer for the local-endpoint retry fix\n* agentrt: advance the commons pointer to the platform cleanup\n* scripts: read the builtin tool set from the capability grid\n* agentrt: advance daemons for the dead router cost tracker drop\n* agentrt: advance atoms for the config valid-list collapse\n* agentrt: advance daemons for the GCCP answer reset collapse\n* agentrt: advance daemons for the JSON-RPC guard collapse\n* agentrt: advance atoms for the think/cognition clone collapse\n* agentrt: advance commons for the ipc nonblock helper reuse\n* codegen: generate the daemon endpoint shims\n* agentrt: re-register the shortened JSON-RPC validator symbol\n* airy_cli: clear the three standing build warnings\n* agentrt: register the sunk JSON-RPC mother symbols\n* airy_cli: retire the experience renderer after direct printing\n* airy_cli: direct-print core output via the plain line printers\n* airy_cli: direct-print command output via the plain line printers\n* airy_cli: gate status lines behind the print-mode check\n* airy_cli: direct-print chat output via the plain line printer\n* airy_cli: drop the in-process memory handle from the pipeline\n* agentrt: drop twelve retired memory symbols from G1 baseline\n* agentrt: retire the memory backend switch after the stack collapse\n* agentrt: drop six swept jsonrpc symbols from G1 baseline\n* agentrt: re-account G1 baseline to 471 for factory removal\n* agentrt: excise dead cli helpers and bump heapstore, gateway\n* daemons: remove dead security surfaces in common\n* atoms: sync pointer for orchestrator dead include cleanup\n* commons: advance pointer for cognition dead-header removal\n* gateway: advance pointer for jsonrpc macro-face convergence\n* commons: advance pointer for memory domain clone convergence\n* daemons: advance pointer for llm_d routing prelude convergence\n* daemons: roll to market_d include-block unification\n* gateway: roll to include-block unification\n* protocols: collapse residual duplicate windows to single source\n* gateway: advance pointer for svc_forward extraction\n* gateway: advance pointer for agent_svc_forward extraction\n* commons: advance pin for [DSL] fallback contract note\n* agentrt: advance commons pointer for sync validation SSoT\n* agentrt: advance commons pointer for YAML node finalize SSoT\n* agentrt: advance atoms pointer for config adopt SSoT\n* agentrt: advance atoms pointer for LLM choice prologue SSoT\n* agentrt: advance atoms pointer for hashset lookup SSoT\n* agentrt: advance atoms pointer for hook write-lock SSoT\n* agentrt: advance atoms pointer for HTTP session SSoT\n* agentrt: advance commons pointer for assert dispatch SSoT\n* agentrt: advance commons/daemons pointers for JSON-RPC guard SSoT\n* agentrt: advance atoms/commons pointers for YAML mapping-root SSoT\n* agentrt: advance daemons pointer for sched refresh SSoT\n* agentrt: advance commons pointer for realloc retrack SSoT\n* agentrt: advance atoms pointer for metric register SSoT\n* agentrt: advance atoms pointer for timer unlink SSoT\n* agentrt: advance daemons pointer for ledger rollback SSoT\n* agentrt: advance daemons pointer for §304 endpoint SSoT\n* agentrt: advance daemons pointer for §303 glob walk convergence\n* agentrt: advance commons pointer for §302 jsonrpc convergence\n* agentrt: advance daemons pointer for §301 tool_d convergence\n* codegen: emit svc_ namespace noop hook names in generated daemons\n* agentrt: generate daemon boot wiring from noop_hooks and bump daemons\n* agentrt: adopt the a2a adapter readiness SSoT mechanism\n* agentrt: fold the C-ABI preamble into airy_abi.h\n* agentrt: add the G14 composition-algebra gate\n* agentrt: add the G1 public-surface symbol baseline\n* agentrt: read profile.env line-wise to stop launcher crash\n* agentrt: advance atoms and daemons for the CPR ops injection\n* agentrt: move airy_depgraph to the top-level tools repo\n* agentrt: track the lang gateway ops consumer switch\n* agentrt: track the daemons gateway ops provider injection\n* agentrt: assemble the language gateway product mount\n* agentrt: mount atoms with the lang gateway ops contract\n* agentrt: mount cupolas_d from the product shell\n* agentrt: generalize the deps module for standalone builds\n* agentrt: assemble the dome policy unit at the root mount\n* agentrt: move the cupolas mount to the products tree\n* 修复\n* agentrt: prune airy_cli fan edge and honestize whitelist rows\n* agentrt: trim dead edges from the link whitelist\n* agentrt: repoint the S1 role-literal exemption at gw_boot.c\n* agentrt: tighten the link whitelist after the L2 transit retirement\n* agentrt: 收口 .gitmodules 分支声明为 dev/hubs-01\n* agentrt: drop dead airy_cli helpers and bump the IPC retirement\n* agentrt: advance daemons for cache single-source fold\n* agentrt: single-source the airy_cli decision-chain emitters\n* agentrt: dedupe the airy_cli include prelude into a family header\n* agentrt: advance protocols for adapter include prelude dedup\n* agentrt: advance protocols for token estimation dedup\n* agentrt: advance gateway for llm_d dispatch dedup\n* agentrt: advance gateway for AF_UNIX connect ritual dedup\n* agentrt: retire the TUI F1..F8 key decode paths\n* agentrt: retire the TUI panel data-source layer\n* agentrt: retire the fullscreen TUI rendering engine\n* agentrt: drop orphaned fullscreen TUI suite\n* agentrt: drop dead fullscreen readline branch\n* agentrt: advance commons for platform clone removal\n* agentrt: advance commons/daemons for event loop family split\n* agentrt: advance heapstore for core family include prelude SSoT\n* agentrt: advance heapstore for token mutex platform-branch cleanup\n* agentrt: advance commons/daemons for llm response destructor SSoT\n* agentrt: 推进 commons/daemons 以收敛 daemon 实体 ID 生成重复\n* agentrt: 推进 gateway 以收敛请求处理回调绑定重复\n* agentrt: 推进 daemons 以收敛 tool_d builtin 家族 include 重复\n* agentrt: 推进 daemons 以收敛 agent_d service 家族 include 重复\n* agentrt: 推进 daemons 以收敛守护进程端点槽重复\n* agentrt: 推进 daemons 以收敛 think_d 事件序列化重复\n* agentrt: 推进 commons/cupolas 以收敛 yaml 词法扫描重复\n* agentrt: 推进 hall gseq 水位线与池测试隔离子仓指针\n* agentrt: 推进目录默认宏单源化子仓指针\n* agentrt: 推进签名密钥装载机制单源化子仓指针\n* agentrt: 推进审计队列链表机制单源化子仓指针\n* agentrt: 推进 sched_d DAG 析构单源化子仓指针\n* agentrt: 推进 daemon RPC 客户端双轨消解子仓指针\n* agentrt/protocols: 推进词计数/LLM往返机制下沉子仓指针\n* agentrt/daemons: 推进 channel_d 簿记/传输拆分子仓指针\n* commons: 同步互斥量家族生命周期单源化\n* agentrt: consume airy_plan_parse in airy_cli and bump atoms/daemons\n* scripts: 门禁 T2 服务面扫描随方法表归位扩为双面\n* agentrt: 提升 commons 子模块指针至默认值格根因修复\n* agentrt: 提升 commons/daemons 子模块指针至 hall 写侧消解\n* codegen: 生成器 v1.8.0 增 main.c ≤150 硬断言\n* workflows: 订正 quality-gate 门禁计数至二十五门\n* workflows: 订正 quality-gate 门禁计数至二十四门\n* workflows: 订正 quality-gate 门禁计数至 23 门\n* codegen: 端口契约升级为 SSoT 符号引用\n* workflows: 订正 quality-gate 门禁计数至 20 门\n* heapstore: 更新子模块（IPC 测试数据根隔离与空跑用例修复）\n* heapstore: 更新子模块（批次入队表驱动收敛与 IPC 落盘解析修复）\n* commons: 更新子模块（流式集合解析零进展死循环修复）\n* 修复\n* commons: 更新子模块（环境格表驱动收敛）\n* commons: 更新子模块\n* agentrt: advance commons and daemons for dead svc removal\n* agentrt: advance daemons for symbol rename\n* agentrt: advance atoms and daemons for dispatcher removal\n* agentrt: advance commons and daemons for shared io helper\n* agentrt: retire hook_d from whitelist, launchers and docs\n* agentrt: advance atoms/daemons/gateway for hook-face rerouting\n* agentrt: whitelist notify_d hook deps and relabel e2e hook section\n* daemons: advance to absorb hook face into notify_d\n* daemons: advance to tool_d hub-head include cleanup (9be6272)\n* daemons: advance tool_d approval gate consolidation\n* daemons: advance submodule pointer for tool_d domain housing\n* daemons: advance submodule pointer for tool_d domain housing\n* daemons: advance submodule pointer for mem_d SSoT assembly\n* commons: advance submodule pointer for dead counter removal\n* daemons: advance submodule pointer for llm_d SSoT convergence\n* daemons: advance submodule pointer for llm_d hub header convergence\n* daemons: advance submodule pointer for llm_d router domain split\n* daemons: advance submodule pointer for llm_d rpc domain move\n* daemons: advance submodule pointer for llm_d bootstrap move\n* codegen: accept src-relative subpath sources in manifests\n* daemons: advance submodule pointer to llm_d gen5 assembly\n* daemons: advance submodule pointer to gateway_d gen5 registration\n* daemons: advance submodule pointer to notify_d gen5 registration\n* daemons: advance submodule pointer to hook_d gen5 assembly\n* daemons: advance submodule pointer to a2a_d gen5 assembly\n* daemons: advance submodule pointer to monit_d gen5 assembly\n* daemons: advance submodule pointer to observe endpoint platform\n* daemons: advance submodule pointer to tool_d gen5 assembly\n* codegen: unlink the bound socket path on graceful stop\n* daemons: advance submodule pointer to market_d gen5 assembly\n* commons: advance submodule pointer to self-contained platform header\n* codegen: adopt naming contract v1.5.0 in daemon_gen.py\n* daemons: advance submodule pointer to L3 gen5 propagation\n* agentrt: ignore the codegen python bytecode cache\n* codegen: pass SD bootstrap handle to svc_activate hook\n* gates: guard against platform/compat shim resurrection\n* cli: drop the redundant utils/sd include mount\n* gates: register the corekern link fact base and verify fresh snapshots\n* linkgate: own the whitelist path as the single source\n* gates: flip the s2 shim check to the terminal contract\n* gates: add AJ wiring-SSoT fail-closed assertions\n* gates: brace vars before CJK punctuation, pin fixed fixtures",
       "artifacts": {
         "linux-arm-32": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-linux-arm-32.tar.gz",
-          "sha256": "2b029b5f65da8da6e9ac2c5f659bb567d3f06692f676bfe4cc3f100aff9c0f67",
-          "size": 36371286
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-linux-arm-32.tar.gz",
+          "sha256": "ce43416448749752a9f1735811f754cadb8d2327937bf219e73204083835e723",
+          "size": 31785073
         },
         "linux-arm-64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-linux-arm-64.tar.gz",
-          "sha256": "016c88cc4a93257a0c9d77d5dfe29f87b5e628e660df1a1f15f48f035dd39e8b",
-          "size": 37988416
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-linux-arm-64.tar.gz",
+          "sha256": "198aadcd6dc98d95e49c1e59e2af86e95fa64c81795f2d8008adf088f0e284df",
+          "size": 33287026
         },
         "linux-x86-32": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-linux-x86-32.tar.gz",
-          "sha256": "6dce617e582ef314f713a53ba51dc57c2e4972a1696bc07aa803bfe4adb4bf49",
-          "size": 36409408
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-linux-x86-32.tar.gz",
+          "sha256": "22ed8f482a2f1a94000530e6663486793aa2227964f4eb97718409ff548d38b4",
+          "size": 32296469
         },
         "linux-x86-64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-linux-x86-64.tar.gz",
-          "sha256": "6766e3d42b3b38dfd90e3a114052aed4806714da7b19123121cb65c28fa4dd11",
-          "size": 38526217
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-linux-x86-64.tar.gz",
+          "sha256": "4ff056d9f0cd4c616763627866bba2beb539180dcf284cceda980edb654ce6f3",
+          "size": 33818448
         },
         "macos-arm-64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-macos-arm-64.tar.gz",
-          "sha256": "4d34c38e7747f4a4170011ca9c826524e4abdf32de0b0a52b918339301a30502",
-          "size": 23326787
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-macos-arm-64.tar.gz",
+          "sha256": "d0cd285bc3d8926513c65d81c9ebbc3620af937fcb8b9422b3987a8a7ca7c1f6",
+          "size": 22691431
         },
         "macos-x86-64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-macos-x86-64.tar.gz",
-          "sha256": "c5da7edf12421999427cff39f467ecde771fa0649f8eaa567e12ec6de03e14eb",
-          "size": 23677021
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-macos-x86-64.tar.gz",
+          "sha256": "2537fc968b5f259cb34eaef150670b3af3e8080c157d2becc59b0bc65a592982",
+          "size": 23040225
         },
         "windows-x86-32": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-windows-x86-32.zip",
-          "sha256": "68f08916099524784fb86eedacf8c7460a7eac1d4a560917bd3f692b4ec0e572",
-          "size": 57518035
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-windows-x86-32.zip",
+          "sha256": "4e31804762847a8afc4e01352f68bf8063c7d323981e7cb221c0993ec19f0852",
+          "size": 47667475
         },
         "windows-x86-64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-windows-x86-64.zip",
-          "sha256": "9f7de028c925afd5f456a5eca4de5523121bf4a8106af1b263d773b1b7e148a1",
-          "size": 58376870
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-windows-x86-64.zip",
+          "sha256": "529851d0d5b9b02d5fc43211cc498e6f238d2e9dc1523a336a63968b78a9fa51",
+          "size": 48581494
         },
         "linux-arm32": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-linux-arm-32.tar.gz",
-          "sha256": "2b029b5f65da8da6e9ac2c5f659bb567d3f06692f676bfe4cc3f100aff9c0f67",
-          "size": 36371286
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-linux-arm-32.tar.gz",
+          "sha256": "ce43416448749752a9f1735811f754cadb8d2327937bf219e73204083835e723",
+          "size": 31785073
         },
         "linux-armv7l": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-linux-arm-32.tar.gz",
-          "sha256": "2b029b5f65da8da6e9ac2c5f659bb567d3f06692f676bfe4cc3f100aff9c0f67",
-          "size": 36371286
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-linux-arm-32.tar.gz",
+          "sha256": "ce43416448749752a9f1735811f754cadb8d2327937bf219e73204083835e723",
+          "size": 31785073
         },
         "linux-arm64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-linux-arm-64.tar.gz",
-          "sha256": "016c88cc4a93257a0c9d77d5dfe29f87b5e628e660df1a1f15f48f035dd39e8b",
-          "size": 37988416
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-linux-arm-64.tar.gz",
+          "sha256": "198aadcd6dc98d95e49c1e59e2af86e95fa64c81795f2d8008adf088f0e284df",
+          "size": 33287026
         },
         "linux-aarch64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-linux-arm-64.tar.gz",
-          "sha256": "016c88cc4a93257a0c9d77d5dfe29f87b5e628e660df1a1f15f48f035dd39e8b",
-          "size": 37988416
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-linux-arm-64.tar.gz",
+          "sha256": "198aadcd6dc98d95e49c1e59e2af86e95fa64c81795f2d8008adf088f0e284df",
+          "size": 33287026
         },
         "linux-x86": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-linux-x86-32.tar.gz",
-          "sha256": "6dce617e582ef314f713a53ba51dc57c2e4972a1696bc07aa803bfe4adb4bf49",
-          "size": 36409408
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-linux-x86-32.tar.gz",
+          "sha256": "22ed8f482a2f1a94000530e6663486793aa2227964f4eb97718409ff548d38b4",
+          "size": 32296469
         },
         "linux-i686": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-linux-x86-32.tar.gz",
-          "sha256": "6dce617e582ef314f713a53ba51dc57c2e4972a1696bc07aa803bfe4adb4bf49",
-          "size": 36409408
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-linux-x86-32.tar.gz",
+          "sha256": "22ed8f482a2f1a94000530e6663486793aa2227964f4eb97718409ff548d38b4",
+          "size": 32296469
         },
         "linux-x64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-linux-x86-64.tar.gz",
-          "sha256": "6766e3d42b3b38dfd90e3a114052aed4806714da7b19123121cb65c28fa4dd11",
-          "size": 38526217
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-linux-x86-64.tar.gz",
+          "sha256": "4ff056d9f0cd4c616763627866bba2beb539180dcf284cceda980edb654ce6f3",
+          "size": 33818448
         },
         "linux-x86_64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-linux-x86-64.tar.gz",
-          "sha256": "6766e3d42b3b38dfd90e3a114052aed4806714da7b19123121cb65c28fa4dd11",
-          "size": 38526217
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-linux-x86-64.tar.gz",
+          "sha256": "4ff056d9f0cd4c616763627866bba2beb539180dcf284cceda980edb654ce6f3",
+          "size": 33818448
         },
         "macos-arm64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-macos-arm-64.tar.gz",
-          "sha256": "4d34c38e7747f4a4170011ca9c826524e4abdf32de0b0a52b918339301a30502",
-          "size": 23326787
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-macos-arm-64.tar.gz",
+          "sha256": "d0cd285bc3d8926513c65d81c9ebbc3620af937fcb8b9422b3987a8a7ca7c1f6",
+          "size": 22691431
         },
         "macos-aarch64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-macos-arm-64.tar.gz",
-          "sha256": "4d34c38e7747f4a4170011ca9c826524e4abdf32de0b0a52b918339301a30502",
-          "size": 23326787
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-macos-arm-64.tar.gz",
+          "sha256": "d0cd285bc3d8926513c65d81c9ebbc3620af937fcb8b9422b3987a8a7ca7c1f6",
+          "size": 22691431
         },
         "macos-x64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-macos-x86-64.tar.gz",
-          "sha256": "c5da7edf12421999427cff39f467ecde771fa0649f8eaa567e12ec6de03e14eb",
-          "size": 23677021
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-macos-x86-64.tar.gz",
+          "sha256": "2537fc968b5f259cb34eaef150670b3af3e8080c157d2becc59b0bc65a592982",
+          "size": 23040225
         },
         "macos-x86_64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-macos-x86-64.tar.gz",
-          "sha256": "c5da7edf12421999427cff39f467ecde771fa0649f8eaa567e12ec6de03e14eb",
-          "size": 23677021
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-macos-x86-64.tar.gz",
+          "sha256": "2537fc968b5f259cb34eaef150670b3af3e8080c157d2becc59b0bc65a592982",
+          "size": 23040225
         },
         "windows-x86": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-windows-x86-32.zip",
-          "sha256": "68f08916099524784fb86eedacf8c7460a7eac1d4a560917bd3f692b4ec0e572",
-          "size": 57518035
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-windows-x86-32.zip",
+          "sha256": "4e31804762847a8afc4e01352f68bf8063c7d323981e7cb221c0993ec19f0852",
+          "size": 47667475
         },
         "windows-i686": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-windows-x86-32.zip",
-          "sha256": "68f08916099524784fb86eedacf8c7460a7eac1d4a560917bd3f692b4ec0e572",
-          "size": 57518035
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-windows-x86-32.zip",
+          "sha256": "4e31804762847a8afc4e01352f68bf8063c7d323981e7cb221c0993ec19f0852",
+          "size": 47667475
         },
         "win-x86": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-windows-x86-32.zip",
-          "sha256": "68f08916099524784fb86eedacf8c7460a7eac1d4a560917bd3f692b4ec0e572",
-          "size": 57518035
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-windows-x86-32.zip",
+          "sha256": "4e31804762847a8afc4e01352f68bf8063c7d323981e7cb221c0993ec19f0852",
+          "size": 47667475
         },
         "win-i686": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-windows-x86-32.zip",
-          "sha256": "68f08916099524784fb86eedacf8c7460a7eac1d4a560917bd3f692b4ec0e572",
-          "size": 57518035
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-windows-x86-32.zip",
+          "sha256": "4e31804762847a8afc4e01352f68bf8063c7d323981e7cb221c0993ec19f0852",
+          "size": 47667475
         },
         "windows-x64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-windows-x86-64.zip",
-          "sha256": "9f7de028c925afd5f456a5eca4de5523121bf4a8106af1b263d773b1b7e148a1",
-          "size": 58376870
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-windows-x86-64.zip",
+          "sha256": "529851d0d5b9b02d5fc43211cc498e6f238d2e9dc1523a336a63968b78a9fa51",
+          "size": 48581494
         },
         "windows-x86_64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-windows-x86-64.zip",
-          "sha256": "9f7de028c925afd5f456a5eca4de5523121bf4a8106af1b263d773b1b7e148a1",
-          "size": 58376870
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-windows-x86-64.zip",
+          "sha256": "529851d0d5b9b02d5fc43211cc498e6f238d2e9dc1523a336a63968b78a9fa51",
+          "size": 48581494
         },
         "win-x64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-windows-x86-64.zip",
-          "sha256": "9f7de028c925afd5f456a5eca4de5523121bf4a8106af1b263d773b1b7e148a1",
-          "size": 58376870
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-windows-x86-64.zip",
+          "sha256": "529851d0d5b9b02d5fc43211cc498e6f238d2e9dc1523a336a63968b78a9fa51",
+          "size": 48581494
         },
         "win-x86_64": {
-          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.18/agentrt-v0.1.18-windows-x86-64.zip",
-          "sha256": "9f7de028c925afd5f456a5eca4de5523121bf4a8106af1b263d773b1b7e148a1",
-          "size": 58376870
+          "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.19/agentrt-v0.1.19-windows-x86-64.zip",
+          "sha256": "529851d0d5b9b02d5fc43211cc498e6f238d2e9dc1523a336a63968b78a9fa51",
+          "size": 48581494
         }
       }
     }
