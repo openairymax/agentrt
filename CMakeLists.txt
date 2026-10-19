@@ -173,6 +173,15 @@ set(CMAKE_BUILD_RPATH "$ORIGIN/../lib")
 set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
 
+# 传递依赖自包含（0.1.19 洁净环境 e2e 根因）：发行版 ld.so 默认生成
+# DT_RUNPATH，仅对**直接依赖**生效、不传给子依赖。第三方 .so（如
+# libwebsockets）自身无 RPATH 时，其子依赖（libcap 等）会落到系统路径；
+# 洁净主机无该系统库即 "not found"。改用 DT_RPATH（沿依赖树传递），
+# 使 $ORIGIN/../lib 覆盖整棵依赖树。Apple ld 不支持该选项，仅 Linux 启用。
+if(UNIX AND NOT APPLE)
+    add_link_options(-Wl,--disable-new-dtags)
+endif()
+
 # 关键路径验证：确认核心目录存在
 airy_print_info("Path check: Source root = ${CMAKE_CURRENT_SOURCE_DIR}")
 foreach(_dir atoms commons protocols gateway daemons heapstore)
