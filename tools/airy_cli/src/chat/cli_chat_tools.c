@@ -27,6 +27,8 @@
 #include "cli_prelude.h"
 #include "err_class.h" /* 0.1.19 N1：工具失败按 class/code/diag 透传 */
 
+#include "airy_tool_schema.h"
+
 #ifdef AIRY_HAS_CJSON
 #include <cjson/cJSON.h>
 
@@ -53,101 +55,20 @@ int web_search_tool(const char *params_json, tool_result_t *res);
 #endif
 int web_fetch_tool(const char *params_json, tool_result_t *res);
 
-/* OpenAI function-calling schema（聊天工具回路）。工具行为 SSoT 在 tool_d
- * （builtin.c 真实实现）；本 schema 与 commons 契约层
- * （commons/include/airy_tool_schema.h）保持同构。
+/* 聊天工具回路 schema：单一权威在 commons airy_tool_schema.h（逐工具片段
+ * 宏，与 tool_d BTOOL 注册一一对应），此处按子集策略引用宏拼装，禁止手写
+ * schema 文本。子集 = 16 − 4：shell_run / git_exec / git_diff / git_apply
+ * 高危不入聊天回路（留给任务管线审批链）。
  * 本地文件读写 + 联网检索 + 数学外挂构成超级智能体的日常能力：
  * fs_read/fs_write/fs_list/fs_glob/fs_grep/fs_edit/fs_delete +
- * web_search/web_fetch + maths_eval/maths_stats/maths_plot。
- * shell_run / git_* 不入聊天回路（高危，留给任务管线审批链）。 */
+ * web_search/web_fetch + maths_eval/maths_stats/maths_plot。 */
 const char *cli_chat_tools_json =
-    "["
-    "{\"type\":\"function\",\"function\":{"
-    "\"name\":\"fs_read\","
-    "\"description\":\"Read a file's content from the local filesystem\","
-    "\"parameters\":{\"type\":\"object\",\"properties\":{"
-    "\"path\":{\"type\":\"string\"}},\"required\":[\"path\"]}}},"
-    "{\"type\":\"function\",\"function\":{"
-    "\"name\":\"fs_write\","
-    "\"description\":\"Write content to a local file (creates or overwrites)\","
-    "\"parameters\":{\"type\":\"object\",\"properties\":{"
-    "\"path\":{\"type\":\"string\"},\"content\":{\"type\":\"string\"}},"
-    "\"required\":[\"path\",\"content\"]}}},"
-    "{\"type\":\"function\",\"function\":{"
-    "\"name\":\"fs_list\","
-    "\"description\":\"List entries of a local directory (JSON array)\","
-    "\"parameters\":{\"type\":\"object\",\"properties\":{"
-    "\"path\":{\"type\":\"string\"}},\"required\":[]}}},"
-    "{\"type\":\"function\",\"function\":{"
-    "\"name\":\"fs_glob\","
-    "\"description\":\"List files matching a glob pattern (supports * ? and **)\","
-    "\"parameters\":{\"type\":\"object\",\"properties\":{"
-    "\"pattern\":{\"type\":\"string\"},\"base\":{\"type\":\"string\"}},"
-    "\"required\":[\"pattern\"]}}},"
-    "{\"type\":\"function\",\"function\":{"
-    "\"name\":\"fs_grep\","
-    "\"description\":\"Search file contents with a regular expression (relpath:line:text)\","
-    "\"parameters\":{\"type\":\"object\",\"properties\":{"
-    "\"pattern\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},"
-    "\"glob\":{\"type\":\"string\"},\"max_results\":{\"type\":\"integer\"}},"
-    "\"required\":[\"pattern\"]}}},"
-    "{\"type\":\"function\",\"function\":{"
-    "\"name\":\"fs_edit\","
-    "\"description\":\"Replace an exact string in a file (search-and-replace edit)\","
-    "\"parameters\":{\"type\":\"object\",\"properties\":{"
-    "\"path\":{\"type\":\"string\"},\"old\":{\"type\":\"string\"},"
-    "\"new\":{\"type\":\"string\"},\"count\":{\"type\":\"integer\"}},"
-    "\"required\":[\"path\",\"old\",\"new\"]}}},"
-    "{\"type\":\"function\",\"function\":{"
-    "\"name\":\"fs_delete\","
-    "\"description\":\"Delete a local file, or a directory (recursive=1 for "
-    "non-empty trees; destructive)\","
-    "\"parameters\":{\"type\":\"object\",\"properties\":{"
-    "\"path\":{\"type\":\"string\"},\"recursive\":{\"type\":\"boolean\"}},"
-    "\"required\":[\"path\"]}}},"
-    "{\"type\":\"function\",\"function\":{"
-    "\"name\":\"web_search\","
-    "\"description\":\"Search the web for up-to-date information relevant to "
-    "the user's question. Returns ranked result titles, URLs and snippets.\","
-    "\"parameters\":{\"type\":\"object\",\"properties\":{"
-    "\"query\":{\"type\":\"string\",\"description\":\"Search query\"},"
-    "\"max_results\":{\"type\":\"integer\",\"description\":\"Max result count, "
-    "1-8\",\"minimum\":1,\"maximum\":8}},"
-    "\"required\":[\"query\"]}}},"
-    "{\"type\":\"function\",\"function\":{"
-    "\"name\":\"web_fetch\","
-    "\"description\":\"Fetch and read the text content of a web page by URL.\","
-    "\"parameters\":{\"type\":\"object\",\"properties\":{"
-    "\"url\":{\"type\":\"string\",\"description\":\"Full http(s) URL\"}},"
-    "\"required\":[\"url\"]}}},"
-    "{\"type\":\"function\",\"function\":{"
-    "\"name\":\"maths_eval\","
-    "\"description\":\"Evaluate a math expression precisely (arithmetic, "
-    "powers, factorial, sqrt/sin/cos/tan/ln/log10/log2/exp/abs/min/max/floor/ceil "
-    "etc.)\","
-    "\"parameters\":{\"type\":\"object\",\"properties\":{"
-    "\"expression\":{\"type\":\"string\"}},\"required\":[\"expression\"]}}},"
-    "{\"type\":\"function\",\"function\":{"
-    "\"name\":\"maths_stats\","
-    "\"description\":\"Compute descriptive statistics of a numeric array "
-    "(sum/mean/median/min/max/variance/stddev)\","
-    "\"parameters\":{\"type\":\"object\",\"properties\":{"
-    "\"op\":{\"type\":\"string\"},"
-    "\"values\":{\"type\":\"array\",\"items\":{\"type\":\"number\"}}},"
-    "\"required\":[\"op\",\"values\"]}}},"
-    "{\"type\":\"function\",\"function\":{"
-    "\"name\":\"maths_plot\","
-    "\"description\":\"Sample y=f(x) over [xmin,xmax] and return a plot block "
-    "that the TUI renders as a braille canvas. Use for any function graph the "
-    "user asks to draw.\","
-    "\"parameters\":{\"type\":\"object\",\"properties\":{"
-    "\"expression\":{\"type\":\"string\",\"description\":\"Expression in "
-    "variable x, e.g. sin(x)+x/2\"},"
-    "\"xmin\":{\"type\":\"number\"},\"xmax\":{\"type\":\"number\"},"
-    "\"samples\":{\"type\":\"integer\",\"description\":\"Sample count, "
-    "default 128, max 256\"}},"
-    "\"required\":[\"expression\",\"xmin\",\"xmax\"]}}}"
-    "]";
+    "[" AIRY_TOOL_JSON_FS_READ "," AIRY_TOOL_JSON_FS_WRITE ","
+    AIRY_TOOL_JSON_FS_LIST "," AIRY_TOOL_JSON_FS_GLOB ","
+    AIRY_TOOL_JSON_FS_GREP "," AIRY_TOOL_JSON_FS_EDIT ","
+    AIRY_TOOL_JSON_FS_DELETE "," AIRY_TOOL_JSON_WEB_SEARCH ","
+    AIRY_TOOL_JSON_WEB_FETCH "," AIRY_TOOL_JSON_MATHS_EVAL ","
+    AIRY_TOOL_JSON_MATHS_STATS "," AIRY_TOOL_JSON_MATHS_PLOT "]";
 
 /* 动态消息缓冲：工具轮需要逐步追加 assistant tool_calls 与 role="tool"
  * 结果消息。content / tool_call_id / tool_calls_json 的副本由 owned 数组
