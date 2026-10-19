@@ -1262,9 +1262,10 @@ jobs:
   #   3) publish-atomgit：SSoT 慢通道上传 + latest/ 指针切换（指针只在
   #      上传完成后才提交，install/update 永远指向已就绪制品）——与 GH
   #      快通道并行，互不阻塞；独立 concurrency 组支持单段重跑续传。
-  #   4) publish-npm：B12（N-5）npm 薄壳通道，needs publish-atomgit——
-  #      附件面（download/latest/）刷新与 npm publish 同 run 强绑定，
-  #      双向杜绝"附件新、npm 旧"与"npm 新、附件旧"漂移。
+  #   4) publish-npm：B12（N-5）npm 薄壳通道，needs publish-atomgit。
+  #      0.1.19 决策：npm registry 组织面尚未开通（外部账号前置），该通道
+  #      降级为**非阻断观察面**——仍与附件刷新同 run 绑定、失败留红可见，
+  #      但不再阻断整条 release；凭据就绪后须恢复 fail-closed（见台账 §349）。
   #
   # 发布顺序语义（社区面向文档化）：GH 数分钟先行可见 → atomgit SSoT
   # ~1.5h 并行补齐 → Gitee 后台幂等镜像。atomgit 仍是数据权威（SSoT），
@@ -1478,15 +1479,17 @@ jobs:
 
   # B12（0.1.18，N-5）：npm 薄壳通道 publish。needs publish-atomgit——数据
   # 权威面（含阶段 4.6 的 download/latest/ 附件刷新）成功后才允许动 npm，
-  # fail-closed 双向防"附件新、npm 旧 / npm 新、附件旧"漂移；publish 失败
-  # 即整条 release 判失败（job 红）。幂等续传与 SSoT 面同语义（精确版本
-  # 已在 registry 即跳过）。dist-tag 按通道分层：stable 占 latest（恒新），
-  # rc/beta 挂各自通道标、不污染 latest。
+  # 防"附件新、npm 旧 / npm 新、附件旧"漂移。0.1.19 决策（台账 §349）：npm
+  # registry 组织面未开通期间该 job 为非阻断观察面（continue-on-error），
+  # 失败仍以红步 + 告警留痕；NPM_TOKEN 就绪后删除 continue-on-error 即恢复
+  # fail-closed。dist-tag 按通道分层：stable 占 latest（恒新），rc/beta 挂
+  # 各自通道标、不污染 latest。
   publish-npm:
     needs: [publish-atomgit]
     if: success() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    continue-on-error: true
     environment: release
     permissions:
       contents: read
@@ -1505,7 +1508,20 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org
 
+      - name: Preflight NPM_TOKEN
+        id: pre
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # 凭据缺失时显式跳过（告警留痕），避免把"外部账号未开通"伪装成
+          # 代码失败；凭据存在但发布失败仍会红步，漂移可被看见。
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::warning::NPM_TOKEN 未配置，npm 薄壳通道本轮跳过（非阻断观察面）"
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish @openairymax/agentrt
+        if: steps.pre.outputs.skip != '1'
         working-directory: packaging/npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
