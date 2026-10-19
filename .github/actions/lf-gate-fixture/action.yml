@@ -67,9 +67,11 @@ inputs:
     # a56d530：cupolas 去掉 C11 原子量的花括号初始化（clang 拒绝，
     # macOS 构建腿因此编译失败，run #556 实证）；70bc6aa：cupolas 的
     # 服务计数器改用 atomic_compat 跨平台原子面，MSVC 不再直引
-    # <stdatomic.h>（C1189，ci-debug #1356 实证）；本 pin 与镜像同步后门禁
-    # 与装配读到同一份可跨编译器构建的快照。
-    default: '70bc6aa324a58bd73f2828957112e9ef9ea670f8'
+    # <stdatomic.h>（C1189，ci-debug #1356 实证）；dcf2a80：cognition
+    # 线程安全测试改用 platform 跨平台线程面 airy_thread_create/join，
+    # MSVC 不再裸引 pthread（LNK2001，ci-debug #1359 实证）；本 pin 与
+    # 镜像同步后门禁与装配读到同一份可跨编译器构建的快照。
+    default: 'dcf2a80879bcd6464ba36b6ddb4961d7f181ef9b'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
