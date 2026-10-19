@@ -516,6 +516,12 @@ jobs:
             foreach ($exe in $exes) {
               "===== cdb: $($exe.Name) =====" | Add-Content $log
               try {
+                # cdb 默认挂调试堆，堆填充与布局同 ctest 裸跑不一致，会掩盖
+                # 布局敏感的未初始化/越界类崩溃（cognition 三测试裸跑 0.2s
+                # 崩、调试堆下却跑完全量用例的差异即由此而来）。
+                # _NO_DEBUG_HEAP=1 让被调试进程用普通堆复现裸跑行为，g 才会
+                # 停在真实的 second-chance 崩溃点，.ecxr 拿到有效栈。
+                $env:_NO_DEBUG_HEAP = '1'
                 # 经典 cdb 自动化：初断处 -c 先 g 跑到 crash 断点，再 .ecxr + k。
                 # Release + ProgramDatabase 产物带 PDB，栈可直接落到函数名。
                 & $cdb -o -c "g; .ecxr; k 40; q" $exe.FullName 2>&1 | Add-Content $log
