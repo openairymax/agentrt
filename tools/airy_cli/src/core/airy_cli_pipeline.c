@@ -20,7 +20,6 @@
 
 /* 0.1.16 B2：corekern 总伞头已摘除，错误码契约由 airy_types.h 提供
  * （经 cli_internal.h 传入，此处不再单独引用 airy_rt.h）。 */
-#include "loop.h"
 #include "cli_gw.h"
 #include "cognition.h"
 #include "gccp.h"
@@ -45,24 +44,13 @@
 
 /* 0.1.9 M1-1c：CLI 退役本地 cog 装配——认知规划唯一经 gateway → think_d
  * （think.process），GCCP 交互/TC3 模型注入/GRAD 反馈（cli_grad_feedback_cb）
- * 等本地认知引擎接线随 0.1.9 C2d-2 一并退役。loop 内引擎集仍由
- * airy_loop_create 自动装配。0.1.19 C3：对话记忆收敛为 gateway mem_d
- * 单轨，进程内 L1 句柄注入随双栈塌缩退役。 */
-airy_core_loop_t *cli_setup_core_engines(void)
+ * 等本地认知引擎接线随 0.1.9 C2d-2 一并退役。0.1.19 C3：对话记忆收敛为
+ * gateway mem_d 单轨，进程内 L1 句柄注入随双栈塌缩退役；0.1.19 e2e 收口：
+ * 进程内 core loop 实例随 0.1.16 B2 纯客户端定位退役（策略载荷不在 CLI
+ * 链接面，装配必然 fail-fast，属残留而非能力）。 */
+airy_err_t cli_setup_runtime(cli_runtime_ctx_t *rt)
 {
-    airy_core_loop_t *loop = NULL;
-    airy_err_t err = airy_loop_create(NULL, &loop);
-    if (err != AIRY_EOK || !loop) {
-        AIRY_LOG_ERROR("airy_cli: loop create failed (err=%d)", (int)err);
-        return NULL;
-    }
-
-    return loop;
-}
-
-airy_err_t cli_setup_runtime(airy_core_loop_t *loop, cli_runtime_ctx_t *rt)
-{
-    if (!loop || !rt)
+    if (!rt)
         return AIRY_EINVAL;
     AIRY_MEMSET(rt, 0, sizeof(*rt));
 
