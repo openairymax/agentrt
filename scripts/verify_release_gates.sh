@@ -1293,11 +1293,26 @@ else
         bad "V3 结构化解析缺失（仅剥标记、保留元话语回潮）"
     fi
 
+    # 负向扫描只覆盖生产编译面：`#[cfg(test)]` 门控的模块（tests/golden/e2e）
+    # 用夹具构造入站 PendingApproval 数据，不越过渲染边界，不属于用户面透传。
+    _v4_mods=$(grep -rn -A1 '#\[cfg(test)\]' "$TUI_SRC/src" --include='*.rs' 2>/dev/null \
+        | grep -oP 'mod \K[a-z0-9_]+(?=;)' | sort -u)
+    _v4_leak=""
+    while IFS= read -r -d '' _rf; do
+        _v4_skip=0
+        for _m in $_v4_mods; do
+            case "$_rf" in */"$_m".rs|*/"$_m"/*) _v4_skip=1; break ;; esac
+        done
+        if [ "$_v4_skip" -eq 0 ] && grep -q 'tool\.to_string()' "$_rf"; then
+            _v4_leak="$_v4_leak ${_rf#"$TUI_SRC"/}"
+        fi
+    done < <(find "$TUI_SRC/src" -name '*.rs' -print0)
+
     if grep -q 'TOOL_ACTIONS' "$_DISP" && grep -q '未知工具（已隐藏）' "$_DISP" \
-        && ! grep -rq 'tool\.to_string()' "$TUI_SRC/src"; then
+        && [ -z "$_v4_leak" ]; then
         ok "V4 标识符白名单兜底在位（V3.4：未登记名零透传）"
     else
-        bad "V4 白名单兜底缺失或 tool.to_string() 裸透传回潮"
+        bad "V4 白名单兜底缺失或 tool.to_string() 裸透传回潮:${_v4_leak:- $_DISP}"
     fi
 fi
 
@@ -1340,12 +1355,12 @@ section "W" "B11 TUI 滚动/鼠标/焦点交互（滚动契约 SSoT 与判据 V1
 
 _w_chat="$TUI_SRC/src/panels/chat/mod.rs"
 _w_ctrl="$TUI_SRC/src/app/control.rs"
-_w_main="$TUI_SRC/src/main.rs"
+_w_entry="$TUI_SRC/src/entry.rs"
 _w_keys="$TUI_SRC/src/keys.rs"
-_w_ui="$TUI_SRC/src/ui.rs"
+_w_pres="$TUI_SRC/src/present.rs"
 _w_tests="$TUI_SRC/src/app/tests.rs"
 _w_missing=""
-for _f in "$_w_chat" "$_w_ctrl" "$_w_main" "$_w_ui" "$_w_tests"; do
+for _f in "$_w_chat" "$_w_ctrl" "$_w_entry" "$_w_pres" "$_w_tests"; do
     [ -f "$_f" ] || _w_missing="$_w_missing $(basename "$_f")"
 done
 if [ -n "$_w_missing" ]; then
@@ -1366,23 +1381,23 @@ else
         bad "W2 控制面滚动契约退化（钳位缺失或固定常量翻页回潮）"
     fi
 
-    if grep -q 'let mut mouse_on = app\.mouse_capture' "$_w_main" \
-        && grep -q 'app\.mouse_capture != mouse_on' "$_w_main" \
+    if grep -q 'let mut mouse_on = app\.mouse_capture' "$_w_entry" \
+        && grep -q 'app\.mouse_capture != mouse_on' "$_w_entry" \
         && grep -q 'mouse_capture: false' "$TUI_SRC/src/app/mod.rs"; then
         ok "W3 鼠标捕获唯一执行点在位（V11.1：默认关，Ctrl+M 会话级差分切换）"
     else
         bad "W3 鼠标捕获执行点散落或默认态回潮"
     fi
 
-    if grep -q 'MouseEventKind::ScrollUp' "$_w_main" \
-        && grep -q 'wheel_lines(shift, ctrl)' "$_w_main"; then
+    if grep -q 'MouseEventKind::ScrollUp' "$_w_entry" \
+        && grep -q 'wheel_lines(shift, ctrl)' "$_w_entry"; then
         ok "W4 滚轮事件分派在位（V11.1：修饰键语义 Shift 翻页/Ctrl 单行）"
     else
         bad "W4 滚轮事件分派缺失（捕获开启后滚轮无响应）"
     fi
 
     if grep -q 'pub fn render_focus' "$_w_chat" \
-        && grep -q 'ActivePanel::Focus => panels::chat::render_focus' "$_w_ui" \
+        && grep -q 'ActivePanel::Focus => panels::chat::render_focus' "$_w_pres" \
         && grep -q 'KeyCode::Char(.f.) | KeyCode::Char(.F.)' "$_w_keys"; then
         ok "W5 焦点视图路由与键位在位（Alt+F 全屏只读 + Esc 返回）"
     else
