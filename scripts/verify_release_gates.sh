@@ -1221,7 +1221,8 @@ _TASK="$TUI_SRC/src/app/task.rs"
 _MEM="$TUI_SRC/src/memory.rs"
 _LOOP="$ROOT/daemons/agent_d/src/run/agent_run_loop.c"
 _ENG="$ROOT/daemons/agent_d/src/run/agent_run_engine.c"
-for _f in "$_CTX" "$_TASK" "$_MEM" "$_LOOP" "$_ENG"; do
+_EXEC="$ROOT/daemons/agent_d/src/run/agent_run_exec.c"
+for _f in "$_CTX" "$_TASK" "$_MEM" "$_LOOP" "$_ENG" "$_EXEC"; do
     [ -f "$_f" ] || _u_missing="$_u_missing $(basename "$_f")"
 done
 if [ -n "$_u_missing" ]; then
@@ -1247,7 +1248,7 @@ else
     fi
 
     if grep -q '【轮次边界】' "$_LOOP" && grep -q 'cJSON_InsertItemInArray' "$_LOOP" \
-        && grep -q '【轮次边界】' "$_ENG"; then
+        && grep -q '【轮次边界】' "$_EXEC"; then
         ok "U3 agent_d 轮次约束兜底双侧存在（主对话头插 + GCCP plan 追加）"
     else
         bad "U3 agent_d 轮次约束兜底缺失"
@@ -1316,7 +1317,7 @@ else
     fi
 fi
 
-_v2_engine="$ROOT/daemons/agent_d/src/run/agent_run_engine.c"
+_v2_engine="$ROOT/daemons/agent_d/src/run/agent_run_exec.c"
 _v2_task="$TUI_SRC/src/app/task.rs"
 _v2_block="$TUI_SRC/src/panels/chat/block.rs"
 _v2_mem="$TUI_SRC/src/memory.rs"
@@ -1503,9 +1504,9 @@ else
     bad "Y3 本地打字机 reveal 回潮（上屏动画门控落定或为落定引入附加延迟）"
 fi
 
-if grep -q 'AIRY_RS_K_THINK_MS' "$_ad/src/run/agent_run_engine.c" \
-    && grep -q 'AIRY_RS_K_LLM_MS' "$_ad/src/run/agent_run_engine.c" \
-    && grep -q 'AIRY_RS_K_TOOL_MS' "$_ad/src/run/agent_run_engine.c"; then
+if grep -q 'AIRY_RS_K_THINK_MS' "$_ad/src/run/agent_run_exec.c" \
+    && grep -q 'AIRY_RS_K_LLM_MS' "$_ad/src/run/agent_run_exec.c" \
+    && grep -q 'AIRY_RS_K_TOOL_MS' "$_ad/src/run/agent_run_exec.c"; then
     ok "Y4 分段耗时落盘在位（think/llm/tool 三段度量，V2.1 不达标可分段归因）"
 else
     bad "Y4 分段耗时缺失（首字延迟不可归因）"
