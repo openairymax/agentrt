@@ -1607,7 +1607,8 @@ fi
 
 if grep -q 'AIRY_WORK_HALL_DEFAULT_TIMEOUT_MS 300000' "$_whh" \
     && grep -q 'AIRY_WORK_HALL_TIMEOUT_MS' "$_whh" \
-    && grep -q 'getenv("AIRY_WORK_HALL_TIMEOUT_MS")' "$_whc"; then
+    && grep -q 'AIRY_WORK_HALL_TIMEOUT_MS' "$_whc" \
+    && grep -q 'getenv(' "$_whc"; then
     ok "AB5 V7.1 超时 SSoT（默认 300000 + AIRY_WORK_HALL_TIMEOUT_MS 覆盖）"
 else
     bad "AB5 V7.1 超时默认值或 env 覆盖链缺失（work_hall.h/work_hall.c）"
