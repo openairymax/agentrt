@@ -98,7 +98,6 @@ int tui_tab_complete(cli_tui_t *t)
 
     if (t->input[tok_start] == '/') {
         /* 命令补全：token 以 '/' 开头。 */
-        t->tab_kind = 0;
         size_t ncmds = cli_commands_count();
 
         /* Collect candidates whose name starts with the typed prefix. */
@@ -151,7 +150,6 @@ int tui_tab_complete(cli_tui_t *t)
     AIRY_MEMCPY(dir, tok, slash);
     dir[slash] = '\0';
 
-    t->tab_kind = 1;
     size_t n = tui_tab_complete_fs(t, dir, tok + slash);
     if (n == 0) {
         t->tab_active = 0;
