@@ -62,7 +62,6 @@ void tui_sigwinch_handler(int sig);
 #define TUI_TAB_CAND_MAX 64      /* Tab 补全候选上限 */
 #define TUI_TAB_NAME_MAX 192     /* 文件/目录候选字符串长度上限 */
 #define TUI_CMD_HIST_MAX 500
-#define TUI_SEARCH_QUERY_MAX 256
 #define TUI_INPUT_PREFIX "airy> " /* input prompt, width tracked in bytes */
 
 #define CLI_CARET_BLINK_MS 265u /* 半周期 ≈ Word 默认光标闪烁频率（530ms 全周期） */
@@ -91,22 +90,10 @@ struct cli_tui_s {
     size_t cmd_hist_edit_len;
     size_t cmd_hist_edit_cap;
 
-    /* Ctrl+R reverse incremental search */
-    int search_active;
-    char search_query[TUI_SEARCH_QUERY_MAX];
-    size_t search_query_len;
-    ssize_t search_match;
-    int search_wrapped;
-    int search_forward;
-
-    /* bracketed paste */
-    int paste_active;
-
     /* Tab completion (SSoT: CLI_COMMANDS in main.c) */
     int tab_active;
     size_t tab_count;
     size_t tab_sel;
-    int tab_kind;
     size_t tab_cands[TUI_TAB_CAND_MAX];
     char tab_cand_strs[TUI_TAB_CAND_MAX][TUI_TAB_NAME_MAX];
 
