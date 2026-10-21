@@ -580,91 +580,140 @@ int cli_daemon_lifecycle_reconcile_once(void)
 
 /* ==================== /daemon + /stats + simple wrappers ==================== */
 
+/* 动作与命名空间共享同一套空白分词；解析结果一律持有堆副本，
+ * 释放路径不再依赖「指针是否等于静态表项」这一脆弱判定。 */
+static const char *dm_take(const char *p, char *buf, size_t cap)
+{
+    while (*p == ' ')
+        p++;
+    if (*p == '\0')
+        return NULL;
+    size_t n = 0;
+    while (p[n] != '\0' && p[n] != ' ')
+        n++;
+    size_t c = n < cap - 1 ? n : cap - 1;
+    __builtin_memcpy(buf, p, c);
+    buf[c] = '\0';
+    return p + n;
+}
+
+static size_t dm_targets(const char *p, const char **out, size_t cap)
+{
+    size_t n = 0;
+    char tok[64];
+    while (n < cap) {
+        p = dm_take(p, tok, sizeof(tok));
+        if (!p)
+            break;
+        char resolved[64];
+        if (cli_ns_resolve(tok, resolved, sizeof(resolved)) != 0) {
+            char hdr[80];
+            snprintf(hdr, sizeof(hdr), "Sub Agent:%s", tok);
+            cli_print_line(hdr, "未知 daemon 命名空间，已忽略");
+            continue;
+        }
+        out[n] = AIRY_STRDUP(resolved);
+        if (out[n])
+            n++;
+    }
+    return n;
+}
+
+static void dm_defaults(const char **out, size_t *n)
+{
+    size_t i;
+    for (i = 0; i < CLI_DAEMONS_COUNT; i++) {
+        out[i] = AIRY_STRDUP(CLI_DAEMONS[i].ns);
+        if (!out[i])
+            break;
+    }
+    *n = i;
+}
+
+static void dm_free(const char **ns, size_t n)
+{
+    for (size_t i = 0; i < n; i++)
+        AIRY_FREE((void *)ns[i]);
+}
+
+static void dm_status(const char **ns, size_t n)
+{
+    for (size_t i = 0; i < n; i++) {
+        int up = cli_daemon_online(ns[i]);
+        if (g_cli_print_mode)
+            cli_outf("%s %s\n", ns[i], up ? "online" : "offline");
+        else
+            cli_print_status(ns[i], up ? "在线 100%" : "离线 0%");
+    }
+}
+
+static void dm_start(const char **ns, size_t n)
+{
+    for (size_t i = 0; i < n; i++) {
+        if (cli_daemon_start(ns[i]) != 0)
+            continue;
+        const char *st = cli_daemon_wait_online(ns[i], 8000) ? "started" : "starting";
+        if (g_cli_print_mode)
+            cli_outf("%s %s\n", ns[i], st);
+        else
+            cli_sub_print(0, ns[i], st);
+    }
+}
+
+static void dm_stop(const char **ns, size_t n)
+{
+    for (size_t i = 0; i < n; i++) {
+        int rc = cli_daemon_stop(ns[i]);
+        const char *st = rc == 0 ? "stopped" : "stop failed (timeout)";
+        if (g_cli_print_mode)
+            cli_outf("%s %s\n", ns[i], st);
+        else
+            cli_sub_print(rc != 0, ns[i], st);
+    }
+}
+
+static void dm_restart(const char **ns, size_t n)
+{
+    for (size_t i = 0; i < n; i++) {
+        cli_daemon_stop(ns[i]);
+        if (cli_daemon_start(ns[i]) != 0)
+            continue;
+        const char *st = cli_daemon_wait_online(ns[i], 8000) ? "restarted" : "restarting";
+        if (g_cli_print_mode)
+            cli_outf("%s %s\n", ns[i], st);
+        else
+            cli_sub_print(0, ns[i], st);
+    }
+}
+
 int cmd_daemon(const char *arg, void *ctx)
 {
     (void)ctx;
     char action[16] = "status";
-    const char *ns_list[CLI_DAEMONS_COUNT];
-    size_t ns_count = 0;
+    const char *ns[CLI_DAEMONS_COUNT];
+    size_t n = 0;
 
-    const char *p = arg;
-    while (p && *p == ' ') p++;
-    if (p && *p) {
-        size_t alen = 0;
-        while (p[alen] && p[alen] != ' ') alen++;
-        if (alen >= sizeof(action)) alen = sizeof(action) - 1;
-        __builtin_memcpy(action, p, alen); action[alen] = '\0';
-        p += alen;
-        while (p && *p == ' ') p++;
-        while (p && *p && ns_count < CLI_DAEMONS_COUNT) {
-            const char *tok = p;
-            size_t tlen = 0;
-            while (tok[tlen] && tok[tlen] != ' ') tlen++;
-            char tokbuf[64];
-            size_t tc = tlen < sizeof(tokbuf) - 1 ? tlen : sizeof(tokbuf) - 1;
-            __builtin_memcpy(tokbuf, tok, tc); tokbuf[tc] = '\0';
-            char resolved[64];
-            if (cli_ns_resolve(tokbuf, resolved, sizeof(resolved)) == 0)
-                ns_list[ns_count++] = AIRY_STRDUP(resolved);
-            else {
-                char hdr[80];
-                snprintf(hdr, sizeof(hdr), "Sub Agent:%s", tokbuf);
-                cli_print_line(hdr, "未知 daemon 命名空间，已忽略");
-            }
-            p = tok + tlen;
-            while (*p == ' ') p++;
-        }
+    if (arg) {
+        const char *p = dm_take(arg, action, sizeof(action));
+        if (p)
+            n = dm_targets(p, ns, CLI_DAEMONS_COUNT);
     }
-    if (ns_count == 0) {
-        for (size_t i = 0; i < CLI_DAEMONS_COUNT; i++) ns_list[i] = CLI_DAEMONS[i].ns;
-        ns_count = CLI_DAEMONS_COUNT;
-    }
+    if (n == 0)
+        dm_defaults(ns, &n);
 
-    if (strcmp(action, "status") == 0) {
-        for (size_t i = 0; i < ns_count; i++) {
-            int up = cli_daemon_online(ns_list[i]);
-            if (g_cli_print_mode) cli_outf("%s %s\n", ns_list[i], up ? "online" : "offline");
-            else cli_print_status(ns_list[i], up ? "在线 100%" : "离线 0%");
-        }
-    } else if (strcmp(action, "start") == 0) {
-        for (size_t i = 0; i < ns_count; i++) {
-            if (cli_daemon_start(ns_list[i]) == 0) {
-                const char *st = cli_daemon_wait_online(ns_list[i], 8000) ? "started" : "starting";
-                if (g_cli_print_mode) cli_outf("%s %s\n", ns_list[i], st);
-                else cli_sub_print(0, ns_list[i], st);
-            }
-        }
-    } else if (strcmp(action, "stop") == 0) {
-        for (size_t i = 0; i < ns_count; i++) {
-            if (cli_daemon_stop(ns_list[i]) == 0) {
-                if (g_cli_print_mode) cli_outf("%s stopped\n", ns_list[i]);
-                else cli_sub_print(0, ns_list[i], "stopped");
-            } else {
-                if (g_cli_print_mode) cli_outf("%s stop failed (timeout)\n", ns_list[i]);
-                else cli_sub_print(1, ns_list[i], "stop failed (timeout)");
-            }
-        }
-    } else if (strcmp(action, "restart") == 0) {
-        for (size_t i = 0; i < ns_count; i++) {
-            cli_daemon_stop(ns_list[i]);
-            if (cli_daemon_start(ns_list[i]) == 0) {
-                const char *st = cli_daemon_wait_online(ns_list[i], 8000) ? "restarted" : "restarting";
-                if (g_cli_print_mode) cli_outf("%s %s\n", ns_list[i], st);
-                else cli_sub_print(0, ns_list[i], st);
-            }
-        }
-    } else {
+    if (strcmp(action, "status") == 0)
+        dm_status(ns, n);
+    else if (strcmp(action, "start") == 0)
+        dm_start(ns, n);
+    else if (strcmp(action, "stop") == 0)
+        dm_stop(ns, n);
+    else if (strcmp(action, "restart") == 0)
+        dm_restart(ns, n);
+    else
         cli_print_line("Sub Agent:usage",
                        "/daemon start|stop|restart|status [ns...]（默认全部）");
-    }
 
-    for (size_t i = 0; i < ns_count; i++) {
-        int is_static = 0;
-        for (size_t j = 0; j < CLI_DAEMONS_COUNT; j++) {
-            if (ns_list[i] == CLI_DAEMONS[j].ns) { is_static = 1; break; }
-        }
-        if (!is_static) AIRY_FREE((void *)ns_list[i]);
-    }
+    dm_free(ns, n);
     return 0;
 }
 
