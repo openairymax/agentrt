@@ -50,8 +50,8 @@
 !tools/
 !tools/codegen/
 !tools/codegen/**
-# Python 字节码缓存不追踪（daemon_gen.py 等生成器运行副产物）
-tools/codegen/__pycache__/
+# Python 字节码缓存不追踪（daemon_gen.py 等生成器运行副产物，含子目录）
+__pycache__/
 !tools/airy_cli/
 !tools/airy_cli/**
 # ---------------------------------------------------------------------------
