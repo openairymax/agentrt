@@ -1010,13 +1010,19 @@ gw_cap_row() {
     python3 "$GW_GEN" --manifest "$GW_MANIFEST" --dump-caps 2>/dev/null \
         | awk -F'\t' -v c="$1" '$1==c{print; exit}'
 }
+# 用户面调用取证面：CLI 直调 cli_gw_call，或经 CLI 内部 DAG 信封原语 dag_rpc
+# （cli_dag.c 静态转发 method，语义等价于直调）。仅放宽“调用表达式形态”，
+# 不放宽“必须存在用户面调用”这一事实。
+_cli_calls_cap() {
+    grep -rqE "(cli_gw_call|dag_rpc)\(\"$1\"" "$CLI/src" 2>/dev/null
+}
 ERRS="$ROOT/commons/utils/error/error_codes.h"
 ERRC="$ROOT/commons/utils/error/err_class.h"
 ERRN="$ROOT/commons/utils/error/handler.c"
 
 _t1_n=0
 _t1_bad=""
-for _cap in $(grep -rhoE 'cli_gw_call\("[a-z_]+\.[a-z_0-9]+"' "$CLI/src" 2>/dev/null \
+for _cap in $(grep -rhoE '(cli_gw_call|dag_rpc)\("[a-z_]+\.[a-z_0-9]+"' "$CLI/src" 2>/dev/null \
               | sed 's/.*("//' | tr -d '"' | sort -u); do
     _t1_n=$((_t1_n+1))
     [ -n "$(gw_cap_row "$_cap")" ] || _t1_bad="$_t1_bad $_cap"
@@ -1045,7 +1051,7 @@ for _cap in llm.complete think.process think.lang_process think.lang_postprocess
     # 注册字面量在 include/ 声明面与 src/ 实现面两处均合法，扫描面随归位同步扩为二者。
     grep -rq "\"$_m\"" "$ROOT/daemons/${_ns}_d/src" "$ROOT/daemons/${_ns}_d/include" 2>/dev/null \
         || _t2_bad="$_t2_bad $_cap(服务面未注册 $_m)"
-    if ! grep -rq "cli_gw_call(\"$_cap\"" "$CLI/src" 2>/dev/null; then
+    if ! _cli_calls_cap "$_cap"; then
         if [ "$_m" != "get_stats" ] || \
            ! grep -rq '%s\.get_stats' "$CLI/src" 2>/dev/null; then
             _t2_bad="$_t2_bad $_cap(无用户面调用方)"

@@ -35,6 +35,39 @@
  *   - sched.dag_cancel: params {"dag_id"}
  */
 
+/* 单字段 params 信封 {"key": value} → 紧凑 JSON；失败返回 NULL。 */
+static char *dag_params1(const char *key, const char *val)
+{
+    cJSON *obj = cJSON_CreateObject();
+    char *js;
+
+    if (!obj)
+        return NULL;
+    cJSON_AddStringToObject(obj, key, val ? val : "");
+    js = cJSON_PrintUnformatted(obj);
+    cJSON_Delete(obj);
+    return js;
+}
+
+/* 经 gateway 调一处 DAG 方法并解析回包根；失败返回 NULL 且写 *err。 */
+static cJSON *dag_rpc(const char *method, const char *params_json, int timeout_ms, int *err)
+{
+    char *rpc_result = NULL;
+    int rc = cli_gw_call(method, params_json, timeout_ms, &rpc_result);
+    cJSON *root;
+
+    *err = (rc == AIRY_SUCCESS && !rpc_result) ? AIRY_ERR_GENERIC_FAIL : rc;
+    if (*err != AIRY_SUCCESS) {
+        AIRY_FREE(rpc_result);
+        return NULL;
+    }
+    root = cJSON_Parse(rpc_result);
+    AIRY_FREE(rpc_result);
+    if (!root)
+        *err = AIRY_ERR_PARSE_ERROR;
+    return root;
+}
+
 static const char *cli_handler_role(const char *handler)
 {
     if (!handler || handler[0] == '\0')
@@ -185,18 +218,12 @@ airy_err_t cli_dag_submit_remote(const airy_task_plan_t *plan, const char *task_
 
     /* 架构约束（2026-08-25）：统一经 gateway 派发（sched.dag_submit →
      * gateway → SYS_SVC_CALL → sched_d），禁止直连 sched.sock。 */
-    char *rpc_result = NULL;
-    int rc = cli_gw_call("sched.dag_submit", params_json, 30000, &rpc_result);
-    AIRY_FREE(params_json);
-    if (rc != AIRY_SUCCESS || !rpc_result) {
-        AIRY_FREE(rpc_result);
-        return (airy_err_t)rc;
-    }
+    int err = 0;
+    cJSON *root = dag_rpc("sched.dag_submit", params_json, 30000, &err);
 
-    cJSON *root = cJSON_Parse(rpc_result);
-    AIRY_FREE(rpc_result);
+    AIRY_FREE(params_json);
     if (!root)
-        return AIRY_ERR_PARSE_ERROR;
+        return (airy_err_t)err;
 
     cJSON *did = cJSON_GetObjectItem(root, "dag_id");
     if (!cJSON_IsString(did) || !did->valuestring || !did->valuestring[0]) {
@@ -223,35 +250,24 @@ cli_dag_snapshot_t *cli_dag_snapshot_fetch(const char *dag_id)
     if (!dag_id || !dag_id[0])
         return NULL;
 
-    cJSON *params = cJSON_CreateObject();
-    if (!params)
-        return NULL;
-    cJSON_AddStringToObject(params, "dag_id", dag_id);
-    char *params_json = cJSON_PrintUnformatted(params);
-    cJSON_Delete(params);
+    char *params_json = dag_params1("dag_id", dag_id);
     if (!params_json)
         return NULL;
 
     /* 架构约束（2026-08-25）：统一经 gateway 派发（sched.dag_status） */
-    char *rpc_result = NULL;
-    int rc = cli_gw_call("sched.dag_status", params_json, 10000, &rpc_result);
+    int err = 0;
+    cJSON *root = dag_rpc("sched.dag_status", params_json, 10000, &err);
+
     AIRY_FREE(params_json);
-    if (rc != AIRY_SUCCESS || !rpc_result) {
-        AIRY_FREE(rpc_result);
+    if (!root)
         return NULL;
-    }
 
     cli_dag_snapshot_t *snap = (cli_dag_snapshot_t *)AIRY_CALLOC(1, sizeof(cli_dag_snapshot_t));
     if (!snap) {
-        AIRY_FREE(rpc_result);
+        cJSON_Delete(root);
         return NULL;
     }
-    snap->root = cJSON_Parse(rpc_result);
-    AIRY_FREE(rpc_result);
-    if (!snap->root) {
-        AIRY_FREE(snap);
-        return NULL;
-    }
+    snap->root = root;
     AIRY_STRNCPY_TERM(snap->dag_id, dag_id, sizeof(snap->dag_id));
     return snap;
 }
@@ -265,12 +281,102 @@ void cli_dag_snapshot_free(cli_dag_snapshot_t *snap)
     AIRY_FREE(snap);
 }
 
+/* cJSON 字符串取值：非字符串、空指针一律回落 dflt（空串表示字段缺失）。 */
+static const char *json_str(const cJSON *obj, const char *key, const char *dflt)
+{
+    const cJSON *v = cJSON_GetObjectItem(obj, key);
+
+    return (cJSON_IsString(v) && v->valuestring) ? v->valuestring : dflt;
+}
+
 static const char *cli_dag_snapshot_state(const cli_dag_snapshot_t *snap)
 {
     if (!snap || !snap->root)
         return "unknown";
-    cJSON *st = cJSON_GetObjectItem(snap->root, "status");
-    return (cJSON_IsString(st) && st->valuestring) ? st->valuestring : "unknown";
+    return json_str(snap->root, "status", "unknown");
+}
+
+/* 节点自述文本：output 优先，其次 error；均为空则返回 NULL。
+ * out_id 可缺省，非空时写回节点编号（缺失记 "?"）。 */
+static const char *node_text(const cJSON *nj, const char **out_id)
+{
+    const char *out = json_str(nj, "output", "");
+    const char *err = json_str(nj, "error", "");
+
+    if (out_id)
+        *out_id = json_str(nj, "id", "?");
+    if (out[0])
+        return out;
+    return err[0] ? err : NULL;
+}
+
+/* 汇总缓冲预算：基座 + 每段编号/分隔/正文余量。 */
+static size_t agg_cap(const cJSON *nodes, int nsz)
+{
+    size_t cap = 4096;
+
+    for (int i = 0; i < nsz; i++) {
+        const cJSON *nj = cJSON_GetArrayItem(nodes, i);
+        const char *txt = nj ? node_text(nj, NULL) : NULL;
+
+        if (txt)
+            cap += strlen(txt) + 128;
+    }
+    return cap;
+}
+
+/* 追加 "[id] text"，段间双换行；越界即置 off=cap 令调用方停写。 */
+static void agg_append(char *buf, size_t cap, size_t *off, const char *id, const char *txt)
+{
+    int w;
+
+    if (*off > 0 && *off < cap - 1) {
+        snprintf(buf + *off, cap - *off, "\n\n");
+        *off += 2;
+    }
+    w = snprintf(buf + *off, cap - *off, "[%s] %s", id, txt);
+    if (w < 0 || (size_t)w >= cap - *off)
+        *off = cap;
+    else
+        *off += (size_t)w;
+}
+
+/* 终态汇总信封：dag_id/status 恒定，output 为逐节点文本拼接。 */
+static char *dag_aggregate(const cli_dag_snapshot_t *snap, const char *status)
+{
+    cJSON *agg = cJSON_CreateObject();
+    cJSON *nodes;
+    int nsz;
+    size_t cap;
+    char *buf;
+    char *out;
+
+    if (!agg)
+        return NULL;
+    cJSON_AddStringToObject(agg, "dag_id", snap->dag_id);
+    cJSON_AddStringToObject(agg, "status", status);
+    nodes = cJSON_GetObjectItem(snap->root, "nodes");
+    nsz = (nodes && cJSON_IsArray(nodes)) ? cJSON_GetArraySize(nodes) : 0;
+    cap = agg_cap(nodes, nsz);
+    buf = (char *)AIRY_MALLOC(cap);
+    if (buf) {
+        size_t off = 0;
+
+        buf[0] = '\0';
+        for (int i = 0; i < nsz && off < cap; i++) {
+            const cJSON *nj = cJSON_GetArrayItem(nodes, i);
+            const char *id = "?";
+            const char *txt = nj ? node_text(nj, &id) : NULL;
+
+            if (txt)
+                agg_append(buf, cap, &off, id, txt);
+        }
+        cJSON_AddStringToObject(agg, "output", buf);
+        AIRY_FREE(buf);
+    }
+    out = cJSON_PrintUnformatted(agg);
+    cJSON_Delete(agg);
+    return out;
 }
 
 /* Consume one fetched snapshot: progress = done nodes / node_count. At the
@@ -278,80 +384,29 @@ static const char *cli_dag_snapshot_state(const cli_dag_snapshot_t *snap)
 cli_dag_poll_rc_t cli_dag_snapshot_poll(const cli_dag_snapshot_t *snap, double *out_progress,
                                         char *out_state, size_t state_cap, char **out_result)
 {
+    const char *status;
+    cJSON *nc;
+    cJSON *pg;
+    double node_n;
+    double done_n;
+    int terminal;
+
     if (out_result)
         *out_result = NULL;
     if (!snap || !snap->root || !out_progress || !out_state || state_cap == 0)
         return CLI_DAG_POLL_ERROR;
 
-    const char *status = cli_dag_snapshot_state(snap);
+    status = cli_dag_snapshot_state(snap);
     snprintf(out_state, state_cap, "%s", status);
-
-    cJSON *nc = cJSON_GetObjectItem(snap->root, "node_count");
-    cJSON *pg = cJSON_GetObjectItem(snap->root, "progress");
-    double node_n = cJSON_IsNumber(nc) ? nc->valuedouble : 0.0;
-    double done_n = cJSON_IsNumber(pg) ? pg->valuedouble : 0.0;
+    nc = cJSON_GetObjectItem(snap->root, "node_count");
+    pg = cJSON_GetObjectItem(snap->root, "progress");
+    node_n = cJSON_IsNumber(nc) ? nc->valuedouble : 0.0;
+    done_n = cJSON_IsNumber(pg) ? pg->valuedouble : 0.0;
     *out_progress = node_n > 0.0 ? done_n / node_n : 0.0;
 
-    int terminal = cli_state_terminal(status);
-    if (terminal && out_result) {
-        cJSON *agg = cJSON_CreateObject();
-        if (agg) {
-            cJSON_AddStringToObject(agg, "dag_id", snap->dag_id);
-            cJSON_AddStringToObject(agg, "status", status);
-            cJSON *nodes = cJSON_GetObjectItem(snap->root, "nodes");
-            int nsz = (nodes && cJSON_IsArray(nodes)) ? cJSON_GetArraySize(nodes) : 0;
-
-            size_t cap = 4096;
-            for (int i = 0; i < nsz; i++) {
-                cJSON *nj = cJSON_GetArrayItem(nodes, i);
-                if (!nj)
-                    continue;
-                cJSON *o = cJSON_GetObjectItem(nj, "output");
-                cJSON *e = cJSON_GetObjectItem(nj, "error");
-                if (cJSON_IsString(o) && o->valuestring)
-                    cap += strlen(o->valuestring) + 128;
-                if (cJSON_IsString(e) && e->valuestring)
-                    cap += strlen(e->valuestring) + 128;
-            }
-            char *buf = (char *)AIRY_MALLOC(cap);
-            if (buf) {
-                size_t off = 0;
-                buf[0] = '\0';
-                for (int i = 0; i < nsz; i++) {
-                    cJSON *nj = cJSON_GetArrayItem(nodes, i);
-                    if (!nj)
-                        continue;
-                    cJSON *o = cJSON_GetObjectItem(nj, "output");
-                    cJSON *e = cJSON_GetObjectItem(nj, "error");
-                    const char *text = NULL;
-                    if (cJSON_IsString(o) && o->valuestring && o->valuestring[0])
-                        text = o->valuestring;
-                    else if (cJSON_IsString(e) && e->valuestring && e->valuestring[0])
-                        text = e->valuestring;
-                    if (!text)
-                        continue;
-                    cJSON *nid = cJSON_GetObjectItem(nj, "id");
-                    const char *nid_s =
-                        (cJSON_IsString(nid) && nid->valuestring) ? nid->valuestring : "?";
-                    if (off > 0 && off < cap - 1) {
-                        snprintf(buf + off, cap - off, "\n\n");
-                        off += 2;
-                    }
-                    int w = snprintf(buf + off, cap - off, "[%s] %s", nid_s, text);
-                    if (w < 0)
-                        break;
-                    off += (size_t)w;
-                    if (off >= cap)
-                        break;
-                }
-                cJSON_AddStringToObject(agg, "output", buf);
-                AIRY_FREE(buf);
-            }
-            *out_result = cJSON_PrintUnformatted(agg);
-            cJSON_Delete(agg);
-        }
-    }
-
+    terminal = cli_state_terminal(status);
+    if (terminal && out_result)
+        *out_result = dag_aggregate(snap, status);
     return terminal ? CLI_DAG_POLL_DONE : CLI_DAG_POLL_ACTIVE;
 }
 
@@ -365,17 +420,11 @@ airy_err_t cli_dag_list_remote(cli_dag_item_t *items, size_t cap, size_t *out_co
         return AIRY_ERR_INVALID_PARAM;
     *out_count = 0;
 
-    char *rpc_result = NULL;
-    int rc = cli_gw_call("sched.dag_list", "{}", 10000, &rpc_result);
-    if (rc != AIRY_SUCCESS || !rpc_result) {
-        AIRY_FREE(rpc_result);
-        return (airy_err_t)rc;
-    }
+    int err = 0;
+    cJSON *root = dag_rpc("sched.dag_list", "{}", 10000, &err);
 
-    cJSON *root = cJSON_Parse(rpc_result);
-    AIRY_FREE(rpc_result);
     if (!root)
-        return AIRY_ERR_PARSE_ERROR;
+        return (airy_err_t)err;
 
     cJSON *dags = cJSON_GetObjectItem(root, "dags");
     int n = (dags && cJSON_IsArray(dags)) ? cJSON_GetArraySize(dags) : 0;
@@ -386,21 +435,9 @@ airy_err_t cli_dag_list_remote(cli_dag_item_t *items, size_t cap, size_t *out_co
         if (!dj)
             continue;
         cli_dag_item_t *it = &items[*out_count];
-        AIRY_STRNCPY_TERM(it->dag_id,
-                          cJSON_IsString(cJSON_GetObjectItem(dj, "dag_id"))
-                              ? cJSON_GetObjectItem(dj, "dag_id")->valuestring
-                              : "",
-                          sizeof(it->dag_id));
-        AIRY_STRNCPY_TERM(it->name,
-                          cJSON_IsString(cJSON_GetObjectItem(dj, "name"))
-                              ? cJSON_GetObjectItem(dj, "name")->valuestring
-                              : "",
-                          sizeof(it->name));
-        AIRY_STRNCPY_TERM(it->status,
-                          cJSON_IsString(cJSON_GetObjectItem(dj, "status"))
-                              ? cJSON_GetObjectItem(dj, "status")->valuestring
-                              : "",
-                          sizeof(it->status));
+        AIRY_STRNCPY_TERM(it->dag_id, json_str(dj, "dag_id", ""), sizeof(it->dag_id));
+        AIRY_STRNCPY_TERM(it->name, json_str(dj, "name", ""), sizeof(it->name));
+        AIRY_STRNCPY_TERM(it->status, json_str(dj, "status", ""), sizeof(it->status));
         cJSON *nc = cJSON_GetObjectItem(dj, "node_count");
         cJSON *pg = cJSON_GetObjectItem(dj, "progress");
         it->node_count = (cJSON_IsNumber(nc) && nc->valuedouble > 0)
@@ -422,12 +459,7 @@ airy_err_t cli_dag_cancel_remote(const char *dag_id)
     if (!dag_id || !dag_id[0])
         return AIRY_ERR_INVALID_PARAM;
 
-    cJSON *cparams = cJSON_CreateObject();
-    if (!cparams)
-        return AIRY_ERR_OUT_OF_MEMORY;
-    cJSON_AddStringToObject(cparams, "dag_id", dag_id);
-    char *cparams_json = cJSON_PrintUnformatted(cparams);
-    cJSON_Delete(cparams);
+    char *cparams_json = dag_params1("dag_id", dag_id);
     if (!cparams_json)
         return AIRY_ERR_OUT_OF_MEMORY;
 
@@ -588,12 +620,9 @@ int cli_dag_node_board_tick(cli_dag_board_t *b, const cli_dag_snapshot_t *snap)
         cJSON *nj = cJSON_GetArrayItem(nodes, i);
         if (!nj)
             continue;
-        cJSON *nid = cJSON_GetObjectItem(nj, "id");
-        cJSON *nst = cJSON_GetObjectItem(nj, "status");
-        cJSON *goal = cJSON_GetObjectItem(nj, "goal");
-        const char *id_s = (cJSON_IsString(nid) && nid->valuestring) ? nid->valuestring : "?";
-        const char *st_s = (cJSON_IsString(nst) && nst->valuestring) ? nst->valuestring : "pending";
-        const char *goal_s = (cJSON_IsString(goal) && goal->valuestring) ? goal->valuestring : "";
+        const char *id_s = json_str(nj, "id", "?");
+        const char *st_s = json_str(nj, "status", "pending");
+        const char *goal_s = json_str(nj, "goal", "");
 
         /* Find or register the node slot. */
         cli_dag_board_node_t *slot = NULL;
