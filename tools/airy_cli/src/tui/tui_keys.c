@@ -235,123 +235,185 @@ static void tui_skip_control_string(cli_tui_t *t)
     }
 }
 
+/* ESC 解析的「未命中」哨兵：合法键码均非负（0x20..0xFF 与 0x1001 起）。 */
+#define TUI_KEY_NONE (-1)
+
+/* ESC [ A..F / H：单字节指令（方向键与 Home/End）。 */
+static int tui_esc_simple(int x)
+{
+    switch (x) {
+    case 'A': return TUI_KEY_UP;
+    case 'B': return TUI_KEY_DOWN;
+    case 'C': return TUI_KEY_RIGHT;
+    case 'D': return TUI_KEY_LEFT;
+    case 'H': return TUI_KEY_HOME;
+    case 'F': return TUI_KEY_END;
+    default:  return TUI_KEY_NONE;
+    }
+}
+
+/* ESC [ 3 ~ / D / C：Delete 与 Alt+方向。 */
+static int tui_esc_three(cli_tui_t *t, int *eof)
+{
+    char b;
+
+    if (!tui_wait_byte(t, &b, 120, eof))
+        return TUI_KEY_UNKNOWN;
+    switch (b) {
+    case '~': return TUI_KEY_DEL;
+    case 'D': return TUI_KEY_ALT_LEFT;
+    case 'C': return TUI_KEY_ALT_RIGHT;
+    default:  return TUI_KEY_UNKNOWN;
+    }
+}
+
+/* ESC [ 5 D / C / ~：Ctrl+方向与 PageUp。 */
+static int tui_esc_five(cli_tui_t *t, int *eof)
+{
+    char b;
+
+    if (!tui_wait_byte(t, &b, 120, eof))
+        return TUI_KEY_UNKNOWN;
+    switch (b) {
+    case 'D': return TUI_KEY_CTRL_LEFT;
+    case 'C': return TUI_KEY_CTRL_RIGHT;
+    case '~': return TUI_KEY_PGUP;
+    default:  return TUI_KEY_UNKNOWN;
+    }
+}
+
+/* ESC [ 6 ~：PageDown。 */
+static int tui_esc_six(cli_tui_t *t, int *eof)
+{
+    char b;
+
+    if (tui_wait_byte(t, &b, 120, eof) && b == '~')
+        return TUI_KEY_PGDN;
+    return TUI_KEY_UNKNOWN;
+}
+
+/* 修饰键映射表：ESC[1;<mod><dir>，mod 5=Ctrl / 3=Alt，dir D/C=左/右。 */
+static int tui_mod_dir(char mod, char dir)
+{
+    static const struct {
+        char mod;
+        char dir;
+        int key;
+    } map[] = {
+        {'5', 'D', TUI_KEY_CTRL_LEFT}, {'5', 'C', TUI_KEY_CTRL_RIGHT},
+        {'3', 'D', TUI_KEY_ALT_LEFT},  {'3', 'C', TUI_KEY_ALT_RIGHT},
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof(map) / sizeof(map[0]); i++) {
+        if (map[i].mod == mod && map[i].dir == dir)
+            return map[i].key;
+    }
+    return TUI_KEY_UNKNOWN;
+}
+
+/* ESC [ 1 ; <mod> <dir>：修饰方向键。 */
+static int tui_esc_mod(cli_tui_t *t, int *eof)
+{
+    char semi, mod, dir;
+
+    if (!tui_wait_byte(t, &semi, 120, eof) || semi != ';')
+        return TUI_KEY_UNKNOWN;
+    if (!tui_wait_byte(t, &mod, 120, eof) || !tui_wait_byte(t, &dir, 120, eof))
+        return TUI_KEY_UNKNOWN;
+    return tui_mod_dir(mod, dir);
+}
+
+/* ESC [ 2 0 ~ = F9；ESC [ 2 0 0 ~ = paste start；ESC [ 2 1 ~ = F10。 */
+static int tui_esc_two(cli_tui_t *t, int *eof)
+{
+    char b, nx;
+
+    if (!tui_wait_byte(t, &b, 120, eof))
+        return TUI_KEY_UNKNOWN;
+    if (b == '1') {
+        if (!tui_wait_byte(t, &nx, 120, eof) || nx != '~')
+            return TUI_KEY_UNKNOWN;
+        return TUI_KEY_F10;
+    }
+    if (b != '0' || !tui_wait_byte(t, &nx, 120, eof))
+        return TUI_KEY_UNKNOWN;
+    if (nx == '~')
+        return TUI_KEY_F9;
+    if (nx != '0' || !tui_wait_byte(t, &nx, 120, eof) || nx != '~')
+        return TUI_KEY_UNKNOWN;
+    return TUI_KEY_PASTE_START;
+}
+
+/* ESC [ <x>：CSI 指令分派（未识别一律 UNKNOWN，含 SGR 鼠标整段忽略）。 */
+static int tui_esc_bracket(cli_tui_t *t, int *eof)
+{
+    char x;
+    int key;
+
+    if (!tui_wait_byte(t, &x, 120, eof))
+        return TUI_KEY_UNKNOWN;
+    key = tui_esc_simple(x);
+    if (key != TUI_KEY_NONE)
+        return key;
+    switch (x) {
+    case '3': return tui_esc_three(t, eof);
+    case '5': return tui_esc_five(t, eof);
+    case '6': return tui_esc_six(t, eof);
+    case '1': return tui_esc_mod(t, eof);
+    case '2': return tui_esc_two(t, eof);
+    default:  return TUI_KEY_UNKNOWN;
+    }
+}
+
+/* ESC O A..D：Application cursor mode（smkx）下的方向键。 */
+static int tui_esc_ss3(cli_tui_t *t, int *eof)
+{
+    char x;
+
+    if (!tui_wait_byte(t, &x, 120, eof))
+        return TUI_KEY_UNKNOWN;
+    switch (x) {
+    case 'A': return TUI_KEY_UP;
+    case 'B': return TUI_KEY_DOWN;
+    case 'C': return TUI_KEY_RIGHT;
+    case 'D': return TUI_KEY_LEFT;
+    default:  return TUI_KEY_UNKNOWN;
+    }
+}
+
+/* Alt+letter：xterm 以 ESC + letter 表达（仅 b/f 有语义）。 */
+static int tui_esc_alt(char b)
+{
+    if (b == 'b')
+        return TUI_KEY_ALT_B;
+    if (b == 'f')
+        return TUI_KEY_ALT_F;
+    return TUI_KEY_UNKNOWN;
+}
+
 /* 读取一个按键（带第一字节超时）。返回键码；0 = EOF；-1 = 轮询超时
  * （*eof 保持 0；面板模式以此节拍刷新）。ESC 序列后续字节用 50ms
  * 短超时，避免孤立 ESC 键阻塞。 */
 int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof)
 {
-    char c;
+    char c, b;
+
     if (!tui_wait_byte(t, &c, timeout_ms, eof))
         return *eof ? 0 : -1;
-    if (c == 0x1b) {
-        char b;
-        if (!tui_wait_byte(t, &b, 120, eof))
-            return 0x1b; /* lone ESC */
-        /* OSC/DCS/SOS/PM/APC 控制串：整段丢弃（含迟到的终端应答），
-         * 绝不把其载荷当作输入字符。 */
-        if (b == ']' || b == 'P' || b == 'X' || b == '^' || b == '_') {
-            tui_skip_control_string(t);
-            return TUI_KEY_UNKNOWN;
-        }
-        if (b == '[') {
-            char x;
-            if (!tui_wait_byte(t, &x, 120, eof))
-                return TUI_KEY_UNKNOWN;
-            switch (x) {
-            case 'A': return TUI_KEY_UP;
-            case 'B': return TUI_KEY_DOWN;
-            case 'C': return TUI_KEY_RIGHT;
-            case 'D': return TUI_KEY_LEFT;
-            case 'H': return TUI_KEY_HOME;
-            case 'F': return TUI_KEY_END;
-            case '3': /* ESC [ 3 ~ = Delete; ESC [ 3 D / C = Alt+Left/Right */
-                if (!tui_wait_byte(t, &b, 120, eof))
-                    return TUI_KEY_UNKNOWN;
-                if (b == '~')
-                    return TUI_KEY_DEL;
-                if (b == 'D')
-                    return TUI_KEY_ALT_LEFT;
-                if (b == 'C')
-                    return TUI_KEY_ALT_RIGHT;
-                return TUI_KEY_UNKNOWN;
-            case '5': /* ESC [ 5 D / C = Ctrl+Left/Right; ESC [ 5 ~ = PageUp */
-                if (!tui_wait_byte(t, &b, 120, eof))
-                    return TUI_KEY_UNKNOWN;
-                if (b == 'D')
-                    return TUI_KEY_CTRL_LEFT;
-                if (b == 'C')
-                    return TUI_KEY_CTRL_RIGHT;
-                if (b == '~')
-                    return TUI_KEY_PGUP;
-                return TUI_KEY_UNKNOWN;
-            case '6': /* page down: ESC [ 6 ~ */
-                if (tui_wait_byte(t, &b, 120, eof) && b == '~')
-                    return TUI_KEY_PGDN;
-                return TUI_KEY_UNKNOWN;
-            case '1': /* ESC[1;<mod><dir> = 修饰方向键（Ctrl/Alt） */
-            {
-                char semi, mod, dir;
-                if (!tui_wait_byte(t, &semi, 120, eof) || semi != ';')
-                    return TUI_KEY_UNKNOWN;
-                if (!tui_wait_byte(t, &mod, 120, eof))
-                    return TUI_KEY_UNKNOWN;
-                if (!tui_wait_byte(t, &dir, 120, eof))
-                    return TUI_KEY_UNKNOWN;
-                if (mod == '5' && dir == 'D')
-                    return TUI_KEY_CTRL_LEFT;
-                if (mod == '5' && dir == 'C')
-                    return TUI_KEY_CTRL_RIGHT;
-                if (mod == '3' && dir == 'D')
-                    return TUI_KEY_ALT_LEFT;
-                if (mod == '3' && dir == 'C')
-                    return TUI_KEY_ALT_RIGHT;
-                return TUI_KEY_UNKNOWN;
-            }
-            case '2': /* ESC[20~ = F9；ESC[21~ = F10；ESC[200~ = paste start */
-                if (!tui_wait_byte(t, &b, 120, eof))
-                    return TUI_KEY_UNKNOWN;
-                if (b == '0') { /* F9: ESC [ 2 0 ~；paste: ESC [ 2 0 0 ~ */
-                    if (!tui_wait_byte(t, &b, 120, eof))
-                        return TUI_KEY_UNKNOWN;
-                    if (b == '~')
-                        return TUI_KEY_F9;
-                    if (b != '0')
-                        return TUI_KEY_UNKNOWN;
-                    if (!tui_wait_byte(t, &b, 120, eof) || b != '~')
-                        return TUI_KEY_UNKNOWN;
-                    return TUI_KEY_PASTE_START;
-                }
-                if (b == '1') { /* F10: ESC [ 2 1 ~ */
-                    if (!tui_wait_byte(t, &b, 120, eof) || b != '~')
-                        return TUI_KEY_UNKNOWN;
-                    return TUI_KEY_F10;
-                }
-                return TUI_KEY_UNKNOWN;
-            case '<': /* SGR mouse: ESC [ < b ; r ; c M  (ignore) */
-                return TUI_KEY_UNKNOWN;
-            default:
-                return TUI_KEY_UNKNOWN;
-            }
-        }
-        /* Alt+letter: xterm sends ESC followed by the letter. */
-        if (b == 'b')
-            return TUI_KEY_ALT_B;
-        if (b == 'f')
-            return TUI_KEY_ALT_F;
-        /* Application cursor mode (smkx): ESC O A/B/C/D = 方向键； */
-        if (b == 'O') {
-            char x;
-            if (!tui_wait_byte(t, &x, 120, eof))
-                return TUI_KEY_UNKNOWN;
-            switch (x) {
-            case 'A': return TUI_KEY_UP;
-            case 'B': return TUI_KEY_DOWN;
-            case 'C': return TUI_KEY_RIGHT;
-            case 'D': return TUI_KEY_LEFT;
-            default:  return TUI_KEY_UNKNOWN;
-            }
-        }
+    if (c != 0x1b)
+        return (unsigned char)c;
+    if (!tui_wait_byte(t, &b, 120, eof))
+        return 0x1b; /* lone ESC */
+    /* OSC/DCS/SOS/PM/APC 控制串：整段丢弃（含迟到的终端应答），
+     * 绝不把其载荷当作输入字符。 */
+    if (b == ']' || b == 'P' || b == 'X' || b == '^' || b == '_') {
+        tui_skip_control_string(t);
         return TUI_KEY_UNKNOWN;
     }
-    return (unsigned char)c;
+    if (b == '[')
+        return tui_esc_bracket(t, eof);
+    if (b == 'O')
+        return tui_esc_ss3(t, eof);
+    return tui_esc_alt(b);
 }
