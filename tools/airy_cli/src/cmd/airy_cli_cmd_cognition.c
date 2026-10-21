@@ -51,6 +51,186 @@ static void cli_secret_masked(const char *val, char *out, size_t cap)
     snprintf(out, cap, "%.*s…%s", 4, val, val + len - 4);
 }
 
+static void ak_free(char **lines, size_t n)
+{
+    for (size_t i = 0; i < n; i++)
+        AIRY_FREE(lines[i]);
+    AIRY_FREE(lines);
+}
+
+static int ak_list(const char *path)
+{
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        cli_print_line("Sub Agent:apikey", "无法读取 secrets.env（文件不存在或不可读）");
+        return 0;
+    }
+
+    char line[1024];
+    int found = 0;
+    cli_print_status("Sub Agent:apikey",
+                     "已配置模型 Key 位（值打码，完整值见 secrets.env）:");
+    while (fgets(line, sizeof(line), f)) {
+        char *eq = strchr(line, '=');
+        if (!eq)
+            continue;
+        *eq = '\0';
+        char *val = eq + 1;
+        size_t vlen = strlen(val);
+        while (vlen > 0 && (val[vlen - 1] == '\n' || val[vlen - 1] == '\r'))
+            val[--vlen] = '\0';
+        if (strncmp(line, "MODEL_", 6) != 0 || strstr(line, "_API_KEY") == NULL)
+            continue;
+        char masked[64];
+        cli_secret_masked(val, masked, sizeof(masked));
+        cli_outf("  %s = %s\n", line, masked);
+        found = 1;
+    }
+    fclose(f);
+    if (!found)
+        cli_outf("  （无 Key 位；使用 /apikey set <N> <key> 添加）\n");
+    return 0;
+}
+
+static int ak_digits(const char *s, size_t n)
+{
+    for (size_t i = 0; i < n; i++) {
+        if (s[i] < '0' || s[i] > '9')
+            return 0;
+    }
+    return 1;
+}
+
+static int ak_args(const char *rest, const char **key, int *idx)
+{
+    const char *sp = rest;
+    while (*sp != '\0' && *sp != ' ')
+        sp++;
+    if (*sp == '\0') {
+        cli_print_status("Sub Agent:usage", "/apikey set <N> <key>");
+        return -1;
+    }
+
+    size_t nlen = (size_t)(sp - rest);
+    if (nlen == 0 || nlen > 4) {
+        cli_print_line("Sub Agent:apikey", "行号 N 非法（1-64）");
+        return -1;
+    }
+    if (!ak_digits(rest, nlen)) {
+        cli_print_line("Sub Agent:apikey", "行号 N 非法（须为数字）");
+        return -1;
+    }
+
+    char num[8];
+    __builtin_memcpy(num, rest, nlen);
+    num[nlen] = '\0';
+    int n = atoi(num);
+    if (n < 1 || n > 64) {
+        cli_print_line("Sub Agent:apikey", "行号 N 超出范围（1-64）");
+        return -1;
+    }
+    if (sp[1] == '\0') {
+        cli_print_line("Sub Agent:apikey", "key 为空");
+        return -1;
+    }
+
+    *idx = n;
+    *key = sp + 1;
+    return 0;
+}
+
+static int ak_load(const char *path, char ***out, size_t *count)
+{
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        *out = NULL;
+        *count = 0;
+        return 0;
+    }
+
+    char **lines = NULL;
+    size_t n = 0;
+    char buf[1024];
+    while (fgets(buf, sizeof(buf), f)) {
+        char **nl = (char **)AIRY_REALLOC(lines, (n + 1) * sizeof(char *));
+        if (!nl) {
+            ak_free(lines, n);
+            fclose(f);
+            return -1;
+        }
+        lines = nl;
+        lines[n++] = AIRY_STRDUP(buf);
+    }
+    fclose(f);
+    *out = lines;
+    *count = n;
+    return 0;
+}
+
+static int ak_rewrite(FILE *wf, char **lines, size_t n, const char *var, const char *key)
+{
+    int replaced = 0;
+    size_t vlen = strlen(var);
+    for (size_t i = 0; i < n; i++) {
+        const char *p = lines[i];
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (strncmp(p, var, vlen) == 0 && p[vlen] == '=') {
+            fprintf(wf, "%s=%s\n", var, key);
+            replaced = 1;
+        } else {
+            fputs(lines[i], wf);
+        }
+    }
+    return replaced;
+}
+
+static int ak_store(const char *path, const char *var, const char *key)
+{
+    char **lines = NULL;
+    size_t n = 0;
+    if (ak_load(path, &lines, &n) != 0) {
+        cli_print_line("Sub Agent:apikey", "OOM");
+        return 0;
+    }
+
+    char tmp[AIRY_PATH_MAX];
+    snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+    FILE *wf = fopen(tmp, "w");
+    if (!wf) {
+        ak_free(lines, n);
+        cli_print_line("Sub Agent:apikey", "无法写入 secrets.env");
+        return 0;
+    }
+
+    int replaced = ak_rewrite(wf, lines, n, var, key);
+    if (!replaced)
+        fprintf(wf, "%s=%s\n", var, key);
+    if (fclose(wf) != 0) {
+        ak_free(lines, n);
+        remove(tmp);
+        cli_print_line("Sub Agent:apikey", "写入失败");
+        return 0;
+    }
+#if defined(_WIN32)
+    _chmod(tmp, _S_IREAD | _S_IWRITE);
+#else
+    chmod(tmp, 0600);
+#endif
+    if (rename(tmp, path) != 0) {
+        remove(tmp);
+        ak_free(lines, n);
+        cli_print_line("Sub Agent:apikey", "写回失败");
+        return 0;
+    }
+    ak_free(lines, n);
+
+    char ok[128];
+    snprintf(ok, sizeof(ok), "%s 已%s（%s，权限 600）", var, replaced ? "更新" : "添加", path);
+    cli_print_status("Sub Agent:apikey", ok);
+    return 0;
+}
+
 int cmd_apikey(const char *arg, void *ctx)
 {
     (void)ctx;
@@ -60,117 +240,24 @@ int cmd_apikey(const char *arg, void *ctx)
                        "无法定位 secrets.env（未设置 AIRY_HOME/AIRY_CONFIG_DIR）");
         return 0;
     }
-    if (!arg || arg[0] == '\0' || strncmp(arg, "list", 4) == 0) {
-        FILE *f = fopen(path, "r");
-        if (!f) {
-            cli_print_line("Sub Agent:apikey",
-                           "无法读取 secrets.env（文件不存在或不可读）");
-            return 0;
-        }
-        char line[1024]; int found = 0;
-        cli_print_status("Sub Agent:apikey",
-                         "已配置模型 Key 位（值打码，完整值见 secrets.env）:");
-        while (fgets(line, sizeof(line), f)) {
-            char *eq = strchr(line, '=');
-            if (!eq) continue;
-            *eq = '\0'; char *val = eq + 1;
-            size_t vlen = strlen(val);
-            while (vlen > 0 && (val[vlen - 1] == '\n' || val[vlen - 1] == '\r')) val[--vlen] = '\0';
-            if (strncmp(line, "MODEL_", 6) == 0 && strstr(line, "_API_KEY") != NULL) {
-                char masked[64]; cli_secret_masked(val, masked, sizeof(masked));
-                cli_outf("  %s = %s\n", line, masked);
-                found = 1;
-            }
-        }
-        fclose(f);
-        if (!found) cli_outf("  （无 Key 位；使用 /apikey set <N> <key> 添加）\n");
-        return 0;
-    }
+
+    if (!arg || arg[0] == '\0' || strncmp(arg, "list", 4) == 0)
+        return ak_list(path);
+
     if (strncmp(arg, "set ", 4) != 0) {
         cli_print_status("Sub Agent:usage",
                          "/apikey list | set <N> <key>（N = model.yaml 连接表行号）");
         return 0;
     }
-    const char *rest = arg + 4;
-    const char *sp = rest;
-    while (*sp != '\0' && *sp != ' ') sp++;
-    if (*sp == '\0') {
-        cli_print_status("Sub Agent:usage", "/apikey set <N> <key>");
-        return 0;
-    }
-    size_t nlen = (size_t)(sp - rest);
-    if (nlen == 0 || nlen > 4) {
-        cli_print_line("Sub Agent:apikey", "行号 N 非法（1-64）");
-        return 0;
-    }
-    char num[8]; __builtin_memcpy(num, rest, nlen); num[nlen] = '\0';
-    for (size_t i = 0; i < nlen; i++) {
-        if (num[i] < '0' || num[i] > '9') {
-            cli_print_line("Sub Agent:apikey", "行号 N 非法（须为数字）");
-            return 0;
-        }
-    }
-    int idx = atoi(num);
-    if (idx < 1 || idx > 64) {
-        cli_print_line("Sub Agent:apikey", "行号 N 超出范围（1-64）");
-        return 0;
-    }
-    const char *key = sp + 1;
-    if (!key[0]) { cli_print_line("Sub Agent:apikey", "key 为空"); return 0; }
 
-    FILE *f = fopen(path, "r");
-    char **lines = NULL; size_t line_count = 0;
-    if (f) {
-        char lbuf[1024];
-        while (fgets(lbuf, sizeof(lbuf), f)) {
-            char **nl = (char **)AIRY_REALLOC(lines, (line_count + 1) * sizeof(char *));
-            if (!nl) { for (size_t i = 0; i < line_count; i++) AIRY_FREE(lines[i]); AIRY_FREE(lines); fclose(f);
-                       cli_print_line("Sub Agent:apikey", "OOM"); return 0; }
-            lines = nl; lines[line_count++] = AIRY_STRDUP(lbuf);
-        }
-        fclose(f);
-    }
+    int idx = 0;
+    const char *key = NULL;
+    if (ak_args(arg + 4, &key, &idx) != 0)
+        return 0;
 
-    char var_name[32]; snprintf(var_name, sizeof(var_name), "MODEL_%d_API_KEY", idx);
-    int replaced = 0;
-    char tmp[AIRY_PATH_MAX]; snprintf(tmp, sizeof(tmp), "%s.tmp", path);
-    const char *tmp_path = tmp; FILE *wf = fopen(tmp_path, "w");
-    if (!wf) {
-        for (size_t i = 0; i < line_count; i++) AIRY_FREE(lines[i]);
-        AIRY_FREE(lines);
-        cli_print_line("Sub Agent:apikey", "无法写入 secrets.env"); return 0;
-    }
-    for (size_t i = 0; i < line_count; i++) {
-        const char *src = lines[i]; const char *p = src;
-        while (*p == ' ' || *p == '\t') p++;
-        if (strncmp(p, var_name, strlen(var_name)) == 0 && p[strlen(var_name)] == '=') {
-            fprintf(wf, "%s=%s\n", var_name, key); replaced = 1;
-        } else { fputs(src, wf); }
-    }
-    if (!replaced) fprintf(wf, "%s=%s\n", var_name, key);
-    if (fclose(wf) != 0) {
-        for (size_t i = 0; i < line_count; i++) AIRY_FREE(lines[i]);
-        AIRY_FREE(lines);
-        remove(tmp_path); cli_print_line("Sub Agent:apikey", "写入失败"); return 0;
-    }
-#if defined(_WIN32)
-    _chmod(tmp_path, _S_IREAD | _S_IWRITE);
-#else
-    chmod(tmp_path, 0600);
-#endif
-    if (rename(tmp_path, path) != 0) {
-        remove(tmp_path);
-        for (size_t i = 0; i < line_count; i++) AIRY_FREE(lines[i]);
-        AIRY_FREE(lines);
-        cli_print_line("Sub Agent:apikey", "写回失败"); return 0;
-    }
-    for (size_t i = 0; i < line_count; i++) AIRY_FREE(lines[i]);
-    AIRY_FREE(lines);
-
-    char ok[128];
-    snprintf(ok, sizeof(ok), "%s 已%s（%s，权限 600）", var_name, replaced ? "更新" : "添加", path);
-    cli_print_status("Sub Agent:apikey", ok);
-    return 0;
+    char var[32];
+    snprintf(var, sizeof(var), "MODEL_%d_API_KEY", idx);
+    return ak_store(path, var, key);
 }
 
 /* ==================== /mem ==================== */
