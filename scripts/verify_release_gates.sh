@@ -1574,7 +1574,7 @@ _whc="$ROOT/atoms/coreloopthree/src/work_hall/work_hall.c"
 _wha="$ROOT/atoms/coreloopthree/src/work_hall/work_hall_agent.c"
 section "AB" "B7 工作大厅超时与重启恢复（V7.1~V7.3 语义防回潮）"
 
-if grep -q 'int terminated = wh_state_terminal(en->state)' "$_wp" \
+if grep -q 'if (wh_state_terminal(en->state))' "$_wp" \
     && grep -q 'strcmp(state, "skipped") == 0' "$_whc" \
     && ! grep -q 'strcmp(en->state, "completed") == 0' "$_wp" \
     && grep -q 'snprintf(en->state, sizeof(en->state), "failed")' "$_wp" \
@@ -1584,17 +1584,18 @@ else
     bad "AB1 V7.2 非终态恢复语义回潮（work_hall_persist.c 归一化为 canceled）"
 fi
 
-if grep -q 'cJSON_AddStringToObject(o, "input_json"' "$_wp" \
-    && grep -q 'cJSON_AddNumberToObject(o, "redispatch_count"' "$_wp" \
-    && grep -q 'en->input_json = AIRY_STRDUP(s)' "$_wp" \
-    && grep -q 'en->redispatch_count = (int32_t)it->valuedouble' "$_wp"; then
-    ok "AB2 V7.2 恢复字段持久化（save 输入副本/预算 + load 恢复保真）"
+if grep -q 'WF_NREF(airy_work_hall_entry_t, input_json)' "$_wp" \
+    && grep -q 'WF_I32(airy_work_hall_entry_t, redispatch_count)' "$_wp" \
+    && grep -q 'wf_fill(e, en, wf_entry_flds' "$_wp" \
+    && grep -q 'AIRY_STRDUP(s)' "$_wp"; then
+    ok "AB2 V7.2 恢复字段持久化（读写同源字段表单点声明，save/load 共用）"
 else
     bad "AB2 V7.2 恢复字段持久化缺失（input_json/redispatch_count 未落盘或未恢复）"
 fi
 
-if grep -q 'hall->redispatch_max > 0' "$_wp" \
-    && grep -q 'en->redispatch_count < hall->redispatch_max' "$_wp"; then
+if grep -q 'hall->redispatch_max <= 0' "$_wp" \
+    && grep -q 'en->redispatch_count >= hall->redispatch_max' "$_wp" \
+    && grep -q 'en->redispatch_at = (uint64_t)airy_time_ns()' "$_wp"; then
     ok "AB3 V7.2 预算内重派重新布防（redispatch_at 按当前时基重算）"
 else
     bad "AB3 V7.2 重启后重派未重新布防（work_hall_persist.c）"
