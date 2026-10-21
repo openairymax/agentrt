@@ -110,7 +110,7 @@ def load_json(path):
         fail("清单 JSON 解析失败 %s: %s" % (path, exc))
 
 
-def parse_manifest(doc):
+def _parse_root(doc):
     if not isinstance(doc, dict):
         fail("清单根节点必须是对象")
     reject_unknown(doc, ("manifest_version", "module", "generator", "facades", "slots",
@@ -120,115 +120,125 @@ def parse_manifest(doc):
     if doc.get("module") != "gateway":
         fail("root.module: 期望 gateway，实际 %r" % doc.get("module"))
 
-    for key in ("facades", "slots"):
-        value = doc.get(key)
-        if not isinstance(value, list) or not value:
-            fail("root.%s: 期望非空数组" % key)
-        for i, item in enumerate(value):
-            need_str(item, "root.%s[%d]" % (key, i))
 
+def _ident_list(doc, key):
+    value = doc.get(key)
+    if not isinstance(value, list) or not value:
+        fail("root.%s: 期望非空数组" % key)
+    for i, item in enumerate(value):
+        need_str(item, "root.%s[%d]" % (key, i))
+
+
+def _parse_defaults(doc):
     defaults = doc.get("defaults")
     if not isinstance(defaults, dict):
         fail("root.defaults: 期望对象")
     reject_unknown(defaults, ("timeout_ms", "version"), "defaults")
-    def_timeout = need_int(defaults.get("timeout_ms"), "defaults.timeout_ms")
-    def_version = need_int(defaults.get("version"), "defaults.version")
+    return (need_int(defaults.get("timeout_ms"), "defaults.timeout_ms"),
+            need_int(defaults.get("version"), "defaults.version"))
 
-    l2_raw = doc.get("l2_methods")
-    if not isinstance(l2_raw, list) or not l2_raw:
-        fail("root.l2_methods: 期望非空数组")
-    l2_methods = []
-    for i, item in enumerate(l2_raw):
-        name = need_str(item, "root.l2_methods[%d]" % i)
-        if name in l2_methods:
-            fail("root.l2_methods: 重复方法 %s" % name)
-        l2_methods.append(name)
 
-    socks_raw = doc.get("sock_bindings")
-    if not isinstance(socks_raw, list) or not socks_raw:
-        fail("root.sock_bindings: 期望非空数组")
-    socks = []
-    for i, item in enumerate(socks_raw):
-        key = need_str(item, "root.sock_bindings[%d]" % i)
-        if key in socks:
-            fail("root.sock_bindings: 重复绑定键 %s" % key)
-        socks.append(key)
+def _uniq_list(doc, key, label):
+    raw = doc.get(key)
+    if not isinstance(raw, list) or not raw:
+        fail("root.%s: 期望非空数组" % key)
+    out = []
+    for i, item in enumerate(raw):
+        name = need_str(item, "root.%s[%d]" % (key, i))
+        if name in out:
+            fail("root.%s: 重复%s %s" % (key, label, name))
+        out.append(name)
+    return out
 
-    ns_raw = doc.get("namespaces")
-    if not isinstance(ns_raw, list) or not ns_raw:
-        fail("root.namespaces: 期望非空数组")
 
-    ns_map = {}
-    for i, item in enumerate(ns_raw):
-        where = "namespaces[%d]" % i
-        if not isinstance(item, dict):
-            fail("%s: 期望对象" % where)
-        reject_unknown(item, ("ns", "owner", "route", "daemon", "sock", "timeout_ms",
-                              "prefix", "l2_pass", "caps"), where)
-        ns = need_str(item.get("ns"), where + ".ns")
-        if len(ns) > 31:
-            fail("%s.ns: 超过 31 字节" % where)
-        if ns in ns_map:
-            fail("%s.ns: 重复命名空间 %s" % (where, ns))
-        owner = need_str(item.get("owner"), where + ".owner")
-        route = need_bool(item.get("route"), where + ".route")
-        daemon = opt_str(item, "daemon", where)
-        sock = opt_str(item, "sock", where)
-        if route:
-            if not daemon or not DAEMON_RE.match(daemon):
-                fail("%s.daemon: 路由命名空间必须声明 <name>_d" % where)
-            if not sock or sock not in socks:
-                fail("%s.sock: %r 不在 sock_bindings" % (where, sock))
-        elif daemon or sock:
-            fail("%s: 非路由命名空间不得声明 daemon/sock" % where)
+def _need_perm(perm, where):
+    if perm is not None and not (isinstance(perm, str) and PERM_RE.match(perm)):
+        fail("%s.perm: 非法权限名 %r" % (where, perm))
 
-        timeout = item.get("timeout_ms")
-        timeout = def_timeout if timeout is None else need_int(timeout, where + ".timeout_ms")
-        prefix = opt_str(item, "prefix", where)
-        l2_pass = need_bool(item["l2_pass"], where + ".l2_pass") if "l2_pass" in item else False
-        if l2_pass and not prefix:
-            fail("%s.l2_pass: 为真时必须声明 prefix" % where)
-        if "l2_pass" in item and not prefix:
-            fail("%s.l2_pass: 仅 prefix 命名空间可声明" % where)
 
-        caps_raw = item.get("caps", [])
-        if not isinstance(caps_raw, list):
-            fail("%s.caps: 期望数组" % where)
-        caps = []
-        for j, cap in enumerate(caps_raw):
-            cwhere = "%s.caps[%d]" % (where, j)
-            if not isinstance(cap, dict):
-                fail("%s: 期望对象" % cwhere)
-            reject_unknown(cap, ("name", "kind", "version", "perm"), cwhere)
-            name = need_str(cap.get("name"), cwhere + ".name")
-            kind = cap.get("kind", "fwd")
-            if kind not in KINDS:
-                fail("%s.kind: 非法 kind %r" % (cwhere, kind))
-            if kind != "fwd" and KIND_HOME[kind] != ns:
-                fail("%s.kind: %s 只能挂在 %s" % (cwhere, kind, KIND_HOME[kind]))
-            version = cap.get("version")
-            version = def_version if version is None else need_int(version, cwhere + ".version")
-            perm = cap.get("perm")
-            if perm is not None and not (isinstance(perm, str) and PERM_RE.match(perm)):
-                fail("%s.perm: 非法权限名 %r" % (cwhere, perm))
-            caps.append({
-                "name": name,
-                "kind": kind,
-                "version": version,
-                "perm": perm,
-            })
-        ns_map[ns] = {
-            "ns": ns,
-            "owner": owner,
-            "route": route,
-            "daemon": daemon,
-            "sock": sock,
-            "timeout": timeout,
-            "prefix": prefix,
-            "l2_pass": l2_pass,
-            "caps": caps,
-        }
+def _parse_caps(item, where, ns, def_version):
+    caps_raw = item.get("caps", [])
+    if not isinstance(caps_raw, list):
+        fail("%s.caps: 期望数组" % where)
+    caps = []
+    for j, cap in enumerate(caps_raw):
+        cwhere = "%s.caps[%d]" % (where, j)
+        if not isinstance(cap, dict):
+            fail("%s: 期望对象" % cwhere)
+        reject_unknown(cap, ("name", "kind", "version", "perm"), cwhere)
+        name = need_str(cap.get("name"), cwhere + ".name")
+        kind = cap.get("kind", "fwd")
+        if kind not in KINDS:
+            fail("%s.kind: 非法 kind %r" % (cwhere, kind))
+        if kind != "fwd" and KIND_HOME[kind] != ns:
+            fail("%s.kind: %s 只能挂在 %s" % (cwhere, kind, KIND_HOME[kind]))
+        version = cap.get("version")
+        version = def_version if version is None else need_int(version, cwhere + ".version")
+        perm = cap.get("perm")
+        _need_perm(perm, cwhere)
+        caps.append({
+            "name": name,
+            "kind": kind,
+            "version": version,
+            "perm": perm,
+        })
+    return caps
 
+
+def _check_route(where, route, daemon, sock, socks):
+    if route:
+        if not daemon or not DAEMON_RE.match(daemon):
+            fail("%s.daemon: 路由命名空间必须声明 <name>_d" % where)
+        if not sock or sock not in socks:
+            fail("%s.sock: %r 不在 sock_bindings" % (where, sock))
+        return
+    if daemon or sock:
+        fail("%s: 非路由命名空间不得声明 daemon/sock" % where)
+
+
+def _check_l2(item, where, prefix, l2_pass):
+    if l2_pass and not prefix:
+        fail("%s.l2_pass: 为真时必须声明 prefix" % where)
+    if "l2_pass" in item and not prefix:
+        fail("%s.l2_pass: 仅 prefix 命名空间可声明" % where)
+
+
+def _parse_ns(item, i, socks, dflt, ns_map):
+    where = "namespaces[%d]" % i
+    if not isinstance(item, dict):
+        fail("%s: 期望对象" % where)
+    reject_unknown(item, ("ns", "owner", "route", "daemon", "sock", "timeout_ms",
+                          "prefix", "l2_pass", "caps"), where)
+    ns = need_str(item.get("ns"), where + ".ns")
+    if len(ns) > 31:
+        fail("%s.ns: 超过 31 字节" % where)
+    if ns in ns_map:
+        fail("%s.ns: 重复命名空间 %s" % (where, ns))
+    owner = need_str(item.get("owner"), where + ".owner")
+    route = need_bool(item.get("route"), where + ".route")
+    daemon = opt_str(item, "daemon", where)
+    sock = opt_str(item, "sock", where)
+    _check_route(where, route, daemon, sock, socks)
+
+    timeout = item.get("timeout_ms")
+    timeout = dflt[0] if timeout is None else need_int(timeout, where + ".timeout_ms")
+    prefix = opt_str(item, "prefix", where)
+    l2_pass = need_bool(item["l2_pass"], where + ".l2_pass") if "l2_pass" in item else False
+    _check_l2(item, where, prefix, l2_pass)
+    return ns, {
+        "ns": ns,
+        "owner": owner,
+        "route": route,
+        "daemon": daemon,
+        "sock": sock,
+        "timeout": timeout,
+        "prefix": prefix,
+        "l2_pass": l2_pass,
+        "caps": _parse_caps(item, where, ns, dflt[1]),
+    }
+
+
+def _check_owner(ns_map):
     for ns, entry in ns_map.items():
         owner = entry["owner"]
         if owner != "gateway" and owner not in ns_map:
@@ -236,6 +246,8 @@ def parse_manifest(doc):
         if owner == "gateway" and entry["route"]:
             fail("namespace %s: gateway 为网关内实现域，不可路由" % ns)
 
+
+def _check_caps(ns_map):
     cap_keys = set()
     for ns, entry in ns_map.items():
         for cap in entry["caps"]:
@@ -248,7 +260,27 @@ def parse_manifest(doc):
             owner = entry["owner"]
             if owner not in ns_map or not ns_map[owner]["route"]:
                 fail("%s: FWD 归属 %r 缺失或不可路由" % (key, owner))
+    return cap_keys
 
+
+def parse_manifest(doc):
+    _parse_root(doc)
+    _ident_list(doc, "facades")
+    _ident_list(doc, "slots")
+    dflt = _parse_defaults(doc)
+    l2_methods = _uniq_list(doc, "l2_methods", "方法")
+    socks = _uniq_list(doc, "sock_bindings", "绑定键")
+
+    ns_raw = doc.get("namespaces")
+    if not isinstance(ns_raw, list) or not ns_raw:
+        fail("root.namespaces: 期望非空数组")
+    ns_map = {}
+    for i, item in enumerate(ns_raw):
+        ns, entry = _parse_ns(item, i, socks, dflt, ns_map)
+        ns_map[ns] = entry
+
+    _check_owner(ns_map)
+    cap_keys = _check_caps(ns_map)
     return {
         "l2_methods": l2_methods,
         "socks": socks,
