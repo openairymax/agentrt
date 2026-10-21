@@ -1574,10 +1574,12 @@ _whc="$ROOT/atoms/coreloopthree/src/work_hall/work_hall.c"
 _wha="$ROOT/atoms/coreloopthree/src/work_hall/work_hall_agent.c"
 section "AB" "B7 工作大厅超时与重启恢复（V7.1~V7.3 语义防回潮）"
 
-if grep -q 'strcmp(en->state, "skipped") == 0' "$_wp" \
+if grep -q 'int terminated = wh_state_terminal(en->state)' "$_wp" \
+    && grep -q 'strcmp(state, "skipped") == 0' "$_whc" \
+    && ! grep -q 'strcmp(en->state, "completed") == 0' "$_wp" \
     && grep -q 'snprintf(en->state, sizeof(en->state), "failed")' "$_wp" \
     && ! grep -q 'normalize them to canceled' "$_wp"; then
-    ok "AB1 V7.2 非终态中断恢复为 failed（不静默归一化 canceled，skipped 计入终态）"
+    ok "AB1 V7.2 非终态中断恢复为 failed（终态集收敛至 wh_state_terminal，skipped 计入终态）"
 else
     bad "AB1 V7.2 非终态恢复语义回潮（work_hall_persist.c 归一化为 canceled）"
 fi
