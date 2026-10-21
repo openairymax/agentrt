@@ -214,65 +214,114 @@ static char *chat_tool_fail(airy_err_t code, const char *diag)
     return s ? s : AIRY_STRDUP("{\"ok\":false,\"error\":\"out of memory\"}");
 }
 
+static char *chat_tool_deny(airy_err_t code, const char *diag, int *out_ok)
+{
+    if (out_ok)
+        *out_ok = 0;
+    return chat_tool_fail(code, diag);
+}
+
+/* fs 工具的路径参数按 CLI cwd 绝对化：fs_glob 取 base（模型常省略，缺省
+ * 补 CLI cwd），其余 fs_* 取 path；非 fs 工具不动参数（key 缺失即 no-op）。 */
+static void chat_fs_paths(const char *id, cJSON *pargs)
+{
+    if (strncmp(id, "fs_", 3) != 0)
+        return;
+    int glob = strcmp(id, "fs_glob") == 0;
+    cli_tool_absolutize_path(pargs, glob ? "base" : "path");
+    if (!glob || cJSON_GetObjectItem(pargs, "base"))
+        return;
+#if !defined(_WIN32)
+    char cwd[4096];
+    if (getcwd(cwd, sizeof(cwd)))
+        cJSON_AddStringToObject(pargs, "base", cwd);
+#endif
+}
+
+static char *chat_params(const char *id, const char *args_json, airy_err_t *perr)
+{
+    cJSON *pargs = cJSON_Parse(args_json);
+    cJSON *params = pargs ? cJSON_CreateObject() : NULL;
+    if (!pargs || !params) {
+        /* 0.1.14 诊断增强：解析失败记录 cJSON 错误位置与参数前缀，
+         * 定位上游（模型输出/流帧截断）问题。 */
+        const char *epos = pargs ? NULL : cJSON_GetErrorPtr();
+        if (epos)
+            cli_trace("chat", "%s args parse fail len=%zu err@%d head=%.*s", CLI_ICON_CROSS,
+                      strlen(args_json), (int)(epos - args_json),
+                      (int)cli_utf8_safe_len(args_json, 100), args_json);
+        *perr = pargs ? AIRY_ERR_OUT_OF_MEMORY : AIRY_ERR_INVALID_PARAM;
+        cJSON_Delete(pargs);
+        cJSON_Delete(params);
+        return NULL;
+    }
+    cJSON_AddStringToObject(params, "tool_id", id);
+    chat_fs_paths(id, pargs);
+    cJSON_AddItemToObject(params, "params", pargs);
+    cJSON_AddStringToObject(params, "agent_id", CLI_TOOL_AGENT);
+    char *s = cJSON_PrintUnformatted(params);
+    cJSON_Delete(params);
+    if (!s)
+        *perr = AIRY_ERR_OUT_OF_MEMORY;
+    return s;
+}
+
+static void chat_fill(cJSON *r, cJSON *root, int ok)
+{
+    cJSON *out = cJSON_GetObjectItem(root, "output");
+    if (ok && out && cJSON_IsString(out) && out->valuestring) {
+        cJSON_AddStringToObject(r, "output", out->valuestring);
+        return;
+    }
+    cJSON *err = cJSON_GetObjectItem(root, "error");
+    cJSON_AddStringToObject(r, "error",
+                            (err && cJSON_IsString(err) && err->valuestring)
+                                ? err->valuestring
+                                : "tool failed");
+    /* L0 产出的 err 三元组原样透传，上层据此分诊（N1 契约）。 */
+    cJSON *eobj = cJSON_GetObjectItem(root, "err");
+    cJSON *dup = cJSON_IsObject(eobj) ? cJSON_Duplicate(eobj, 1) : NULL;
+    if (dup)
+        cJSON_AddItemToObject(r, "err", dup);
+}
+
+static char *chat_reply(const char *result_json, int *ok)
+{
+    cJSON *root = cJSON_Parse(result_json);
+    if (!root)
+        return NULL;
+    cJSON *succ = cJSON_GetObjectItem(root, "success");
+    /* tool_d 返回 "success":1（数字），cJSON_IsTrue 只认 true 字面量；
+     * 数字与布尔都按非 0 判定（2026-08-16 实测误判 ok=0）。 */
+    *ok = (succ && (cJSON_IsTrue(succ) || (cJSON_IsNumber(succ) && succ->valueint != 0))) ? 1 : 0;
+    cJSON *r = cJSON_CreateObject();
+    char *out = NULL;
+    if (r) {
+        cJSON_AddBoolToObject(r, "ok", *ok);
+        chat_fill(r, root, *ok);
+        out = cJSON_PrintUnformatted(r);
+        cJSON_Delete(r);
+    }
+    cJSON_Delete(root);
+    return out;
+}
+
 /* 执行一个工具调用，返回回填模型的 result JSON（OWNER，AIRY_FREE）。
  * 架构约束（2026-08-25）：统一经 gateway 派发（tool.execute → gateway →
  * SYS_SVC_CALL → tool_d，带 ACL fail-closed），与 gateway agent.run 同一
  * 路径；不直连 tool.sock / builtin 库（那会绕过权限边界）。 */
 static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int *out_ok)
 {
-    if (!tool_id || !args_json) {
-        if (out_ok)
-            *out_ok = 0;
-        return AIRY_STRDUP("{\"ok\":false,\"error\":\"missing tool arguments\"}");
-    }
+    if (!tool_id || !args_json)
+        return chat_tool_deny(AIRY_ERR_INVALID_PARAM, "missing tool arguments", out_ok);
 
-    cJSON *params = cJSON_CreateObject();
-    if (!params) {
-        if (out_ok)
-            *out_ok = 0;
-        return AIRY_STRDUP("{\"ok\":false,\"error\":\"out of memory\"}");
-    }
-    cJSON_AddStringToObject(params, "tool_id", tool_id);
-    cJSON *pargs = cJSON_Parse(args_json);
-    if (!pargs) {
-        /* 0.1.14 诊断增强：解析失败时记录 cJSON 错误位置与参数前缀，
-         * 定位上游（模型输出/流帧截断）问题；此前仅返回笼统错误。 */
-        const char *epos = cJSON_GetErrorPtr();
-        int eoff = epos ? (int)(epos - args_json) : -1;
-        cli_trace("chat", "%s args parse fail len=%zu err@%d head=%.*s", CLI_ICON_CROSS,
-                  strlen(args_json), eoff, (int)cli_utf8_safe_len(args_json, 100),
-                  args_json);
-        cJSON_Delete(params);
-        if (out_ok)
-            *out_ok = 0;
-        return chat_tool_fail(AIRY_ERR_INVALID_PARAM, "invalid tool arguments");
-    }
-    /* 相对路径绝对化（基于 CLI cwd；tool_d 按自身 cwd 解析）：
-     * fs 工具的 path 参数与 fs_glob 的 base 参数。 */
-    if (strcmp(tool_id, "fs_read") == 0 || strcmp(tool_id, "fs_write") == 0 ||
-        strcmp(tool_id, "fs_list") == 0 || strcmp(tool_id, "fs_edit") == 0 ||
-        strcmp(tool_id, "fs_grep") == 0 || strcmp(tool_id, "fs_delete") == 0) {
-        cli_tool_absolutize_path(pargs, "path");
-    } else if (strcmp(tool_id, "fs_glob") == 0) {
-        cli_tool_absolutize_path(pargs, "base");
-        if (!cJSON_GetObjectItem(pargs, "base")) {
-            char cwd[4096];
-#if !defined(_WIN32)
-            if (getcwd(cwd, sizeof(cwd)))
-                cJSON_AddStringToObject(pargs, "base", cwd);
-#else
-            (void)cwd;
-#endif
-        }
-    }
-    cJSON_AddItemToObject(params, "params", pargs);
-    cJSON_AddStringToObject(params, "agent_id", CLI_TOOL_AGENT);
-    char *params_json = cJSON_PrintUnformatted(params);
-    cJSON_Delete(params);
+    airy_err_t perr = AIRY_ERR_OUT_OF_MEMORY;
+    char *params_json = chat_params(tool_id, args_json, &perr);
     if (!params_json) {
-        if (out_ok)
-            *out_ok = 0;
-        return chat_tool_fail(AIRY_ERR_OUT_OF_MEMORY, "out of memory");
+        return chat_tool_deny(perr,
+                              perr == AIRY_ERR_INVALID_PARAM ? "invalid tool arguments"
+                                                             : "out of memory",
+                              out_ok);
     }
 
     char *result_json = NULL;
@@ -283,51 +332,22 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
         cli_trace("chat", "%s tool rpc fail tool=%s ret=%d (via gateway)", CLI_ICON_CROSS,
                   tool_id, rpc_ret);
         AIRY_FREE(result_json);
-        if (out_ok)
-            *out_ok = 0;
         /* cli_gw_call 已返回真实 AIRY 码（0.1.19 N1）：此处只补人类可读
          * 原文，网关未应答与工具业务失败由 class 分诊，不再统一误报不可达。 */
         const char *gw_err = cli_gw_last_err();
-        const char *desc = gw_err[0] ? gw_err : "tool rpc failed (via gateway)";
-        return chat_tool_fail(rpc_ret != 0 ? rpc_ret : AIRY_ERR_PROTOCOL, desc);
+        return chat_tool_deny(rpc_ret != 0 ? rpc_ret : AIRY_ERR_PROTOCOL,
+                              gw_err[0] ? gw_err : "tool rpc failed (via gateway)", out_ok);
     }
 
     /* daemon_rpc_call 已解包 JSON-RPC 的 result 字段：result_json 即
      * {"success":..,"output":"..","error":"..","exit_code":..}（2026-08-16
      * 实测：误以为带外层 "result" 导致解析失败，工具全部报 ✗）。 */
-    cJSON *root = cJSON_Parse(result_json);
-    AIRY_FREE(result_json);
     int ok = 0;
-    char *out_json = NULL;
-    if (root) {
-        cJSON *succ = cJSON_GetObjectItem(root, "success");
-        /* tool_d 返回 "success":1（数字），cJSON_IsTrue 只认 true 字面量；
-         * 数字与布尔都按非 0 判定（2026-08-16 实测误判 ok=0）。 */
-        ok = (succ && (cJSON_IsTrue(succ) || (cJSON_IsNumber(succ) && succ->valueint != 0))) ? 1
-                                                                                            : 0;
-        cJSON *out = cJSON_GetObjectItem(root, "output");
-        cJSON *err = cJSON_GetObjectItem(root, "error");
-        cJSON *r = cJSON_CreateObject();
-        cJSON_AddBoolToObject(r, "ok", ok);
-        if (ok && out && cJSON_IsString(out) && out->valuestring) {
-            cJSON_AddStringToObject(r, "output", out->valuestring);
-        } else {
-            cJSON_AddStringToObject(r, "error",
-                                    (err && cJSON_IsString(err) && err->valuestring)
-                                        ? err->valuestring
-                                        : "tool failed");
-            /* L0 产出的 err 三元组原样透传，上层据此分诊（N1 契约）。 */
-            cJSON *eobj = cJSON_GetObjectItem(root, "err");
-            cJSON *dup = cJSON_IsObject(eobj) ? cJSON_Duplicate(eobj, 1) : NULL;
-            if (dup)
-                cJSON_AddItemToObject(r, "err", dup);
-        }
-        out_json = cJSON_PrintUnformatted(r);
-        cJSON_Delete(r);
-        cJSON_Delete(root);
-    }
+    char *out_json = chat_reply(result_json, &ok);
+    AIRY_FREE(result_json);
     if (!out_json)
-        out_json = chat_tool_fail(AIRY_ERR_PROTOCOL, "tool response parse failed");
+        return chat_tool_deny(AIRY_ERR_PROTOCOL, "tool response parse failed", out_ok);
+
     cli_trace("chat", "%s tool exec tool=%s ok=%d resp=%.*s", ok ? CLI_ICON_CHECK : CLI_ICON_CROSS,
               tool_id, ok, (int)cli_utf8_safe_len(out_json, 120), out_json ? out_json : "");
     if (out_ok)
