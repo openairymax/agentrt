@@ -1478,10 +1478,10 @@ _tui="$TUI_SRC/src/app"
 _ad="$ROOT/daemons/agent_d"
 section "Y" "B2 首字延迟与零反馈（流式契约/零反馈/打字机解耦/分段耗时 V2.1~V2.4 机制防回潮）"
 
-if grep -q 'daemon_rpc_call_stream(llm_sock, "complete_stream"' "$_ad/src/run/agent_run_loop.c" \
+if grep -Eq 'daemon_rpc_call_stream\([^,]+, *"complete_stream"' "$_ad/src/run/agent_run_loop.c" \
     && grep -q 'RUN_DELTA_STACK' "$_ad/src/run/agent_run_loop.c" \
     && grep -q 'AIRY_MALLOC(dlen + 1)' "$_ad/src/run/agent_run_loop.c" \
-    && ! grep -q 'daemon_rpc_call(llm_sock, "complete"' "$_ad/src/run/agent_run_loop.c"; then
+    && ! grep -Eq 'daemon_rpc_call\([^,]+, *"complete"' "$_ad/src/run/agent_run_loop.c"; then
     ok "Y1 流式契约在位（V2.1/V2.2：complete_stream 真实增量，超限堆扩容不截断不丢内容）"
 else
     bad "Y1 流式契约回潮（退化为非流式 complete 或定长截断）"
