@@ -121,169 +121,244 @@ static const char *cli_fastpath_metrics(void)
     return cli_chat_usage_metrics(buf, sizeof(buf)) ? buf : NULL;
 }
 
-int cli_blueprint_fastpath(const char *input, uint64_t turn_start)
+/* 解析 rs_out 中的字符串字段并复制出来；缺失/非字符串/解析失败返回 NULL。
+ * L1 next_step、L2 suggestion、L3 hint 三处共用同一取词口径。 */
+static char *bp_json_str(const char *doc, const char *key)
 {
-    if (!input || !input[0])
-        return 0;
-    char *rs_out = NULL;
-    char tier[8] = "l3";
-
 #ifdef AIRY_HAS_CJSON
-    /* 0.1.9 M3（roadmap CLI 切断）：三级路由判定经 gateway → sched_d
-     * sched.plan RPC，L2 语义缓存由 sched_d 唯一持有；网关不可达时
-     * 静默按 L3 miss 降级（与 think.lang_process 同款降级策略）。 */
+    cJSON *r;
+    cJSON *f;
+    char *out = NULL;
+
+    if (!doc)
+        return NULL;
+    r = cJSON_Parse(doc);
+    if (!r)
+        return NULL;
+    f = cJSON_GetObjectItem(r, key);
+    if (cJSON_IsString(f) && f->valuestring)
+        out = AIRY_STRDUP(f->valuestring);
+    cJSON_Delete(r);
+    return out;
+#else
+    (void)doc;
+    (void)key;
+    return NULL;
+#endif
+}
+
+/* 蓝图命中回执（--json）：{role, type, success:1, <key>: <val>}。
+ * L1 与 L2 共用同一骨架，仅 role/type/字段名不同。 */
+static void bp_emit_json(const char *role, const char *type,
+                         const char *key, const char *val)
+{
+#ifdef AIRY_HAS_CJSON
+    cJSON *root = cJSON_CreateObject();
+    char *js;
+
+    cJSON_AddStringToObject(root, "role", role);
+    cJSON_AddStringToObject(root, "type", type);
+    cJSON_AddBoolToObject(root, "success", 1);
+    cJSON_AddStringToObject(root, key, val);
+    js = cJSON_PrintUnformatted(root);
+    if (js) {
+        cli_outf("%s\n", js);
+        cJSON_free(js);
+    }
+    cJSON_Delete(root);
+#else
+    (void)role;
+    (void)type;
+    (void)key;
+    (void)val;
+#endif
+}
+
+/* 0.1.9 M3（roadmap CLI 切断）：三级路由判定经 gateway → sched_d
+ * sched.plan RPC，L2 语义缓存由 sched_d 唯一持有；网关不可达时静默按
+ * L3 miss 降级（与 think.lang_process 同款降级策略）。tier 缺省已在调用
+ * 方置 "l3"，本函数只覆盖命中值。 */
+static void bp_route(const char *input, char *tier, size_t tier_sz,
+                     char **rsp)
+{
+#ifdef AIRY_HAS_CJSON
     cJSON *prm = cJSON_CreateObject();
     cJSON *pit = cJSON_CreateString(input);
+    char *prm_json;
+    char *resp = NULL;
+    cJSON *jr;
+    cJSON *dt;
+    cJSON *rr;
+
     if (prm && pit)
         cJSON_AddItemToObject(prm, "input", pit);
     else
         cJSON_Delete(pit);
-    char *prm_json = prm ? cJSON_PrintUnformatted(prm) : NULL;
+    prm_json = prm ? cJSON_PrintUnformatted(prm) : NULL;
     cJSON_Delete(prm);
-    char *resp = NULL;
-    if (prm_json && cli_gw_call("sched.plan", prm_json, CLI_ROADMAP_RPC_TIMEOUT_MS,
-                                &resp) == 0 && resp) {
-        cJSON *jr = cJSON_Parse(resp);
-        if (jr) {
-            cJSON *dt = cJSON_GetObjectItem(jr, "dispatch");
-            cJSON *rr = cJSON_GetObjectItem(jr, "result");
-            if (cJSON_IsString(dt) && dt->valuestring && dt->valuestring[0])
-                AIRY_STRNCPY_TERM(tier, dt->valuestring, sizeof(tier));
-            if (cJSON_IsString(rr) && rr->valuestring && rr->valuestring[0])
-                rs_out = AIRY_STRDUP(rr->valuestring);
-            cJSON_Delete(jr);
-        }
+    if (!prm_json ||
+        cli_gw_call("sched.plan", prm_json, CLI_ROADMAP_RPC_TIMEOUT_MS,
+                    &resp) != 0 || !resp) {
         AIRY_FREE(resp);
+        AIRY_FREE(prm_json);
+        return;
     }
+    jr = cJSON_Parse(resp);
+    if (jr) {
+        dt = cJSON_GetObjectItem(jr, "dispatch");
+        rr = cJSON_GetObjectItem(jr, "result");
+        if (cJSON_IsString(dt) && dt->valuestring && dt->valuestring[0])
+            AIRY_STRNCPY_TERM(tier, dt->valuestring, tier_sz);
+        if (cJSON_IsString(rr) && rr->valuestring && rr->valuestring[0])
+            *rsp = AIRY_STRDUP(rr->valuestring);
+        cJSON_Delete(jr);
+    }
+    AIRY_FREE(resp);
     AIRY_FREE(prm_json);
+#else
+    (void)input;
+    (void)tier;
+    (void)tier_sz;
+    (void)rsp;
 #endif
+}
 
-    if (strcmp(tier, "l1") == 0) {
+/* L1 状态机命中：零 token，按 next_step 指引下一步；无 cJSON 构建退化为
+ * 原始结果直出。 */
+static void bp_l1(const char *rs_out, uint64_t t0)
+{
 #ifdef AIRY_HAS_CJSON
-        char next_buf[128] = "";
-        if (rs_out) {
-            cJSON *r = cJSON_Parse(rs_out);
-            if (r) {
-                cJSON *n = cJSON_GetObjectItem(r, "next_step");
-                if (cJSON_IsString(n) && n->valuestring)
-                    AIRY_STRNCPY_TERM(next_buf, n->valuestring, sizeof(next_buf));
-                cJSON_Delete(r);
-            }
-        }
+    char next_buf[128] = "";
+    char *next = bp_json_str(rs_out, "next_step");
+
+    if (next) {
+        AIRY_STRNCPY_TERM(next_buf, next, sizeof(next_buf));
+        AIRY_FREE(next);
+    }
+    if (g_cli_json_mode) {
+        bp_emit_json("dual_think", "l1_hit", "next_step", next_buf);
+    } else if (next_buf[0] && g_cli_print_mode) {
+        cli_trace("blueprint", "L1 state machine hit (zero token)");
+        cli_outf("%s\n", next_buf);
+    } else if (next_buf[0]) {
+        char line[1024];
+
+        snprintf(line, sizeof(line), "L1 blueprint state machine: advance to step "
+                                     "%s (zero token)",
+                 next_buf);
+        cli_print_status("Dual Prof Think:blueprint", line);
+    } else
+#endif
+    {
+        char line[1024];
+
+        snprintf(line, sizeof(line), "L1 state machine hit (zero token): %s",
+                 rs_out ? rs_out : "{}");
+        cli_print_status("Dual Prof Think:blueprint", line);
+        cli_trace("blueprint", "%s", line);
+    }
+    cli_hall_emit("preflight", AIRY_HALL_CAT_CHAIN,
+                  "{\"event\":\"blueprint_hit\",\"layer\":\"L1\",\"result\":%s}",
+                  rs_out ? rs_out : "null");
+    if (!g_cli_json_mode)
+        cli_print_turn(cli_now_ms() - t0, cli_fastpath_metrics());
+}
+
+/* L2 语义缓存命中：低 token 重放上次结果；无建议时退化为原始结果直出。 */
+static void bp_l2(const char *rs_out, uint64_t t0)
+{
+#ifdef AIRY_HAS_CJSON
+    char *sugg = bp_json_str(rs_out, "suggestion");
+
+    if (sugg && sugg[0]) {
         if (g_cli_json_mode) {
-            cJSON *jroot = cJSON_CreateObject();
-            cJSON_AddStringToObject(jroot, "role", "dual_think");
-            cJSON_AddStringToObject(jroot, "type", "l1_hit");
-            cJSON_AddBoolToObject(jroot, "success", 1);
-            cJSON_AddStringToObject(jroot, "next_step", next_buf);
-            char *js = cJSON_PrintUnformatted(jroot);
-            if (js) {
-                cli_outf("%s\n", js);
-                cJSON_free(js);
-            }
-            cJSON_Delete(jroot);
-        } else if (next_buf[0] && g_cli_print_mode) {
-            cli_trace("blueprint", "L1 state machine hit (zero token)");
-            cli_outf("%s\n", next_buf);
-        } else if (next_buf[0]) {
-            char line[1024];
-            snprintf(line, sizeof(line), "L1 blueprint state machine: advance to step "
-                                         "%s (zero token)",
-                     next_buf);
-            cli_print_status("Dual Prof Think:blueprint", line);
-        } else
-#endif
-        {
-            char line[1024];
-            snprintf(line, sizeof(line), "L1 state machine hit (zero token): %s",
-                     rs_out ? rs_out : "{}");
-            cli_print_status("Dual Prof Think:blueprint", line);
-            cli_trace("blueprint", "%s", line);
+            bp_emit_json("super_agent", "l2_hit", "result", sugg);
+        } else if (g_cli_print_mode) {
+            cli_trace("blueprint",
+                      "L2 semantic cache hit (low token): replaying last result");
+            cli_print_plain(sugg, 0);
+        } else {
+            cli_print_status("Dual Prof Think:blueprint",
+                             "L2 semantic cache hit (low token): replaying last result");
+            cli_print_line("Super Agent", sugg);
         }
-        cli_hall_emit("preflight", AIRY_HALL_CAT_CHAIN,
-                      "{\"event\":\"blueprint_hit\",\"layer\":\"L1\",\"result\":%s}",
-                      rs_out ? rs_out : "null");
-        AIRY_FREE(rs_out);
-        if (!g_cli_json_mode)
-            cli_print_turn(cli_now_ms() - turn_start, cli_fastpath_metrics());
-        return 1;
+        AIRY_FREE(sugg);
+    } else
+#endif
+    {
+        char line[1024];
+
+        snprintf(line, sizeof(line), "L2 semantic cache hit (low token): %s",
+                 rs_out ? rs_out : "{}");
+        cli_print_status("Dual Prof Think:blueprint", line);
     }
-    if (strcmp(tier, "l2") == 0) {
+    cli_hall_emit("preflight", AIRY_HALL_CAT_CHAIN,
+                  "{\"event\":\"blueprint_hit\",\"layer\":\"L2\",\"result\":%s}",
+                  rs_out ? rs_out : "null");
+    if (!g_cli_json_mode)
+        cli_print_turn(cli_now_ms() - t0, cli_fastpath_metrics());
+}
+
+/* L3 miss 的语义提示：仅 semantic_hint 且非 -p/--json 时上屏，不短路回合。 */
+static void bp_hint(const char *rs_out)
+{
 #ifdef AIRY_HAS_CJSON
-        char *sugg = NULL;
-        if (rs_out) {
-            cJSON *r = cJSON_Parse(rs_out);
-            if (r) {
-                cJSON *s = cJSON_GetObjectItem(r, "suggestion");
-                if (cJSON_IsString(s) && s->valuestring)
-                    sugg = AIRY_STRDUP(s->valuestring);
-                cJSON_Delete(r);
-            }
-        }
-        if (sugg && sugg[0]) {
-            if (g_cli_json_mode) {
-                cJSON *jroot = cJSON_CreateObject();
-                cJSON_AddStringToObject(jroot, "role", "super_agent");
-                cJSON_AddStringToObject(jroot, "type", "l2_hit");
-                cJSON_AddBoolToObject(jroot, "success", 1);
-                cJSON_AddStringToObject(jroot, "result", sugg);
-                char *js = cJSON_PrintUnformatted(jroot);
-                if (js) {
-                    cli_outf("%s\n", js);
-                    cJSON_free(js);
-                }
-                cJSON_Delete(jroot);
-            } else if (g_cli_print_mode) {
-                cli_trace("blueprint",
-                          "L2 semantic cache hit (low token): replaying last result");
-                cli_print_plain(sugg, 0);
-            } else {
-                cli_print_status("Dual Prof Think:blueprint",
-                                 "L2 semantic cache hit (low token): replaying last result");
-                cli_print_line("Super Agent", sugg);
-            }
-            AIRY_FREE(sugg);
-        } else
-#endif
-        {
-            char line[1024];
-            snprintf(line, sizeof(line), "L2 semantic cache hit (low token): %s",
-                     rs_out ? rs_out : "{}");
-            cli_print_status("Dual Prof Think:blueprint", line);
-        }
-        cli_hall_emit("preflight", AIRY_HALL_CAT_CHAIN,
-                      "{\"event\":\"blueprint_hit\",\"layer\":\"L2\",\"result\":%s}",
-                      rs_out ? rs_out : "null");
-        AIRY_FREE(rs_out);
-        if (!g_cli_json_mode)
-            cli_print_turn(cli_now_ms() - turn_start, cli_fastpath_metrics());
-        return 1;
-    }
-    if (rs_out && rs_out[0]) {
-        char *hint = NULL;
+    char *hint;
+
+    if (!rs_out || !rs_out[0])
+        return;
+    hint = bp_json_str(rs_out, "suggestion");
+    if (!hint)
+        return;
+    {
         cJSON *r = cJSON_Parse(rs_out);
+        const char *reason = NULL;
+
         if (r) {
-            const char *reason = NULL;
             cJSON *rz = cJSON_GetObjectItem(r, "reason");
+
             if (cJSON_IsString(rz))
                 reason = rz->valuestring;
-            if (reason && strcmp(reason, "semantic_hint") == 0) {
-                cJSON *s = cJSON_GetObjectItem(r, "suggestion");
-                if (cJSON_IsString(s) && s->valuestring)
-                    hint = AIRY_STRDUP(s->valuestring);
+            if (!reason || strcmp(reason, "semantic_hint") != 0) {
+                cJSON_Delete(r);
+                AIRY_FREE(hint);
+                return;
             }
             cJSON_Delete(r);
         }
-        if (hint) {
-            cli_trace("blueprint", "L2 semantic hint for similar task");
-            if (!g_cli_print_mode && !g_cli_json_mode) {
-                char line[512];
-                snprintf(line, sizeof(line), "检测到相似历史任务，可参考：%s", hint);
-                cli_print_status("Dual Prof Think:blueprint", line);
-            }
-            AIRY_FREE(hint);
-        }
     }
+    cli_trace("blueprint", "L2 semantic hint for similar task");
+    if (!g_cli_print_mode && !g_cli_json_mode) {
+        char line[512];
+
+        snprintf(line, sizeof(line), "检测到相似历史任务，可参考：%s", hint);
+        cli_print_status("Dual Prof Think:blueprint", line);
+    }
+    AIRY_FREE(hint);
+#else
+    (void)rs_out;
+#endif
+}
+
+int cli_blueprint_fastpath(const char *input, uint64_t turn_start)
+{
+    char tier[8] = "l3";
+    char *rs_out = NULL;
+
+    if (!input || !input[0])
+        return 0;
+    bp_route(input, tier, sizeof(tier), &rs_out);
+    if (strcmp(tier, "l1") == 0) {
+        bp_l1(rs_out, turn_start);
+        AIRY_FREE(rs_out);
+        return 1;
+    }
+    if (strcmp(tier, "l2") == 0) {
+        bp_l2(rs_out, turn_start);
+        AIRY_FREE(rs_out);
+        return 1;
+    }
+    bp_hint(rs_out);
     AIRY_FREE(rs_out);
     return 0;
 }
