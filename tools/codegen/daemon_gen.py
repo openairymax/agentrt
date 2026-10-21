@@ -204,8 +204,8 @@ def parse_manifest(path):
     return data
 
 
-def validate(data, path):
-    """校验 manifest 契约一致性（schema v4 全量规则，见文件头注释）。"""
+def _check_head(data, path):
+    """manifest 版本、守护进程名与标识符。"""
     if data.get("manifest_version") != SCHEMA_VERSION:
         raise GenError("%s: manifest_version 必须为 %d" % (path, SCHEMA_VERSION))
 
@@ -220,6 +220,9 @@ def validate(data, path):
             raise GenError("%s: %s 非法（小写下划线标识符）: %r"
                            % (path, key, val))
 
+
+def _check_vocab(data, path):
+    """形态面与能力格词表。"""
     for key, vocab in (("facades", FACADES_VOCAB), ("slots", SLOTS_VOCAB)):
         words = data.get(key)
         if not isinstance(words, list) or not words:
@@ -229,6 +232,9 @@ def validate(data, path):
             raise GenError("%s: %s 含词表外词 %s（词表见 daemon_gen.py 常量）"
                            % (path, key, bad))
 
+
+def _check_ops(data, path):
+    """原子的 ops 词表、去重与规范排序。"""
     ops = data.get("ops") or ["ipc"]
     if not isinstance(ops, list) or not ops:
         raise GenError("%s: ops 必须为非空数组" % path)
@@ -240,6 +246,9 @@ def validate(data, path):
         raise GenError("%s: ops 存在重复" % path)
     data["ops"] = [op for op in OPS_ORDER if op in ops]
 
+
+def _check_modes(data, path):
+    """注入模式：端点装配与 cupolas 形态。"""
     endpoint = data.get("endpoint")
     if endpoint not in ENDPOINT_MODES:
         raise GenError("%s: endpoint 须为 %s 之一（v4 必填：base=生成头"
@@ -252,6 +261,9 @@ def validate(data, path):
                        % (path, sorted(CUPOLAS_MODES), cupolas))
     data["cupolas"] = cupolas
 
+
+def _check_hooks(data, path):
+    """noop 钩子词表、去重与规范排序。"""
     noop_hooks = data.get("noop_hooks") or []
     if not isinstance(noop_hooks, list):
         raise GenError("%s: noop_hooks 必须为数组: %r" % (path, noop_hooks))
@@ -263,10 +275,9 @@ def validate(data, path):
         raise GenError("%s: noop_hooks 存在重复: %s" % (path, noop_hooks))
     data["noop_hooks"] = [h for h in NOOP_HOOKS_ORDER if h in noop_hooks]
 
-    rpc = data.get("rpc")
-    if not isinstance(rpc, dict):
-        raise GenError("%s: 缺 rpc 段" % path)
 
+def _check_addr(rpc, path):
+    """RPC 地址：unix socket 与 Windows 命名管道。"""
     unix = rpc.get("unix")
     if not isinstance(unix, str) or not RE_SOCK.match(unix):
         raise GenError("%s: rpc.unix 非法（须 <name>.sock）: %r" % (path, unix))
@@ -274,6 +285,9 @@ def validate(data, path):
     if not isinstance(win_pipe, str) or not RE_IDENT.match(win_pipe):
         raise GenError("%s: rpc.win_pipe 非法: %r" % (path, win_pipe))
 
+
+def _check_port(rpc, path):
+    """端口符号 SSoT 与 tags 词形。"""
     tcp = rpc.get("tcp")
     if not isinstance(tcp, str) or not RE_PORT_SYM.match(tcp):
         raise GenError(
@@ -284,16 +298,9 @@ def validate(data, path):
     if not isinstance(tags, str) or not RE_TAGS.match(tags):
         raise GenError("%s: rpc.tags 非法（逗号分隔小写词）: %r" % (path, tags))
 
-    buffer_size = rpc.get("buffer", DEFAULT_BUFFER)
-    if not isinstance(buffer_size, int) or buffer_size < 4096:
-        raise GenError("%s: rpc.buffer 须 >= 4096: %r" % (path, buffer_size))
-    rpc["buffer"] = buffer_size
 
-    concurrent = rpc.get("concurrent", False)
-    if not isinstance(concurrent, bool):
-        raise GenError("%s: rpc.concurrent 须为布尔: %r" % (path, concurrent))
-    rpc["concurrent"] = concurrent
-
+def _check_pool(rpc, path):
+    """事件池四参数：正整数下限。"""
     pool = dict(DEFAULT_POOL)
     pool.update(rpc.get("pool") or {})
     for key in ("max_events", "min", "max", "queue"):
@@ -302,6 +309,9 @@ def validate(data, path):
                            % (path, key, pool[key]))
     rpc["pool"] = pool
 
+
+def _check_methods(rpc, path):
+    """方法名标识符、协议保留字与去重。"""
     methods = rpc.get("methods")
     if not isinstance(methods, list) or not methods:
         raise GenError("%s: rpc.methods 必须为非空数组" % path)
@@ -314,10 +324,48 @@ def validate(data, path):
     if len(set(methods)) != len(methods):
         raise GenError("%s: rpc.methods 存在重复" % path)
 
+
+def _check_rpc(data, path):
+    """rpc 段：地址、缓冲区、并发、事件池、方法表。"""
+    rpc = data.get("rpc")
+    if not isinstance(rpc, dict):
+        raise GenError("%s: 缺 rpc 段" % path)
+    _check_addr(rpc, path)
+    _check_port(rpc, path)
+
+    buffer_size = rpc.get("buffer", DEFAULT_BUFFER)
+    if not isinstance(buffer_size, int) or buffer_size < 4096:
+        raise GenError("%s: rpc.buffer 须 >= 4096: %r" % (path, buffer_size))
+    rpc["buffer"] = buffer_size
+
+    concurrent = rpc.get("concurrent", False)
+    if not isinstance(concurrent, bool):
+        raise GenError("%s: rpc.concurrent 须为布尔: %r" % (path, concurrent))
+    rpc["concurrent"] = concurrent
+
+    _check_pool(rpc, path)
+    _check_methods(rpc, path)
+
+
+def _check_deps(data, path):
+    """deps 段：缺省允许，给出时须为对象。"""
     deps = data.get("deps")
     if deps is not None and not isinstance(deps, dict):
         raise GenError("%s: deps 必须为对象" % path)
 
+
+def _check_src(path, mod_name, src):
+    """module 源文件：src/ 下相对路径、.c 结尾、禁绝对路径与上跳。"""
+    if not isinstance(src, str) or not src.endswith(".c") \
+            or "\\" in src or src.startswith("/") \
+            or ".." in src.split("/") or "" in src.split("/"):
+        raise GenError("%s: modules[%s] 源文件须为 src/ 下相对路径"
+                       "（禁绝对路径与上跳，须 .c 结尾）: %r"
+                       % (path, mod_name, src))
+
+
+def _check_modules(data, path):
+    """modules 段：名称、非空源列表、源路径合法且不重复。"""
     modules = data.get("modules")
     if not isinstance(modules, list) or not modules:
         raise GenError("%s: modules 必须为非空数组" % path)
@@ -330,16 +378,22 @@ def validate(data, path):
             raise GenError("%s: modules[%s].sources 必须为非空数组"
                            % (path, mod["name"]))
         for src in sources:
-            if not isinstance(src, str) or not src.endswith(".c") \
-                    or "\\" in src or src.startswith("/") \
-                    or ".." in src.split("/") or "" in src.split("/"):
-                raise GenError("%s: modules[%s] 源文件须为 src/ 下相对路径"
-                               "（禁绝对路径与上跳，须 .c 结尾）: %r"
-                               % (path, mod["name"], src))
+            _check_src(path, mod["name"], src)
             if src in seen:
                 raise GenError("%s: 源文件重复列出: %s" % (path, src))
             seen.add(src)
 
+
+def validate(data, path):
+    """校验 manifest 契约一致性（schema v4 全量规则，见文件头注释）。"""
+    _check_head(data, path)
+    _check_vocab(data, path)
+    _check_ops(data, path)
+    _check_modes(data, path)
+    _check_hooks(data, path)
+    _check_rpc(data, path)
+    _check_deps(data, path)
+    _check_modules(data, path)
     return data
 
 
