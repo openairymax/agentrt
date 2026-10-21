@@ -102,92 +102,104 @@ void cli_chain_record_submit(const char *exec_id, const airy_task_plan_t *plan)
                   cli_plan_deps_count(plan));
 }
 
+#ifdef AIRY_HAS_CJSON
+/* 结果体自述的成败：status 优先，缺失时看 success / error。 */
+static int body_ok(const cJSON *obj)
+{
+    const cJSON *st = cJSON_GetObjectItem(obj, "status");
+    const cJSON *ok;
+    const cJSON *errj;
+
+    if (cJSON_IsString(st) && st->valuestring)
+        return strcmp(st->valuestring, "completed") == 0;
+    ok = cJSON_GetObjectItem(obj, "success");
+    errj = cJSON_GetObjectItem(obj, "error");
+    if (cJSON_IsBool(ok) && !cJSON_IsTrue(ok))
+        return 0;
+    if (cJSON_IsString(ok) && strcmp(ok->valuestring, "true") != 0)
+        return 0;
+    return !(cJSON_IsString(errj) && errj->valuestring[0]);
+}
+#endif
+
+/* 结果体自述的成败：解析失败按成功处理（无自述即不否决）。 */
+static int task_ok_probe(const char *result)
+{
+#ifdef AIRY_HAS_CJSON
+    cJSON *rstat = cJSON_Parse(result);
+    int ok;
+
+    if (!rstat)
+        return 1;
+    ok = body_ok(rstat);
+    cJSON_Delete(rstat);
+    return ok;
+#else
+    return !(strstr(result, "\"failed\"") || strstr(result, "\"canceled\"") ||
+             strstr(result, "\"success\":false") || strstr(result, "\"error\":"));
+#endif
+}
+
+/* 单次 JSON 信封：成功携带 result，失败携带错误码。 */
+static void json_emit(const char *exec_id, int ok, const char *result, airy_err_t err)
+{
+    const char *dag_id = exec_id ? exec_id : "";
+
+#ifdef AIRY_HAS_CJSON
+    cJSON *jroot = cJSON_CreateObject();
+    char *js;
+
+    if (!jroot)
+        return;
+    cJSON_AddStringToObject(jroot, "role", "super_agent");
+    cJSON_AddStringToObject(jroot, "type", "task");
+    cJSON_AddBoolToObject(jroot, "success", ok);
+    cJSON_AddStringToObject(jroot, "dag_id", dag_id);
+    if (ok)
+        cJSON_AddStringToObject(jroot, "result", result ? result : "");
+    else
+        cJSON_AddNumberToObject(jroot, "code", (double)(int)err);
+    js = cJSON_PrintUnformatted(jroot);
+    if (js) {
+        cli_outf("%s\n", js);
+        cJSON_free(js);
+    }
+    cJSON_Delete(jroot);
+#else
+    if (ok)
+        cli_outf("{\"role\":\"super_agent\",\"type\":\"task\",\"success\":true,"
+                 "\"dag_id\":\"%s\",\"result\":\"%s\"}\n",
+                 dag_id, result ? result : "");
+    else
+        cli_outf("{\"role\":\"super_agent\",\"type\":\"task\",\"success\":false,"
+                 "\"dag_id\":\"%s\",\"code\":%d}\n",
+                 dag_id, (int)err);
+#endif
+}
+
 int cli_task_result_render(const char *result, airy_err_t err, const char *exec_id, int canceled)
 {
-    int task_succeeded = (err == AIRY_EOK && result) ? 1 : 0;
-    if (task_succeeded && result) {
-#ifdef AIRY_HAS_CJSON
-        cJSON *rstat = cJSON_Parse(result);
-        if (rstat) {
-            cJSON *st = cJSON_GetObjectItem(rstat, "status");
-            if (cJSON_IsString(st) && st->valuestring) {
-                if (strcmp(st->valuestring, "completed") != 0)
-                    task_succeeded = 0;
-            } else {
-                cJSON *ok = cJSON_GetObjectItem(rstat, "success");
-                if (cJSON_IsBool(ok) && !cJSON_IsTrue(ok))
-                    task_succeeded = 0;
-                else if (cJSON_IsString(ok) && strcmp(ok->valuestring, "true") != 0)
-                    task_succeeded = 0;
-                cJSON *errj = cJSON_GetObjectItem(rstat, "error");
-                if (errj && cJSON_IsString(errj) && errj->valuestring &&
-                    errj->valuestring[0])
-                    task_succeeded = 0;
-            }
-            cJSON_Delete(rstat);
-        }
-#else
-        if (strstr(result, "\"failed\"") || strstr(result, "\"canceled\"") ||
-            strstr(result, "\"success\":false") || strstr(result, "\"error\":"))
-            task_succeeded = 0;
-#endif
-    }
+    int ok = (err == AIRY_EOK && result) ? task_ok_probe(result) : 0;
+
     if (canceled) {
-        cli_print_line("Sub cancel Agent",
-                       "Task aborted (stopped after the current node).");
+        cli_print_line("Sub cancel Agent", "Task aborted (stopped after the current node).");
         cli_trace("result", "%s canceled", CLI_ICON_CROSS);
-    } else if (err == AIRY_EOK && result) {
-        cli_print_status("phase", "结果汇总");
-        if (g_cli_json_mode) {
-#ifdef AIRY_HAS_CJSON
-            cJSON *jroot = cJSON_CreateObject();
-            cJSON_AddStringToObject(jroot, "role", "super_agent");
-            cJSON_AddStringToObject(jroot, "type", "task");
-            cJSON_AddBoolToObject(jroot, "success", task_succeeded);
-            cJSON_AddStringToObject(jroot, "dag_id", exec_id ? exec_id : "");
-            cJSON_AddStringToObject(jroot, "result", result);
-            char *js = cJSON_PrintUnformatted(jroot);
-            if (js) {
-                cli_outf("%s\n", js);
-                cJSON_free(js);
-            }
-            cJSON_Delete(jroot);
-#else
-            cli_outf("{\"role\":\"super_agent\",\"type\":\"task\",\"success\":%s,"
-                     "\"dag_id\":\"%s\",\"result\":\"%s\"}\n",
-                     task_succeeded ? "true" : "false",
-                     exec_id ? exec_id : "", result);
-#endif
-        } else {
-            cli_print_result(result);
-        }
-        cli_trace("result", "%s success=%d", task_succeeded ? CLI_ICON_CHECK : CLI_ICON_CROSS,
-                  task_succeeded ? 1 : 0);
-    } else {
-        if (g_cli_json_mode) {
-#ifdef AIRY_HAS_CJSON
-            cJSON *jroot = cJSON_CreateObject();
-            cJSON_AddStringToObject(jroot, "role", "super_agent");
-            cJSON_AddStringToObject(jroot, "type", "task");
-            cJSON_AddBoolToObject(jroot, "success", 0);
-            cJSON_AddStringToObject(jroot, "dag_id", exec_id ? exec_id : "");
-            cJSON_AddNumberToObject(jroot, "code", (double)(int)err);
-            char *js = cJSON_PrintUnformatted(jroot);
-            if (js) {
-                cli_outf("%s\n", js);
-                cJSON_free(js);
-            }
-            cJSON_Delete(jroot);
-#else
-            cli_outf("{\"role\":\"super_agent\",\"type\":\"task\",\"success\":false,"
-                     "\"dag_id\":\"%s\",\"code\":%d}\n",
-                     exec_id ? exec_id : "", (int)err);
-#endif
-        } else {
-            char line[128];
-            snprintf(line, sizeof(line), "任务执行无结果：%s", cli_err_desc((int)err));
-            cli_print_line("Super Agent:执行结果", line);
-        }
+        return ok;
     }
-    return task_succeeded;
+    if (err == AIRY_EOK && result) {
+        cli_print_status("phase", "结果汇总");
+        if (g_cli_json_mode)
+            json_emit(exec_id, ok, result, err);
+        else
+            cli_print_result(result);
+        cli_trace("result", "%s success=%d", ok ? CLI_ICON_CHECK : CLI_ICON_CROSS, ok ? 1 : 0);
+    } else if (g_cli_json_mode) {
+        json_emit(exec_id, 0, NULL, err);
+    } else {
+        char line[128];
+
+        snprintf(line, sizeof(line), "任务执行无结果：%s", cli_err_desc((int)err));
+        cli_print_line("Super Agent:执行结果", line);
+    }
+    return ok;
 }
