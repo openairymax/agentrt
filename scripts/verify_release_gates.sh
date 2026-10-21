@@ -389,10 +389,12 @@ else
 fi
 
 _gw_cancel=$(grep -c 'if (g_cli_cancel)' "$GW" || true)
-if [ "${_gw_cancel:-0}" -ge 2 ]; then
-    ok "F2 交换双腿取消检查在位（$_gw_cancel 处 if (g_cli_cancel)）"
+_gw_legs=$(grep -cE '^static int gw_rd_(win|posix)[(]' "$GW" || true)
+if [ "${_gw_cancel:-0}" -ge 1 ] && [ "${_gw_legs:-0}" -ge 2 ] \
+   && awk '/^static int gw_rx_loop[(]/,/^}/' "$GW" | grep -Fq 'if (g_cli_cancel)'; then
+    ok "F2 交换双腿取消检查在位（单一接收环 + 双平台读腿）"
 else
-    bad "F2 取消检查不足双腿（$_gw_cancel 处，应 ≥2）"
+    bad "F2 取消检查结构不完整（接收环取消检查 $_gw_cancel 处 / 平台读腿 $_gw_legs 条）"
 fi
 
 if grep -q 'AIRY_ERR_CANCELED' "$GW"; then

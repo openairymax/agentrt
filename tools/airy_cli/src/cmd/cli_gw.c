@@ -233,55 +233,148 @@ static int cli_gw_connect(const char *host, int port, int timeout_ms)
 
 /* ── HTTP 请求发送 + 响应体读取（返回 malloc'd body，调用方 AIRY_FREE）── */
 
-/* 接收缓冲喂入统一机制（Windows/POSIX 两腿共用）：追加 n 字节后按需扩容，
- * 解析响应头（Content-Length / chunked），并判定 body 是否读满。返回
- * 0=继续、1=读满、-1=失败（*presp 已释放并置 NULL，调用方只需关连接）。
- * 完成判定统一为 (rlen - body_off) >= content_len，body_off 为头结束偏移；
- * 修正旧 POSIX 腿以固定 4 近似 body_off 的判定——大响应头下会提前 break。 */
-static int gw_recv_feed(char **presp, size_t *pcap, size_t *prlen, size_t n,
-                        int *pheader_done, size_t *pcontent_len, size_t *pbody_off,
-                        int *pis_chunked)
+/* 接收累积态：响应缓冲与解析进度随一次 exchange 存活，栈上持有。完成
+ * 判定统一为 (len - body_off) >= content_len（旧 POSIX 腿用固定 4 近似
+ * body_off，大响应头下会提前 break）。 */
+typedef struct {
+    char *buf;
+    size_t cap;
+    size_t len;
+    size_t body_off;
+    size_t content_len;
+    long long budget;
+    int header_done;
+    int chunked;
+} gw_rx_t;
+
+/* 平台读腿的返回细分：0=已读到（*out 为 0 表示结束），1=继续等待。 */
+#define GW_RX_ERROR (-1)
+#define GW_RX_CANCEL (-2)
+#define GW_RX_MORE 1
+
+/* 解析响应头（仅首次）：定位头结束、Content-Length 与 chunked 标记。 */
+static void gw_rx_hdr(gw_rx_t *rx)
 {
-    *prlen += n;
-    if (*prlen >= *pcap) {
-        size_t cap = *pcap * 2;
+    char *he = memmem(rx->buf, rx->len, "\r\n\r\n", 4);
+    size_t hlen;
+    char *cl;
+
+    if (!he)
+        return;
+    rx->header_done = 1;
+    hlen = (size_t)(he - rx->buf) + 4;
+    rx->body_off = hlen;
+    cl = memmem(rx->buf, hlen, "Content-Length:", 15);
+    if (!cl)
+        cl = memmem(rx->buf, hlen, "content-length:", 15);
+    if (cl)
+        rx->content_len = (size_t)strtoull(cl + 15, NULL, 10);
+    if (memmem(rx->buf, hlen, "Transfer-Encoding:", 18) &&
+        memmem(rx->buf, hlen, "chunked", 7))
+        rx->chunked = 1;
+}
+
+/* 追加 n 字节到接收缓冲，并按 Content-Length / chunked 判定是否收全。
+ * 返回 1=响应完整；0=继续接收；-1=超过 CLI_GW_MAX_BODY 或扩容失败。 */
+static int gw_recv_feed(gw_rx_t *rx, size_t n)
+{
+    rx->len += n;
+    if (rx->len >= rx->cap) {
+        size_t cap = rx->cap * 2;
+        char *nb;
+
         if (cap > CLI_GW_MAX_BODY) {
-            AIRY_FREE(*presp);
-            *presp = NULL;
+            AIRY_FREE(rx->buf);
+            rx->buf = NULL;
             return -1;
         }
-        char *nb = (char *)AIRY_REALLOC(*presp, cap);
+        nb = (char *)AIRY_REALLOC(rx->buf, cap);
         if (!nb) {
-            AIRY_FREE(*presp);
-            *presp = NULL;
+            AIRY_FREE(rx->buf);
+            rx->buf = NULL;
             return -1;
         }
-        *presp = nb;
-        *pcap = cap;
+        rx->buf = nb;
+        rx->cap = cap;
     }
 
-    if (!*pheader_done) {
-        char *he = memmem(*presp, *prlen, "\r\n\r\n", 4);
-        if (!he)
+    if (!rx->header_done)
+        gw_rx_hdr(rx);
+    if (!rx->chunked && rx->content_len > 0 &&
+        (rx->len - rx->body_off) >= rx->content_len)
+        return 1;
+    if (!rx->chunked && rx->content_len == 0 && rx->body_off &&
+        rx->len > rx->body_off)
+        return 1;
+    return 0;
+}
+
+#ifdef _WIN32
+/* Winsock 读腿：非阻塞 recv；WSAEWOULDBLOCK 以 10ms 步进扣减预算。 */
+static int gw_rd_win(int fd, gw_rx_t *rx, ssize_t *out)
+{
+    *out = recv(fd, rx->buf + rx->len, (int)(rx->cap - rx->len), 0);
+    if (*out >= 0)
+        return 0;
+    if (WSAGetLastError() != WSAEWOULDBLOCK) {
+        *out = 0;
+        return 0;
+    }
+    Sleep(10);
+    rx->budget -= 10;
+    return GW_RX_MORE;
+}
+#else
+/* POSIX 读腿：poll ≤100ms 后 recv；空转窗口继续等待直至总预算耗尽
+ * （0.1.14 修复：原实现 poll 返回 0 即 break，响应到达前的任何 >100ms
+ * 空闲都会被提前判死，误报"网关不在线"）。 */
+static int gw_rd_posix(int fd, gw_rx_t *rx, ssize_t *out)
+{
+    struct pollfd pfd = { fd, POLLIN, 0 };
+    int wait = (int)(rx->budget > 100 ? 100 : rx->budget);
+    int pr = poll(&pfd, 1, wait);
+
+    if (pr < 0)
+        return (errno == EINTR) ? GW_RX_MORE : 0;
+    if (pr == 0) {
+        rx->budget -= wait;
+        return GW_RX_MORE;
+    }
+    *out = recv(fd, rx->buf + rx->len, rx->cap - rx->len, 0);
+    if (*out >= 0)
+        return 0;
+    if (errno == EINTR)
+        return GW_RX_MORE;
+    *out = 0;
+    return 0;
+}
+#endif
+
+#ifdef _WIN32
+#define GW_RD(fd, rx, out) gw_rd_win((fd), (rx), (out))
+#else
+#define GW_RD(fd, rx, out) gw_rd_posix((fd), (rx), (out))
+#endif
+
+/* 接收主循环：平台读腿只负责一次等待+读取，完成判定与预算语义集中在此。 */
+static int gw_rx_loop(int fd, gw_rx_t *rx)
+{
+    while (rx->budget > 0) {
+        ssize_t n = 0;
+        int rc;
+
+        if (g_cli_cancel)
+            return GW_RX_CANCEL;
+        if (GW_RD(fd, rx, &n) == GW_RX_MORE)
+            continue;
+        if (n == 0)
             return 0;
-        *pheader_done = 1;
-        size_t hlen = (size_t)(he - *presp) + 4;
-        *pbody_off = hlen;
-        char *cl = memmem(*presp, hlen, "Content-Length:", 15);
-        if (!cl)
-            cl = memmem(*presp, hlen, "content-length:", 15);
-        if (cl)
-            *pcontent_len = (size_t)strtoull(cl + 15, NULL, 10);
-        if (memmem(*presp, hlen, "Transfer-Encoding:", 18) &&
-            memmem(*presp, hlen, "chunked", 7))
-            *pis_chunked = 1;
+        rc = gw_recv_feed(rx, (size_t)n);
+        if (rc < 0)
+            return GW_RX_ERROR;
+        if (rc > 0)
+            return 0;
     }
-
-    if (!*pis_chunked && *pcontent_len > 0 &&
-        (*prlen - *pbody_off) >= *pcontent_len)
-        return 1;
-    if (!*pis_chunked && *pcontent_len == 0 && *pbody_off && *prlen > *pbody_off)
-        return 1;
     return 0;
 }
 
@@ -300,20 +393,11 @@ static int cli_gw_status_line(const char *resp, size_t hlen)
     return (c[0] - '0') * 100 + (c[1] - '0') * 10 + (c[2] - '0');
 }
 
-static int cli_gw_exchange(const char *method, const char *host, int port, const char *path,
-                           const char *body, int timeout_ms, char **out_body, size_t *out_body_len,
-                           int *out_status)
+/* 构造 HTTP/1.1 请求头（含 Content-Length）。返回头部字节数，超长返回 -1。 */
+static int gw_build_req(const char *method, const char *host, int port,
+                        const char *path, const char *body, char *req, size_t reqsz)
 {
-    *out_body = NULL;
-    *out_body_len = 0;
-    if (out_status)
-        *out_status = 0;
-    int fd = cli_gw_connect(host, port, timeout_ms);
-    if (fd < 0)
-        return -1;
-
-    char req[512];
-    int reqn = snprintf(req, sizeof(req),
+    int reqn = snprintf(req, reqsz,
                         "%s %s HTTP/1.1\r\n"
                         "Host: %s:%d\r\n"
                         "Content-Type: application/json\r\n"
@@ -322,38 +406,28 @@ static int cli_gw_exchange(const char *method, const char *host, int port, const
                         "Accept: text/event-stream\r\n"
                         "\r\n",
                         method, path, host, port, body ? strlen(body) : 0);
-    /* P2: snprintf returns the would-be length; if it exceeds the stack
-     * buffer the header was truncated and the memcpy below would over-read. */
-    if (reqn < 0 || (size_t)reqn >= sizeof(req)) {
-        fprintf(stderr, "cli_gw: request header too long (path/host)\n");
-#ifdef _WIN32
-        closesocket(fd);
-#else
-        close(fd);
-#endif
-        return -1;
-    }
 
-    /* 发送（先请求头 + body） */
-    size_t to_send = (size_t)reqn + (body ? strlen(body) : 0);
-    size_t sent = 0;
-    if (reqn > 0)
-        sent += (size_t)reqn;
-    if (body)
-        sent += strlen(body);
-    char *buf = (char *)AIRY_MALLOC(to_send + 1);
-    if (!buf) {
-#ifdef _WIN32
-        closesocket(fd);
-#else
-        close(fd);
-#endif
+    /* P2: snprintf 返回的是应写长度；超出栈缓冲即表示头部已被截断。 */
+    if (reqn < 0 || (size_t)reqn >= reqsz) {
+        fprintf(stderr, "cli_gw: request header too long (path/host)\n");
         return -1;
     }
-    __builtin_memcpy(buf, req, (size_t)reqn);
-    if (body)
-        __builtin_memcpy(buf + reqn, body, strlen(body));
+    return reqn;
+}
+
+/* 发送请求头 + body（body 可为 NULL）；未发完即判传输失败。 */
+static int gw_send_req(int fd, const char *req, size_t reqn, const char *body)
+{
+    size_t blen = body ? strlen(body) : 0;
+    size_t to_send = reqn + blen;
+    char *buf = (char *)AIRY_MALLOC(to_send + 1);
     size_t off = 0;
+
+    if (!buf)
+        return -1;
+    __builtin_memcpy(buf, req, reqn);
+    if (body)
+        __builtin_memcpy(buf + reqn, body, blen);
     while (off < to_send) {
 #ifdef _WIN32
         int n = send(fd, buf + off, (int)(to_send - off), 0);
@@ -365,187 +439,147 @@ static int cli_gw_exchange(const char *method, const char *host, int port, const
         off += (size_t)n;
     }
     AIRY_FREE(buf);
-    if (off < to_send) {
-#ifdef _WIN32
-        closesocket(fd);
-        WSACleanup();
-#else
-        close(fd);
-#endif
-        return -1;
-    }
+    return (off < to_send) ? -1 : 0;
+}
 
-    /* 接收（先收头，找 Content-Length / chunked，再收 body） */
-    size_t cap = CLI_GW_RECV_CHUNK;
-    char *resp = (char *)AIRY_MALLOC(cap);
-    if (!resp) {
-#ifdef _WIN32
-        closesocket(fd);
-        WSACleanup();
-#else
-        close(fd);
-#endif
+/* 接收态初始化：缓冲初值 CLI_GW_RECV_CHUNK，预算为 timeout_ms。 */
+static int gw_rx_init(gw_rx_t *rx, int timeout_ms)
+{
+    AIRY_MEMSET(rx, 0, sizeof(*rx));
+    rx->buf = (char *)AIRY_MALLOC(CLI_GW_RECV_CHUNK);
+    if (!rx->buf)
         return -1;
-    }
-    size_t rlen = 0;
-    int header_done = 0;
-    size_t content_len = 0;
-    size_t body_off = 0;
-    int is_chunked = 0;
-    int canceled = 0; /* S-02：两腿共用，Ctrl+C 命中即置位 */
-    long long total_timeout = (long long)timeout_ms;
-#ifdef _WIN32
-    while (total_timeout > 0) {
-        if (g_cli_cancel) { /* S-02：Ctrl+C 立即中断接收等待（≤10ms 响应） */
-            canceled = 1;
-            break;
-        }
-        int n = recv(fd, resp + rlen, (int)(cap - rlen), 0);
-        if (n == 0)
-            break;
-        if (n < 0) {
-            int err = WSAGetLastError();
-            if (err == WSAEWOULDBLOCK) {
-                Sleep(10);
-                total_timeout -= 10;
-                continue;
-            }
-            break;
-        }
-        int rc = gw_recv_feed(&resp, &cap, &rlen, (size_t)n, &header_done,
-                              &content_len, &body_off, &is_chunked);
-        if (rc < 0) {
-            closesocket(fd);
-            WSACleanup();
-            return -1;
-        }
-        if (rc > 0)
-            break;
-    }
-#else
-    while (total_timeout > 0) {
-        if (g_cli_cancel) { /* S-02：Ctrl+C 立即中断接收等待（poll ≤100ms 步进） */
-            canceled = 1;
-            break;
-        }
-        struct pollfd pfd;
-        pfd.fd = fd;
-        pfd.events = POLLIN;
-        pfd.revents = 0;
-        int wait = (int)(total_timeout > 100 ? 100 : total_timeout);
-        int pr = poll(&pfd, 1, wait);
-        if (pr < 0) {
-            if (errno == EINTR)
-                continue;
-            break;
-        }
-        if (pr == 0) {
-            /* 0.1.14 修复：空转窗口继续等待直至总预算耗尽。原实现 poll
-             * 返回 0 即 break——响应到达前的任何 >100ms 空闲（如
-             * think.process 规划需数秒）都会被提前判死，误报
-             * "网关不在线"（0.1.13 实机回归实锤；Windows 腿语义正确）。 */
-            total_timeout -= wait;
-            continue;
-        }
-        ssize_t n = recv(fd, resp + rlen, cap - rlen, 0);
-        if (n == 0)
-            break;
-        if (n < 0) {
-            if (errno == EINTR)
-                continue;
-            break;
-        }
-        int rc = gw_recv_feed(&resp, &cap, &rlen, (size_t)n, &header_done,
-                              &content_len, &body_off, &is_chunked);
-        if (rc < 0) {
-            close(fd);
-            return -1;
-        }
-        if (rc > 0)
-            break;
-    }
-#endif
+    rx->cap = CLI_GW_RECV_CHUNK;
+    rx->budget = (long long)timeout_ms;
+    return 0;
+}
+
+/* 关闭连接（Winsock 腿需配平 WSAStartup）。 */
+static void gw_close(int fd)
+{
 #ifdef _WIN32
     closesocket(fd);
     WSACleanup();
 #else
     close(fd);
 #endif
+}
 
-    /* S-02：用户取消优先于一切失败判定（rlen 可能半途） */
-    if (canceled) {
-        AIRY_FREE(resp);
-        return CLI_GW_EXCH_CANCELED;
-    }
-    /* 接收预算耗尽即超时（两腿同构：POSIX poll 空转扣减 / Win
-     * WSAEWOULDBLOCK 扣减）。与传输失败（对端拒绝/早断）区分，供
-     * cli_gw_call 填写可诊断文案——超时 ≠ 网关不在线。 */
-    int timed_out = (total_timeout <= 0);
-
-    if (rlen == 0) {
-        AIRY_FREE(resp);
-        return timed_out ? CLI_GW_EXCH_TIMEOUT : -1;
-    }
-    /* 定位 header 结束，body = 其后内容 */
-    char *he = memmem(resp, rlen, "\r\n\r\n", 4);
-    if (!he) {
-        AIRY_FREE(resp);
-        return timed_out ? CLI_GW_EXCH_TIMEOUT : -1;
-    }
-    size_t hlen = (size_t)(he - resp) + 4;
-    char *body_start = resp + hlen;
-    size_t body_len = rlen - hlen;
-    if (out_status)
-        *out_status = cli_gw_status_line(resp, (size_t)(he - resp));
-    if (is_chunked) {
-        /* 简单 chunked 解码（CLI 侧 SSE 场景） */
-        char *out = (char *)AIRY_MALLOC(body_len + 1);
-        if (!out) {
-            AIRY_FREE(resp);
-            return -1;
-        }
-        size_t o = 0;
-        char *p = body_start;
-        char *end = body_start + body_len;
-        while (p < end) {
-            char *nl = memmem(p, (size_t)(end - p), "\r\n", 2);
-            if (!nl)
-                break;
-            size_t sz = (size_t)strtoull(p, NULL, 16);
-            if (sz == 0)
-                break;
-            if ((size_t)(end - (nl + 2)) < sz)
-                break;
-            __builtin_memcpy(out + o, nl + 2, sz);
-            o += sz;
-            p = nl + 2 + (ssize_t)sz + 2;
-        }
-        out[o] = '\0';
-        AIRY_FREE(resp);
-        *out_body = out;
-        *out_body_len = o;
-        return 0;
-    }
+/* chunked 正文解码（CLI 侧 SSE 场景），返回 malloc'd 缓冲。 */
+static char *gw_chunked_plain(const char *body, size_t body_len, size_t *out_len)
+{
     char *out = (char *)AIRY_MALLOC(body_len + 1);
-    if (!out) {
-        AIRY_FREE(resp);
-        return -1;
+    size_t o = 0;
+    char *p = (char *)body;
+    char *end = (char *)body + body_len;
+
+    if (!out)
+        return NULL;
+    while (p < end) {
+        char *nl = memmem(p, (size_t)(end - p), "\r\n", 2);
+        size_t sz;
+
+        if (!nl)
+            break;
+        sz = (size_t)strtoull(p, NULL, 16);
+        if (sz == 0)
+            break;
+        if ((size_t)(end - (nl + 2)) < sz)
+            break;
+        __builtin_memcpy(out + o, nl + 2, sz);
+        o += sz;
+        p = nl + 2 + sz + 2;
     }
-    __builtin_memcpy(out, body_start, body_len);
+    out[o] = '\0';
+    *out_len = o;
+    return out;
+}
+
+/* 非 chunked 正文复制（补 NUL 结尾）。 */
+static char *gw_body_dup(const char *body, size_t body_len, size_t *out_len)
+{
+    char *out = (char *)AIRY_MALLOC(body_len + 1);
+
+    if (!out)
+        return NULL;
+    __builtin_memcpy(out, body, body_len);
     out[body_len] = '\0';
-    AIRY_FREE(resp);
+    *out_len = body_len;
+    return out;
+}
+
+/* 从接收态切出正文：定位头部、填状态码、按 chunked 解码。
+ * 返回 0=成功；CLI_GW_EXCH_TIMEOUT=无完整头部且预算耗尽；-1=失败。 */
+static int gw_body_take(gw_rx_t *rx, char **out_body, size_t *out_len, int *out_status)
+{
+    char *he;
+    size_t hlen;
+    size_t olen = 0;
+    char *out;
+
+    if (rx->len == 0)
+        return (rx->budget <= 0) ? CLI_GW_EXCH_TIMEOUT : -1;
+    he = memmem(rx->buf, rx->len, "\r\n\r\n", 4);
+    if (!he)
+        return (rx->budget <= 0) ? CLI_GW_EXCH_TIMEOUT : -1;
+    hlen = (size_t)(he - rx->buf) + 4;
+    if (out_status)
+        *out_status = cli_gw_status_line(rx->buf, (size_t)(he - rx->buf));
+    if (rx->chunked)
+        out = gw_chunked_plain(rx->buf + hlen, rx->len - hlen, &olen);
+    else
+        out = gw_body_dup(rx->buf + hlen, rx->len - hlen, &olen);
+    if (!out)
+        return -1;
     *out_body = out;
-    *out_body_len = body_len;
+    *out_len = olen;
     return 0;
 }
 
+static int cli_gw_exchange(const char *method, const char *host, int port, const char *path,
+                           const char *body, int timeout_ms, char **out_body, size_t *out_body_len,
+                           int *out_status)
+{
+    char req[512];
+    int reqn;
+    int fd;
+    gw_rx_t rx;
+    int rc;
+
+    *out_body = NULL;
+    *out_body_len = 0;
+    if (out_status)
+        *out_status = 0;
+    reqn = gw_build_req(method, host, port, path, body, req, sizeof(req));
+    if (reqn < 0)
+        return -1;
+    fd = cli_gw_connect(host, port, timeout_ms);
+    if (fd < 0)
+        return -1;
+    if (gw_send_req(fd, req, (size_t)reqn, body) != 0 ||
+        gw_rx_init(&rx, timeout_ms) != 0) {
+        gw_close(fd);
+        return -1;
+    }
+    rc = gw_rx_loop(fd, &rx);
+    gw_close(fd);
+    if (rc == GW_RX_CANCEL) {
+        AIRY_FREE(rx.buf);
+        return CLI_GW_EXCH_CANCELED;
+    }
+    if (rc == GW_RX_ERROR) {
+        AIRY_FREE(rx.buf);
+        return -1;
+    }
+    rc = gw_body_take(&rx, out_body, out_body_len, out_status);
+    AIRY_FREE(rx.buf);
+    return rc;
+}
+
 /* N-3（0.1.16）：provider 400/422（请求体非法，典型是消息含无效 UTF-8 →
- * "invalid unicode code point"）在 llm_d 已归入专用码 AIRY_ERR_LLM_BAD_REQUEST，
- * 经 llm_error_message() 渲染为 "Provider rejected the request body (HTTP
- * 400/422): malformed JSON or invalid UTF-8 in messages; …"（见
- * openai_rate_limit.c / provider_stream.c / rpc/methods.c）。但网关
- * 转发时把 daemon 错误码统一折叠为 -32603，只透传 message 文本，故 CLI 侧
- * 对网关 error.message 做特征分诊，避免把 provider 400 误报为"读写错误/
+ * "invalid unicode code point"）在 llm_d 已归入 AIRY_ERR_LLM_BAD_REQUEST，
+ * 但网关转发时把 daemon 错误码统一折叠为 -32603、只透传 message 文本，故
+ * CLI 侧对 error.message 做特征分诊，避免把 provider 400 误报为"读写错误/
  * 网络错误"（R-1 已处理 401/403，R-5 已处理超时/连接失败，此处补齐 400/422）。
  * 返回：2=请求体被明确拒绝；1=provider 请求失败（请求体非法或不可达）；
  *       0=与 provider 无关。 */
