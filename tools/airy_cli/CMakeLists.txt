@@ -50,6 +50,8 @@ add_executable(airy_cli
     src/core/cli_hall.c
     # daemon_cmds.c 域拆分（2026-08-27：1480 行 → 3 个命名空间模块）
     src/cmd/airy_cli_cmd_system.c
+    # 0.1.19 §458：进程生命周期与自愈协调自 cmd_system 拆出（910 → 两件）
+    src/cmd/cli_daemon_lifecycle.c
     src/cmd/airy_cli_cmd_cognition.c
     src/cmd/airy_cli_cmd_capability.c
     # 0.1.17 R5-G4 审批视图：tool.pending 只读视图 + tool.approve 决议回传
