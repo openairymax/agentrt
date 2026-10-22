@@ -381,9 +381,11 @@ fi
 section "F" "9.7/S-02 长任务可取消 + 超时可诊断（稳定问题：Ctrl+C 假死/超时黑箱）"
 
 GW="$CLI/src/cmd/cli_gw.c"
-if grep -Fq '#define CLI_GW_EXCH_CANCELED' "$GW" \
-   && grep -Fq '#define CLI_GW_EXCH_TIMEOUT' "$GW"; then
-    ok "F1 交换状态码 CANCELED/TIMEOUT 常量在位"
+GW_RPC="$CLI/src/cmd/cli_gw_rpc.c"
+GW_INT="$CLI/include/cli_gw_int.h"
+if grep -Fq '#define CLI_GW_EXCH_CANCELED' "$GW_INT" \
+   && grep -Fq '#define CLI_GW_EXCH_TIMEOUT' "$GW_INT"; then
+    ok "F1 交换状态码 CANCELED/TIMEOUT 常量在位（cli_gw_int.h 契约唯一）"
 else
     bad "F1 CLI_GW_EXCH_CANCELED/TIMEOUT 常量缺失"
 fi
@@ -397,7 +399,7 @@ else
     bad "F2 取消检查结构不完整（接收环取消检查 $_gw_cancel 处 / 平台读腿 $_gw_legs 条）"
 fi
 
-if grep -q 'AIRY_ERR_CANCELED' "$GW"; then
+if grep -q 'AIRY_ERR_CANCELED' "$GW_RPC"; then
     ok "F3 取消映射 AIRY_ERR_CANCELED 在位（诊断可区分取消/超时）"
 else
     bad "F3 AIRY_ERR_CANCELED 映射缺失"

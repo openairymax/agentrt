@@ -27,6 +27,15 @@ message(STATUS "airy_cli version (SSoT): ${AIRY_CLI_VERSION}")
 # 源/头分离布局（2026-08-19）：include/ 公共头，src/ 实现
 # 2026-08-27 目录原子化：src/ 按功能域组织
 #   core/ 入口与编排管线 · cmd/ 命令面 · chat/ 对话会话 · tui/ 终端界面 · render/ 渲染与展示
+
+# 网关客户端 SSoT（0.1.19 §452 分层：传输在 cli_gw.c，JSON-RPC 在
+# cli_gw_rpc.c，两者以 include/cli_gw_int.h 为唯一契约）。所有引用网关
+# 客户端的可执行目标一律展开此变量，禁止只链其中一半。
+set(CLI_GW_SRCS
+    src/cmd/cli_gw.c
+    src/cmd/cli_gw_rpc.c
+)
+
 add_executable(airy_cli
     src/core/main.c
     # main.c 域拆分（2026-08-27：1930 行 → 3 个职责模块）
@@ -84,7 +93,7 @@ add_executable(airy_cli
     # S-5 编排管线：/orch 命令（orchestrator 七阶段流程编排）
     src/core/cli_orch.c
     # 架构约束（2026-08-25）：统一网关客户端（所有客户端必须经 gateway 派发）
-    src/cmd/cli_gw.c
+    ${CLI_GW_SRCS}
     # 0.1.19 N4：会话存活节拍（代次比对 + stale 重建）
     src/cmd/cli_live.c
 )
@@ -207,7 +216,7 @@ if(BUILD_TESTS)
     # （linux/macos）保障；Windows 侧只跑可移植的 cli_classify_heuristic。
     if(NOT WIN32)
         add_executable(test_cli_gw tests/test_cli_gw.c tests/cli_test_globals.c
-                       src/cmd/cli_gw.c)
+                       ${CLI_GW_SRCS})
         target_include_directories(test_cli_gw PRIVATE ${CLI_INC_DIRS})
         # AIRY_COMPLIANCE_IMPL：测试 TU 的 mock 服务端使用裸 memset/sscanf/free，
         # 需豁免全局 banned_functions.h 毒化（与 gateway/tests 同策略）。
@@ -229,7 +238,7 @@ if(BUILD_TESTS)
     # ——该路径的累计字段即厂商 usage 字段，可逐项断言映射关系。
     if(NOT WIN32)
         add_executable(test_cli_usage tests/test_cli_usage.c tests/cli_test_globals.c
-                       src/chat/cli_chat_usage.c src/cmd/cli_gw.c)
+                       src/chat/cli_chat_usage.c ${CLI_GW_SRCS})
         target_include_directories(test_cli_usage PRIVATE ${CLI_INC_DIRS})
         target_compile_definitions(test_cli_usage PRIVATE AIRY_HAS_CJSON=1)
         if(AIRY_CJSON_INCLUDE_DIRS)
@@ -255,7 +264,7 @@ if(BUILD_TESTS)
     if(NOT WIN32)
         add_executable(test_cli_approval tests/test_cli_approval.c
                        tests/cli_test_globals.c
-                       src/cmd/airy_cli_cmd_approval.c src/cmd/cli_gw.c
+                       src/cmd/airy_cli_cmd_approval.c ${CLI_GW_SRCS}
                        src/render/cli_render.c src/core/cli_dag.c
                        src/core/cli_term.c)
         target_include_directories(test_cli_approval PRIVATE ${CLI_INC_DIRS})
@@ -284,7 +293,7 @@ if(BUILD_TESTS)
         add_executable(test_cli_session tests/test_cli_session.c
                        tests/cli_test_globals.c
                        src/chat/cli_chat_session.c src/chat/cli_chat_history.c
-                       src/cmd/cli_gw.c src/render/cli_render.c
+                       ${CLI_GW_SRCS} src/render/cli_render.c
                        src/core/cli_dag.c src/core/cli_term.c)
         target_include_directories(test_cli_session PRIVATE ${CLI_INC_DIRS})
         target_compile_definitions(test_cli_session PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
@@ -307,7 +316,7 @@ if(BUILD_TESTS)
     if(NOT WIN32)
         add_executable(test_cli_errdesc tests/test_cli_errdesc.c
                        tests/cli_test_globals.c
-                       src/cmd/cli_gw.c src/render/cli_render.c
+                       ${CLI_GW_SRCS} src/render/cli_render.c
                        src/core/cli_dag.c src/core/cli_term.c)
         target_include_directories(test_cli_errdesc PRIVATE ${CLI_INC_DIRS})
         target_compile_definitions(test_cli_errdesc PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
@@ -331,7 +340,7 @@ if(BUILD_TESTS)
     if(NOT WIN32)
         add_executable(test_cli_live tests/test_cli_live.c
                        tests/cli_test_globals.c
-                       src/cmd/cli_live.c src/cmd/cli_gw.c
+                       src/cmd/cli_live.c ${CLI_GW_SRCS}
                        src/render/cli_render.c src/core/cli_dag.c
                        src/core/cli_term.c)
         target_include_directories(test_cli_live PRIVATE ${CLI_INC_DIRS})
