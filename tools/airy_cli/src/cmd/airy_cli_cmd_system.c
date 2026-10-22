@@ -3,13 +3,14 @@
 
 /**
  * @file airy_cli_cmd_system.c
- * @brief System-face daemon commands: RPC infrastructure, health check,
- *        daemon lifecycle (start/stop/restart), self-heal reconcile.
+ * @brief System-face daemon commands: shared table, namespace and socket
+ *        resolution, generic RPC printer, /daemons view, /daemon control
+ *        dispatch, /stats rendering.
  *
- * Split from daemon_cmds.c.  Owns the shared CLI_DAEMONS table, namespace
- * resolution, socket path building, the generic RPC printer, the /daemons
- * health check (with gateway TCP probe), and the declarative self-heal
- * reconcile loop.
+ * Daemon process lifecycle and the self-heal reconcile loop live in
+ * cli_daemon_lifecycle.c (§458): spawning a process and waiting for its
+ * readiness depend on a different platform surface than read-only views,
+ * and keeping them here pushed the file past the 800-line budget.
  */
 
 #include "daemon_cmds.h"
@@ -19,7 +20,6 @@
 #include "airy_defaults.h"
 #include "airy_memory.h"
 #include "cli_render.h"
-#include "logger.h"
 #include "platform.h"
 /* Windows 无 dirent.h：airy_dirent.h 在 _WIN32 下以 FindFirstFileA 提供
    DIR/opendir/readdir/closedir（#112 实证 cmd_system.c C2065 DIR） */
@@ -28,30 +28,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <windows.h>
-#include <process.h>
-#include <io.h>
-#include <sys/stat.h>
-#else
-#include <arpa/inet.h>
-#include <dirent.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <poll.h>
-#include <signal.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#endif
 
 #define CLI_GW_PROBE_TIMEOUT_MS 1000
 
@@ -76,6 +52,11 @@ const cli_daemon_desc_t CLI_DAEMONS[] = {
     {"notify", "notify.sock", "health_check"},
     {"a2a", "a2a.sock", "health_check"},
 };
+
+/* 容量口径唯一来源：仅在表定义所在 TU 成立（见 airy_cli_cmd_internal.h）。 */
+#define CLI_DAEMONS_COUNT (sizeof(CLI_DAEMONS) / sizeof(CLI_DAEMONS[0]))
+
+size_t cli_daemons_count(void) { return CLI_DAEMONS_COUNT; }
 
 /* 运行时自动发现（0.1.7）：枚举 $AIRY_HOME/bin 下所有 *_d 后缀可执行
    （排除 gateway_d 与 maths_d——前者为 HTTP 服务、后者为符号计算后端
@@ -192,7 +173,7 @@ const char *cli_ns_sock(const char *ns)
 /* 0.1.19 直印化：Sub <ns> Agent 动态头（ns 运行期可变，无法字面量直印）。
  * is_err 非零走 cli_print_line（-p 下保留），零走 cli_print_status（-p 下
  * 静默），与直印化前的 -p 语义逐点等价。 */
-static void cli_sub_print(int is_err, const char *ns, const char *text)
+void cli_sub_print(int is_err, const char *ns, const char *text)
 {
     char hdr[80];
     snprintf(hdr, sizeof(hdr), "Sub %s Agent", ns);
@@ -269,6 +250,17 @@ int cmd_rpc(const char *arg, void *ctx)
     return 0;
 }
 
+/* 一次 health_check 探测：rc 与结果体双条件，与 /daemon status 的
+ * cli_daemon_online 保持同一判据来源（daemon_rpc_client 的返回约定）。 */
+static int daemon_state(const char *ns, const char *method)
+{
+    char *result = NULL;
+    int rc = daemon_rpc_call(cli_ns_sock(ns), method, NULL, &result, 6000);
+    int up = (rc == 0 && result) ? 1 : 0;
+    AIRY_FREE(result);
+    return up;
+}
+
 int cmd_daemons(const char *arg, void *ctx)
 {
     (void)arg; (void)ctx;
@@ -280,85 +272,19 @@ int cmd_daemons(const char *arg, void *ctx)
     const cli_daemon_desc_t *tab = dcount ? dyn : CLI_DAEMONS;
     cli_print_status("Super Agent:daemon", "health check");
     for (size_t i = 0; i < total; i++) {
-        char *result = NULL;
-        int rc = daemon_rpc_call(cli_ns_sock(tab[i].ns), tab[i].health_method,
-                                 NULL, &result, 6000);
-        if (rc == 0 && result) {
-            if (g_cli_print_mode) cli_outf("%s online\n", tab[i].ns);
-            else cli_print_status(tab[i].ns, "在线 100%");
-            online++;
-        } else {
-            if (g_cli_print_mode) cli_outf("%s offline\n", tab[i].ns);
-            else cli_print_status(tab[i].ns, "离线 0%");
-        }
-        AIRY_FREE(result);
+        int up = daemon_state(tab[i].ns, tab[i].health_method);
+        if (g_cli_print_mode) cli_outf("%s %s\n", tab[i].ns, up ? "online" : "offline");
+        else cli_print_status(tab[i].ns, up ? "在线 100%" : "离线 0%");
+        online += up;
     }
-    /* gateway TCP probe */
-    {
-        /* 0.1.6h：统一经 cli_gw_endpoint 取实际端口（run/gateway.port
-         * 优先，端口漂移兼容），不再裸用 8080——完整启动器漂移到 8083+
-         * 后 /daemons 会误报 gateway offline。 */
-        char gw_host[128] = "127.0.0.1";
-        int gw_port = 0; /* cli_gw_endpoint 无条件回填，此处不复刻端口字面量 */
-        cli_gw_endpoint(gw_host, sizeof(gw_host), &gw_port);
-        int gw_ok = 0;
-#ifdef _WIN32
-        WSADATA wsa;
-        if (WSAStartup(MAKEWORD(2, 2), &wsa) == 0) {
-            SOCKET s = socket(AF_INET, SOCK_STREAM, 0);
-            if (s != INVALID_SOCKET) {
-                u_long nb = 1;
-                ioctlsocket(s, FIONBIO, &nb);
-                struct sockaddr_in sa;
-                sa.sin_family = AF_INET;
-                sa.sin_port = htons((unsigned short)gw_port);
-                sa.sin_addr.s_addr = inet_addr(gw_host);
-                if (connect(s, (struct sockaddr *)&sa, sizeof(sa)) == 0) {
-                    gw_ok = 1;
-                } else {
-                    fd_set wf; FD_ZERO(&wf); FD_SET(s, &wf);
-                    struct timeval tv;
-                    tv.tv_sec = CLI_GW_PROBE_TIMEOUT_MS / 1000;
-                    tv.tv_usec = (long)(CLI_GW_PROBE_TIMEOUT_MS % 1000) * 1000L;
-                    if (select(0, NULL, &wf, NULL, &tv) > 0) {
-                        int soerr = 0; int slen = sizeof(soerr);
-                        if (getsockopt(s, SOL_SOCKET, SO_ERROR, (char *)&soerr, &slen) == 0 &&
-                            soerr == 0) gw_ok = 1;
-                    }
-                }
-                closesocket(s);
-            }
-            WSACleanup();
-        }
-#else
-        int s = socket(AF_INET, SOCK_STREAM, 0);
-        if (s >= 0) {
-            int flags = fcntl(s, F_GETFL, 0);
-            if (flags >= 0) (void)fcntl(s, F_SETFL, flags | O_NONBLOCK);
-            struct sockaddr_in sa;
-            sa.sin_family = AF_INET;
-            sa.sin_port = htons((unsigned short)gw_port);
-            sa.sin_addr.s_addr = inet_addr(gw_host);
-            if (connect(s, (struct sockaddr *)&sa, sizeof(sa)) == 0) {
-                gw_ok = 1;
-            } else if (errno == EINPROGRESS) {
-                struct pollfd pfd;
-                pfd.fd = s; pfd.events = POLLOUT; pfd.revents = 0;
-                if (poll(&pfd, 1, CLI_GW_PROBE_TIMEOUT_MS) > 0) {
-                    int soerr = 0; socklen_t slen = sizeof(soerr);
-                    if (getsockopt(s, SOL_SOCKET, SO_ERROR, &soerr, &slen) == 0 && soerr == 0)
-                        gw_ok = 1;
-                }
-            }
-            close(s);
-        }
-#endif
-        if (g_cli_print_mode)
-            cli_outf("gateway %s\n", gw_ok ? "online" : "offline");
-        else
-            cli_print_status("gateway", gw_ok ? "在线 100%" : "离线 0%");
-        if (gw_ok) online++;
-    }
+    /* gateway 在线判据唯一化（0.1.19 §458）：此前此处手写 TCP 连通性探测，
+     * 与 main.c 的 cli_gw_health 构成两套定义——TCP 可连而 HTTP /health 未
+     * 就绪时误报在线。现统一取 cli_gw_health（GET /health + healthy 判定，
+     * 端口经 cli_gw_endpoint 解析，兼容端口漂移）。 */
+    int gw_ok = cli_gw_health(CLI_GW_PROBE_TIMEOUT_MS);
+    if (g_cli_print_mode) cli_outf("gateway %s\n", gw_ok ? "online" : "offline");
+    else cli_print_status("gateway", gw_ok ? "在线 100%" : "离线 0%");
+    if (gw_ok) online++;
     {
         char line[64];
         snprintf(line, sizeof(line), "online %d/%zu", online, total + 1);
@@ -366,216 +292,6 @@ int cmd_daemons(const char *arg, void *ctx)
         else cli_print_status("Super Agent:daemon", line);
     }
     return 0;
-}
-
-/* ==================== daemon lifecycle ==================== */
-
-static const char *cli_rt_base(void) { return airy_home_dir(); }
-
-static int cli_daemon_bin(const char *ns, char *buf, size_t cap)
-{
-#ifdef _WIN32
-    snprintf(buf, cap, "%s\\bin\\%s_d.exe", cli_rt_base(), ns);
-#else
-    snprintf(buf, cap, "%s/bin/%s_d", cli_rt_base(), ns);
-#endif
-#ifdef _WIN32
-    struct _stat st;
-    return (_stat(buf, &st) == 0 && (st.st_mode & _S_IFREG)) ? 1 : 0;
-#else
-    struct stat st;
-    return (stat(buf, &st) == 0 && S_ISREG(st.st_mode)) ? 1 : 0;
-#endif
-}
-
-static int cli_daemon_online(const char *ns)
-{
-    char *result = NULL;
-    int rc = daemon_rpc_call(cli_ns_sock(ns), "health_check", NULL, &result, 6000);
-    AIRY_FREE(result);
-    return (rc == 0) ? 1 : 0;
-}
-
-static int cli_daemon_start(const char *ns)
-{
-    char bin[512];
-    if (!cli_daemon_bin(ns, bin, sizeof(bin))) {
-        char hdr[80];
-        snprintf(hdr, sizeof(hdr), "Sub Agent:%s", ns);
-        cli_print_line(hdr, "二进制不存在（$AIRY_HOME/bin 下未找到），先安装/构建");
-        return -1;
-    }
-    if (cli_daemon_online(ns)) {
-        cli_sub_print(0, ns, "already online");
-        return 0;
-    }
-    char logf[640];
-    snprintf(logf, sizeof(logf), "%s/%s_d.log", airy_log_dir(), ns);
-#ifdef _WIN32
-    {
-        STARTUPINFOA si; PROCESS_INFORMATION pi;
-        __builtin_memset(&si, 0, sizeof(si));
-        __builtin_memset(&pi, 0, sizeof(pi));
-        si.cb = sizeof(si);
-        SECURITY_ATTRIBUTES sa;
-        __builtin_memset(&sa, 0, sizeof(sa));
-        sa.nLength = sizeof(sa); sa.bInheritHandle = TRUE;
-        HANDLE log_h = CreateFileA(logf, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                   &sa, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (log_h != INVALID_HANDLE_VALUE) {
-            si.dwFlags = STARTF_USESTDHANDLES;
-            si.hStdOutput = log_h; si.hStdError = log_h;
-            si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-        }
-        char cmd[560]; snprintf(cmd, sizeof(cmd), "\"%s\"", bin);
-        if (!CreateProcessA(NULL, cmd, NULL, NULL, TRUE, DETACHED_PROCESS | CREATE_NO_WINDOW,
-                            NULL, NULL, &si, &pi)) {
-            if (log_h != INVALID_HANDLE_VALUE) CloseHandle(log_h);
-            return -1;
-        }
-        CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
-        if (log_h != INVALID_HANDLE_VALUE) CloseHandle(log_h);
-    }
-#else
-    {
-        pid_t pid = fork();
-        if (pid < 0) return -1;
-        if (pid == 0) {
-            setsid();
-            int fd = open(logf, O_WRONLY | O_CREAT | O_APPEND, 0644);
-            if (fd >= 0) { dup2(fd, STDOUT_FILENO); dup2(fd, STDERR_FILENO); close(fd); }
-            execl(bin, bin, (char *)NULL);
-            _exit(127);
-        }
-    }
-#endif
-    return 0;
-}
-
-static int cli_daemon_wait_offline(const char *ns, int timeout_ms)
-{
-    int waited = 0;
-    while (cli_daemon_online(ns)) {
-        airy_sleep_ms(200); waited += 200;
-        if (waited >= timeout_ms) return 0;
-    }
-    return 1;
-}
-
-static int cli_daemon_wait_online(const char *ns, int timeout_ms)
-{
-    int waited = 0;
-    while (!cli_daemon_online(ns)) {
-        airy_sleep_ms(200); waited += 200;
-        if (waited >= timeout_ms) return 0;
-    }
-    return 1;
-}
-
-static int cli_daemon_stop(const char *ns)
-{
-    if (!cli_daemon_online(ns)) {
-        cli_sub_print(0, ns, "already offline");
-        return 0;
-    }
-    char *result = NULL;
-    daemon_rpc_call(cli_ns_sock(ns), "shutdown", "{}", &result, 3000);
-    AIRY_FREE(result);
-    if (!cli_daemon_wait_offline(ns, 5000)) return -1;
-    return 0;
-}
-
-/* ==================== self-heal reconcile ==================== */
-
-#define CLI_SELF_HEAL_MAX_AGENTS CLI_DAEMONS_COUNT
-
-typedef struct { char ns[32]; int restarts; uint64_t last_restart_ms; } cli_selfheal_agent_t;
-typedef struct {
-    int enabled; int max_restarts;
-    uint64_t backoff_ms; uint64_t poll_interval_ms; uint64_t last_scan_ms;
-    size_t agent_count;
-    cli_selfheal_agent_t agents[CLI_SELF_HEAL_MAX_AGENTS];
-} cli_selfheal_t;
-
-static cli_selfheal_t g_selfheal;
-
-void cli_daemon_lifecycle_init(const char *agents_csv)
-{
-    if (g_selfheal.enabled) return;
-    g_selfheal.max_restarts = 3;
-    g_selfheal.backoff_ms = 10000;
-    g_selfheal.poll_interval_ms = 5000;
-
-    const char *e_max = getenv("AIRY_SELF_HEAL_MAX_RESTARTS");
-    if (e_max && e_max[0]) { long v = strtol(e_max, NULL, 10); if (v >= 0) g_selfheal.max_restarts = (int)v; }
-    const char *e_bk = getenv("AIRY_SELF_HEAL_BACKOFF_MS");
-    if (e_bk && e_bk[0]) { long long v = strtoll(e_bk, NULL, 10); if (v >= 0) g_selfheal.backoff_ms = (uint64_t)v; }
-    const char *e_poll = getenv("AIRY_SELF_HEAL_POLL_MS");
-    if (e_poll && e_poll[0]) { long long v = strtoll(e_poll, NULL, 10); if (v >= 100) g_selfheal.poll_interval_ms = (uint64_t)v; }
-
-    if (agents_csv && agents_csv[0]) {
-        char csv[512]; AIRY_STRNCPY_TERM(csv, agents_csv, sizeof(csv));
-        char *tok = csv;
-        while (tok && *tok && g_selfheal.agent_count < CLI_SELF_HEAL_MAX_AGENTS) {
-            char *comma = strchr(tok, ',');
-            if (comma) *comma = '\0';
-            char *p = tok;
-            while (*p == ' ' || *p == '\t') p++;
-            size_t n = strlen(p);
-            while (n > 0 && (p[n - 1] == ' ' || p[n - 1] == '\t')) p[--n] = '\0';
-            if (p[0]) {
-                int known = 0;
-                for (size_t i = 0; i < CLI_DAEMONS_COUNT; i++) {
-                    if (strcmp(CLI_DAEMONS[i].ns, p) == 0) { known = 1; break; }
-                }
-                if (known) {
-                    size_t idx = g_selfheal.agent_count++;
-                    AIRY_STRNCPY_TERM(g_selfheal.agents[idx].ns, p, sizeof(g_selfheal.agents[0].ns));
-                }
-            }
-            tok = comma ? comma + 1 : NULL;
-        }
-    } else {
-        for (size_t i = 0; i < CLI_DAEMONS_COUNT; i++) {
-            size_t idx = g_selfheal.agent_count++;
-            AIRY_STRNCPY_TERM(g_selfheal.agents[idx].ns, CLI_DAEMONS[i].ns, sizeof(g_selfheal.agents[0].ns));
-        }
-    }
-    if (g_selfheal.agent_count == 0) {
-        AIRY_LOG_INFO("cli_lifecycle: no valid agents, self-heal disabled"); return;
-    }
-    g_selfheal.enabled = 1;
-    AIRY_LOG_INFO("cli_lifecycle: agent self-heal enabled (agents=%zu, max_restarts=%d, "
-                  "backoff_ms=%llu, poll_ms=%llu)",
-                  g_selfheal.agent_count, g_selfheal.max_restarts,
-                  (unsigned long long)g_selfheal.backoff_ms, (unsigned long long)g_selfheal.poll_interval_ms);
-}
-
-int cli_daemon_lifecycle_reconcile_once(void)
-{
-    if (!g_selfheal.enabled || g_selfheal.agent_count == 0) return 0;
-    uint64_t now = cli_now_ms();
-    if (g_selfheal.last_scan_ms != 0 && now - g_selfheal.last_scan_ms < g_selfheal.poll_interval_ms)
-        return 0;
-    g_selfheal.last_scan_ms = now;
-
-    int restarted = 0;
-    for (size_t i = 0; i < g_selfheal.agent_count; i++) {
-        cli_selfheal_agent_t *a = &g_selfheal.agents[i];
-        if (cli_daemon_online(a->ns)) continue;
-        if (g_selfheal.max_restarts >= 0 && a->restarts >= g_selfheal.max_restarts) continue;
-        if (g_selfheal.backoff_ms > 0 && now - a->last_restart_ms < g_selfheal.backoff_ms) continue;
-        char bin[512];
-        if (!cli_daemon_bin(a->ns, bin, sizeof(bin))) continue;
-        if (cli_daemon_start(a->ns) != 0) {
-            cli_sub_print(1, a->ns, "self-heal restart failed"); continue;
-        }
-        a->restarts++; a->last_restart_ms = now; restarted++;
-        char line[128];
-        snprintf(line, sizeof(line), "offline → auto-restarted (%d/%d)", a->restarts, g_selfheal.max_restarts);
-        cli_sub_print(1, a->ns, line);
-    }
-    return restarted;
 }
 
 /* ==================== /daemon + /stats + simple wrappers ==================== */
