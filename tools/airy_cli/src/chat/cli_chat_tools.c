@@ -436,100 +436,88 @@ static void cli_print_tool(const char *name, const char *detail, int ok, int don
         cli_print_line("Tool", line);
 }
 
+/* 从 JSON 对象取字符串字段；缺键或类型不符返回 NULL。 */
+static const char *cli_json_str(cJSON *o, const char *key)
+{
+    cJSON *it = o ? cJSON_GetObjectItem(o, key) : NULL;
+    return (it && cJSON_IsString(it)) ? it->valuestring : NULL;
+}
+
+/* 结果折叠摘要：ok 取 output、失败取 error。树必须在直印之后释放
+ * （UAF 修复 2026-08-16：detail 指向 cJSON 树内字符串）。 */
+static void cli_tool_report(const char *name, const char *json, int ok)
+{
+    char err_sum[128] = "";
+    const char *detail = NULL;
+#ifdef AIRY_HAS_CJSON
+    cJSON *root = cJSON_Parse(json);
+    if (root)
+        detail = ok ? cli_json_str(root, "output") : cli_json_str(root, "error");
+#else
+    detail = ok ? NULL : json;
+#endif
+    if (!ok)
+        cli_tool_error_summary(detail, err_sum, sizeof(err_sum));
+    cli_print_tool(name, err_sum, ok, 1);
+#ifdef AIRY_HAS_CJSON
+    if (root)
+        cJSON_Delete(root);
+#endif
+}
+
 /* 解析一轮 LLM 返回的 tool_calls，渲染 + 执行 + 回填消息缓冲。
  * 返回 0 = 本轮已消费（调用方应继续下一轮）；-1 = 终止（解析失败/无工具）。 */
 int cli_chat_tool_round(cli_chat_msgbuf_t *b, const llm_response_t *resp)
 {
     if (!resp || resp->choice_count == 0 || !resp->choices[0].tool_calls_json)
         return -1;
-
     cJSON *calls = cJSON_Parse(resp->choices[0].tool_calls_json);
     if (!calls || !cJSON_IsArray(calls)) {
         if (calls)
             cJSON_Delete(calls);
         return -1;
     }
-    size_t n = (size_t)cJSON_GetArraySize(calls);
-    if (n == 0) {
+    if (cJSON_GetArraySize(calls) == 0) {
         cJSON_Delete(calls);
         return -1;
     }
 
-    /* assistant 消息：保留原 content 与 reasoning_content，附 tool_calls
-     * （OpenAI 要求续轮必需 tool_calls；DeepSeek thinking 要求回传
-     * reasoning_content，否则 tool 续轮 HTTP 400） */
+    /* assistant 消息：保留 content 与 reasoning_content，附 tool_calls
+     * （OpenAI 续轮必需 tool_calls；DeepSeek thinking 缺 reasoning 报 400）。 */
+    const llm_message_t *ch = &resp->choices[0];
     cli_trace("chat", "tool-round reasoning=%s tools=%zu",
-              resp->choices[0].reasoning_content ? "yes" : "no",
-              strlen(resp->choices[0].tool_calls_json));
-    cli_msgbuf_push(b, "assistant", resp->choices[0].content, NULL,
-                    resp->choices[0].tool_calls_json,
-                    resp->choices[0].reasoning_content);
+              ch->reasoning_content ? "yes" : "no", strlen(ch->tool_calls_json));
+    cli_msgbuf_push(b, "assistant", ch->content, NULL, ch->tool_calls_json,
+                    ch->reasoning_content);
 
     cJSON *call = NULL;
     cJSON_ArrayForEach(call, calls)
     {
         cJSON *fn = cJSON_GetObjectItem(call, "function");
-        cJSON *id = cJSON_GetObjectItem(call, "id");
-        const char *name = fn && cJSON_IsObject(fn) ? cJSON_GetObjectItem(fn, "name")->valuestring : NULL;
-        const char *args = fn && cJSON_IsObject(fn) ? cJSON_GetObjectItem(fn, "arguments")->valuestring : NULL;
-        const char *call_id = (id && cJSON_IsString(id)) ? id->valuestring : "call_unknown";
-        if (!name)
-            name = "unknown";
-
-        /* 工具调用过程行：动作名…（参数/返回内容不暴露在对话中；
-         * 操作细节经 cli_trace 留档供 -p 管道与日志诊断）。 */
-        cli_trace("chat", "tool call %s args=%.*s", name, (int)cli_utf8_safe_len(args, 160), args ? args : "{}");
+        const char *name = cli_json_str(fn, "name");
+        const char *args = cli_json_str(fn, "arguments");
+        const char *call_id = cli_json_str(call, "id");
+        name = name ? name : "unknown";
+        args = args ? args : "{}";
+        /* 过程行只出动作名；参数与返回内容经 cli_trace 留档供诊断。 */
+        cli_trace("chat", "tool call %s args=%.*s", name,
+                  (int)cli_utf8_safe_len(args, 160), args);
         cli_print_tool(name, NULL, 0, 0);
 
         int ok = 0;
-        char *result_json = cli_chat_exec_tool(name, args ? args : "{}", &ok);
-        if (!result_json)
-            result_json = AIRY_STRDUP("{\"ok\":false,\"error\":\"tool failed\"}");
+        char *rj = cli_chat_exec_tool(name, args, &ok);
+        if (!rj)
+            rj = AIRY_STRDUP("{\"ok\":false,\"error\":\"tool failed\"}");
+        cli_tool_report(name, rj, ok);
 
-        /* 折叠摘要（全量文本已回填模型上下文）；失败摘要经白名单动作名
-         * + 可读错误直印（icon/色彩体验随 0.1.19 清退）。 */
-        const char *detail = NULL;
-#ifdef AIRY_HAS_CJSON
-        cJSON *rroot = cJSON_Parse(result_json);
-        if (rroot) {
-            cJSON *out = cJSON_GetObjectItem(rroot, "output");
-            cJSON *err = cJSON_GetObjectItem(rroot, "error");
-            detail = (ok && out && cJSON_IsString(out)) ? out->valuestring
-                     : (err && cJSON_IsString(err)) ? err->valuestring
-                                                    : NULL;
-        }
-#else
-        detail = ok ? NULL : result_json;
-#endif
-        /* UAF 修复（2026-08-16，ASan heap-use-after-free）：detail 指向
-         * cJSON 树内字符串（out->valuestring），必须在直印消费完之后再
-         * 释放树；此前 cJSON_Delete(rroot) 先于过程行输出执行，工具回路
-         * 偶发崩溃。 */
-        char err_sum[128];
-        err_sum[0] = '\0';
-        if (!ok)
-            cli_tool_error_summary(detail, err_sum, sizeof(err_sum));
-        cli_print_tool(name, err_sum, ok, 1);
-#ifdef AIRY_HAS_CJSON
-        if (rroot)
-            cJSON_Delete(rroot);
-#endif
-
-        /* role="tool" 消息回填：携带匹配的 tool_call_id；超长结果在 UTF-8
-         * 字符边界截断，防止上下文无界膨胀（web_fetch 页面可能很大）。 */
+        /* role="tool" 回填：带匹配 tool_call_id，超长按 UTF-8 边界截断。 */
         char trunc_buf[CLI_CHAT_TOOL_RESULT_CAP + 1];
-        const char *feed = result_json;
-        size_t rl = strlen(result_json);
-        if (rl > CLI_CHAT_TOOL_RESULT_CAP) {
-            size_t n = CLI_CHAT_TOOL_RESULT_CAP;
-            while (n > 0 && ((unsigned char)result_json[n] & 0xC0) == 0x80)
-                n--;
-            AIRY_MEMCPY(trunc_buf, result_json, n);
-            trunc_buf[n] = '\0';
-            feed = trunc_buf;
-        }
-        cli_msgbuf_push(b, "tool", feed, call_id, NULL, NULL);
-        AIRY_FREE(result_json);
+        size_t n = cli_utf8_safe_len(rj, CLI_CHAT_TOOL_RESULT_CAP);
+        AIRY_MEMCPY(trunc_buf, rj, n);
+        trunc_buf[n] = '\0';
+        cli_msgbuf_push(b, "tool", trunc_buf,
+                        call_id ? call_id : "call_unknown", NULL, NULL);
+        AIRY_FREE(rj);
     }
     cJSON_Delete(calls);
     return 0;
