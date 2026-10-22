@@ -235,6 +235,47 @@ airy_err_t cli_think_process_remote(const char *input, airy_task_plan_t **out_pl
 
 /* ==================== 双思考三模型配置统一读取 ==================== */
 
+/* 原地去行尾 CR/LF，跳过行首空白，再把 "key: value" 切成键（拷入 kbuf）
+ * 与值起点；非 "key:" 行（空行、无冒号、键为空或超长）返回 -1。 */
+static int yaml_kv(char *line, char *kbuf, size_t kcap, const char **val)
+{
+    size_t len = strlen(line);
+
+    while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r'))
+        line[--len] = '\0';
+    const char *p = line;
+    while (*p == ' ' || *p == '\t')
+        p++;
+    const char *ks = p;
+    while (*p && *p != ':' && *p != ' ' && *p != '\t')
+        p++;
+    size_t kl = (size_t)(p - ks);
+    if (*p != ':' || kl == 0 || kl >= kcap)
+        return -1;
+    AIRY_MEMCPY(kbuf, ks, kl);
+    kbuf[kl] = '\0';
+    const char *v = p + 1;
+    while (*v == ' ' || *v == '\t')
+        v++;
+    *val = v;
+    return 0;
+}
+
+/* 取标量值：引号包裹截到闭引号；无引号（timeout_ms 等）仅确认键存在，值为空。 */
+static void yaml_scalar(const char *after, char *out, size_t cap)
+{
+    out[0] = '\0';
+    if (*after != '"')
+        return;
+    const char *v = after + 1;
+    size_t vl = 0;
+
+    while (v[vl] && v[vl] != '"' && vl + 1 < cap)
+        vl++;
+    AIRY_MEMCPY(out, v, vl);
+    out[vl] = '\0';
+}
+
 /* 从 model.yaml 提取标量字段（BAN 合规：手写解析，禁 sscanf）。
  *
  * 结构约定（ecosystem/manager/model/model.yaml）：
@@ -259,51 +300,22 @@ static int cli_think_cfg_yaml_get(const char *path, const char *section,
 
     char line[512];
     char cur[32] = "";
+    char kbuf[64];
     int found = 0;
     while (fgets(line, sizeof(line), f)) {
-        size_t len = strlen(line);
-        while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r'))
-            line[--len] = '\0';
+        const char *after = NULL;
 
-        const char *p = line;
-        while (*p == ' ' || *p == '\t')
-            p++;
-        const char *kstart = p;
-        while (*p && *p != ':' && *p != ' ' && *p != '\t')
-            p++;
-        if (*p != ':' || p == kstart)
+        if (yaml_kv(line, kbuf, sizeof(kbuf), &after) != 0)
             continue;
-
-        const char *after = p + 1;
-        while (*after == ' ' || *after == '\t')
-            after++;
-        size_t kl = (size_t)(p - kstart);
-
         if (*after == '\0') {
             /* 段标题行：key:（后无其他非空白） */
-            if (kl < sizeof(cur)) {
-                AIRY_MEMCPY(cur, kstart, kl);
-                cur[kl] = '\0';
-            }
+            if (strlen(kbuf) < sizeof(cur))
+                AIRY_STRNCPY_TERM(cur, kbuf, sizeof(cur));
             continue;
         }
-        if (strcmp(cur, section) != 0)
+        if (strcmp(cur, section) != 0 || strcmp(key, kbuf) != 0)
             continue;
-        if (strlen(key) != kl || strncmp(kstart, key, kl) != 0)
-            continue;
-
-        if (*after == '"') {
-            /* 引号包裹值：截到闭引号 */
-            const char *v = after + 1;
-            size_t vl = 0;
-            while (v[vl] && v[vl] != '"' && vl + 1 < cap)
-                vl++;
-            AIRY_MEMCPY(out, v, vl);
-            out[vl] = '\0';
-        } else {
-            /* 无引号标量（timeout_ms 等）：仅确认键存在，值为空 */
-            out[0] = '\0';
-        }
+        yaml_scalar(after, out, cap);
         found = 1;
         break;
     }

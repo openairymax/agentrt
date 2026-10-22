@@ -98,20 +98,59 @@ size_t cli_plan_deps_count(const airy_task_plan_t *plan)
     return total;
 }
 
-/* 将 airy_task_plan_t 序列化为 sched_d 的 DAG JSON 线格式（唯一真相源）。
- *
- * task_input 是用户原始任务文本，作为顶层 "input" 字段传递；goal 只是计划
- * 标签（goal==id）的节点由 sched_d 回退到 input，远端 agent 因此收到真实
- * 任务而非 "reactive_1_step1"。workspace_dir（未设时 NULL）作为顶层字段，
- * 令 sched_d -> agent_d -> runner 执行前 chdir 进任务目录，产物留在调用方
- * 工程树而非 daemon 的 cwd。 */
-static char *cli_plan_to_dag_json(const airy_task_plan_t *plan, const char *task_input,
-                                  const char *workspace_dir)
+/* 单个计划节点 → DAG 节点对象（id/goal/role/depends）。goal 仅为计划标签
+ * （goal==id）时回退到 task_input，令远端 agent 收到真实任务而非
+ * "reactive_1_step1"。节点对象所有权交调用方。 */
+static cJSON *dag_node_json(const airy_task_node_t *nd, const char *task_input)
 {
-    if (!plan || plan->task_plan_node_count == 0 || !plan->task_plan_nodes)
-        return NULL;
+    char nid[64];
+    char handler[96];
 
+    snprintf(nid, sizeof(nid), "%s", nd->task_node_id ? nd->task_node_id : "node");
+    cJSON *nj = cJSON_CreateObject();
+    if (!nj)
+        return NULL;
+    cJSON_AddStringToObject(nj, "id", nid);
+    const char *goal = nd->task_node_goal ? nd->task_node_goal : nid;
+    if (strcmp(goal, nid) == 0 && task_input && task_input[0])
+        goal = task_input;
+    cJSON_AddStringToObject(nj, "goal", goal);
+    cli_node_handler(nd, handler, sizeof(handler));
+    cJSON_AddStringToObject(nj, "role", cli_handler_role(handler));
+
+    cJSON *deps = cJSON_AddArrayToObject(nj, "depends");
+    for (size_t e = 0; deps && e < nd->task_node_depends_count; e++) {
+        const char *dep = nd->task_node_depends_on ? nd->task_node_depends_on[e] : NULL;
+        if (dep && dep[0])
+            cJSON_AddItemToArray(deps, cJSON_CreateString(dep));
+    }
+    return nj;
+}
+
+/* 逐节点装配；跳过无法构造的节点。 */
+static void dag_nodes_fill(cJSON *nodes, const airy_task_plan_t *plan, const char *task_input)
+{
+    for (size_t i = 0; i < plan->task_plan_node_count; i++) {
+        const airy_task_node_t *nd = plan->task_plan_nodes[i];
+        cJSON *nj = nd ? dag_node_json(nd, task_input) : NULL;
+        if (nj)
+            cJSON_AddItemToArray(nodes, nj);
+    }
+}
+
+/* 计划 → sched_d DAG 线格式根对象（唯一真相源）。
+ *
+ * workspace_dir（未设时 NULL）令 sched_d -> agent_d -> runner 执行前 chdir
+ * 进任务目录，产物留在调用方工程树而非 daemon 的 cwd。返回 NULL 表示计划
+ * 为空或内存不足。 */
+static cJSON *dag_plan_json(const airy_task_plan_t *plan, const char *task_input,
+                            const char *workspace_dir)
+{
     char pid[64] = {0};
+    char name[80];
+
+    if (!plan || !plan->task_plan_nodes || plan->task_plan_node_count == 0)
+        return NULL;
     if (plan->task_plan_id && plan->task_plan_id[0])
         AIRY_STRNCPY_TERM(pid, plan->task_plan_id, sizeof(pid));
     else
@@ -120,7 +159,6 @@ static char *cli_plan_to_dag_json(const airy_task_plan_t *plan, const char *task
     cJSON *root = cJSON_CreateObject();
     if (!root)
         return NULL;
-    char name[80];
     snprintf(name, sizeof(name), "plan_%s", pid);
     cJSON_AddStringToObject(root, "name", name);
     if (task_input && task_input[0])
@@ -128,50 +166,14 @@ static char *cli_plan_to_dag_json(const airy_task_plan_t *plan, const char *task
     if (workspace_dir && workspace_dir[0])
         cJSON_AddStringToObject(root, "workspace_dir", workspace_dir);
 
-    cJSON *nodes = cJSON_CreateArray();
-    if (!nodes) {
+    cJSON *nodes = cJSON_AddArrayToObject(root, "nodes");
+    if (nodes)
+        dag_nodes_fill(nodes, plan, task_input);
+    if (!nodes || cJSON_GetArraySize(nodes) == 0) {
         cJSON_Delete(root);
         return NULL;
     }
-    for (size_t i = 0; i < plan->task_plan_node_count; i++) {
-        const airy_task_node_t *nd = plan->task_plan_nodes[i];
-        if (!nd)
-            continue;
-        char nid[64];
-        snprintf(nid, sizeof(nid), "%s", nd->task_node_id ? nd->task_node_id : "node");
-        cJSON *nj = cJSON_CreateObject();
-        if (!nj)
-            continue;
-        cJSON_AddStringToObject(nj, "id", nid);
-        const char *goal = nd->task_node_goal ? nd->task_node_goal : nid;
-        if (strcmp(goal, nid) == 0 && task_input && task_input[0])
-            goal = task_input;
-        cJSON_AddStringToObject(nj, "goal", goal);
-        char handler[96];
-        cli_node_handler(nd, handler, sizeof(handler));
-        cJSON_AddStringToObject(nj, "role", cli_handler_role(handler));
-
-        cJSON *deps = cJSON_CreateArray();
-        if (deps && nd->task_node_depends_on && nd->task_node_depends_count > 0) {
-            for (size_t e = 0; e < nd->task_node_depends_count; e++) {
-                const char *dep = nd->task_node_depends_on[e];
-                if (dep && dep[0] != '\0')
-                    cJSON_AddItemToArray(deps, cJSON_CreateString(dep));
-            }
-        }
-        cJSON_AddItemToObject(nj, "depends", deps);
-        cJSON_AddItemToArray(nodes, nj);
-    }
-    cJSON_AddItemToObject(root, "nodes", nodes);
-
-    if (cJSON_GetArraySize(nodes) == 0) {
-        cJSON_Delete(root);
-        return NULL;
-    }
-
-    char *out = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    return out;
+    return root;
 }
 
 airy_err_t cli_dag_submit_remote(const airy_task_plan_t *plan, const char *task_input,
@@ -181,23 +183,16 @@ airy_err_t cli_dag_submit_remote(const airy_task_plan_t *plan, const char *task_
         return AIRY_ERR_INVALID_PARAM;
     *out_dag_id = NULL;
 
-    char *dag_json = cli_plan_to_dag_json(plan, task_input, workspace_dir);
-    if (!dag_json)
+    cJSON *dag_obj = dag_plan_json(plan, task_input, workspace_dir);
+    if (!dag_obj)
         return AIRY_ERR_OUT_OF_MEMORY;
 
     cJSON *params = cJSON_CreateObject();
     if (!params) {
-        AIRY_FREE(dag_json);
+        cJSON_Delete(dag_obj);
         return AIRY_ERR_OUT_OF_MEMORY;
     }
-    cJSON *dag_obj = cJSON_Parse(dag_json);
-    if (!dag_obj) {
-        AIRY_FREE(dag_json);
-        cJSON_Delete(params);
-        return AIRY_ERR_PARSE_ERROR;
-    }
     cJSON_AddItemToObject(params, "dag", dag_obj);
-    AIRY_FREE(dag_json);
 
     /* 架构约束（2026-08-25）：统一经 gateway 派发（sched.dag_submit →
      * gateway → SYS_SVC_CALL → sched_d），禁止直连 sched.sock。 */
