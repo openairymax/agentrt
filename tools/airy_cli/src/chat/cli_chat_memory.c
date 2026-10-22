@@ -26,7 +26,30 @@
 #include <string.h>
 
 #ifdef AIRY_HAS_CJSON
+#include "cli_gw_json.h"
+
 #include <cjson/cJSON.h>
+#include <stdarg.h>
+
+/* 记忆库调用超时：mem_d 为本地服务，6 s 足够覆盖冷缓存首查。 */
+#define MEM_TIMEOUT_MS 6000
+/* 单轮注入的召回条数与单条字节上限（UTF-8 边界安全截断，见 seg_put）。 */
+#define MEM_LIMIT 3
+#define MEM_ITEM_MAX 200
+
+/* 有界追加：snprintf 的返回值是"若空间足够会写多少"，直接累加会越过
+ * 缓冲边界；此处统一按实际可用空间收敛，调用方无需重复这段算术。 */
+static void seg_put(char *buf, size_t cap, size_t *off, const char *fmt, ...)
+{
+    if (*off >= cap - 1)
+        return;
+    va_list ap;
+    va_start(ap, fmt);
+    int w = vsnprintf(buf + *off, cap - *off, fmt, ap);
+    va_end(ap);
+    if (w > 0)
+        *off += ((size_t)w < cap - *off) ? (size_t)w : (cap - *off - 1);
+}
 
 /* 2.2.2.1：无信息量寒暄启发式——此类对话不应进记忆，避免垃圾累积
  * 污染语义检索（匹配时返回 1）。仅作写入门槛，不做强制语义判断。 */
@@ -49,8 +72,35 @@ static int cli_chat_is_greeting(const char *s)
     return 0;
 }
 
+/* 取单条记忆正文（mem.get）。返回 AIRY_MALLOC 副本，调用方 AIRY_FREE；
+ * 失败返回 NULL（该条跳过，不影响其余检索结果）。 */
+static char *mem_get_text(const char *rid)
+{
+    cJSON *params = cJSON_CreateObject();
+    if (!params)
+        return NULL;
+    cJSON_AddStringToObject(params, "record_id", rid);
+    cJSON *root = NULL;
+    if (cli_gw_json("mem.get", params, MEM_TIMEOUT_MS, &root) != 0)
+        return NULL;
+    cJSON *data = cJSON_GetObjectItem(root, "data");
+    char *text = cJSON_IsString(data) ? AIRY_STRDUP(data->valuestring) : NULL;
+    cJSON_Delete(root);
+    return text;
+}
+
+/* 防自我回灌：跳过以 "用户: <当前输入>" 开头的条目（"用户: " = 9 字节）。
+ * strncmp 遇到 NUL 即判定不等，无需额外长度比较。 */
+static int mem_echo(const char *rec, const char *input)
+{
+    static const char k_user[] = "用户: ";
+    return strncmp(rec, k_user, sizeof(k_user) - 1) == 0 &&
+           strncmp(rec + sizeof(k_user) - 1, input, strlen(input)) == 0;
+}
+
 /* gateway 统一记忆注入（mem_d）。0.1.19 C3 起进程内 L1 回退通道退役，
- * gateway 不可达即不注入——记忆唯一事实源为 mem_d，不做本地伪存储。 */
+ * gateway 不可达即不注入——记忆唯一事实源为 mem_d，不做本地伪存储。
+ * 段头只在确有命中时输出：零命中仍注入空段会让模型看到无内容的提示块。 */
 static int cli_chat_mem_inject_gw(const char *input, char *out_buf, size_t out_size)
 {
     if (!input || !input[0] || !out_buf || out_size < 16)
@@ -61,85 +111,35 @@ static int cli_chat_mem_inject_gw(const char *input, char *out_buf, size_t out_s
     if (!params)
         return -1;
     cJSON_AddStringToObject(params, "query", input);
-    cJSON_AddNumberToObject(params, "limit", 3);
-    char *pstr = cJSON_PrintUnformatted(params);
-    cJSON_Delete(params);
-    if (!pstr)
+    cJSON_AddNumberToObject(params, "limit", MEM_LIMIT);
+    cJSON *root = NULL;
+    if (cli_gw_json("mem.search", params, MEM_TIMEOUT_MS, &root) != 0)
         return -1;
 
-    char *res_json = NULL;
-    if (cli_gw_call("mem.search", pstr, 6000, &res_json) != 0) {
-        AIRY_FREE(pstr);
-        return -1;
-    }
-    AIRY_FREE(pstr);
-
-    cJSON *root = cJSON_Parse(res_json);
-    AIRY_FREE(res_json);
-    if (!root)
-        return -1;
     cJSON *results = cJSON_GetObjectItem(root, "results");
-    if (!cJSON_IsArray(results)) {
-        cJSON_Delete(root);
-        return -1;
-    }
-
+    int n_items = cJSON_IsArray(results) ? cJSON_GetArraySize(results) : 0;
     size_t off = 0;
-    if (out_size > 0) {
-        int w0 = snprintf(out_buf + off, out_size - off, "\n\n[相关历史记忆]");
-        if (w0 > 0)
-            off += ((size_t)w0 < out_size - off) ? (size_t)w0 : (out_size - off - 1);
-    }
-
-    /* 防自我回灌：跳过与当前输入相同/几乎相同的记忆（"用户: "=9 字节 UTF-8） */
-    size_t input_prefix_len = strlen(input) + 9;
-    int n_items = cJSON_GetArraySize(results);
+    int kept = 0;
     for (int i = 0; i < n_items && off < out_size - 1; i++) {
-        cJSON *item = cJSON_GetArrayItem(results, i);
-        cJSON *rid = cJSON_GetObjectItem(item, "record_id");
+        cJSON *rid = cJSON_GetObjectItem(cJSON_GetArrayItem(results, i), "record_id");
         if (!cJSON_IsString(rid) || !rid->valuestring[0])
             continue;
-
-        cJSON *gparams = cJSON_CreateObject();
-        if (!gparams)
+        char *rec = mem_get_text(rid->valuestring);
+        if (!rec)
             continue;
-        cJSON_AddStringToObject(gparams, "record_id", rid->valuestring);
-        char *gstr = cJSON_PrintUnformatted(gparams);
-        cJSON_Delete(gparams);
-        if (!gstr)
-            continue;
-        char *gjson = NULL;
-        if (cli_gw_call("mem.get", gstr, 6000, &gjson) != 0) {
-            AIRY_FREE(gstr);
-            continue;
+        if (!mem_echo(rec, input)) {
+            if (kept == 0)
+                seg_put(out_buf, out_size, &off, "\n\n[相关历史记忆]");
+            /* UTF-8 边界回退：%.*s 精度是字节数，直接取 200 会切断
+             * 汉字/emoji，产生非法序列经 messages[].content 上报 400。 */
+            seg_put(out_buf, out_size, &off, "\n- %.*s", (int)cli_utf8_safe_len(rec, MEM_ITEM_MAX),
+                    rec);
+            kept++;
         }
-        AIRY_FREE(gstr);
-        cJSON *groot = cJSON_Parse(gjson);
-        AIRY_FREE(gjson);
-        if (!groot)
-            continue;
-        cJSON *data = cJSON_GetObjectItem(groot, "data");
-        if (cJSON_IsString(data)) {
-            const char *rec = data->valuestring;
-            size_t dlen = strlen(rec);
-            if (!(dlen >= input_prefix_len && strncmp(rec, "用户: ", 9) == 0 &&
-                  strncmp(rec + 9, input, strlen(input)) == 0)) {
-                /* UTF-8 边界回退：%.*s 精度是字节数，直接取 200 会切断
-                 * 汉字/emoji，产生非法序列经 messages[].content 上报 400。 */
-                size_t n = cli_utf8_safe_len(rec, 200);
-                if (off < out_size - 1) {
-                    int w1 = snprintf(out_buf + off, out_size - off, "\n- %.*s", (int)n, rec);
-                    if (w1 > 0)
-                        off += ((size_t)w1 < out_size - off) ? (size_t)w1 : (out_size - off - 1);
-                }
-            }
-        }
-        cJSON_Delete(groot);
-        if (off >= out_size - 1)
-            break;
+        AIRY_FREE(rec);
     }
     cJSON_Delete(root);
-    return off > 0 ? 0 : -1;
+    return kept > 0 ? 0 : -1;
 }
 
 /* 检索相关历史记忆，拼成 system 追加段（最多 3 条、每条截断 200 字符）。
@@ -153,9 +153,9 @@ void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t out_siz
     (void)cli_chat_mem_inject_gw(input, out_buf, out_size);
 }
 
-/* gateway 统一记忆写回（mem_d；失败回退 L1）。0.1.18 B4：只写用户输入与
- * 回复——思考链不得进入共享长期记忆（§12.4 步 3），否则下轮检索注入会把
- * 模型内部推导当事实回灌。 */
+/* gateway 统一记忆写回（mem_d）。0.1.18 B4：只写用户输入与回复——思考链
+ * 不得进入共享长期记忆（§12.4 步 3），否则下轮检索注入会把模型内部推导
+ * 当事实回灌。 */
 static int cli_chat_mem_record_gw(const char *input, const char *reply)
 {
     if (!input || !input[0] || !reply || !reply[0])
@@ -182,14 +182,9 @@ static int cli_chat_mem_record_gw(const char *input, const char *reply)
         cJSON_AddStringToObject(meta, "kind", "chat");
         cJSON_AddItemToObject(params, "metadata", meta);
     }
-    char *pstr = cJSON_PrintUnformatted(params);
-    cJSON_Delete(params);
-    if (!pstr)
-        return -1;
-    char *res = NULL;
-    int rc = cli_gw_call("mem.write", pstr, 6000, &res);
-    AIRY_FREE(pstr);
-    AIRY_FREE(res);
+    cJSON *root = NULL;
+    int rc = cli_gw_json("mem.write", params, MEM_TIMEOUT_MS, &root);
+    cJSON_Delete(root);
     return rc == 0 ? 0 : -1;
 }
 

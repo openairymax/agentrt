@@ -18,13 +18,11 @@
 
 #include "cli_internal.h"
 
-#include "cli_gw.h"
-
 #include <stdio.h>
 #include <string.h>
 
 #ifdef AIRY_HAS_CJSON
-#include <cjson/cJSON.h>
+#include "cli_gw_json.h"
 
 #define CLI_SESSION_GW_TIMEOUT_MS 6000
 
@@ -122,22 +120,17 @@ static void cli_session_add_record(cJSON *item)
 
 void cli_session_restore(void)
 {
-    char params[48];
-    snprintf(params, sizeof(params), "{\"limit\":%zu}", cli_session_records_want());
-
-    char *res = NULL;
-    if (cli_gw_call("mem.recent", params, CLI_SESSION_GW_TIMEOUT_MS, &res) != 0 || !res) {
-        AIRY_FREE(res);
-        cli_print_line("Sub session Agent",
-                       "会话恢复失败：记忆服务不可达（mem.recent）");
+    cJSON *params = cJSON_CreateObject();
+    if (!params)
         return;
-    }
+    cJSON_AddNumberToObject(params, "limit", (double)cli_session_records_want());
 
-    cJSON *root = cJSON_Parse(res);
-    AIRY_FREE(res);
-    if (!root) {
+    cJSON *root = NULL;
+    int rc = cli_gw_json("mem.recent", params, CLI_SESSION_GW_TIMEOUT_MS, &root);
+    if (rc != 0) {
         cli_print_line("Sub session Agent",
-                       "会话恢复失败：mem.recent 响应无法解析");
+                       rc == AIRY_ERR_PROTOCOL ? "会话恢复失败：mem.recent 响应无法解析"
+                                               : "会话恢复失败：记忆服务不可达（mem.recent）");
         return;
     }
 
