@@ -27,6 +27,7 @@
 
 #include "cli_render.h"
 #include "cli_gw.h" /* 架构约束 2026-08-25：统一经 gateway 派发 */
+#include "cli_gw_json.h"
 #include "daemon_rpc_client.h"
 #include "airy_memory.h"
 #include "logging.h"
@@ -61,7 +62,6 @@
  * runner for the remaining 120s (0.1.16 budget inversion). */
 #define CLI_REVIEW_INVOKE_BUDGET_S 170
 #define CLI_REVIEW_PROMPT_MAX 4096
-#define CLI_REVIEW_SPEC_MAX 256
 
 /* Topic table: each reviewer sub-agent audits one aspect of the plan.
  * Hardware-rich hosts enable all four; constrained hosts fall back to the
@@ -201,31 +201,19 @@ static char *cli_review_build_prompt(const char *topic, const char *task, const 
     return prompt;
 }
 
-/* Extract "<field>" (or "result.<field>") from a gateway RPC response; OWNER
- * via AIRY_STRDUP. Handles both the bare result object and the JSON-RPC
- * "result"-wrapped form, so callers may pass either shape. */
-static char *cli_review_rpc_field(const char *resp, const char *field)
+/* Extract "<field>" (or "result.<field>") from a parsed gateway result;
+ * OWNER via AIRY_STRDUP. Accepts both the bare result object and the
+ * JSON-RPC "result"-wrapped form. */
+static char *rv_json_str(const cJSON *root, const char *field)
 {
-    if (!resp)
+    const cJSON *f = root ? cJSON_GetObjectItem(root, field) : NULL;
+    const cJSON *res = root ? cJSON_GetObjectItem(root, "result") : NULL;
+
+    if (!cJSON_IsString(f) && res)
+        f = cJSON_GetObjectItem(res, field);
+    if (!cJSON_IsString(f) || !f->valuestring)
         return NULL;
-    cJSON *root = cJSON_Parse(resp);
-    if (!root)
-        return NULL;
-    const char *val = NULL;
-    cJSON *f = cJSON_GetObjectItem(root, field);
-    if (cJSON_IsString(f) && f->valuestring) {
-        val = f->valuestring;
-    } else {
-        cJSON *result = cJSON_GetObjectItem(root, "result");
-        if (result) {
-            f = cJSON_GetObjectItem(result, field);
-            if (cJSON_IsString(f) && f->valuestring)
-                val = f->valuestring;
-        }
-    }
-    char *out = val ? AIRY_STRDUP(val) : NULL;
-    cJSON_Delete(root);
-    return out;
+    return AIRY_STRDUP(f->valuestring);
 }
 
 /* Worker: spawn a reviewer agent and invoke it once with the prompt. */
@@ -235,21 +223,25 @@ static void *cli_review_worker(void *arg)
     if (!job || !job->sock || !job->sock[0] || !job->prompt)
         return NULL;
 
-    char spec[CLI_REVIEW_SPEC_MAX];
-    snprintf(spec, sizeof(spec), "{\"agent_spec\":{\"role\":\"reviewer\",\"topic\":\"%s\"}}",
-             job->topic);
+    cJSON *spec = cJSON_CreateObject();
+    cJSON *as = spec ? cJSON_AddObjectToObject(spec, "agent_spec") : NULL;
+    cJSON *root = NULL;
+    if (!as) {
+        cJSON_Delete(spec);
+        job->status = CLI_REVIEW_ERR_MEM;
+        return NULL;
+    }
+    cJSON_AddStringToObject(as, "role", "reviewer");
+    cJSON_AddStringToObject(as, "topic", job->topic);
 
     /* 架构约束（2026-08-25）：统一经 gateway 派发（agent.spawn →
      * gateway → SYS_SVC_CALL → agent_d），禁止直连 agent.sock。 */
-    char *resp = NULL;
-    int rc = cli_gw_call("agent.spawn", spec, CLI_REVIEW_SPAWN_TIMEOUT_MS, &resp);
-    if (rc != 0 || !resp) {
-        AIRY_FREE(resp);
+    if (cli_gw_json("agent.spawn", spec, CLI_REVIEW_SPAWN_TIMEOUT_MS, &root) != 0) {
         job->status = CLI_REVIEW_ERR_SPAWN;
         return NULL;
     }
-    char *agent_id = cli_review_rpc_field(resp, "agent_id");
-    AIRY_FREE(resp);
+    char *agent_id = rv_json_str(root, "agent_id");
+    cJSON_Delete(root);
     if (!agent_id) {
         job->status = CLI_REVIEW_ERR_NO_AGENT;
         return NULL;
@@ -264,27 +256,96 @@ static void *cli_review_worker(void *arg)
     cJSON_AddStringToObject(params, "agent_id", agent_id);
     cJSON_AddStringToObject(params, "input", job->prompt);
     cJSON_AddNumberToObject(params, "timeout_s", CLI_REVIEW_INVOKE_BUDGET_S);
-    char *params_str = cJSON_PrintUnformatted(params);
-    cJSON_Delete(params);
     AIRY_FREE(agent_id);
-    if (!params_str) {
-        job->status = CLI_REVIEW_ERR_MEM;
-        return NULL;
-    }
 
-    resp = NULL;
-    rc = cli_gw_call("agent.invoke", params_str, CLI_REVIEW_INVOKE_TIMEOUT_MS, &resp);
-    AIRY_FREE(params_str);
-    if (rc == 0 && resp)
-        job->output = cli_review_rpc_field(resp, "output");
+    int rc = cli_gw_json("agent.invoke", params, CLI_REVIEW_INVOKE_TIMEOUT_MS, &root);
+    if (rc == 0)
+        job->output = rv_json_str(root, "output");
+    cJSON_Delete(root);
     if (job->output && job->output[0]) {
         job->status = CLI_REVIEW_OK;
         cli_trace("review", "sub-agent[%s] verdict: %.*s", job->topic, (int)cli_utf8_safe_len(job->output, 180), job->output);
     } else {
         job->status = (rc == 0) ? CLI_REVIEW_ERR_EMPTY : CLI_REVIEW_ERR_INVOKE;
     }
-    AIRY_FREE(resp);
     return NULL;
+}
+
+/* 并发下发：每个主题一线程；prompt 构造失败记为 OOM 并跳过该主题。 */
+static void review_dispatch(cli_review_job_t *jobs, airy_thread_t *threads, int n,
+                            const char *sock, const char *task, const char *plan_json)
+{
+    for (int i = 0; i < n; i++) {
+        threads[i] = AIRY_INVALID_THREAD;
+        jobs[i].sock = sock;
+        jobs[i].topic = cli_review_topics[i].name;
+        jobs[i].prompt = cli_review_build_prompt(cli_review_topics[i].name, task, plan_json);
+        if (jobs[i].prompt)
+            airy_thread_create(&threads[i], cli_review_worker, &jobs[i]);
+        else
+            jobs[i].status = CLI_REVIEW_ERR_MEM;
+    }
+}
+
+/* 等待全部作业结束并释放 prompt（output 留待主线程汇总/渲染）。 */
+static void review_join(cli_review_job_t *jobs, airy_thread_t *threads, int n)
+{
+    for (int i = 0; i < n; i++) {
+        if (threads[i] != AIRY_INVALID_THREAD)
+            airy_thread_join(threads[i], NULL);
+        AIRY_FREE(jobs[i].prompt);
+    }
+}
+
+/* 释放作业面（output 由主线程独占）。 */
+static void review_free(cli_review_job_t *jobs, airy_thread_t *threads, int n)
+{
+    for (int i = 0; i < n; i++)
+        AIRY_FREE(jobs[i].output);
+    AIRY_FREE(jobs);
+    AIRY_FREE(threads);
+}
+
+/* 汇总有输出的作业为报告 JSON；内存不足返回 NULL。 */
+static char *review_report(const cli_review_job_t *jobs, int n)
+{
+    cJSON *rep = cJSON_CreateObject();
+
+    if (!rep)
+        return NULL;
+    cJSON_AddStringToObject(rep, "reviewer", "cognition-sub-agents");
+    cJSON *items = cJSON_AddArrayToObject(rep, "reviews");
+    for (int i = 0; items && i < n; i++) {
+        if (!jobs[i].output)
+            continue;
+        cJSON *it = cJSON_CreateObject();
+        if (!it)
+            continue;
+        cJSON_AddStringToObject(it, "topic", cli_review_topics[i].name);
+        cJSON_AddStringToObject(it, "output", jobs[i].output);
+        cJSON_AddItemToArray(items, it);
+    }
+    char *out = cJSON_PrintUnformatted(rep);
+    cJSON_Delete(rep);
+    return out;
+}
+
+/* 逐条渲染失败主题并统计成功条数（渲染只在主线程）。 */
+static int review_verdicts(const cli_review_job_t *jobs, int n)
+{
+    int produced = 0;
+
+    for (int i = 0; i < n; i++) {
+        if (jobs[i].output) {
+            produced++;
+            continue;
+        }
+        /* Rendering happens here (main thread) — never inside workers. */
+        char hdr[24];
+        snprintf(hdr, sizeof(hdr), "Sub %s Agent", cli_review_topics[i].name);
+        cli_print_line(hdr, cli_review_err_str(jobs[i].status));
+    }
+    return produced;
 }
 
 int cli_cognition_review(const char *agent_sock, const char *task, const airy_task_plan_t *plan,
@@ -307,8 +368,7 @@ int cli_cognition_review(const char *agent_sock, const char *task, const airy_ta
      * user must still see why the review was skipped.
      * 架构约束（2026-08-25）：统一经 gateway 派发（agent.health_check）。 */
     char *hc = NULL;
-    int hc_rc = cli_gw_call("agent.health_check", NULL, CLI_REVIEW_HEALTH_TIMEOUT_MS, &hc);
-    if (hc_rc != 0) {
+    if (cli_gw_call("agent.health_check", NULL, CLI_REVIEW_HEALTH_TIMEOUT_MS, &hc) != 0) {
         AIRY_FREE(hc);
         cli_print_line("Sub review Agent",
                        "cognition review unavailable: agent_d health check failed");
@@ -317,12 +377,11 @@ int cli_cognition_review(const char *agent_sock, const char *task, const airy_ta
     AIRY_FREE(hc);
 
     char *plan_json = cli_review_plan_summary(plan);
-    if (!plan_json)
-        return 0;
-
     const int n = cli_review_parallelism();
-    if (n <= 0 || n > CLI_REVIEW_MAX_TOPICS)
+    if (!plan_json || n <= 0 || n > CLI_REVIEW_MAX_TOPICS) {
+        AIRY_FREE(plan_json);
         return 0;
+    }
 
     cli_review_job_t *jobs = (cli_review_job_t *)AIRY_CALLOC((size_t)n, sizeof(cli_review_job_t));
     airy_thread_t *threads = (airy_thread_t *)AIRY_CALLOC((size_t)n, sizeof(airy_thread_t));
@@ -335,80 +394,24 @@ int cli_cognition_review(const char *agent_sock, const char *task, const airy_ta
     cli_trace("review", "parallel cognition review (%d sub-agents) started, plan=%s nodes=%zu",
               n, plan->task_plan_id ? plan->task_plan_id : "?", plan->task_plan_node_count);
 
-    for (int i = 0; i < n; i++) {
-        threads[i] = AIRY_INVALID_THREAD;
-        jobs[i].sock = sock;
-        jobs[i].topic = cli_review_topics[i].name;
-        jobs[i].prompt = cli_review_build_prompt(cli_review_topics[i].name, task, plan_json);
-        if (jobs[i].prompt)
-            airy_thread_create(&threads[i], cli_review_worker, &jobs[i]);
-        else
-            jobs[i].status = CLI_REVIEW_ERR_MEM;
-    }
-
-    for (int i = 0; i < n; i++) {
-        if (threads[i] != AIRY_INVALID_THREAD)
-            airy_thread_join(threads[i], NULL);
-        AIRY_FREE(jobs[i].prompt);
-    }
+    review_dispatch(jobs, threads, n, sock, task, plan_json);
+    review_join(jobs, threads, n);
     AIRY_FREE(plan_json);
 
-    int produced = 0;
-    for (int i = 0; i < n; i++) {
-        if (jobs[i].output) {
-            produced++;
-        } else {
-            /* Rendering happens here (main thread) — never inside workers. */
-            char hdr[24];
-            snprintf(hdr, sizeof(hdr), "Sub %s Agent", cli_review_topics[i].name);
-            cli_print_line(hdr, cli_review_err_str(jobs[i].status));
-        }
-    }
+    int produced = review_verdicts(jobs, n);
     if (produced == 0) {
-        cli_print_line("Sub review Agent",
-                       "cognition review produced no verdicts");
-        AIRY_FREE(jobs);
-        AIRY_FREE(threads);
+        cli_print_line("Sub review Agent", "cognition review produced no verdicts");
+        review_free(jobs, threads, n);
         return 0;
     }
 
-    cJSON *rep = cJSON_CreateObject();
-    if (!rep) {
-        for (int i = 0; i < n; i++)
-            AIRY_FREE(jobs[i].output);
-        AIRY_FREE(jobs);
-        AIRY_FREE(threads);
-        return 0;
-    }
-    cJSON_AddStringToObject(rep, "reviewer", "cognition-sub-agents");
-    cJSON *items = cJSON_CreateArray();
-    if (items) {
-        for (int i = 0; i < n; i++) {
-            if (!jobs[i].output)
-                continue;
-            cJSON *it = cJSON_CreateObject();
-            if (!it)
-                continue;
-            cJSON_AddStringToObject(it, "topic", cli_review_topics[i].name);
-            cJSON_AddStringToObject(it, "output", jobs[i].output);
-            cJSON_AddItemToArray(items, it);
-        }
-        cJSON_AddItemToObject(rep, "reviews", items);
-    }
-    char *report = cJSON_PrintUnformatted(rep);
-    cJSON_Delete(rep);
-
-    for (int i = 0; i < n; i++)
-        AIRY_FREE(jobs[i].output);
-    AIRY_FREE(jobs);
-    AIRY_FREE(threads);
-
+    char *report = review_report(jobs, n);
+    review_free(jobs, threads, n);
     if (!report)
         return 0;
-    if (out_report) {
+    if (out_report)
         *out_report = report;
-    } else {
+    else
         AIRY_FREE(report);
-    }
     return 1;
 }

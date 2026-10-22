@@ -15,6 +15,7 @@
 #include "cli_internal.h"
 #include "cli_review.h"
 #include "cli_gw.h"
+#include "cli_gw_json.h"
 #include "airy_cli_exec.h"
 /* 0.1.16 B2：corekern task.h 已摘除，airy_task_plan_t 来自 coreloopthree
  * cognition.h（经 cli_internal.h/airy_cli_exec.h 传入），错误码由
@@ -112,54 +113,47 @@ static cJSON *pl_entry_json(const airy_task_plan_t *plan)
     return entries;
 }
 
-/* 序列化 airy_task_plan_t → JSON（反向序列化，与 airy_plan_parse 成对）。 */
-static char *cli_plan_to_json(const airy_task_plan_t *plan)
+/* 序列化 airy_task_plan_t → JSON 树（反向序列化，与 airy_plan_parse 成对）。 */
+static cJSON *cli_plan_json(const airy_task_plan_t *plan)
 {
-    cJSON *root;
-    cJSON *nodes;
-    cJSON *entries;
-    char *out;
-
     if (!plan)
         return NULL;
-    root = cJSON_CreateObject();
+    cJSON *root = cJSON_CreateObject();
     if (!root)
         return NULL;
     if (plan->task_plan_id && plan->task_plan_id[0])
         cJSON_AddStringToObject(root, "task_plan_id", plan->task_plan_id);
-    nodes = pl_nodes_json(plan);
+    cJSON *nodes = pl_nodes_json(plan);
     if (nodes)
         cJSON_AddItemToObject(root, "nodes", nodes);
-    entries = pl_entry_json(plan);
+    cJSON *entries = pl_entry_json(plan);
     if (entries)
         cJSON_AddItemToObject(root, "entry_points", entries);
-    out = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    return out;
+    return root;
+}
+
+/* 吸收面单点出口：params 所有权在此结束，回包丢弃（fire-and-forget）。 */
+static void absorb_send(cJSON *params)
+{
+    cJSON *root = NULL;
+
+    if (cli_gw_json("sched.absorb", params, CLI_ROADMAP_ABSORB_TIMEOUT_MS, &root) == 0)
+        cJSON_Delete(root);
 }
 
 /* 蓝图注册吸收：sched.absorb 模式 A（plan 对象 JSON） */
 static void cli_roadmap_absorb_plan(const airy_task_plan_t *plan)
 {
-    if (!plan)
-        return;
-    char *plan_json = cli_plan_to_json(plan);
-    if (!plan_json)
+    cJSON *pv = cli_plan_json(plan);
+    if (!pv)
         return;
     cJSON *params = cJSON_CreateObject();
-    cJSON *pv = cJSON_Parse(plan_json);
-    if (params && pv)
-        cJSON_AddItemToObject(params, "plan", pv);
-    else
+    if (!params) {
         cJSON_Delete(pv);
-    char *pj = params ? cJSON_PrintUnformatted(params) : NULL;
-    cJSON_Delete(params);
-    char *resp = NULL;
-    if (pj)
-        (void)cli_gw_call("sched.absorb", pj, CLI_ROADMAP_ABSORB_TIMEOUT_MS, &resp);
-    AIRY_FREE(pj);
-    AIRY_FREE(resp);
-    AIRY_FREE(plan_json);
+        return;
+    }
+    cJSON_AddItemToObject(params, "plan", pv);
+    absorb_send(params);
 }
 
 /* 执行结果回灌：sched.absorb 模式 B（exec_id + node_id + output_json +
@@ -180,13 +174,7 @@ static void cli_roadmap_absorb_result(const char *exec_id, const char *node_id,
     cJSON_AddNumberToObject(params, "result", result);
     cJSON_AddNumberToObject(params, "verify", verify);
     cJSON_AddTrueToObject(params, "is_user_intent");
-    char *pj = cJSON_PrintUnformatted(params);
-    cJSON_Delete(params);
-    char *resp = NULL;
-    if (pj)
-        (void)cli_gw_call("sched.absorb", pj, CLI_ROADMAP_ABSORB_TIMEOUT_MS, &resp);
-    AIRY_FREE(pj);
-    AIRY_FREE(resp);
+    absorb_send(params);
 }
 #endif /* AIRY_HAS_CJSON */
 
