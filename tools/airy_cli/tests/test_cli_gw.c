@@ -110,52 +110,53 @@ static void mock_send(int fd, int status, const char *body)
     (void)send(fd, body, strlen(body), MSG_NOSIGNAL);
 }
 
-static void mock_handle(int fd)
+/* 追加读一段到 n 之后；缓冲区已满或对端结束返回 -1。 */
+static ssize_t mock_more(int fd, char *buf, size_t cap, size_t *n)
 {
-    char buf[8192];
+    if (*n + 1 >= cap)
+        return -1;
+    ssize_t r = recv(fd, buf + *n, cap - *n - 1, 0);
+    if (r <= 0)
+        return -1;
+    *n += (size_t)r;
+    buf[*n] = '\0';
+    return r;
+}
+
+/* 读满请求头与 Content-Length 声明的 body，返回 body 起点（body 为空时
+ * 指向缓冲区当前结尾）；请求头不完整时返回 NULL。 */
+static char *mock_recv(int fd, char *buf, size_t cap)
+{
     size_t n = 0;
-    /* 读请求头至 "\r\n\r\n" */
-    while (n + 1 < sizeof(buf)) {
-        ssize_t r = recv(fd, buf + n, sizeof(buf) - n - 1, 0);
-        if (r <= 0)
-            break;
-        n += (size_t)r;
-        buf[n] = '\0';
+    char *he;
+    size_t hlen;
+    size_t clen = 0;
+
+    while (mock_more(fd, buf, cap, &n) > 0) {
         if (strstr(buf, "\r\n\r\n"))
             break;
     }
     if (n == 0)
-        return;
+        return NULL;
     buf[n] = '\0';
-
-    char method[8] = "";
-    char path[64] = "";
-    (void)sscanf(buf, "%7s %63s HTTP/1.1", method, path);
-
-    char *he = strstr(buf, "\r\n\r\n");
+    he = strstr(buf, "\r\n\r\n");
     if (!he)
-        return;
-    size_t hlen = (size_t)(he - buf) + 4;
-
-    size_t clen = 0;
+        return NULL;
+    hlen = (size_t)(he - buf) + 4;
     char *cl = strstr(buf, "Content-Length:");
     if (!cl)
         cl = strstr(buf, "content-length:");
     if (cl)
         clen = (size_t)strtoul(cl + 15, NULL, 10);
+    /* 补齐 body 至声明长度（clen==0 时不得进入阻塞 recv） */
+    while (n < hlen + clen && mock_more(fd, buf, cap, &n) > 0)
+        ;
+    return (buf + hlen < buf + n) ? (buf + hlen) : (buf + n);
+}
 
-    /* 补齐 body 至 Content-Length 声明长度（clen==0 时不得进入阻塞 recv） */
-    while (n < hlen + clen) {
-        if (n + 1 >= sizeof(buf))
-            break;
-        ssize_t r = recv(fd, buf + n, sizeof(buf) - n - 1, 0);
-        if (r <= 0)
-            break;
-        n += (size_t)r;
-        buf[n] = '\0';
-    }
-    char *body = (buf + hlen < buf + n) ? (buf + hlen) : (buf + n);
-
+/* 记录本次请求到全局观测面，返回当轮 mock 模式（锁内取值，与计数一致）。 */
+static int mock_record(const char *path, const char *body)
+{
     pthread_mutex_lock(&g_lock);
     g_reqs++;
     snprintf(g_last_path, sizeof(g_last_path), "%s", path);
@@ -184,6 +185,45 @@ static void mock_handle(int fd)
     }
     int mode = g_mode;
     pthread_mutex_unlock(&g_lock);
+    return mode;
+}
+
+/* 固定形态故障应答表（mode → status/body）；命中即应答并返回 1。 */
+static int mock_fail_mode(int fd, int mode)
+{
+    static const struct {
+        int mode;
+        int status;
+        const char *body;
+    } tbl[] = {
+        {MOCK_MODE_ERROR, 200,
+         "{\"jsonrpc\":\"2.0\",\"id\":1,"
+         "\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}"},
+        {MOCK_MODE_BADJSON, 200, "<html>gateway panic</html>"},
+        {MOCK_MODE_NORESULT, 200, "{\"jsonrpc\":\"2.0\",\"id\":1}"},
+        {MOCK_MODE_503, 503, ""}, /* daemon 重启窗口：网关返回空体 503 */
+    };
+
+    for (size_t i = 0; i < sizeof(tbl) / sizeof(tbl[0]); i++) {
+        if (tbl[i].mode != mode)
+            continue;
+        mock_send(fd, tbl[i].status, tbl[i].body);
+        return 1;
+    }
+    return 0;
+}
+
+static void mock_handle(int fd)
+{
+    char buf[8192];
+    char method[8] = "";
+    char path[64] = "";
+    char *body = mock_recv(fd, buf, sizeof(buf));
+
+    if (!body)
+        return;
+    (void)sscanf(buf, "%7s %63s HTTP/1.1", method, path);
+    int mode = mock_record(path, body);
 
     /* /health 按真实网关契约：仅 GET 返回 200 healthy，其他方法 404
      * -32601（方法契约锁进 mock，防止探针方法回归）。 */
@@ -199,24 +239,9 @@ static void mock_handle(int fd)
         airy_sleep_ms(800); /* 静默至客户端预算耗尽 */
         return;
     }
-    if (mode == MOCK_MODE_ERROR) {
-        mock_send(fd, 200, "{\"jsonrpc\":\"2.0\",\"id\":1,"
-                           "\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}");
+    if (mock_fail_mode(fd, mode))
         return;
-    }
-    if (mode == MOCK_MODE_BADJSON) {
-        mock_send(fd, 200, "<html>gateway panic</html>");
-        return;
-    }
-    if (mode == MOCK_MODE_NORESULT) {
-        mock_send(fd, 200, "{\"jsonrpc\":\"2.0\",\"id\":1}");
-        return;
-    }
-    if (mode == MOCK_MODE_503) {
-        /* daemon 重启窗口：网关返回空体 503（N4 现场根因形态） */
-        mock_send(fd, 503, "");
-        return;
-    }
+
     char resp[512];
     snprintf(resp, sizeof(resp),
              "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"echo\":true,\"method\":\"%s\"}}",

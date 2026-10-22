@@ -134,6 +134,40 @@ void cli_msgbuf_push(cli_chat_msgbuf_t *b, const char *role, const char *content
 #define CLI_TOOL_AGENT "coding_v1"
 #define CLI_TOOL_RPC_TIMEOUT_MS 30000
 
+/* 原地规范化绝对路径：空段与 "." 丢弃，".." 回退上一段，其余段保留。
+ * dst 恒 ≤ 当前段起点，故边读边写不破坏未消费内容。 */
+static void path_trim_dots(char *path)
+{
+    char *dst = path;
+    const char *p = path;
+
+    while (*p) {
+        while (*p == '/')
+            p++;
+        const char *seg = p;
+        while (*p && *p != '/')
+            p++;
+        size_t len = (size_t)(p - seg);
+
+        if (len == 0)
+            break;
+        if (len == 1 && seg[0] == '.')
+            continue;
+        if (len == 2 && seg[0] == '.' && seg[1] == '.') {
+            if (dst > path + 1) {
+                dst -= 1;
+                while (dst > path && dst[-1] != '/')
+                    dst -= 1;
+            }
+            continue;
+        }
+        dst[0] = '/';
+        AIRY_MEMCPY(dst + 1, seg, len);
+        dst += 1 + len;
+    }
+    *dst = '\0';
+}
+
 /* 相对路径绝对化：tool_d 在 daemon 启动目录解析相对路径，与 CLI 的 cwd
  * 不一致（2026-08-16 实测：模型传 "test_edit.txt" 被 tool_d 按自己的 cwd
  * 解析失败）。CLI 是用户会话的语义边界——用户说"当前目录"就是 CLI 的
@@ -157,39 +191,7 @@ static void cli_tool_absolutize_path(cJSON *args, const char *key)
         return;
     char out[4096];
     snprintf(out, sizeof(out), "%s/%s", cwd, p);
-    /* 逐段规范化：空段与 "." 跳过；".." 回退上一段（cwd 为绝对路径）；*/
-    /* 其余段原样保留。dst 指向当前写入位置，回退即移回上一 '/'。 */
-    char *dst = out;
-    const char *src = out;
-    for (;;) {
-        const char *seg = src;
-        const char *slash = strchr(seg, '/');
-        size_t seg_len = slash ? (size_t)(slash - seg) : strlen(seg);
-        if (seg_len == 0 || (seg_len == 1 && seg[0] == '.')) {
-            src = slash ? slash + 1 : seg + seg_len;
-            if (!slash)
-                break;
-            continue;
-        }
-        if (seg_len == 2 && seg[0] == '.' && seg[1] == '.') {
-            if (dst > out + 1) {
-                dst -= 1;
-                while (dst > out && dst[-1] != '/')
-                    dst -= 1;
-            }
-            src = slash ? slash + 1 : seg + seg_len;
-            if (!slash)
-                break;
-            continue;
-        }
-        dst[0] = '/';
-        __builtin_memcpy(dst + 1, seg, seg_len);
-        dst += 1 + seg_len;
-        src = slash ? slash + 1 : seg + seg_len;
-        if (!slash)
-            break;
-    }
-    *dst = '\0';
+    path_trim_dots(out);
     if (out[0] == '\0')
         snprintf(out, sizeof(out), "%s/", cwd);
     cJSON_SetValuestring(v, out);
