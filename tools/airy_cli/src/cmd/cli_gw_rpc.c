@@ -14,6 +14,7 @@
 #include "airy_memory.h"
 #include "cli_gw.h"
 #include "cli_gw_int.h"
+#include "cli_gw_json.h"
 #include "error_codes.h" /* AIRY_ERR_CANCELED（S-02：取消语义与 sched.dag_cancel 对齐） */
 #include "logger.h"
 
@@ -268,4 +269,39 @@ int cli_gw_probe(int timeout_ms, unsigned long long *epoch_out)
 int cli_gw_health(int timeout_ms)
 {
     return cli_gw_probe(timeout_ms, NULL);
+}
+
+/* ── cJSON 参数面（0.1.19 §459）────────────────────────────────────── */
+/* 业务模块的通用骨架：建 params → 序列化 → 调 → 解析 result。params
+ * 所有权在函数内结束（成功与失败路径都释放），调用方只需管 result 树。 */
+int cli_gw_json(const char *method, cJSON *params, int timeout_ms, cJSON **out_root)
+{
+    char *params_json = NULL;
+    char *result_json = NULL;
+    int rc;
+
+    if (!method || !out_root) {
+        cJSON_Delete(params);
+        cli_gw_err_set("网关调用参数非法（method 或 out_root 为空）");
+        return AIRY_ERR_INVALID_PARAM;
+    }
+    *out_root = NULL;
+    if (params && !(params_json = cJSON_PrintUnformatted(params))) {
+        cJSON_Delete(params);
+        cli_gw_err_set("请求参数序列化失败（内存不足）");
+        return AIRY_ERR_OUT_OF_MEMORY;
+    }
+    cJSON_Delete(params);
+    rc = cli_gw_call(method, params_json, timeout_ms, &result_json);
+    AIRY_FREE(params_json);
+    if (rc != 0)
+        return rc;
+    *out_root = result_json ? cJSON_Parse(result_json) : NULL;
+    AIRY_FREE(result_json);
+    if (!*out_root) {
+        snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
+                 "网关返回格式异常（method=%s），result 不是合法 JSON", method);
+        return AIRY_ERR_PROTOCOL;
+    }
+    return 0;
 }

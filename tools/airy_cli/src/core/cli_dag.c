@@ -14,14 +14,10 @@
 #include "cli_internal.h"
 
 #include "agent_vocab.h"
-#include "cli_gw.h" /* 架构约束 2026-08-25：统一经 gateway 派发 */
+#include "cli_gw_json.h" /* 架构约束 2026-08-25：统一经 gateway 派发 */
 #include "id_utils.h"
 
 #include "cli_prelude.h"
-
-#ifdef AIRY_HAS_CJSON
-#include <cjson/cJSON.h>
-#endif
 
 /* ==================== sched_d blueprint DAG over gateway ====================
  */
@@ -35,36 +31,27 @@
  *   - sched.dag_cancel: params {"dag_id"}
  */
 
-/* 单字段 params 信封 {"key": value} → 紧凑 JSON；失败返回 NULL。 */
-static char *dag_params1(const char *key, const char *val)
+/* 单字段 params 对象 {"key": value}（所有权交 dag_rpc/cli_gw_json 消费）。 */
+static cJSON *dag_p1(const char *key, const char *val)
 {
     cJSON *obj = cJSON_CreateObject();
-    char *js;
 
     if (!obj)
         return NULL;
     cJSON_AddStringToObject(obj, key, val ? val : "");
-    js = cJSON_PrintUnformatted(obj);
-    cJSON_Delete(obj);
-    return js;
+    return obj;
 }
 
 /* 经 gateway 调一处 DAG 方法并解析回包根；失败返回 NULL 且写 *err。 */
-static cJSON *dag_rpc(const char *method, const char *params_json, int timeout_ms, int *err)
+static cJSON *dag_rpc(const char *method, cJSON *params, int timeout_ms, int *err)
 {
-    char *rpc_result = NULL;
-    int rc = cli_gw_call(method, params_json, timeout_ms, &rpc_result);
-    cJSON *root;
+    cJSON *root = NULL;
 
-    *err = (rc == AIRY_SUCCESS && !rpc_result) ? AIRY_ERR_GENERIC_FAIL : rc;
-    if (*err != AIRY_SUCCESS) {
-        AIRY_FREE(rpc_result);
+    if (!params) {
+        *err = AIRY_ERR_OUT_OF_MEMORY;
         return NULL;
     }
-    root = cJSON_Parse(rpc_result);
-    AIRY_FREE(rpc_result);
-    if (!root)
-        *err = AIRY_ERR_PARSE_ERROR;
+    *err = cli_gw_json(method, params, timeout_ms, &root);
     return root;
 }
 
@@ -210,18 +197,13 @@ airy_err_t cli_dag_submit_remote(const airy_task_plan_t *plan, const char *task_
         return AIRY_ERR_PARSE_ERROR;
     }
     cJSON_AddItemToObject(params, "dag", dag_obj);
-    char *params_json = cJSON_PrintUnformatted(params);
-    cJSON_Delete(params);
     AIRY_FREE(dag_json);
-    if (!params_json)
-        return AIRY_ERR_OUT_OF_MEMORY;
 
     /* 架构约束（2026-08-25）：统一经 gateway 派发（sched.dag_submit →
      * gateway → SYS_SVC_CALL → sched_d），禁止直连 sched.sock。 */
     int err = 0;
-    cJSON *root = dag_rpc("sched.dag_submit", params_json, 30000, &err);
+    cJSON *root = dag_rpc("sched.dag_submit", params, 30000, &err);
 
-    AIRY_FREE(params_json);
     if (!root)
         return (airy_err_t)err;
 
@@ -250,15 +232,14 @@ cli_dag_snapshot_t *cli_dag_snapshot_fetch(const char *dag_id)
     if (!dag_id || !dag_id[0])
         return NULL;
 
-    char *params_json = dag_params1("dag_id", dag_id);
-    if (!params_json)
+    cJSON *params = dag_p1("dag_id", dag_id);
+    if (!params)
         return NULL;
 
     /* 架构约束（2026-08-25）：统一经 gateway 派发（sched.dag_status） */
     int err = 0;
-    cJSON *root = dag_rpc("sched.dag_status", params_json, 10000, &err);
+    cJSON *root = dag_rpc("sched.dag_status", params, 10000, &err);
 
-    AIRY_FREE(params_json);
     if (!root)
         return NULL;
 
@@ -421,7 +402,7 @@ airy_err_t cli_dag_list_remote(cli_dag_item_t *items, size_t cap, size_t *out_co
     *out_count = 0;
 
     int err = 0;
-    cJSON *root = dag_rpc("sched.dag_list", "{}", 10000, &err);
+    cJSON *root = dag_rpc("sched.dag_list", cJSON_CreateObject(), 10000, &err);
 
     if (!root)
         return (airy_err_t)err;
@@ -459,14 +440,13 @@ airy_err_t cli_dag_cancel_remote(const char *dag_id)
     if (!dag_id || !dag_id[0])
         return AIRY_ERR_INVALID_PARAM;
 
-    char *cparams_json = dag_params1("dag_id", dag_id);
-    if (!cparams_json)
+    cJSON *params = dag_p1("dag_id", dag_id);
+    if (!params)
         return AIRY_ERR_OUT_OF_MEMORY;
 
-    char *cres = NULL;
-    int rc = cli_gw_call("sched.dag_cancel", cparams_json, 5000, &cres);
-    AIRY_FREE(cparams_json);
-    AIRY_FREE(cres);
+    cJSON *root = NULL;
+    int rc = cli_gw_json("sched.dag_cancel", params, 5000, &root);
+    cJSON_Delete(root);
     return rc == AIRY_SUCCESS ? AIRY_EOK : (airy_err_t)rc;
 }
 

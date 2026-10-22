@@ -340,10 +340,10 @@ fi
 section "D" "9.4/C-01 airy_cli 聊天路径单一实现（稳定问题：stream 遗留死码清除）"
 
 CHAT="$CLI/src/chat/cli_chat.c"
-if grep -q 'cli_gw_call(' "$CHAT" && grep -q '"llm.complete"' "$CHAT"; then
-    ok "D1 cli_chat.c 直连 gw（cli_gw_call + llm.complete）"
+if grep -qE 'cli_gw_(call|json)\(' "$CHAT" && grep -q '"llm.complete"' "$CHAT"; then
+    ok "D1 cli_chat.c 直连 gw（cli_gw_call/cli_gw_json + llm.complete）"
 else
-    bad "D1 cli_chat.c 未走 cli_gw_call/llm.complete 单一实现"
+    bad "D1 cli_chat.c 未走 cli_gw_call/cli_gw_json/llm.complete 单一实现"
 fi
 
 if [ ! -f "$CLI/src/chat/cli_chat_stream.c" ]; then
@@ -1012,11 +1012,11 @@ gw_cap_row() {
     python3 "$GW_GEN" --manifest "$GW_MANIFEST" --dump-caps 2>/dev/null \
         | awk -F'\t' -v c="$1" '$1==c{print; exit}'
 }
-# 用户面调用取证面：CLI 直调 cli_gw_call，或经 CLI 内部 DAG 信封原语 dag_rpc
-# （cli_dag.c 静态转发 method，语义等价于直调）。仅放宽“调用表达式形态”，
-# 不放宽“必须存在用户面调用”这一事实。
+# 用户面调用取证面：CLI 直调 cli_gw_call，或经 0.1.19 §459 的 cJSON 参数面
+# cli_gw_json，或经 CLI 内部 DAG 信封原语 dag_rpc（cli_dag.c 静态转发 method，
+# 语义等价于直调）。仅放宽“调用表达式形态”，不放宽“必须存在用户面调用”这一事实。
 _cli_calls_cap() {
-    grep -rqE "(cli_gw_call|dag_rpc)\(\"$1\"" "$CLI/src" 2>/dev/null
+    grep -rqE "(cli_gw_call|cli_gw_json|dag_rpc)\(\"$1\"" "$CLI/src" 2>/dev/null
 }
 ERRS="$ROOT/commons/utils/error/error_codes.h"
 ERRC="$ROOT/commons/utils/error/err_class.h"
@@ -1024,7 +1024,7 @@ ERRN="$ROOT/commons/utils/error/handler.c"
 
 _t1_n=0
 _t1_bad=""
-for _cap in $(grep -rhoE '(cli_gw_call|dag_rpc)\("[a-z_]+\.[a-z_0-9]+"' "$CLI/src" 2>/dev/null \
+for _cap in $(grep -rhoE '(cli_gw_call|cli_gw_json|dag_rpc)\("[a-z_]+\.[a-z_0-9]+"' "$CLI/src" 2>/dev/null \
               | sed 's/.*("//' | tr -d '"' | sort -u); do
     _t1_n=$((_t1_n+1))
     [ -n "$(gw_cap_row "$_cap")" ] || _t1_bad="$_t1_bad $_cap"

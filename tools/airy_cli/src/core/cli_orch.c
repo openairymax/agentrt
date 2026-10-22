@@ -12,10 +12,9 @@
 
 #include "cli_internal.h"
 #include "cli_gw.h"
+#include "cli_gw_json.h"
 
 #include "airy_memory.h"
-
-#include <cjson/cJSON.h>
 
 #include <stdio.h>
 
@@ -35,25 +34,12 @@ int cmd_orch(const char *arg, void *ctx)
     if (!params)
         return 1;
     cJSON_AddStringToObject(params, "input", arg);
-    char *ps = cJSON_PrintUnformatted(params);
-    cJSON_Delete(params);
-    if (!ps)
-        return 1;
 
-    char *result = NULL;
-    int rc = cli_gw_call("think.orchestrate", ps, 120000, &result);
-    AIRY_FREE(ps);
-    if (rc != 0 || !result) {
+    cJSON *root = NULL;
+    int rc = cli_gw_json("think.orchestrate", params, 120000, &root);
+    if (rc != 0) {
         /* C-5 收敛：经 cli_err_desc 统一渲染，契约外码值不进用户面 */
         cli_outf("  %s[编排]%s 编排请求失败：%s\n", CLR_RED, CLR_RESET, cli_err_desc(rc));
-        AIRY_FREE(result);
-        return 1;
-    }
-
-    cJSON *root = cJSON_Parse(result);
-    AIRY_FREE(result);
-    if (!root) {
-        cli_outf("  %s[编排]%s 响应解析失败\n", CLR_RED, CLR_RESET);
         return 1;
     }
 
