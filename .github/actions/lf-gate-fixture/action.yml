@@ -51,7 +51,10 @@ inputs:
     # 8a61e36：tui gitlink 前推至 a80a492（0.1.19 TUI 收敛面：entry.rs、
     # present 拆件、Alt+E 键路）。旧 pin b688680 的 tui 尚未产出 entry/present，
     # Y 组判据读不到结构面、构建腿按新入口编译失败（run #557 实证）。
-    default: '8a61e362c4cd799ff9ea637eec16d1f3dda9ae69'
+    # 63e9d67：tui gitlink 前推至 ba68318（解包即用态单根自锚定 + 版本查询）。
+    # latest 发布面已同步该启动器，AF1 双面一致判据要求 pin 同步前推，否则
+    # 取到旧快照即报「latest 与 sdk 启动器分叉」。
+    default: '63e9d67fc8f0adddb694671e93812d4aa0ff44f5'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
