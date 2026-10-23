@@ -1309,8 +1309,10 @@ else
 
     # 负向扫描只覆盖生产编译面：`#[cfg(test)]` 门控的模块（tests/golden/e2e）
     # 用夹具构造入站 PendingApproval 数据，不越过渲染边界，不属于用户面透传。
+    # sed 而非 grep -oP：BSD grep（macOS）无 -P，曾致 _v4_mods 恒空、
+    # tests/golden 被误判为用户面裸透传（run #557 macOS release_gates 实证）。
     _v4_mods=$(grep -rn -A1 '#\[cfg(test)\]' "$TUI_SRC/src" --include='*.rs' 2>/dev/null \
-        | grep -oP 'mod \K[a-z0-9_]+(?=;)' | sort -u)
+        | sed -n 's/.*mod \([a-z0-9_]*\);.*/\1/p' | sort -u)
     _v4_leak=""
     while IFS= read -r -d '' _rf; do
         _v4_skip=0
