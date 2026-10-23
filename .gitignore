@@ -17,7 +17,11 @@
 !.github/**
 !ACKNOWLEDGMENTS.md
 !CHANGELOG.md
-# RELEASE_NOTES.d/：维护者本地发布素材目录，不入库、不随仓分发
+# RELEASE_NOTES.d/<VERSION>.md：发行正文 SSoT，必须随 tag 入库。
+# 曾按「本地素材」排除，导致 release.yml 取不到文件而永远走兜底生成器，
+# 正文泄漏内部 pin 提交（v0.1.19 事故）。正文即发行物，须版本化。
+!RELEASE_NOTES.d/
+!RELEASE_NOTES.d/**
 !CMakeLists.txt
 !CONTRIBUTING.md
 !Doxyfile
