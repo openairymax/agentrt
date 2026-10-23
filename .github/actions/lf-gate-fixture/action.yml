@@ -55,10 +55,9 @@ inputs:
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
-    # 8e1f3cd：0.1.19 M5-3 起 airy_depgraph 执行器在 tools 仓，agentrt 经
-    # _tools/airy_depgraph 跨仓装配；旧 pin 早于迁出，构建腿取不到该工具，
-    # release-gates P5（全量链接新鲜校验）结构性红（run #556 实证）。
-    default: '8e1f3cdb9724d0993f5d124177bc4c304bfccc66'
+    # 5097aa1：函数名基线收敛（删去两个已重命名条目），使 NameLength 门禁
+    # 不再每轮报「缩减 2 项」的常驻噪声。除基线外零差异。
+    default: '5097aa1f5fbf3e629ce14fe6967a4b8e8bae4a52'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
