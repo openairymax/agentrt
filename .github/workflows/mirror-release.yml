@@ -72,7 +72,10 @@ env:
   NOTES: ${{ inputs.notes || github.event.client_payload.notes }}
   # fetch_missing 语义为「默认开，仅显式 false 才关」：repository_dispatch
   # 的 client_payload 缺省该字段时解析为 null，须与 true 同等归为开。
-  FETCH_MISSING: ${{ (github.event.client_payload.fetch_missing == false || inputs.fetch_missing == false) && '0' || '1' }}
+  # 必须先按事件名分流再比较：表达式的宽松相等把 null 视同 false，
+  # 若跨事件名并置比较，dispatch 触发时 inputs.* 为 null 会被判成
+  # 「显式 false」，回填通道静默关闭（v0.1.18 引导失效实证）。
+  FETCH_MISSING: ${{ ((github.event_name == 'workflow_dispatch' && inputs.fetch_missing == false) || (github.event_name == 'repository_dispatch' && github.event.client_payload.fetch_missing == false)) && '0' || '1' }}
 
 jobs:
   mirror:
