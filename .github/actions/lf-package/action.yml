@@ -64,6 +64,11 @@ runs:
         cp -f agent-workload/sdk/tui/scripts/airymaxrt "${PKG_DIR}/bin/airymaxrt-full" \
           || { echo "::error::full 启动器缺失（agent-workload/sdk 未检出）"; exit 1; }
         chmod +x "${PKG_DIR}/bin/airymaxrt-full"
+        # 版本 SSoT 随包落地：解包即用态无 install.env，启动器以包根 VERSION
+        # 自述版本；缺失即包无法自证版本 → fail-closed。与 tools 侧
+        # lib-package.sh 同语义（离线整包构建路径），双实现不得分叉。
+        cp -f ./VERSION "${PKG_DIR}/VERSION" \
+          || { echo "::error::版本 SSoT（仓库根 VERSION）缺失，包不完整"; exit 1; }
         # 运行时 .so 收集/校验已在构建容器内由 finalize-linux-libs.sh 完成
         #（host 无容器 /usr/local 自编译库，ldd 收集必 not found）
         # 平台标记勿回退 uname 原始名（platform-x86_64 会触发更新器

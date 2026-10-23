@@ -413,6 +413,9 @@ jobs:
           if (Test-Path "_tools\scripts\ops\bin\agentrt-bootstrap.sh") {
             Copy-Item -Path "_tools\scripts\ops\bin\agentrt-bootstrap.sh" -Destination "$pkgDir\bin\" -Force
           }
+          # 版本 SSoT 随包落地（与 tar.gz 腿同语义）：解包态无 install.env，
+          # 启动器以包根 VERSION 自述版本。缺失即包无法自证版本。
+          Copy-Item -Path "VERSION" -Destination "$pkgDir\VERSION" -Force
           New-Item -ItemType File -Path "$pkgDir\platform-x86-64" -Force | Out-Null
           $artifact = "agentrt-$VERSION-windows-x86-64"
           Compress-Archive -Path "pkg\*" -DestinationPath "$artifact.zip"
@@ -558,6 +561,9 @@ jobs:
           if (Test-Path "_tools\scripts\ops\bin\agentrt-bootstrap.sh") {
             Copy-Item -Path "_tools\scripts\ops\bin\agentrt-bootstrap.sh" -Destination "$pkgDir\bin\" -Force
           }
+          # 版本 SSoT 随包落地（与 tar.gz 腿同语义）：解包态无 install.env，
+          # 启动器以包根 VERSION 自述版本。缺失即包无法自证版本。
+          Copy-Item -Path "VERSION" -Destination "$pkgDir\VERSION" -Force
           New-Item -ItemType File -Path "$pkgDir\platform-x86-32" -Force | Out-Null
           $artifact = "agentrt-$VERSION-windows-x86-32"
           Compress-Archive -Path "pkg\*" -DestinationPath "$artifact.zip"
