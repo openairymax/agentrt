@@ -48,10 +48,10 @@ inputs:
   sdk_sha:
     description: 'sdk 仓锁定 commit（判据消费：tui/scripts/airymaxrt + tui/src 判据面）'
     required: false
-    # b688680：tui gitlink 前推至 871ee38，启动器与 agentrt/latest/airymaxrt
-    # 内容一致（AF1 双面单路径）。旧 pin 的启动器缺 profile_load 逐行解析，
-    # 与 latest 分叉（run #556 实证）。
-    default: 'b688680923c53f5044d395d0cdefe8bd1802c4fa'
+    # 8a61e36：tui gitlink 前推至 a80a492（0.1.19 TUI 收敛面：entry.rs、
+    # present 拆件、Alt+E 键路）。旧 pin b688680 的 tui 尚未产出 entry/present，
+    # Y 组判据读不到结构面、构建腿按新入口编译失败（run #557 实证）。
+    default: '8a61e362c4cd799ff9ea637eec16d1f3dda9ae69'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
@@ -69,9 +69,12 @@ inputs:
     # 服务计数器改用 atomic_compat 跨平台原子面，MSVC 不再直引
     # <stdatomic.h>（C1189，ci-debug #1356 实证）；dcf2a80：cognition
     # 线程安全测试改用 platform 跨平台线程面 airy_thread_create/join，
-    # MSVC 不再裸引 pthread（LNK2001，ci-debug #1359 实证）；本 pin 与
-    # 镜像同步后门禁与装配读到同一份可跨编译器构建的快照。
-    default: 'dcf2a80879bcd6464ba36b6ddb4961d7f181ef9b'
+    # MSVC 不再裸引 pthread（LNK2001，ci-debug #1359 实证）。
+    # 4e429bd：gateway_biz 协议宏收敛为 GW_PROTO_DETECT_LLM_API（与 agentrt
+    # 枚举同名；旧 pin 的 GW_PROTO_DETECT_OPENAI 已不存在，Gate/Build 腿
+    # 报未声明标识符）；cognition standalone 增补 memory provider 装配锚；
+    # lang_gateway 分词族归属下沉产品侧。本 pin 与镜像 main 一致。
+    default: '4e429bdead3df16d8bc50993322ed4941d10cfc9'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
