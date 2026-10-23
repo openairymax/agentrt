@@ -1020,7 +1020,10 @@ _cli_calls_cap() {
 }
 ERRS="$ROOT/commons/utils/error/error_codes.h"
 ERRC="$ROOT/commons/utils/error/err_class.h"
-ERRN="$ROOT/commons/utils/error/handler.c"
+# 可读名称面取证：错误目录表已从 handler.c 独立为静态单元（error_catalog.c），
+# 判据按“目录单元集合”取证，不再绑定单一实现文件。
+ERRDIR="$ROOT/commons/utils/error"
+ERRN="$ERRDIR/handler.c"
 
 _t1_n=0
 _t1_bad=""
@@ -1108,7 +1111,7 @@ for _code in $(grep -rhoE 'AIRY_ERR_[A-Z0-9_]+' "$CLI/src" 2>/dev/null | sort -u
        ! grep -qE "^[[:space:]]*$_code[[:space:]]*=[[:space:]]*[0-9]+" "$ERRC" 2>/dev/null; then
         _t4_bad="$_t4_bad $_code(未登记契约)"; continue
     fi
-    if ! grep -qE "\{ *$_code," "$ERRN" 2>/dev/null && \
+    if ! grep -rqE "\{ *$_code," "$ERRDIR"/*.c 2>/dev/null && \
        ! grep -rqE "case $_code:" "$CLI/src" 2>/dev/null; then
         _t4_bad="$_t4_bad $_code(无可读名称)"
     fi
