@@ -1048,39 +1048,22 @@ jobs:
       # 发布说明面向整个开源社区（公开场合）：三段式固定骨架
       # （概述/说明/其他），全文不超过 12 行；严禁出现内部工程流水
       # （commit 逐条罗列、CI 取证、内部路径等）。RELEASE_NOTES.d/
-      # <VERSION>.md 为「一份文件即一版正文」的 SSoT，存在时原样发布；
-      # 缺省时按骨架合成，说明段自动剔除内部维护类提交（bump/CI/文档/
-      # 工具链/镜像），面向用户只留真实功能变更。
+      # <VERSION>.md 是唯一 SSoT，随 tag 入库；缺失即 fail-closed。
+      # 历史上此处另有「按 commit 合成」的兜底分支：它会把子模块 pin
+      # 之类的维护提交写进正文（v0.1.19 事故），且同一事实存在两份
+      # 生成逻辑，已删除。
       - name: Generate release notes
         run: |
           VERSION="${{ env.VERSION }}"
           IS_RC=0; case "$VERSION" in *-rc*) IS_RC=1 ;; esac
-          PREV="$(git describe --tags --abbrev=0 "${VERSION}^" 2>/dev/null || echo '')"
-          if [ -n "$PREV" ]; then LOGARGS=(--no-merges "${PREV}..${VERSION}"); else LOGARGS=(--no-merges -30); fi
           NOTES_FILE="RELEASE_NOTES.d/${VERSION}.md"
-          if [ -f "$NOTES_FILE" ]; then
-            cp -f "$NOTES_FILE" dist/notes.txt
-          else
-            # 内部维护类提交剔除：已知内部前缀，外加子模块 gitlink bump
-            # （形如 `x: bump ...` / `x: pick up ...` / 裸 `bump ...`），
-            # 后者只改 submodule 指针，对用户无可见行为——漏滤会整屏刷屏。
-            _internal='^[-*] (((ci|docs|chore|test|refactor|style|release|mirror|tools|github|agents|build|deps|submodules)([/:]|\(| |$))|([a-z0-9_.+-]+(/[a-z0-9_.+-]+)?: )?(bump|pick up)( |$))'
-            _log="$(git log "${LOGARGS[@]}" --pretty='- %s' \
-              | grep -vE "$_internal" | head -3 || true)"
-            {
-              echo "## 概述"
-              echo "${VERSION}；$(date -u +%Y-%m-%d)"
-              echo
-              echo "## 说明"
-              if [ -n "$_log" ]; then printf '%s\n' "$_log"; else echo "- 稳定性与使用体验修复。"; fi
-              echo
-              echo "## 其他"
-              echo "Linux x86-64/x86-32/arm-64/arm-32；macOS arm-64/x86-64；Windows x86-64/x86-32。"
-              echo "安装：curl -fsSL https://atomgit.com/openairymax/agentrt/releases/download/${VERSION}/install.sh | bash"
-              if [ "$IS_RC" = 1 ]; then
-                echo "候选版本（RC）：仅供测试与预览，生产部署请等待正式版。"
-              fi
-            } > dist/notes.txt
+          test -f "$NOTES_FILE" || {
+            echo "::error::缺 ${NOTES_FILE}（发行正文 SSoT 必须随 tag 入库）"
+            exit 1
+          }
+          cp -f "$NOTES_FILE" dist/notes.txt
+          if [ "$IS_RC" = 1 ] && ! grep -q '候选版本' dist/notes.txt; then
+            echo "候选版本（RC）：仅供测试与预览，生产部署请等待正式版。" >> dist/notes.txt
           fi
           test -s dist/notes.txt || { echo "::error::发布说明为空"; exit 1; }
           lines="$(wc -l < dist/notes.txt)"
