@@ -1045,69 +1045,50 @@ jobs:
           done
           echo "标记补全完成: $(ls agentrt-${VERSION}-*.tar.gz | wc -l) 个包"
 
-      # 发布说明面向整个开源社区（公开场合）：固定模板（版本定位/平台
-      # 支持/安装方式）+ 用户可见变更列表；严禁出现内部工程流水（commit
-      # 逐条罗列、CI 取证、内部路径等）。变更列表自动剔除内部维护类提交
-      # （bump/CI/文档/工具链/镜像），面向用户只留真实功能变更。
+      # 发布说明面向整个开源社区（公开场合）：三段式固定骨架
+      # （概述/说明/其他），全文不超过 12 行；严禁出现内部工程流水
+      # （commit 逐条罗列、CI 取证、内部路径等）。RELEASE_NOTES.d/
+      # <VERSION>.md 为「一份文件即一版正文」的 SSoT，存在时原样发布；
+      # 缺省时按骨架合成，说明段自动剔除内部维护类提交（bump/CI/文档/
+      # 工具链/镜像），面向用户只留真实功能变更。
       - name: Generate release notes
         run: |
           VERSION="${{ env.VERSION }}"
           IS_RC=0; case "$VERSION" in *-rc*) IS_RC=1 ;; esac
           PREV="$(git describe --tags --abbrev=0 "${VERSION}^" 2>/dev/null || echo '')"
           if [ -n "$PREV" ]; then LOGARGS=(--no-merges "${PREV}..${VERSION}"); else LOGARGS=(--no-merges -30); fi
-          # 本版亮点为可选输入（发布期经 RELEASE_NOTES / notes 入参注入三端
-          # 正文）；旧版 tag 内若存在 RELEASE_NOTES.d/<VERSION>.md 则优先
-          # 呈现，缺失时以变更列表兜底，不再阻断发布。
           NOTES_FILE="RELEASE_NOTES.d/${VERSION}.md"
-          {
-            echo "AgentRT ${VERSION}"
-            echo
-            if [ "$IS_RC" = 1 ]; then
-              echo "> 候选版本（Release Candidate）：供测试与预览，接口和行为可能继续调整；生产部署请等待正式版。"
-              echo
-            fi
-            # 本版亮点：存在 RELEASE_NOTES.d/<VERSION>.md 时优先呈现，
-            # 避免逐条内部提交刷屏；缺失则跳到下方变更列表。
-            if [ -f "$NOTES_FILE" ]; then
-              echo "## 1. 本版亮点"
-              echo
-              cat "$NOTES_FILE"
-              echo
-            fi
-            echo "## 2. 平台支持"
-            echo
-            echo "- Linux（主力平台）：x86-64 / x86-32 / arm-64 / arm-32"
-            echo "- macOS：arm-64（Apple Silicon）/ x86-64（Intel）"
-            echo "- Windows：x86-64 / x86-32"
-            echo
-            echo "## 3. 安装"
-            echo
-            echo '```bash'
-            echo "curl -fsSL https://atomgit.com/openairymax/agentrt/releases/download/${VERSION}/install.sh | bash"
-            echo '```'
-            echo
-            echo "Windows（PowerShell）："
-            echo '```powershell'
-            echo "irm https://atomgit.com/openairymax/agentrt/releases/download/${VERSION}/install.ps1 | iex"
-            echo '```'
-            echo
-            echo "## 4. 本版变更"
-            echo
+          if [ -f "$NOTES_FILE" ]; then
+            cp -f "$NOTES_FILE" dist/notes.txt
+          else
             # 内部维护类提交剔除：已知内部前缀，外加子模块 gitlink bump
             # （形如 `x: bump ...` / `x: pick up ...` / 裸 `bump ...`），
             # 后者只改 submodule 指针，对用户无可见行为——漏滤会整屏刷屏。
-            _internal='^\* (((ci|docs|chore|test|refactor|style|release|mirror|tools|github|agents|build|deps|submodules)([/:]|\(| |$))|([a-z0-9_.+-]+(/[a-z0-9_.+-]+)?: )?(bump|pick up)( |$))'
-            _log="$(git log "${LOGARGS[@]}" --pretty='* %s' \
-              | grep -vE "$_internal" || true)"
-            if [ -n "$_log" ]; then
-              printf '%s\n' "$_log"
-            elif [ -f "RELEASE_NOTES.d/${VERSION}.md" ]; then
-              echo "*（本版为稳定性与使用体验修复；详见第 1 节本版亮点与仓库提交记录）"
-            else
-              echo "*（本版为稳定性与使用体验修复；详见仓库提交记录）"
-            fi
-          } > dist/notes.txt
-          echo "发布说明已生成（社区面向，$(wc -l < dist/notes.txt) 行）"
+            _internal='^[-*] (((ci|docs|chore|test|refactor|style|release|mirror|tools|github|agents|build|deps|submodules)([/:]|\(| |$))|([a-z0-9_.+-]+(/[a-z0-9_.+-]+)?: )?(bump|pick up)( |$))'
+            _log="$(git log "${LOGARGS[@]}" --pretty='- %s' \
+              | grep -vE "$_internal" | head -3 || true)"
+            {
+              echo "## 概述"
+              echo "${VERSION}；$(date -u +%Y-%m-%d)"
+              echo
+              echo "## 说明"
+              if [ -n "$_log" ]; then printf '%s\n' "$_log"; else echo "- 稳定性与使用体验修复。"; fi
+              echo
+              echo "## 其他"
+              echo "Linux x86-64/x86-32/arm-64/arm-32；macOS arm-64/x86-64；Windows x86-64/x86-32。"
+              echo "安装：curl -fsSL https://atomgit.com/openairymax/agentrt/releases/download/${VERSION}/install.sh | bash"
+              if [ "$IS_RC" = 1 ]; then
+                echo "候选版本（RC）：仅供测试与预览，生产部署请等待正式版。"
+              fi
+            } > dist/notes.txt
+          fi
+          test -s dist/notes.txt || { echo "::error::发布说明为空"; exit 1; }
+          lines="$(wc -l < dist/notes.txt)"
+          echo "发布说明已生成（社区面向，${lines} 行）"
+          if [ "$lines" -gt 12 ]; then
+            echo "::error::发布说明 ${lines} 行，超出 12 行上限"
+            exit 1
+          fi
 
       # 发布交接（发布已移出 runner）：校验 dist 后聚合上传为单一附件。
       # 本地发布命令（MCP/维护者）：
