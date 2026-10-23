@@ -1335,7 +1335,7 @@ _v2_task="$TUI_SRC/src/app/task.rs"
 _v2_block="$TUI_SRC/src/panels/chat/block.rs"
 _v2_mem="$TUI_SRC/src/memory.rs"
 _v2_sess="$TUI_SRC/src/app/session.rs"
-_v2_keys="$TUI_SRC/src/keys.rs"
+_v2_keys="$TUI_SRC/src/keys"
 _v2_panel="$TUI_SRC/src/app/panel.rs"
 section "V2" "B4 思维链原文泄漏（默认不上屏 / 不落长期记忆 / 恢复不回灌 V4.1~V4.3 防回潮）"
 
@@ -1359,7 +1359,7 @@ else
 fi
 
 if grep -qF '打开思考链独立视图（Alt+E）' "$_v2_panel" \
-    && grep -qF 'Alt+E：打开思考链独立视图' "$_v2_keys"; then
+    && grep -rqF 'Alt+E：打开思考链独立视图' "$_v2_keys"; then
     ok "V2.3 V4.3 Alt+E 独立视图在位（能力未丢失：按需取用唯一数据源）"
 else
     bad "V2.3 V4.3 思考链独立视图缺失（Alt+E 能力回退）"
@@ -1370,12 +1370,12 @@ section "W" "B11 TUI 滚动/鼠标/焦点交互（滚动契约 SSoT 与判据 V1
 _w_chat="$TUI_SRC/src/panels/chat/mod.rs"
 _w_ctrl="$TUI_SRC/src/app/control.rs"
 _w_entry="$TUI_SRC/src/entry.rs"
-_w_keys="$TUI_SRC/src/keys.rs"
-_w_pres="$TUI_SRC/src/present.rs"
-_w_tests="$TUI_SRC/src/app/tests.rs"
+_w_keys="$TUI_SRC/src/keys"
+_w_pres="$TUI_SRC/src/present"
+_w_tests="$TUI_SRC/src/app/tests"
 _w_missing=""
 for _f in "$_w_chat" "$_w_ctrl" "$_w_entry" "$_w_pres" "$_w_tests"; do
-    [ -f "$_f" ] || _w_missing="$_w_missing $(basename "$_f")"
+    [ -e "$_f" ] || _w_missing="$_w_missing $(basename "$_f")"
 done
 if [ -n "$_w_missing" ]; then
     bad "W0 B11 结构性文件缺失:$_w_missing"
@@ -1411,16 +1411,16 @@ else
     fi
 
     if grep -q 'pub fn render_focus' "$_w_chat" \
-        && grep -q 'ActivePanel::Focus => panels::chat::render_focus' "$_w_pres" \
-        && grep -q 'KeyCode::Char(.f.) | KeyCode::Char(.F.)' "$_w_keys"; then
+        && grep -rq 'ActivePanel::Focus => panels::chat::render_focus' "$_w_pres" \
+        && grep -rq 'KeyCode::Char(.f.) | KeyCode::Char(.F.)' "$_w_keys"; then
         ok "W5 焦点视图路由与键位在位（Alt+F 全屏只读 + Esc 返回）"
     else
         bad "W5 焦点视图路由或键位断裂"
     fi
 
-    if grep -q 'fn b11_scroll_clamps_to_chat_scroll_max' "$_w_tests" \
-        && grep -q 'fn b11_wheel_lines_follows_modifiers' "$_w_tests" \
-        && grep -q 'fn b11_focus_open_snapshots_last_reply' "$_w_tests" \
+    if grep -rq 'fn b11_scroll_clamps_to_chat_scroll_max' "$_w_tests" \
+        && grep -rq 'fn b11_wheel_lines_follows_modifiers' "$_w_tests" \
+        && grep -rq 'fn b11_focus_open_snapshots_last_reply' "$_w_tests" \
         && grep -q 'fn b11_hint_covers_position_states' "$_w_chat"; then
         ok "W6 B11 单元测试防回潮在位（钳位/滚轮/焦点/位置指示契约）"
     else
@@ -1526,8 +1526,8 @@ else
 fi
 
 if grep -q '900B payload not truncated' "$_ad/tests/test_run_loop.c" \
-    && grep -q 'fn stream_delta_lands_on_arrival_and_settles' "$_tui/tests.rs" \
-    && grep -q 'fn begin_busy_marks_request_start' "$_tui/tests.rs"; then
+    && grep -rq 'fn stream_delta_lands_on_arrival_and_settles' "$_tui/tests" \
+    && grep -rq 'fn begin_busy_marks_request_start' "$_tui/tests"; then
     ok "Y5 B2 测试守卫在位（V2.2 截断回归 + V2.3 零反馈 + V2.4 移除语义 Rust 断言）"
 else
     bad "Y5 B2 测试守卫缺失"
