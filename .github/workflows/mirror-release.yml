@@ -132,6 +132,8 @@ jobs:
         env:
           # 缺件回填开关（publish-mirror.sh 读 FETCH_MISSING=1）
           FETCH_MISSING: ${{ env.FETCH_MISSING }}
+          # 回填引导的 API 查询凭据（匿名在 CI 侧可能受限）
+          ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
           # 发布说明覆盖（publish-mirror.sh 读 RELEASE_NOTES，优先于
           # dist/notes.txt）：回填历史版本/纠偏时传入社区面向说明
           RELEASE_NOTES: ${{ env.NOTES }}
