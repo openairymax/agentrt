@@ -34,6 +34,12 @@ if [ -z "${AIRY_HOME:-}" ]; then
         _CAND="$(dirname "$_CAND")"
     done
 fi
+# 解包即用态自锚定：无 install.env 时，若启动器位于包内 bin/（同级
+# config/agentrt.yaml 为包标志），包根即安装根——运行态、配置、组件
+# 发现三者收敛到同一根，杜绝回落到 $HOME 幽灵根。
+if [ -z "${AIRY_HOME:-}" ] && [ -f "${SCRIPT_DIR}/../config/agentrt.yaml" ]; then
+    AIRY_HOME="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
 if [ -n "${AIRY_HOME:-}" ] && [ ! -d "${AIRY_HOME}" ]; then
     printf '\033[1;33m[WARN]\033[0m AIRY_HOME=%s 不存在（疑似终端残留环境变量），已忽略并回退统一路径\n' "$AIRY_HOME" >&2
     AIRY_HOME=""
@@ -363,8 +369,9 @@ find_tool() {
         fi
         log warn "$env_name 指向的路径不可执行: ${!env_name}"
     fi
+    # 自锚定优先：启动器与随包组件同处 bin/（解包即用态），先看自身目录。
     local c
-    for c in "$@"; do
+    for c in "$SCRIPT_DIR/$cmd_name" "$@"; do
         if [ -x "$c" ]; then
             log debug "找到 $cmd_name: $c"
             echo "$c"
@@ -1343,6 +1350,18 @@ _cfg_stale() {
     printf '%s' "${out# }"
 }
 
+# 版本唯一事实源：安装态 install.env 优先；解包即用态随包根 VERSION 兜底。
+ver_resolve() {
+    local v=""
+    if [ -f "$AIRY_HOME/config/install.env" ]; then
+        v="$(sed -n 's/^AIRY_VERSION=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
+    fi
+    if [ -z "$v" ] && [ -f "$SCRIPT_DIR/../VERSION" ]; then
+        v="$(head -1 "$SCRIPT_DIR/../VERSION" 2>/dev/null)"
+    fi
+    printf '%s' "${v#v}"
+}
+
 status_json() {
     local ok=1 k v
     local comp="" dm=""
@@ -1357,13 +1376,15 @@ status_json() {
         fi
     done
     comp="${comp%,}"
-    local env_ok=true
-    if [ ! -f "$AIRY_HOME/config/install.env" ]; then
-        env_ok=false
+    local env_ok=false pkg_ok=false ver
+    [ -f "$AIRY_HOME/config/install.env" ] && env_ok=true
+    [ -f "$SCRIPT_DIR/../VERSION" ] && pkg_ok=true
+    # 安装态以 install.env 为完整性凭据；解包即用态无 install.env，
+    # 以随包 VERSION 同位凭据，二者皆缺才算安装不完整。
+    if [ "$env_ok" = false ] && [ "$pkg_ok" = false ]; then
         ok=0
     fi
-    local ver=""
-    [ -f "$AIRY_HOME/config/install.env" ] && ver="$(sed -n 's/^AIRY_VERSION=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
+    ver="$(ver_resolve)"
     for k in llm think agent tool; do
         if _sock_alive "$RUNTIME_DIR/$k.sock"; then
             dm="${dm}\"${k}\":true,"
@@ -1386,8 +1407,15 @@ status_json() {
 }
 
 case "$CMD" in
+    --version|-V|version)
+        _ver="$(ver_resolve)"
+        [ -n "$_ver" ] || _ver="unknown"
+        printf 'airymaxrt %s\n' "$_ver"
+        exit 0
+        ;;
     --help|-h|help)
         echo "用法: airymaxrt [airy_cli 参数]（默认进入 TUI 渲染层）"
+        echo "      airymaxrt version     显示版本号（等同 --version）"
         echo "      airymaxrt cli [airy_cli 参数]  行式模式（不经 TUI 渲染层）"
         echo "      airymaxrt profile [full|minimal|auto]  查看/切换运行画像（硬件自适应）"
         echo "      airymaxrt monitor   硬件监控：检测到能力增强自动恢复功能"
