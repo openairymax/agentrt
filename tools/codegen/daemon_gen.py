@@ -128,6 +128,12 @@ DAEMONS_ROOT = AGENTRT_ROOT / "daemons"
 # （CI codegen-check job 经 clone 注入 CUPOLAS_ROOT，保证门禁全覆盖）。
 EXTERNAL_DAEMONS = {"cupolas_d": ("CUPOLAS_ROOT", "cupolas", "daemon")}
 
+# 登记型户（方案 §6.3 G16）：daemons/ 下的非 C daemon 目录，不入 codegen
+# 辖内。scripts 户为 CI 脚本集，仅以自身 .manifest 登记入形态台账；
+# common 为共享层目录。二者在户枚举（--check/--gen 全扫）中显式跳过，
+# 户形态由 gates/form-count-check.sh 统一执法。
+REGISTRATION_ONLY_DIRS = frozenset({"common", "scripts"})
+
 SCHEMA_VERSION = 4
 
 # noop_hooks 词表（0.1.19 §80 null object）：可缺省钩子（svc_activate/
@@ -711,6 +717,8 @@ def external_home(name):
 def discover_manifests(daemon):
     """定位 .manifest：指定 daemon 时取单户（树内/外户），否则扫描全部
     daemons 并追补外户。"""
+    if daemon in REGISTRATION_ONLY_DIRS:
+        raise GenError("%s 为登记型户（非 C daemon），不在 codegen 辖内" % daemon)
     if daemon:
         path = DAEMONS_ROOT / daemon / ".manifest"
         if path.exists():
@@ -723,7 +731,8 @@ def discover_manifests(daemon):
                                   EXTERNAL_DAEMONS[daemon][1]))
             return [ext]
         raise GenError(".manifest 不存在: %s" % path)
-    paths = sorted(DAEMONS_ROOT.glob("*/.manifest"))
+    paths = [p for p in sorted(DAEMONS_ROOT.glob("*/.manifest"))
+             if p.parent.name not in REGISTRATION_ONLY_DIRS]
     if not paths:
         raise GenError("daemons/ 下未发现任何 .manifest")
     for name in sorted(EXTERNAL_DAEMONS):
