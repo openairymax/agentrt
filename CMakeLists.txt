@@ -888,6 +888,9 @@ if(AIRY_BUILD_ALL)
     option(BUILD_CUPOLAS "Build cupolas module (security framework)" ON)
     option(BUILD_LANG_GATEWAY "Build lang_gateway module (inference language gateway)" ON)
     option(BUILD_COGNITION_STRATEGY "Build cognition dispatch strategy product library" ON)
+    # canary 自演进门控（r13 §7.0.2）：C11 + libc 零 agentrt 依赖，
+    # 三平台默认可构建，无平台支持矩阵门控。
+    option(BUILD_CANARY "Build canary evolution gate product module" ON)
     # Windows 支持矩阵：daemons 子系统（svc/ipc/
     # discovery/各 *_d 服务）现为 POSIX 绑定——DIR/strings.h/sys/socket/
     # unistd 直引（MSVC 下 C1083/C2065 大面积失败），Windows 侧默认
@@ -915,6 +918,7 @@ if(AIRY_BUILD_ALL)
     airy_print_info("[MODULE]   cupolas:  ${BUILD_CUPOLAS}")
     airy_print_info("[MODULE]   lang_gw:  ${BUILD_LANG_GATEWAY}")
     airy_print_info("[MODULE]   cog_strat:${BUILD_COGNITION_STRATEGY}")
+    airy_print_info("[MODULE]   canary:   ${BUILD_CANARY}")
     airy_print_info("[MODULE]   daemon:   ${BUILD_DAEMON}")
     airy_print_info("[MODULE]   gateway:  ${BUILD_GATEWAY}")
     airy_print_info("[MODULE]   heapstore: ${BUILD_HEAPSTORE}")
@@ -1047,6 +1051,21 @@ if(AIRY_BUILD_ALL)
         endforeach()
     endif()
 
+    # canary 自演进门控源目录探测（0.1.20，r13 §7.0.2；与 cupolas 同构：
+    # 显式 -D 变量 → CANARY_ROOT 环境 → AIRY_PRODUCTS_CANDS）。模块零
+    # agentrt 依赖，无装配时序约束；缺席仅告警不装配（不产生桩实现）。
+    if(NOT CANARY_SRC_DIR AND DEFINED ENV{CANARY_ROOT})
+        set(CANARY_SRC_DIR "$ENV{CANARY_ROOT}")
+    endif()
+    if(NOT CANARY_SRC_DIR)
+        foreach(_prod IN LISTS AIRY_PRODUCTS_CANDS)
+            if(EXISTS "${_prod}/canary/CMakeLists.txt")
+                set(CANARY_SRC_DIR "${_prod}/canary")
+                break()
+            endif()
+        endforeach()
+    endif()
+
     if(BUILD_COMMONS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/commons/CMakeLists.txt")
         add_subdirectory(commons)
     else()
@@ -1085,6 +1104,15 @@ if(AIRY_BUILD_ALL)
         add_subdirectory("${COG_SRC_DIR}" cognition)
     else()
         airy_print_warn("cognition module not mounted (products/cognition or -DCOG_SRC_DIR)")
+    endif()
+
+    # canary 自演进门控产品模块挂载（0.1.20，r13 §7.0.2）：零 agentrt
+    # 依赖故无时序约束，置于 cognition 之后 daemons 之前维持产品件
+    # 装配段一致性。缺席仅告警。
+    if(BUILD_CANARY AND CANARY_SRC_DIR AND EXISTS "${CANARY_SRC_DIR}/CMakeLists.txt")
+        add_subdirectory("${CANARY_SRC_DIR}" canary)
+    else()
+        airy_print_warn("canary module not mounted (products/canary or -DCANARY_SRC_DIR)")
     endif()
 
     if(BUILD_DAEMON AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/daemons/CMakeLists.txt")
