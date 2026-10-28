@@ -65,8 +65,10 @@ think_d: airy_platform_libs airy_common airy_think_service airy_coreloopthree ai
 # 由顶层装配块挂载），目标名与链接结构不变，白名单行照旧。
 # 0.1.20：金丝雀治理面 svc_canary（products/canary 五态机）以 PRIVATE 直链
 # 挂载 cupolas_d（dpolicy canary 挂载点接线），airy_canary 为登记直链。
+# 0.1.20 §3.7v：airy_platform_libs 已随 airy_cupolas_service 的 PUBLIC 依赖
+# 传递，直链属重复登记（G13 fan 4→3），本行不再枚举。
 airy_security_dome: svc_common airy_platform_libs
-cupolas_d: airy_platform_libs airy_common airy_cupolas_service airy_core airy_canary
+cupolas_d: airy_common airy_cupolas_service airy_core airy_canary
 maths_d: airy_platform_libs airy_common svc_common airy_core airy_security_dome
 # supervisor_d（0.1.18 §12.13 B13）：监管者自身零项目内库链接（V13.5，
 # 允许集为空）——UDS/TCP、进程原语、JSON、日志全部自持，仅链接系统库，
