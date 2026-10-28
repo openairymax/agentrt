@@ -46,6 +46,9 @@
 # 0.1.19 G1 公开功能面符号基线（tools 门禁 Gate 26 功能守恒判据 SSoT，
 # 与工件同宿：改面随 PR 记账，双向 fail-closed 自包含）
 !g1-symbol-baseline.txt
+# 0.1.20 Q2 可回收清单（方案 §11.2 D-0 前置证据：nm 全符号审计 + 重复函数
+# 扫描，选项 1 证伪结论与配减决策依据，随 r24 记账归档）
+!q2-reclaimable-audit.txt
 # ---------------------------------------------------------------------------
 # 管理仓必要工具（CMake/README/CHANGELOG 正式引用，须入库）：
 # - tools/codegen: syscall.xml SSoT codegen 生成器（CMake 构建与 CI 防漂移校验依赖）

@@ -1,0 +1,91 @@
+# AgentRT Q2 可回收清单（0.1.20 §11.2 D-0 前置证据）
+
+生成日期：2026-10-28
+对应方案：docs-closed/agent-workload-dev/0.1.20-架构改进完善和自演化方案.md §11.2 Q2、§7.5
+结论：链接级可回收代码 0 行；重复函数维度真收拢候选 1 处（约 24 行）；
+     选项 1（账一内部去重）证伪，配减须走选项 2 或选项 3。
+
+## 一、审计口径（可复现）
+
+构建：区外 /tmp/agentrt-q2-build，Release，-flto -ffat-lto-objects，AgentRT v0.1.20，
+全部 real libs no stubs。重链：22 目标从 link.txt 重放并剥离 -s，产物 /tmp/agentrt-q2-sym
+（not stripped，符号完整）。
+
+生产可执行集（19）：15 daemon（a2a/agent/channel/cupolas/gateway/llm/market/maths/mem/
+monit/notify/sched/supervisor/think/tool）+ agentrt_atoms_standalone + airy_cli +
+airy_depgraph + license_sign。排除 e2e_l3_l4 与两个 benchmark（非生产目标）。
+
+活符号宇宙 = 19 exe 定义符号（2390）∪ exe 未定义引用（372）∪ 全部 link.txt 直通
+.o 定义符号（5105，含 object library 双通道）= 6915。
+LTO 符号后缀（.lto_priv.N / .constprop.N / .isra.N / .part.N）与 @版本号在比对前剥离。
+
+成员判定 = 归档成员全局定义符号（TtDdBbRrWwVv）∩ 活符号宇宙；空交集 → 死成员。
+34 个静态库 / 647 个归档成员 → 死成员 6，存活 641（99.07%）。
+
+## 二、死成员全表（6 项，逐项 <成员> <行数> <可回收依据>）
+
+1. <airy_event_loop_win.c.o> <310 行> <不可回收：Windows 事件循环平台后端，
+   Linux 构建不拉取属预期形态面；跨平台三端纪律（方案 §4.1.1）要求保留>
+2. <airy_event_loop_kqueue.c.o> <224 行> <不可回收：macOS/BSD 事件循环平台后端，同上>
+3. <ws_gateway_message.c.o> <355 行> <不可回收：双编译通道假象。GATEWAY_HAS_WS=1
+   仅定义于 daemon 编译（flags.make 实证），该文件经 gateway_lib_obj 直通进
+   gateway_d 且 ws_message_create 以 LTO 本地化符号存活；归档成员编译时无宏
+   为空 TU，功能在生产可执行内完整>
+4. <ws_gateway_callback.c.o> <179 行> <不可回收：同第 3 项双编译通道>
+5. <heapstore_registry.c.o> <324 行> <不可回收：SQLite 构建下 heapstore_SQLITE_
+   IMPLEMENTATION 使 #ifndef 分支为空 TU（nm no symbols 实证）；零运行时成本。
+   构建卫生记录：CMake 可在 SQLite 启用时条件排除源文件，行为无影响，0.1.20 不动>
+6. <heapstore_journal_mem.c.o> <129 行> <不可回收：无 SQLite3 时的 journal 内存
+   后端（资源受限端侧形态面），本构建 SQLite 启用故为空 TU；端侧纪律要求保留>
+
+链接级可回收行数合计：0。
+
+## 三、重复函数扫描（生产代码，排除 tests/test/bench）
+
+口径：列 0 签名块合并提取（内核风格函数名在行尾），排除类型名与宏调用误报。
+结果：TOTAL_FUNCS=4913，UNIQUE_NAMES=4644，CROSS_FILE_DUP_NAMES=114。
+
+114 组全部归入以下豁免类（本 session 逐一取证）：
+
+A. corekern freestanding shim（shim_memory/sync/error/log/id/prealloc）：
+   头注释明示 hosted stand-ins / standalone link closure，为独立编译检查提供
+   链接闭包，架构豁免。
+B. 平台后端：airy_event_loop_{epoll,kqueue,win,posix}、backend_svc_*（posix/win32）、
+   heapstore mem/sqlite 双后端，形态面豁免。
+C. daemon 生命周期与 RPC 样板：svc_prepare/attach/destroy/activate/teardown、
+   handle_get_stats/handle_health_check，DAEMON_RPC_SHELL 框架约定，豁免。
+D. 有意双后端（同 ABI）：gateway syscall_router_*.c thin-IPC 版与 atoms/syscall
+   in-process 版（gateway/CMakeLists.txt「仅 svc_dispatch.o 被拉取，其余 airy_sys_*
+   由本库 syscall_router_*.c 提供」为权威证据），豁免。
+E. 同名不同体（形态性重名）：validate_required_fields（模板校验 vs cJSON 校验）、
+   find_metric、generate_id、ensure_initialized 等局部工具重名，不可收拢；
+   改名建议留待 0.2.x 品味批次。
+F. 平台降级：web_search_tool Windows 版（头注释明示非桩函数，工具行为 SSoT
+   在 tool_d），豁免。
+
+唯一真收拢候选：
+<http_write_callback> <约 24 行/处，2 处> <atoms/syscall/src/skill/skill_http.c:33
+与 daemons/llm_d/src/providers/core/http.c:33 近同体 static curl 写回调。收拢需
+公共落点并处理依赖方向，收益约 24 行，回归风险大于收益；0.1.20 不动，留 0.2.x
+品味批次连同附带发现 skill_http.c:87/133 curl_easy_setopt long 参数警告一并处理>
+
+## 四、配减决策结论
+
+§7.5 账一 79,775/79,999（slack 224 行），D 面 4.20K 全落账一须配减 ≥3.98K。三选一：
+
+- 选项 1（账一内部去重）：本清单证伪——nm 维度收益 0 行，重复函数维度唯一候选
+  约 24 行且不建议动。不成立。
+- 选项 2（RATCHET-JUSTIFY 上限上移）：与清单结论自洽——账一经全量符号审计无水分，
+  上限上移属诚实记账。建议采纳。
+- 选项 3（D5 缩量移 0.1.21）：与 0.1.20 三大任务指令冲突，不采纳。
+
+决策建议：选项 2。清单作为 D-0 准入证据，随 r24 记账归档。
+
+## 五、审计方法备忘
+
+- Release 链接带 -s 时 nm 无符号，符号审计必须去 -s 重链（strip 陷阱）。
+- link.txt 重放的相对路径基准 = CMakeFiles 的父目录（target 构建目录，三层 dirname）。
+- object library 直通输入（*.dir/...*.o）必须并入活符号宇宙，否则归档通道的
+  双编译成员会被误判死（本次 629→6 误判差值的根因之一）。
+- 归档成员与直通 .o 的宏状态可能不同（GATEWAY_HAS_WS），死成员判定后必须回源
+  核对条件编译再定性。
