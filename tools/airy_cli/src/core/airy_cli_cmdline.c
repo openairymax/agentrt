@@ -109,6 +109,8 @@ static void cli_print_usage(void)
            cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %s--continue%s, %s--resume%s   恢复上次会话上下文（读 mem_d 最近记忆装配视图）\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_outf("  %s-V%s, %s--version%s          输出版本号（构建期 VERSION SSoT 注入）\n",
+           cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %s-h%s, %s--help%s             显示本帮助\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("交互模式：直接运行 airy_cli 进入对话；输入 /help 查看命令。\n");
@@ -117,7 +119,7 @@ static void cli_print_usage(void)
 /* 命令行解析（2026-08-21 自 main 抽离降圈复杂度）：支持选项与
  * -p 模式 prompt 任意顺序（`-p --json "prompt"`、`--json -p "prompt"`、
  * `-p "prompt" --json` 均合法），首个非选项 token 作为 prompt（含空格的
- * prompt 须用引号包裹）。返回 0=继续启动；1=已输出帮助或错误并退出。 */
+ * prompt 须用引号包裹）。返回 0=继续启动；1=已输出版本/帮助或错误并退出。 */
 int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
 {
     for (int i = 1; i < argc; i++) {
@@ -130,6 +132,9 @@ int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
         } else if (strcmp(argv[i], "--continue") == 0 ||
                    strcmp(argv[i], "--resume") == 0) {
             g_cli_resume_mode = 1;
+        } else if (strcmp(argv[i], "-V") == 0 || strcmp(argv[i], "--version") == 0) {
+            cli_outf("airy_cli %s\n", AIRY_CLI_VERSION);
+            return 1;
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             cli_print_usage();
             return 1;
