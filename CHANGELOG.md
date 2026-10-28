@@ -4,7 +4,18 @@
 
 ## 📋 目录
 
-- [v0.1.9](#v019---2026-09-03) ⭐ 最新 — 架构改进：地基归位 / gateway 纯化 / cupolas PDP 化 / daemon 整编 18→15 / TUI 强化
+- [v0.1.20](#v0120---unreleased) ⭐ 开发中 — 架构改进：金丝雀自演进 / llama.cpp 自托管推理链 / cli-golden-twelve harness / 复杂度治理
+- [v0.1.19](#v0119---2026-10-16) — 架构改进：SSoT 收敛大战役 / daemon 门面收敛 / 认知策略搬迁 / G1 符号基线
+- [v0.1.18](#v0118---2026-09-22) — 架构改进：llm_d B16 重构 / SSE 三合一 / supervisor_d 托管 / 版本化安装布局
+- [v0.1.17](#v0117---2026-09-17) — 架构改进：cli 面拆分 / 词汇 SSoT / daemons 防熔断收敛
+- [v0.1.16](#v0116---2026-09-14) — 架构改进：网关主路径收口 / TUI 环形窗口 / 发布通道白名单
+- [v0.1.15](#v0115---2026-09-12) — 架构改进：corekern 引入 / corekern IPC / ASan+UBSan 门禁 / 发布 Plan A
+- [v0.1.14-rc1](#v0114-rc1---2026-09-09) — airy_cli 网关错误诊断 / TUI 发布构建（仅 rc1，滚入 0.1.15）
+- [v0.1.13](#v0113---2026-09-09) — MSVC wave 1-9 大战役 / 双仓 Releases 镜像 / arm-32 正式化
+- [v0.1.12](#v0112---2026-09-06) — composite actions / i386 工具链 / Windows x86-64 tag 发布 / rc 通道演练
+- [v0.1.11](#v0111---2026-09-05) — GHCR qemu 工具链 / 原生 arm64 runner / 发布 single-flight
+- [v0.1.10](#v010---2026-09-05) — gcovr 覆盖率门禁 / Windows 支持矩阵 / workflow 折叠为 4
+- [v0.1.9](#v019---2026-09-03) — 架构改进：地基归位 / gateway 纯化 / cupolas PDP 化 / daemon 整编 18→15 / TUI 强化
 - [v0.1.8](#v018---2026-09-01) — 向导首配 model.yaml 修复 / TUI 交互细节修复
 - [v0.1.7](#v017---2026-08-31) — CLI/TUI 交互重构 / 版本 SSoT 防漂移
 - [v0.1.6g](#v016g---2026-08-31) — CLI 英雄区重设计 / 安装器系统性修复 / 函数名规范
@@ -25,6 +36,189 @@
 - [v0.0.4](#v004---生产就绪-2026-03-25)
 - [v0.0.3](#v003---开发中-2026)
 - [历史版本](#历史版本)
+
+---
+
+## [v0.1.20] - Unreleased
+
+> 回填验证：已对照 git 区间 d1c320c1f..HEAD（265 commits，持续更新中）。
+
+### 🎯 发布主题：架构改进 0.1.20 —— 金丝雀自演进 / llama.cpp 自托管 / 复杂度治理三大任务
+
+0.1.20 按《架构改进完善和自演化方案》推进三大任务：0.1.19 未完成技术点补齐收尾、金丝雀自演进功能开发、llama.cpp 自托管与推理链完善。同步完成跨仓 SSoT 复杂度治理大战役与 cli-golden-twelve golden harness 建设。
+
+### Added
+
+- **金丝雀自演进**：products/canary 演化门禁模块挂载装配根，airy_canary 登记 cupolas_d 链接白名单；S3 blast radius 用例、S4 kill switch 四通道、S5 admit 分类学 + Gate 39/43；Gate 38 金丝雀激活（S1 补记），gate-39 假红根因修复。
+- **llama.cpp 自托管与推理链**：A7 fetch 机制 / pin 数据 / model 子命令 / supervisor 外部进程托管（11435-11436）/ model.yaml 声明面；推理链 B1-a..d cached_tokens → timings → router measurement → upstream detail 逐环透传；C11 sampling/integrity 契约、prefix-stable 与 kv reuse 契约、grad 单成功形态与启动槽位、topological plan dispatch。
+- **A2 cli-golden-twelve harness**：12 组 golden × 24 fixture 覆盖十二机制命令面；`@VERSION@` 占位符构建期展开（bump 零维护）；airy_cli `-V/--version` 自检旗标；Gate 28 接入 harness。
+- **可观测与运维面**：统一 endpoint health、rpc timeout tiers、llm_d hot reload 与健康记账、svc_swap 机制、capacity echo、gate status batch、D2-7 配置热加载 / D2-8 单调时间戳、evolution observation surface、批式成本记账。
+- **发布工程**：release notes 三节骨架 SSoT、版本 SSoT 进发布包、npm 通道非阻塞、DT_RPATH 传递依赖、launcher 自锚定镜像、mirror backfill 按事件源 fail-closed、AB5 放宽为结构不变量。
+
+### Changed
+
+- **复杂度治理大战役**：全仓 stage split / CCN 拆分——daemon 13 域 fold（channel_d / monit_d / sched_d / market_d / tool_d / llm_d / think_d / agent_d / a2a_d / maths_d / gateway_d / notify_d / supervisor_d）；gateway 客户端 transport/RPC 分层；CLI 子命令 staging 化；libyaml 出树。
+- **错误模型与安全**：错误分类落地（atoms/commons/gateway 指针齐动）、failure 按 error class 渲染、tool contract sidecar、write-path precheck、tool_d realpath confinement、session epoch 与 liveness heartbeat。
+- MSVC/Windows 修复（unused-variable、uuid probe、mkdir）；死代码大扫除（zero-consumer narrow atomics、config_unified dead-strategy、sandbox dead-state）；gateway_biz 产品件登记装配根链接边；CI 四产品面物化。
+
+---
+
+## [v0.1.19] - 2026-10-16
+
+> 回填验证：已对照 git 区间 55b604f60..d1c320c1f（428 commits）。
+
+### 🎯 发布主题：架构改进 0.1.19 —— SSoT 收敛大战役 / daemon 门面收敛 / 认知策略搬迁
+
+0.1.19 执行 t48-t205 SSoT 收敛大战役与 daemon 门面收敛，完成认知策略向产品库的搬迁，建立 G1 公共面符号基线门禁体系。
+
+### Changed
+
+- **SSoT 收敛大战役 t48-t205**：clone 塌缩 / 单源化 / include 塌缩 / JSON 塌缩 / ritual 塌缩 / margin 塌缩 / outlet 统一，横跨 atoms / commons / daemons / cupolas / gateway / protocols / heapstore。
+- **daemon 门面收敛**：channel_d / monit_d / sched_d / market_d / tool_d / llm_d facade 依赖收敛、JWT auth 域收敛、boot strategy 统一；hook_d 并入 notify_d。
+- **认知策略搬迁**：planner / coordinator / grad 策略移入 strategy 产品库（intent / tc-mc / cognitive evolution / planner payload split）；cupolas_d 挂载产品树；语言网关产品件装配。
+- **airy_cli 直印收敛**：experience / live board / markdown 渲染器退役，全量 plain line printers 直印；in-process memory 句柄退役；dead cli helpers 清除。
+- **memory 栈塌缩**：memory backend switch 退役、memory 栈塌缩进 mem_d RPC provider、G1 基线退役 12 符号；ARE L2 message header 与 IPC channel 子系统退役。
+- **门禁与基线**：G1 公共面符号基线（471 符号）+ G14 组合代数门禁；linkgate 白名单 SSoT + AJ wiring fail-closed + shim 复活守卫；codegen 命名契约 v1.5.0/v1.8.0（main.c ≤150 硬断言）+ gen5 装配。
+
+### Fixed
+
+- profile.env 逐行读取修复 launcher 崩溃；JSON-RPC id 对象泄漏修复；circuit-breaker liveness guard；BAN-154 memcpy 治理；v0.1.18 manifests 回填。
+
+---
+
+## [v0.1.18] - 2026-09-22
+
+> 回填验证：已对照 git 区间 cce651651..55b604f60（37 commits）。
+
+### 🎯 发布主题：架构改进 0.1.18 —— llm_d B16 重构 / 发布布局版本化
+
+### Changed
+
+- **llm_d B16 重构**：hub 头拆分、include 面塌缩、providers core+adapters 分离、adapter_table SSoT、openapi 三合一、五域重定位；semantic cache 重定位。
+- **SSE 三解析器合一** core/sse.c；secrets 进 core/secrets.c。
+- **网关按需 daemon 激活**；supervisor_d 托管 daemon 生命周期；sched_d 表驱动评分。
+- **版本化安装布局** + 事务化更新 + npm 通道；AIRY_HOME 版本化发现修复。
+
+### Fixed
+
+- CoT 隐藏；supervisor_d MSVC / macOS 修复；llm_d YAML 修复。
+
+---
+
+## [v0.1.17] - 2026-09-17
+
+> 回填验证：已对照 git 区间 fd299c80f..cce651651（50 commits）。
+
+### 🎯 发布主题：架构改进 0.1.17 —— cli 面拆分 / 词汇 SSoT / daemons 收敛
+
+### Changed
+
+- **cli 面拆分**：session view / approval face / tui frontend 拆分 + 命令面层界门禁。
+- **词汇 SSoT**：规范角色词汇 SSoT、finish_reason SSoT；mem/llm 统计逐字段渲染 + turn 用量统一。
+- **daemons 收敛**：tool-loop fuse、ledger、semantic cache、retry backoff；GCCP F8 重试 / 回声拒收；maths_* schema；dag_status 轮询退避。
+- agent_d 编排失败传播；tool_d 跨会话写门禁移除；跨版本更新安装修复。
+
+---
+
+## [v0.1.16] - 2026-09-14
+
+> 回填验证：已对照 git 区间 774e0e9b9..fd299c80f（59 commits）。
+
+### 🎯 发布主题：架构改进 0.1.16 —— 网关主路径收口 / 发布通道治理
+
+### Changed
+
+- **WS-9 社区六类修复** + 发布门禁；质量门禁数据集装配。
+- **chat 主路径走网关 llm.complete**；推理累积上限；可取消网关等待；provider 超时不变量；MCP 工具授权门禁。
+- **TUI**：历史环形窗口、拼音候选条、UTF-8 边界切割。
+- **发布通道白名单 stable|rc|beta** + 保留通道契约；RISC-V 撤出预编译白名单（源码构建保留）；shim_sync MSVC。
+
+---
+
+## [v0.1.15] - 2026-09-12
+
+> 回填验证：已对照 git 区间 62fe2f0fd..774e0e9b9（46 commits）。
+
+### 🎯 发布主题：架构改进 0.1.15 —— corekern 引入 / 质量门禁体系
+
+### Added
+
+- **corekern 引入**：airy_cli 接入 corekern（airy_init、boot evidence）；corekern IPC——ring-buffer 通道、binder UAF 修复、reply routing、L1 server mount、L2 envelope bridge。
+- **ASan/UBSan 门禁** + 九质量门禁进 publish。
+
+### Changed
+
+- TUI 终端状态恢复 + OSC 应答；发布 Plan A 快慢通道 + 统一 release notes；install.sh 已装检测；网关入口认证 + bind 硬化。
+
+---
+
+## [v0.1.14-rc1] - 2026-09-09
+
+> 回填验证：已对照 git 区间 83cdbf98b..62fe2f0fd（7 commits）。注：0.1.14 仅发布 rc1 无正式版，后续工作滚入 0.1.15。
+
+### Changed
+
+- airy_cli 真实网关错误 + 参数诊断。
+
+- 请求体按实际长度构建。
+
+- TUI 发布构建注入版本 + IME。
+
+---
+
+## [v0.1.13] - 2026-09-09
+
+> 回填验证：已对照 git 区间 6b2229ad0..83cdbf98b（106 commits）。
+
+### 🎯 发布主题：架构改进 0.1.13 —— MSVC 大战役 / 发布体系正式化
+
+### Changed
+
+- **MSVC wave 1-9 大战役**：libmicrohttpd 发现、memmem shim、PDB 注入、cdb SegFault 栈捕获；Windows build 升必需门禁 + 产品腿升 G1 发布门禁。
+- **双仓 Releases 镜像**：GitHub/Gitee Releases 镜像发布 + 回填 workflow；macOS dylib 打包；G4b macOS clean-host 验证 + 取证硬化。
+- **架构正式化**：arm-32 / win-x86-32 进支持矩阵；chat_stream 退役（HTTP 410）；升级残留清理 + fail-closed 卸载；社区 release notes 生成。
+
+---
+
+## [v0.1.12] - 2026-09-06
+
+> 回填验证：已对照 git 区间 abbf9865e..6b2229ad0（68 commits）。注：本版 VERSION 文件漏 bump（历史直跳 0.1.11→0.1.13），发布凭证为 manifest.stable.json 固化 commit 6b2229ad0。
+
+### Changed
+
+- **composite actions** 抽取：lf-init-deps / 容器构建 / 打包三件套。
+
+- **i386 工具链镜像** + host-cross TUI 构建；Windows x86-64 进 tag 发布；MSVC 修复启动（D8021 / C2099 / C4013 / #122 系列）。
+
+- **rc1→rc6 通道演练** + stable manifest 固化；安装一行化文档；cli 暴露 llm_d 拒绝原因。
+
+---
+
+## [v0.1.11] - 2026-09-05
+
+> 回填验证：已对照 git 区间 3f3c4b746..abbf9865e（31 commits）。
+
+### Changed
+
+- **多架构基建**：E1 GHCR qemu 工具链镜像 + 原生 arm64 runner；i686 bullseye 探针系列。
+
+- **CI 公平调度**：E3/E4/E5 公平调度 + vcpkg 缓存 + doc-only 变更过滤。
+
+- **发布纪律**：single-flight 防并发、cosign 升 v2.6.5、tag 同步 GitHub 镜像、macOS 打包腿（macos-15-intel / macos-13）、OS-arch-bits 平台命名统一；installer 静默回退修复。
+
+---
+
+## [v0.1.10] - 2026-09-05
+
+> 回填验证：已对照 git 区间 v0.1.9..3f3c4b746（25 commits）。
+
+### Changed
+
+- **覆盖率门禁重建**：lcov→gcovr，覆盖率地板 28.61%→30% 首基线。
+
+- **Windows 支持矩阵**：Windows 默认关 daemons/CLI（advisory 门禁直至 MSVC green）；macOS exec 路径 / execvp errno 修正。
+
+- **CI 精简**：workflow 折叠为 4；ci-debug issue 改 python urllib 提交（弃 gh CLI 依赖）；ctest 重跑可读失败输出；v0.1.9 manifest 平台标记。
 
 ---
 
