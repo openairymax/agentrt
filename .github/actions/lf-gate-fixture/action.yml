@@ -87,7 +87,14 @@ inputs:
     # 跨 52 个提交（GRAD 终态归因、canary 五态门禁、元认知闭环、
     # cupolas/memoryrovol gitlink 前推）。判据消费面无漂移：
     # verify_release_gates.sh 对该树 PASS=141 FAIL=0。
-    default: '1a625b0f0d3d88cc052bfa74a24750dcbde0bb77'
+    # 030b724：macOS ctest 腿单子测试红的根因修正在此。cognition 的 C11
+    # 契约 fake 跨调用持有 grad_llm_call 栈上配置指针并在返回后回读，
+    # 属 use-after-scope；Linux 残骸恰好成全断言而绿，macOS 实测
+    # temp=-5.5e37、seed=2451972（期望 GRAD_SEED=20260101）。旧 pin
+    # 取不到该修正即恒红，缺口在 pin 未随镜像 main 前推，不在判据面。
+    # 与旧 pin 单提交差，仅 cognition/tests/unit/test_grad_misc.c，
+    # 不触判据消费路径，故 verify_release_gates.sh 无需同步改动。
+    default: '030b724b9331d68b522d4b9ccd97cede1cb2677a'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
