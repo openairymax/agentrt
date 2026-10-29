@@ -153,7 +153,7 @@ clone_sibling() {
     fi
     rm -rf "$dir"
   fi
-  echo "::warning::layout: clone ${name} failed — 打包完整度可能降级（pack 步骤多为 || true 容错）"
+  echo "::error::layout: clone ${name} failed — 装配输入缺席，发布包不完整（宁红不降级）"
   return 1
 }
 
@@ -186,9 +186,9 @@ if [ "$want_layout" = true ]; then
   echo "layout: materializing release sibling data (_tools/ecosystem + pinned sdk/products)"
   # 注意：tools 克隆到 _tools/ —— agentrt 自带顶层 tools/（codegen 等），
   # 若同名会跳过克隆导致 release 脚本缺失（linux job 实证）。
-  clone_sibling tools _tools
+  clone_sibling tools _tools || rc=1
   mkdir -p agent-workload
-  clone_sibling ecosystem agent-workload/ecosystem
+  clone_sibling ecosystem agent-workload/ecosystem || rc=1
   # 装配输入按 pin 物化（§快照同源）：pin 解析自 lf-gate-fixture，
   # 解析或检出失败即置 rc=1，严禁回退 tip 克隆。
   for _leg in sdk products; do
