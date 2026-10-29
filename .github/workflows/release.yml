@@ -27,6 +27,33 @@ env:
   VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', github.event.inputs.version) }}
 
 jobs:
+  # 门禁绿前置（0.1.20 快照同源的另一半）：被发行的 commit 必须是门禁
+  # Build & Test 与 Quality Gates 实际跑过并判绿的 commit。发行平面原先对
+  # 目标 commit 从未经过门禁即聚合发行物——上游一推进，「门禁验证的树」与
+  # 「发行装配的树」即分叉，且事后无从证明二进制对应哪一判据。tag 常紧随
+  # main push 打出，故按 sha 轮询等待门禁终态，而不要求维护者人工择时；
+  # 判红、被取消、或该 commit 根本没有 push 运行（非 push tip、被
+  # paths-ignore 跳过的纯文档 commit）一律 fail-closed，不设跳过通道——
+  # 跳过会让「绿」与被发行内容脱钩，正是本判据要消除的形态。门禁清单在
+  # 脚本内单点声明，严禁在此复制。
+  ci-green:
+    runs-on: ubuntu-latest
+    # 门禁最坏 150min/作业 + 队列余量；超时即红，不无限占用 runner
+    timeout-minutes: 260
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Assert gate workflows green at this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/assert-ci-green.sh "$GITHUB_SHA"
+
   # Linux x86-64：container ubuntu:20.04 保证 glibc 2.31 基线（覆盖
   # Ubuntu 20.04+/Debian 11+/Pi OS Bullseye+）。平台命名规范：
   # OS-架构族-位宽（linux-x86-64 / linux-arm-64 …），下同；旧两代平台名由
@@ -968,10 +995,11 @@ jobs:
   # 上传超时由脚本 --max-time 3600 + 3 并发 + 上传完整性校验兜底，聚合
   # dist 附件兼作审计/紧急 fallback。
   release:
-    # 发布门禁：Linux x86-64 / x86-32 / arm-64 / arm-32 + macOS arm-64 /
-    # x86-64 + Windows x86-64 / x86-32 八平台全绿后才聚合。riscv 为
-    # dispatch-only canary（不发制品，QEMU 6h 上限预留 0.3.x）。
-    needs: [build-linux-x86-64, build-macos-arm-64, build-macos-x86-64, build-linux-arm-64, build-linux-x86-32, build-linux-arm-32, build-windows-x86-64, build-windows-x86-32]
+    # 发布门禁：同 commit 门禁全绿（ci-green）+ Linux x86-64 / x86-32 /
+    # arm-64 / arm-32 + macOS arm-64 / x86-64 + Windows x86-64 / x86-32
+    # 八平台全绿后才聚合。riscv 为 dispatch-only canary（不发制品，QEMU
+    # 6h 上限预留 0.3.x）。
+    needs: [ci-green, build-linux-x86-64, build-macos-arm-64, build-macos-x86-64, build-linux-arm-64, build-linux-x86-32, build-linux-arm-32, build-windows-x86-64, build-windows-x86-32]
     runs-on: ubuntu-latest
     # tag 推送或手动 dispatch（手动时版本来自 inputs.version）皆可触发。
     # success() 必须显式写出：带 needs 的作业一旦自定义 if，即替换掉默认的
