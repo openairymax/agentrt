@@ -112,6 +112,20 @@ jobs:
             https://atomgit.com/openairymax/docs-workload.git
           git -C "$UMB/docs" submodule update --init --depth 1 -- docs-workload \
             || echo "::warning::docs docs-workload submodule unavailable, Gate 7 will fail"
+          # docs-closed 承载受辖文档本体（如 0.1.20 方案）：Gate 45
+          # DocConsistency 以「受辖文档缺席（fail-closed）」判红，其根因
+          # 即此处未 init（run 40884260525 实证）。闭源属性与 docs-linux
+          # 同（无公网镜像，匿名 https 被拒），走同一 oauth2 覆写模式；
+          # token 缺失时退回匿名并显式告警。
+          if [ -n "${ATOMGIT_TOKEN:-}" ]; then
+            git -C "$UMB/docs" config submodule.docs-closed.url \
+              "https://oauth2:${ATOMGIT_TOKEN}@atomgit.com/openairymax/docs-closed.git"
+          else
+            git -C "$UMB/docs" config submodule.docs-closed.url \
+              https://atomgit.com/openairymax/docs-closed.git
+          fi
+          git -C "$UMB/docs" submodule update --init --depth 1 -- docs-closed \
+            || echo "::warning::docs docs-closed submodule unavailable, Gate 45 will fail"
           # docs-workload 的 50-engineering-standards 是指向
           # ../docs-linux/50-engineering-standards 的 symlink（跨子
           # 模块依赖），docs-linux 不 init 则 symlink 悬空，Gate 7
