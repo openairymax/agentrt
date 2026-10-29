@@ -49,7 +49,11 @@ fi
 # 故对失败做有限重试（每次重跑幂等），而非一次失败即红。
 init_rc=1
 for attempt in 1 2 3 4 5 6; do
-  git submodule update --init --recursive
+  # sync 重算 .git/modules 内的 URL，避免镜像切换后沿用旧地址；
+  # --force 保证重试时重新 checkout（首次 checkout 中止会留下空工作树，
+  # 而 git 视其为已初始化，幂等重跑不会再动它）。
+  git submodule sync --recursive >/dev/null 2>&1 || true
+  git submodule update --init --recursive --force
   init_rc=$?
   if [ "$init_rc" -eq 0 ]; then
     break
@@ -58,6 +62,27 @@ for attempt in 1 2 3 4 5 6; do
   sleep 30
 done
 rc=$init_rc
+
+# 1b) fail-closed：叶子工作树必须真正 populate
+#
+# git 的「已初始化」判据（.git/modules/<name> 存在、submodule status 无
+# '-' 前缀）不等于工作树有内容：克隆成功而 checkout 中止时目录为空，状态
+# 仍显示就绪（2026-10-29 run 40880211714 实证——protocols 空树，CMake 侧
+# 静默跳过，airy_protocols 目标缺席，gateway_biz 装配 FATAL，13 门连锁红）。
+# 故按内容校验：任一登记的叶子空树即非零退出，把故障挡在 configure 之前，
+# 不以「后续门禁红」的形式延迟暴露。
+missing=""
+while IFS= read -r p; do
+  [ -n "$p" ] || continue
+  if [ ! -d "$p" ] || [ -z "$(ls -A "$p" 2>/dev/null)" ]; then
+    missing="$missing $p"
+  fi
+done < <(git config --file .gitmodules --get-regexp '^submodule\..*\.path$' \
+           2>/dev/null | awk '{print $2}')
+if [ -n "$missing" ]; then
+  echo "::error::submodule worktree empty:$missing"
+  rc=1
+fi
 
 # 2) sibling 数据（仅当参数含 tools 时按需补齐，即 release 链）
 want_layout=false
