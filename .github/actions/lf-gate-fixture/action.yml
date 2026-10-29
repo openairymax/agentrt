@@ -75,8 +75,19 @@ inputs:
     # 4e429bd：gateway_biz 协议宏收敛为 GW_PROTO_DETECT_LLM_API（与 agentrt
     # 枚举同名；旧 pin 的 GW_PROTO_DETECT_OPENAI 已不存在，Gate/Build 腿
     # 报未声明标识符）；cognition standalone 增补 memory provider 装配锚；
-    # lang_gateway 分词族归属下沉产品侧。本 pin 与镜像 main 一致。
-    default: '4e429bdead3df16d8bc50993322ed4941d10cfc9'
+    # lang_gateway 分词族归属下沉产品侧。
+    # 1a625b0：agentrt commons 在 dead-code 批次删除 error_utils.h，而本 pin
+    # 的 cognition 仍 #include "error_utils.h"（intent_parser.c、
+    # intent_parser_internal.h），三平台 Build 腿因此恒红——ci-debug #1827
+    # （macOS：'error_utils.h' file not found）与 #1828（MSVC C1083）为直证，
+    # Build & Test 自 run 476（2026-10-26）起连续判负。products 侧已由
+    # Commit 072c35f92ba3 ("cognition: drop two stale error_utils includes")
+    # 修掉，pin 未随伞仓 gitlink 前推才是缺口本身。新 pin 等于伞仓
+    # agent-workload 记录的 gitlink，也等于 products 镜像 main tip。
+    # 跨 52 个提交（GRAD 终态归因、canary 五态门禁、元认知闭环、
+    # cupolas/memoryrovol gitlink 前推）。判据消费面无漂移：
+    # verify_release_gates.sh 对该树 PASS=141 FAIL=0。
+    default: '1a625b0f0d3d88cc052bfa74a24750dcbde0bb77'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
