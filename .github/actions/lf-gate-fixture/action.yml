@@ -9,10 +9,12 @@ description: |
                    M3 组 MCP 暴露集 ⊆ external 授权集断言
                    （脚本 L663：本地无仓仅限 skip，CI 侧由本 action fail-closed 兜底）。
     - products   → agent-workload/products/{gateway_biz,cupolas,lang_gateway,
-                   cognition}：0.1.19 刀H 起 gateway 业务面寄宿 gateway_biz，
-                   release-gates 的 AI/AM/AF 组直接读取其源文件；四件同时是
+                   cognition,canary}：0.1.19 刀H 起 gateway 业务面寄宿 gateway_biz，
+                   release-gates 的 AI/AM/AF 组直接读取其源文件；五件同时是
                    agentrt 构建的装配输入（cupolas 缺席则 cupolas_d /
-                   airy_security_dome 不装配，全部 daemon 二进制缺失）。
+                   airy_security_dome 不装配，全部 daemon 二进制缺失；canary
+                   缺席则 BUILD_CANARY=ON 只能 warn "not mounted"，金丝雀
+                   机制核从未在门禁树编译过）。
 
   取料腿可按调用方裁剪（inputs.legs）；构建腿只取 products 时与门禁腿共用
   同一 pin，保证「门禁验证的产品件」即「构建装配的产品件」。
@@ -155,21 +157,22 @@ runs:
         GH_TOKEN: ${{ inputs.gh_token }}
       run: |
         set -euo pipefail
-        # sparse 浅克隆取四件装配输入与判据源；落点与 verify_release_gates.sh
+        # sparse 浅克隆取五件装配输入与判据源；落点与 verify_release_gates.sh
         # 的候选二一致（$ROOT/agent-workload/products/<件>）。cone 模式的
         # sparse-checkout 把 gitlink 索引项当作文件而非目录，对 cupolas 直接
         # 判 "not a directory"（run #555 实证），故显式 --skip-checks；其后
         # 仍需 submodule update 才检出策略单元源。memoryrovol 声明
-        # update=none，按路径限定不触发。末行四件 test 兜底，取料失败即红
-        # （fail-closed，不得静默降级——缺席会使 cupolas_d 静默不装配）。
+        # update=none，按路径限定不触发。末行五件 test 兜底，取料失败即红
+        # （fail-closed，不得静默降级——缺席会使 cupolas_d 静默不装配，
+        # 使 canary 机制核只 warn "not mounted" 而从不进编译）。
         git clone -q --filter=blob:none --sparse \
           "https://x-access-token:${GH_TOKEN}@github.com/openairymax/products.git" \
           agent-workload/products
         git -C agent-workload/products fetch -q --depth 1 origin "${{ inputs.products_sha }}"
         git -C agent-workload/products checkout -q "${{ inputs.products_sha }}"
         git -C agent-workload/products sparse-checkout set --skip-checks \
-          gateway_biz cupolas lang_gateway cognition
+          gateway_biz cupolas lang_gateway cognition canary
         git -C agent-workload/products submodule update --init --depth 1 -- cupolas
-        for _face in gateway_biz cupolas lang_gateway cognition; do
+        for _face in gateway_biz cupolas lang_gateway cognition canary; do
           test -f "agent-workload/products/${_face}/CMakeLists.txt"
         done
