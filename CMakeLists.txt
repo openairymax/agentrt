@@ -1080,6 +1080,8 @@ if(AIRY_BUILD_ALL)
 
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/protocols/CMakeLists.txt")
         add_subdirectory(protocols)
+    else()
+        airy_print_warn("protocols module not found (leaf submodule worktree empty?)")
     endif()
 
     if(BUILD_CUPOLAS AND CUPOLAS_SRC_DIR AND EXISTS "${CUPOLAS_SRC_DIR}/CMakeLists.txt")
