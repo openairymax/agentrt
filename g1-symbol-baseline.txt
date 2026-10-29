@@ -15,11 +15,12 @@ airy_checkpoint_set_auto_hook
 airy_checkpoint_shutdown
 airy_checkpoint_trigger_auto
 airy_checkpoint_verify
+airy_cog_fail_policy
+airy_cog_set_disp
 airy_cognition_create_ex_take
 airy_cognition_create_take
 airy_cognition_destroy
 airy_cognition_enable_checkpoint
-airy_cognition_get_tool_service
 airy_cognition_health_check
 airy_cognition_process
 airy_cognition_set_context_take
@@ -193,9 +194,6 @@ airy_sandbox_invoke
 airy_sandbox_manager_destroy
 airy_sandbox_manager_init
 airy_scheduler_dep_result_free
-airy_scheduler_priority_inherit
-airy_scheduler_resolve_dependencies
-airy_scheduler_resource_reserve
 airy_set_assert_handler
 airy_shutdown
 airy_snapshot_create
@@ -263,6 +261,7 @@ airy_task_cleanup
 airy_task_get_priority
 airy_task_get_state
 airy_task_init
+airy_task_plan_clone
 airy_task_plan_free
 airy_task_self
 airy_task_set_priority
