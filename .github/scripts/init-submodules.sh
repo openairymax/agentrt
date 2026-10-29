@@ -18,16 +18,68 @@
 #   bash .github/scripts/init-submodules.sh agent-workload
 #        → 仅初始化 6 个叶子子模块（build-test / codegen-check 用）。
 #   bash .github/scripts/init-submodules.sh agent-workload tools
-#        → 初始化叶子 + 克隆 release 打包所需的 sibling 数据到历史相对路径：
+#        → 初始化叶子 + 补齐 release 打包所需的 sibling 数据到历史相对路径：
 #          tools/（发布/签名脚本、bootstrap、config 模板）、
 #          agent-workload/{sdk,ecosystem,products}（TUI 源、Python 运行时、
 #          manager 配置、cupolas 安全穹顶源）。
 #          —— sdk/ecosystem/tools 在 agentrt 树外（分属独立仓），以镜像期数据
 #          补齐，使打包/发布脚本的路径引用无需改动。
+#
+# 快照同源（0.1.20）：装配输入 sdk/products 不再跟随 main tip，而是解析
+# lf-gate-fixture 的 *_sha default（全仓唯一字面量），使「门禁验证的快照」
+# 与「发行装配的快照」必然同一。tip 克隆时上游一推进即分叉：门禁判绿来自
+# pin、二进制产自 tip，两边的结论互不背书，且发布内容不可复现。解析或校验
+# 失败即 fail-closed，严禁回退 tip 克隆（静默回退正是分叉的成因）。
+# 仍跟 tip 的两腿及理由：tools 是发布/签名脚本与 airy_depgraph 的宿主，钉旧
+# 会使发布工具链落后于脚本修正；ecosystem 是策略载荷（manager 配置、运行时
+# 策略、sanitizer suppressions），按机制/策略分离可随生态推进，不入机制核
+# 判据面。
 
 set -uo pipefail
 
 export GIT_TERMINAL_PROMPT=0
+
+FIXTURE=.github/actions/lf-gate-fixture/action.yml
+
+# 需要物化的子模块路径清单（跳过 update=none 的可选项，如 products 的
+# memoryrovol 商业件——门禁数据集不取，发布腿亦不校验）。
+sub_paths() {
+  git -C "$1" config --file .gitmodules \
+    --get-regexp '^submodule\..*\.path$' 2>/dev/null |
+    while read -r key path; do
+      name=${key#submodule.}; name=${name%.path}
+      [ "$(git -C "$1" config --file .gitmodules \
+             "submodule.$name.update" 2>/dev/null)" = "none" ] && continue
+      printf '%s\n' "$path"
+    done
+}
+
+# 登记子模块的工作树必须真正 populate——「已初始化」不等于「有内容」：
+# 克隆成功而 checkout 中止时目录为空而状态仍显示就绪（2026-10-29
+# run 40880211714 实证：protocols 空树，CMake 静默跳过，13 门连锁红）。
+# 故按内容判据把故障挡在 configure 之前，不以「后续门禁红」延迟暴露。
+empty_paths() {
+  local dir="$1" p out=""
+  for p in $(sub_paths "$dir"); do
+    [ -n "$(ls -A "$dir/$p" 2>/dev/null)" ] || out="$out $dir/$p"
+  done
+  printf '%s\n' "${out# }"
+}
+
+# 解析 lf-gate-fixture 内某 input 的 default 作为唯一快照来源（SSoT）。
+fixture_pin() {
+  local v
+  v=$(awk -v k="$1" '
+        $0 ~ ("^  " k ":") { f = 1; next }
+        f && /^  [^ ]/     { exit }
+        f && /^    default:/ { sub(/^ *default: */, ""); print; exit }
+      ' "$FIXTURE" 2>/dev/null | tr -d "\"' ")
+  case "$v" in
+    '' | *[!0-9a-f]*) return 1 ;;
+  esac
+  [ "${#v}" -ge 40 ] || return 1
+  printf '%s\n' "$v"
+}
 
 # PAT 认证走 ~/.netrc（git https 原生凭据机制），不改写 URL。
 if [ -n "${GH_TOKEN:-}" ]; then
@@ -63,22 +115,8 @@ for attempt in 1 2 3 4 5 6; do
 done
 rc=$init_rc
 
-# 1b) fail-closed：叶子工作树必须真正 populate
-#
-# git 的「已初始化」判据（.git/modules/<name> 存在、submodule status 无
-# '-' 前缀）不等于工作树有内容：克隆成功而 checkout 中止时目录为空，状态
-# 仍显示就绪（2026-10-29 run 40880211714 实证——protocols 空树，CMake 侧
-# 静默跳过，airy_protocols 目标缺席，gateway_biz 装配 FATAL，13 门连锁红）。
-# 故按内容校验：任一登记的叶子空树即非零退出，把故障挡在 configure 之前，
-# 不以「后续门禁红」的形式延迟暴露。
-missing=""
-while IFS= read -r p; do
-  [ -n "$p" ] || continue
-  if [ ! -d "$p" ] || [ -z "$(ls -A "$p" 2>/dev/null)" ]; then
-    missing="$missing $p"
-  fi
-done < <(git config --file .gitmodules --get-regexp '^submodule\..*\.path$' \
-           2>/dev/null | awk '{print $2}')
+# 1b) fail-closed：叶子工作树必须真正 populate（判据见 empty_paths）
+missing=$(empty_paths .)
 if [ -n "$missing" ]; then
   echo "::error::submodule worktree empty:$missing"
   rc=1
@@ -119,16 +157,51 @@ clone_sibling() {
   return 1
 }
 
+# 按 SHA 物化装配输入（与 lf-gate-fixture 同一取料语义）：--no-checkout 建壳、
+# fetch 指定 SHA 再 checkout，得到 detached 锁定快照；嵌套 gitlink（sdk→tui、
+# products→cupolas）随该 commit 记录的 gitlink 检出。末三行是决定性断言——
+# HEAD 必须等于 pin、需物化的子模块不得空树，否则发行装配的快照与门禁验证的
+# 快照不同一，本脚本宁红不降级。认证复用脚本顶部写入的 ~/.netrc。
+pin_sibling() {
+  local name="$1" dir="$2" sha="$3" miss
+  if [ -e "$dir" ]; then
+    echo "layout: $dir already present"
+    return 0
+  fi
+  git clone -q --no-checkout --depth 1 \
+    "https://github.com/openairymax/${name}.git" "$dir" || return 1
+  git -C "$dir" fetch -q --depth 1 origin "$sha" || return 1
+  git -C "$dir" checkout -q "$sha" || return 1
+  [ "$(git -C "$dir" rev-parse HEAD)" = "$sha" ] || return 1
+  git -C "$dir" submodule update --init --recursive --depth 1 || return 1
+  miss=$(empty_paths "$dir")
+  if [ -n "$miss" ]; then
+    echo "::error::pin: submodule worktree empty:$miss"
+    return 1
+  fi
+  echo "layout: pinned ${name}@$(printf '%.7s' "$sha") -> $dir"
+}
+
 if [ "$want_layout" = true ]; then
-  echo "layout: cloning release sibling repos (_tools/sdk/ecosystem/products)"
+  echo "layout: materializing release sibling data (_tools/ecosystem + pinned sdk/products)"
   # 注意：tools 克隆到 _tools/ —— agentrt 自带顶层 tools/（codegen 等），
   # 若同名会跳过克隆导致 release 脚本缺失（linux job 实证）。
   clone_sibling tools _tools
   mkdir -p agent-workload
-  clone_sibling sdk agent-workload/sdk
   clone_sibling ecosystem agent-workload/ecosystem
-  # §254a：cupolas 叶子挂点迁出至 products 装配仓，发布布局需其源码在位
-  clone_sibling products agent-workload/products
+  # 装配输入按 pin 物化（§快照同源）：pin 解析自 lf-gate-fixture，
+  # 解析或检出失败即置 rc=1，严禁回退 tip 克隆。
+  for _leg in sdk products; do
+    _pin=$(fixture_pin "${_leg}_sha") || {
+      echo "::error::layout: cannot resolve ${_leg}_sha from $FIXTURE"
+      rc=1
+      continue
+    }
+    pin_sibling "$_leg" "agent-workload/$_leg" "$_pin" || {
+      echo "::error::layout: materialize ${_leg}@$_pin failed"
+      rc=1
+    }
+  done
 fi
 
 echo "--- submodule status ---"
