@@ -104,7 +104,11 @@ inputs:
     # （MOVEFILE_REPLACE_EXISTING|WRITE_THROUGH）——d1fd950 的 remove+rename
     # 在两步之间留下两侧皆缺的崩溃窗口，而该文件是 C4 回滚锚点。与旧 pin
     # 单提交差，仅 canary/src/canary_manifest.c，不触判据消费路径。
-    default: 'd4943364f147a19d6481e63f67e765630a5cae8a'
+    # 4b9e8e9：金丝雀 K1/K2 的度量源落到引擎双集评估（cupolas
+    # dcb5bfa：灰度会话期同一请求在新旧两集各裁一次并上报观测）。
+    # 与旧 pin 单提交差，仅 cupolas 的策略核/守护面/单测，不触
+    # products/cupolas/src/permission/ 判据消费路径。
+    default: '4b9e8e9f844ca849acf22a573392c8f80e4fd5bb'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
