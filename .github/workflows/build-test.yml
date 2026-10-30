@@ -414,6 +414,7 @@ jobs:
             -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=ProgramDatabase
 
       - name: Build
+        id: build
         shell: pwsh
         run: |
           # MSVC 编译失败时把错误以 ::error:: 上报为 annotation（匿名 API 可读）；
@@ -456,10 +457,10 @@ jobs:
       # ctest SegFault 栈捕获（cdb）。windows runner 带 Windows SDK Debugging
       # Tools 时，对失败测试跑 cdb，crash 断点上 .ecxr + k 输出符号化调用栈，
       # 整段落 ci-debug issue —— SegFault 只有 "***Exception: SegFault" 无法
-      # 定位，需真实调用栈定位。仅失败时触发；runner 无 cdb 则静默跳过
-      # （记录说明），不阻塞门禁。
+      # 定位，需真实调用栈定位。仅测试失败时触发（构建失败时没有可调试的
+      # 产物，栈捕获无对象）；runner 无 cdb 则静默跳过（记录说明），不阻塞门禁。
       - name: Triage ctest crash stacks (cdb)
-        if: failure()
+        if: failure() && steps.build.outcome == 'success'
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -540,8 +541,11 @@ jobs:
           # exit 0 保证该步骤不额外报红。
           bash .github/scripts/ci-debug-dump.sh "windows ctest triage" $log
           exit 0
+      # 构建失败时没有测试二进制，--rerun-failed 会退化成跑全量再用 240s
+      # 单测超时逐个拖死，把 job 顶到 90 分钟护栏才收场（实测一次）。判据
+      # 只在测试段失败时才有意义，构建段失败直接把现场留给上一步的日志。
       - name: Rerun failed tests & dump to ci-debug issue
-        if: failure()
+        if: failure() && steps.build.outcome == 'success'
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -551,13 +555,15 @@ jobs:
           bash .github/scripts/ci-debug-dump.sh "windows ctest rerun" $rerunLog
 
       # 与 linux/macos 腿同口径，日志直传 artifact 作为免凭据兜底取证
-      # （windows 日志在 RUNNER_TEMP 而非 /tmp）。
+      # （windows 日志在 RUNNER_TEMP 而非 /tmp）。build.log 必须在内：ci-debug
+      # issue 只落尾部截断窗口，真实报错若落在窗口之外，就只能靠全量日志。
       - name: Upload ctest logs artifact
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: windows-ctest-logs
           path: |
+            ${{ runner.temp }}/build.log
             ${{ runner.temp }}/ctest.log
             ${{ runner.temp }}/ctest-rerun.log
             ${{ runner.temp }}/ctest-triage.log
