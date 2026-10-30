@@ -422,6 +422,15 @@ jobs:
             Copy-Item -Path $p -Destination "${{ env.STAGE_DIR }}\lib\" -Recurse -Force
           }
 
+      # 自含性判据（0.1.20 W2）：zip 直接取自安装树，安装树缺 vcpkg 运行时
+      # DLL 即等于发行包缺。资产一致性判据只证"字节与清单一致"，不证"字节
+      # 能跑"——v0.1.20 包内 0 个 vcpkg DLL 而流水线全绿，正是缺这道题。
+      - name: Assert package self-containment
+        shell: pwsh
+        run: |
+          & _tools/scripts/ci/release/assert-win-selfcontained.ps1 -BinDir "${{ env.STAGE_DIR }}\bin"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # zip 包与 tar.gz 完全体一致（install.ps1 二进制模式依赖 config 模板）。
       - name: Package (zip)
         shell: pwsh
@@ -568,6 +577,13 @@ jobs:
             if (-not (Test-Path $p)) { throw "[windows-x86-32] python 运行时子树缺失: $p" }
             Copy-Item -Path $p -Destination "${{ env.STAGE_DIR }}\lib\" -Recurse -Force
           }
+
+      # 自含性判据：与 x64 腿同款（判据实现单点在 tools 仓，两腿不复制）
+      - name: Assert package self-containment
+        shell: pwsh
+        run: |
+          & _tools/scripts/ci/release/assert-win-selfcontained.ps1 -BinDir "${{ env.STAGE_DIR }}\bin"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # zip 包与 x64 腿完全体一致；install.ps1 PROCESSOR_ARCHITECTURE=x86
       # 分支按此命名消费。

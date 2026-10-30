@@ -441,9 +441,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: bash .github/scripts/ci-debug-dump.sh "windows build" "$RUNNER_TEMP/build.log"
 
+      # 构建期 vcpkg applocal 已在根 CMakeLists 关闭（每目标 POST_BUILD 在
+      # 共享输出目录并发改写同名 DLL → MSB3075 "Access is denied."）。测试
+      # 二进制因此需从 vcpkg 安装树取运行时 DLL：把 installed/<triplet>/bin
+      # 置于 PATH 首位，等价于安装期部署后的运行环境。
       - name: Run tests (ctest)
         shell: pwsh
         run: |
+          $env:PATH = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin;$env:PATH"
           $ctestLog = Join-Path $env:RUNNER_TEMP "ctest.log"
           ctest --test-dir ${{ env.BUILD_DIR }} -C Release --output-on-failure --timeout 240 2>&1 | Tee-Object -FilePath $ctestLog
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
