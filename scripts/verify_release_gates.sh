@@ -420,9 +420,12 @@ else
     bad "G2 g_chat_reasoning_truncated 截断逻辑缺失"
 fi
 
+# 轮转的判据是「旧份被覆盖 + 覆盖动作原子」，不是「先删后改」这组实现
+# 细节：W4 把改名收敛到平台原语后覆盖语义由 airy_file_rename 承担，原先的
+# remove() 反而制造两侧皆缺的崩溃窗口。
 if grep -q 'cli_reasoning_log_rotate' "$CLI/src/chat/cli_chat_history.c" \
-   && grep -q 'remove(' "$CLI/src/chat/cli_chat_history.c"; then
-    ok "G3 日志轮转 cli_reasoning_log_rotate + remove 旧份在位"
+   && grep -q 'airy_file_rename(' "$CLI/src/chat/cli_chat_history.c"; then
+    ok "G3 日志轮转 cli_reasoning_log_rotate + 原子覆盖改名在位"
 else
     bad "G3 思考链日志轮转缺失（磁盘无界回归）"
 fi
