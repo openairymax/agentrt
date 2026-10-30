@@ -100,7 +100,11 @@ inputs:
     # rename 拒绝已存在目标，run 40975362676 canary_unit 回滚判负
     # 实证）。与旧 pin 单提交差，仅 canary/src/canary_manifest.c，
     # 不触判据消费路径。
-    default: 'd1fd950312af5dd66199e1b1e4beb3212e2baf86'
+    # d494336：canary manifest 覆盖式改名改用 MoveFileExA
+    # （MOVEFILE_REPLACE_EXISTING|WRITE_THROUGH）——d1fd950 的 remove+rename
+    # 在两步之间留下两侧皆缺的崩溃窗口，而该文件是 C4 回滚锚点。与旧 pin
+    # 单提交差，仅 canary/src/canary_manifest.c，不触判据消费路径。
+    default: 'd4943364f147a19d6481e63f67e765630a5cae8a'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
