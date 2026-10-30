@@ -3,7 +3,7 @@
   "channel": "stable",
   "state": "active",
   "latest": "v0.1.20",
-  "updated_at": "2026-10-29T16:54:05Z",
+  "updated_at": "2026-10-30T03:05:57Z",
   "releases": {
     "v0.1.20": {
       "yanked": false,
@@ -11,143 +11,143 @@
       "artifacts": {
         "linux-arm-32": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-linux-arm-32.tar.gz",
-          "sha256": "2a23f2278421303c0c90f6b4cee9f2c08ee358e680eef6166c3db256b00005df",
-          "size": 32972340
+          "sha256": "49ec476bb71fdf2b9744442d7bcbd42b2ea036e2ecc76e28f07f88cdb399f7d4",
+          "size": 32965562
         },
         "linux-arm-64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-linux-arm-64.tar.gz",
-          "sha256": "97af53601f6d8881778238e42dca02acb29cc08f558c58542d0c873674023b36",
-          "size": 34505553
+          "sha256": "227f3a657d7bf0a46fcf7509aa139b4593a121f0fe9bc46ca9c41022fcd99ff9",
+          "size": 34499882
         },
         "linux-x86-32": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-linux-x86-32.tar.gz",
-          "sha256": "0a23f22b0a45afc5cbe8f27bf1ca811f8c844502140c3bea485d08d2de96394e",
-          "size": 33371322
+          "sha256": "0a35585995087edaa86d544a6ef81aadded4d71a76eb222af9feed5b8d00566d",
+          "size": 33373011
         },
         "linux-x86-64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-linux-x86-64.tar.gz",
-          "sha256": "ea25a160274942a2583b8433f2b77b45c13325df89894811723bbd61791fcb6c",
-          "size": 35030251
+          "sha256": "85653c794f8e644b363cc34749f29e3051dbb1b7aa2fb973a349750c6bf0dfa1",
+          "size": 35029511
         },
         "macos-arm-64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-macos-arm-64.tar.gz",
-          "sha256": "0cf77734854cade35a5f65139c5fca6a088f0fa0084a5c41305d0d9b17a77e05",
-          "size": 22999952
+          "sha256": "18743b22805e9ae04b53d26c2924b0c88ea031084d0571390d5714eefffc85b2",
+          "size": 22975450
         },
         "macos-x86-64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-macos-x86-64.tar.gz",
-          "sha256": "429236bf301a2734cbe3c1a037ea4d9689b7d4af352fd18f7dfd63e906d68b4b",
-          "size": 23328650
+          "sha256": "bc815d698d4843f587ed46c8112c00e5487ab9be2c76bcded6e02b22c810fbcb",
+          "size": 23330714
         },
         "windows-x86-32": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-windows-x86-32.zip",
-          "sha256": "446901e9fa077d1bbb0a395d24101fe27d91c3cdaad7f9306e99d56928d1e402",
-          "size": 48202582
+          "sha256": "d8e5bfdd94f6e101b1a3b62f88663cdf6c464dfc24f0c4cdcdd3d19134e12bd5",
+          "size": 48193873
         },
         "windows-x86-64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-windows-x86-64.zip",
-          "sha256": "46d1358bd2d73745da3211c2684f79e7386c5c062a64ee29b4ab1f558cf6d1e8",
-          "size": 49244580
+          "sha256": "5a5bba2b6595f899275bd7aabaff6c87cb6e9f4109c16954e22b0e8acc028003",
+          "size": 49240899
         },
         "linux-arm32": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-linux-arm-32.tar.gz",
-          "sha256": "2a23f2278421303c0c90f6b4cee9f2c08ee358e680eef6166c3db256b00005df",
-          "size": 32972340
+          "sha256": "49ec476bb71fdf2b9744442d7bcbd42b2ea036e2ecc76e28f07f88cdb399f7d4",
+          "size": 32965562
         },
         "linux-armv7l": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-linux-arm-32.tar.gz",
-          "sha256": "2a23f2278421303c0c90f6b4cee9f2c08ee358e680eef6166c3db256b00005df",
-          "size": 32972340
+          "sha256": "49ec476bb71fdf2b9744442d7bcbd42b2ea036e2ecc76e28f07f88cdb399f7d4",
+          "size": 32965562
         },
         "linux-arm64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-linux-arm-64.tar.gz",
-          "sha256": "97af53601f6d8881778238e42dca02acb29cc08f558c58542d0c873674023b36",
-          "size": 34505553
+          "sha256": "227f3a657d7bf0a46fcf7509aa139b4593a121f0fe9bc46ca9c41022fcd99ff9",
+          "size": 34499882
         },
         "linux-aarch64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-linux-arm-64.tar.gz",
-          "sha256": "97af53601f6d8881778238e42dca02acb29cc08f558c58542d0c873674023b36",
-          "size": 34505553
+          "sha256": "227f3a657d7bf0a46fcf7509aa139b4593a121f0fe9bc46ca9c41022fcd99ff9",
+          "size": 34499882
         },
         "linux-x86": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-linux-x86-32.tar.gz",
-          "sha256": "0a23f22b0a45afc5cbe8f27bf1ca811f8c844502140c3bea485d08d2de96394e",
-          "size": 33371322
+          "sha256": "0a35585995087edaa86d544a6ef81aadded4d71a76eb222af9feed5b8d00566d",
+          "size": 33373011
         },
         "linux-i686": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-linux-x86-32.tar.gz",
-          "sha256": "0a23f22b0a45afc5cbe8f27bf1ca811f8c844502140c3bea485d08d2de96394e",
-          "size": 33371322
+          "sha256": "0a35585995087edaa86d544a6ef81aadded4d71a76eb222af9feed5b8d00566d",
+          "size": 33373011
         },
         "linux-x64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-linux-x86-64.tar.gz",
-          "sha256": "ea25a160274942a2583b8433f2b77b45c13325df89894811723bbd61791fcb6c",
-          "size": 35030251
+          "sha256": "85653c794f8e644b363cc34749f29e3051dbb1b7aa2fb973a349750c6bf0dfa1",
+          "size": 35029511
         },
         "linux-x86_64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-linux-x86-64.tar.gz",
-          "sha256": "ea25a160274942a2583b8433f2b77b45c13325df89894811723bbd61791fcb6c",
-          "size": 35030251
+          "sha256": "85653c794f8e644b363cc34749f29e3051dbb1b7aa2fb973a349750c6bf0dfa1",
+          "size": 35029511
         },
         "macos-arm64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-macos-arm-64.tar.gz",
-          "sha256": "0cf77734854cade35a5f65139c5fca6a088f0fa0084a5c41305d0d9b17a77e05",
-          "size": 22999952
+          "sha256": "18743b22805e9ae04b53d26c2924b0c88ea031084d0571390d5714eefffc85b2",
+          "size": 22975450
         },
         "macos-aarch64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-macos-arm-64.tar.gz",
-          "sha256": "0cf77734854cade35a5f65139c5fca6a088f0fa0084a5c41305d0d9b17a77e05",
-          "size": 22999952
+          "sha256": "18743b22805e9ae04b53d26c2924b0c88ea031084d0571390d5714eefffc85b2",
+          "size": 22975450
         },
         "macos-x64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-macos-x86-64.tar.gz",
-          "sha256": "429236bf301a2734cbe3c1a037ea4d9689b7d4af352fd18f7dfd63e906d68b4b",
-          "size": 23328650
+          "sha256": "bc815d698d4843f587ed46c8112c00e5487ab9be2c76bcded6e02b22c810fbcb",
+          "size": 23330714
         },
         "macos-x86_64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-macos-x86-64.tar.gz",
-          "sha256": "429236bf301a2734cbe3c1a037ea4d9689b7d4af352fd18f7dfd63e906d68b4b",
-          "size": 23328650
+          "sha256": "bc815d698d4843f587ed46c8112c00e5487ab9be2c76bcded6e02b22c810fbcb",
+          "size": 23330714
         },
         "windows-x86": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-windows-x86-32.zip",
-          "sha256": "446901e9fa077d1bbb0a395d24101fe27d91c3cdaad7f9306e99d56928d1e402",
-          "size": 48202582
+          "sha256": "d8e5bfdd94f6e101b1a3b62f88663cdf6c464dfc24f0c4cdcdd3d19134e12bd5",
+          "size": 48193873
         },
         "windows-i686": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-windows-x86-32.zip",
-          "sha256": "446901e9fa077d1bbb0a395d24101fe27d91c3cdaad7f9306e99d56928d1e402",
-          "size": 48202582
+          "sha256": "d8e5bfdd94f6e101b1a3b62f88663cdf6c464dfc24f0c4cdcdd3d19134e12bd5",
+          "size": 48193873
         },
         "win-x86": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-windows-x86-32.zip",
-          "sha256": "446901e9fa077d1bbb0a395d24101fe27d91c3cdaad7f9306e99d56928d1e402",
-          "size": 48202582
+          "sha256": "d8e5bfdd94f6e101b1a3b62f88663cdf6c464dfc24f0c4cdcdd3d19134e12bd5",
+          "size": 48193873
         },
         "win-i686": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-windows-x86-32.zip",
-          "sha256": "446901e9fa077d1bbb0a395d24101fe27d91c3cdaad7f9306e99d56928d1e402",
-          "size": 48202582
+          "sha256": "d8e5bfdd94f6e101b1a3b62f88663cdf6c464dfc24f0c4cdcdd3d19134e12bd5",
+          "size": 48193873
         },
         "windows-x64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-windows-x86-64.zip",
-          "sha256": "46d1358bd2d73745da3211c2684f79e7386c5c062a64ee29b4ab1f558cf6d1e8",
-          "size": 49244580
+          "sha256": "5a5bba2b6595f899275bd7aabaff6c87cb6e9f4109c16954e22b0e8acc028003",
+          "size": 49240899
         },
         "windows-x86_64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-windows-x86-64.zip",
-          "sha256": "46d1358bd2d73745da3211c2684f79e7386c5c062a64ee29b4ab1f558cf6d1e8",
-          "size": 49244580
+          "sha256": "5a5bba2b6595f899275bd7aabaff6c87cb6e9f4109c16954e22b0e8acc028003",
+          "size": 49240899
         },
         "win-x64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-windows-x86-64.zip",
-          "sha256": "46d1358bd2d73745da3211c2684f79e7386c5c062a64ee29b4ab1f558cf6d1e8",
-          "size": 49244580
+          "sha256": "5a5bba2b6595f899275bd7aabaff6c87cb6e9f4109c16954e22b0e8acc028003",
+          "size": 49240899
         },
         "win-x86_64": {
           "url": "https://atomgit.com/openairymax/agentrt/releases/download/v0.1.20/agentrt-v0.1.20-windows-x86-64.zip",
-          "sha256": "46d1358bd2d73745da3211c2684f79e7386c5c062a64ee29b4ab1f558cf6d1e8",
-          "size": 49244580
+          "sha256": "5a5bba2b6595f899275bd7aabaff6c87cb6e9f4109c16954e22b0e8acc028003",
+          "size": 49240899
         }
       }
     }
