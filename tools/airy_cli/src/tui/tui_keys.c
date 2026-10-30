@@ -71,29 +71,51 @@ static void tui_win_enqueue_wchar(WCHAR wc)
     tui_win_flush_buf(buf, n);
 }
 
+/* 虚拟键 → VT 序列。左右键按修饰取变体（Ctrl 优先于 Alt），其余键无
+ * 修饰差异，直接用定值表查。未映射的键返回 NULL，交调用方继续判定。 */
+static const char *tui_win_vt_seq(WORD vk, int ctrl, int alt)
+{
+    static const struct {
+        WORD vk;
+        const char *seq;
+    } fixed[] = {
+        {VK_UP,     "\x1b[A"},  {VK_DOWN,  "\x1b[B"},
+        {VK_HOME,   "\x1b[H"},  {VK_END,   "\x1b[F"},
+        {VK_PRIOR,  "\x1b[5~"}, {VK_NEXT,  "\x1b[6~"},
+        {VK_DELETE, "\x1b[3~"}, {VK_TAB,   "\t"},
+        {VK_RETURN, "\r"},
+        {VK_BACK,   "\x7f"},    /* termios DEL，与 POSIX 一致 */
+        {VK_ESCAPE, "\x1b"},
+    };
+    /* 变体下标：0 = 无修饰，1 = Alt，2 = Ctrl（对应 xterm ESC[D / ESC[1;3D /
+     * ESC[1;5D）。 */
+    static const struct {
+        WORD vk;
+        const char *seq[3];
+    } arrow[] = {
+        {VK_LEFT,  {"\x1b[D", "\x1b[1;3D", "\x1b[1;5D"}},
+        {VK_RIGHT, {"\x1b[C", "\x1b[1;3C", "\x1b[1;5C"}},
+    };
+    const int mod = ctrl ? 2 : alt ? 1 : 0;
+    size_t i;
+
+    for (i = 0; i < sizeof(fixed) / sizeof(fixed[0]); i++) {
+        if (fixed[i].vk == vk)
+            return fixed[i].seq;
+    }
+    for (i = 0; i < sizeof(arrow) / sizeof(arrow[0]); i++) {
+        if (arrow[i].vk == vk)
+            return arrow[i].seq[mod];
+    }
+    return NULL;
+}
+
 static void tui_win_enqueue_key(WORD vk, WCHAR wc, DWORD ctl)
 {
     const int ctrl = (ctl & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)) != 0;
     const int alt = (ctl & (LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED)) != 0;
-    const char *seq = NULL;
+    const char *seq = tui_win_vt_seq(vk, ctrl, alt);
 
-    switch (vk) {
-    case VK_UP:     seq = "\x1b[A";      break;
-    case VK_DOWN:   seq = "\x1b[B";      break;
-    case VK_RIGHT:  seq = ctrl ? "\x1b[1;5C" : alt ? "\x1b[1;3C" : "\x1b[C"; break;
-    case VK_LEFT:   seq = ctrl ? "\x1b[1;5D" : alt ? "\x1b[1;3D" : "\x1b[D"; break;
-    case VK_HOME:   seq = "\x1b[H";      break;
-    case VK_END:    seq = "\x1b[F";      break;
-    case VK_PRIOR:  seq = "\x1b[5~";     break;
-    case VK_NEXT:   seq = "\x1b[6~";     break;
-    case VK_DELETE: seq = "\x1b[3~";     break;
-    case VK_TAB:    seq = "\t";          break;
-    case VK_RETURN: seq = "\r";          break;
-    case VK_BACK:   seq = "\x7f";        break; /* termios DEL，与 POSIX 一致 */
-    case VK_ESCAPE: seq = "\x1b";        break;
-    default:
-        break;
-    }
     if (seq) {
         tui_win_flush_buf(seq, strlen(seq));
         return;
