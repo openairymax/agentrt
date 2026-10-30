@@ -96,7 +96,11 @@ inputs:
     # 取不到该修正即恒红，缺口在 pin 未随镜像 main 前推，不在判据面。
     # 与旧 pin 单提交差，仅 cognition/tests/unit/test_grad_misc.c，
     # 不触判据消费路径，故 verify_release_gates.sh 无需同步改动。
-    default: '030b724b9331d68b522d4b9ccd97cede1cb2677a'
+    # d1fd950：canary manifest 覆盖式改名原语 man_repl（Windows CRT
+    # rename 拒绝已存在目标，run 40975362676 canary_unit 回滚判负
+    # 实证）。与旧 pin 单提交差，仅 canary/src/canary_manifest.c，
+    # 不触判据消费路径。
+    default: 'd1fd950312af5dd66199e1b1e4beb3212e2baf86'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
