@@ -152,6 +152,14 @@ jobs:
           if [ -d "$UMB/agent-workload/sdk" ]; then
             git -C "$UMB/agent-workload/sdk" submodule update --init --depth 1 -- tui \
               || echo "::warning::sdk tui submodule unavailable, G38 launcher probe will fail"
+            # sdk-python 承载 `agentrt` Python 包：Gate 46 的 skills 守卫在
+            # 插件模块内 `from agentrt.plugin_types import ...`，其源码兜底
+            # 路径正是 agent-workload/sdk/sdk-python。未 init 时该目录为空，
+            # 兜底静默落空，Guard 以 ImportError 判红而红因指向插件源码
+            # （run 41122590599 实证）。sdk-python 为私有仓，相对 URL 经
+            # .netrc 的 GH_TOKEN 解析，与 ecosystem 第二层子模块同通道。
+            git -C "$UMB/agent-workload/sdk" submodule update --init --depth 1 -- sdk-python \
+              || echo "::warning::sdk sdk-python submodule unavailable, Gate 46 will fail"
           fi
           # ecosystem 的第二层子模块（agents/manager/…）承载门禁的直接数据源：
           #   Gate 5 工具 schema 双源之一 agents/airymax_agents/base.py，
