@@ -217,7 +217,7 @@ static int ak_store(const char *path, const char *var, const char *key)
 #else
     chmod(tmp, 0600);
 #endif
-    if (rename(tmp, path) != 0) {
+    if (airy_file_rename(tmp, path) != 0) {
         remove(tmp);
         ak_free(lines, n);
         cli_print_line("Sub Agent:apikey", "写回失败");

@@ -136,7 +136,8 @@ void tui_cmd_hist_save(cli_tui_t *t)
     for (size_t i = 0; i < t->cmd_hist.count; i++)
         fprintf(f, "%s\n", t->cmd_hist.entries[i]);
     fclose(f);
-    rename(tmp, path);
+    if (airy_file_rename(tmp, path) != 0)
+        remove(tmp);
 #endif
 }
 
