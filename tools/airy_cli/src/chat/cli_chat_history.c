@@ -96,8 +96,8 @@ void cli_history_clear(void)
  * S-04：写前轮转（保一代 .1），长期使用不再让日志无界增长。 */
 
 /* S-04：现日志超过 AIRY_REASONING_LOG_MAX_BYTES 时改名为 .1（覆盖旧
- * .1，磁盘占用封顶约两倍阈值）。remove 先行：Windows rename 目标存在
- * 即失败，先删统一两平台语义；轮转失败不阻断本次写入。 */
+ * .1，磁盘占用封顶约两倍阈值）。改名走原子替换原语，覆盖语义两端一致；
+ * 轮转失败不阻断本次写入。 */
 static void cli_reasoning_log_rotate(const char *logpath)
 {
 #ifdef _WIN32
@@ -113,8 +113,7 @@ static void cli_reasoning_log_rotate(const char *logpath)
     int blen = snprintf(backup, sizeof(backup), "%s.1", logpath);
     if (blen < 0 || blen >= (int)sizeof(backup))
         return;
-    remove(backup);
-    rename(logpath, backup);
+    airy_file_rename(logpath, backup);
 }
 
 void cli_chat_reasoning_persist(const char *text)
