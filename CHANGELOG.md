@@ -61,6 +61,11 @@
 - **错误模型与安全**：错误分类落地（atoms/commons/gateway 指针齐动）、failure 按 error class 渲染、tool contract sidecar、write-path precheck、tool_d realpath confinement、session epoch 与 liveness heartbeat。
 - MSVC/Windows 修复（unused-variable、uuid probe、mkdir）；死代码大扫除（zero-consumer narrow atomics、config_unified dead-strategy、sandbox dead-state）；gateway_biz 产品件登记装配根链接边；CI 四产品面物化。
 
+### Fixed
+
+- **Windows 原子替换语义（W3/W4）**：`airy_file_rename()` 加固为 `MoveFileExA(REPLACE_EXISTING|WRITE_THROUGH)` 并把 Win32 错误码映射回 `ENOENT`/`EACCES`/`EIO`；全树 8 处「tmp + fsync + rename」站点（checkpoint、成本账目、work_hall、语义缓存、服务发现、日志轮转、CLI 历史与 key、heapstore 迁移）改为转调该原语。此前 Windows CRT `rename()` 目标存在即失败，覆盖写在第二次起必然失败。
+- **发行包自含性（W2）与安装期 DLL 部署（W1）**：`VCPKG_APPLOCAL_DEPS=OFF` + 安装期串行 applocal，消除并发写同名 DLL 的 `MSB3075`，发行 zip 随附 vcpkg 依赖 DLL。
+
 ---
 
 ## [v0.1.19] - 2026-10-16
