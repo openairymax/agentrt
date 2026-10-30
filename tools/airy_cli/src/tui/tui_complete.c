@@ -83,68 +83,72 @@ static size_t tui_tab_complete_fs(cli_tui_t *t, const char *dir, const char *bas
     return n;
 }
 
-int tui_tab_complete(cli_tui_t *t)
+/* 新一轮补全开始时复位循环：token 变化或候选集收缩都要从 0 重新开始。 */
+static void tui_tab_arm(cli_tui_t *t, size_t n)
 {
-    if (!t->input || t->input_len == 0)
-        return 0;
+    if (!t->tab_active || t->tab_sel >= n)
+        t->tab_sel = 0;
+    t->tab_active = 1;
+    t->tab_count = n;
+}
 
-    /* 定位光标处的 token。 */
-    size_t tok_start = 0;
-    for (size_t i = 0; i < t->input_col; i++) {
-        if (t->input[i] == ' ' || t->input[i] == '\t')
-            tok_start = i + 1;
-    }
-    size_t tok_len = t->input_col - tok_start;
+/* 单候选收尾：补一个空格，避免用户重新敲分隔符。 */
+static void tui_tab_space(cli_tui_t *t)
+{
+    if (t->input_len + 1 >= t->input_cap)
+        return;
+    t->input[t->input_len++] = ' ';
+    t->input[t->input_len] = '\0';
+    t->input_col = t->input_len;
+}
 
-    if (t->input[tok_start] == '/') {
-        /* 命令补全：token 以 '/' 开头。 */
-        size_t ncmds = cli_commands_count();
+/* 候选落地（命令与文件两条路径共用）：
+ * 多候选时推进循环，单候选时补空格——目录以分隔符结尾，不补。 */
+static int tui_tab_pick(cli_tui_t *t, size_t ts, size_t tl,
+                        const char *pick, size_t n)
+{
+    size_t mlen = strlen(pick);
 
-        /* Collect candidates whose name starts with the typed prefix. */
-        size_t cand_idx[TUI_TAB_CAND_MAX];
-        size_t n_cand = 0;
-        for (size_t i = 0; i < ncmds && n_cand < TUI_TAB_CAND_MAX; i++) {
-            const char *name = CLI_COMMANDS[i].name;
-            if (strncmp(name, t->input + tok_start, tok_len) == 0)
-                cand_idx[n_cand++] = i;
-        }
-        if (n_cand == 0) {
-            t->tab_active = 0;
-            return 0;
-        }
-
-        /* Reset the cycle when the typed token changed since the last Tab. */
-        if (!t->tab_active || t->tab_sel >= n_cand)
-            t->tab_sel = 0;
-        t->tab_active = 1;
-        t->tab_count = n_cand;
-        for (size_t i = 0; i < n_cand; i++)
-            t->tab_cands[i] = cand_idx[i];
-
-        const char *match = CLI_COMMANDS[cand_idx[t->tab_sel]].name;
-        size_t mlen = strlen(match);
-        tui_tab_replace(t, tok_start, tok_len, match, mlen);
-
-        /* Single candidate: append a trailing space so typing continues.
-         * Multiple candidates: advance the cycle for the next Tab press. */
-        if (n_cand == 1) {
-            if (t->input_len + 1 < t->input_cap) {
-                t->input[t->input_len++] = ' ';
-                t->input[t->input_len] = '\0';
-                t->input_col = t->input_len;
-            }
-        } else {
-            t->tab_sel = (t->tab_sel + 1) % n_cand;
-        }
+    tui_tab_replace(t, ts, tl, pick, mlen);
+    if (n > 1) {
+        t->tab_sel = (t->tab_sel + 1) % n;
         return 1;
     }
+    if (mlen > 0 && pick[mlen - 1] != TUI_PATH_SEP)
+        tui_tab_space(t);
+    return 1;
+}
 
-    /* 文件补全：token 为普通文本。拆分目录与 basename。 */
-    const char *tok = t->input + tok_start;
-    size_t slash = tok_len;
+/* 命令补全：token 以 '/' 开头，在 CLI_COMMANDS 表内做前缀匹配。 */
+static int tui_tab_cmd(cli_tui_t *t, size_t ts, size_t tl)
+{
+    size_t cand[TUI_TAB_CAND_MAX];
+    size_t n = 0;
+    size_t ncmds = cli_commands_count();
+
+    for (size_t i = 0; i < ncmds && n < TUI_TAB_CAND_MAX; i++) {
+        if (strncmp(CLI_COMMANDS[i].name, t->input + ts, tl) == 0)
+            cand[n++] = i;
+    }
+    if (n == 0) {
+        t->tab_active = 0;
+        return 0;
+    }
+    tui_tab_arm(t, n);
+    for (size_t i = 0; i < n; i++)
+        t->tab_cands[i] = cand[i];
+    return tui_tab_pick(t, ts, tl, CLI_COMMANDS[cand[t->tab_sel]].name, n);
+}
+
+/* 文件补全：把 token 拆成目录与 basename，再交给目录遍历。 */
+static int tui_tab_fs(cli_tui_t *t, size_t ts, size_t tl)
+{
+    const char *tok = t->input + ts;
+    size_t slash = tl;
+    char dir[TUI_TAB_NAME_MAX];
+
     while (slash > 0 && tok[slash - 1] != '/' && tok[slash - 1] != '\\')
         slash--;
-    char dir[TUI_TAB_NAME_MAX];
     if (slash >= sizeof(dir))
         return 0;
     AIRY_MEMCPY(dir, tok, slash);
@@ -155,26 +159,24 @@ int tui_tab_complete(cli_tui_t *t)
         t->tab_active = 0;
         return 0;
     }
-    if (!t->tab_active || t->tab_sel >= n)
-        t->tab_sel = 0;
-    t->tab_active = 1;
-    t->tab_count = n;
+    tui_tab_arm(t, n);
+    return tui_tab_pick(t, ts, tl, t->tab_cand_strs[t->tab_sel], n);
+}
 
-    const char *match = t->tab_cand_strs[t->tab_sel];
-    size_t mlen = strlen(match);
-    tui_tab_replace(t, tok_start, tok_len, match, mlen);
+int tui_tab_complete(cli_tui_t *t)
+{
+    if (!t->input || t->input_len == 0)
+        return 0;
 
-    /* 单候选：文件追加空格便于继续输入；目录不加（可继续 Tab 深入）。 */
-    if (n == 1) {
-        if (mlen > 0 && match[mlen - 1] != '/') {
-            if (t->input_len + 1 < t->input_cap) {
-                t->input[t->input_len++] = ' ';
-                t->input[t->input_len] = '\0';
-                t->input_col = t->input_len;
-            }
-        }
-    } else {
-        t->tab_sel = (t->tab_sel + 1) % n;
+    /* 定位光标处的 token。 */
+    size_t ts = 0;
+    for (size_t i = 0; i < t->input_col; i++) {
+        if (t->input[i] == ' ' || t->input[i] == '\t')
+            ts = i + 1;
     }
-    return 1;
+    size_t tl = t->input_col - ts;
+
+    if (t->input[ts] == '/')
+        return tui_tab_cmd(t, ts, tl);
+    return tui_tab_fs(t, ts, tl);
 }
