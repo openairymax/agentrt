@@ -20,6 +20,17 @@ string(REGEX REPLACE "([0-9.]+).*" "\\1" AIRY_VERSION_NUM "${AIRY_VERSION_RAW}")
 if(NOT AIRY_VERSION_NUM)
     message(FATAL_ERROR "版本 SSoT 非法：无法从 VERSION ('${AIRY_VERSION_RAW}') 解析数字版本")
 endif()
+# vcpkg 依赖部署形态：默认的每目标 POST_BUILD applocal 在共享输出目录
+# （如 commons/tests 多测试目标同写 Release/）下并发执行 z-applocal，
+# 多个进程同时改写同名 DLL 会触发 MSB3075 "Access is denied."
+# （0.1.20 发行后 windows-build 间歇红的唯一成因，无编译错误）；且它只
+# 覆盖构建树，而发行包取自安装树（cmake --install 后打包），vcpkg 运行时
+# DLL 从未进包（实测包内仅 8 个 MSVC 运行时 DLL）。部署是"装"的一部分、
+# 不是"编"的一部分：此处关掉构建期部署，改由文末 install(SCRIPT) 在安装期
+# 串行部署一次。必须在 project() 之前设置——toolchain 在 project() 时载入，
+# 用 CACHE 变量压住 toolchain 内 option() 的默认值 ON。
+set(VCPKG_APPLOCAL_DEPS OFF CACHE BOOL "Disable per-target build-time applocal (install-time deploy instead)")
+
 # 纯 C 项目（全仓无 .cpp/.cc 源文件）；仅声明 C 可避免 CXX 编译器
 # 缺失时（如 aarch64 交叉工具链仅装了 gcc 未装 g++）configure 失败。
 project(AgentRT VERSION ${AIRY_VERSION_NUM} LANGUAGES C)
@@ -1264,6 +1275,43 @@ endif()
 
 # 包生成支持
 include(InstallRequiredSystemLibraries)
+
+# 安装期依赖部署（Windows + vcpkg）：构建期 applocal 已在文首关闭，这里是
+# 唯一的依赖部署点。对安装树 bin/ 下每个 PE 二进制串行执行一次 z-applocal，
+# 使发行包（zip 取自安装树）自含 vcpkg 运行时 DLL。串行执行天然消除共享
+# 输出目录的并发写；以安装树实物为输入，不存在"构建树有、包内没有"的偏差。
+# 任一二进制部署失败即 FATAL_ERROR（fail-closed）：缺依赖的包在干净 Windows
+# 上根本起不来，与其发出去不如构建失败。
+if(WIN32 AND DEFINED Z_VCPKG_EXECUTABLE AND DEFINED VCPKG_INSTALLED_DIR)
+    set(VCPKG_INSTALLED_BIN "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin")
+    file(WRITE "${CMAKE_BINARY_DIR}/airy-applocal-install.cmake.in" [==[
+# 由根 CMakeLists.txt 生成，勿手改。@ONLY 只替换 @VAR@，${} 留到安装期求值。
+file(GLOB _airy_pe "${CMAKE_INSTALL_PREFIX}/bin/*.exe")
+set(_airy_src_bin "@VCPKG_INSTALLED_BIN@")
+if(NOT EXISTS "${_airy_src_bin}")
+    string(REGEX REPLACE "/bin/?$" "/debug/bin" _airy_src_bin "${_airy_src_bin}")
+endif()
+foreach(_airy_bin IN LISTS _airy_pe)
+    get_filename_component(_airy_name "${_airy_bin}" NAME)
+    execute_process(
+        COMMAND "@Z_VCPKG_EXECUTABLE@" z-applocal
+                "--target-binary=${_airy_bin}"
+                "--installed-bin-dir=${_airy_src_bin}"
+        RESULT_VARIABLE _airy_rc
+        OUTPUT_VARIABLE _airy_out
+        ERROR_VARIABLE _airy_err)
+    if(NOT _airy_rc EQUAL 0)
+        message(FATAL_ERROR "applocal 失败: ${_airy_name} (rc=${_airy_rc}) ${_airy_err}")
+    endif()
+endforeach()
+message(STATUS "applocal: bin/ 依赖部署完成 (${_airy_src_bin})")
+]==])
+    configure_file("${CMAKE_BINARY_DIR}/airy-applocal-install.cmake.in"
+        "${CMAKE_BINARY_DIR}/airy-applocal-install.cmake" @ONLY)
+    install(SCRIPT "${CMAKE_BINARY_DIR}/airy-applocal-install.cmake")
+    airy_print_info("Windows install-time applocal: ${VCPKG_INSTALLED_BIN}")
+endif()
+
 set(CPACK_SET_DESTDIR ON)
 set(CPACK_PACKAGE_NAME "AgentRT")
 set(CPACK_PACKAGE_VENDOR "SPHARX")
