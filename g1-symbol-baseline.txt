@@ -281,6 +281,7 @@ airy_time_ms
 airy_time_nanosleep
 airy_time_ns
 airy_time_realtime_ns
+airy_time_res_ns
 airy_time_sleep_ms
 airy_time_timer_cleanup
 airy_time_timer_process
