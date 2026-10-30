@@ -62,7 +62,10 @@ inputs:
     required: false
     # 5097aa1：函数名基线收敛（删去两个已重命名条目），使 NameLength 门禁
     # 不再每轮报「缩减 2 项」的常驻噪声。除基线外零差异。
-    default: '5097aa1f5fbf3e629ce14fe6967a4b8e8bae4a52'
+    # 9b2db08：cupolas 体积 pin 按 Gate 41 的 RATCHET-JUSTIFY 抬到实测
+    # 17,460（+118，金丝雀 K1/K2 度量源）。不 bump 则 Gate 18/42 仍按旧
+    # pin 判红，本地绿而 CI 红（run 41035295324 实证）。
+    default: '9b2db0880fafe6ea58807f9e959f414dab82724e'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
