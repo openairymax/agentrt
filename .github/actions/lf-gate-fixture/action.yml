@@ -56,7 +56,12 @@ inputs:
     # 63e9d67：tui gitlink 前推至 ba68318（解包即用态单根自锚定 + 版本查询）。
     # latest 发布面已同步该启动器，AF1 双面一致判据要求 pin 同步前推，否则
     # 取到旧快照即报「latest 与 sdk 启动器分叉」。
-    default: '63e9d67fc8f0adddb694671e93812d4aa0ff44f5'
+    # fe109e3：tui gitlink 前推至 7475258（0.1.20 W8 演化指标面板：
+    # panels/evolution.rs 277 行 + probe/mod.rs 存活探针 + keys 绑定）。
+    # 旧 pin ba68318 的 tui 全树无 evolution 面，W8 判据读不到、发行包装不进，
+    # 面板即「写在文档里而没有进二进制」。启动器 scripts/airymaxrt 两 pin
+    # 之间零差异，AF1 双面一致判据不因本前推而变。
+    default: 'fe109e3f5cda8d22f5e5a2e7c1ead60d3ff5bfe7'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
@@ -65,7 +70,12 @@ inputs:
     # 9b2db08：cupolas 体积 pin 按 Gate 41 的 RATCHET-JUSTIFY 抬到实测
     # 17,460（+118，金丝雀 K1/K2 度量源）。不 bump 则 Gate 18/42 仍按旧
     # pin 判红，本地绿而 CI 红（run 41035295324 实证）。
-    default: '9b2db0880fafe6ea58807f9e959f414dab82724e'
+    # 545a297：0.1.20 收尾批。判据面新增 Gate 46（生态四模块守卫，缺依赖
+    # 即 fail-closed）、Gate 1–5/21–25 的假绿面收口（合约宿主单点
+    # contract-sso.sh）、以及 r73–r84 三次体积与账目登记（E-2 拆解、W8 数据面、
+    # D4/D5、P-A、P-B/P-C/P-D）。旧 pin 下 CI 既不执行生态守卫，也按旧账判红；
+    # 本 pin 与仓库实测三账 core=81221 / facade=64629 / cupolas=17464 一致。
+    default: '545a2971e7b7473d5fe88f0b78a5f8efc72f8131'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
@@ -111,7 +121,11 @@ inputs:
     # dcb5bfa：灰度会话期同一请求在新旧两集各裁一次并上报观测）。
     # 与旧 pin 单提交差，仅 cupolas 的策略核/守护面/单测，不触
     # products/cupolas/src/permission/ 判据消费路径。
-    default: '4b9e8e9f844ca849acf22a573392c8f80e4fd5bb'
+    # 652a778：cupolas 前进至 aa65885（金丝雀时延以时钟分辨率上报，替换
+    # 秒级粗粒度差分；K1/K2 的观测值此前在亚秒区间恒为 0，等于度量源存在
+    # 而不可读）。memoryrovol 指针同批同步，该件 update=none 不参与门禁。
+    # 判据消费路径仍不触，仅装配输入前进。
+    default: '652a7782678e5ed22b09b1041161ff821b93ad67'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
