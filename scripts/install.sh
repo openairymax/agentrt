@@ -1370,6 +1370,31 @@ EOF
         log_warn "agentrt-bootstrap.sh 未部署（源码缺失且二进制未含）"
     fi
 
+    # 自托管工具链（A7-5）：发行说明承诺 llama.cpp 自托管推理链可用。
+    # airy-local 以 ${AIRY_LOCAL_DIR}/../{lib,templates} 解析依赖，故整棵
+    # ops/ 同构落 share/ops/（bin/lib/templates 同级，与发行包内布局一致）；
+    # PATH 入口不能直接软链——bash 不解析 BASH_SOURCE 的符号链接，软链会使
+    # 上述算术落到 bin/ 导致 lib/templates 查找失败，故以转发脚本包裹真实
+    # 路径。缺席即自托管不可执行，须显式告警不得静默。
+    if [ -d "${AIRY_SRC_DIR}/tools/scripts/ops/bin" ]; then
+        mkdir -p "${AIRY_HOME}/share/ops"
+        cp -rf "${AIRY_SRC_DIR}/tools/scripts/ops/bin" \
+               "${AIRY_SRC_DIR}/tools/scripts/ops/lib" \
+               "${AIRY_SRC_DIR}/tools/scripts/ops/templates" \
+               "${AIRY_HOME}/share/ops/"
+    fi
+    if [ -x "${AIRY_HOME}/share/ops/bin/airy-local" ]; then
+        chmod 755 "${AIRY_HOME}/share/ops/bin/airy-local"
+        printf '#!/bin/sh\nexec "%s/share/ops/bin/airy-local" "$@"\n' \
+            "${AIRY_HOME}" > "${AIRY_HOME}/bin/airy-local"
+        chmod 755 "${AIRY_HOME}/bin/airy-local"
+        mkdir -p "${BIN_DIR}"
+        ln -sf "${AIRY_HOME}/bin/airy-local" "${BIN_DIR}/airy-local"
+        log_ok "自托管安装器: ${BIN_DIR}/airy-local（llama.cpp 本地推理）"
+    else
+        log_warn "自托管工具链未部署：llama.cpp 自托管安装不可用（llm_d 本地模式需预置模型与服务）"
+    fi
+
     mkdir -p "${AIRY_HOME}/scripts"
     if [ -f "$0" ] && [ -r "$0" ]; then
         cp -f "$0" "${AIRY_HOME}/scripts/install.sh"
