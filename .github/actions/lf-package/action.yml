@@ -56,6 +56,26 @@ runs:
           # 脚本，位于 tools 子仓，cmake --install 不会带入），host 侧显式部署
           cp -f _tools/scripts/ops/bin/agentrt-bootstrap.sh "${PKG_DIR}/bin/" 2>/dev/null || true
         fi
+        # 自托管工具链（A7-5 llama.cpp）：发行说明承诺自托管推理链可用，但
+        # 此前包内只有 agentrt-bootstrap.sh——airy-local 及其 lib/templates
+        # 缺席，用户拿到发行件无法执行自托管安装（能力只在源码树可用）。
+        # airy-local 以 ${AIRY_LOCAL_DIR}/../{lib,templates} 解析依赖，故整棵
+        # ops/ 同构落 share/ops/（bin/lib/templates 同级），不改脚本内路径
+        # 算术；share/ 由 install.sh 原样部署到版本目录。缺件即检出故障，
+        # fail-closed 拒绝出半成品包。
+        mkdir -p "${PKG_DIR}/share/ops/bin" "${PKG_DIR}/share/ops/lib" \
+          "${PKG_DIR}/share/ops/templates"
+        cp -f _tools/scripts/ops/bin/airy-local "${PKG_DIR}/share/ops/bin/airy-local" \
+          || { echo "::error::自托管安装器 airy-local 缺失"; exit 1; }
+        chmod 755 "${PKG_DIR}/share/ops/bin/airy-local"
+        for _opl in common.sh fetch.sh error.sh log.sh platform.sh; do
+          cp -f "_tools/scripts/ops/lib/${_opl}" "${PKG_DIR}/share/ops/lib/${_opl}" \
+            || { echo "::error::自托管库缺失: ${_opl}"; exit 1; }
+        done
+        for _opt in llama-pin.list llama-models.list; do
+          cp -f "_tools/scripts/ops/templates/${_opt}" "${PKG_DIR}/share/ops/templates/${_opt}" \
+            || { echo "::error::自托管 pin 表缺失: ${_opt}"; exit 1; }
+        done
         # 管理面 full 启动器随包内置（0.1.19 洁净环境 e2e 根因）：缺此文件时
         # 安装器生成的 thin 包装只能用 curl 下载 latest/airymaxrt；离线或
         # 无 curl 的环境（e2e-clean-room 按设计如此）status 门禁恒失败，
