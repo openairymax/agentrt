@@ -195,6 +195,133 @@ jobs:
             exit 1
           fi
 
+  # ============ canary 可拔插反向构建（V7 双向矩阵） ============
+  # 判据（0.1.20 §V7，r23）：「关掉就编不过的件不是件，是耦合」。上面的
+  # ON 腿证明装配后的完整树可构建可测；本腿以 -DBUILD_CANARY=OFF 反向
+  # 证明金丝雀是真正可拔插的产品件——关掉它，机制核与其余产品件仍完整
+  # 构建、测试仍全绿。0.1.20 期该判据只有 lab 出树双向构建代行（/tmp/
+  # airy-v7on|v7off），本 job 把「人工代行」升为「每次 push 自动判」。
+  # 不跑覆盖率：覆盖率是产品面的属性，与本腿要判的可拔插性无关，重复
+  # 插桩只翻倍本腿运行时长而不增加判据信号。
+  linux-canary-off-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      # 与 ON 腿分目录：两腿并发时同一 BUILD_DIR 会互相踩踏 cmake 缓存
+      BUILD_DIR: ../build-canary-off
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+      - name: Init submodules (targeted)
+        uses: ./.github/actions/lf-init-deps
+        with:
+          groups: agent-workload
+          gh_token: ${{ secrets.GH_TOKEN }}
+      # 只取 products 腿：本腿不消费门禁判据源，但 canary 之外的四个产品件
+      # （gateway_biz/cupolas/lang_gateway/cognition）是装配输入——缺任一件
+      # 会让 OFF 判据退化成「少装几个件也照样绿」的假绿。
+      - name: Fetch product faces (pinned)
+        uses: ./.github/actions/lf-gate-fixture
+        with:
+          gh_token: ${{ secrets.GH_TOKEN }}
+          legs: products
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build \
+            libsqlite3-dev libcjson-dev libcurl4-openssl-dev \
+            libssl-dev zlib1g-dev libzstd-dev \
+            libmicrohttpd-dev libwebsockets-dev libevent-dev
+
+      # 第一判据是配置回显：两行必须同时在。只断言「构建通过」不够——
+      # 开关没生效时树仍是 ON 树，绿得毫无意义。
+      - name: Configure (BUILD_CANARY=OFF) and assert the switch took effect
+        run: |
+          set -o pipefail
+          cmake -S . -B ${{ env.BUILD_DIR }} \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTS=ON \
+            -DAIRY_BUILD_ALL=ON \
+            -DBUILD_CANARY=OFF 2>&1 | tee /tmp/canary-off-configure.log
+          if ! grep -qE 'canary: +OFF' /tmp/canary-off-configure.log; then
+            echo "::error::BUILD_CANARY=OFF not honoured (no 'canary: OFF' echo)"
+            exit 1
+          fi
+          if ! grep -q 'canary module not mounted' /tmp/canary-off-configure.log; then
+            echo "::error::canary module still mounted under BUILD_CANARY=OFF"
+            exit 1
+          fi
+
+      - name: Build
+        run: |
+          set +e
+          cmake --build ${{ env.BUILD_DIR }} --parallel "$(nproc)" > /tmp/canary-off-build.log 2>&1
+          rc=$?
+          if [ $rc -ne 0 ]; then
+            echo "::error::canary-off build FAILED rc=$rc"
+            grep -E ': error:|fatal error:|undefined reference|Error [0-9]' \
+              /tmp/canary-off-build.log | sort -u | head -40 | sed 's/^/::error::  /'
+            tail -n 30 /tmp/canary-off-build.log | sed 's/^/::error::  /'
+            exit $rc
+          fi
+
+      # 第二判据是产物面：金丝雀静态库必须缺席（在场即开关失效），四个
+      # 兄弟产品件的可执行必须齐全（缺席即 OFF 腿把无关件一起关掉了）。
+      - name: Assert artifacts (canary absent, peers present)
+        run: |
+          if find "${{ env.BUILD_DIR }}" -name 'libairy_canary*' | grep -q .; then
+            echo "::error::libairy_canary present under BUILD_CANARY=OFF"
+            exit 1
+          fi
+          for _bin in cupolas_d gateway_d tool_d llm_d monit_d; do
+            if ! find "${{ env.BUILD_DIR }}" -name "$_bin" -type f -perm -u+x | grep -q .; then
+              echo "::error::${_bin} missing under BUILD_CANARY=OFF"
+              exit 1
+            fi
+          done
+
+      # 与 ON 腿同口径：瞬态 flaky 经一次 rerun 吸收，真实回归 fail-closed
+      - name: Run tests (ctest, auto-retry once)
+        run: |
+          set +e
+          ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure -j"$(nproc)" \
+            --timeout 240 > /tmp/canary-off-ctest.log 2>&1
+          rc=$?
+          if [ $rc -eq 0 ]; then
+            exit 0
+          fi
+          echo "::error::ctest FAILED rc=$rc (attempt 1)，自动 rerun-failed…"
+          awk '/The following tests FAILED:/,/Errors while running CTest/' \
+            /tmp/canary-off-ctest.log | sed 's/^/::error::  /' | head -40
+          ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure --rerun-failed \
+            --timeout 240 > /tmp/canary-off-ctest-rerun.log 2>&1
+          rc2=$?
+          if [ $rc2 -eq 0 ]; then
+            echo "::warning::ctest attempt1 失败但 rerun-failed 全过（flaky），门禁放行"
+            exit 0
+          fi
+          echo "::error::ctest rerun FAILED rc=$rc2"
+          tail -n 40 /tmp/canary-off-ctest-rerun.log | sed 's/^/::error::  /'
+          exit $rc2
+
+      - name: Upload logs artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-canary-off-logs
+          path: |
+            /tmp/canary-off-configure.log
+            /tmp/canary-off-build.log
+            /tmp/canary-off-ctest.log
+            /tmp/canary-off-ctest-rerun.log
+          if-no-files-found: ignore
+          retention-days: 14
+
   # ==================== macOS 跨平台构建门禁 ====================
   macos-build:
     # hosted runner 争抢治理：macos-latest 腿跨 workflow（本 job 与
