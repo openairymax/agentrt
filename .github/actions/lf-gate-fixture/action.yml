@@ -79,7 +79,10 @@ inputs:
     # quality/gates 两份基线（ceiling 的 llm_d 14101 / tool_d 11548、budget 的
     # facade 64668）加 tests/integration 的四支用例登记（判据不消费）。不 bump
     # 则 Gate 12/18/42 仍按旧账判红——本地绿而 CI 红（run 41284205853 实证）。
-    default: '5b4662564c70e75e9fcbea5e4a389e15b6243e8c'
+    # f91d854：contract SSoT 宿主随文档仓迁至 10-designs-and-contracts/
+    # contracts，解析器第三个候选同步改写。不 bump 则 CI 仍按旧路径解析：
+    # 目录不存在 → 无合约变更 → 通过，Gate 4/5 的合约判据整体假绿。
+    default: 'f91d854a4fc05da1bd57e8e7afb5731905614688'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
