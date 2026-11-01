@@ -220,14 +220,16 @@ jobs:
         with:
           groups: agent-workload
           gh_token: ${{ secrets.GH_TOKEN }}
-      # 只取 products 腿：本腿不消费门禁判据源，但 canary 之外的四个产品件
-      # （gateway_biz/cupolas/lang_gateway/cognition）是装配输入——缺任一件
-      # 会让 OFF 判据退化成「少装几个件也照样绿」的假绿。
-      - name: Fetch product faces (pinned)
+      # 取三腿全量，与 ON 腿同口径。本腿跑 ctest，而 release_gates 在测列
+      # 内：它判 sdk（U/V/V2/W/Y 的 Rust 结构面 + B 组三副本）、tools
+      # （M3 权限模板 + P5 的 airy_depgraph 链接校验）与 products（AI/AM/AF，
+      # 且四件是装配输入，缺席会让 OFF 判据退化成「少装几个件也照样绿」）。
+      # 少取一腿不是少判几条：脚本把缺料判成红（run 41284966384 实证，
+      # 只取 products 时 PASS=97 FAIL=11）。裁剪只对不跑 ctest 的腿成立。
+      - name: Fetch cross-repo gate fixture (pinned)
         uses: ./.github/actions/lf-gate-fixture
         with:
           gh_token: ${{ secrets.GH_TOKEN }}
-          legs: products
 
       - name: Install build dependencies
         run: |
