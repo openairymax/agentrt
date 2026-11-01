@@ -56,6 +56,15 @@ extract_fn() { # <file> <fnname> <outfile>
     sed -n "/^$2() {/,/^}$/p" "$1" > "$3"
 }
 
+# _arch_warn_unknown 的 SSoT 是告警文案，呈现设施按宿主各异（install.sh
+# 直写 stderr，启动器走 log warn）。逐字节比对会把这种差异判成漂移，
+# 故该函数的判据在此单点声明，sdk 检出与否两个分支共用。
+warn_text_ok() { # <files...>
+    for _f in "$@"; do
+        grep -q '用户空间位宽未知' "$_f" || return 1
+    done
+}
+
 # 0.1.19 刀H：gateway 业务面已迁出机制核，寄宿 products/gateway_biz 产品件
 # （hub 布局下 agentrt 与 products 同级）。独立检出缺产品件时，相关判据
 # 以三路径探测兜底（hub 同级 / CI 取料物化 agent-workload/products / 历史
@@ -130,11 +139,7 @@ for _fn in _uspace_bits _loader_exists _arch_warn_unknown detect_arch assess_har
         0)
             extract_fn "$SDK_AIRYMAXRT" "$_fn" "$TMP/c_$_fn"
             if [ "$_fn" = "_arch_warn_unknown" ]; then
-                _w=0
-                for _g in "$TMP/a_$_fn" "$TMP/b_$_fn" "$TMP/c_$_fn"; do
-                    grep -q '用户空间位宽未知' "$_g" || _w=1
-                done
-                if [ "$_w" -eq 0 ]; then
+                if warn_text_ok "$TMP/a_$_fn" "$TMP/b_$_fn" "$TMP/c_$_fn"; then
                     ok "B($_fn) 三副本检测语义一致（呈现设施各异：printf>&2 / log warn，SSoT=文案）"
                 else
                     bad "B($_fn) 告警文案漂移"
@@ -156,7 +161,13 @@ for _fn in _uspace_bits _loader_exists _arch_warn_unknown detect_arch assess_har
             fi
             ;;
         1)
-            if cmp -s "$TMP/a_$_fn" "$TMP/b_$_fn"; then
+            if [ "$_fn" = "_arch_warn_unknown" ]; then
+                if warn_text_ok "$TMP/a_$_fn" "$TMP/b_$_fn"; then
+                    skip "B($_fn) 仓内两副本文案一致（sdk 未检出，跨仓比对跳过）"
+                else
+                    bad "B($_fn) 告警文案漂移"
+                fi
+            elif cmp -s "$TMP/a_$_fn" "$TMP/b_$_fn"; then
                 skip "B($_fn) 仓内两副本一致（sdk 未检出，跨仓比对跳过）"
             else
                 bad "B($_fn) 仓内两副本漂移（install.sh / latest/airymaxrt）"
