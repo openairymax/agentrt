@@ -75,7 +75,11 @@ inputs:
     # contract-sso.sh）、以及 r73–r84 三次体积与账目登记（E-2 拆解、W8 数据面、
     # D4/D5、P-A、P-B/P-C/P-D）。旧 pin 下 CI 既不执行生态守卫，也按旧账判红；
     # 本 pin 与仓库实测三账 core=81221 / facade=64629 / cupolas=17464 一致。
-    default: '545a2971e7b7473d5fe88f0b78a5f8efc72f8131'
+    # 5b46625：P-E 截断归因的账目登记（r85）。与旧 pin 在判据消费面上单差
+    # quality/gates 两份基线（ceiling 的 llm_d 14101 / tool_d 11548、budget 的
+    # facade 64668）加 tests/integration 的四支用例登记（判据不消费）。不 bump
+    # 则 Gate 12/18/42 仍按旧账判红——本地绿而 CI 红（run 41284205853 实证）。
+    default: '5b4662564c70e75e9fcbea5e4a389e15b6243e8c'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
