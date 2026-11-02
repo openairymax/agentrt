@@ -620,19 +620,21 @@ jobs:
           path: ${{ env.artifact_name }}.*
           if-no-files-found: error
 
-  # RISC-V (linux-riscv64)：标准 runner 无 riscv64 第三方库（libcurl 等），
-  # 经 Docker buildx + qemu 多架构容器构建（ubuntu:20.04 riscv64 镜像，
-  # 与 x86-64/arm-64 统一 glibc 2.31 基线）。
+  # RISC-V (linux-riscv64) 门禁腿：focal(20.04) amd64 宿主交叉编译，零 QEMU
+  # 执行（qemu-user 仅用于产物冒烟）。历史形态是 linux/riscv64 容器全模拟，
+  # 每轮撞 6h 单 job 上限后被降级为 dispatch-only + continue-on-error，tag
+  # 发布时直接 skip，发行面长期无 riscv 制品——RISC-V 并非缺失而是从未参与
+  # 门禁。交叉形态沿用 i686/armhf 的成熟路径（bootstrap 工具链 → 交叉
+  # builddeps → 交叉 cmake → Rust TUI 交叉 → readelf 收集），基线仍在
+  # focal 内（glibc 2.31），与 x86-64/arm-64 一致。
   build-linux-riscv-64:
-    # QEMU 全模拟在托管 runner 上持续撞 6h 单 job 硬上限：仅 dispatch 显式
-    # 请求时尝试；完整制品由本地构建台 build.sh 交叉补发。仍尝试产出
-    # riscv-64 制品但不阻断发布。
-    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    continue-on-error: true
+    continue-on-error: false
     env:
       BUILD_DIR: build
       STAGE_DIR: stage
+      AIRY_WORKSPACE: /tmp/airywork
+      AIRY_SUITE: focal
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -647,64 +649,97 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: bash .github/scripts/init-submodules.sh agent-workload tools
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Build in riscv64 container
+      - name: Build in riscv64-cross container
         uses: ./.github/actions/lf-build-container
         with:
-          # riscv64 无专用工具链镜像（已知例外：ubuntu:20.04 非 digest 钉版），
-          # QEMU 全模拟。
+          # 交叉工具链无预构建镜像（已知例外：ubuntu:20.04 非 digest 钉版），
+          # 平台为 amd64——在 x86_64 hosted runner 上原生执行，零 QEMU 模拟。
+          # 交叉编译器与目标 libc 由 bootstrap 在容器内 apt 下载并解压。
           image: ubuntu:20.04
-          platform: linux/riscv64
-          leg: riscv64
-          envs: -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage
+          platform: linux/amd64
+          leg: riscv64-cross
+          envs: -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage -e AIRY_JOBS -e AIRY_WORKSPACE=/tmp/airywork -e AIRY_SUITE=focal
           script: |
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
-            apt-get install -y -qq \
-              build-essential make perl curl python3 python3-pip \
-              libsqlite3-dev libcurl4-openssl-dev \
-              libssl-dev zlib1g-dev libzstd-dev libmicrohttpd-dev \
-              libwebsockets-dev libevent-dev libnghttp2-dev
-            # cmake/cJSON/OpenSSL/libcurl/libwebsockets 自编译收敛到
-            # lib-builddeps.sh（幂等 + 离线 deps 缓存优先，统一 libssl.so.3 链路）。
-            bash /src/_tools/scripts/ci/release/lib-builddeps.sh
-            # Rust 工具链仅供 agentrt-tui 构建。riscv64 为 canary 载体，TUI
-            # 降级可接受；qemu 模拟下 rustup-init 偶发失败，重试 3 次后仍失败
-            # 则告警降级，不阻塞其余平台门禁。
-            if ! (curl --proto '=https' --tlsv1.2 -sSf --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal); then
-              echo "warn: rustup 安装失败，agentrt-tui 将缺失（riscv64 canary 降级继续）"
-            fi
-            export PATH="$HOME/.cargo/bin:$PATH"
-            export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+            apt-get install -y -qq --no-install-recommends \
+              build-essential make perl curl ca-certificates xz-utils file \
+              python3 python3-pip pkg-config git \
+              gcc-riscv64-linux-gnu g++-riscv64-linux-gnu qemu-user-static
+            # 交叉工具链 + focal ports riscv64 sysroot：布局见
+            # bootstrap-cross-toolchain.sh（root/ 工具链与目标 libc，
+            # sysroot/ 第三方依赖）。AIRY_WORKSPACE 显式给出——CI 里 /src 就是
+            # agentrt 根，dirname 推定会落到不可写的 /。
+            TC=/tmp/airywork/airymaxrt-build/riscv64-toolchain
+            bash /src/_tools/scripts/ci/release/bootstrap-cross-toolchain.sh riscv64
+            # 四依赖（cJSON/OpenSSL/libcurl/libwebsockets）交叉自编译进
+            # sysroot，与 libc 同源，避免 focal 旧符号与双 OpenSSL ABI。
+            AIRY_CROSS_TRIPLE=riscv64-linux-gnu \
+            AIRY_CROSS_SYSROOT="$TC/sysroot" \
+            AIRY_CROSS_TC="$TC" \
+              bash /src/_tools/scripts/ci/release/lib-builddeps.sh
+            # 交叉 cmake：工具链文件已固定 sysroot 与 PKG_CONFIG_LIBDIR。
+            # OpenSSL 装在 lib/riscv64-linux-gnu，FindOpenSSL 不默认搜
+            # multiarch 子目录，显式给出库与头路径（与 lib-builddeps 同源）。
             cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release \
               -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF -DAIRY_BUILD_ALL=ON \
-              -DOPENSSL_ROOT_DIR=/usr/local -DCMAKE_PREFIX_PATH=/usr/local \
+              -DCMAKE_TOOLCHAIN_FILE="$TC/toolchain-riscv64.cmake" \
+              -DOPENSSL_SSL_LIBRARY="$TC/sysroot/usr/lib/riscv64-linux-gnu/libssl.so" \
+              -DOPENSSL_CRYPTO_LIBRARY="$TC/sysroot/usr/lib/riscv64-linux-gnu/libcrypto.so" \
+              -DOPENSSL_INCLUDE_DIR="$TC/sysroot/usr/include" \
               -DCMAKE_INSTALL_PREFIX="$PWD/$STAGE_DIR"
-            cmake --build "$BUILD_DIR" -j"$(nproc)"
+            cmake --build "$BUILD_DIR" -j"${AIRY_JOBS:-$(nproc)}"
             cmake --install "$BUILD_DIR"
-            # Rust TUI（agentrt-tui），失败降级不阻断。riscv64 链接器选择：
-            # GNU ld 2.34 无法合并 RISC-V attributes（libc build script 即
-            # 失败）——rust-lld 复制为 ld.lld，gcc driver 保留库路径，
-            # -fuse-ld=lld 仅换链接器。
+            # Rust TUI 交叉（门禁产品腿，TUI 属 REQUIRED_SUBTREE：fail-closed）。
+            # 链接器定案同本地 build.sh：GNU ld 2.34 无法合并 RISC-V
+            # attributes，rust-lld 复制为 ld.lld 置于交叉 gcc 的
+            # COMPILER_PATH 目录，gcc 仍作 driver 保留库路径，
+            # -fuse-ld=lld 只换链接器。RUSTFLAGS 用 target 专属变量，
+            # 避免宿主侧 build script 被 riscv sysroot 污染。
+            curl --proto =https --tlsv1.2 -sSf --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal
             export PATH="$HOME/.cargo/bin:$PATH"
-            export CARGO_TARGET_DIR=/tmp/tui-target
-            # agentrt-rs/build.rs 需 airy_run_stream.h（显式注入直布局路径）
-            export AGENTRT_RS_RUN_STREAM_H="$PWD/commons/include/airy_run_stream.h"
-            RUST_LLD="$(find "$HOME/.rustup" -name rust-lld -path '*riscv64*' 2>/dev/null | head -1)"
-            if [ -n "$RUST_LLD" ]; then cp -f "$RUST_LLD" /usr/local/bin/ld.lld; chmod +x /usr/local/bin/ld.lld; fi
-            if ! (cd agent-workload/sdk/tui && RUSTFLAGS="-C link-arg=-fuse-ld=lld" cargo build --release); then
-              echo "warn: riscv64 TUI 构建失败（降级）"
-            else
-              cp -f /tmp/tui-target/release/agentrt-tui "$STAGE_DIR/bin/" 2>/dev/null || true
-            fi
+            rustup target add riscv64gc-unknown-linux-gnu
+            RUST_LLD="$(find "$HOME/.rustup/toolchains" -name rust-lld -path "*/lib/rustlib/x86_64-unknown-linux-gnu/bin/*" 2>/dev/null | head -1)"
+            [ -n "$RUST_LLD" ] || { echo "::error::[riscv-64] rust-lld 缺失（无法替换 GNU ld）"; exit 1; }
+            cp -f "$RUST_LLD" "$TC/root/usr/riscv64-linux-gnu/bin/ld.lld"
+            chmod 755 "$TC/root/usr/riscv64-linux-gnu/bin/ld.lld"
+            export LD_LIBRARY_PATH="$TC/root/usr/lib/x86_64-linux-gnu:$HOME/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib:${LD_LIBRARY_PATH:-}"
+            export CARGO_TARGET_RISCV64GC_UNKNOWN_LINUX_GNU_LINKER="$TC/root/usr/bin/riscv64-linux-gnu-gcc"
+            export CARGO_TARGET_RISCV64GC_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=-fuse-ld=lld -C link-arg=-Wl,--sysroot=$TC/root -C link-arg=-L$TC/sysroot/usr/lib/riscv64-linux-gnu -C link-arg=-Wl,-rpath-link,$TC/sysroot/usr/lib/riscv64-linux-gnu"
+            # ring 等含 C/asm 的 crate 经 cc-rs 编译：目标专属 CC/AR/CFLAGS
+            export CC_riscv64gc_unknown_linux_gnu="$TC/root/usr/bin/riscv64-linux-gnu-gcc"
+            export AR_riscv64gc_unknown_linux_gnu="$TC/root/usr/bin/riscv64-linux-gnu-ar"
+            export CFLAGS_riscv64gc_unknown_linux_gnu="--sysroot=$TC/root -I$TC/root/usr/riscv64-linux-gnu/include -I$TC/sysroot/usr/include -I$TC/sysroot/usr/include/riscv64-linux-gnu"
+            export AIRY_RT_VERSION_FILE=/src/VERSION
+            export AGENTRT_RS_RUN_STREAM_H=/src/commons/include/airy_run_stream.h
+            export CARGO_TARGET_DIR=/tmp/tui-target-riscv
+            (cd agent-workload/sdk/tui && cargo build --release --target riscv64gc-unknown-linux-gnu) \
+              || { echo "::error::[riscv-64] TUI 交叉构建失败（bin/agentrt-tui 发布完整性必需）"; exit 1; }
+            mkdir -p "$STAGE_DIR/bin"
+            cp -f /tmp/tui-target-riscv/riscv64gc-unknown-linux-gnu/release/agentrt-tui "$STAGE_DIR/bin/" \
+              || { echo "::error::[riscv-64] TUI 产物缺失"; exit 1; }
             # Python 运行时依赖（完全体包 lib/，fail-closed）
             bash /src/.github/scripts/copy-python-runtime.sh "$STAGE_DIR" \
               || { echo "::error::python 运行时四子树拷贝失败（lib/ 完整性必需）"; exit 1; }
-            # 完全体 finalize：容器内收集运行时 .so + fail-closed 校验（host
-            # 无 /usr/local 自编译库，收集必 not found；.collected 不入包）
-            bash /src/.github/scripts/finalize-linux-libs.sh "$STAGE_DIR" /src/_tools
+            # 完全体 finalize：readelf + sysroot 走交叉收集（宿主 ldd 无法分析
+            # 异架构 ELF；系统核心库由目标机提供，不入包）。
+            READELF=/usr/bin/riscv64-linux-gnu-readelf
+            [ -x "$READELF" ] || READELF="$TC/root/usr/bin/riscv64-linux-gnu-readelf"
+            bash /src/.github/scripts/finalize-linux-libs.sh "$STAGE_DIR" /src/_tools \
+              "$READELF" "$TC/sysroot"
+            # qemu-user 冒烟：产物必须可执行。-L 指向 overlay 根——riscv64
+            # 目标 ELF 的 PT_INTERP 是 /lib/ld-linux-riscv64-lp64d.so.1，而
+            # 工具链 root 把目标 libc 放在 usr/riscv64-linux-gnu/lib，故用
+            # 软链补齐 /lib 与 /opt（包内 lib/ + sysroot 依赖）。
+            SMOKE=/tmp/smoke-riscv
+            rm -rf "$SMOKE"
+            mkdir -p "$SMOKE/opt"
+            ln -s "$TC/root/usr/riscv64-linux-gnu/lib" "$SMOKE/lib"
+            ln -s "$PWD/$STAGE_DIR/lib" "$SMOKE/opt/stage-lib"
+            ln -s "$TC/sysroot/usr/lib/riscv64-linux-gnu" "$SMOKE/opt/deps"
+            LD_LIBRARY_PATH=/opt/stage-lib:/opt/deps \
+              qemu-riscv64-static -L "$SMOKE" "$PWD/$STAGE_DIR/bin/airy_cli" --version \
+              || { echo "::error::[riscv-64] qemu 冒烟失败（产物不可执行）"; exit 1; }
 
       # 打包：包内建 agentrt-<version> 顶层目录（install.sh 二进制模式按
       # agentrt-* 目录名匹配解压位置），platform 标记 + sha256 + upload
@@ -1012,10 +1047,11 @@ jobs:
   # dist 附件兼作审计/紧急 fallback。
   release:
     # 发布门禁：同 commit 门禁全绿（ci-green）+ Linux x86-64 / x86-32 /
-    # arm-64 / arm-32 + macOS arm-64 / x86-64 + Windows x86-64 / x86-32
-    # 八平台全绿后才聚合。riscv 为 dispatch-only canary（不发制品，QEMU
-    # 6h 上限预留 0.3.x）。
-    needs: [ci-green, build-linux-x86-64, build-macos-arm-64, build-macos-x86-64, build-linux-arm-64, build-linux-x86-32, build-linux-arm-32, build-windows-x86-64, build-windows-x86-32]
+    # arm-64 / arm-32 / riscv-64 + macOS arm-64 / x86-64 + Windows
+    # x86-64 / x86-32 九平台全绿后才聚合。riscv-64 自 0.1.20 起转为门禁腿
+    # （focal amd64 交叉，零 QEMU），与其余 Linux 腿同在依赖图上，任一红即
+    # 阻断发布。
+    needs: [ci-green, build-linux-x86-64, build-macos-arm-64, build-macos-x86-64, build-linux-arm-64, build-linux-x86-32, build-linux-arm-32, build-linux-riscv-64, build-windows-x86-64, build-windows-x86-32]
     runs-on: ubuntu-latest
     # tag 推送或手动 dispatch（手动时版本来自 inputs.version）皆可触发。
     # success() 必须显式写出：带 needs 的作业一旦自定义 if，即替换掉默认的
