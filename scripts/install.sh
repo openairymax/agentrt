@@ -488,9 +488,12 @@ install_binary() {
     fi
     log_info "运行平台: ${plat}（架构 ${arch}）"
     if [ -z "${AIRY_FROM_FILE:-}" ]; then
+        # RISC-V 64 自 0.1.20 起进入官方预编译面（linux-riscv-64）；32 位
+        # 仍无制品——riscv32 目标 ABI（ilp32/lp64）尚未定案，宁可明确拒绝，
+        # 也不让用户下到一个架构不匹配的包。
         case "$arch" in
-            riscv64|riscv32|riscv)
-                log_err "检测到 RISC-V（${arch}）：官方暂无预编译制品（CI 仅 canary 构建）"
+            riscv32|riscv)
+                log_err "检测到 RISC-V 32 位（${arch}）：官方预编译面仅含 riscv64（linux-riscv-64）"
                 log_err "请源码构建：AIRY_MODE=source bash install.sh（需 RISC-V 工具链 + 依赖库）"
                 return 1
                 ;;
@@ -1021,7 +1024,7 @@ detect_arch() {
         *)                echo "unknown" ;;
     esac
 }
-SUPPORTED_ARCHS="x86_64 aarch64 i686 armv7l"
+SUPPORTED_ARCHS="x86_64 aarch64 i686 armv7l riscv64"
 
 plat_name() {
     case "$1" in
