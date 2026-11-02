@@ -119,7 +119,8 @@ static void cli_print_usage(void)
 /* 命令行解析（2026-08-21 自 main 抽离降圈复杂度）：支持选项与
  * -p 模式 prompt 任意顺序（`-p --json "prompt"`、`--json -p "prompt"`、
  * `-p "prompt" --json` 均合法），首个非选项 token 作为 prompt（含空格的
- * prompt 须用引号包裹）。返回 0=继续启动；1=已输出版本/帮助或错误并退出。 */
+ * prompt 须用引号包裹）。返回 0=继续启动；1=已输出版本/帮助（正常终止，
+ * 调用方以 0 退出）；2=参数错误（调用方以非 0 退出）。 */
 int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
 {
     for (int i = 1; i < argc; i++) {
@@ -142,26 +143,26 @@ int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
             cli_outf("airy_cli: 未知选项 %s%s%s\n", cli_c(CLR_YELLOW), argv[i],
                    cli_c(CLR_RESET));
             cli_print_usage();
-            return 1;
+            return 2;
         } else if (g_cli_print_mode && !*out_print_prompt) {
             *out_print_prompt = argv[i];
         } else if (g_cli_print_mode) {
             cli_outf("airy_cli: 多出的参数 %s%s%s（-p 只接受一个 prompt）\n",
                    cli_c(CLR_YELLOW), argv[i], cli_c(CLR_RESET));
             cli_print_usage();
-            return 1;
+            return 2;
         } else {
             cli_outf("airy_cli: 未知参数 %s%s%s（非选项参数仅可用于 %s-p%s 模式）\n",
                    cli_c(CLR_YELLOW), argv[i], cli_c(CLR_RESET),
                    cli_c(CLR_CYAN), cli_c(CLR_RESET));
             cli_print_usage();
-            return 1;
+            return 2;
         }
     }
     if (g_cli_tui_mode && g_cli_print_mode) {
         cli_outf("airy_cli: %s--tui%s 与 %s-p%s 互斥（全屏渲染层 vs 无界面单轮）\n",
                cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
-        return 1;
+        return 2;
     }
     return 0;
 }
