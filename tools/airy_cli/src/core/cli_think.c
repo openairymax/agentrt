@@ -16,6 +16,7 @@
 
 #include "cli_internal.h"
 
+#include "airy_defaults.h"
 #include "cli_gw.h" /* 架构约束 2026-08-25：统一经 gateway 派发 */
 
 #include "cli_prelude.h"
@@ -261,17 +262,23 @@ static int yaml_kv(char *line, char *kbuf, size_t kcap, const char **val)
     return 0;
 }
 
-/* 取标量值：引号包裹截到闭引号；无引号（timeout_ms 等）仅确认键存在，值为空。 */
+/* 取标量值：引号包裹截到闭引号；无引号截到空白、注释符或行尾
+ * （timeout_ms: 120000 等数字键）。 */
 static void yaml_scalar(const char *after, char *out, size_t cap)
 {
-    out[0] = '\0';
-    if (*after != '"')
-        return;
-    const char *v = after + 1;
+    const char *v;
     size_t vl = 0;
 
-    while (v[vl] && v[vl] != '"' && vl + 1 < cap)
-        vl++;
+    out[0] = '\0';
+    if (*after == '"') {
+        v = after + 1;
+        while (v[vl] && v[vl] != '"' && vl + 1 < cap)
+            vl++;
+    } else {
+        v = after;
+        while (v[vl] && v[vl] != ' ' && v[vl] != '\t' && v[vl] != '#' && vl + 1 < cap)
+            vl++;
+    }
     AIRY_MEMCPY(out, v, vl);
     out[vl] = '\0';
 }
@@ -396,4 +403,34 @@ void cli_think_cfg_load(char *t2, size_t t2c, char *t1f, size_t t1fc,
         if (t1p[0] == '\0')
             snprintf(t1p, t1pc, "%s", def_model);
     }
+}
+
+/* ── /orch 等待预算（T-19）────────────────────────────────────────── */
+/* 与 think_d 服务端同链对齐（svc.c 同优先级）：env AIRY_THINK_TIMEOUT_MS
+ * > model.yaml [think] timeout_ms > commons SSoT 缺省。返回预算量子，
+ * /orch 续期轮询以此为单轮额度。手写十进制解析（BAN 禁 sscanf）。 */
+static long long cli_dec_ms(const char *s)
+{
+    long long v = 0;
+    const char *p;
+
+    if (!s)
+        return 0;
+    for (p = s; *p >= '0' && *p <= '9'; p++)
+        v = v * 10 + (*p - '0');
+    return (p > s && v > 0 && v <= 0x7FFFFFFF) ? v : 0;
+}
+
+uint32_t cli_think_timeout_ms(void)
+{
+    char path[AIRY_PATH_MAX];
+    char val[32];
+    long long v = cli_dec_ms(getenv("AIRY_THINK_TIMEOUT_MS"));
+
+    if (v <= 0) {
+        cli_think_cfg_path(path, sizeof(path));
+        if (cli_think_cfg_yaml_get(path, "think", "timeout_ms", val, sizeof(val)) == 0)
+            v = cli_dec_ms(val);
+    }
+    return (uint32_t)(v > 0 ? v : AIRY_THINK_TIMEOUT_DEFAULT_MS);
 }

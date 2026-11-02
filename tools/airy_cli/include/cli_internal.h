@@ -283,6 +283,10 @@ int cmd_orch(const char *arg, void *ctx);
  * string means "unset" (callers render "默认" or pass NULL). */
 void cli_think_cfg_load(char *t2, size_t t2c, char *t1f, size_t t1fc,
                         char *t1p, size_t t1pc);
+
+/* /orch 等待预算量子（T-19）：与 think_d 服务端同链——env
+ * AIRY_THINK_TIMEOUT_MS > model.yaml think.timeout_ms > commons SSoT 缺省。 */
+uint32_t cli_think_timeout_ms(void);
 int cmd_clear(const char *arg, void *ctx);
 int cmd_status(const char *arg, void *ctx);
 int cmd_chain(const char *arg, void *ctx);
