@@ -9,11 +9,13 @@
 # 门禁实际跑过并判绿的 commit。
 #
 # 判据（fail-closed，无跳过通道）：GATES 内每个工作流都必须在 head_sha 上
-# 有一条 push 事件运行，且其终态 conclusion 为 success。据此：
-#   - 无运行 → 红。两条成因都真：该 commit 非某次 push 的 tip（一次 push 只
-#     为 tip 建运行），或纯文档变更被 paths-ignore 跳过。发行须改打门禁真正
-#     跑过的 commit——"跳过判据发布"与"补跑一次 dispatch"都会让绿结论与被
-#     发布的内容脱钩，正是本判据要消除的形态。
+# 有一条 push 或 workflow_dispatch 事件运行，且其终态 conclusion 为 success。
+# 据此：
+#   - 无运行 → 红。该 commit 从未被任何门禁验证：非某次 push 的 tip（一次
+#     push 只为 tip 建运行），或纯文档变更被 paths-ignore 跳过且无人补验。
+#     发行须让门禁真正跑过发行 commit——被 paths-ignore 豁免的树若要发行，
+#     以 dispatch 在同一 sha 补验；dispatch 执行的是同一工作流、同一棵树，
+#     绿结论与被发布的内容不脱钩，仅触发方式不同。
 #   - 有运行但未终态 → 轮询等待至 deadline。tag 常紧随 main push 打出，
 #     此时门禁仍在跑；等待使「打 tag」无需人工择时。
 #   - 终态非 success（含 cancelled）→ 红。同一 sha 的运行被更新的 push 顶掉
@@ -44,13 +46,14 @@ die() {
 command -v gh >/dev/null 2>&1 || die "gh CLI not available on this runner"
 [ -n "$TOKEN" ] || die "GH_TOKEN/GITHUB_TOKEN missing (need actions:read)"
 
-# 该 sha 上某门禁工作流的最新 push 运行状态，输出 "<status> <conclusion>"，
-# 无运行输出 "absent -"。event/head_sha 交由 API 侧过滤，避免把 PR 合入
-# 运行（head_sha 为 PR 头）误当对本 commit 的判定。
+# 该 sha 上某门禁工作流的最新 push/dispatch 运行状态，输出
+# "<status> <conclusion>"，无运行输出 "absent -"。head_sha 交由 API 侧
+# 过滤，event 侧排除 PR 运行（其 head_sha 为 PR 头，非本仓 push 面）。
 gate_state() {
   gh api "repos/$REPO/actions/workflows/$1/runs" \
-    -X GET -f head_sha="$SHA" -f event='push' -f per_page=100 \
-    --jq '.workflow_runs | if length == 0 then "absent -"
+    -X GET -f head_sha="$SHA" -f per_page=100 \
+    --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")] |
+           if length == 0 then "absent -"
            else (.[0].status + " " + (.[0].conclusion // "-")) end'
 }
 
