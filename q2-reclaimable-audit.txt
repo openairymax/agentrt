@@ -89,3 +89,30 @@ F. 平台降级：web_search_tool Windows 版（头注释明示非桩函数，�
   双编译成员会被误判死（本次 629→6 误判差值的根因之一）。
 - 归档成员与直通 .o 的宏状态可能不同（GATEWAY_HAS_WS），死成员判定后必须回源
   核对条件编译再定性。
+
+## 六、2026-11-02 复核（D-0 准入证据，r109）
+
+构建：区外 /tmp/agentrt-q2-build，Release，real libs no stubs，全量构建成功。
+方法升级：不再用符号并集推断，改为链接器 Map 判定——19 个生产可执行体从
+link.txt 重放（去 -s，加 -Wl,-Map），Map 的 "Archive member included" 段
+直接给出被拉取的归档成员，避免同名平台后端造成的假活/假死。
+
+结果：34 个静态库 / 650 个归档成员；被拉取 431，未拉取 221。
+221 个未拉取成员逐一比对直通 .o 名单，全部是同名直通 .o 的影子副本
+（object library 双通道：成员被编译进目标直通通道，归档只是并存副本），
+真实死成员 0，链接级可回收 0 行。
+
+与 2026-10-28 六项对照：airy_event_loop_win / airy_event_loop_kqueue /
+ws_gateway_message / ws_gateway_callback / heapstore_registry /
+heapstore_journal_mem 在当前树均存在于直通 .o 通道（平台后端空 TU 与
+双通道编译），不构成可回收实现行，原判不变。
+
+零扇入导出扫描（611 个 .c/.h）：仅命中 airy_intent_parser_parse 与
+airy_intent_parser_add_rule，二者是 atoms/coreloopthree/include/cognition.h
+的 AIRY_API 声明，实现随 intent 载荷迁出（tests/CMakeLists.txt 注
+"test_intent_parser 随 intent 载荷迁出"），属头文件声明冗余，0 实现行。
+重复函数维度沿用第三节结论（4913 函数 / 4644 唯一名 / 114 跨文件重名，
+全部 A–F 豁免；唯一候选 http_write_callback 约 24 行不动）。
+
+结论：链接级可回收 0 行、零扇入 0 行、去重唯一候选 24 行且不建议动，
+选项 1（账一内部去重）在 2026-11-02 树上再次证伪；配减只能走选项 2。
