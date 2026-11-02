@@ -17,14 +17,26 @@
 #   - .collected 不入包（finalize 末尾清理）。
 #
 # 用法：
-#   bash finalize-linux-libs.sh <out_dir> [tools_repo_dir=..]
+#   bash finalize-linux-libs.sh <out_dir> [tools_repo_dir=..] [readelf] [sysroot]
 #     out_dir     收集目标（包内顶层目录 或 STAGE_DIR，须含 bin/ 与 lib/）
 #     tools_repo  含 scripts/ci/release/lib-package.sh 的仓目录（默认 ..）
+#     readelf     交叉腿必填：目标架构 readelf（宿主 ldd 无法分析异架构 ELF）
+#     sysroot     交叉腿必填：目标 sysroot（.so 来源，系统核心库不入包）
+#   交叉腿（riscv64 等）必须同时给 readelf/sysroot：走 pkg_runtime_libs_cross
+#   + pkg_verify_deps_cross；否则走容器内 ldd 路径。
 # ============================================================================
 set -euo pipefail
 
 OUT="${1:?out_dir（含 bin/ lib/ 的包目录或 STAGE_DIR）}"
 TOOLS="${2:-..}"
+READELF="${3:-}"
+SYSROOT="${4:-}"
+
+if { [ -n "$READELF" ] && [ -z "$SYSROOT" ]; } || \
+   { [ -z "$READELF" ] && [ -n "$SYSROOT" ]; }; then
+    echo "[finalize] readelf/sysroot 须成对给出（交叉收集需两者）" >&2
+    exit 1
+fi
 
 if [ ! -d "$OUT/bin" ] || [ ! -d "$OUT/lib" ]; then
     echo "[finalize] 缺 $OUT/bin 或 $OUT/lib，中止" >&2
@@ -37,11 +49,17 @@ fi
 
 # 自编译 deps（cjson/ssl/curl/websockets…）在 /usr/local/lib；容器或 runner 的
 # ld.so.cache 未含该路径时 ldd 报 not found，显式注入保证收集与校验可达。
+# 交叉腿的自编译 deps 在 <sysroot>/usr/lib/<multiarch>，由 readelf+sysroot
+# 路径直达，不依赖宿主 ld.so 解析，故不注入。
 export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
 
 . "$TOOLS/scripts/ci/release/lib-package.sh"
 
-pkg_runtime_libs "$OUT"
+if [ -n "$READELF" ]; then
+    pkg_runtime_libs_cross "$OUT" "$SYSROOT" "$READELF"
+else
+    pkg_runtime_libs "$OUT"
+fi
 # fail-closed：收集后 lib/ 必须存在运行时库（本仓 daemon 全动态链接）。
 # 0.1.11-rc.2 实证：file(1) 在工具链镜像中缺失时，收集/校验的 ELF 守卫
 # 曾整体空转——0 个 .so 仍假阳性 "collected + verified" 出包，自编译
@@ -50,8 +68,15 @@ if [ -z "$(ls -A "$OUT/lib" 2>/dev/null | grep -v '^\.' || true)" ]; then
     echo "[finalize] lib/ 无运行时库：收集空转（ELF 判定或 ldd 异常），中止" >&2
     exit 1
 fi
-touch "$OUT/lib/.collected"
-pkg_verify_deps "$OUT"
-rm -f "$OUT/lib/.collected"
+if [ -n "$READELF" ]; then
+    if ! pkg_verify_deps_cross "$OUT" "$READELF"; then
+        echo "[finalize] 交叉产物存在未解析依赖，中止" >&2
+        exit 1
+    fi
+else
+    touch "$OUT/lib/.collected"
+    pkg_verify_deps "$OUT"
+    rm -f "$OUT/lib/.collected"
+fi
 
 echo "[finalize] runtime libs collected + verified ($OUT)"
