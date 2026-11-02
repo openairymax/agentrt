@@ -82,7 +82,10 @@ inputs:
     # f91d854：contract SSoT 宿主随文档仓迁至 10-designs-and-contracts/
     # contracts，解析器第三个候选同步改写。不 bump 则 CI 仍按旧路径解析：
     # 目录不存在 → 无合约变更 → 通过，Gate 4/5 的合约判据整体假绿。
-    default: 'f91d854a4fc05da1bd57e8e7afb5731905614688'
+    # 66db059：0.1.20 七份专题并入方案后，Gate 45 受辖清单删去已归并的
+    # 架构文档行。不 bump 则清单仍列该文件：docs 侧已删 → fail-closed
+    # exit 2，整条 Gate 45 判红。
+    default: '66db059a63cefd232cdecd3324443643d47eb650'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
