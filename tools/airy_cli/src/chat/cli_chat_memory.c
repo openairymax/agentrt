@@ -20,6 +20,7 @@
 #include "cli_internal.h"
 
 #include "cli_gw.h" /* 架构约束 2026-08-25：统一经 gateway 派发 */
+#include "safe_utf8.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,8 +48,18 @@ static void seg_put(char *buf, size_t cap, size_t *off, const char *fmt, ...)
     va_start(ap, fmt);
     int w = vsnprintf(buf + *off, cap - *off, fmt, ap);
     va_end(ap);
-    if (w > 0)
-        *off += ((size_t)w < cap - *off) ? (size_t)w : (cap - *off - 1);
+    if (w <= 0)
+        return;
+    size_t avail = cap - *off;
+    if ((size_t)w < avail) {
+        *off += (size_t)w;
+        return;
+    }
+    /* 越过缓冲末尾：vsnprintf 已按容量截断，回退到字符边界再收敛——
+     * 尾部半个汉字会随 messages[].content 上报，模型端以 400/412 拒绝。 */
+    *off += avail - 1;
+    *off = utf8_prefix_len(buf, *off);
+    buf[*off] = '\0';
 }
 
 /* 2.2.2.1：无信息量寒暄启发式——此类对话不应进记忆，避免垃圾累积

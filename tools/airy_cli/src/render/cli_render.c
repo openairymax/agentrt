@@ -22,6 +22,7 @@
 #include "cli_gw.h"
 #include "err_class.h"
 #include "platform.h"
+#include "safe_utf8.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -195,9 +196,8 @@ size_t cli_utf8_safe_len(const char *s, size_t max_bytes)
 {
     size_t len = strlen(s);
     if (max_bytes >= len) return len;
-    size_t n = max_bytes;
-    while (n > 0 && ((unsigned char)s[n] & 0xC0) == 0x80) n--;
-    return n;
+    /* 边界回退统一委托 commons 的 safe_utf8（SSoT），本域不再私藏副本。 */
+    return utf8_prefix_len(s, max_bytes);
 }
 
 /* ---- plain 直印（0.1.19 统一出口） ---- */
