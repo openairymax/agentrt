@@ -33,6 +33,12 @@ extern "C" {
  */
 int cli_gw_json(const char *method, cJSON *params, int timeout_ms, cJSON **out_root);
 
+/**
+ * @brief cli_gw_json 的续期轮询变体（长管线专用，语义同 cli_gw_call_q）。
+ */
+int cli_gw_json_q(const char *method, cJSON *params, int timeout_ms, int renewals,
+                  cJSON **out_root);
+
 #ifdef __cplusplus
 }
 #endif

@@ -216,6 +216,8 @@ typedef struct {
     size_t body_off;
     size_t content_len;
     long long budget;
+    long long quantum; /* 续期后的单轮预算（=初始 timeout_ms） */
+    int renewals;      /* 剩余可续期次数 */
     int header_done;
     int chunked;
 } gw_rx_t;
@@ -223,6 +225,7 @@ typedef struct {
 /* 平台读腿的返回细分：0=已读到（*out 为 0 表示结束），1=继续等待。 */
 #define GW_RX_ERROR (-1)
 #define GW_RX_CANCEL (-2)
+#define GW_RX_TIMEOUT (-3)
 #define GW_RX_MORE 1
 
 /* 解析响应头（仅首次）：定位头结束、Content-Length 与 chunked 标记。 */
@@ -329,17 +332,27 @@ static int gw_rd_posix(int fd, gw_rx_t *rx, ssize_t *out)
 #define GW_RD(fd, rx, out) gw_rd_posix((fd), (rx), (out))
 #endif
 
-/* 接收主循环：平台读腿只负责一次等待+读取，完成判定与预算语义集中在此。 */
+/* 接收主循环：平台读腿只负责一次等待+读取，完成判定与预算语义集中在此。
+ * 续期轮询（T-19）：预算量子耗尽可能续期 renewals 次——think.orchestrate
+ * 等长管线在服务端单步超时即收尾应答，总时长可达量子的有限倍数；客户端
+ * 不定长斩首，改为继续轮询同一连接（SIGINT 取消与对端关连接不续期）。 */
 static int gw_rx_loop(int fd, gw_rx_t *rx)
 {
-    while (rx->budget > 0) {
+    for (;;) {
         ssize_t n = 0;
         int rc;
 
         if (g_cli_cancel)
             return GW_RX_CANCEL;
-        if (GW_RD(fd, rx, &n) == GW_RX_MORE)
+        if (GW_RD(fd, rx, &n) == GW_RX_MORE) {
+            if (rx->budget > 0)
+                continue;
+            if (rx->renewals <= 0)
+                return GW_RX_TIMEOUT;
+            rx->renewals--;
+            rx->budget = rx->quantum;
             continue;
+        }
         if (n == 0)
             return 0;
         rc = gw_recv_feed(rx, (size_t)n);
@@ -348,7 +361,6 @@ static int gw_rx_loop(int fd, gw_rx_t *rx)
         if (rc > 0)
             return 0;
     }
-    return 0;
 }
 
 /* 解析状态行 "HTTP/1.x NNN ..."（仅头部区间，resp 未必以 NUL 结尾）。
@@ -415,15 +427,18 @@ static int gw_send_req(int fd, const char *req, size_t reqn, const char *body)
     return (off < to_send) ? -1 : 0;
 }
 
-/* 接收态初始化：缓冲初值 CLI_GW_RECV_CHUNK，预算为 timeout_ms。 */
-static int gw_rx_init(gw_rx_t *rx, int timeout_ms)
+/* 接收态初始化：缓冲初值 CLI_GW_RECV_CHUNK，预算量子 timeout_ms，
+ * 可续期 renewals 次（0=定长预算）。 */
+static int gw_rx_init(gw_rx_t *rx, int timeout_ms, int renewals)
 {
     AIRY_MEMSET(rx, 0, sizeof(*rx));
     rx->buf = (char *)AIRY_MALLOC(CLI_GW_RECV_CHUNK);
     if (!rx->buf)
         return -1;
     rx->cap = CLI_GW_RECV_CHUNK;
+    rx->quantum = (long long)timeout_ms;
     rx->budget = (long long)timeout_ms;
+    rx->renewals = renewals;
     return 0;
 }
 
@@ -511,8 +526,8 @@ static int gw_body_take(gw_rx_t *rx, char **out_body, size_t *out_len, int *out_
 
 /* 一次完整交换：建连 → 发请求 → 收响应 → 切正文 → 关连接。 */
 int cli_gw_exchange(const char *method, const char *host, int port, const char *path,
-                    const char *body, int timeout_ms, char **out_body, size_t *out_body_len,
-                    int *out_status)
+                    const char *body, int timeout_ms, int renewals, char **out_body,
+                    size_t *out_body_len, int *out_status)
 {
     char req[512];
     int reqn;
@@ -531,7 +546,7 @@ int cli_gw_exchange(const char *method, const char *host, int port, const char *
     if (fd < 0)
         return -1;
     if (gw_send_req(fd, req, (size_t)reqn, body) != 0 ||
-        gw_rx_init(&rx, timeout_ms) != 0) {
+        gw_rx_init(&rx, timeout_ms, renewals) != 0) {
         gw_close(fd);
         return -1;
     }
@@ -544,6 +559,10 @@ int cli_gw_exchange(const char *method, const char *host, int port, const char *
     if (rc == GW_RX_ERROR) {
         AIRY_FREE(rx.buf);
         return -1;
+    }
+    if (rc == GW_RX_TIMEOUT) {
+        AIRY_FREE(rx.buf);
+        return CLI_GW_EXCH_TIMEOUT;
     }
     rc = gw_body_take(&rx, out_body, out_body_len, out_status);
     AIRY_FREE(rx.buf);

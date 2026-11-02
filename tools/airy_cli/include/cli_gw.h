@@ -42,6 +42,17 @@ extern "C" {
 int cli_gw_call(const char *method, const char *params_json, int timeout_ms, char **out_result);
 
 /**
+ * @brief cli_gw_call 的续期轮询变体（长管线专用）。
+ * @param renewals   预算量子耗尽可能续期次数（0 等价于 cli_gw_call 定长
+ *                   预算；>0 时服务端未应答且连接未关则继续等待，总上界
+ *                   timeout_ms×(1+renewals)；SIGINT 取消与对端关连接
+ *                   不续期）
+ * 其余语义同 cli_gw_call。
+ */
+int cli_gw_call_q(const char *method, const char *params_json, int timeout_ms, int renewals,
+                  char **out_result);
+
+/**
  * @brief 最近一次失败原因（只读，不消费）。
  * @return 失败描述；当前无失败为空串
  */

@@ -69,6 +69,7 @@ static int g_tests_passed = 0;
 #define MOCK_MODE_BADJSON 3 /* POST / → 响应体非合法 JSON */
 #define MOCK_MODE_NORESULT 4 /* POST / → 合法 JSON 但既无 result 也无 error */
 #define MOCK_MODE_503    5 /* POST / → 空体 503（daemon 重启窗口的网关应答） */
+#define MOCK_MODE_SLOW   6 /* POST / → 延迟应答，驱动客户端续期轮询（T-19） */
 
 static int g_srv_fd = -1;
 static int g_srv_port = 0;
@@ -237,6 +238,11 @@ static void mock_handle(int fd)
     }
     if (mode == MOCK_MODE_SILENT) {
         airy_sleep_ms(800); /* 静默至客户端预算耗尽 */
+        return;
+    }
+    if (mode == MOCK_MODE_SLOW) {
+        airy_sleep_ms(700); /* 延迟应答：单量子预算内等不到，需续期才收得到 */
+        mock_send(fd, 200, "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"slow\":true}}");
         return;
     }
     if (mock_fail_mode(fd, mode))
@@ -521,6 +527,27 @@ static void test_call_timeout(void)
     g_mode = MOCK_MODE_OK;
 }
 
+/* T-19 续期轮询：响应慢于单量子但落在续期总预算内 → 成功；续期耗尽 →
+ * 超时。定长等待的缺陷形态（长管线被客户端预算斩首）由此用例锁死。 */
+static void test_call_renewal(void)
+{
+    mock_reset();
+    g_mode = MOCK_MODE_SLOW;
+    set_url_port(g_srv_port);
+    char *out = NULL;
+    /* 量子 300ms × (1+3) = 1200ms 总预算 > 700ms 延迟 → 续期等到响应 */
+    int rc = cli_gw_call_q("slow.pipe", "{}", 300, 3, &out);
+    CHECK(rc == 0, "call_renewal rc==0 within renewed budget");
+    CHECK(out != NULL, "call_renewal out!=NULL");
+    free(out);
+    /* 量子 300ms × (1+1) = 600ms 总预算 < 700ms 延迟 → 续期耗尽超时 */
+    out = NULL;
+    rc = cli_gw_call_q("slow.pipe", "{}", 300, 1, &out);
+    CHECK(rc == AIRY_ERR_TIMEOUT, "call_renewal_exhausted rc==AIRY_ERR_TIMEOUT");
+    CHECK(out == NULL, "call_renewal_exhausted out==NULL");
+    g_mode = MOCK_MODE_OK;
+}
+
 static void test_call_canceled(void)
 {
     mock_reset();
@@ -583,6 +610,7 @@ int main(void)
     test_call_upstream_503();
     test_call_offline();
     test_call_timeout();
+    test_call_renewal();
     test_call_canceled();
     test_health_online();
     test_health_offline();

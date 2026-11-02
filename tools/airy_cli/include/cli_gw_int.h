@@ -21,7 +21,7 @@ extern "C" {
 #endif
 
 /* cli_gw_exchange 失败细分：-1 传输失败（连接/发送/协议）；-2 用户取消；
- * -3 接收超时（预算耗尽仍无完整响应头）。 */
+ * -3 接收超时（总预算耗尽仍无完整响应）。 */
 #define CLI_GW_EXCH_CANCELED (-2)
 #define CLI_GW_EXCH_TIMEOUT (-3)
 
@@ -32,15 +32,17 @@ extern "C" {
  * @param port        目标端口
  * @param path        请求路径（"/" 或 "/health"）
  * @param body        POST 正文（GET 传 NULL）
- * @param timeout_ms  总预算毫秒
+ * @param timeout_ms  预算量子毫秒
+ * @param renewals    量子耗尽可能续期次数（0=定长预算；>0 时对端未关
+ *                    连接则继续轮询同一响应，总上界 timeout_ms×(1+renewals)）
  * @param out_body    [out] 正文（OWNER，AIRY_FREE）
  * @param out_body_len [out] 正文长度
  * @param out_status  [out] 状态码（可 NULL；0 表示未识别）
  * @return 0 成功；-1 传输失败；CLI_GW_EXCH_CANCELED；CLI_GW_EXCH_TIMEOUT
  */
 int cli_gw_exchange(const char *method, const char *host, int port, const char *path,
-                    const char *body, int timeout_ms, char **out_body, size_t *out_body_len,
-                    int *out_status);
+                    const char *body, int timeout_ms, int renewals, char **out_body,
+                    size_t *out_body_len, int *out_status);
 
 #ifdef __cplusplus
 }

@@ -100,17 +100,20 @@ static int cli_gw_body(const char *method, const char *params_json, char **out_b
 
 /* 传输层分诊：取消 / 超时 / 不可达各自成码，超时给出可诊断文案（S-02），
  * 不可达给出可执行提示。 */
-static int cli_gw_xfer_err(int xerr, const char *method, int timeout_ms, const char *host, int port)
+static int cli_gw_xfer_err(int xerr, const char *method, int timeout_ms, int renewals,
+                           const char *host, int port)
 {
     if (xerr == CLI_GW_EXCH_CANCELED)
         return AIRY_ERR_CANCELED;
     if (xerr == CLI_GW_EXCH_TIMEOUT) {
+        long long total_ms = (long long)timeout_ms * (renewals + 1);
+
         snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
-                 "网关已连接但响应超时（%d 秒，method=%s）：服务端可能仍在推理，"
+                 "网关已连接但响应超时（等待 %lld 秒，method=%s）：服务端可能仍在推理，"
                  "可重试或排查模型负载",
-                 timeout_ms / 1000, method);
-        AIRY_LOG_WARN("cli_gw: response timeout after %dms (method=%s) at %s:%d", timeout_ms, method,
-                      host, port);
+                 total_ms / 1000, method);
+        AIRY_LOG_WARN("cli_gw: response timeout after %lldms (method=%s) at %s:%d", total_ms,
+                      method, host, port);
         return AIRY_ERR_TIMEOUT;
     }
     snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
@@ -171,7 +174,8 @@ static int cli_gw_take(cJSON *root, const char *method, const char *host, int po
     return 0;
 }
 
-int cli_gw_call(const char *method, const char *params_json, int timeout_ms, char **out_result)
+int cli_gw_call_q(const char *method, const char *params_json, int timeout_ms, int renewals,
+                  char **out_result)
 {
     if (!method || !out_result) {
         snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
@@ -192,14 +196,14 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
     char *resp = NULL;
     size_t rlen = 0;
     int status = 0;
-    int exchange_err = cli_gw_exchange("POST", host, port, "/", body, timeout_ms, &resp, &rlen,
-                                       &status);
+    int exchange_err = cli_gw_exchange("POST", host, port, "/", body, timeout_ms, renewals, &resp,
+                                       &rlen, &status);
     AIRY_FREE(body);
     if (exchange_err != 0) {
         AIRY_FREE(resp);
         /* S-02：取消 / 超时 / 不可达分别在 cli_gw_xfer_err 中具名，
          * 描述由 cli_err_desc 统一渲染；各处调用面均按非 0 判失败。 */
-        return cli_gw_xfer_err(exchange_err, method, timeout_ms, host, port);
+        return cli_gw_xfer_err(exchange_err, method, timeout_ms, renewals, host, port);
     }
     if (!resp) {
         snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
@@ -239,6 +243,11 @@ int cli_gw_call(const char *method, const char *params_json, int timeout_ms, cha
     return rc;
 }
 
+int cli_gw_call(const char *method, const char *params_json, int timeout_ms, char **out_result)
+{
+    return cli_gw_call_q(method, params_json, timeout_ms, 0, out_result);
+}
+
 /* ── /health 可达性 + 传输代次 ────────────────────────────────────── */
 int cli_gw_probe(int timeout_ms, unsigned long long *epoch_out)
 {
@@ -252,7 +261,8 @@ int cli_gw_probe(int timeout_ms, unsigned long long *epoch_out)
     int status = 0;
     /* /health 仅支持 GET；此前误用 POST 得 404，导致网关健康时仍误报
      * "gateway unreachable"（v0.1.16 现场缺陷根因）。 */
-    if (cli_gw_exchange("GET", host, port, "/health", NULL, timeout_ms, &resp, &rlen, &status) != 0) {
+    if (cli_gw_exchange("GET", host, port, "/health", NULL, timeout_ms, 0, &resp, &rlen,
+                        &status) != 0) {
         AIRY_FREE(resp);
         return 0;
     }
@@ -274,7 +284,8 @@ int cli_gw_health(int timeout_ms)
 /* ── cJSON 参数面（0.1.19 §459）────────────────────────────────────── */
 /* 业务模块的通用骨架：建 params → 序列化 → 调 → 解析 result。params
  * 所有权在函数内结束（成功与失败路径都释放），调用方只需管 result 树。 */
-int cli_gw_json(const char *method, cJSON *params, int timeout_ms, cJSON **out_root)
+int cli_gw_json_q(const char *method, cJSON *params, int timeout_ms, int renewals,
+                  cJSON **out_root)
 {
     char *params_json = NULL;
     char *result_json = NULL;
@@ -292,7 +303,7 @@ int cli_gw_json(const char *method, cJSON *params, int timeout_ms, cJSON **out_r
         return AIRY_ERR_OUT_OF_MEMORY;
     }
     cJSON_Delete(params);
-    rc = cli_gw_call(method, params_json, timeout_ms, &result_json);
+    rc = cli_gw_call_q(method, params_json, timeout_ms, renewals, &result_json);
     AIRY_FREE(params_json);
     if (rc != 0)
         return rc;
@@ -304,4 +315,9 @@ int cli_gw_json(const char *method, cJSON *params, int timeout_ms, cJSON **out_r
         return AIRY_ERR_PROTOCOL;
     }
     return 0;
+}
+
+int cli_gw_json(const char *method, cJSON *params, int timeout_ms, cJSON **out_root)
+{
+    return cli_gw_json_q(method, params, timeout_ms, 0, out_root);
 }
