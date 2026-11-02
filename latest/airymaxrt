@@ -1280,7 +1280,7 @@ airymaxrt_update() {
         log error "当前平台 ${plat} 无可用制品"
         case "$plat" in
             *riscv*)
-                log error "RISC-V（${plat}）无对应预编译制品：官方仅出 riscv64（平台键 riscv-64）"
+                log error "RISC-V（${plat}）暂无官方预编译制品（CI 仅 canary 构建）"
                 log error "请在目标机源码构建：AIRY_MODE=source bash install.sh（需 RISC-V 工具链 + 依赖库）"
                 ;;
         esac
