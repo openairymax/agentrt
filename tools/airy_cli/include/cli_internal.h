@@ -161,7 +161,8 @@ size_t cli_commands_count(void);
 
 /* 命令分发与参数解析（airy_cli_cmdline.c；main.c 主循环调用）：
  * cli_dispatch_command 匹配 /name，未命中返回 0 以便落回普通输入；
- * cli_parse_args 返回 0=继续启动，1=已输出帮助/错误并退出。 */
+ * cli_parse_args 返回 0=继续启动，1=已输出版本/帮助（正常终止），
+ * 2=参数错误。 */
 int cli_dispatch_command(const char *input, void *ctx);
 int cli_parse_args(int argc, char *argv[], const char **out_print_prompt);
 
