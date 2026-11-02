@@ -18,6 +18,11 @@
 
 #include <stdio.h>
 
+/* 续期轮询（T-19）：服务端七阶段各自限时、单步超时即收尾应答，总时长可
+ * 达预算量子的有限倍数。客户端按「量子 + 续期轮询」等待而非定长斩首：
+ * 7 量子 = 七阶段硬上界；量子取 cli_think_timeout_ms（与 think_d 同链）。 */
+#define CLI_ORCH_WAIT_RENEWALS 6
+
 int cmd_orch(const char *arg, void *ctx)
 {
     (void)ctx;
@@ -36,7 +41,8 @@ int cmd_orch(const char *arg, void *ctx)
     cJSON_AddStringToObject(params, "input", arg);
 
     cJSON *root = NULL;
-    int rc = cli_gw_json("think.orchestrate", params, 120000, &root);
+    int rc = cli_gw_json_q("think.orchestrate", params, (int)cli_think_timeout_ms(),
+                           CLI_ORCH_WAIT_RENEWALS, &root);
     if (rc != 0) {
         /* C-5 收敛：经 cli_err_desc 统一渲染，契约外码值不进用户面 */
         cli_outf("  %s[编排]%s 编排请求失败：%s\n", CLR_RED, CLR_RESET, cli_err_desc(rc));
