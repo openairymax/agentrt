@@ -443,10 +443,8 @@ int main(int argc, char *argv[])
      * 返回 1 为 --version/--help 的请求终止（按约定以 0 退出：版本查询在
      * 脚本里必须可判定成功），2 才是用法错误。 */
     int parse_rc = cli_parse_args(argc, argv, &loop.prompt);
-    if (parse_rc == 1)
-        return 0;
     if (parse_rc != 0)
-        return 1;
+        return parse_rc == 1 ? 0 : 1;
     /* 0.1.17 R5-G6 入口唯一化：--tui 为 CLI 的一个模式——调起 agentrt-tui
      * 子进程并回传退出码；CLI 父进程不初始化终端（保持零终端改性），
      * TUI 异常退出仅报错，不做接力。R5-G5：--resume/--continue 原样转发，
