@@ -117,7 +117,7 @@ install, use `airymaxrt update`. If several copies are present on one machine,
 
 | Platform | Architectures published |
 |----------|-------------------------|
-| Linux | x86-64, x86-32, arm-64 (aarch64), arm-32 (armv7l) |
+| Linux | x86-64, x86-32, arm-64 (aarch64), arm-32 (armv7l), riscv-64 (riscv64) |
 | macOS | arm-64 (Apple Silicon), x86-64 |
 | Windows | x86-64, x86-32 |
 

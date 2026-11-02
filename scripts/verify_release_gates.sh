@@ -515,37 +515,40 @@ else
     bad "H5 消费端缺 state=reserved 门禁（保留通道将被静默源码构建）"
 fi
 
-section "I" "9.10/I-03 架构白名单精确串 + 全仓零 riscv 表述 + 源码构建指引"
+section "I" "9.10/I-03 架构白名单精确串 + 已出品位宽宣发一致性 + 源码构建指引"
 
-if grep -Fq 'SUPPORTED_ARCHS="x86_64 aarch64 i686 armv7l"' "$INSTALL"; then
-    ok "I1 SUPPORTED_ARCHS 白名单精确串在位"
+# 0.1.20 起 riscv64 进入官方预编译面（linux-riscv-64），白名单必须随之扩展；
+# 32 位 RISC-V 目标 ABI（ilp32/lp64）尚未定案，安装器与宣发面一律不承诺。
+if grep -Fq 'SUPPORTED_ARCHS="x86_64 aarch64 i686 armv7l riscv64"' "$INSTALL"; then
+    ok "I1 SUPPORTED_ARCHS 白名单精确串在位（含 riscv64）"
 else
-    bad "I1 SUPPORTED_ARCHS 白名单漂移"
+    bad "I1 SUPPORTED_ARCHS 白名单漂移（应含 riscv64）"
 fi
 
 _i2=0
 for _mf in "$ROOT/latest/manifest.stable.json" "$ROOT/latest/manifest.rc.json" \
            "$ROOT/latest/manifest.beta.json"; do
-    if [ -f "$_mf" ] && grep -riq 'riscv' "$_mf"; then
+    if [ -f "$_mf" ] && grep -riEq 'riscv[-_]?32' "$_mf"; then
         _i2=1
     fi
 done
 if [ "$_i2" -eq 0 ]; then
-    ok "I2 latest/ 三 manifest 零 riscv（不宣发未支持架构）"
+    ok "I2 latest/ 三 manifest 不宣发 riscv32（未出品位宽）"
 else
-    bad "I2 latest/ manifest 出现 riscv 表述"
+    bad "I2 latest/ manifest 出现 riscv32 表述（该位宽无制品）"
 fi
 
 _i3=0
 for _rd in "$ROOT/README.md" "$ROOT/README_zh.md"; do
-    if [ -f "$_rd" ] && grep -iq 'riscv' "$_rd"; then
-        _i3=1
+    if [ -f "$_rd" ]; then
+        grep -riEq 'riscv-64|riscv64' "$_rd" || _i3=1
+        grep -riEq 'riscv[-_]?32' "$_rd" && _i3=1
     fi
 done
 if [ "$_i3" -eq 0 ]; then
-    ok "I3 README 双语零 riscv 承诺"
+    ok "I3 README 双语立档 riscv-64 且不承诺 riscv32"
 else
-    bad "I3 README 出现 riscv 支持表述"
+    bad "I3 README 平台表述与出厂面不一致（缺 riscv-64 或承诺 riscv32）"
 fi
 
 case "$(sdk_ready; echo $?)" in

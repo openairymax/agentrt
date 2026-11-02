@@ -103,7 +103,7 @@ airymaxrt update --check    # 只检查，不做任何变更
 
 | 平台      | 已发布的架构                                       |
 | ------- | -------------------------------------------- |
-| Linux   | x86-64、x86-32、arm-64（aarch64）、arm-32（armv7l） |
+| Linux   | x86-64、x86-32、arm-64（aarch64）、arm-32（armv7l）、riscv-64（riscv64） |
 | macOS   | arm-64（Apple Silicon）、x86-64                 |
 | Windows | x86-64、x86-32                                |
 
