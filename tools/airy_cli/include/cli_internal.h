@@ -159,6 +159,15 @@ extern size_t g_history_count;
 extern const cli_command_t CLI_COMMANDS[];
 size_t cli_commands_count(void);
 
+/* 命令词匹配（airy_cli_cmdline.c，社区反馈②）：命令词 = 首个空格前
+ * token（CLI_CMD_TOK_MAX 截断）。cli_cmd_exact 精确命中；cli_cmd_prefix
+ * 统计前缀候选并在唯一命中时带回表项；cli_dispatch_command 按精确 →
+ * 唯一前缀 → 歧义列候选分发。cli_cmd_token 从任意输入截出命令词。 */
+#define CLI_CMD_TOK_MAX 64
+const cli_command_t *cli_cmd_exact(const char *tok);
+int cli_cmd_prefix(const char *tok, const cli_command_t **out);
+void cli_cmd_token(const char *input, char *tok, size_t cap);
+
 /* 命令分发与参数解析（airy_cli_cmdline.c；main.c 主循环调用）：
  * cli_dispatch_command 匹配 /name，未命中返回 0 以便落回普通输入；
  * cli_parse_args 返回 0=继续启动，1=已输出版本/帮助（正常终止），

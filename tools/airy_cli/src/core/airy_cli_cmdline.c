@@ -59,6 +59,52 @@ size_t cli_commands_count(void)
     return CLI_COMMANDS_COUNT;
 }
 
+/* ---- 命令词匹配 helpers（社区反馈②）----
+ * 此前分发对前缀回退的判定写反了比较长度：任何单字符输入（如 "/t"）
+ * 以首字节 '/' 与首条命令恒等而误触 /help，"/tu" 这类短一字符输入则
+ * 直触 /tui——用户输入被静默改道。现收敛为三步：精确命中优先；
+ * 前缀缩写仅在唯一命中时放行；多义并列候选交用户裁决。 */
+
+const cli_command_t *cli_cmd_exact(const char *tok)
+{
+    for (size_t i = 0; i < CLI_COMMANDS_COUNT; i++)
+        if (strcmp(CLI_COMMANDS[i].name, tok) == 0)
+            return &CLI_COMMANDS[i];
+    return NULL;
+}
+
+/* tok 的前缀候选数；唯一命中时经 *out 带回表项。 */
+int cli_cmd_prefix(const char *tok, const cli_command_t **out)
+{
+    size_t len = strlen(tok);
+    int hits = 0;
+    for (size_t i = 0; i < CLI_COMMANDS_COUNT; i++) {
+        if (strncmp(CLI_COMMANDS[i].name, tok, len) == 0) {
+            hits++;
+            if (hits == 1 && out)
+                *out = &CLI_COMMANDS[i];
+        }
+    }
+    return hits;
+}
+
+static void cli_cmd_list(const char *tok)
+{
+    size_t len = strlen(tok);
+    cli_outf("  %s%s%s 有歧义，可匹配：", cli_c(CLR_YELLOW), tok, cli_c(CLR_RESET));
+    for (size_t i = 0; i < CLI_COMMANDS_COUNT; i++)
+        if (strncmp(CLI_COMMANDS[i].name, tok, len) == 0)
+            cli_outf(" %s", CLI_COMMANDS[i].name);
+    cli_outf("\n");
+}
+
+void cli_cmd_token(const char *input, char *tok, size_t cap)
+{
+    const char *sp = strchr(input, ' ');
+    size_t n = sp ? (size_t)(sp - input) : strlen(input);
+    snprintf(tok, cap, "%.*s", (int)n, input);
+}
+
 /**
  * @brief Slash-command dispatch: match /name; return 0 to fall through on miss
  */
@@ -67,33 +113,32 @@ int cli_dispatch_command(const char *input, void *ctx)
     if (input[0] != '/')
         return 0;
 
-    for (size_t i = 0; i < CLI_COMMANDS_COUNT; i++) {
-        const cli_command_t *cmd = &CLI_COMMANDS[i];
-        size_t nlen = strlen(cmd->name);
-        if (strncmp(input, cmd->name, nlen) == 0) {
+    char tok[CLI_CMD_TOK_MAX];
+    cli_cmd_token(input, tok, sizeof(tok));
 
-            const char *rest = input + nlen;
-            if (*rest == '\0' || *rest == ' ') {
-                const char *arg = (*rest == ' ') ? rest + 1 : NULL;
-                if (cmd->needs_args && (!arg || arg[0] == '\0')) {
-                    cli_outf("  %s%s%s 需要参数。%s\n", cli_c(CLR_YELLOW), cmd->name,
-                           cli_c(CLR_RESET), cmd->desc);
-                    return 1;
-                }
-                cmd->fn(arg, ctx);
-                return 1;
-            }
-
-            if (nlen >= 2 && strncmp(input, cmd->name, strlen(input) - 1) == 0 &&
-                cmd->name[strlen(input) - 1] != '\0' && !cmd->needs_args) {
-                cmd->fn(NULL, ctx);
-                return 1;
-            }
+    const cli_command_t *cmd = cli_cmd_exact(tok);
+    if (!cmd) {
+        int hits = cli_cmd_prefix(tok, &cmd);
+        if (hits > 1) {
+            cli_cmd_list(tok);
+            return 1;
+        }
+        if (hits == 0) {
+            cli_outf("  %s未知命令%s %s，输入 %s/help%s 查看可用命令。\n",
+                   cli_c(CLR_YELLOW), cli_c(CLR_RESET), input, cli_c(CLR_CYAN),
+                   cli_c(CLR_RESET));
+            return 1;
         }
     }
 
-    cli_outf("  %s未知命令%s %s，输入 %s/help%s 查看可用命令。\n", cli_c(CLR_YELLOW),
-           cli_c(CLR_RESET), input, cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    const char *rest = input + strlen(tok);
+    const char *arg = (*rest == ' ') ? rest + 1 : NULL;
+    if (cmd->needs_args && (!arg || arg[0] == '\0')) {
+        cli_outf("  %s%s%s 需要参数。%s\n", cli_c(CLR_YELLOW), cmd->name,
+               cli_c(CLR_RESET), cmd->desc);
+        return 1;
+    }
+    cmd->fn(arg, ctx);
     return 1;
 }
 
