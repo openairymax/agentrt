@@ -17,39 +17,39 @@
 #include <string.h>
 
 const cli_command_t CLI_COMMANDS[] = {
-    {"/help", "显示所有命令", CLI_CAT_SESSION, 0, cmd_help},
-    {"/clear", "清屏并清空对话上下文", CLI_CAT_SESSION, 0, cmd_clear},
-    {"/status", "查看调度器任务状态", CLI_CAT_SYSTEM, 0, cmd_status},
-    {"/chain", "决策链可视化：/chain [task_id]（默认列出最近任务）", CLI_CAT_SYSTEM, 0, cmd_chain},
-    {"/hall", "事件流：/hall（统计）/hall audit（审计完整性）/hall replay [n]（全局回放）", CLI_CAT_SYSTEM, 0, cmd_hall},
-    {"/orch", "流程编排：/orch <task>（七阶段管线：分解→规划→生成→批判→验证→审计→对齐）", CLI_CAT_SYSTEM, 1, cmd_orch},
-    {"/quit", "退出 agentrt", CLI_CAT_SESSION, 0, cmd_quit},
-    {"/tui", "切换到全屏 TUI 渲染层（退出后返回行式对话）", CLI_CAT_SESSION, 0, cmd_tui},
-    {"/daemons", "查看全部 daemon 在线状态", CLI_CAT_SYSTEM, 0, cmd_daemons},
-    {"/daemon", "管理 daemon：/daemon start|stop|restart|status [ns...]（默认全部）", CLI_CAT_SYSTEM, 0, cmd_daemon},
-    {"/rpc", "直接调用 daemon 方法：/rpc <ns>.<method> [json]（ns 或 ns_d 均可）", CLI_CAT_SYSTEM, 1, cmd_rpc},
-    {"/stats", "查看 daemon 统计：/stats [ns]", CLI_CAT_SYSTEM, 0, cmd_stats},
-    {"/agents", "列出已注册智能体", CLI_CAT_RESOURCE, 0, cmd_agents},
-    {"/tools", "列出可用工具", CLI_CAT_RESOURCE, 0, cmd_tools},
-    {"/hooks", "列出事件钩子", CLI_CAT_RESOURCE, 0, cmd_hooks},
-    {"/plugins", "列出插件", CLI_CAT_RESOURCE, 0, cmd_plugins},
-    {"/channels", "列出消息通道", CLI_CAT_RESOURCE, 0, cmd_channels},
-    {"/market", "搜索市场（/market skill 搜技能）", CLI_CAT_RESOURCE, 0, cmd_market},
-    {"/models", "列出 LLM 模型", CLI_CAT_RESOURCE, 0, cmd_models},
-    {"/apikey", "配置模型 API Key：/apikey list | set <N> <key>（N=model.yaml 行号）", CLI_CAT_SECURITY, 0, cmd_apikey},
-    {"/mem", "记忆链：/mem（最近记忆） /mem <query>（检索） /mem get <id>（详情）", CLI_CAT_RESOURCE, 0, cmd_mem},
-    {"/a2a", "发现 A2A 智能体", CLI_CAT_RESOURCE, 0, cmd_a2a},
-    {"/metrics", "查询观测指标", CLI_CAT_SYSTEM, 0, cmd_metrics},
-    {"/alerts", "查看监控告警", CLI_CAT_SYSTEM, 0, cmd_alerts},
-    {"/tasks", "调度状态与检查点", CLI_CAT_SYSTEM, 0, cmd_tasks},
-    {"/info", "系统信息", CLI_CAT_SYSTEM, 0, cmd_info},
-    {"/notify", "发布通知：/notify <topic> <msg>", CLI_CAT_SECURITY, 1, cmd_notify},
-    {"/vault", "凭据保险库：/vault list", CLI_CAT_SECURITY, 1, cmd_vault},
-    {"/perm", "权限裁决：/perm <agent> <action> <resource>", CLI_CAT_SECURITY, 1, cmd_perm},
-    {"/sanitize", "输入净化：/sanitize <input>", CLI_CAT_SESSION, 1, cmd_sanitize},
-    {"/security", "安全状态（网络规则统计）", CLI_CAT_SECURITY, 0, cmd_security},
-    {"/pending", "待审批工具调用（只读视图）", CLI_CAT_SECURITY, 0, cmd_pending},
-    {"/approve", "回传审批决议：/approve <request_id> allow|always|deny", CLI_CAT_SECURITY, 1, cmd_approve},
+    {"/help", "显示所有命令", "/help [命令]", CLI_CAT_SESSION, 0, cmd_help},
+    {"/clear", "清屏并清空对话上下文", "/clear", CLI_CAT_SESSION, 0, cmd_clear},
+    {"/status", "查看调度器任务状态", "/status", CLI_CAT_SYSTEM, 0, cmd_status},
+    {"/chain", "决策链可视化：/chain [task_id]（默认列出最近任务）", "/chain [task_id]", CLI_CAT_SYSTEM, 0, cmd_chain},
+    {"/hall", "事件流：/hall（统计）/hall audit（审计完整性）/hall replay [n]（全局回放）", "/hall [audit | replay [n]]", CLI_CAT_SYSTEM, 0, cmd_hall},
+    {"/orch", "流程编排：/orch <task>（七阶段管线：分解→规划→生成→批判→验证→审计→对齐）", "/orch <task>", CLI_CAT_SYSTEM, 1, cmd_orch},
+    {"/quit", "退出 agentrt", "/quit", CLI_CAT_SESSION, 0, cmd_quit},
+    {"/tui", "切换到全屏 TUI 渲染层（退出后返回行式对话）", "/tui", CLI_CAT_SESSION, 0, cmd_tui},
+    {"/daemons", "查看全部 daemon 在线状态", "/daemons", CLI_CAT_SYSTEM, 0, cmd_daemons},
+    {"/daemon", "管理 daemon：/daemon start|stop|restart|status [ns...]（默认全部）", "/daemon [start|stop|restart|status] [ns...]", CLI_CAT_SYSTEM, 0, cmd_daemon},
+    {"/rpc", "直接调用 daemon 方法：/rpc <ns>.<method> [json]（ns 或 ns_d 均可）", "/rpc <ns>.<method> [json]", CLI_CAT_SYSTEM, 1, cmd_rpc},
+    {"/stats", "查看 daemon 统计：/stats [ns]", "/stats [ns]", CLI_CAT_SYSTEM, 0, cmd_stats},
+    {"/agents", "列出已注册智能体", "/agents", CLI_CAT_RESOURCE, 0, cmd_agents},
+    {"/tools", "列出可用工具", "/tools", CLI_CAT_RESOURCE, 0, cmd_tools},
+    {"/hooks", "列出事件钩子", "/hooks", CLI_CAT_RESOURCE, 0, cmd_hooks},
+    {"/plugins", "列出插件", "/plugins", CLI_CAT_RESOURCE, 0, cmd_plugins},
+    {"/channels", "列出消息通道", "/channels", CLI_CAT_RESOURCE, 0, cmd_channels},
+    {"/market", "搜索市场（/market skill 搜技能）", "/market [skill] [query]", CLI_CAT_RESOURCE, 0, cmd_market},
+    {"/models", "列出 LLM 模型", "/models", CLI_CAT_RESOURCE, 0, cmd_models},
+    {"/apikey", "配置模型 API Key：/apikey list | set <N> <key>（N=model.yaml 行号）", "/apikey list | set <N> <key>", CLI_CAT_SECURITY, 0, cmd_apikey},
+    {"/mem", "记忆链：/mem（最近记忆） /mem <query>（检索） /mem get <id>（详情）", "/mem [query | get <id>]", CLI_CAT_RESOURCE, 0, cmd_mem},
+    {"/a2a", "发现 A2A 智能体", "/a2a", CLI_CAT_RESOURCE, 0, cmd_a2a},
+    {"/metrics", "查询观测指标", "/metrics", CLI_CAT_SYSTEM, 0, cmd_metrics},
+    {"/alerts", "查看监控告警", "/alerts", CLI_CAT_SYSTEM, 0, cmd_alerts},
+    {"/tasks", "调度状态与检查点", "/tasks", CLI_CAT_SYSTEM, 0, cmd_tasks},
+    {"/info", "系统信息", "/info", CLI_CAT_SYSTEM, 0, cmd_info},
+    {"/notify", "发布通知：/notify <topic> <msg>", "/notify <topic> <msg>", CLI_CAT_SECURITY, 1, cmd_notify},
+    {"/vault", "凭据保险库：/vault list", "/vault list", CLI_CAT_SECURITY, 1, cmd_vault},
+    {"/perm", "权限裁决：/perm <agent> <action> <resource>", "/perm <agent> <action> <resource>", CLI_CAT_SECURITY, 1, cmd_perm},
+    {"/sanitize", "输入净化：/sanitize <input>", "/sanitize <input>", CLI_CAT_SESSION, 1, cmd_sanitize},
+    {"/security", "安全状态（网络规则统计）", "/security", CLI_CAT_SECURITY, 0, cmd_security},
+    {"/pending", "待审批工具调用（只读视图）", "/pending", CLI_CAT_SECURITY, 0, cmd_pending},
+    {"/approve", "回传审批决议：/approve <request_id> allow|always|deny", "/approve <request_id> allow|always|deny", CLI_CAT_SECURITY, 1, cmd_approve},
 };
 
 #define CLI_COMMANDS_COUNT (sizeof(CLI_COMMANDS) / sizeof(CLI_COMMANDS[0]))
@@ -88,7 +88,7 @@ int cli_cmd_prefix(const char *tok, const cli_command_t **out)
     return hits;
 }
 
-static void cli_cmd_list(const char *tok)
+void cli_cmd_list(const char *tok)
 {
     size_t len = strlen(tok);
     cli_outf("  %s%s%s 有歧义，可匹配：", cli_c(CLR_YELLOW), tok, cli_c(CLR_RESET));
@@ -136,6 +136,7 @@ int cli_dispatch_command(const char *input, void *ctx)
     if (cmd->needs_args && (!arg || arg[0] == '\0')) {
         cli_outf("  %s%s%s 需要参数。%s\n", cli_c(CLR_YELLOW), cmd->name,
                cli_c(CLR_RESET), cmd->desc);
+        cli_outf("  用法：%s\n", cmd->usage);
         return 1;
     }
     cmd->fn(arg, ctx);

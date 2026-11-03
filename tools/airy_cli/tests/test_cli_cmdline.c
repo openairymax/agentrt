@@ -126,6 +126,21 @@ static int test_lookup_helpers(void)
     return 0;
 }
 
+/* usage 字段完备性（社区反馈②：缺参提示与 /help <cmd> 的权威用法源） */
+static int test_usage_table(void)
+{
+    printf("  test_usage_table...\n");
+    size_t n = cli_commands_count();
+    CHECK(n == 33);
+    for (size_t i = 0; i < n; i++) {
+        CHECK(CLI_COMMANDS[i].usage != NULL);
+        CHECK(CLI_COMMANDS[i].usage[0] == '/');
+        CHECK(CLI_COMMANDS[i].fn != NULL);
+    }
+    printf("    PASSED\n");
+    return 0;
+}
+
 int main(void)
 {
     printf("test_cli_cmdline:\n");
@@ -133,6 +148,7 @@ int main(void)
     test_prefix_disambiguation();
     test_unknown_and_fallthrough();
     test_lookup_helpers();
+    test_usage_table();
     printf("ALL PASSED\n");
     return 0;
 }
