@@ -197,6 +197,15 @@ install(TARGETS airy_cli RUNTIME DESTINATION bin)
 
 # 2.5.x 意图分辨启发式单测（纯函数，独立于 LLM/daemon）
 if(BUILD_TESTS)
+    # 社区反馈②：命令分发匹配行为（精确/唯一前缀/多义拒绝/落回）。
+    # 命令实现以 cli_cmd_stubs.c 桩承接链接面，避免拖入 cli_cmds.c 的
+    # render/RPC 依赖树；quit/tui 桩保留 ctx 副作用供断言分发去向。
+    add_executable(test_cli_cmdline tests/test_cli_cmdline.c tests/cli_cmd_stubs.c
+                   tests/cli_test_globals.c src/core/airy_cli_cmdline.c)
+    target_include_directories(test_cli_cmdline PRIVATE ${CLI_INC_DIRS})
+    target_link_libraries(test_cli_cmdline PRIVATE airy_coreloopthree airy_common)
+    add_test(NAME cli_cmdline_dispatch COMMAND test_cli_cmdline)
+
     add_executable(test_cli_classify tests/test_cli_classify.c src/cmd/cli_classify.c)
     target_include_directories(test_cli_classify PRIVATE ${CLI_INC_DIRS})
     target_compile_definitions(test_cli_classify PRIVATE AIRY_HAS_CJSON=1)
