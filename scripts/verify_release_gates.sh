@@ -1328,6 +1328,17 @@ else
     # 用夹具构造入站 PendingApproval 数据，不越过渲染边界，不属于用户面透传。
     # sed 而非 grep -oP：BSD grep（macOS）无 -P，曾致 _v4_mods 恒空、
     # tests/golden 被误判为用户面裸透传（run #557 macOS release_gates 实证）。
+    # 文件内联 `#[cfg(test)] mod tests { ... }` 同样非生产编译面：按 rustfmt
+    # 顶格 `}` 收尾剥离后再扫，避免夹具里的字符串构造被误判（0.1.20 实证）。
+    _v4_strip() {
+        awk '
+            skip { if ($0 ~ /^\}$/) skip = 0; next }
+            /^[[:space:]]*#\[cfg\(test\)\][[:space:]]*$/ { pend = $0; isp = 1; next }
+            isp && /^[[:space:]]*mod[[:space:]]+[A-Za-z0-9_]+[[:space:]]*\{[[:space:]]*$/ { isp = 0; skip = 1; next }
+            isp { print pend; isp = 0 }
+            { print }
+        ' "$1"
+    }
     _v4_mods=$(grep -rn -A1 '#\[cfg(test)\]' "$TUI_SRC/src" --include='*.rs' 2>/dev/null \
         | sed -n 's/.*mod \([a-z0-9_]*\);.*/\1/p' | sort -u)
     _v4_leak=""
@@ -1336,7 +1347,7 @@ else
         for _m in $_v4_mods; do
             case "$_rf" in */"$_m".rs|*/"$_m"/*) _v4_skip=1; break ;; esac
         done
-        if [ "$_v4_skip" -eq 0 ] && grep -q 'tool\.to_string()' "$_rf"; then
+        if [ "$_v4_skip" -eq 0 ] && _v4_strip "$_rf" | grep -q 'tool\.to_string()'; then
             _v4_leak="$_v4_leak ${_rf#"$TUI_SRC"/}"
         fi
     done < <(find "$TUI_SRC/src" -name '*.rs' -print0)
