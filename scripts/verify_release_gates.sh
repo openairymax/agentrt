@@ -617,7 +617,8 @@ fi
 section "L" "R-5 provider 默认超时 < 网关 LLM 转发背压（连不上网络：精确诊断先于网关返回）"
 
 # B16-S3 c3：PROVIDER_DEFAULT_TIMEOUT_SEC 自 provider.c（已删）迁至 registry.c
-PROVIDER_C="$ROOT/daemons/llm_d/src/providers/core/registry.c"
+# 0.1.20 §13.17.45 批次七：providers 子树迁出 llm_d，成为独立机制格。
+PROVIDER_C="$ROOT/daemons/providers/src/core/registry.c"
 LLM_METHODS="$ROOT/daemons/llm_d/src/rpc/methods.c"
 GW_INTERNAL="$(BIZ_FACE include/gateway_biz_internal.h)"
 
