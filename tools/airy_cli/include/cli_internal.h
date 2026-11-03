@@ -88,6 +88,9 @@ typedef enum {
 typedef struct {
     const char *name;
     const char *desc;
+    /* 一行用法（形如 "/rpc <ns>.<method> [json]"，社区反馈②）：
+     * needs_args 缺参提示与 /help <cmd> 单命令查询的权威参数形态。 */
+    const char *usage;
     cli_cmd_category_t category;
     int needs_args;
     int (*fn)(const char *arg, void *ctx);
@@ -167,6 +170,8 @@ size_t cli_commands_count(void);
 const cli_command_t *cli_cmd_exact(const char *tok);
 int cli_cmd_prefix(const char *tok, const cli_command_t **out);
 void cli_cmd_token(const char *input, char *tok, size_t cap);
+/* 前缀候选并列时列出到 stdout（分发侧与 /help <cmd> 共用同一形态） */
+void cli_cmd_list(const char *tok);
 
 /* 命令分发与参数解析（airy_cli_cmdline.c；main.c 主循环调用）：
  * cli_dispatch_command 匹配 /name，未命中返回 0 以便落回普通输入；

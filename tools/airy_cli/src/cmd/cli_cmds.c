@@ -18,8 +18,37 @@
 
 int cmd_help(const char *arg, void *ctx)
 {
-    (void)arg;
     (void)ctx;
+    /* /help <cmd>：单命令用法查询（社区反馈②）——精确/唯一缩写命中
+     * 展示描述与 usage 权威参数形态；多义并列候选交用户裁决；未知命令
+     * 显式提示。匹配形态与 cli_dispatch_command 完全一致。 */
+    if (arg && arg[0]) {
+        char tok[CLI_CMD_TOK_MAX];
+        cli_cmd_token(arg, tok, sizeof(tok));
+        const cli_command_t *cmd = cli_cmd_exact(tok);
+        if (cmd) {
+            cli_outf("  %s%s%s  %s\n", cli_c(CLR_CYAN), cmd->name,
+                   cli_c(CLR_RESET), cmd->desc);
+            cli_outf("  用法：%s\n", cmd->usage);
+            return 0;
+        }
+        int hits = cli_cmd_prefix(tok, &cmd);
+        if (hits == 1) {
+            cli_outf("  （%s 为 %s%s%s 缩写）\n", tok, cli_c(CLR_CYAN),
+                   cmd->name, cli_c(CLR_RESET));
+            cli_outf("  %s  %s\n", cmd->name, cmd->desc);
+            cli_outf("  用法：%s\n", cmd->usage);
+            return 0;
+        }
+        if (hits > 1) {
+            cli_cmd_list(tok);
+            return 0;
+        }
+        cli_outf("  %s未知命令%s %s，输入 %s/help%s 查看全部命令。\n",
+               cli_c(CLR_YELLOW), cli_c(CLR_RESET), tok, cli_c(CLR_CYAN),
+               cli_c(CLR_RESET));
+        return 0;
+    }
     /* 分组顺序与 CLI_CAT_* 枚举一致（会话/系统/资源/安全） */
     static const struct {
         cli_cmd_category_t cat;
