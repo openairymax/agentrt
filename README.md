@@ -1,4 +1,4 @@
-# AgentRT — AI Agent Runtime Platform Engineering
+# AirymaxRT— AI Agent Runtime Platform Engineering
 
 > An OS-grade runtime substrate for AI agent teams — the layer that standardises
 > how agents think, act, remember, and talk to each other, in the same way a
