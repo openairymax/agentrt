@@ -30,6 +30,7 @@
 #include <cjson/cJSON.h>
 #include <errno.h>
 #include <netinet/in.h>
+#include <poll.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdatomic.h>
@@ -214,6 +215,26 @@ static int mock_fail_mode(int fd, int mode)
     return 0;
 }
 
+/* 静默模式：保持静默直至对端关闭，而非固定睡一段时间。mock 服务端单线程
+ * 串行 accept，固定睡眠会把下一个用例的连接挡在 backlog 里，续期用例的
+ * 应答因此被前一用例的残睡推迟（1200ms 预算对 ~1100ms 应答仅剩 100ms
+ * 余量，macOS 实测超时）。客户端预算耗尽即关连接，这里等到 EOF 即收，
+ * 上限 3s 防止夹具自身挂死。 */
+static void mock_silent(int fd)
+{
+    char tmp[256];
+    int waited = 0;
+
+    while (waited < 3000) {
+        struct pollfd p = { fd, POLLIN, 0 };
+        int pr = poll(&p, 1, 100);
+
+        if (pr > 0 && recv(fd, tmp, sizeof(tmp), 0) <= 0)
+            return;
+        waited += 100;
+    }
+}
+
 static void mock_handle(int fd)
 {
     char buf[8192];
@@ -237,7 +258,7 @@ static void mock_handle(int fd)
         return;
     }
     if (mode == MOCK_MODE_SILENT) {
-        airy_sleep_ms(800); /* 静默至客户端预算耗尽 */
+        mock_silent(fd);
         return;
     }
     if (mode == MOCK_MODE_SLOW) {
