@@ -85,7 +85,13 @@ inputs:
     # 66db059：0.1.20 七份专题并入方案后，Gate 45 受辖清单删去已归并的
     # 架构文档行。不 bump 则清单仍列该文件：docs 侧已删 → fail-closed
     # exit 2，整条 Gate 45 判红。
-    default: '66db059a63cefd232cdecd3324443643d47eb650'
+    # 56f1bc6：permission_rules.yaml v1.5.0，coding_v1 / external 两处补
+    # tool_create 授权（0.1.20 会话内自制工具的准入面）。本 action 消费该
+    # 模板的只有 M3 组的「/mcp 暴露集 ⊆ external 授权集」，其余提交
+    # （体积账 pin、sample-form 域表）不在判据消费路径上。不 bump 则旧快照
+    # 里没有 tool_create：M3 判「external 缺工具授权」，release-gates 整组红
+    # （run 41742838214 实证）。
+    default: '56f1bc6cb527fdcd59720c86c0c6c3e3a8e59ba7'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
