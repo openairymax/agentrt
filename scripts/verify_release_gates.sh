@@ -1522,7 +1522,7 @@ _tui="$TUI_SRC/src/app"
 _ad="$ROOT/daemons/agent_d"
 section "Y" "B2 首字延迟与零反馈（流式契约/零反馈/打字机解耦/分段耗时 V2.1~V2.4 机制防回潮）"
 
-if grep -Eq 'daemon_rpc_call_stream(_idle)?\([^,]+, *"complete_stream"' "$_ad/src/run/agent_run_loop.c" \
+if grep -Eq '(daemon_rpc_call_stream|rpc_stream_idle)\([^,]+, *"complete_stream"' "$_ad/src/run/agent_run_loop.c" \
     && grep -q 'RUN_DELTA_STACK' "$_ad/src/run/agent_run_loop.c" \
     && grep -q 'AIRY_MALLOC(dlen + 1)' "$_ad/src/run/agent_run_loop.c" \
     && ! grep -Eq 'daemon_rpc_call\([^,]+, *"complete"' "$_ad/src/run/agent_run_loop.c"; then
