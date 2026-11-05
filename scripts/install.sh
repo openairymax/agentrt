@@ -876,10 +876,19 @@ build_tui() {
     fi
     command -v cargo >/dev/null 2>&1 || { log_warn "cargo 不可用，跳过 agentrt-tui"; return 0; }
     export CARGO_TARGET_DIR="${AIRY_HOME}/target"
+    mkdir -p "${AIRY_HOME}/logs"
     log_info "构建 agentrt-tui（Rust TUI，产物 → ${CARGO_TARGET_DIR}）…"
-    ( cd "${AIRY_SRC_APP}/sdk/tui" && cargo build --release ) 2>/dev/null || { log_warn "TUI 构建失败，跳过"; return 0; }
-    [ -f "${CARGO_TARGET_DIR}/release/agentrt-tui" ] && \
-        cp -f "${CARGO_TARGET_DIR}/release/agentrt-tui" "${AIRY_HOME}/bin/agentrt-tui"
+    # 构建日志落盘而非丢弃：失败时给出可复现的命令，而不是只报「跳过」。
+    if ! ( cd "${AIRY_SRC_APP}/sdk/tui" && cargo build --release ) \
+            >"${AIRY_HOME}/logs/tui-build.log" 2>&1; then
+        log_warn "TUI 构建失败（/tui 与 --tui 将不可用），日志: ${AIRY_HOME}/logs/tui-build.log"
+        return 0
+    fi
+    # 部署成功与否以产物落地为准，不以构建返回码为准。
+    if ! cp -f "${CARGO_TARGET_DIR}/release/agentrt-tui" "${AIRY_HOME}/bin/agentrt-tui"; then
+        log_warn "TUI 产物未能部署到 ${AIRY_HOME}/bin/agentrt-tui（/tui 不可用）"
+        return 0
+    fi
     log_ok "agentrt-tui 部署完成"
 }
 

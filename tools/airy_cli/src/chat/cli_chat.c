@@ -375,7 +375,7 @@ static llm_response_t *chat_loop(cli_chat_msgbuf_t *buf, const char *model, int 
   * llm.complete 非流式单发；--json/-p/TUI/交互 TTY 统一形态（spinner +
   * 完整渲染）；收尾渲染/历史写入收敛在 cli_chat_reply_finalize。
   */
-void cli_chat_reply(const char *input)
+int cli_chat_reply(const char *input)
 {
     /* 2.1.1.5：新一轮开始清零统计（main.c 在上一轮结束后已读取展示）。
      * 清零逻辑收敛在 cli_chat_usage_reset（cli_chat_usage.c）。 */
@@ -399,7 +399,7 @@ void cli_chat_reply(const char *input)
     llm_response_t *final_resp = chat_loop(&buf, model, &rounds);
     if (!final_resp) {
         cli_msgbuf_free(&buf);
-        return;
+        return -1;
     }
 
     /* 2.2.4 对话记忆写入：一轮对话完成且有回复时落盘（用户输入+回复，只记
@@ -415,6 +415,7 @@ void cli_chat_reply(const char *input)
 
     llm_response_free(final_resp);
     cli_msgbuf_free(&buf);
+    return 0;
 }
 
 /* ── 模型槽缓存（自 cli_chat_stream.c 迁入；C-01 ⑤ 退役该文件） ── */
