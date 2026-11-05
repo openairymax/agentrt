@@ -61,7 +61,13 @@ inputs:
     # 旧 pin ba68318 的 tui 全树无 evolution 面，W8 判据读不到、发行包装不进，
     # 面板即「写在文档里而没有进二进制」。启动器 scripts/airymaxrt 两 pin
     # 之间零差异，AF1 双面一致判据不因本前推而变。
-    default: 'fe109e3f5cda8d22f5e5a2e7c1ead60d3ff5bfe7'
+    # 260e362：tui gitlink 前推至 cb158b4（0.1.20 社区反馈「TUI 功能不全」
+    # 七项缺口闭合：Config 面板可执行、会话落盘 /sessions /new /close /rename、
+    # 工具结果正文入史、Plugins 去 take(10) 翻页、F9–F12 观测键位、八面板
+    # golden、Logs 合流 daemon 尾读）。旧 pin fe109e3 的 tui 无上述结构面，
+    # 发行包 agentrt-tui 与门禁验证快照均停在缺口修复前；TUI cargo test
+    # 599→620 全绿，判据消费面（scripts/airymaxrt 启动器）两 pin 零差异。
+    default: '260e36220f4584a23c31759872bd5fad4d93100e'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
@@ -91,7 +97,11 @@ inputs:
     # （体积账 pin、sample-form 域表）不在判据消费路径上。不 bump 则旧快照
     # 里没有 tool_create：M3 判「external 缺工具授权」，release-gates 整组红
     # （run 41742838214 实证）。
-    default: '56f1bc6cb527fdcd59720c86c0c6c3e3a8e59ba7'
+    # 84072d9：publish-release.sh 上传后校验加退避重试（OBS 最终一致性
+    # 窗口：DELETE→PUT 成功后立即 GET 读到 0 字节/旧内容，v0.1.20 同 tag
+    # 重切 run 41953730585 实证 13/31 附件误红，publish-npm 连带
+    # BlobNotFound）。不 bump 则发布平面仍跑单次校验旧脚本，重切必红。
+    default: '84072d97ea1ce8fe3e2c4d79e8af7accb524c6eb'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
