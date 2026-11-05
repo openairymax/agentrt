@@ -101,7 +101,11 @@ inputs:
     # 窗口：DELETE→PUT 成功后立即 GET 读到 0 字节/旧内容，v0.1.20 同 tag
     # 重切 run 41953730585 实证 13/31 附件误红，publish-npm 连带
     # BlobNotFound）。不 bump 则发布平面仍跑单次校验旧脚本，重切必红。
-    default: '84072d97ea1ce8fe3e2c4d79e8af7accb524c6eb'
+    # b43da4a：core 账 pin 79173 → 79185（commons 890c6cb 运行时目录覆盖
+    # 优先级，+12，RATCHET-JUSTIFY 已随提交），另修 bootstrap -r 帮助面的
+    # 过期默认值（/tmp/agentrt → $AIRY_HOME/run）。不 bump 则 CI 的 Gate 42
+    # 仍按旧账判「实测 79185 vs pin 79173」差异非零，本地绿而 CI 红。
+    default: 'b43da4a152b5c68f227814b726b4f132fddf0cdd'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
