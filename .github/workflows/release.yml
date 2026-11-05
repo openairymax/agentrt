@@ -1478,9 +1478,9 @@ jobs:
     needs: [finalize-dist, e2e-clean-room]
     if: success() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
-    # 单文件 PUT 上限 60min × UPLOAD_RETRY 4 = 4h 理论最坏；封顶 300min
-    # 使"上传挂死"以失败态终止（fail-fast，进入可重跑的重试路径），而非
-    # 静默耗尽默认 360min 上限。
+    # 单文件 PUT 上限 60min；重试按"次数上限 8 + 墙钟预算 2h"计，故单 job
+    # 最坏约 2h（预算耗尽即停）；封顶 300min 使"上传挂死"以失败态终止
+    # （fail-fast，进入可重跑的重试路径），而非静默耗尽默认 360min 上限。
     timeout-minutes: 300
     environment: release
     permissions:
