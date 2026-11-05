@@ -196,7 +196,9 @@ size_t cli_history_capacity(void);
  * 返回 1=task / 0=chat / -1=未命中（调用方交 LLM 兜底） */
 int cli_classify_heuristic(const char *input);
 int cli_classify_input(const char *input);
-void cli_chat_reply(const char *input);
+/* 0 = 本轮拿到回复并完成渲染；-1 = 上游失败/取消，无回复可交付。
+ * -p 模式据此决定进程退出码，脚本才能判定这一轮是否成功。 */
+int cli_chat_reply(const char *input);
 /* B-1/B-2：计费展示口径 SSoT，所有回合出口（chat / task / 蓝图快速路径）
  * 共用；返回 1 = buf 写入非空指标，0 = 本回合无消耗 */
 int cli_chat_usage_metrics(char *buf, size_t n);

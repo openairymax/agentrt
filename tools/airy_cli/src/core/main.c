@@ -294,8 +294,9 @@ static void cli_lang_gw(const char *input)
 }
 #endif /* AIRY_HAS_CJSON */
 
-/* 单回合：状态渲染 → 语言网关 → 蓝图三级路由 → 对话/任务分支。 */
-static void cli_turn(cli_loop_t *l)
+/* 单回合：状态渲染 → 语言网关 → 蓝图三级路由 → 对话/任务分支。
+ * 返回 0 = 本轮完成；1 = 本轮未拿到可用结果（-p 的进程退出码由此决定）。 */
+static int cli_turn(cli_loop_t *l)
 {
     uint64_t t0 = cli_now_ms();
     int is_task;
@@ -307,20 +308,20 @@ static void cli_turn(cli_loop_t *l)
     /* 4.0b Blueprint scheduling three-tier routing（0.1.9 M3：经
      * gateway → sched_d sched.plan RPC，CLI 不再持有本地 roadmap） */
     if (cli_blueprint_fastpath(l->input, t0))
-        return;
+        return 0;
     is_task = cli_classify_input(l->input);
     cli_trace("intent", "%s", is_task ? "task" : "chat");
     if (is_task == 0) {
         char metrics[192];
+        int failed = cli_chat_reply(l->input) != 0;
 
-        cli_chat_reply(l->input);
         cli_chat_usage_metrics(metrics, sizeof(metrics));
         cli_print_turn(cli_now_ms() - t0, metrics[0] ? metrics : NULL);
-        return;
+        return failed;
     }
     /* === 任务回合：认知规划（gateway → think_d）→ DAG 适配 → 提交 →
      * 轮询 → 等待 → 结果汇总（airy_cli_taskflow.c） === */
-    (void)cli_run_task_pipeline(&l->rt, l->input, t0);
+    return cli_run_task_pipeline(&l->rt, l->input, t0) != 0;
 }
 
 #ifndef _WIN32
@@ -470,17 +471,23 @@ int main(int argc, char *argv[])
     loop.cmd.quit = &loop.quit;
     loop.cmd.switch_tui = &loop.switch_tui;
     cli_boot_heal();
-    for (;;) {
-        size_t len = 0;
-        int step;
+    {
+        int failed = 0;
 
-        (void)cli_daemon_lifecycle_reconcile_once();
-        step = cli_loop_step(&loop, &len);
-        if (step == CLI_LOOP_EOF)
-            break;
-        if (step == CLI_LOOP_TURN)
-            cli_turn(&loop);
+        for (;;) {
+            size_t len = 0;
+            int step;
+
+            (void)cli_daemon_lifecycle_reconcile_once();
+            step = cli_loop_step(&loop, &len);
+            if (step == CLI_LOOP_EOF)
+                break;
+            if (step == CLI_LOOP_TURN && cli_turn(&loop) != 0)
+                failed = 1;
+        }
+        cli_shutdown(&loop);
+        /* -p 是脚本入口，单轮失败必须落到退出码；交互式 REPL 沿用 0，
+         * 避免历史失败污染用户 shell 的后续命令链。 */
+        return g_cli_print_mode ? failed : 0;
     }
-    cli_shutdown(&loop);
-    return 0;
 }
