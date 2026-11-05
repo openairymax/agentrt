@@ -82,7 +82,7 @@ int cli_task_poll_input(void)
         return -1;
     }
     cli_print_line("For Thee", line);
-    cli_chat_reply(line);
+    (void)cli_chat_reply(line);
     return 1;
 #else
     (void)0;

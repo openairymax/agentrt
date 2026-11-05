@@ -160,6 +160,8 @@ static void cli_print_usage(void)
     cli_outf("  %s-h%s, %s--help%s             显示本帮助\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("交互模式：直接运行 airy_cli 进入对话；输入 /help 查看命令。\n");
+    cli_outf("退出码：0 成功；1 用法错误或本轮未拿到结果（-p 下可判定）；"
+             "126 TUI 不可用。\n");
 }
 
 /* 命令行解析（2026-08-21 自 main 抽离降圈复杂度）：支持选项与
