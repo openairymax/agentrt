@@ -151,7 +151,12 @@ inputs:
     # 秒级粗粒度差分；K1/K2 的观测值此前在亚秒区间恒为 0，等于度量源存在
     # 而不可读）。memoryrovol 指针同批同步，该件 update=none 不参与门禁。
     # 判据消费路径仍不触，仅装配输入前进。
-    default: '652a7782678e5ed22b09b1041161ff821b93ad67'
+    # a562df4：cupolas 前进至 14155ef（r141 映射装配哨兵槽回归：在容量边界
+    # 8/9/15/16/17/32/33 与「16 条同名 capabilities」现场形态上钉住
+    # yaml_size() 的 key==NULL 终点）。与旧 pin 单提交差，仅
+    # cupolas/tests/unit/test_yaml_minimal.c，不触判据消费路径；不 bump 则
+    # 该回归在 CI 中永不执行（pin 之外的测试树等于不存在）。
+    default: 'a562df44c67126e1ea6f32bc5acc9559c6570775'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
