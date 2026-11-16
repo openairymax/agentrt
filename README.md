@@ -6,9 +6,12 @@
 
 **Language:** English | [简体中文](README_zh.md)
 
-[![Version](https://img.shields.io/github/v/release/openairymax/agentrt?label=version&color=5a6b7e)](https://github.com/openairymax/agentrt/releases/latest)
-[![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
+[![AtomGit](https://atomgit.com/openairymax/agentrt/star/badge.svg)](https://atomgit.com/openairymax/agentrt)
+[![GitHub](https://img.shields.io/github/stars/openairymax/agentrt?style=flat&logo=github)](https://github.com/openairymax/agentrt)
+[![Version](https://img.shields.io/github/v/release/openairymax/agentrt)](https://github.com/openairymax/agentrt/releases)
 [![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
+[![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
+[![CI](https://github.com/openairymax/agentrt/actions/workflows/build-test.yml/badge.svg)](https://github.com/openairymax/agentrt/actions/workflows/build-test.yml)
 
 ---
 
