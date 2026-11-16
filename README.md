@@ -8,17 +8,16 @@
 
 [![AtomGit](https://atomgit.com/openairymax/agentrt/star/badge.svg)](https://atomgit.com/openairymax/agentrt)
 [![GitHub stars](https://img.shields.io/github/stars/openairymax/agentrt?style=flat&logo=github&label=stars)](https://github.com/openairymax/agentrt)
-[![Gitee stars](https://gitee.com/openairymax/agentrt/badge/star.svg?theme=white)](https://gitee.com/openairymax/agentrt/stargazers)  
-
+[![Gitee stars](https://gitee.com/openairymax/agentrt/badge/star.svg?theme=white)](https://gitee.com/openairymax/agentrt/stargazers)
 [![Release](https://img.shields.io/github/v/release/openairymax/agentrt?style=flat&label=release)](https://github.com/openairymax/agentrt/releases)
-[![C11](https://img.shields.io/badge/C11-00599C?style=flat&logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
-[![License](https://img.shields.io/badge/license-AGPL--3.0%20%7C%20Apache--2.0-4a90d9?style=flat)](LICENSE)
+[![C11](https://img.shields.io/badge/C11-00599C?style=flat&logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)  
+
+[![License](https://img.shields.io/badge/license-AGPL--3.0%20%7C%20Apache--2.0-4a90d9?style=flat)](LICENSE)  
 
 [![macOS](https://img.shields.io/badge/macOS-000000?style=flat&logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![Linux](https://img.shields.io/badge/Linux-FCC624?style=flat&logo=linux&logoColor=black)](https://www.kernel.org)
 [![Windows](https://img.shields.io/badge/Windows-0078D6?style=flat&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
 [![AirymaxOS](https://img.shields.io/badge/AirymaxOS-000000?style=flat)](https://atomgit.com/openairymax/agent-linux)
-
 [![x86](https://img.shields.io/badge/x86-494B4D?style=flat)](https://en.wikipedia.org/wiki/X86)
 [![ARM](https://img.shields.io/badge/ARM-494B4D?style=flat&logo=arm&logoColor=white)](https://www.arm.com)
 [![RISC-V](https://img.shields.io/badge/RISC--V-494B4D?style=flat&logo=riscv&logoColor=white)](https://riscv.org)
