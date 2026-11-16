@@ -1,15 +1,17 @@
 # AirymaxRT 极境智能体运行底座
 
-> 面向 AI 智能体团队的操作系统级运行底座。它把智能体"如何思考、如何执行、
-> 如何记忆、如何彼此通信"标准化为一套运行时，角色类比于容器运行时之于微服务。
+> 面向AI Agent的操作系统级运行底座，兼容驱动目前行业内的所有Agent。
+> 它把智能体"如何思考、如何执行、如何记忆、如何彼此通信"标准化为一套运行时，类比于容器运行时之于微服务。
 
 **语言：** [English](README.md) | 简体中文
 
 [![AtomGit](https://atomgit.com/openairymax/agentrt/star/badge.svg)](https://atomgit.com/openairymax/agentrt)
-[![GitHub](https://img.shields.io/github/stars/openairymax/agentrt?style=flat&logo=github)](https://github.com/openairymax/agentrt)
-[![Version](https://img.shields.io/github/v/release/openairymax/agentrt)](https://github.com/openairymax/agentrt/releases)
-[![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
-[![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/openairymax/agentrt?style=flat&logo=github&label=stars)](https://github.com/openairymax/agentrt)
+[![Gitee stars](https://gitee.com/openairymax/agentrt/badge/star.svg?theme=white)](https://gitee.com/openairymax/agentrt/stargazers)  
+
+[![Release](https://img.shields.io/github/v/release/openairymax/agentrt?style=flat&label=release)](https://github.com/openairymax/agentrt/releases)
+[![C11](https://img.shields.io/badge/C-11-00599C?style=flat&logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
+[![License](https://img.shields.io/badge/license-AGPL--3.0%20%7C%20Apache--2.0-4a90d9?style=flat)](LICENSE)
 [![CI](https://github.com/openairymax/agentrt/actions/workflows/build-test.yml/badge.svg)](https://github.com/openairymax/agentrt/actions/workflows/build-test.yml)
 
 ***
