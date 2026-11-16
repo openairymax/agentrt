@@ -7,10 +7,12 @@
 **Language:** English | [简体中文](README_zh.md)
 
 [![AtomGit](https://atomgit.com/openairymax/agentrt/star/badge.svg)](https://atomgit.com/openairymax/agentrt)
-[![GitHub](https://img.shields.io/github/stars/openairymax/agentrt?style=flat&logo=github)](https://github.com/openairymax/agentrt)
-[![Version](https://img.shields.io/github/v/release/openairymax/agentrt)](https://github.com/openairymax/agentrt/releases)
-[![C11](https://img.shields.io/badge/C-11-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
-[![License](https://img.shields.io/badge/license-AGPL--3.0+Apache--2.0-4a90d9)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/openairymax/agentrt?style=flat&logo=github&label=stars)](https://github.com/openairymax/agentrt)
+[![Gitee stars](https://gitee.com/openairymax/agentrt/badge/star.svg?theme=white)](https://gitee.com/openairymax/agentrt/stargazers)  
+
+[![Release](https://img.shields.io/github/v/release/openairymax/agentrt?style=flat&label=release)](https://github.com/openairymax/agentrt/releases)
+[![C11](https://img.shields.io/badge/C-11-00599C?style=flat&logo=c&logoColor=white)](https://en.cppreference.com/w/c/11)
+[![License](https://img.shields.io/badge/license-AGPL--3.0%20%7C%20Apache--2.0-4a90d9?style=flat)](LICENSE)
 [![CI](https://github.com/openairymax/agentrt/actions/workflows/build-test.yml/badge.svg)](https://github.com/openairymax/agentrt/actions/workflows/build-test.yml)
 
 ---
