@@ -41,13 +41,14 @@ IDENT_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 PERM_RE = re.compile(r"^cap:[a-z][a-z0-9_.]*$")
 DAEMON_RE = re.compile(r"^[a-z][a-z0-9_]*_d$")
 
-KINDS = ("fwd", "mem", "llm_list", "tool_approve", "hall", "agent_run")
+KINDS = ("fwd", "mem", "llm_list", "tool_approve", "hall", "agent_run", "task_submit")
 KIND_HOME = {
     "mem": "mem",
     "llm_list": "llm",
     "tool_approve": "tool",
     "hall": "hall",
     "agent_run": "agent",
+    "task_submit": "task",
 }
 KIND_ENUM = {
     "fwd": "GW_CAP_KIND_FWD",
@@ -56,6 +57,7 @@ KIND_ENUM = {
     "tool_approve": "GW_CAP_KIND_TOOL_APPROVE",
     "hall": "GW_CAP_KIND_HALL",
     "agent_run": "GW_CAP_KIND_AGENT_RUN",
+    "task_submit": "GW_CAP_KIND_TASK_SUBMIT",
 }
 
 
