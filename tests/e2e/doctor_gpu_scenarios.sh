@@ -70,19 +70,19 @@ expect() {
 }
 
 # 场景 1：有 GPU，L1/L2/L3 打通，未声明 local → 能力匹配
-G1='{"schema":1,"verdict":"r1","devices":1,"drv_bound":1,"layers":7,"backend":"127.0.0.1:8000","drivers":"nvidia(555.42)","reason":""}'
+G1='{"schema":1,"verdict":"r1","accel":"nvidia","devices":1,"drv_bound":1,"vram_mb":24576,"layers":7,"backend":"127.0.0.1:8000","drivers":"nvidia(555.42)","reason":""}'
 O1="$(run_doctor "$G1" "$TMP/rows_api.ndjson")"
-expect "$O1" "GPU: nvidia(555.42) 后端 127.0.0.1:8000" "场景1 GPU 段 PASS"
+expect "$O1" "GPU: 加速器 nvidia，驱动 nvidia(555.42)，显存 24576MiB，后端 127.0.0.1:8000" "场景1 GPU 段 PASS"
 expect "$O1" "选路: 能力匹配 → 127.0.0.1:8000" "场景1 选路=能力匹配"
 
 # 场景 2：无 GPU，有已配密钥的远端 → 远端 API，并给出 GPU 降级原因
-G2='{"schema":1,"verdict":"r3","devices":0,"drv_bound":0,"layers":0,"backend":"","drivers":"","reason":"sysfs/drm 未检出 PCI 加速器"}'
+G2='{"schema":1,"verdict":"r3","accel":"none","devices":0,"drv_bound":0,"vram_mb":0,"layers":0,"backend":"","drivers":"","reason":"sysfs/drm 未检出 PCI 加速器"}'
 O2="$(run_doctor "$G2" "$TMP/rows_api.ndjson")"
 expect "$O2" "GPU: 未检出加速器" "场景2 GPU 段明示无卡"
 expect "$O2" "选路: 远端 API → remote-a" "场景2 选路=远端 API"
 
 # 场景 3：GPU 在但驱动未绑定，且远端无密钥 → CPU 自托管
-G3='{"schema":1,"verdict":"r3","devices":1,"drv_bound":0,"layers":1,"backend":"","drivers":"unbound","reason":"加速器在，但 127.0.0.1:8000 无 OpenAI 兼容应答"}'
+G3='{"schema":1,"verdict":"r3","accel":"nvidia","devices":1,"drv_bound":0,"vram_mb":0,"layers":1,"backend":"","drivers":"unbound","reason":"加速器在，但 127.0.0.1:8000 无 OpenAI 兼容应答"}'
 O3="$(run_doctor "$G3" "$TMP/rows_nokey.ndjson")"
 expect "$O3" "驱动不可用" "场景3 GPU 段判驱动不可用"
 expect "$O3" "选路: CPU 自托管" "场景3 选路=CPU 自托管"
