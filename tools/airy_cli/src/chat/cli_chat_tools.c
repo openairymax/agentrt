@@ -292,10 +292,16 @@ static char *chat_reply(const char *result_json, int *ok)
     cJSON *root = cJSON_Parse(result_json);
     if (!root)
         return NULL;
+    cJSON *err_code = cJSON_GetObjectItem(root, "err_code");
     cJSON *succ = cJSON_GetObjectItem(root, "success");
-    /* tool_d 返回 "success":1（数字），cJSON_IsTrue 只认 true 字面量；
-     * 数字与布尔都按非 0 判定（2026-08-16 实测误判 ok=0）。 */
-    *ok = (succ && (cJSON_IsTrue(succ) || (cJSON_IsNumber(succ) && succ->valueint != 0))) ? 1 : 0;
+    cJSON *out_item = cJSON_GetObjectItem(root, "output");
+    /* C-2：err_code 为准（缺失才回落 success）；tool_d 数字/布尔双形态都
+     * 认非 0 为成功。成功但产出为空不记成功——空正文的 ✓ 与事实脱节。 */
+    int reported = cJSON_IsNumber(err_code)
+                       ? err_code->valueint == 0
+                       : (succ && (cJSON_IsTrue(succ) || (cJSON_IsNumber(succ) && succ->valueint != 0)));
+    int has_out = cJSON_IsString(out_item) && out_item->valuestring && out_item->valuestring[0];
+    *ok = (reported && has_out) ? 1 : 0;
     cJSON *r = cJSON_CreateObject();
     char *out = NULL;
     if (r) {

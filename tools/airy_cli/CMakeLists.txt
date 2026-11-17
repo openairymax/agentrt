@@ -349,6 +349,28 @@ if(BUILD_TESTS)
         add_test(NAME cli_errdesc_unit COMMAND test_cli_errdesc)
     endif()
 
+    # 0.1.21 C-2：空计划独立用例——零节点计划必须报 AIRY_ERR_PLAN_EMPTY，
+    # 不得再被映射为「内存不足」。装配期即返回，不依赖网关。
+    if(NOT WIN32)
+        add_executable(test_cli_plan_empty tests/test_cli_plan_empty.c
+                       tests/cli_test_globals.c
+                       ${CLI_GW_SRCS} src/render/cli_render.c
+                       src/core/cli_dag.c src/core/cli_term.c)
+        target_include_directories(test_cli_plan_empty PRIVATE ${CLI_INC_DIRS})
+        target_compile_definitions(test_cli_plan_empty PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
+        if(AIRY_CJSON_INCLUDE_DIRS)
+            target_include_directories(test_cli_plan_empty PRIVATE ${AIRY_CJSON_INCLUDE_DIRS})
+        endif()
+        target_link_libraries(test_cli_plan_empty PRIVATE airy_coreloopthree airy_common
+                                                          Threads::Threads)
+        if(TARGET cJSON OR TARGET cjson)
+            target_link_libraries(test_cli_plan_empty PRIVATE $<IF:$<TARGET_EXISTS:cJSON>,cJSON,cjson>)
+        elseif(AIRY_CJSON_LIBRARIES)
+            target_link_libraries(test_cli_plan_empty PRIVATE ${AIRY_CJSON_LIBRARIES})
+        endif()
+        add_test(NAME cli_plan_empty_unit COMMAND test_cli_plan_empty)
+    endif()
+
     # 0.1.19 N4：会话存活节拍端到端——mock 网关驱动 /health 代次与服务
     # health_check，覆盖基线不误判、代次重建恰一次、down→up 兜底、超时
     # 不改视图且不污染业务诊断、网关断连后凭代次重建、AIRY_CLI_LIVE_MS=0
