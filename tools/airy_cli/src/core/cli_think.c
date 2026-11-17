@@ -285,13 +285,14 @@ static void yaml_scalar(const char *after, char *out, size_t cap)
 
 /* 从 model.yaml 提取标量字段（BAN 合规：手写解析，禁 sscanf）。
  *
- * 结构约定（ecosystem/manager/model/model.yaml）：
+ * 结构约定（ecosystem/manager/model/model.yaml，C-19 起 slots 为单一
+ * 事实源；think.*_model 三键已废弃，仅作兼容回落）：
  *   llm:
  *     model: "your-model-id"
- *   think:
- *     think2_slow_model: ""
- *     think1_fast_model: ""
- *     think1_prof_model: ""
+ *   slots:
+ *     t2: ""
+ *     t1f: ""
+ *     t1p: ""
  * 无缩进段标题（"name:"）切换当前段；目标段内缩进的 "key: \"value\""
  * 行命中即返回。返回 0 找到（含空串），-1 未找到/文件不可读。 */
 static int cli_think_cfg_yaml_get(const char *path, const char *section,
@@ -361,9 +362,10 @@ static void cli_think_env(char *t2, size_t t2c, char *t1f, size_t t1fc,
 
 /* 双思考三模型配置统一读取，CLI 侧真相源对齐 think_d。
  *
- * 优先级：env AIRY_MODEL_T2/T1F/T1P > $AIRY_MODEL_CONFIG（或
- * $AIRY_HOME/config/model.yaml）think 段 > 该文件 llm.model 默认
- * （model.yaml 语义：think 段留空 = 使用默认模型）。
+ * 优先级（与 think_d svc_slot_resolve 同序）：env AIRY_MODEL_T2/T1F/T1P
+ * > $AIRY_MODEL_CONFIG（或 $AIRY_HOME/config/model.yaml）顶层 slots 段
+ * > 废弃 think.*_model 键 > 该文件 llm.model 默认（槽位留空 = 使用
+ * 默认模型）。
  *
  * 2026-08-19：CLI 此前只读 env，与 think_d 配置脱节——think 段留空
  * 时 CLI 显示"默认"而 think_d 实际用 llm.model；现统一为真实生效
@@ -381,6 +383,15 @@ void cli_think_cfg_load(char *t2, size_t t2c, char *t1f, size_t t1fc,
     char path[AIRY_PATH_MAX];
     cli_think_cfg_path(path, sizeof(path));
 
+    if (t2[0] == '\0')
+        cli_think_cfg_yaml_get(path, "slots", "t2", t2, t2c);
+    if (t1f[0] == '\0')
+        cli_think_cfg_yaml_get(path, "slots", "t1f", t1f, t1fc);
+    if (t1p[0] == '\0')
+        cli_think_cfg_yaml_get(path, "slots", "t1p", t1p, t1pc);
+
+    /* 兼容窗口：slots 未覆盖时回落废弃 think.*_model（think_d 侧同源
+     * 回落并告警，CLI 只读展示不再提示第二次）。 */
     if (t2[0] == '\0')
         cli_think_cfg_yaml_get(path, "think", "think2_slow_model", t2, t2c);
     if (t1f[0] == '\0')

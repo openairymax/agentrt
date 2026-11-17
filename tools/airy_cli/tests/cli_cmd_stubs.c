@@ -119,6 +119,13 @@ int cli_cmd_models(int argc, char *argv[])
     return 0;
 }
 
+int cli_cmd_model(int argc, char *argv[])
+{
+    (void)argc;
+    (void)argv;
+    return 0;
+}
+
 int cli_cmd_gpu(int argc, char *argv[])
 {
     (void)argc;
