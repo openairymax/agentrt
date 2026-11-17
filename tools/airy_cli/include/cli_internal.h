@@ -159,6 +159,10 @@ int cli_cmd_model(int argc, char *argv[]);
  * 无 GPU / GPU 在但驱动不可用 / GPU 可用，并打印降级原因。 */
 int cli_cmd_gpu(int argc, char *argv[]);
 
+/* 0.1.21 D-2：密钥装配引导（选行 → 写 secrets.env → llm.probe 立即验证）。
+ * 返回 0 成功、2 失败；中途取消不落盘。 */
+int cli_cmd_key(int argc, char *argv[]);
+
 /* Chat history buffer (defined in cli_chat.c) */
 extern char *g_history_roles[CLI_HISTORY_MAX_MSGS];
 extern char *g_history_contents[CLI_HISTORY_MAX_MSGS];

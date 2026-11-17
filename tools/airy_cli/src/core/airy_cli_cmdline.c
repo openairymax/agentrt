@@ -240,6 +240,8 @@ static void cli_print_usage(void)
              "本地模型注册表\n", cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %smodel slot%s [get|set <t2|t1f|t1p> <model_id>]  三角色槽位视图/热切换\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_outf("  %skey%s [--list] [--model M|--index N] [--key K] [--dry-run]  "
+             "密钥装配引导（写入后立即连通验证）\n", cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %sgpu%s [--json]             加速器能力快照（驱动/版本/后端/降级原因）\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("交互模式：直接运行 airy_cli 进入对话；输入 /help 查看命令。\n");
@@ -282,6 +284,8 @@ int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
             return cli_cmd_models(argc - i - 1, argv + i + 1) == 0 ? 1 : 2;
         } else if (!g_cli_print_mode && strcmp(argv[i], "model") == 0) {
             return cli_cmd_model(argc - i - 1, argv + i + 1) == 0 ? 1 : 2;
+        } else if (!g_cli_print_mode && strcmp(argv[i], "key") == 0) {
+            return cli_cmd_key(argc - i - 1, argv + i + 1) == 0 ? 1 : 2;
         } else if (!g_cli_print_mode && strcmp(argv[i], "gpu") == 0) {
             return cli_cmd_gpu(argc - i - 1, argv + i + 1) == 0 ? 1 : 2;
         } else if (argv[i][0] == '-') {

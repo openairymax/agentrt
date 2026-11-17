@@ -48,6 +48,14 @@ void cli_rpc_print(const char *ns, const char *method, const char *params_json);
  * list / use / remove；返回 0 成功、2 失败（与 cli_cmd_* 约定一致）。 */
 int cli_model_reg(int argc, char *argv[]);
 
+/* 密钥装配引导写盘件（cli_key.c，0.1.21 D-2）：选行 → 填 key → 写
+ * secrets.env → llm.probe 立即验证；命令入口 cli_cmd_key 见 cli_internal.h。
+ * 中途取消不落盘。 */
+
+/* secrets.env 变量位原子写入（tmp + fsync + rename，权限 600）。
+ * 与 /apikey set 同源；replaced 非空时回传是否覆盖既有键。 */
+int airy_cli_secret_store(const char *path, const char *var, const char *key, int *replaced);
+
 /* Render one sub-agent line: header "Sub <ns> Agent" is built at runtime
  * because the namespace is dynamic. is_err picks the -p-visible channel. */
 void cli_sub_print(int is_err, const char *ns, const char *text);
