@@ -151,6 +151,14 @@ extern int g_cli_resume_mode;
  * 可判读错误，不做接力降级（R5-G6 判据④）。 */
 int cli_run_tui_frontend(int resume);
 
+/* 0.1.21 A-6：JSON 字符串转义（Windows 路径含反斜杠，双引号亦须转义）。
+ * paths 与 models 两个自证子命令共用，禁止各写一份转义。 */
+void cli_json_esc(char *dst, size_t cap, const char *src);
+
+/* 0.1.21 A-7：模型连接表快照（NDJSON 一行一连接）。doctor 据此区分
+ * 本地模型 / 缺 key / 已配 key；不联网、不输出密钥值。 */
+int cli_cmd_models(int argc, char *argv[]);
+
 /* Chat history buffer (defined in cli_chat.c) */
 extern char *g_history_roles[CLI_HISTORY_MAX_MSGS];
 extern char *g_history_contents[CLI_HISTORY_MAX_MSGS];
