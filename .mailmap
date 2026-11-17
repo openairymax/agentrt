@@ -1,0 +1,8 @@
+# 身份归并 SSoT（0.1.21 A-10）：同一自然人只保留一个规范身份。
+# 语法：仅写「规范姓名 <邮箱>」时，该邮箱下的全部姓名变体在 log/blame/shortlog
+# 中统一显示为规范姓名；不改变任何历史提交对象及其 SHA。
+Liren Wang <wangliren@spharx.cn>
+Decheng Li <lidecheng@spharx.cn>
+Zhixian Zhou <zhouzhixian@spharx.cn>
+# 发布自动化账号：非自然人，禁止用于 Signed-off-by（CONTRIBUTING §3.4）。
+AgentRT Release <release@agentrt.airymax.io>
