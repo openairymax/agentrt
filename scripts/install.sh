@@ -399,12 +399,19 @@ detect_existing_install() {
     return 0
 }
 
+# A-9 H1：锚定「命令行以该路径开头」并转义正则元字符，避免 ssh 会话
+# 因命令行携带同一路径字符串被 pkill -f 误杀（自匹配）。
+pkill_bin() {
+    _pat="$(printf '%s' "$1" | sed 's/[][\\.*^$]/\\&/g')"
+    pkill -f -- "^${_pat}([[:space:]]|$)" >/dev/null 2>&1
+}
+
 stop_daemons() {
     local bin="$1" found=0 d
     [ -d "$bin" ] || return 1
     for d in $(daemon_list "$bin"); do
         if [ -x "${bin}/${d}" ]; then
-            if pkill -f "${bin}/${d}" >/dev/null 2>&1; then
+            if pkill_bin "${bin}/${d}"; then
                 found=1
             fi
             if [ -d /proc ] && command -v readlink >/dev/null 2>&1; then
