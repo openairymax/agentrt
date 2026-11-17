@@ -144,6 +144,76 @@ int cli_dispatch_command(const char *input, void *ctx)
     return 1;
 }
 
+/* 0.1.21 A-6：JSON 字符串转义（Windows 路径含反斜杠，双引号亦须转义）。 */
+static void cli_json_esc(char *dst, size_t cap, const char *src)
+{
+    size_t n = 0;
+
+    for (; src && *src && n + 7 < cap; src++) {
+        unsigned char c = (unsigned char)*src;
+
+        if (c == '"' || c == '\\') {
+            dst[n++] = '\\';
+            dst[n++] = (char)c;
+        } else if (c < 0x20) {
+            n += (size_t)snprintf(dst + n, cap - n, "\\u%04x", c);
+        } else {
+            dst[n++] = (char)c;
+        }
+    }
+    dst[n] = '\0';
+}
+
+/* 0.1.21 A-6：路径自证子命令。doctor、安装器与门禁同取此源（机制侧
+ * airy_paths_query），禁止各自拼 $AIRY_HOME/... 造成双根分叉；单行 JSON
+ * 便于 POSIX shell 用 sed 取字段（容器内未必有 python/jq）。 */
+static int cli_cmd_paths(int argc, char *argv[])
+{
+    static const char *const keys[] = {
+        "home", "bin", "lib", "run", "log",
+        "config", "data", "tmp", "cache", "workspace",
+    };
+    airy_paths_view_t v;
+    const char *vals[10];
+    char esc[AIRY_PATH_MAX * 2];
+    int json = g_cli_json_mode;
+
+    for (int i = 0; i < argc; i++) {
+        if (strcmp(argv[i], "--json") == 0) {
+            json = 1;
+            continue;
+        }
+        cli_outf("airy_cli: paths 不认识参数 %s\n", argv[i]);
+        return 2;
+    }
+    if (airy_paths_query(&v) != AIRY_SUCCESS) {
+        cli_outf("airy_cli: 路径解析失败\n");
+        return 2;
+    }
+    vals[0] = v.home;
+    vals[1] = v.bin;
+    vals[2] = v.lib;
+    vals[3] = v.run;
+    vals[4] = v.log;
+    vals[5] = v.config;
+    vals[6] = v.data;
+    vals[7] = v.tmp;
+    vals[8] = v.cache;
+    vals[9] = v.workspace;
+    if (!json) {
+        for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++)
+            cli_outf("%s=%s\n", keys[i], vals[i]);
+        return 0;
+    }
+    cli_outf("{\"schema\":1");
+    for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) {
+        cli_json_esc(esc, sizeof(esc), vals[i]);
+        cli_outf(",\"%s\":\"%s\"", keys[i], esc);
+    }
+    cli_outf("}\n");
+    return 0;
+}
+
 static void cli_print_usage(void)
 {
     cli_outf("用法: airy_cli [选项]\n");
@@ -160,6 +230,8 @@ static void cli_print_usage(void)
            cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %s-h%s, %s--help%s             显示本帮助\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_outf("  %spaths%s [--json]          路径体系快照（自检/门禁与安装器同一来源）\n",
+           cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("交互模式：直接运行 airy_cli 进入对话；输入 /help 查看命令。\n");
     cli_outf("退出码：0 成功；1 用法错误或本轮未拿到结果（-p 下可判定）；"
              "126 TUI 不可用。\n");
@@ -190,6 +262,9 @@ int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             cli_print_usage();
             return 1;
+        } else if (!g_cli_print_mode && strcmp(argv[i], "paths") == 0) {
+            /* 子命令按「已输出、正常终止」返回；失败仍走用法错误码。 */
+            return cli_cmd_paths(argc - i - 1, argv + i + 1) == 0 ? 1 : 2;
         } else if (argv[i][0] == '-') {
             cli_outf("airy_cli: 未知选项 %s%s%s\n", cli_c(CLR_YELLOW), argv[i],
                    cli_c(CLR_RESET));
