@@ -134,12 +134,16 @@ jobs:
 
       # sanitizer 对构建环境负载敏感（栈使用检测 + 泄漏追踪），单测超时护栏
       # 放宽到 300s；不做自动 rerun（内存问题不是瞬态 flaky，rerun 只会掩盖）。
-      - name: Run sanitizer tests (ctest)
+      # A-4 隔离门禁：ctest 在沙箱 HOME/XDG/TMPDIR 下执行，跑完断言真实
+      # $HOME 零新增；写真实 HOME 与用例失败同等判红。
+      - name: Run sanitizer tests (ctest, HOME isolated)
         run: |
           set +e
-          ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure -j"$(nproc)" \
-            --timeout 300 -R '${{ env.SANITIZER_CTEST_RE }}' \
-            > /tmp/sanitizer-ctest.log 2>&1
+          bash scripts/gate_home_isolate.sh run --leg tests \
+            --verdict-dir "${RUNNER_TEMP}/airy-gate-a4-san" -- \
+            ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure -j"$(nproc)" \
+              --timeout 300 -R '${{ env.SANITIZER_CTEST_RE }}' \
+              > /tmp/sanitizer-ctest.log 2>&1
           rc=$?
           if [ $rc -eq 0 ]; then
             tail -n 4 /tmp/sanitizer-ctest.log
@@ -147,7 +151,7 @@ jobs:
           fi
           echo "::error::sanitizer ctest FAILED rc=$rc"
           # sanitizer 报告在断言行之后（SUMMARY/ERROR 行），逐类抓取定位。
-          grep -E 'ERROR: (Address|Leak|UndefinedBehavior)Sanitizer|runtime error:|SUMMARY: |The following tests FAILED:|^[[:space:]]+[0-9]+ - ' \
+          grep -E 'ERROR: (Address|Leak|UndefinedBehavior)Sanitizer|runtime error:|SUMMARY: |The following tests FAILED:|^[[:space:]]+[0-9]+ - |::error::A-4' \
             /tmp/sanitizer-ctest.log | head -60 | sed 's/^/::error::  /'
           tail -n 60 /tmp/sanitizer-ctest.log | sed 's/^/::error::  /'
           exit $rc
