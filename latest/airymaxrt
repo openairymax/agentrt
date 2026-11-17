@@ -1453,7 +1453,9 @@ case "$CMD" in
         echo "                        （monitor --daemon 后台常驻 / --stop 停止）"
         echo "      airymaxrt status      查看运行时状态"
         echo "      airymaxrt stop        收摊 daemon 群（supervisor.shutdown 唯一收摊入口）"
-        echo "      airymaxrt doctor [--online]  组件健康检查（--online 联网校验 api key）"
+        echo "      airymaxrt doctor [--online] [--gc-empty-out]  组件健康检查"
+        echo "                        （--online 联网校验 api key；--gc-empty-out 回收"
+        echo "                          白名单内 0 字节且超期（默认 7 天）的 .out）"
         echo "      airymaxrt logs [N]    查看最近日志（默认 airymaxrt.log 末 50 行；"
         echo "                            logs <name> 看指定 daemon，如 logs llm_d）"
         echo "      airymaxrt update      自更新（--check 仅检查 / --channel stable|rc|beta"
@@ -1685,7 +1687,45 @@ case "$CMD" in
         _dn_fail() { log error "[FAIL] $*"; _dn_f=$((_dn_f + 1)); }
         _dn_norm() { printf '%s' "${1#v}" | sed -n 's/^\([0-9][0-9.]*\).*/\1/p'; }
         _dn_online=0
-        case "${2:-}" in --online) _dn_online=1 ;; esac
+        _dn_gc=0
+        if [ $# -ge 1 ]; then
+            shift # 丢掉 "doctor" 自身，其余按选项解析
+        fi
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --online) _dn_online=1 ;;
+                --gc-empty-out) _dn_gc=1 ;;
+                *) log warn "doctor: 忽略未知参数 $1" ;;
+            esac
+            shift
+        done
+        # A-5：空 .out 回收。只删「白名单 daemon 名 + size 0 + mtime 超期」，
+        # 超期天数取 AIRY_GC_EMPTY_OUT_DAYS（默认 7）；白名单外一律不碰。
+        _dn_gc_empty_out() {
+            _gc_days="${AIRY_GC_EMPTY_OUT_DAYS:-7}"
+            case "$_gc_days" in ''|*[!0-9]*) _gc_days=7 ;; esac
+            _gc_n=0
+            _gc_scan=0
+            if [ ! -d "$LOG_DIR" ]; then
+                _dn_pass "空日志回收: 日志根不存在（$LOG_DIR，无需回收）"
+                return 0
+            fi
+            for _gc_f in "$LOG_DIR"/*.out; do
+                [ -f "$_gc_f" ] || continue
+                _gc_b="${_gc_f##*/}"
+                case "$_gc_b" in
+                    gateway_d.out|llm_d.out|think_d.out|agent_d.out|tool_d.out|\
+                    notify_d.out|supervisor_d.out|memory_d.out|maths.out) ;;
+                    *) continue ;;
+                esac
+                _gc_scan=$((_gc_scan + 1))
+                [ -s "$_gc_f" ] && continue
+                [ -n "$(find "$_gc_f" -maxdepth 0 -mtime +"$_gc_days" 2>/dev/null)" ] ||
+                    continue
+                rm -f -- "$_gc_f" && _gc_n=$((_gc_n + 1))
+            done
+            _dn_pass "空日志回收: 白名单 ${_gc_scan} 个 .out，删除 ${_gc_n} 个（0 字节且 >${_gc_days} 天）"
+        }
         _dn_get() { printf '%s' "$2" | sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p"; }
 
         # 路径来源自证：LOG_DIR/RUNTIME_DIR 必须出自 airy_cli 同一事实源，
@@ -1697,6 +1737,9 @@ case "$CMD" in
         fi
         if [ -d "$AIRY_HOME/logs" ] && [ "$AIRY_HOME/logs" != "$LOG_DIR" ]; then
             _dn_warn "旧日志根残留: $AIRY_HOME/logs（新根 $LOG_DIR；确认无进程写入后可删）"
+        fi
+        if [ "$_dn_gc" = "1" ]; then
+            _dn_gc_empty_out
         fi
 
         # 发布标识：install.env 与运行期构建自证必须同源，否则装的是 A 版、
