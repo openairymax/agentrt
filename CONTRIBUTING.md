@@ -147,6 +147,19 @@ refactor(gateway): 重构协议路由层错误处理逻辑
 docs(sdk): 更新 Python SDK 快速入门指南
 ```
 
+### 3.4 署名与身份（DCO）
+
+每个提交必须携带 `Signed-off-by: <自然人姓名> <邮箱>`，表示提交者有权按本项目许可证提交该代码。
+
+- 署名主体必须是自然人，或由该自然人明确授权的统一身份；**禁止机器/代理身份署名**
+  （如 `trae-solo-agent`、`*bot`、`*agent*`、`noreply@*`）。发布自动化账号
+  （`AgentRT Release`）只用于打标签与发行提交，不得出现在 `Signed-off-by` 中。
+- 同一自然人只允许一个规范身份：姓名变体（`LirenWang` / `Liren_Wang` 等）由仓库根
+  `.mailmap` 归并到规范姓名，`git log` / `git blame` / `git shortlog` 一律按归并后显示。
+- 校验方式：`git shortlog -sne` 的身份集合必须全部落在 `.mailmap` 声明的规范身份内；
+  CI 提交审计作业对每个新增提交执行同一规则（见 §16.20.5 的 R2/R7）。
+- 历史提交不改写：归并只影响显示，不改变任何提交对象及其 SHA。
+
 ---
 
 ## 4. 分支策略
