@@ -45,15 +45,16 @@ skip() { printf 'SKIP  %s\n' "$*"; SKIP_N=$((SKIP_N + 1)); }
 
 LLAMA_PID=""
 LLM_PID=""
-FIX_PID=""
+FIX_PIDS=()
 PORT_LLAMA="${AIRY_GATE_PORT_LLAMA:-21435}"
 PORT_FIX="${AIRY_GATE_PORT_FIX:-21436}"
 PORT_OOM="${AIRY_GATE_PORT_OOM:-21437}"
+PORT_OK="${AIRY_GATE_PORT_OK:-21438}"
 
 cleanup() {
     [ -n "$LLM_PID" ] && kill -TERM "$LLM_PID" 2>/dev/null
     [ -n "$LLAMA_PID" ] && kill -KILL "$LLAMA_PID" 2>/dev/null
-    [ -n "$FIX_PID" ] && kill -KILL "$FIX_PID" 2>/dev/null
+    rt_fix_stop_all
     [ "$KEEP" = "1" ] && printf 'NOTE  夹具保留于 %s\n' "$SB"
     [ "$KEEP" = "1" ] || rm -rf "$SB"
 }
@@ -167,9 +168,18 @@ class H(BaseHTTPRequestHandler):
 
 ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
 PY
-    python3 "$SB/fixture.py" "$1" "$2" "${3:-}" >"$SB/fixture.log" 2>&1 &
-    FIX_PID=$!
+    python3 "$SB/fixture.py" "$1" "$2" "${3:-}" >"$SB/fixture-$1.log" 2>&1 &
+    FIX_PIDS+=("$!")
     rt_wait_http "$1" 20
+}
+
+rt_fix_stop_all() {
+    local p
+    for p in ${FIX_PIDS[@]+"${FIX_PIDS[@]}"}; do
+        kill -KILL "$p" 2>/dev/null
+        wait "$p" 2>/dev/null
+    done
+    FIX_PIDS=()
 }
 
 rt_wait_http() { # <port> <秒>
@@ -198,7 +208,6 @@ rt_cfg() { # <home> <mode: api|local> <base_url> [model_id]
 models:
   - name: gate-$mode
     mode: $mode
-    api_format: $mode
     base_url: $base
     model_id: $mid
     provision: external
@@ -216,14 +225,12 @@ routing:
 models:
   - name: gate-bad
     mode: api
-    api_format: api
     base_url: $bad
     model_id: gate-bad
     api_key_env: GATE_BAD_KEY
     provision: external
   - name: gate-good
     mode: api
-    api_format: api
     base_url: $good
     model_id: gate-good
     api_key_env: GATE_GOOD_KEY
@@ -333,7 +340,7 @@ rt_self_test() {
         got="$(curl -fsS -m 3 -X POST "http://127.0.0.1:$PORT_FIX/v1/chat/completions" \
                -H 'Content-Type: application/json' -d '{}' 2>/dev/null)"
         case "$got" in *gate-ok*) pass "S0 夹具 ok 模式可用" ;; *) fail "S0 夹具 ok 模式异常" ;; esac
-        kill -KILL "$FIX_PID" 2>/dev/null; wait "$FIX_PID" 2>/dev/null; FIX_PID=""
+        rt_fix_stop_all
     fi
 }
 
@@ -350,8 +357,119 @@ rt_list() {
 
 # 场景实现按卡片递进补齐；未补齐的场景以 SKIP 保留契约位置。
 scn_t1() { skip "T-1 场景待 C-6-03 落地"; }
-scn_t2() { skip "T-2 场景待 C-6-02 落地"; }
-scn_t3() { skip "T-3 场景待 C-6-02 落地"; }
+# ── T-2 断网：失败必须有界且可判读；auto 模式必须切到健康端点 ──
+scn_t2() {
+    rt_need_llm "T-2" || return 0
+
+    local h out t0 dt
+    h="$(rt_home t2a)"
+    rt_cfg "$h" api "http://127.0.0.1:9" gate-net
+    export GATE_NET_KEY=gate
+    rt_start "$h" "$h/logs/llm.log"
+    if ! rt_wait_sock "$h" 20; then
+        fail "T-2a llm_d 未就绪（见 $h/logs/llm.log）"
+        rt_stop_llm
+        return 0
+    fi
+
+    t0="$(date +%s%N)"
+    out="$(rt_rpc "$h/run/llm.sock" complete \
+        '{"model":"gate-net","messages":[{"role":"user","content":"ping"}],"max_tokens":32}' 60)"
+    dt=$((($(date +%s%N) - t0) / 1000000))
+    case "$out" in
+        *'"error"'*) pass "T-2a 断网返回明确错误（${dt}ms）" ;;
+        *) fail "T-2a 断网未返回错误：$(printf '%.160s' "$out")" ;;
+    esac
+    if [ "$dt" -lt 60000 ]; then
+        pass "T-2a 失败路径有界（${dt}ms < 60000ms）"
+    else
+        fail "T-2a 失败路径疑似挂起（${dt}ms）"
+    fi
+    if grep -Eq 'diag=TIMEOUT|HTTP-POST-NORETRY|curl_error|connect' "$h/logs/llm.log"; then
+        pass "T-2a 日志给出传输层诊断"
+    else
+        fail "T-2a 缺传输层诊断日志"
+    fi
+    out="$(rt_rpc "$h/run/llm.sock" health_check '{}' 10)"
+    case "$out" in
+        *'"health"'*) pass "T-2a 失败后健康面仍可应答" ;;
+        *) fail "T-2a 失败后守护无响应" ;;
+    esac
+    rt_stop_llm
+
+    # auto 链：坏端点（空 content）→ 好端点（content=ok），切换须留原因。
+    h="$(rt_home t2b)"
+    if ! rt_fixture "$PORT_FIX" empty "$MODEL"; then
+        fail "T-2b 空响应夹具未就绪"
+        return 0
+    fi
+    if ! rt_fixture "$PORT_OK" ok "$MODEL"; then
+        fail "T-2b 正常夹具未就绪"
+        rt_fix_stop_all
+        return 0
+    fi
+    rt_cfg_chain "$h" "http://127.0.0.1:$PORT_FIX" "http://127.0.0.1:$PORT_OK"
+    export GATE_BAD_KEY=gate GATE_GOOD_KEY=gate
+    rt_start "$h" "$h/logs/llm.log"
+    if ! rt_wait_sock "$h" 20; then
+        fail "T-2b llm_d 未就绪（见 $h/logs/llm.log）"
+        rt_stop_llm
+        rt_fix_stop_all
+        return 0
+    fi
+
+    out="$(rt_rpc "$h/run/llm.sock" complete \
+        '{"model":"gate-bad","messages":[{"role":"user","content":"switch"}],"max_tokens":32}' 90)"
+    case "$out" in
+        *'"error"'*) fail "T-2b 切换后仍失败：$(printf '%.160s' "$out")" ;;
+        *'"ok"'*) pass "T-2b 失败端点后切到健康端点并成功" ;;
+        *) fail "T-2b 响应不含预期内容：$(printf '%.160s' "$out")" ;;
+    esac
+    if grep -q 'CHAIN-SWITCH' "$h/logs/llm.log"; then
+        pass "T-2b 切换留 CHAIN-SWITCH 记录"
+    else
+        fail "T-2b 缺 CHAIN-SWITCH 记录"
+    fi
+    if grep -q 'reason=transport' "$h/logs/llm.log"; then
+        pass "T-2b 切换原因可判读（transport）"
+    else
+        fail "T-2b 切换原因不可判读"
+    fi
+    rt_stop_llm
+    rt_fix_stop_all
+}
+
+# ── T-3 模型缺失：拒绝启用、给出可执行安装指引、通道不崩 ──
+scn_t3() {
+    rt_need_local "T-3" || return 0
+
+    local h out rc
+    h="$(rt_home t3)"
+    out="$(AIRY_HOME="$h" "$AIRY_LOCAL" model use gate-absent 2>&1)"
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        pass "T-3 缺失模型拒绝启用（rc=$rc）"
+    else
+        fail "T-3 缺失模型被误判为已安装"
+    fi
+    case "$out" in
+        *"model install gate-absent"*) pass "T-3 输出给出可执行安装指引" ;;
+        *) fail "T-3 缺安装指引：$(printf '%.160s' "$out")" ;;
+    esac
+    if [ "$rc" -lt 128 ]; then
+        pass "T-3 缺失路径未崩溃（rc=$rc）"
+    else
+        fail "T-3 异常终止（rc=$rc）"
+    fi
+    out="$(AIRY_HOME="$h" "$AIRY_LOCAL" model list 2>&1)"
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+        pass "T-3 失败后制品通道仍可用（model list rc=0）"
+    else
+        fail "T-3 失败后制品通道不可用（rc=$rc）：$(printf '%.120s' "$out")"
+    fi
+}
+
 scn_t4() { skip "T-4 场景待 C-6-04 落地"; }
 scn_t5() { skip "T-5 场景待 C-6-04 落地"; }
 scn_t6() { skip "T-6 场景待 C-6-05 落地"; }
