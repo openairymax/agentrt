@@ -25,7 +25,6 @@
 #include "airy_types.h"
 #include "platform.h"
 #include "cognition.h"
-#include "hall_store.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -39,13 +38,13 @@ extern "C" {
  * main() owns the struct on its stack and passes it by pointer.
  * 0.1.9 M1-1c：本地 work_hall/reviewer/governance/validator 已退役——
  * 任务执行唯一经 gateway → sched_d，查询面（/status）迁 sched.dag_list；
- * 此处仅保留事件流 hall_store 与任务目录。 */
+ * 0.1.21 C-18-05：进程内 hall_store 亦退役，/chain 与 /hall 统一经
+ * gateway hall.* 只读视图，此处仅保留任务目录。 */
 typedef struct {
-    airy_hall_store_t *hall_store;
     const char *main_workspace_dir;
 } cli_runtime_ctx_t;
 
-/* Full runtime assembly: event-stream hall_store → chat adapter.
+/* Full runtime assembly: chat adapter only.
  * 0.1.16 B2：CLI 为 gateway 纯客户端，进程内不装配 core loop（0.1.19
  * 退役残留的 loop 实例——认知规划唯一经 gateway → think_d）。
  * Returns AIRY_EOK on success, error code on failure (caller must clean up). */

@@ -80,7 +80,6 @@ static void cli_sigint_handler(int sig)
 #endif
 
 llm_svc_adapter_t *g_chat_adapter = NULL;
-airy_hall_store_t *g_cli_hall_store = NULL;
 
 /* 1.3 推理语言网关：全局句柄（cli_setup_runtime 创建后赋值）+ 最新一轮
  * 语言约束注入物（输入环节 process 填充，cli_chat.c 消费；每轮覆盖前释放）。 */

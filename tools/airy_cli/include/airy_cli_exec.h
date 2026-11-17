@@ -43,9 +43,6 @@ void *cli_task_wait_worker(void *arg);
  *  +1  = interjected chat rendered, task continues */
 int cli_task_poll_input(void);
 
-/* Record a task submission event in the decision-chain hall store. */
-void cli_chain_record_submit(const char *exec_id, const airy_task_plan_t *plan);
-
 /* Render the task result (JSON parse for real success/failure, metrics).
  * Returns 1 when the task truly succeeded (caller uses this for L2 cache
  * absorb decision). */

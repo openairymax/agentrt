@@ -93,11 +93,6 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
 
     char *json = cJSON_PrintUnformatted(answers);
     cJSON_Delete(answers);
-    /* 阶段 4：GCCP 意图确认 → 决策链事件（preflight，cognition 角色）。
-     * 仅记录结构化信号（问题数），用户回答原文不进事件流（隐私 + JSON 转义安全）。 */
-    cli_hall_emit("preflight", AIRY_HALL_CAT_CHAIN,
-                  "{\"event\":\"gccp_confirm\",\"question_count\":%zu}",
-                  probe->question_count);
     return json;
 }
 
@@ -158,10 +153,6 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
         p += n;
     }
     snprintf(p, cap - (size_t)(p - json), "}");
-    /* 阶段 4：GCCP 意图确认 → 决策链事件（同 cJSON 分支，仅记录结构化信号） */
-    cli_hall_emit("preflight", AIRY_HALL_CAT_CHAIN,
-                  "{\"event\":\"gccp_confirm\",\"question_count\":%zu}",
-                  probe->question_count);
     return json;
 }
 

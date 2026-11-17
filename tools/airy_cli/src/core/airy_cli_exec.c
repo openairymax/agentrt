@@ -16,7 +16,6 @@
 
 /* 0.1.16 B2：corekern 总伞头已摘除，错误码契约由 airy_types.h 提供
  * （经 airy_cli_exec.h/cli_internal.h 传入）。 */
-#include "hall_store.h"
 #include "logger.h"
 #include "airy_memory.h"
 #include "string_compat.h"
@@ -88,18 +87,6 @@ int cli_task_poll_input(void)
     (void)0;
     return 0;
 #endif
-}
-
-void cli_chain_record_submit(const char *exec_id, const airy_task_plan_t *plan)
-{
-    if (!exec_id || !exec_id[0])
-        return;
-    cli_hall_emit(exec_id, AIRY_HALL_CAT_COMMAND,
-                  "{\"dag_id\":\"%s\",\"plan_id\":\"%s\",\"nodes\":%zu,\"edges\":%zu}",
-                  exec_id,
-                  (plan && plan->task_plan_id) ? plan->task_plan_id : "",
-                  plan ? plan->task_plan_node_count : (size_t)0,
-                  cli_plan_deps_count(plan));
 }
 
 #ifdef AIRY_HAS_CJSON
