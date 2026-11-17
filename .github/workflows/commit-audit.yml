@@ -1,0 +1,57 @@
+name: Commit Audit
+
+# 0.1.21 L-11 / L-12：提交纪律与测试债的常驻判定。
+#
+# 规则与本地 commit-msg 钩子同源（tools/scripts/git/commit-rules.sh），
+# 本作业只负责取工具、定范围、跑门禁；「谁算违例」不在 YAML 里重写，
+# 否则钩子与 CI 各有一套，迟早一边先松。
+#
+# 只判 AIRY_COMMIT_BASE..HEAD 的新增提交：历史不改写（§2.3 第 4 条），
+# 旧提交的问题登记在 COMMIT-AUDIT.md，由 L-10 普查出账。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  commit-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout (full history for range)
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 0
+
+      - name: Resolve audit base
+        run: |
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          case "$base" in
+            ''|0000000000000000000000000000000000000000) base="" ;;
+          esac
+          echo "AIRY_COMMIT_BASE=$base" >> "$GITHUB_ENV"
+
+      - name: Fetch tools (gate scripts + rule SSoT)
+        run: |
+          git clone -q --depth 1 https://github.com/openairymax/tools.git \
+            "$RUNNER_TEMP/airy-tools"
+
+      - name: Audit new commits (R1~R9)
+        env:
+          AIRY_COMMIT_REPO: ${{ github.workspace }}
+        run: bash "$RUNNER_TEMP/airy-tools/scripts/ci/quality/gates/g47-commit-audit.sh"
+
+      - name: Test debt (R6) and ledger
+        env:
+          G48_REPO: ${{ github.workspace }}
+        run: bash "$RUNNER_TEMP/airy-tools/scripts/ci/quality/gates/g48-test-debt.sh"
