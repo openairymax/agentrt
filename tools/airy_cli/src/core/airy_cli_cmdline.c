@@ -236,6 +236,8 @@ static void cli_print_usage(void)
            cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %smodels%s [--json] [--file F]  模型连接表快照（mode/端点/key 是否存在）\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_outf("  %smodel%s list|use <name>|remove <name> [--yes] [--force]  "
+             "本地模型注册表\n", cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %smodel slot%s [get|set <t2|t1f|t1p> <model_id>]  三角色槽位视图/热切换\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %sgpu%s [--json]             加速器能力快照（驱动/版本/后端/降级原因）\n",

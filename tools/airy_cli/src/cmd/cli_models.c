@@ -118,19 +118,27 @@ static void emit_row(const struct yaml_node *row, size_t idx, const char *secret
 
 /* C-19：模型槽位（t2/t1f/t1p）只读视图与热切换。读写都经 gateway 转发
  * llm.slots_get / llm.slots_set，CLI 不直接改文件——配置面与运行期必须
- * 同源，避免两处说法不一致。 */
+ * 同源，避免两处说法不一致。
+ * D-6：list/use/remove 走本地模型注册表（cli_model_reg.c）；slot 前缀与
+ * get/无参仍为槽位视图，保持既有脚本兼容。 */
 int cli_cmd_model(int argc, char *argv[])
 {
     char params[640];
     char esc_role[128];
     char esc_model[512];
     char *res = NULL;
+    int is_slot = 0;
     int rc;
 
     while (argc > 0 && strcmp(argv[0], "slot") == 0) {
+        is_slot = 1;
         argc--;
         argv++;
     }
+    if (!is_slot && argc > 0 &&
+        (strcmp(argv[0], "list") == 0 || strcmp(argv[0], "use") == 0 ||
+         strcmp(argv[0], "remove") == 0))
+        return cli_model_reg(argc, argv);
     if (argc == 0 || strcmp(argv[0], "get") == 0 || strcmp(argv[0], "list") == 0) {
         rc = cli_gw_call("llm.slots_get", NULL, CLI_RPC_TIMEOUT_MS, &res);
     } else if (strcmp(argv[0], "set") == 0 && argc >= 3) {
@@ -140,7 +148,9 @@ int cli_cmd_model(int argc, char *argv[])
                  esc_model);
         rc = cli_gw_call("llm.slots_set", params, CLI_RPC_TIMEOUT_MS, &res);
     } else {
-        cli_outf("用法: airy_cli model slot [get|list] | "
+        cli_outf("用法: airy_cli model list | use <model> | "
+                 "remove <model> [--yes] [--force]\n"
+                 "      airy_cli model slot [get|list] | "
                  "model slot set <t2|t1f|t1p> <model_id>\n");
         return 2;
     }

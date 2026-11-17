@@ -56,6 +56,8 @@ add_executable(airy_cli
     src/cmd/airy_cli_cmd_approval.c
     # 0.1.21 A-7：模型连接表自检视图（doctor 的 key 三态判据来源）
     src/cmd/cli_models.c
+    # 0.1.21 D-6：本地模型注册表 list/use/remove（与 airy-local 同数据面）
+    src/cmd/cli_model_reg.c
     # 0.1.21 B-3：加速器能力快照（doctor 的 GPU 段与降级原因来源）
     src/cmd/cli_gpu.c
     src/chat/cli_chat.c
@@ -392,5 +394,19 @@ if(BUILD_TESTS)
             target_link_libraries(test_cli_live PRIVATE ${AIRY_CJSON_LIBRARIES})
         endif()
         add_test(NAME cli_live_e2e COMMAND test_cli_live)
+    endif()
+
+    # 0.1.21 D-6：本地模型注册表子命令——真实临时 AIRY_HOME 下验证
+    # use 校验+原子写、remove 默认 dry-run / 未确认不删 / 引用拒绝 /
+    # --force 生效，以及声明片段只改本实例键（第二实例声明保留）。
+    if(NOT WIN32)
+        add_executable(test_cli_model_reg tests/test_cli_model_reg.c
+                       tests/cli_test_globals.c src/cmd/cli_model_reg.c)
+        target_include_directories(test_cli_model_reg PRIVATE ${CLI_INC_DIRS})
+        target_compile_definitions(test_cli_model_reg PRIVATE AIRY_COMPLIANCE_IMPL)
+        target_link_libraries(test_cli_model_reg PRIVATE airy_coreloopthree
+                                                            airy_common
+                                                            Threads::Threads)
+        add_test(NAME cli_model_reg_unit COMMAND test_cli_model_reg)
     endif()
 endif()
