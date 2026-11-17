@@ -141,6 +141,34 @@ static int test_usage_table(void)
     return 0;
 }
 
+/* 0.1.21 A-6：paths 自证子命令的 CLI 契约。仅裸词位（非 -p 提示词）
+ * 才走子命令；成功按「已输出」返回 1，未知参数按用法错误返回 2。 */
+static int test_paths_subcommand(void)
+{
+    printf("  test_paths_subcommand...\n");
+    char a0[] = "airy_cli", a1[] = "paths", a2[] = "--bogus", a3[] = "-p";
+    char a4[] = "--json";
+    char *ok[] = {a0, a1};
+    char *js[] = {a0, a1, a4};
+    char *bad[] = {a0, a1, a2};
+    char *prompt[] = {a0, a3, a1};
+    const char *pp = NULL;
+
+    g_cli_print_mode = 0;
+    CHECK(cli_parse_args(2, ok, &pp) == 1);
+    CHECK(cli_parse_args(3, js, &pp) == 1);
+    CHECK(cli_parse_args(3, bad, &pp) == 2);
+
+    /* -p paths：呈现模式下的裸词是提示词，必须落回对话（返回 0） */
+    g_cli_print_mode = 0;
+    CHECK(cli_parse_args(3, prompt, &pp) == 0);
+    CHECK(pp != NULL && strcmp(pp, "paths") == 0);
+    g_cli_print_mode = 0;
+
+    printf("    PASSED\n");
+    return 0;
+}
+
 int main(void)
 {
     printf("test_cli_cmdline:\n");
@@ -149,6 +177,7 @@ int main(void)
     test_unknown_and_fallthrough();
     test_lookup_helpers();
     test_usage_table();
+    test_paths_subcommand();
     printf("ALL PASSED\n");
     return 0;
 }
