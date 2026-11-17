@@ -715,6 +715,12 @@ install_binary() {
         printf 'AIRY_VERSION=v%s\n' "$rel_id"
         [ -n "${AIRY_ARTIFACT_SHA256:-}" ] && printf 'AIRY_ARTIFACT_SHA256=%s\n' "$AIRY_ARTIFACT_SHA256"
         printf 'AIRY_RELEASE_ID=%s\n' "$rel_id"
+        # 构建身份（A-1）：CI 在包内 share/agentrt/build.env 落
+        # run<id>.<attempt>-g<sha12>；安装期并入清单，运行时由
+        # airy_build_id() 自证。离线自建包无此文件，保留 unknown 降级。
+        _bid=$(sed -n 's/^AIRY_BUILD_ID=\([A-Za-z0-9._-]\{1,120\}\)$/\1/p' \
+            "${extracted}/share/agentrt/build.env" 2>/dev/null | head -n 1)
+        [ -n "$_bid" ] && printf 'AIRY_BUILD_ID=%s\n' "$_bid"
     } > "${rel_dir}/release.env"
     : > "${rel_dir}/.complete"
     for d in bin lib include share; do
