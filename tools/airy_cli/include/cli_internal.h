@@ -145,6 +145,16 @@ void cli_json_esc(char *dst, size_t cap, const char *src);
  * 本地模型 / 缺 key / 已配 key；不联网、不输出密钥值。 */
 int cli_cmd_models(int argc, char *argv[]);
 
+/**
+ * @brief 模型槽位视图/热切换（C-19）：`model slot [get|set <role> <model>]`。
+ *
+ * 经 gateway 调 llm.slots_get / llm.slots_set；set 由 llm_d 校验注册表、
+ * 持久化 model.yaml 并热重载，CLI 不直接改文件。
+ *
+ * @return 0 成功；2 用法错误或 RPC 失败
+ */
+int cli_cmd_model(int argc, char *argv[]);
+
 /* 0.1.21 B-3：加速器能力快照（单行 JSON）。doctor GPU 段据此区分
  * 无 GPU / GPU 在但驱动不可用 / GPU 可用，并打印降级原因。 */
 int cli_cmd_gpu(int argc, char *argv[]);
