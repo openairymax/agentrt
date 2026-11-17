@@ -22,7 +22,6 @@
 #include "platform.h"
 #include "cognition.h"
 #include "gccp.h"
-#include "hall_store.h"
 #include "llm_svc_adapter.h"
 #include "logger.h"
 #include "logging.h"
@@ -115,22 +114,6 @@ extern llm_svc_adapter_t *g_chat_adapter;
  * 为 wire 语言值（0=未知/1=中文/2=英文）。 */
 extern char *g_cli_lang_sys_prompt;
 extern int g_cli_lang_output;
-
-/* 阶段 4（2026-08-15）：决策链事件流句柄（⑥单一真相源事件流底座）。
- * main.c 创建 hall_store 后赋值；CLI 决策点（GCCP 确认/蓝图命中/计划/提交）
- * 以 "cognition" 角色写入 CHAIN/COMMAND 事件，供 /chain 决策链可视化回放。 */
-extern airy_hall_store_t *g_cli_hall_store;
-
-/* 决策链事件发射唯一机制件（cli_hall.c）：调用方声明「会话 + 类别 + 内容
- * 格式」，固定面（tenant="default"、node=NULL、role="cognition"、无 out
- * 参数）由机制独占。句柄为空时静默丢弃。fmt 须产出合法 JSON 对象字面量。 */
-#if defined(__GNUC__)
-void cli_hall_emit(const char *task_id, airy_hall_category_t cat,
-                   const char *fmt, ...) __attribute__((format(printf, 3, 4)));
-#else
-void cli_hall_emit(const char *task_id, airy_hall_category_t cat,
-                   const char *fmt, ...);
-#endif
 
 /* Server one-shot mode (-p/--print): no banner/prompt/TUI, single-turn
  * execution then exit. --json switches the final result to JSON. Defined
@@ -324,12 +307,6 @@ int cmd_chain(const char *arg, void *ctx);
 int cmd_hall(const char *arg, void *ctx);
 int cmd_quit(const char *arg, void *ctx);
 int cmd_tui(const char *arg, void *ctx);
-
-/* 决策链事件解析 helpers（cli_cmds.c 实现；/chain 命令用） */
-uint64_t cli_chain_extract_gseq(const char *json);
-void cli_chain_extract_content(const char *json, char *out, size_t cap);
-int cli_chain_str_field(const char *json, const char *key, char *out, size_t cap);
-void cli_chain_label(int cat, const char *content, char *out, size_t cap);
 
 #ifdef __cplusplus
 }
