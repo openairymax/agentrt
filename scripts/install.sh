@@ -114,6 +114,7 @@ AIRY_BUILD_JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 AIRY_MODE="${AIRY_MODE:-auto}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
 UNINSTALL=0; REINSTALL=0; KEEP_DATA=0; YES=0
+DRY_RUN=0; PURGE=0
 WITH_MATHS=1
 AIRY_PROFILE="${AIRY_PROFILE:-auto}"
 AIRY_CHANNEL="${AIRY_CHANNEL:-stable}"
@@ -154,6 +155,69 @@ sha256_stdin() {
     else
         printf ''
     fi
+}
+
+MANIFEST_JSON="install-manifest.json"
+
+# 安装版本号：优先 current 指向，其次 install.env，末位取脚本自身版本。
+rel_id() {
+    local h="$1" r
+    r="$(readlink "${h}/current" 2>/dev/null | sed 's|.*/||')"
+    [ -n "$r" ] || r="$(sed -n 's/^AIRY_VERSION=v//p' "${h}/config/install.env" 2>/dev/null | head -1)"
+    [ -n "$r" ] || r="${AIRY_VERSION#v}"
+    printf '%s' "$r"
+}
+
+# 构建身份：与 airy_build_id() 同源（release.env → 包内 build.env），缺件降级。
+manifest_build() {
+    local h="$1" r="$2" f b
+    for f in "${h}/current/release.env" "${h}/release.env" "${h}/share/agentrt/build.env"; do
+        [ -f "$f" ] || continue
+        b="$(sed -n 's/^AIRY_BUILD_ID=//p' "$f" 2>/dev/null | head -1)"
+        [ -n "$b" ] && { printf 'v%s %s' "$r" "$b"; return 0; }
+    done
+    printf 'v%s release=unknown' "$r"
+}
+
+# 安装逐件清单：path/size/sha256/tag + release.env 摘要 + build 段。
+# 卸载按 entries 逆序删除，故 entries 必须覆盖所有安装件（含 config/keys）。
+manifest_write() {
+    local h="$1" r env tmp lst f rel sz sha first=1 rc=0
+    r="$(rel_id "$h")"
+    env="${h}/current/release.env"
+    [ -f "$env" ] || env="${h}/release.env"
+    tmp="${h}/.${MANIFEST_JSON}.$$"
+    lst="${tmp}.lst"
+    {
+        for f in releases config keys modules scripts bin lib include share; do
+            [ -d "${h}/${f}" ] || continue
+            [ -L "${h}/${f}" ] && continue
+            find "${h}/${f}" \( -type f -o -type l \) 2>/dev/null
+        done
+    } | LC_ALL=C sort -u > "$lst" || rc=1
+    if [ "$rc" = "0" ]; then
+        {
+            printf '{\n  "schema": 1,\n'
+            printf '  "release": "%s",\n' "$r"
+            printf '  "build": "%s",\n' "$(manifest_build "$h" "$r")"
+            printf '  "release_env_sha256": "%s",\n' "$(sha256_file "$env")"
+            printf '  "entries": [\n'
+            while IFS= read -r f; do
+                rel="${f#"${h}"/}"
+                [ -n "$rel" ] || continue
+                case "$rel" in *[\"\\]*) continue ;; esac
+                sz="$(wc -c < "$f" 2>/dev/null | tr -d ' ')"
+                sha="$(sha256_file "$f")"
+                [ "$first" = "1" ] || printf ',\n'
+                printf '  {"path": "%s", "size": %s, "sha256": "%s", "tag": "tag:%s"}' \
+                    "$rel" "${sz:-0}" "$sha" "$r"
+                first=0
+            done < "$lst"
+            printf '\n  ]\n}\n'
+        } > "$tmp" && mv -f "$tmp" "${h}/${MANIFEST_JSON}" || rc=1
+    fi
+    rm -f "$lst" "$tmp"
+    return "$rc"
 }
 
 env_set() {
@@ -221,7 +285,7 @@ AirymaxRT 安装器
   本地执行:  sh install.sh [参数]
   更新:      airymaxrt update [--check] [--channel stable|rc|beta] [--rollback]
   重装:      airymaxrt update --reinstall  或  sh install.sh --reinstall
-  卸载:      sh install.sh --uninstall [--keep-data]
+  卸载:      sh install.sh --uninstall [--keep-data | --purge] [--dry-run]
 
 参数:
   --prefix DIR       安装根目录（默认复用既有实例，否则 ~/.airymaxrt）
@@ -232,7 +296,9 @@ AirymaxRT 安装器
   --from-file FILE   从本地制品文件安装
   --reinstall        强制重装
   --uninstall        卸载
-  --keep-data        卸载时保留用户数据
+  --keep-data        卸载时保留用户数据（按安装清单逆序删除其余）
+  --purge            卸载时保留 data/、清空其余全部残留（含清单外文件）
+  --dry-run          仅打印待删除集合，零副作用（需配合 --uninstall）
   --with-maths       安装数学计算模块（默认开启）
   --without-maths    跳过数学计算模块
   --yes              跳过交互确认
@@ -251,6 +317,8 @@ while [ $# -gt 0 ]; do
         --uninstall) UNINSTALL=1; shift ;;
         --reinstall) REINSTALL=1; shift ;;
         --keep-data) KEEP_DATA=1; shift ;;
+        --purge)     PURGE=1; KEEP_DATA=1; shift ;;
+        --dry-run)   DRY_RUN=1; shift ;;
         --yes)       YES=1; shift ;;
         --with-maths)    WITH_MATHS=1; shift ;;
         --without-maths) WITH_MATHS=0; shift ;;
@@ -258,6 +326,13 @@ while [ $# -gt 0 ]; do
         *) log_err "未知参数: $1（--help 查看用法）"; exit 1 ;;
     esac
 done
+
+if [ "$DRY_RUN" = "1" ] && [ "$UNINSTALL" != "1" ]; then
+    log_err "--dry-run 仅用于 --uninstall"; exit 1
+fi
+if [ "$PURGE" = "1" ] && [ "$UNINSTALL" != "1" ]; then
+    log_err "--purge 仅用于 --uninstall"; exit 1
+fi
 
 case "$AIRY_MODE" in auto|binary|hybrid|source) ;; *) log_err "非法 --mode: ${AIRY_MODE}"; exit 1 ;; esac
 case "$AIRY_PROFILE" in auto|full|minimal) ;; *) log_err "非法 --profile: ${AIRY_PROFILE}（支持 full|minimal|auto）"; exit 1 ;; esac
@@ -348,10 +423,14 @@ stop_daemons() {
 }
 
 remove_path_bootstrap() {
-    local rc rc_path="${1:-}" _tmp
+    local rc rc_path="${1:-}" _tmp _seen=""
     for rc in "$rc_path" "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile" "$HOME/.config/fish/config.fish"; do
         [ -n "$rc" ] && [ -f "$rc" ] || continue
+        case ":${_seen}:" in *":${rc}:"*) continue ;; esac
+        _seen="${_seen:+$_seen:}${rc}"
         grep -q '# >>> AgentRT PATH bootstrap <<<' "$rc" 2>/dev/null || continue
+        printf '[PLAN] rm-bootstrap %s\n' "$rc"
+        [ "${DRY_RUN:-0}" = "1" ] && continue
         _tmp="$rc.airy_uninstall_tmp"
         if sed '\|# >>> AgentRT PATH bootstrap <<<|,\|# <<< AgentRT PATH bootstrap <<<|d' "$rc" > "$_tmp" 2>/dev/null \
             && mv "$_tmp" "$rc"; then
@@ -363,49 +442,161 @@ remove_path_bootstrap() {
     done
 }
 
-do_uninstall() {
-    local home="$1" keep_data="$2" yes="$3" env_file link size ans rc_path
-    env_file="${home}/config/install.env"
-    if [ -f "$env_file" ]; then
-        home="$(sed -n 's/^AIRY_HOME=//p' "$env_file" | head -1)"
-        [ -n "$home" ] || home="$1"
-    fi
-    if [ ! -d "$home" ]; then
-        log_warn "未检测到安装（$home 不存在），无需卸载"
+uninst_norm() {
+    local p d
+    case "$1" in /*) ;; *) return 1 ;; esac
+    d="$(cd -P "$1" 2>/dev/null && pwd -P)" || return 1
+    printf '%s' "$d"
+}
+
+# 卸载安全闸：允许前缀内 + 具备本产品自证物 + 非 / 非 $HOME 本体。
+uninst_ok() {
+    local h="$1" p ok=1
+    case "$h" in /|"") return 1 ;; esac
+    if [ -n "${HOME:-}" ] && [ "$h" = "$HOME" ]; then return 1; fi
+    for p in "${HOME:-/nonexistent}" /opt /usr/local /var/lib /var/opt /srv /tmp /home /Users /private; do
+        case "$h" in "$p"/*) ok=0; break ;; esac
+    done
+    [ "$ok" = "0" ] || return 1
+    is_install_home "$h" && return 0
+    [ -f "${h}/${MANIFEST_JSON}" ] && return 0
+    [ -d "${h}/data/agentrt" ] && return 0
+    return 1
+}
+
+# install.env 的 AIRY_HOME 只作自证：与目标根不一致即拒绝（防伪造重定向）。
+uninst_env_home() {
+    local root="$1" envf="$2" h n
+    h="$(sed -n 's/^AIRY_HOME=//p' "$envf" 2>/dev/null | head -1)"
+    [ -n "$h" ] || return 0
+    n="$(uninst_norm "$h" || true)"
+    [ -n "$n" ] && [ "$n" = "$root" ]
+}
+
+# 删除集合（执行序）：keep=0 整根；purge 清顶层非 data；否则按清单逆序。
+uninst_plan() {
+    local root="$1" keep="$2" p rel
+    if [ "$keep" != "1" ]; then
+        printf '%s\n' "$root"
         return 0
+    fi
+    if [ "${PURGE}" = "1" ]; then
+        for p in "$root"/* "$root"/.[!.]*; do
+            [ -e "$p" ] || [ -L "$p" ] || continue
+            case "${p##*/}" in data) continue ;; esac
+            printf '%s\n' "$p"
+        done
+        return 0
+    fi
+    for p in current share include lib bin; do
+        [ -L "${root}/${p}" ] && printf '%s\n' "${root}/${p}"
+    done
+    if [ -f "${root}/${MANIFEST_JSON}" ]; then
+        # 先落快照再逐行输出：清单自身排在被删集合首位，若边删边读，
+        # 消费端可能先删掉清单、生产端随后读到空文件。
+        _lst="${TMPDIR:-/tmp}/airy-uninst.$$"
+        sed -n 's/^  {"path": "\([^"]*\)".*/\1/p' "${root}/${MANIFEST_JSON}" 2>/dev/null \
+            | sed '1!G;h;$!d' > "$_lst"
+        printf '%s\n' "${root}/${MANIFEST_JSON}"
+        while IFS= read -r p; do
+            [ -n "$p" ] && printf '%s/%s\n' "$root" "$p"
+        done < "$_lst"
+        rm -f "$_lst"
+    else
+        rel="$(rel_id "$root")"
+        [ -n "$rel" ] && [ -d "${root}/releases/${rel}" ] && printf '%s\n' "${root}/releases/${rel}"
+    fi
+    for p in venv target logs src tmp run build; do
+        [ -e "${root}/${p}" ] && printf '%s\n' "${root}/${p}"
+    done
+}
+
+# 单条删除：dry-run 只打印；实删与打印共用同一条目，保证集合可逐行对齐。
+uninst_rm() {
+    printf '[PLAN] rm -rf %s\n' "$1"
+    [ "${DRY_RUN}" = "1" ] && return 0
+    rm -rf -- "$1" 2>/dev/null || log_warn "删除失败: $1"
+}
+
+uninst_rmf() {
+    { [ -L "$1" ] || [ -e "$1" ]; } || return 0
+    printf '[PLAN] rm -f %s\n' "$1"
+    [ "${DRY_RUN}" = "1" ] && return 0
+    rm -f -- "$1" 2>/dev/null || log_warn "删除失败: $1"
+}
+
+do_uninstall() {
+    local root="$1" keep="$2" yes="$3" home env_file link rc_path size ans stash=""
+    home="$(uninst_norm "$root" || true)"
+    if [ -z "$home" ]; then
+        log_warn "未检测到安装（${root} 不存在），无需卸载"
+        return 0
+    fi
+    if ! uninst_ok "$home"; then
+        log_err "拒绝卸载：${home} 不是可信安装根（须位于 \$HOME、/opt、/usr/local、/var/lib、"
+        log_err "  /srv、/tmp、/home、/Users、/private 之下，且有 config/install.env 或 ${MANIFEST_JSON}；"
+        log_err "  且不得是 / 或 \$HOME 本体），未做任何删除"
+        return 3
+    fi
+    env_file="${home}/config/install.env"
+    if [ -f "$env_file" ] && ! uninst_env_home "$home" "$env_file"; then
+        log_err "拒绝卸载：${env_file} 的 AIRY_HOME 与目标根不一致（疑似伪造或已搬迁），未做任何删除"
+        return 3
     fi
     link="$(sed -n 's/^AIRY_BIN_LINK=//p' "$env_file" 2>/dev/null | head -1)"
     [ -n "$link" ] || link="${BIN_DIR}/airymaxrt"
     rc_path="$(sed -n 's/^AIRY_PATH_RC=//p' "$env_file" 2>/dev/null | head -1)"
     size="$(du -sh "$home" 2>/dev/null | cut -f1)"
     log_warn "将卸载 AirymaxRT：${home}（${size}）"
-    if [ "$yes" != "1" ]; then
+    if [ "${DRY_RUN}" != "1" ] && [ "$yes" != "1" ]; then
         printf "${C_YELLOW}确认卸载？[y/N] ${C_NC}"
         read -r ans || true
         case "$ans" in y|Y|yes|YES) ;; *) log_info "已取消卸载"; return 0 ;; esac
     fi
-    stop_daemons "$home/bin"
-    if command -v pgrep >/dev/null 2>&1; then
-        for _mp in $(pgrep -f "airymaxrt monitor" 2>/dev/null || true); do
-            if tr '\0' '\n' < "/proc/${_mp}/environ" 2>/dev/null | grep -q "^AIRY_HOME=${home}$"; then
-                kill "$_mp" 2>/dev/null || true
-            fi
-        done
+    if [ "$keep" = "1" ] && [ -d "${home}/data" ]; then
+        stash="${home%/}.data.$$"
     fi
-    if [ "$keep_data" = "1" ] && [ -d "$home/data" ]; then
-        rm -rf "$home"
-        mkdir -p "$home/data"
-        log_ok "已删除 ${home}（保留 data/ 记忆数据）"
-    else
-        rm -rf "$home"
-        log_ok "已删除 ${home}"
+    if [ "${DRY_RUN}" != "1" ]; then
+        stop_daemons "${home}/bin"
+        if command -v pgrep >/dev/null 2>&1; then
+            for _mp in $(pgrep -f "airymaxrt monitor" 2>/dev/null || true); do
+                if tr '\0' '\n' < "/proc/${_mp}/environ" 2>/dev/null | grep -q "^AIRY_HOME=${home}$"; then
+                    kill "$_mp" 2>/dev/null || true
+                fi
+            done
+        fi
+        if [ -n "$stash" ] && ! mv "${home}/data" "$stash" 2>/dev/null; then
+            log_err "data/ 暂存失败（${stash}），已中止，未删除任何内容"
+            return 2
+        fi
     fi
-    if [ -L "$link" ] || [ -e "$link" ]; then
-        rm -f "$link"
-        log_ok "已移除启动器 ${link}"
+    uninst_plan "$home" "$keep" | while IFS= read -r p; do
+        [ -n "$p" ] && uninst_rm "$p"
+    done
+    uninst_rmf "$link"
+    if [ "${DRY_RUN}" != "1" ] && [ "$keep" = "1" ]; then
+        # -depth + 逐件 rmdir：批式 -exec + 会在同一批里先判 -empty 后删子目录，
+        # 导致刚腾空的父目录漏删（releases/<ver>/share 残壳）。
+        find "$home" -mindepth 1 -depth -type d -empty \
+            ! -path "${home}/data" ! -path "${home}/data/*" \
+            -exec rmdir {} \; 2>/dev/null || true
+        if [ -n "$stash" ]; then
+            mkdir -p "$home" 2>/dev/null || true
+            [ -d "${home}/data" ] || mv "$stash" "${home}/data" 2>/dev/null \
+                || log_warn "data/ 回迁失败，暂存于 ${stash}"
+        fi
     fi
     remove_path_bootstrap "$rc_path"
-    log_ok "卸载完成"
+    if [ "${DRY_RUN}" = "1" ]; then
+        log_info "dry-run 结束：以上为待删除集合，未做任何改动"
+        return 0
+    fi
+    if [ "$keep" = "1" ]; then
+        log_ok "已卸载 ${home}（data/ 已保留）"
+    else
+        log_ok "已卸载 ${home}"
+    fi
+    return 0
 }
 
 
@@ -636,8 +827,11 @@ install_binary() {
         log_err "release 包缺失 daemon 二进制（bin/*_d 为空，制品不完整）"
         return 2
     fi
-    # B10 版本化布局：存量旧布局（真实目录）先迁移为首个版本目录
-    if [ -d "${AIRY_HOME}/bin" ] && [ ! -L "${AIRY_HOME}/bin" ]; then
+    # B10 版本化布局：存量旧布局（真实目录，且确有安装件）先迁移为首个版本目录。
+    # 仅凭「目录存在」判定会把 init_home 刚建的空 bin/ 误当存量，导致每次
+    # 全新安装都留下一个空的 releases/migrate-<ts>/。
+    if [ -d "${AIRY_HOME}/bin" ] && [ ! -L "${AIRY_HOME}/bin" ] && \
+       { [ -n "$(daemon_list "${AIRY_HOME}/bin")" ] || [ -x "${AIRY_HOME}/bin/airy_cli" ]; }; then
         local _mig _cur_tmp
         _mig="${AIRY_HOME}/releases/migrate-$(date +%Y%m%d%H%M%S)"
         mkdir -p "${AIRY_HOME}/releases" "$_mig" || { log_err "releases/ 目录创建失败"; return 2; }
@@ -725,9 +919,13 @@ install_binary() {
     : > "${rel_dir}/.complete"
     for d in bin lib include share; do
         if [ -e "${AIRY_HOME}/$d" ] && [ ! -L "${AIRY_HOME}/$d" ]; then
-            log_err "布局异常: ${AIRY_HOME}/$d 为真实目录（预期符号链接），请先清理后重装"
-            rm -rf "$rel_dir"
-            return 2
+            # init_home 预建的空目录不是安装件：用 rmdir 原地让位（非空即失败），
+            # 非空真实目录仍判布局异常，存量安装由上方迁移分支处置。
+            if ! rmdir "${AIRY_HOME}/$d" 2>/dev/null; then
+                log_err "布局异常: ${AIRY_HOME}/$d 为真实目录（预期符号链接），请先清理后重装"
+                rm -rf "$rel_dir"
+                return 2
+            fi
         fi
         [ -L "${AIRY_HOME}/$d" ] || ln -s "current/$d" "${AIRY_HOME}/$d" 2>/dev/null || true
     done
@@ -1447,6 +1645,12 @@ EOF
         log_warn "PATH 引导: ${BIN_DIR} 不在 PATH 中——当前 shell 输入 airymaxrt 会报 command not found"
         path_bootstrap
         env_set "AIRY_BIN_DIR_IN_PATH=no"
+    fi
+
+    if manifest_write "${AIRY_HOME}"; then
+        log_ok "安装清单已生成: ${AIRY_HOME}/${MANIFEST_JSON}"
+    else
+        log_warn "安装清单生成失败（卸载将退回按版本目录删除）"
     fi
 }
 
