@@ -134,6 +134,13 @@ void cli_msgbuf_push(cli_chat_msgbuf_t *b, const char *role, const char *content
 #define CLI_TOOL_AGENT "coding_v1"
 #define CLI_TOOL_RPC_TIMEOUT_MS 30000
 
+/* C-11：作业轮询参数。工具自身预算由 tool_d 按元数据/请求夹取（上限
+ * 600s），这里只负责等到终态，避免同步 execute 被 30s 链路超时截断。 */
+#define CLI_TOOL_POLL_MS 200
+#define CLI_TOOL_WAIT_MS 610000
+
+static const char *cli_json_str(cJSON *o, const char *key);
+
 /* 原地规范化绝对路径：空段与 "." 丢弃，".." 回退上一段，其余段保留。
  * dst 恒 ≤ 当前段起点，故边读边写不破坏未消费内容。 */
 static void path_trim_dots(char *path)
@@ -268,6 +275,78 @@ static char *chat_params(const char *id, const char *args_json, airy_err_t *perr
     return s;
 }
 
+/* 提交作业：成功返回 0 并写出 job_id。失败（旧网关未放行 / 旧 tool_d
+ * 无该方法）由调用方回退同步 execute，不改变既有行为。 */
+static int chat_job_submit(const char *params_json, char *job_id, size_t cap)
+{
+    char *body = NULL;
+    int ret = cli_gw_call("tool.submit", params_json, CLI_TOOL_RPC_TIMEOUT_MS, &body);
+    cJSON *root;
+    const char *id;
+    int ok;
+
+    if (ret != 0 || !body) {
+        AIRY_FREE(body);
+        return ret != 0 ? ret : AIRY_ERR_PROTOCOL;
+    }
+    root = cJSON_Parse(body);
+    id = cli_json_str(root, "job_id");
+    ok = id && id[0] && strlen(id) + 1 <= cap;
+    if (ok)
+        snprintf(job_id, cap, "%s", id);
+    cJSON_Delete(root);
+    AIRY_FREE(body);
+    return ok ? 0 : AIRY_ERR_PROTOCOL;
+}
+
+/* 轮询作业至终态：返回 tool_d 的终态 JSON（与 execute 的 result 同形）；
+ * 仍运行则 sleep 后继续，超时/链路失败返回 NULL（此时作业可能仍在跑，
+ * 但绝不能重放 execute，否则产生重复副作用）。 */
+static char *chat_job_wait(const char *job_id)
+{
+    cJSON *q = cJSON_CreateObject();
+    char *qj;
+    char *body = NULL;
+    long waited = 0;
+
+    if (!q)
+        return NULL;
+    cJSON_AddStringToObject(q, "job_id", job_id);
+    qj = cJSON_PrintUnformatted(q);
+    cJSON_Delete(q);
+    if (!qj)
+        return NULL;
+
+    for (;;) {
+        cJSON *root;
+        const char *state;
+        int running;
+
+        AIRY_FREE(body);
+        body = NULL;
+        if (cli_gw_call("tool.poll", qj, CLI_TOOL_RPC_TIMEOUT_MS, &body) != 0 || !body)
+            break;
+        root = cJSON_Parse(body);
+        state = cli_json_str(root, "state");
+        running = state && strcmp(state, "running") == 0;
+        if (!running) {
+            char *out = cJSON_PrintUnformatted(root);
+            cJSON_Delete(root);
+            AIRY_FREE(body);
+            AIRY_FREE(qj);
+            return out;
+        }
+        cJSON_Delete(root);
+        if (waited >= CLI_TOOL_WAIT_MS)
+            break;
+        airy_sleep_ms(CLI_TOOL_POLL_MS);
+        waited += CLI_TOOL_POLL_MS;
+    }
+    AIRY_FREE(body);
+    AIRY_FREE(qj);
+    return NULL;
+}
+
 static void chat_fill(cJSON *r, cJSON *root, int ok)
 {
     cJSON *out = cJSON_GetObjectItem(root, "output");
@@ -333,18 +412,34 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
     }
 
     char *result_json = NULL;
-    int rpc_ret = cli_gw_call("tool.execute", params_json, CLI_TOOL_RPC_TIMEOUT_MS,
-                              &result_json);
-    AIRY_FREE(params_json);
-    if (rpc_ret != 0 || !result_json) {
-        cli_trace("chat", "%s tool rpc fail tool=%s ret=%d (via gateway)", CLI_ICON_CROSS,
-                  tool_id, rpc_ret);
-        AIRY_FREE(result_json);
-        /* cli_gw_call 已返回真实 AIRY 码（0.1.19 N1）：此处只补人类可读
-         * 原文，网关未应答与工具业务失败由 class 分诊，不再统一误报不可达。 */
-        const char *gw_err = cli_gw_last_err();
-        return chat_tool_deny(rpc_ret != 0 ? rpc_ret : AIRY_ERR_PROTOCOL,
-                              gw_err[0] ? gw_err : "tool rpc failed (via gateway)", out_ok);
+    char job_id[64] = "";
+
+    /* C-11：优先作业句柄（submit + poll），长任务不再被 30s 链路超时
+     * 截断；submit 不可用时回退同步 execute，兼容旧网关/旧 tool_d。 */
+    int job_ret = chat_job_submit(params_json, job_id, sizeof(job_id));
+    if (job_ret == 0) {
+        result_json = chat_job_wait(job_id);
+        AIRY_FREE(params_json);
+        if (!result_json) {
+            cli_trace("chat", "%s tool job wait fail tool=%s id=%s", CLI_ICON_CROSS,
+                      tool_id, job_id);
+            return chat_tool_deny(AIRY_ETIMEDOUT, "tool job did not reach a final state",
+                                  out_ok);
+        }
+    } else {
+        int rpc_ret = cli_gw_call("tool.execute", params_json, CLI_TOOL_RPC_TIMEOUT_MS,
+                                  &result_json);
+        AIRY_FREE(params_json);
+        if (rpc_ret != 0 || !result_json) {
+            cli_trace("chat", "%s tool rpc fail tool=%s ret=%d (via gateway)", CLI_ICON_CROSS,
+                      tool_id, rpc_ret);
+            AIRY_FREE(result_json);
+            /* cli_gw_call 已返回真实 AIRY 码（0.1.19 N1）：此处只补人类可读
+             * 原文，网关未应答与工具业务失败由 class 分诊，不再统一误报不可达。 */
+            const char *gw_err = cli_gw_last_err();
+            return chat_tool_deny(rpc_ret != 0 ? rpc_ret : AIRY_ERR_PROTOCOL,
+                                  gw_err[0] ? gw_err : "tool rpc failed (via gateway)", out_ok);
+        }
     }
 
     /* daemon_rpc_call 已解包 JSON-RPC 的 result 字段：result_json 即
