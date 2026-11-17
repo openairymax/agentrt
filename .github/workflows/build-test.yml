@@ -86,31 +86,52 @@ jobs:
         run: |
           cmake --build ${{ env.BUILD_DIR }} --parallel "$(nproc)"
 
-      - name: Run tests (ctest, auto-retry once)
+      # A-4 隔离门禁（§17.1 A-4）：只跑通不算过，测试不得写真实 $HOME。
+      # 反例注入先行：探针故意写真实 $HOME，gate 必须判红；探针未被拦下
+      # 说明门禁自身失效，直接 fail-closed。AIRY_GATE_SELFTEST=0 仅供排障。
+      - name: "Gate A-4 selftest (probe must be caught)"
         run: |
-          # --timeout 240：单测超时护栏。瞬态 flaky（runner 负载下并发时序
-          # 单测首轮偶发红、同环境 rerun-failed 即全过）经一次自动重试吸收；
-          # 真实回归 rerun 仍失败 → fail-closed。与 macOS 腿同口径。
-          set +e
-          ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure -j"$(nproc)" \
-            --timeout 240 > /tmp/ctest.log 2>&1
-          rc=$?
-          if [ $rc -eq 0 ]; then
-            exit 0
-          fi
-          echo "::error::ctest FAILED rc=$rc (attempt 1)，自动 rerun-failed…"
-          awk '/The following tests FAILED:/,/Errors while running CTest/' /tmp/ctest.log | sed 's/^/::error::  /' | head -40
-          grep -E '^\s*[0-9]+/[0-9]+ Testing|FAILED|Failed' /tmp/ctest.log | sed 's/^/::error::  /' | head -40
-          ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure --rerun-failed \
-            --timeout 240 > /tmp/ctest-rerun.log 2>&1
-          rc2=$?
-          if [ $rc2 -eq 0 ]; then
-            echo "::warning::ctest attempt1 失败但 rerun-failed 全过（flaky），门禁放行"
-            exit 0
-          fi
-          echo "::error::ctest rerun FAILED rc=$rc2"
-          tail -n 40 /tmp/ctest-rerun.log | sed 's/^/::error::  /'
-          exit $rc2
+          bash scripts/gate_home_isolate.sh selftest \
+            --verdict-dir "${RUNNER_TEMP}/airy-gate-a4"
+
+      # 两腿独立判据：tests 腿（除 cli_ 前缀）与 tools 腿（^cli_）各自写
+      # verdict；verify 要求两腿都存在且 PASS，缺一腿判红。ctest 在沙箱
+      # HOME/XDG/TMPDIR 下执行，跑完比对真实 $HOME 快照（路径+size+mtime）。
+      # 瞬态 flaky 仍按一次 rerun-failed 吸收：rerun 不走 gate（避免把首轮
+      # 的 HOME 污染判定覆盖成 PASS），污染结论由 verify 终判。
+      - name: Run tests under HOME isolation (tests + tools legs, auto-retry once)
+        run: |
+          GATE="scripts/gate_home_isolate.sh"
+          VDIR="${RUNNER_TEMP}/airy-gate-a4"
+          run_leg() {
+            leg="$1"; filter="$2"; log="$3"; rlog="$4"
+            # shellcheck disable=SC2086
+            bash "$GATE" run --leg "$leg" --verdict-dir "$VDIR" -- \
+              ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure \
+              -j"$(nproc)" --timeout 240 $filter > "$log" 2>&1
+            rc=$?
+            if [ $rc -eq 0 ]; then
+              return 0
+            fi
+            echo "::error::A-4 $leg 腿 FAILED rc=$rc (attempt 1)，自动 rerun-failed…"
+            awk '/The following tests FAILED:/,/Errors while running CTest/' "$log" | sed 's/^/::error::  /' | head -40
+            grep -E '^\s*[0-9]+/[0-9]+ Testing|FAILED|Failed' "$log" | sed 's/^/::error::  /' | head -40
+            ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure --rerun-failed \
+              --timeout 240 > "$rlog" 2>&1
+            rc2=$?
+            if [ $rc2 -eq 0 ]; then
+              echo "::warning::A-4 $leg 腿 attempt1 失败但 rerun-failed 全过（flaky），用例层放行；隔离结论由 verify 终判"
+              return 0
+            fi
+            echo "::error::A-4 $leg 腿 rerun FAILED rc=$rc2"
+            tail -n 40 "$rlog" | sed 's/^/::error::  /'
+            return $rc2
+          }
+          rc=0
+          run_leg tests '-E ^cli_' /tmp/ctest.log /tmp/ctest-rerun.log || rc=$?
+          run_leg tools '-R ^cli_' /tmp/ctest-tools.log /tmp/ctest-tools-rerun.log || rc=$?
+          bash "$GATE" verify --verdict-dir "$VDIR" || rc=$?
+          exit $rc
 
       # 失败（含 rerun 仍失败）即把首轮与 rerun 日志落 ci-debug issue（公共
       # issue 匿名 API 可读，供排障拉取）；与 macOS 腿同口径。annotation
@@ -123,6 +144,8 @@ jobs:
         run: |
           [ -f /tmp/ctest.log ] && bash .github/scripts/ci-debug-dump.sh "linux ctest" "/tmp/ctest.log" || true
           [ -f /tmp/ctest-rerun.log ] && bash .github/scripts/ci-debug-dump.sh "linux ctest rerun" "/tmp/ctest-rerun.log" || true
+          [ -f /tmp/ctest-tools.log ] && bash .github/scripts/ci-debug-dump.sh "linux ctest tools leg" "/tmp/ctest-tools.log" || true
+          [ -f /tmp/ctest-tools-rerun.log ] && bash .github/scripts/ci-debug-dump.sh "linux ctest tools rerun" "/tmp/ctest-tools-rerun.log" || true
 
       # 日志直传 artifact：ci-debug issue 依赖 GH_TOKEN 与 issue 可见性；
       # artifact 无需凭据即可从 run 页面下载，作为兜底取证通道。
@@ -134,6 +157,9 @@ jobs:
           path: |
             /tmp/ctest.log
             /tmp/ctest-rerun.log
+            /tmp/ctest-tools.log
+            /tmp/ctest-tools-rerun.log
+            ${{ runner.temp }}/airy-gate-a4/**
           if-no-files-found: ignore
           retention-days: 14
 
@@ -287,12 +313,15 @@ jobs:
             fi
           done
 
-      # 与 ON 腿同口径：瞬态 flaky 经一次 rerun 吸收，真实回归 fail-closed
-      - name: Run tests (ctest, auto-retry once)
+      # 与 ON 腿同口径：瞬态 flaky 经一次 rerun 吸收，真实回归 fail-closed；
+      # ctest 同样在 A-4 隔离沙箱下执行（写真实 $HOME 即判红）。
+      - name: Run tests (ctest, auto-retry once, HOME isolated)
         run: |
           set +e
-          ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure -j"$(nproc)" \
-            --timeout 240 > /tmp/canary-off-ctest.log 2>&1
+          bash scripts/gate_home_isolate.sh run --leg tests \
+            --verdict-dir "${RUNNER_TEMP}/airy-gate-a4-canary-off" -- \
+            ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure -j"$(nproc)" \
+              --timeout 240 > /tmp/canary-off-ctest.log 2>&1
           rc=$?
           if [ $rc -eq 0 ]; then
             exit 0
@@ -300,10 +329,17 @@ jobs:
           echo "::error::ctest FAILED rc=$rc (attempt 1)，自动 rerun-failed…"
           awk '/The following tests FAILED:/,/Errors while running CTest/' \
             /tmp/canary-off-ctest.log | sed 's/^/::error::  /' | head -40
+          grep -E '::error::A-4' /tmp/canary-off-ctest.log | sed 's/^/::error::  /' | head -20
           ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure --rerun-failed \
             --timeout 240 > /tmp/canary-off-ctest-rerun.log 2>&1
           rc2=$?
           if [ $rc2 -eq 0 ]; then
+            # 用例层 flaky 放行，但隔离结论不能跟着放行：首轮若写了真实
+            # $HOME，verdict 仍是 FAIL，这里必须判红。
+            if [ "$(head -1 "${RUNNER_TEMP}/airy-gate-a4-canary-off/leg-tests.verdict" 2>/dev/null)" != "PASS" ]; then
+              echo "::error::A-4 隔离门禁判红：真实 \$HOME 被写入（见 offenders-tests.txt）"
+              exit 1
+            fi
             echo "::warning::ctest attempt1 失败但 rerun-failed 全过（flaky），门禁放行"
             exit 0
           fi
