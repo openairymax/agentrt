@@ -460,17 +460,22 @@ static void cli_mem_stats_show(const char *ns, const char *json)
         const cJSON *m = cJSON_GetObjectItem(cache, "misses");
         const cJSON *r = cJSON_GetObjectItem(cache, "hit_rate");
         const cJSON *v = cJSON_GetObjectItem(cache, "evictions");
-        /* 无查询样本时 hit_rate 为负：呈现"不可用"，不得伪零（§2.1-6） */
+        const cJSON *s = cJSON_GetObjectItem(cache, "state");
+        /* 三态（D-4）：disabled/empty/active；hit_rate 仅在有查询样本时呈现，
+         * 未启用时固定 unavailable，避免 -1 被误读为零命中。 */
         char rate[16];
         if (cJSON_IsNumber(r) && r->valuedouble >= 0.0)
             snprintf(rate, sizeof(rate), "%.1f%%", r->valuedouble * 100.0);
         else
             snprintf(rate, sizeof(rate), "unavailable");
         snprintf(line, sizeof(line),
-                 "semantic cache: entries=%d hits=%d misses=%d hit_rate=%s evictions=%d",
-                 e ? e->valueint : 0, h ? h->valueint : 0, m ? m->valueint : 0, rate,
-                 v ? v->valueint : 0);
+                 "semantic cache: state=%s entries=%d hits=%d misses=%d hit_rate=%s evictions=%d",
+                 cJSON_IsString(s) ? s->valuestring : "unknown", e ? e->valueint : 0,
+                 h ? h->valueint : 0, m ? m->valueint : 0, rate, v ? v->valueint : 0);
         cli_sub_print(0, ns, line);
+        if (cJSON_IsTrue(cJSON_GetObjectItem(cache, "enabled")) &&
+            (!h || h->valueint == 0) && m && m->valueint > 0)
+            cli_sub_print(0, ns, "WARN: semantic cache 已启用但有查询零命中，缓存未生效");
     }
 
     const cJSON *ledger = cJSON_GetObjectItem(root, "ledger");
