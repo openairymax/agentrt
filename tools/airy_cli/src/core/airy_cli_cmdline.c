@@ -12,6 +12,7 @@
  */
 
 #include "cli_internal.h"
+#include "compat.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -182,7 +183,9 @@ int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
                    strcmp(argv[i], "--resume") == 0) {
             g_cli_resume_mode = 1;
         } else if (strcmp(argv[i], "-V") == 0 || strcmp(argv[i], "--version") == 0) {
-            cli_outf("airy_cli %s\n", AIRY_CLI_VERSION);
+            /* 版本自证取运行期身份（airy_build_id）：与 /health、启动横幅
+             * 同一来源，现场三处对照不会出现两个说法。 */
+            cli_outf("airy_cli %s\n", airy_build_id());
             return 1;
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             cli_print_usage();
