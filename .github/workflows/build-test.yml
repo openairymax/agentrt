@@ -133,6 +133,14 @@ jobs:
           bash "$GATE" verify --verdict-dir "$VDIR" || rc=$?
           exit $rc
 
+      # A-5 运行时门禁（§17.1 A-5）：干净 AIRY_HOME 首启后静默 daemon 不得
+      # 留 0 字节 .out，有输出者 .out 必须非空，且 sandbox 内 -size 0 命中 0。
+      # 反例先行：AIRY_PREOPEN_OUT=1 下必须检出 0 字节文件，否则门禁失效。
+      - name: "Gate A-5 no empty .out (runtime, self-proved)"
+        run: |
+          bash scripts/gate_no_empty_out.sh selftest --bin "${BUILD_DIR}/bin/supervisor_d"
+          bash scripts/gate_no_empty_out.sh run --bin "${BUILD_DIR}/bin/supervisor_d"
+
       # 失败（含 rerun 仍失败）即把首轮与 rerun 日志落 ci-debug issue（公共
       # issue 匿名 API 可读，供排障拉取）；与 macOS 腿同口径。annotation
       # 每 job 仅保留 ≤10 条 + tail 窗口截断，无法承载断言级明细，故以
