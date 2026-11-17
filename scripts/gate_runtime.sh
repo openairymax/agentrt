@@ -105,7 +105,7 @@ MODEL_ID="${AIRY_GATE_MODEL_ID:-$(basename "${MODEL:-model.gguf}" .gguf)}"
 AIRY_LOCAL="${AIRY_LOCAL_BIN:-$ROOT/../../tools/scripts/ops/bin/airy-local}"
 
 # ---- 夹具：OpenAI 兼容端 + 支持 Range 的制品服务 ----
-rt_fixture() { # <port> <mode: ok|empty|err500> <file>
+rt_fixture() { # <port> <mode: ok|empty|err500|echo|slow> <file>
     cat >"$SB/fixture.py" <<'PY'
 import json, os, re, sys, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -160,9 +160,25 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         n = int(self.headers.get("Content-Length", "0"))
-        _ = self.rfile.read(n)
+        raw = self.rfile.read(n)
         if mode == "err500":
             return self._send(500, b'{"error":{"message":"gate: injected upstream failure"}}')
+        if mode == "echo":
+            try:
+                msgs = json.loads(raw.decode("utf-8", "replace")).get("messages") or []
+                # 守护会追加宿主机时间上下文，回声取最后一条 user 正文。
+                text = ""
+                for m in msgs:
+                    if m.get("role") == "user":
+                        text = m.get("content", "")
+            except ValueError:
+                text = ""
+            time.sleep(0.5)
+            body = {"id": "gate-echo", "object": "chat.completion", "model": "gate",
+                    "choices": [{"index": 0, "finish_reason": "stop",
+                                 "message": {"role": "assistant", "content": "echo:" + text}}],
+                    "usage": {"prompt_tokens": 3, "completion_tokens": 1, "total_tokens": 4}}
+            return self._send(200, json.dumps(body).encode())
         if mode == "empty":
             body = {"id": "gate-empty", "object": "chat.completion", "model": "gate",
                     "choices": [{"index": 0, "finish_reason": "length",
@@ -325,6 +341,36 @@ rt_llama_stop() {
     [ -n "$LLAMA_PID" ] && kill -KILL "$LLAMA_PID" 2>/dev/null
     wait "$LLAMA_PID" 2>/dev/null
     LLAMA_PID=""
+}
+
+# 内存受限启动：地址空间上限取模型体积之半，权重映射必然失败。
+# 返回 llama-server 退出码；124 = 有界等待内未退出（视为异常）。
+rt_llama_oom() { # <port> <log> <vkb>
+    rt_port_free "$1" || return 99
+    (ulimit -v "$3" 2>/dev/null || exit 98
+     LD_LIBRARY_PATH="$(dirname "$LLAMA")" exec "$LLAMA" -m "$MODEL" --host 127.0.0.1 \
+        --port "$1" -c 2048 -np 4 --no-webui >"$2" 2>&1) &
+    LLAMA_PID=$!
+    local i=0 rc
+    while [ "$i" -lt 600 ]; do
+        if ! kill -0 "$LLAMA_PID" 2>/dev/null; then
+            wait "$LLAMA_PID" 2>/dev/null
+            rc=$?
+            LLAMA_PID=""
+            return "$rc"
+        fi
+        sleep 0.1
+        i=$((i + 1))
+    done
+    kill -KILL "$LLAMA_PID" 2>/dev/null
+    wait "$LLAMA_PID" 2>/dev/null
+    LLAMA_PID=""
+    return 124
+}
+
+rt_fd_n() { # <pid> → fd 数；无 /proc 平台输出 -1
+    [ -d "/proc/$1/fd" ] || { printf -- '-1\n'; return 0; }
+    ls "/proc/$1/fd" 2>/dev/null | wc -l | tr -d ' '
 }
 
 rt_need_llm() {
@@ -644,8 +690,146 @@ scn_t3() {
     fi
 }
 
-scn_t4() { skip "T-4 场景待 C-6-04 落地"; }
-scn_t5() { skip "T-5 场景待 C-6-04 落地"; }
+# ── T-4 并发：8 路各自配对不串扰，fd 不随请求数增长 ──
+scn_t4() {
+    rt_need_llm "T-4" || return 0
+    if ! command -v python3 >/dev/null 2>&1; then
+        skip "T-4：缺 python3，无法起回声夹具"
+        return 0
+    fi
+    if ! rt_fixture "$PORT_FIX" echo "$MODEL"; then
+        fail "T-4 回声夹具未就绪"
+        return 0
+    fi
+
+    local h out i bad=0 fd0 fd1 t0 dt tag
+    h="$(rt_home t4)"
+    rt_cfg "$h" api "http://127.0.0.1:$PORT_FIX" gate-echo
+    rt_start "$h" "$h/logs/llm.log"
+    if ! rt_wait_sock "$h" 20; then
+        fail "T-4 llm_d 未就绪（见 $h/logs/llm.log）"
+        rt_stop_llm
+        rt_fix_stop_all
+        return 0
+    fi
+
+    # 预热一次，让常驻连接进入基线，避免首连开合计入增量。
+    out="$(rt_rpc "$h/run/llm.sock" complete \
+        '{"model":"gate-echo","messages":[{"role":"user","content":"c4-00"}],"max_tokens":16}' 30)"
+    fd0="$(rt_fd_n "$LLM_PID")"
+
+    local pids=()
+    t0="$(date +%s%N)"
+    for i in 1 2 3 4 5 6 7 8; do
+        rt_rpc "$h/run/llm.sock" complete \
+            "{\"model\":\"gate-echo\",\"messages\":[{\"role\":\"user\",\"content\":\"c4-0$i\"}],\"max_tokens\":16}" 60 \
+            >"$SB/t4-$i.out" 2>&1 &
+        pids+=("$!")
+    done
+    for i in ${pids[@]+"${pids[@]}"}; do wait "$i" 2>/dev/null; done
+    dt=$((($(date +%s%N) - t0) / 1000000))
+
+    for i in 1 2 3 4 5 6 7 8; do
+        tag="$(grep -o 'echo:c4-[0-9][0-9]' "$SB/t4-$i.out" 2>/dev/null | head -1)"
+        [ "$tag" = "echo:c4-0$i" ] || bad=$((bad + 1))
+    done
+    if [ "$bad" -eq 0 ]; then
+        pass "T-4 8 并发响应各自配对无串扰"
+    else
+        fail "T-4 ${bad}/8 并发响应串扰或缺失"
+    fi
+    if [ "$dt" -lt 3000 ]; then
+        pass "T-4 请求并行执行（${dt}ms，串行下界 4000ms）"
+    else
+        fail "T-4 请求疑似串行（${dt}ms）"
+    fi
+
+    sleep 0.5
+    fd1="$(rt_fd_n "$LLM_PID")"
+    if [ "$fd0" = "-1" ]; then
+        skip "T-4 fd 采样不可用（非 /proc 平台）"
+    elif [ $((fd1 - fd0)) -le 2 ]; then
+        pass "T-4 fd 不随请求数增长（${fd0} → ${fd1}）"
+    else
+        fail "T-4 fd 泄漏（${fd0} → ${fd1}）"
+    fi
+    if kill -0 "$LLM_PID" 2>/dev/null; then
+        pass "T-4 并发后守护存活"
+    else
+        fail "T-4 并发后守护退出"
+    fi
+    rt_stop_llm
+    rt_fix_stop_all
+}
+
+# ── T-5 内存不足：引擎显式分配失败，守护健康面仍可答 ──
+scn_t5() {
+    rt_need_llm "T-5" || return 0
+    rt_need_llama "T-5" || return 0
+
+    local h lim log rc out t0 dt
+    h="$(rt_home t5)"
+    log="$h/logs/engine.log"
+    rt_cfg "$h" api "http://127.0.0.1:$PORT_OOM" gate-oom
+    rt_start "$h" "$h/logs/llm.log"
+    if ! rt_wait_sock "$h" 20; then
+        fail "T-5 llm_d 未就绪（见 $h/logs/llm.log）"
+        rt_stop_llm
+        return 0
+    fi
+
+    # 上限取权重体积之半：地址空间不足以映射权重，加载必然显式失败。
+    lim=$(( $(rt_size "$MODEL") / 2048 ))
+    [ "$lim" -ge 65536 ] || lim=65536
+    rc=0
+    rt_llama_oom "$PORT_OOM" "$log" "$lim" || rc=$?
+    if [ "$rc" -eq 98 ]; then
+        skip "T-5：本平台不支持 ulimit -v"
+        rt_stop_llm
+        return 0
+    fi
+    if [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ] && [ "$rc" -ne 99 ]; then
+        pass "T-5 地址空间受限下引擎显式退出（rc=$rc）"
+    else
+        fail "T-5 引擎未给出显式失败（rc=$rc）"
+    fi
+    if grep -Eqi 'Cannot allocate memory|out of memory|failed to allocate|ENOMEM|mmap failed' "$log"; then
+        pass "T-5 失败语义显式为分配失败"
+    else
+        fail "T-5 缺显式分配失败日志"
+    fi
+    if rt_port_free "$PORT_OOM"; then
+        pass "T-5 失败后无残留监听（未进入未知态）"
+    else
+        fail "T-5 引擎失败后端口仍被占用"
+    fi
+
+    t0="$(date +%s%N)"
+    out="$(rt_rpc "$h/run/llm.sock" complete \
+        '{"model":"gate-oom","messages":[{"role":"user","content":"oom"}],"max_tokens":16}' 60)"
+    dt=$((($(date +%s%N) - t0) / 1000000))
+    case "$out" in
+        *'"error"'*) pass "T-5 引擎不可用时请求返回明确错误（${dt}ms）" ;;
+        *) fail "T-5 未返回明确错误：$(printf '%.160s' "$out")" ;;
+    esac
+    if [ "$dt" -lt 60000 ]; then
+        pass "T-5 失败路径有界（${dt}ms < 60000ms）"
+    else
+        fail "T-5 失败路径疑似挂起（${dt}ms）"
+    fi
+    out="$(rt_rpc "$h/run/llm.sock" health_check '{}' 10)"
+    case "$out" in
+        *'"health"'*) pass "T-5 OOM 后守护健康面仍可应答" ;;
+        *) fail "T-5 OOM 后守护健康面无响应" ;;
+    esac
+    if kill -0 "$LLM_PID" 2>/dev/null; then
+        pass "T-5 守护进程存活未进入未知态"
+    else
+        fail "T-5 守护进程已退出"
+    fi
+    rt_stop_llm
+}
+
 scn_t6() { skip "T-6 场景待 C-6-05 落地"; }
 scn_t7() { skip "T-7 场景待 C-6-05 落地"; }
 scn_t8() { skip "T-8 场景待 C-6-05 落地"; }
