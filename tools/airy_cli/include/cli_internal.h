@@ -137,6 +137,9 @@ void cli_hall_emit(const char *task_id, airy_hall_category_t cat,
  * in main.c; read by the render layer to keep output clean. */
 extern int g_cli_print_mode;
 extern int g_cli_json_mode;
+/* C-10（0.1.21）：--verbose 打开失败归因的原始错误 data 输出；默认仅
+ * 一行「失败在哪一环」。定义在 main.c，网关错误层只读。 */
+extern int g_cli_verbose;
 
 /* 全屏 TUI 渲染层模式（--tui）：airy_cli 调起 agentrt-tui 子进程并回传
  * 退出码，CLI 自身不初始化终端。与 -p 互斥。 */

@@ -44,6 +44,20 @@ int cli_gw_exchange(const char *method, const char *host, int port, const char *
                     const char *body, int timeout_ms, int renewals, char **out_body,
                     size_t *out_body_len, int *out_status);
 
+/**
+ * @brief C-10：把 gateway 的 JSON-RPC error.data 压成「失败在哪一环」单行。
+ *
+ * 只读 data 中的 stage/grad_rounds/grad_rejections/affected_node/err_detail
+ * 与 stats.err_code，不改变错误语义：返回 daemon 侧原始错误码，供上层
+ * 保留 code（-31 只能作为进程退出码，不得吞掉 -110 等根因）。
+ *
+ * @param data_json error.data 的 JSON 文本（可为 NULL 或空串）
+ * @param out       [out] 单行归因（空串表示无可归因信息）
+ * @param cap       输出容量
+ * @return daemon 原始错误码（负值，取自 data.stats.err_code）；无则 0
+ */
+int cli_gw_fail_line(const char *data_json, char *out, size_t cap);
+
 #ifdef __cplusplus
 }
 #endif
