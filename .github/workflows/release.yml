@@ -452,6 +452,10 @@ jobs:
           # 版本 SSoT 随包落地（与 tar.gz 腿同语义）：解包态无 install.env，
           # 启动器以包根 VERSION 自述版本。缺失即包无法自证版本。
           Copy-Item -Path "VERSION" -Destination "$pkgDir\VERSION" -Force
+          # 构建身份随包（A-1）：与 lf-package 同语义，安装期并入安装清单。
+          $sha12 = (git rev-parse --short=12 HEAD).Trim()
+          New-Item -ItemType Directory -Path "$pkgDir\share\agentrt" -Force | Out-Null
+          "AIRY_BUILD_ID=run${{ github.run_id }}.${{ github.run_attempt }}-g$sha12" | Out-File -FilePath "$pkgDir\share\agentrt\build.env" -Encoding ascii
           New-Item -ItemType File -Path "$pkgDir\platform-x86-64" -Force | Out-Null
           $artifact = "agentrt-$VERSION-windows-x86-64"
           Compress-Archive -Path "pkg\*" -DestinationPath "$artifact.zip"
@@ -607,6 +611,10 @@ jobs:
           # 版本 SSoT 随包落地（与 tar.gz 腿同语义）：解包态无 install.env，
           # 启动器以包根 VERSION 自述版本。缺失即包无法自证版本。
           Copy-Item -Path "VERSION" -Destination "$pkgDir\VERSION" -Force
+          # 构建身份随包（A-1）：与 lf-package 同语义，安装期并入安装清单。
+          $sha12 = (git rev-parse --short=12 HEAD).Trim()
+          New-Item -ItemType Directory -Path "$pkgDir\share\agentrt" -Force | Out-Null
+          "AIRY_BUILD_ID=run${{ github.run_id }}.${{ github.run_attempt }}-g$sha12" | Out-File -FilePath "$pkgDir\share\agentrt\build.env" -Encoding ascii
           New-Item -ItemType File -Path "$pkgDir\platform-x86-32" -Force | Out-Null
           $artifact = "agentrt-$VERSION-windows-x86-32"
           Compress-Archive -Path "pkg\*" -DestinationPath "$artifact.zip"
