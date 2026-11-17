@@ -21,6 +21,7 @@
  */
 
 #include "cli_gw.h"
+#include "cli_gw_int.h"
 
 #include "airy_defaults.h"
 #include "error_codes.h"
@@ -45,6 +46,8 @@
  * cli_gw.c 同域同约定，文件内 extern 引用；本目标刻意不链 coreloopthree，
  * 不 include cli_internal.h（其头森林需 corekern include 面）。 */
 extern volatile sig_atomic_t g_cli_cancel;
+/* C-10（0.1.21）：--verbose 开关（cli_test_globals.c 定义）。 */
+extern int g_cli_verbose;
 
 /* ── 极简测试框架 ─────────────────────────────────────────────────── */
 
@@ -71,6 +74,7 @@ static int g_tests_passed = 0;
 #define MOCK_MODE_NORESULT 4 /* POST / → 合法 JSON 但既无 result 也无 error */
 #define MOCK_MODE_503    5 /* POST / → 空体 503（daemon 重启窗口的网关应答） */
 #define MOCK_MODE_SLOW   6 /* POST / → 延迟应答，驱动客户端续期轮询（T-19） */
+#define MOCK_MODE_ERRDATA 7 /* POST / → -32603 + 归因 data（C-10） */
 
 static int g_srv_fd = -1;
 static int g_srv_port = 0;
@@ -204,6 +208,12 @@ static int mock_fail_mode(int fd, int mode)
         {MOCK_MODE_BADJSON, 200, "<html>gateway panic</html>"},
         {MOCK_MODE_NORESULT, 200, "{\"jsonrpc\":\"2.0\",\"id\":1}"},
         {MOCK_MODE_503, 503, ""}, /* daemon 重启窗口：网关返回空体 503 */
+        {MOCK_MODE_ERRDATA, 200,
+         "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32603,"
+         "\"message\":\"Think process failed\",\"data\":{\"degraded\":true,"
+         "\"stage\":7,\"grad_rounds\":4,\"grad_rejections\":3,"
+         "\"affected_node\":\"n7\",\"err_detail\":\"loop: no progress\","
+         "\"stats\":{\"err_code\":-110}}}}"},
     };
 
     for (size_t i = 0; i < sizeof(tbl) / sizeof(tbl[0]); i++) {
@@ -582,6 +592,81 @@ static void test_call_canceled(void)
     CHECK(out == NULL, "call_canceled out==NULL");
 }
 
+/* ── 用例 13-15：C-10 失败归因与错误码透传 ───────────────────────── */
+
+/* 四类失败的单行归因必须两两可区分，且原始 err_code 不被 -32603 覆盖。 */
+static void test_fail_line_kinds(void)
+{
+    static const struct {
+        const char *name;
+        const char *data;
+        int err;
+        const char *needle;
+    } cases[] = {
+        { "schema",
+          "{\"stage\":4,\"grad_rounds\":1,\"grad_rejections\":0,\"affected_node\":\"\","
+          "\"err_detail\":\"gen: inputs: missing\",\"stats\":{\"err_code\":-22}}",
+          -22, "gen" },
+        { "arbiter",
+          "{\"stage\":6,\"grad_rounds\":2,\"grad_rejections\":1,\"affected_node\":\"n2\","
+          "\"err_detail\":\"unusable: err=-5\",\"stats\":{\"err_code\":-5}}",
+          -5, "arbiter" },
+        { "loop",
+          "{\"stage\":7,\"grad_rounds\":4,\"grad_rejections\":3,\"affected_node\":\"n7\","
+          "\"err_detail\":\"loop: no progress\",\"stats\":{\"err_code\":-110}}",
+          -110, "loop" },
+        { "llm",
+          "{\"stage\":2,\"grad_rounds\":0,\"grad_rejections\":0,\"affected_node\":\"\","
+          "\"err_detail\":\"llm: err=-111\",\"stats\":{\"err_code\":-111}}",
+          -111, "llm" },
+    };
+    char lines[4][320];
+    size_t n = sizeof(cases) / sizeof(cases[0]);
+    for (size_t i = 0; i < n; i++) {
+        lines[i][0] = '\0';
+        int rc = cli_gw_fail_line(cases[i].data, lines[i], sizeof(lines[i]));
+        CHECK(rc == cases[i].err, "fail_line keeps daemon err_code");
+        CHECK(strstr(lines[i], cases[i].needle) != NULL, "fail_line names the failing stage");
+        CHECK(strstr(lines[i], "stats") == NULL, "fail_line is one line without raw json");
+    }
+    for (size_t i = 0; i < n; i++) {
+        for (size_t j = i + 1; j < n; j++)
+            CHECK(strcmp(lines[i], lines[j]) != 0, "fail_line kinds are distinguishable");
+    }
+    /* 无归因 data：空串 + 0，调用方回退网关文案 */
+    char none[64] = "x";
+    CHECK(cli_gw_fail_line("{}", none, sizeof(none)) == 0, "fail_line empty data returns 0");
+    CHECK(none[0] == '\0', "fail_line empty data yields empty line");
+    CHECK(cli_gw_fail_line(NULL, none, sizeof(none)) == 0, "fail_line null data returns 0");
+}
+
+/* -32603 包装码下的端到端：错误码保真 + 默认一行 + --verbose 附原始 data。 */
+static void test_call_errdata(void)
+{
+    mock_reset();
+    g_mode = MOCK_MODE_ERRDATA;
+    set_url_port(g_srv_port);
+    g_cli_verbose = 0;
+    char *out = NULL;
+    int rc = cli_gw_call("think.process", "{}", 3000, &out);
+    CHECK(rc == -110, "call_errdata keeps daemon err_code (-110)");
+    CHECK(out == NULL, "call_errdata out==NULL");
+    CHECK(strstr(cli_gw_last_err(), "失败于 loop") != NULL, "call_errdata line names loop");
+    CHECK(strstr(cli_gw_last_err(), "节点 n7") != NULL, "call_errdata line names affected node");
+    CHECK(strstr(cli_gw_last_err(), "原始错误 data") == NULL,
+          "call_errdata default hides raw data");
+
+    mock_reset();
+    g_cli_verbose = 1;
+    out = NULL;
+    rc = cli_gw_call("think.process", "{}", 3000, &out);
+    CHECK(rc == -110, "call_errdata verbose keeps err_code");
+    CHECK(strstr(cli_gw_last_err(), "原始错误 data") != NULL,
+          "call_errdata verbose appends raw data");
+    g_cli_verbose = 0;
+    g_mode = MOCK_MODE_OK;
+}
+
 /* ── 用例 11-12：/health 可达性 ───────────────────────────────────── */
 
 static void test_health_online(void)
@@ -633,6 +718,8 @@ int main(void)
     test_call_timeout();
     test_call_renewal();
     test_call_canceled();
+    test_fail_line_kinds();
+    test_call_errdata();
     test_health_online();
     test_health_offline();
 

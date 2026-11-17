@@ -222,6 +222,8 @@ static void cli_print_usage(void)
     cli_outf("                           （无 banner/提示符；省略 PROMPT 时从 stdin 读取）\n");
     cli_outf("  %s--json%s                 结构化 JSON 输出（与 %s-p%s 组合使用）\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_outf("  %s--verbose%s              失败时附原始错误 data（默认仅一行归因）\n",
+           cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %s--tui%s                  全屏 TUI 渲染层（agentrt-tui 子进程，退出码回传）\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %s--continue%s, %s--resume%s   恢复上次会话上下文（读 mem_d 最近记忆装配视图）\n",
@@ -253,6 +255,9 @@ int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
             g_cli_print_mode = 1;
         } else if (strcmp(argv[i], "--json") == 0) {
             g_cli_json_mode = 1;
+        } else if (strcmp(argv[i], "--verbose") == 0) {
+            /* C-10（0.1.21）：失败归因默认一行，--verbose 附原始错误 data。 */
+            g_cli_verbose = 1;
         } else if (strcmp(argv[i], "--tui") == 0) {
             g_cli_tui_mode = 1;
         } else if (strcmp(argv[i], "--continue") == 0 ||
