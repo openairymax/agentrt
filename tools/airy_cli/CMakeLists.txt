@@ -58,6 +58,8 @@ add_executable(airy_cli
     src/cmd/airy_cli_cmd_approval.c
     # 0.1.21 A-7：模型连接表自检视图（doctor 的 key 三态判据来源）
     src/cmd/cli_models.c
+    # 0.1.21 B-3：加速器能力快照（doctor 的 GPU 段与降级原因来源）
+    src/cmd/cli_gpu.c
     src/chat/cli_chat.c
     # cli_chat.c 域拆分（2026-08-27：2040 行 → 6 个职责模块）
     src/chat/cli_chat_usage.c
