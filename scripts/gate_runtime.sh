@@ -250,6 +250,18 @@ models:
 EOF
 }
 
+rt_cfg_local() { # <home> <base_url> [model_id]
+    local h="$1" base="$2" mid="${3:-$MODEL_ID}"
+    cat >"$h/config/model.yaml" <<EOF
+models:
+  - name: gate-local
+    mode: local
+    base_url: $base
+    model_id: $mid
+    provision: external
+EOF
+}
+
 rt_cfg_chain() { # <home> <bad_base> <good_base>
     local h="$1" bad="$2" good="$3"
     cat >"$h/config/model.yaml" <<EOF
@@ -332,7 +344,7 @@ PY
 rt_llama() { # <port> <log>
     rt_port_free "$1" || return 1
     LD_LIBRARY_PATH="$(dirname "$LLAMA")" "$LLAMA" -m "$MODEL" --host 127.0.0.1 \
-        --port "$1" -c 2048 -np 4 --no-webui >"$2" 2>&1 &
+        --port "$1" -c 2048 -np 4 --no-webui --reasoning off >"$2" 2>&1 &
     LLAMA_PID=$!
     rt_wait_http "$1" 120
 }
@@ -830,9 +842,226 @@ scn_t5() {
     rt_stop_llm
 }
 
-scn_t6() { skip "T-6 场景待 C-6-05 落地"; }
-scn_t7() { skip "T-7 场景待 C-6-05 落地"; }
-scn_t8() { skip "T-8 场景待 C-6-05 落地"; }
+rt_wait_port_free() { # <port> <秒>
+    local i=0
+    while [ "$i" -lt $(($2 * 10)) ]; do
+        rt_port_free "$1" && return 0
+        sleep 0.1
+        i=$((i + 1))
+    done
+    return 1
+}
+
+# 计费账目合计（prompt + completion）：无账目文件输出 -1。
+rt_usage_tokens() { # <home>
+    local f="$1/data/agentrt/llm_usage.json"
+    [ -f "$f" ] || { printf -- '-1\n'; return 0; }
+    python3 - "$f" <<'PY'
+import json, sys
+try:
+    d = json.load(open(sys.argv[1], encoding="utf-8"))
+except (OSError, ValueError):
+    print(-1)
+    raise SystemExit
+tot = 0
+for m in d.get("models") or []:
+    tot += int(m.get("prompt_tokens", 0)) + int(m.get("completion_tokens", 0))
+print(tot)
+PY
+}
+
+# ── T-6 OOM/强杀后恢复：引擎可重建，请求自动恢复 ──
+scn_t6() {
+    rt_need_llm "T-6" || return 0
+    rt_need_llama "T-6" || return 0
+
+    local h out
+    h="$(rt_home t6)"
+    if ! rt_llama "$PORT_LLAMA" "$h/logs/engine.log"; then
+        fail "T-6 引擎首启未就绪（见 $h/logs/engine.log）"
+        rt_llama_stop
+        return 0
+    fi
+    rt_cfg_local "$h" "http://127.0.0.1:$PORT_LLAMA/v1"
+    rt_start "$h" "$h/logs/llm.log"
+    if ! rt_wait_sock "$h" 20; then
+        fail "T-6 llm_d 未就绪（见 $h/logs/llm.log）"
+        rt_stop_llm
+        rt_llama_stop
+        return 0
+    fi
+
+    out="$(rt_rpc "$h/run/llm.sock" complete \
+        "{\"model\":\"$MODEL_ID\",\"messages\":[{\"role\":\"user\",\"content\":\"gate t6\"}],\"max_tokens\":24}" 120)"
+    if printf '%s' "$out" | grep -Eq '"content":".+"'; then
+        pass "T-6 基线请求成功（引擎在线）"
+    else
+        fail "T-6 基线请求失败：$(printf '%.160s' "$out")"
+    fi
+
+    rt_llama_stop
+    if rt_wait_port_free "$PORT_LLAMA" 10; then
+        pass "T-6 引擎被强杀后端口释放"
+    else
+        fail "T-6 引擎强杀后端口仍占用"
+    fi
+    out="$(rt_rpc "$h/run/llm.sock" complete \
+        "{\"model\":\"$MODEL_ID\",\"messages\":[{\"role\":\"user\",\"content\":\"gate t6 down\"}],\"max_tokens\":24}" 60)"
+    case "$out" in
+        *'"error"'*) pass "T-6 引擎缺失时请求返回明确错误" ;;
+        *) fail "T-6 引擎缺失时未返回明确错误：$(printf '%.160s' "$out")" ;;
+    esac
+
+    if rt_llama "$PORT_LLAMA" "$h/logs/engine2.log"; then
+        pass "T-6 引擎同端口重建成功"
+    else
+        fail "T-6 引擎同端口重建失败"
+    fi
+    out="$(rt_rpc "$h/run/llm.sock" complete \
+        "{\"model\":\"$MODEL_ID\",\"messages\":[{\"role\":\"user\",\"content\":\"gate t6 up\"}],\"max_tokens\":24}" 120)"
+    if printf '%s' "$out" | grep -Eq '"content":".+"'; then
+        pass "T-6 引擎重建后请求自动恢复（未重启守护）"
+    else
+        fail "T-6 引擎重建后请求未恢复：$(printf '%.160s' "$out")"
+    fi
+    out="$(rt_rpc "$h/run/llm.sock" health_check '{}' 10)"
+    case "$out" in
+        *'"health"'*) pass "T-6 恢复后守护健康面可答" ;;
+        *) fail "T-6 恢复后守护健康面无响应" ;;
+    esac
+    if kill -0 "$LLM_PID" 2>/dev/null; then
+        pass "T-6 守护跨引擎重建存活"
+    else
+        fail "T-6 守护已退出"
+    fi
+    rt_stop_llm
+    rt_llama_stop
+}
+
+# ── T-7 重启恢复：配置与计费账目跨重启保留，请求仍通 ──
+scn_t7() {
+    rt_need_llm "T-7" || return 0
+    if ! command -v python3 >/dev/null 2>&1; then
+        skip "T-7：缺 python3，无法起回声夹具"
+        return 0
+    fi
+    if ! rt_fixture "$PORT_FIX" echo "$MODEL"; then
+        fail "T-7 回声夹具未就绪"
+        return 0
+    fi
+
+    local h out i cfg_sha t1 t2
+    h="$(rt_home t7)"
+    rt_cfg "$h" api "http://127.0.0.1:$PORT_FIX" gate-echo
+    rt_start "$h" "$h/logs/llm.log"
+    if ! rt_wait_sock "$h" 20; then
+        fail "T-7 llm_d 首启未就绪（见 $h/logs/llm.log）"
+        rt_stop_llm
+        rt_fix_stop_all
+        return 0
+    fi
+
+    for i in 1 2 3; do
+        out="$(rt_rpc "$h/run/llm.sock" complete \
+            "{\"model\":\"gate-echo\",\"messages\":[{\"role\":\"user\",\"content\":\"t7-$i\"}],\"max_tokens\":16}" 60)"
+        printf '%s' "$out" | grep -q "echo:t7-$i" || fail "T-7 首启第 ${i} 次请求失败"
+    done
+    cfg_sha="$(rt_sha "$h/config/model.yaml")"
+    rt_stop_llm
+
+    t1="$(rt_usage_tokens "$h")"
+    if [ -f "$h/data/agentrt/llm_usage.json" ] && [ "$t1" = "12" ]; then
+        pass "T-7 停机后计费账目落盘（3 次 × 4 = ${t1}）"
+    else
+        fail "T-7 计费账目落盘异常（合计 ${t1}）"
+    fi
+
+    rt_start "$h" "$h/logs/llm2.log"
+    if ! rt_wait_sock "$h" 20; then
+        fail "T-7 llm_d 重启未就绪（见 $h/logs/llm2.log）"
+        rt_stop_llm
+        rt_fix_stop_all
+        return 0
+    fi
+    if [ "$(rt_sha "$h/config/model.yaml")" = "$cfg_sha" ]; then
+        pass "T-7 配置跨重启逐字节不变"
+    else
+        fail "T-7 配置在重启中被改写"
+    fi
+    if [ "$(rt_usage_tokens "$h")" = "$t1" ]; then
+        pass "T-7 重启后账目保留（${t1}）"
+    else
+        fail "T-7 重启后账目丢失（$t1 → $(rt_usage_tokens "$h")）"
+    fi
+
+    out="$(rt_rpc "$h/run/llm.sock" complete \
+        '{"model":"gate-echo","messages":[{"role":"user","content":"t7-after"}],"max_tokens":16}' 60)"
+    if printf '%s' "$out" | grep -q 'echo:t7-after'; then
+        pass "T-7 重启后请求仍通"
+    else
+        fail "T-7 重启后请求失败：$(printf '%.160s' "$out")"
+    fi
+    rt_stop_llm
+    t2="$(rt_usage_tokens "$h")"
+    if [ "$t2" = "16" ]; then
+        pass "T-7 重启后账目继续累加（${t1} → ${t2}）"
+    else
+        fail "T-7 重启后账目累加异常（${t1} → ${t2}）"
+    fi
+    rt_fix_stop_all
+}
+
+# ── T-8 日志可判读：启动/就绪/请求/失败四段均有可检索字段 ──
+scn_t8() {
+    rt_need_llm "T-8" || return 0
+    rt_need_llama "T-8" || return 0
+
+    local h log out
+    h="$(rt_home t8)"
+    log="$h/logs/llm.log"
+    if ! rt_llama "$PORT_LLAMA" "$h/logs/engine.log"; then
+        fail "T-8 引擎未就绪（见 $h/logs/engine.log）"
+        rt_llama_stop
+        return 0
+    fi
+    rt_cfg_local "$h" "http://127.0.0.1:$PORT_LLAMA/v1"
+    rt_start "$h" "$log"
+    if ! rt_wait_sock "$h" 20; then
+        fail "T-8 llm_d 未就绪（见 $log）"
+        rt_stop_llm
+        rt_llama_stop
+        return 0
+    fi
+
+    out="$(rt_rpc "$h/run/llm.sock" complete \
+        "{\"model\":\"$MODEL_ID\",\"messages\":[{\"role\":\"user\",\"content\":\"gate t8\"}],\"max_tokens\":24}" 120)"
+    rt_llama_stop
+    out="$(rt_rpc "$h/run/llm.sock" complete \
+        "{\"model\":\"$MODEL_ID\",\"messages\":[{\"role\":\"user\",\"content\":\"gate t8 down\"}],\"max_tokens\":24}" 60)"
+    out="$(rt_rpc "$h/run/llm.sock" health_check '{}' 10)"
+
+    grep -q 'C-L02: SVC: CREATE-OK' "$log" \
+        && pass "T-8 启动段可判读（SVC CREATE-OK）" \
+        || fail "T-8 缺启动段结构化日志"
+    grep -Eq "Listening on .*llm\.sock|C-L08: REGISTER service='llm_d'.*endpoint=" "$log" \
+        && pass "T-8 就绪段可判读（监听地址与注册端点）" \
+        || fail "T-8 缺就绪段结构化日志"
+    if grep -Eq 'C-L02: [A-Z]+: COMPLETE-START model=' "$log" \
+        && grep -Eq 'C-L02: [A-Z]+: COMPLETE-OK model=' "$log"; then
+        pass "T-8 请求段可判读（COMPLETE-START/OK）"
+    else
+        fail "T-8 缺请求段结构化日志"
+    fi
+    grep -Eq 'C-L02: [A-Z]+: COMPLETE-FAIL model=.*DIAGNOSIS=' "$log" \
+        && pass "T-8 失败段可判读（COMPLETE-FAIL 带诊断码）" \
+        || fail "T-8 缺失败段结构化日志"
+    if grep -q 'NO-KEY env=' "$log"; then
+        fail "T-8 本地模式误报 NO-KEY 引导"
+    else
+        pass "T-8 本地模式无误导性 NO-KEY 引导"
+    fi
+    rt_stop_llm
+}
 
 case "$MODE" in
     list) rt_list; exit 0 ;;
