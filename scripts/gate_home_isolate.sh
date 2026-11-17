@@ -54,9 +54,17 @@ a4_default_vdir() {
     printf '%s\n' "${RUNNER_TEMP:-/tmp}/airy-gate-a4"
 }
 
-# 快照：路径集合 + size + mtime。符号链接不跟随（-P），避免逃逸到 HOME 外。
+# 快照：路径集合 + size + mtime。符号链接不跟随（find 缺省 -P），避免逃逸
+# 到 HOME 外。GNU find 有 -printf 时单进程直出；BSD/macOS 缺该谓词则回退
+# 逐文件 stat（开发机 HOME 上百万条目时回退路径慢到门禁不可用，CI 小 HOME
+# 不受影响——两条路径产出的字段语义一致，只是取数方式不同）。
 a4_snap() {
     local home="$1" out="$2"
+    if find "$home" -maxdepth 0 -printf '' >/dev/null 2>&1; then
+        find "$home" $A4_SNAP_OPTS -printf '%y\t%s\t%T@\t%p\n' 2>/dev/null |
+            LC_ALL=C sort >"$out"
+        return 0
+    fi
     find "$home" $A4_SNAP_OPTS -exec bash -c '
         for p in "$@"; do
             if stat -c "%s %Y" "$p" >/dev/null 2>&1; then
