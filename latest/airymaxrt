@@ -1156,6 +1156,15 @@ apply_package() {
     return 0
 }
 
+# A-9 H1：按「命令行以该路径开头」锚定，且正则元字符按字面量转义。
+# 旧写法 pkill -f "$AIRY_HOME/bin/$d" 会把 ssh 会话（命令行内携带同一
+# 路径字符串）一并命中——这是 H1 自匹配的根因。
+pkill_bin() {
+    local _pat
+    _pat="$(printf '%s' "$1" | sed 's/[][\\.*^$]/\\&/g')"
+    pkill -f -- "^${_pat}([[:space:]]|$)" >/dev/null 2>&1
+}
+
 stop_running_daemons() {
     # B13 收摊归一：daemon 群生命周期归 supervisor_d，先走 shutdown；
     # pkill 循环仅兜底清理旧版（B13 前直拉起）残留实例
@@ -1172,7 +1181,7 @@ stop_running_daemons() {
         [ -f "$d" ] || continue
         d="${d##*/}"
         if [ -x "$AIRY_HOME/bin/$d" ]; then
-            pkill -f "$AIRY_HOME/bin/$d" >/dev/null 2>&1 && found=1
+            pkill_bin "$AIRY_HOME/bin/$d" && found=1
             if [ -r /proc/self/exe ] && command -v pgrep >/dev/null 2>&1; then
                 for p in $(pgrep -x "$d" 2>/dev/null); do
                     exe="$(readlink "/proc/$p/exe" 2>/dev/null)"
