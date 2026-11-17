@@ -142,15 +142,20 @@ static void dag_nodes_fill(cJSON *nodes, const airy_task_plan_t *plan, const cha
  *
  * workspace_dir（未设时 NULL）令 sched_d -> agent_d -> runner 执行前 chdir
  * 进任务目录，产物留在调用方工程树而非 daemon 的 cwd。返回 NULL 表示计划
- * 为空或内存不足。 */
+ * 为空或内存不足：两者以 *empty 区分——空计划是输入语义错误，此前被调用方
+ * 一律映射为 OUT_OF_MEMORY，用户看到「内存不足」而非「没有可执行的步骤」。 */
 static cJSON *dag_plan_json(const airy_task_plan_t *plan, const char *task_input,
-                            const char *workspace_dir)
+                            const char *workspace_dir, int *empty)
 {
     char pid[64] = {0};
     char name[80];
 
-    if (!plan || !plan->task_plan_nodes || plan->task_plan_node_count == 0)
+    *empty = 0;
+    if (!plan || !plan->task_plan_nodes || plan->task_plan_node_count == 0) {
+        if (plan)
+            *empty = 1;
         return NULL;
+    }
     if (plan->task_plan_id && plan->task_plan_id[0])
         AIRY_STRNCPY_TERM(pid, plan->task_plan_id, sizeof(pid));
     else
@@ -183,9 +188,10 @@ airy_err_t cli_dag_submit_remote(const airy_task_plan_t *plan, const char *task_
         return AIRY_ERR_INVALID_PARAM;
     *out_dag_id = NULL;
 
-    cJSON *dag_obj = dag_plan_json(plan, task_input, workspace_dir);
+    int empty = 0;
+    cJSON *dag_obj = dag_plan_json(plan, task_input, workspace_dir, &empty);
     if (!dag_obj)
-        return AIRY_ERR_OUT_OF_MEMORY;
+        return empty ? AIRY_ERR_PLAN_EMPTY : AIRY_ERR_OUT_OF_MEMORY;
 
     cJSON *params = cJSON_CreateObject();
     if (!params) {
