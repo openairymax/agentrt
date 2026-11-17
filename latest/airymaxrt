@@ -1886,6 +1886,7 @@ case "$CMD" in
             case "$_c" in 2?? | 401 | 403 | 000) ;; *) _c=000 ;; esac
             printf '%s' "$_c"
         }
+        _dn_rows=""
         if [ -f "$MODEL_CONFIG" ] && [ -n "${CLI_BIN:-}" ] && [ -x "$CLI_BIN" ]; then
             _dn_rows="$("$CLI_BIN" models --json --file "$MODEL_CONFIG" 2>/dev/null || true)"
             if [ -z "$_dn_rows" ]; then
@@ -1920,6 +1921,75 @@ case "$CMD" in
 $_dn_rows
 EOF
             fi
+        fi
+
+        # B-3：GPU 段与选路降级。探测在机制侧（airy_cli gpu），doctor 只读
+        # 呈现，不尝试修复。选路顺序与 llm_d 一致：显式配置 > 能力匹配 >
+        # 远端 API > CPU 自托管；每次降级必须打印原因，否则用户无法判断
+        # 「为何明明有卡却没用上」。
+        _dn_num() { printf '%s' "$2" | sed -n "s/.*\"$1\":\([0-9]*\).*/\1/p"; }
+        _dn_gver="r3"
+        _dn_gdev=0
+        _dn_gbound=0
+        _dn_gbe=""
+        _dn_grsn=""
+        _dn_gdrv=""
+        _dn_gpu=""
+        if [ -n "${CLI_BIN:-}" ] && [ -x "$CLI_BIN" ]; then
+            _dn_gpu="$("$CLI_BIN" gpu --json 2>/dev/null || true)"
+        fi
+        if [ -z "$_dn_gpu" ]; then
+            _dn_warn "GPU: airy_cli gpu 不可用，无法判定加速器（按 CPU 自托管）"
+        else
+            _dn_gver="$(_dn_get verdict "$_dn_gpu")"
+            _dn_gbe="$(_dn_get backend "$_dn_gpu")"
+            _dn_grsn="$(_dn_get reason "$_dn_gpu")"
+            _dn_gdrv="$(_dn_get drivers "$_dn_gpu")"
+            _dn_gdev="$(_dn_num devices "$_dn_gpu")"
+            _dn_gbound="$(_dn_num drv_bound "$_dn_gpu")"
+            case "${_dn_gdev:-}" in ''|*[!0-9]*) _dn_gdev=0 ;; esac
+            case "${_dn_gbound:-}" in ''|*[!0-9]*) _dn_gbound=0 ;; esac
+            if [ "$_dn_gver" = "r1" ] || [ "$_dn_gver" = "r2" ]; then
+                if [ -n "$_dn_gbe" ]; then
+                    _dn_pass "GPU: ${_dn_gdrv:-加速器} 后端 ${_dn_gbe}（结论 ${_dn_gver}，L1/L2/L3 已打通）"
+                else
+                    _dn_warn "GPU: 结论 ${_dn_gver} 但无后端（探测器结论不自洽）"
+                fi
+            elif [ "$_dn_gdev" -gt 0 ] && [ "$_dn_gbound" -lt "$_dn_gdev" ]; then
+                _dn_warn "GPU: 检出 ${_dn_gdev} 块加速器，仅 ${_dn_gbound} 块驱动已绑定——驱动不可用（${_dn_grsn}）；降级原因：驱动未就绪"
+            elif [ "$_dn_gdev" -gt 0 ]; then
+                _dn_warn "GPU: 加速器在（${_dn_gdrv}）但无加速后端应答（${_dn_grsn}）；降级原因：后端未就绪"
+            else
+                _dn_pass "GPU: 未检出加速器（${_dn_grsn}）；降级原因：本机无 GPU，按 CPU 自托管"
+            fi
+        fi
+
+        _dn_local=0
+        _dn_remote=0
+        _dn_lname=""
+        _dn_rname=""
+        while IFS= read -r _dn_row; do
+            [ -n "$_dn_row" ] || continue
+            _dn_mm="$(_dn_get mode "$_dn_row")"
+            _dn_mh="$(printf '%s' "$_dn_row" | sed -n 's/.*"has_key":\([0-9]*\).*/\1/p')"
+            if [ "$_dn_mm" = "local" ]; then
+                _dn_local=$((_dn_local + 1))
+                [ -n "$_dn_lname" ] || _dn_lname="$(_dn_get name "$_dn_row")"
+            elif [ "$_dn_mh" = "1" ]; then
+                _dn_remote=$((_dn_remote + 1))
+                [ -n "$_dn_rname" ] || _dn_rname="$(_dn_get name "$_dn_row")"
+            fi
+        done <<EOF
+$_dn_rows
+EOF
+        if [ "$_dn_local" -gt 0 ]; then
+            _dn_pass "选路: 显式配置 → ${_dn_lname}（model.yaml 声明 ${_dn_local} 条 local provider）"
+        elif [ "$_dn_gver" = "r1" ] || [ "$_dn_gver" = "r2" ]; then
+            _dn_pass "选路: 能力匹配 → ${_dn_gbe}（GPU 后端可用，未声明 local provider）"
+        elif [ "$_dn_remote" -gt 0 ]; then
+            _dn_warn "选路: 远端 API → ${_dn_rname}（降级原因：GPU 档不可用：${_dn_grsn:-未探测}）"
+        else
+            _dn_warn "选路: CPU 自托管（降级原因：无 local provider、无可用 GPU 后端、无已配密钥的 api provider）"
         fi
 
         if [ "$_dn_f" -gt 0 ]; then

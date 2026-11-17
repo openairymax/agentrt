@@ -159,6 +159,10 @@ void cli_json_esc(char *dst, size_t cap, const char *src);
  * 本地模型 / 缺 key / 已配 key；不联网、不输出密钥值。 */
 int cli_cmd_models(int argc, char *argv[]);
 
+/* 0.1.21 B-3：加速器能力快照（单行 JSON）。doctor GPU 段据此区分
+ * 无 GPU / GPU 在但驱动不可用 / GPU 可用，并打印降级原因。 */
+int cli_cmd_gpu(int argc, char *argv[]);
+
 /* Chat history buffer (defined in cli_chat.c) */
 extern char *g_history_roles[CLI_HISTORY_MAX_MSGS];
 extern char *g_history_contents[CLI_HISTORY_MAX_MSGS];
