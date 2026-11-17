@@ -1453,7 +1453,7 @@ case "$CMD" in
         echo "                        （monitor --daemon 后台常驻 / --stop 停止）"
         echo "      airymaxrt status      查看运行时状态"
         echo "      airymaxrt stop        收摊 daemon 群（supervisor.shutdown 唯一收摊入口）"
-        echo "      airymaxrt doctor      组件健康检查"
+        echo "      airymaxrt doctor [--online]  组件健康检查（--online 联网校验 api key）"
         echo "      airymaxrt logs [N]    查看最近日志（默认 airymaxrt.log 末 50 行；"
         echo "                            logs <name> 看指定 daemon，如 logs llm_d）"
         echo "      airymaxrt update      自更新（--check 仅检查 / --channel stable|rc|beta"
@@ -1684,6 +1684,9 @@ case "$CMD" in
         _dn_warn() { log warn "[WARN] $*"; _dn_w=$((_dn_w + 1)); }
         _dn_fail() { log error "[FAIL] $*"; _dn_f=$((_dn_f + 1)); }
         _dn_norm() { printf '%s' "${1#v}" | sed -n 's/^\([0-9][0-9.]*\).*/\1/p'; }
+        _dn_online=0
+        case "${2:-}" in --online) _dn_online=1 ;; esac
+        _dn_get() { printf '%s' "$2" | sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p"; }
 
         # 路径来源自证：LOG_DIR/RUNTIME_DIR 必须出自 airy_cli 同一事实源，
         # 否则 doctor 与 daemon 会各看一半日志（A-6 修复的双根问题）。
@@ -1854,6 +1857,69 @@ case "$CMD" in
             _dn_pass "agent 包: 已就位"
         else
             _dn_warn "agent 包: 未找到（$AIRY_HOME/lib/agents）"
+        fi
+
+        # 连接三态（A-7）：local 免 key；api 缺 key 给出两条可执行修法；
+        # 只有 --online 才联网校验——离线自检不能把网络故障算成安装损坏。
+        # 密钥只经 stdin 交给 curl（-K -），不进 argv，ps 不可见。
+        _dn_key() {
+            local _k
+            _k="${!1:-}"
+            if [ -z "$_k" ] && [ -f "$AIRY_CFG_DIR/secrets.env" ]; then
+                _k="$(sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" \
+                    "$AIRY_CFG_DIR/secrets.env" 2>/dev/null | head -1)"
+                _k="${_k%"${_k##*[![:space:]]}"}"
+                _k="${_k#\"}"
+                _k="${_k%\"}"
+            fi
+            printf '%s' "$_k"
+        }
+        _dn_probe() {
+            local _k _c
+            _k="$(_dn_key "$2")"
+            [ -n "$_k" ] || { printf '401'; return 0; }
+            _k="${_k//\\/\\\\}"
+            _k="${_k//\"/\\\"}"
+            _c="$(printf 'header = "Authorization: Bearer %s"\n' "$_k" |
+                curl -sS -K - -o /dev/null -w '%{http_code}' --max-time 5 \
+                    "${1%/}/models" 2>/dev/null || true)"
+            case "$_c" in 2?? | 401 | 403 | 000) ;; *) _c=000 ;; esac
+            printf '%s' "$_c"
+        }
+        if [ -f "$MODEL_CONFIG" ] && [ -n "${CLI_BIN:-}" ] && [ -x "$CLI_BIN" ]; then
+            _dn_rows="$("$CLI_BIN" models --json --file "$MODEL_CONFIG" 2>/dev/null || true)"
+            if [ -z "$_dn_rows" ]; then
+                _dn_warn "模型连接表: 无法解析 $MODEL_CONFIG（确认 models: 列表格式）"
+            else
+                while IFS= read -r _dn_row; do
+                    [ -n "$_dn_row" ] || continue
+                    _dn_mn="$(_dn_get name "$_dn_row")"
+                    _dn_mm="$(_dn_get mode "$_dn_row")"
+                    _dn_mu="$(_dn_get base_url "$_dn_row")"
+                    _dn_me="$(_dn_get key_env "$_dn_row")"
+                    _dn_mh="$(printf '%s' "$_dn_row" |
+                        sed -n 's/.*"has_key":\([0-9]*\).*/\1/p')"
+                    if [ "$_dn_mm" = "local" ]; then
+                        _dn_pass "provider ${_dn_mn}: 本地模型（免 key）"
+                    elif [ "$_dn_mh" != "1" ]; then
+                        _dn_warn "provider ${_dn_mn}: 缺 key——在 $AIRY_CFG_DIR/secrets.env 写 ${_dn_me}=<密钥>，或把该行 mode 改为 local"
+                    elif [ "$_dn_online" != "1" ]; then
+                        _dn_warn "provider ${_dn_mn}: 已配置 key（未联网校验；doctor --online 可验）"
+                    else
+                        _dn_code="$(_dn_probe "$_dn_mu" "$_dn_me")"
+                        case "$_dn_code" in
+                            2??) _dn_pass "provider ${_dn_mn}: key 有效（HTTP ${_dn_code}）" ;;
+                            401 | 403)
+                                _dn_fail "provider ${_dn_mn}: key 无效（HTTP ${_dn_code}）——检查 $AIRY_CFG_DIR/secrets.env 的 ${_dn_me}"
+                                ;;
+                            000) _dn_warn "provider ${_dn_mn}: 端点不可达（${_dn_mu}）——检查网络或 base_url" ;;
+                            *) _dn_pass "provider ${_dn_mn}: 端点可达（HTTP ${_dn_code}，未校验鉴权）" ;;
+                        esac
+                    fi
+                done <<EOF
+$_dn_rows
+EOF
+            fi
         fi
 
         if [ "$_dn_f" -gt 0 ]; then
