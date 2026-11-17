@@ -23,7 +23,6 @@
 #include "cli_gw.h"
 #include "cognition.h"
 #include "gccp.h"
-#include "hall_store.h"
 #include "llm_svc_adapter.h"
 #include "logger.h"
 #include "logging.h"
@@ -56,15 +55,9 @@ airy_err_t cli_setup_runtime(cli_runtime_ctx_t *rt)
 
     /* 0.1.9 M1-1c：CLI 本地 work_hall/reviewer/governance 已退役——任务
      * 执行唯一经 gateway → sched_d（C2'），/status 查询迁 sched.dag_list
-     * （C2c）。此处仅装配 chat adapter、事件流 hall_store（/chain 决策链）
-     * 与任务工作目录。 */
-
-    /* 决策链事件流底座（/chain 命令与决策点事件写入共用） */
-    airy_hall_store_t *hall_store = airy_hall_store_create(NULL);
-    if (!hall_store)
-        AIRY_LOG_WARN("airy_cli: hall store create failed, full visibility disabled");
-    g_cli_hall_store = hall_store;
-    rt->hall_store = hall_store;
+     * （C2c）。0.1.21 C-18-05：进程内 hall_store 一并退役，/chain 与
+     * /hall 经 gateway hall.* 读取账本。此处仅装配 chat adapter 与任务
+     * 工作目录。 */
 
     /* 任务工作目录（提交 DAG 时经 gateway 传 sched_d，产物留在调用方工程树） */
     {
@@ -107,8 +100,6 @@ void cli_teardown_runtime(cli_runtime_ctx_t *rt)
 {
     if (!rt)
         return;
-    if (rt->hall_store)
-        airy_hall_store_destroy(rt->hall_store);
     AIRY_MEMSET(rt, 0, sizeof(*rt));
 }
 
@@ -257,9 +248,6 @@ static void bp_l1(const char *rs_out, uint64_t t0)
         cli_print_status("Dual Prof Think:blueprint", line);
         cli_trace("blueprint", "%s", line);
     }
-    cli_hall_emit("preflight", AIRY_HALL_CAT_CHAIN,
-                  "{\"event\":\"blueprint_hit\",\"layer\":\"L1\",\"result\":%s}",
-                  rs_out ? rs_out : "null");
     if (!g_cli_json_mode)
         cli_print_turn(cli_now_ms() - t0, cli_fastpath_metrics());
 }
@@ -292,9 +280,6 @@ static void bp_l2(const char *rs_out, uint64_t t0)
                  rs_out ? rs_out : "{}");
         cli_print_status("Dual Prof Think:blueprint", line);
     }
-    cli_hall_emit("preflight", AIRY_HALL_CAT_CHAIN,
-                  "{\"event\":\"blueprint_hit\",\"layer\":\"L2\",\"result\":%s}",
-                  rs_out ? rs_out : "null");
     if (!g_cli_json_mode)
         cli_print_turn(cli_now_ms() - t0, cli_fastpath_metrics());
 }
