@@ -1934,6 +1934,9 @@ EOF
         _dn_gbe=""
         _dn_grsn=""
         _dn_gdrv=""
+        _dn_gacc=""
+        _dn_gvram=""
+        _dn_gmem="未知"
         _dn_gpu=""
         if [ -n "${CLI_BIN:-}" ] && [ -x "$CLI_BIN" ]; then
             _dn_gpu="$("$CLI_BIN" gpu --json 2>/dev/null || true)"
@@ -1945,20 +1948,24 @@ EOF
             _dn_gbe="$(_dn_get backend "$_dn_gpu")"
             _dn_grsn="$(_dn_get reason "$_dn_gpu")"
             _dn_gdrv="$(_dn_get drivers "$_dn_gpu")"
+            _dn_gacc="$(_dn_get accel "$_dn_gpu")"
             _dn_gdev="$(_dn_num devices "$_dn_gpu")"
             _dn_gbound="$(_dn_num drv_bound "$_dn_gpu")"
+            _dn_gvram="$(_dn_num vram_mb "$_dn_gpu")"
             case "${_dn_gdev:-}" in ''|*[!0-9]*) _dn_gdev=0 ;; esac
             case "${_dn_gbound:-}" in ''|*[!0-9]*) _dn_gbound=0 ;; esac
+            case "${_dn_gvram:-}" in ''|*[!0-9]*) _dn_gvram=0 ;; esac
+            [ "$_dn_gvram" -eq 0 ] || _dn_gmem="${_dn_gvram}MiB"
             if [ "$_dn_gver" = "r1" ] || [ "$_dn_gver" = "r2" ]; then
                 if [ -n "$_dn_gbe" ]; then
-                    _dn_pass "GPU: ${_dn_gdrv:-加速器} 后端 ${_dn_gbe}（结论 ${_dn_gver}，L1/L2/L3 已打通）"
+                    _dn_pass "GPU: 加速器 ${_dn_gacc:-未知}，驱动 ${_dn_gdrv}，显存 ${_dn_gmem}，后端 ${_dn_gbe}（结论 ${_dn_gver}，L1/L2/L3 已打通）"
                 else
                     _dn_warn "GPU: 结论 ${_dn_gver} 但无后端（探测器结论不自洽）"
                 fi
             elif [ "$_dn_gdev" -gt 0 ] && [ "$_dn_gbound" -lt "$_dn_gdev" ]; then
-                _dn_warn "GPU: 检出 ${_dn_gdev} 块加速器，仅 ${_dn_gbound} 块驱动已绑定——驱动不可用（${_dn_grsn}）；降级原因：驱动未就绪"
+                _dn_warn "GPU: 检出 ${_dn_gdev} 块加速器（${_dn_gdrv}），仅 ${_dn_gbound} 块驱动已绑定——驱动不可用（${_dn_grsn}）；降级原因：驱动未就绪"
             elif [ "$_dn_gdev" -gt 0 ]; then
-                _dn_warn "GPU: 加速器在（${_dn_gdrv}）但无加速后端应答（${_dn_grsn}）；降级原因：后端未就绪"
+                _dn_warn "GPU: 加速器在（${_dn_gacc:-未知} ${_dn_gdrv}，显存 ${_dn_gmem}）但无加速后端应答（${_dn_grsn}）；降级原因：后端未就绪"
             else
                 _dn_pass "GPU: 未检出加速器（${_dn_grsn}）；降级原因：本机无 GPU，按 CPU 自托管"
             fi
