@@ -25,6 +25,9 @@
 !RELEASE_NOTES.d/**
 !CMakeLists.txt
 !CONTRIBUTING.md
+# 0.1.21 L-10~L-12 公开台账：提交勘误与测试债，须随仓公开可查
+!COMMIT-AUDIT.md
+!TEST-DEBT.md
 !Doxyfile
 !LICENSE
 !NOTICE
