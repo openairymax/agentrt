@@ -852,6 +852,27 @@ rt_wait_port_free() { # <port> <秒>
     return 1
 }
 
+# 请求四元组（D-7/Q19）：输出 "total ok fail timeout"，不可读时输出全 -1。
+rt_req_tuple() { # <sock>
+    rt_rpc "$1" get_stats '{}' 10 | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except ValueError:
+    print(-1, -1, -1, -1)
+    raise SystemExit
+r = d.get("result")
+if isinstance(r, str):
+    try:
+        r = json.loads(r)
+    except ValueError:
+        r = None
+q = (r or {}).get("requests") or {}
+print(int(q.get("total", -1)), int(q.get("ok", -1)),
+      int(q.get("fail", -1)), int(q.get("timeout", -1)))
+'
+}
+
 # 计费账目合计（prompt + completion）：无账目文件输出 -1。
 rt_usage_tokens() { # <home>
     local f="$1/data/agentrt/llm_usage.json"
@@ -966,6 +987,23 @@ scn_t7() {
             "{\"model\":\"gate-echo\",\"messages\":[{\"role\":\"user\",\"content\":\"t7-$i\"}],\"max_tokens\":16}" 60)"
         printf '%s' "$out" | grep -q "echo:t7-$i" || fail "T-7 首启第 ${i} 次请求失败"
     done
+    # D-7（Q19）：四元组自洽且分母非零；两次连续采集差值可解释。
+    local tup a b
+    tup="$(rt_req_tuple "$h/run/llm.sock")"
+    set -- $tup
+    if [ "$1" -gt 0 ] && [ $(( $2 + $3 + $4 )) -eq "$1" ]; then
+        pass "T-7 成功率四元组自洽（total=$1 ok=$2 fail=$3 timeout=$4）"
+    else
+        fail "T-7 四元组不自洽（total=$1 ok=$2 fail=$3 timeout=$4）"
+    fi
+    a="$tup"
+    sleep 1
+    b="$(rt_req_tuple "$h/run/llm.sock")"
+    if [ "$a" = "$b" ]; then
+        pass "T-7 连续两次采集差值 0（期间无新请求）"
+    else
+        fail "T-7 采集差值不可解释（$a → $b）"
+    fi
     cfg_sha="$(rt_sha "$h/config/model.yaml")"
     rt_stop_llm
 
@@ -1000,6 +1038,14 @@ scn_t7() {
         pass "T-7 重启后请求仍通"
     else
         fail "T-7 重启后请求失败：$(printf '%.160s' "$out")"
+    fi
+    # 计数器随进程重建：重启后仅本次请求计入，四元组仍须自洽。
+    tup="$(rt_req_tuple "$h/run/llm.sock")"
+    set -- $tup
+    if [ "$1" = 1 ] && [ "$2" = 1 ] && [ $(( $2 + $3 + $4 )) -eq "$1" ]; then
+        pass "T-7 重启后四元组按新进程计（total=1 ok=1）"
+    else
+        fail "T-7 重启后四元组异常（total=$1 ok=$2 fail=$3 timeout=$4）"
     fi
     rt_stop_llm
     t2="$(rt_usage_tokens "$h")"
