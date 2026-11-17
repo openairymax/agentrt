@@ -2187,14 +2187,45 @@ clear_front_screen() {
     fi
 }
 
+# A-9 H3：daemon 存活数为唯一口径——启动器不得在守护群仍存活时
+# 以「界面退出」暗示整体退出。计数取 run/ 下非 supervisor 的活 socket。
+daemon_count() {
+    local _s _n=0
+    for _s in "$RUNTIME_DIR"/*.sock; do
+        [ -S "$_s" ] || continue
+        [ "${_s##*/}" = "supervisor.sock" ] && continue
+        _sock_alive "$_s" && _n=$((_n + 1))
+    done
+    printf '%s' "$_n"
+}
+
+# stdin 指向 /dev/null（非交互调用）判定：管道输入不在此列，仍交给 CLI。
+stdin_is_null() {
+    [ -t 0 ] && return 1
+    local _t
+    _t="$(readlink /proc/self/fd/0 2>/dev/null || true)"
+    [ "$_t" = "/dev/null" ] && return 0
+    [ -c /dev/stdin ]
+}
+
 launch_frontend() {
     log debug "TTY 检测: stdin=$([ -t 0 ] && echo tty || echo pipe) stdout=$([ -t 1 ] && echo tty || echo pipe)"
     if [ -d "$AIRY_HOME/tmp" ]; then
         find "$AIRY_HOME/tmp" -mindepth 1 -mtime +1 -exec rm -rf {} + 2>/dev/null
         log debug "tmp 清理: 已回收超过 24h 未修改的临时文件/目录"
     fi
+    # A-9 H3：无参数 + stdin=/dev/null 时 CLI 必然读到 EOF 后立即退出，
+    # 旧行为打印「交互界面退出」而 13 个 daemon 仍存活（误导）。此处
+    # 直接跳过前端，以 daemon count 为口径打印运行态。
+    if [ "${#CLI_ARGS[@]}" -eq 0 ] && stdin_is_null; then
+        _FRONTEND_SKIPPED=1
+        boot_line "守护进程群运行中（daemon count=$(daemon_count)）"
+        return 0
+    fi
     export AIRY_GATEWAY_URL="$GATEWAY_URL"
     export AIRY_AGENT_FILE="$AGENT_FILE"
+    # A-9 H4：标记启动来源，CLI 据此绑定父进程死亡联动（PDEATHSIG）。
+    export AIRY_LAUNCHED_BY="airymaxrt"
     if [ "$FRONTEND_TUI" = "1" ] && [ -t 0 ] && [ -t 1 ]; then
         if [ "${#CLI_ARGS[@]}" -eq 0 ]; then
             clear_front_screen
@@ -2421,7 +2452,12 @@ else
     fi
 fi
 
+_FRONTEND_SKIPPED=0
 launch_frontend
 rc=$?
-log info "交互界面退出（exit=${rc}）"
+if [ "$_FRONTEND_SKIPPED" = "1" ]; then
+    log info "交互界面已跳过（stdin=/dev/null），daemon count=$(daemon_count)"
+else
+    log info "交互界面退出（exit=${rc}），daemon count=$(daemon_count)"
+fi
 exit $rc
