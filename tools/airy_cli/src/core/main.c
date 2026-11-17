@@ -48,6 +48,9 @@
 #include <unistd.h>
 #include <signal.h>
 #include <poll.h>
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
 #endif
 
 #ifdef AIRY_HAS_CJSON
@@ -437,10 +440,29 @@ static void cli_shutdown(cli_loop_t *l)
     cli_term_header_unpin();
 }
 
+/* A-9 H4：由 airymaxrt 启动时绑定父进程死亡联动——启动器被强杀（SIGKILL，
+ * trap 失效）后 CLI 不得残留为孤儿并继续持有 TUI 子进程。standalone /
+ * nohup 调用不带 AIRY_LAUNCHED_BY，保持原有父子生命周期语义。 */
+static void cli_bind_pdeath(void)
+{
+#if defined(__linux__)
+    const char *by = getenv("AIRY_LAUNCHED_BY");
+    if (!by || strcmp(by, "airymaxrt") != 0)
+        return;
+    pid_t ppid = getppid();
+    if (prctl(PR_SET_PDEATHSIG, SIGTERM) != 0)
+        return;
+    /* 设置与父死竞态：父已更替则直接退出，不进入交互 */
+    if (getppid() != ppid)
+        _exit(0);
+#endif
+}
+
 int main(int argc, char *argv[])
 {
     cli_loop_t loop = {0};
 
+    cli_bind_pdeath();
     /* cli_parse_args 以 *out_print_prompt == NULL 判定「prompt 尚未给出」，
      * 故运行态必须先清零再解析（-p "" 的空串亦为合法给定值）。
      * 返回 1 为 --version/--help 的请求终止（按约定以 0 退出：版本查询在
