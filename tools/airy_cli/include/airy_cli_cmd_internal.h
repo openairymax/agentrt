@@ -44,6 +44,10 @@ const char *cli_ns_sock(const char *ns);
 /* Generic daemon method call via gateway, render result as sub-agent line. */
 void cli_rpc_print(const char *ns, const char *method, const char *params_json);
 
+/* 本地模型注册表子命令（cli_model_reg.c，0.1.21 D-6）：
+ * list / use / remove；返回 0 成功、2 失败（与 cli_cmd_* 约定一致）。 */
+int cli_model_reg(int argc, char *argv[]);
+
 /* Render one sub-agent line: header "Sub <ns> Agent" is built at runtime
  * because the namespace is dynamic. is_err picks the -p-visible channel. */
 void cli_sub_print(int is_err, const char *ns, const char *text);
