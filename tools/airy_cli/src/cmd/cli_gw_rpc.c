@@ -122,6 +122,62 @@ static int cli_gw_xfer_err(int xerr, const char *method, int timeout_ms, int ren
     return AIRY_ERR_SYS_SOCKET;
 }
 
+/* C-10（0.1.21）：--verbose 打开后追加 daemon 原始错误 data；默认只给
+ * 一行归因。定义在 main.c，此处只读。 */
+extern int g_cli_verbose;
+
+/* C-10（0.1.21）：stage 数字的中文呈现位。daemon 的 error.data 只带
+ * grad_stage_e 数字与 err_detail，翻译放呈现层，不回头改协议。 */
+static const char *const g_gw_stage_name[] = {
+    "none", "input", "llm", "channel", "gen", "verify", "arbiter", "loop",
+};
+
+int cli_gw_fail_line(const char *data_json, char *out, size_t cap)
+{
+    if (out && cap)
+        out[0] = '\0';
+    if (!data_json || !data_json[0] || !out || cap == 0)
+        return 0;
+
+    cJSON *root = cJSON_Parse(data_json);
+    if (!root)
+        return 0;
+    cJSON *stage = cJSON_GetObjectItem(root, "stage");
+    cJSON *rounds = cJSON_GetObjectItem(root, "grad_rounds");
+    cJSON *rej = cJSON_GetObjectItem(root, "grad_rejections");
+    cJSON *node = cJSON_GetObjectItem(root, "affected_node");
+    cJSON *detail = cJSON_GetObjectItem(root, "err_detail");
+    cJSON *stats = cJSON_GetObjectItem(root, "stats");
+    cJSON *code = stats ? cJSON_GetObjectItem(stats, "err_code") : NULL;
+    int err = (code && cJSON_IsNumber(code)) ? (int)code->valuedouble : 0;
+    int st = (stage && cJSON_IsNumber(stage)) ? (int)stage->valuedouble : 0;
+    unsigned nr = (rounds && cJSON_IsNumber(rounds)) ? (unsigned)rounds->valuedouble : 0;
+    unsigned nrej = (rej && cJSON_IsNumber(rej)) ? (unsigned)rej->valuedouble : 0;
+    const char *snode = (node && cJSON_IsString(node)) ? node->valuestring : "";
+    const char *sdet = (detail && cJSON_IsString(detail)) ? detail->valuestring : "";
+
+    if (st <= 0 && !sdet[0] && err == 0) {
+        cJSON_Delete(root);
+        return 0;
+    }
+    const char *sname = (st > 0 && (size_t)st < sizeof(g_gw_stage_name) / sizeof(g_gw_stage_name[0]))
+                            ? g_gw_stage_name[st]
+                            : "unknown";
+    int off = snprintf(out, cap, "失败于 %s", sname);
+    if (off > 0 && (size_t)off < cap && (nr || nrej || snode[0])) {
+        off += snprintf(out + off, cap - (size_t)off, "（第 %u 轮，驳回 %u 次%s%s）", nr, nrej,
+                        snode[0] ? "，节点 " : "", snode);
+    }
+    if (off > 0 && (size_t)off < cap) {
+        if (sdet[0])
+            snprintf(out + off, cap - (size_t)off, "：%s", sdet);
+        else if (err != 0)
+            snprintf(out + off, cap - (size_t)off, "：err=%d", err);
+    }
+    cJSON_Delete(root);
+    return err;
+}
+
 /* JSON-RPC error 对象分诊：网关已应答即链路可达，绝不外溢为 transport（N1）。 */
 static int cli_gw_rpc_err(cJSON *err, const char *method)
 {
@@ -140,10 +196,25 @@ static int cli_gw_rpc_err(cJSON *err, const char *method)
         return AIRY_ERR_GENERIC_FAIL;
     }
     if (c == -32603) {
-        snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
-                 "网关服务内部错误（%s），请查看 %s/logs/gateway_d.out", m[0] ? m : "Internal error",
-                 home);
-        return AIRY_ERR_GENERIC_FAIL;
+        /* C-10（0.1.21）：-32603 只是网关的包装码，真实失败环在 error.data
+         * 里（stage/rounds/rejections/affected_node/err_detail）。默认压成
+         * 一行"失败在哪一环"；--verbose 再附原始 JSON。daemon 原始错误码
+         * （如 -110 未收敛）原样返回，-32603 不覆盖根因，-31 只作退出码。 */
+        cJSON *data = cJSON_GetObjectItem(err, "data");
+        char *data_json = data ? cJSON_PrintUnformatted(data) : NULL;
+        char line[320];
+        int real = cli_gw_fail_line(data_json, line, sizeof(line));
+        if (g_cli_verbose && data_json)
+            snprintf(g_cli_gw_err, sizeof(g_cli_gw_err), "%s%s；原始错误 data：%s",
+                     line[0] ? line : "网关服务内部错误", line[0] ? "" : m, data_json);
+        else if (line[0])
+            snprintf(g_cli_gw_err, sizeof(g_cli_gw_err), "%s", line);
+        else
+            snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
+                     "网关服务内部错误（%s），请查看 %s/logs/gateway_d.out",
+                     m[0] ? m : "Internal error", home);
+        AIRY_FREE(data_json);
+        return real != 0 ? real : AIRY_ERR_GENERIC_FAIL;
     }
     if (c == -32601) {
         snprintf(g_cli_gw_err, sizeof(g_cli_gw_err), "网关不支持该方法（%s）", method);

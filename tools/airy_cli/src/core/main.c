@@ -62,6 +62,9 @@ volatile sig_atomic_t g_cli_cancel = 0;
 /* Server one-shot mode (-p/--print) and --json structured output. */
 int g_cli_print_mode = 0;
 int g_cli_json_mode = 0;
+/* C-10（0.1.21）：失败归因详细度——默认一行「失败在哪一环」，--verbose
+ * 追加 daemon 原始错误 data。网关错误层只读。 */
+int g_cli_verbose = 0;
 /* 全屏 TUI 渲染层模式（--tui，0.1.17 R5-G6）。 */
 int g_cli_tui_mode = 0;
 /* 会话恢复视图模式（--continue / --resume，0.1.17 R5-G5）：启动时读一次
