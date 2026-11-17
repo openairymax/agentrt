@@ -107,7 +107,7 @@ AIRY_LOCAL="${AIRY_LOCAL_BIN:-$ROOT/../../tools/scripts/ops/bin/airy-local}"
 # ---- 夹具：OpenAI 兼容端 + 支持 Range 的制品服务 ----
 rt_fixture() { # <port> <mode: ok|empty|err500> <file>
     cat >"$SB/fixture.py" <<'PY'
-import json, os, re, sys
+import json, os, re, sys, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 mode = sys.argv[2]
@@ -132,20 +132,30 @@ class H(BaseHTTPRequestHandler):
         if self.path.startswith("/artifact") and path:
             data = open(path, "rb").read()
             rng = self.headers.get("Range")
+            start, end = 0, len(data) - 1
+            code = 200
             if rng:
                 m = re.match(r"bytes=(\d+)-(\d*)", rng)
                 if m:
-                    a = int(m.group(1))
-                    b = int(m.group(2)) if m.group(2) else len(data) - 1
-                    b = min(b, len(data) - 1)
-                    chunk = data[a:b + 1]
-                    self.send_response(206)
-                    self.send_header("Content-Range", "bytes %d-%d/%d" % (a, b, len(data)))
-                    self.send_header("Content-Length", str(len(chunk)))
-                    self.end_headers()
-                    self.wfile.write(chunk)
-                    return
-            return self._send(200, data, "application/octet-stream")
+                    start = int(m.group(1))
+                    end = min(int(m.group(2)) if m.group(2) else len(data) - 1, len(data) - 1)
+                    code = 206
+                    print("RANGE %d-%d %s" % (start, end, self.path), flush=True)
+            chunk = data[start:end + 1]
+            self.send_response(code)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(len(chunk)))
+            if code == 206:
+                self.send_header("Content-Range", "bytes %d-%d/%d" % (start, end, len(data)))
+            self.end_headers()
+            if mode == "slow":
+                for off in range(0, len(chunk), 65536):
+                    self.wfile.write(chunk[off:off + 65536])
+                    self.wfile.flush()
+                    time.sleep(0.04)
+                return
+            self.wfile.write(chunk)
+            return
         return self._send(404, b'{"error":"not found"}')
 
     def do_POST(self):
@@ -200,6 +210,16 @@ rt_home() { # <tag>
     local h="$SB/$1"
     mkdir -p "$h/config" "$h/data" "$h/logs" "$h/run" "$h/local/models" "$h/local/tmp"
     printf '%s\n' "$h"
+}
+
+rt_size() { stat -c%s "$1" 2>/dev/null || stat -f%z "$1" 2>/dev/null; }
+
+rt_sha() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
 }
 
 rt_cfg() { # <home> <mode: api|local> <base_url> [model_id]
@@ -355,8 +375,162 @@ rt_list() {
     printf 'T-8 日志可判读（四段结构化字段）\n'
 }
 
-# 场景实现按卡片递进补齐；未补齐的场景以 SKIP 保留契约位置。
-scn_t1() { skip "T-1 场景待 C-6-03 落地"; }
+# ── T-1 首次拉模：阶段进度、中断留痕、续传收敛、毒件 fail-closed ──
+scn_t1() {
+    rt_need_local "T-1" || return 0
+    if ! command -v python3 >/dev/null 2>&1; then
+        skip "T-1：缺 python3，无法生成制品与夹具"
+        return 0
+    fi
+
+    local src h pin log out rc dl part ps size sha
+    src="$SB/t1"
+    mkdir -p "$src"
+    python3 - "$src/good.bin" <<'PY'
+import sys
+buf = bytearray(4 * 1024 * 1024)
+for i in range(len(buf)):
+    buf[i] = (i * 7 + i // 251) % 256
+open(sys.argv[1], "wb").write(buf)
+PY
+    size="$(rt_size "$src/good.bin")"
+    sha="$(rt_sha "$src/good.bin")"
+    if [ -z "$size" ] || [ -z "$sha" ]; then
+        fail "T-1 制品基准生成失败"
+        return 0
+    fi
+
+    rt_fixture "$PORT_FIX" slow "$src/good.bin" || {
+        fail "T-1 慢速制品夹具未就绪"
+        return 0
+    }
+
+    # A 段：慢速下载中 SIGTERM，在途 .part 必须保留且不完整。
+    h="$(rt_home t1a)"
+    pin="$src/pin-a.list"
+    printf 'model|gate-model|gate-model.gguf|%s|%s|\nmirror|gate-model.gguf|http://127.0.0.1:%s/artifact/{asset}\n' \
+        "$size" "$sha" "$PORT_FIX" >"$pin"
+    log="$h/logs/install.log"
+    setsid env AIRY_HOME="$h" AIRY_LOCAL_MODEL_PIN="$pin" \
+        AIRY_LOCAL_MODEL_CURATED="$src/none.list" \
+        "$AIRY_LOCAL" model install gate-model >"$log" 2>&1 &
+    dl=$!
+    part=""
+    for _i in $(seq 1 200); do
+        part="$(compgen -G "$h/local/tmp/*.part" | head -1)"
+        if [ -n "$part" ] && [ "$(rt_size "$part")" -ge 262144 ]; then break; fi
+        sleep 0.1
+    done
+    if [ -z "$part" ] || [ ! -f "$part" ]; then
+        fail "T-1a 未观察到在途 .part"
+        kill -TERM -- -"$dl" 2>/dev/null || kill -TERM "$dl" 2>/dev/null
+        wait "$dl" 2>/dev/null
+        return 0
+    fi
+    kill -TERM -- -"$dl" 2>/dev/null || {
+        kill -TERM "$dl" 2>/dev/null
+        pkill -TERM -P "$dl" 2>/dev/null
+    }
+    wait "$dl" 2>/dev/null
+
+    if [ -f "$part" ]; then
+        ps="$(rt_size "$part")"
+        pass "T-1a SIGTERM 后保留在途 .part（${ps} 字节）"
+        if [ "$ps" -gt 0 ] && [ "$ps" -lt "$size" ]; then
+            pass "T-1a 中断点确为不完整件（${ps}/${size}）"
+        else
+            fail "T-1a 中断件尺寸异常（${ps}/${size}）"
+        fi
+    else
+        ps=0
+        fail "T-1a 中断后未保留 .part"
+    fi
+    if grep -q 'Fetching:' "$log"; then
+        pass "T-1a 拉取阶段进度可见"
+    else
+        fail "T-1a 缺拉取阶段日志"
+    fi
+
+    # B 段：同目录重跑，必须从既有偏移续传并收敛为完整件。
+    out="$(AIRY_HOME="$h" AIRY_LOCAL_MODEL_PIN="$pin" \
+        AIRY_LOCAL_MODEL_CURATED="$src/none.list" \
+        "$AIRY_LOCAL" model install gate-model 2>&1)"
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+        pass "T-1b 重跑收敛成功"
+    else
+        fail "T-1b 重跑失败（rc=$rc）：$(printf '%.160s' "$out")"
+    fi
+    if [ "$ps" -gt 0 ] && grep -q "RANGE ${ps}-" "$SB/fixture-$PORT_FIX.log"; then
+        pass "T-1b 续传从既有偏移发起（${ps}）"
+    else
+        fail "T-1b 未见从既有偏移续传"
+    fi
+    if printf '%s' "$out" | grep -q 'Installed model:'; then
+        pass "T-1b 落位阶段进度可见"
+    else
+        fail "T-1b 缺落位阶段日志"
+    fi
+    if [ -f "$h/local/models/gate-model.gguf" ] \
+       && [ "$(rt_sha "$h/local/models/gate-model.gguf")" = "$sha" ]; then
+        pass "T-1b 落位件 sha256 与 pin 一致"
+    else
+        fail "T-1b 落位件缺失或哈希不符"
+    fi
+
+    # C 段：同尺寸异内容即毒件，必须 fail-closed 且不留残件；换正品即恢复。
+    rt_fix_stop_all
+    python3 - "$src/good.bin" "$src/bad.bin" <<'PY'
+import sys
+buf = bytearray(open(sys.argv[1], "rb").read())
+buf[0] ^= 0xFF
+open(sys.argv[2], "wb").write(buf)
+PY
+    rt_fixture "$PORT_FIX" ok "$src/bad.bin" || {
+        fail "T-1c 毒件夹具未就绪"
+        return 0
+    }
+    h="$(rt_home t1b)"
+    pin="$src/pin-b.list"
+    printf 'model|gate-model|gate-model.gguf|%s|%s|\nmirror|gate-model.gguf|http://127.0.0.1:%s/artifact/{asset}\n' \
+        "$size" "$sha" "$PORT_FIX" >"$pin"
+    out="$(AIRY_HOME="$h" AIRY_LOCAL_MODEL_PIN="$pin" \
+        AIRY_LOCAL_MODEL_CURATED="$src/none.list" \
+        "$AIRY_LOCAL" model install gate-model 2>&1)"
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        pass "T-1c 毒件拒绝安装（rc=$rc）"
+    else
+        fail "T-1c 毒件被误接受"
+    fi
+    case "$out" in
+        *poisoned*) pass "T-1c fail-closed 语义明确" ;;
+        *) fail "T-1c 缺 fail-closed 说明：$(printf '%.160s' "$out")" ;;
+    esac
+    if [ ! -f "$h/local/models/gate-model.gguf" ] \
+       && [ -z "$(compgen -G "$h/local/tmp/*.part")" ]; then
+        pass "T-1c 毒件与残件均未落位"
+    else
+        fail "T-1c 毒件路径留下残件"
+    fi
+
+    rt_fix_stop_all
+    for _i in $(seq 1 50); do rt_port_free "$PORT_FIX" && break; sleep 0.1; done
+    rt_fixture "$PORT_FIX" ok "$src/good.bin" || {
+        fail "T-1c 正品夹具未就绪"
+        return 0
+    }
+    out="$(AIRY_HOME="$h" AIRY_LOCAL_MODEL_PIN="$pin" \
+        AIRY_LOCAL_MODEL_CURATED="$src/none.list" \
+        "$AIRY_LOCAL" model install gate-model 2>&1)"
+    rc=$?
+    if [ "$rc" -eq 0 ] && [ -f "$h/local/models/gate-model.gguf" ]; then
+        pass "T-1c 换回正品后重试成功"
+    else
+        fail "T-1c 恢复重试未成功（rc=$rc）"
+    fi
+    rt_fix_stop_all
+}
 # ── T-2 断网：失败必须有界且可判读；auto 模式必须切到健康端点 ──
 scn_t2() {
     rt_need_llm "T-2" || return 0
