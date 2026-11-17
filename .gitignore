@@ -12,6 +12,7 @@
 !.clang-format-ignore
 !.gitignore
 !.gitmodules
+!.mailmap
 !.gitattributes
 !.github/
 !.github/**
