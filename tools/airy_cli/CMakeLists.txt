@@ -58,6 +58,8 @@ add_executable(airy_cli
     src/cmd/cli_models.c
     # 0.1.21 D-6：本地模型注册表 list/use/remove（与 airy-local 同数据面）
     src/cmd/cli_model_reg.c
+    # 0.1.21 D-2：密钥装配引导（写 secrets.env 后经 llm.probe 立即验证）
+    src/cmd/cli_key.c
     # 0.1.21 B-3：加速器能力快照（doctor 的 GPU 段与降级原因来源）
     src/cmd/cli_gpu.c
     src/chat/cli_chat.c
@@ -408,5 +410,18 @@ if(BUILD_TESTS)
                                                             airy_common
                                                             Threads::Threads)
         add_test(NAME cli_model_reg_unit COMMAND test_cli_model_reg)
+    endif()
+
+    # 0.1.21 D-2：密钥装配引导——临时 AIRY_HOME 下验证行选择、变量位映射
+    # （声明 api_key_env / MODEL_<N>_API_KEY）、原子写替换与取消不落盘。
+    if(NOT WIN32)
+        add_executable(test_cli_key tests/test_cli_key.c
+                       tests/cli_test_globals.c src/cmd/cli_key.c)
+        target_include_directories(test_cli_key PRIVATE ${CLI_INC_DIRS})
+        target_compile_definitions(test_cli_key PRIVATE AIRY_COMPLIANCE_IMPL)
+        target_link_libraries(test_cli_key PRIVATE airy_coreloopthree
+                                                    airy_common
+                                                    Threads::Threads)
+        add_test(NAME cli_key_unit COMMAND test_cli_key)
     endif()
 endif()

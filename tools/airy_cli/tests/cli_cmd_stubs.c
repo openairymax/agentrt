@@ -132,3 +132,10 @@ int cli_cmd_gpu(int argc, char *argv[])
     (void)argv;
     return 0;
 }
+
+int cli_cmd_key(int argc, char *argv[])
+{
+    (void)argc;
+    (void)argv;
+    return 0;
+}
