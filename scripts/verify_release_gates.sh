@@ -2155,6 +2155,16 @@ else
     bad "AJ3 构建目录守卫注入残留:$(printf '\n%s' "$_aj3_hits")"
 fi
 
+section "SC" "C-15 gate:ci 跨仓 [SC] 契约头 sha256 与 agent-linux 侧逐字节一致"
+
+_sc_log="$TMP/sc_headers.log"
+bash "$ROOT/scripts/gate_ssot_headers.sh" >"$_sc_log" 2>&1
+case $? in
+    0) ok "SC1 [SC] 契约头全量逐字节一致（$(sed -n 's/^\[gate:ci\] \[SC\] headers: //p' "$_sc_log" | tail -1)）" ;;
+    2) skip "SC1 缺 agent-linux kernel UAPI 源树（AIRY_SC_HEADER_SRC 未指向），跨仓比对跳过" ;;
+    *) bad "SC1 [SC] 契约头漂移:$(sed -n 's/^  \[FAIL\] //p' "$_sc_log" | tr '\n' ' ')" ;;
+esac
+
 printf '\n门禁汇总: PASS=%d FAIL=%d\n' "$PASS" "$FAIL"
 if [ "$FAIL" -gt 0 ]; then
     printf '  [GATE] WS-9 社区六类问题修复发布门禁未通过（方案 §4.9 / 9.8）\n'
