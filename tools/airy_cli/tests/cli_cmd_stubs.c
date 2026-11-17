@@ -109,3 +109,19 @@ CMD_STUB(cmd_sanitize)
 CMD_STUB(cmd_security)
 CMD_STUB(cmd_pending)
 CMD_STUB(cmd_approve)
+
+/* 非交互子命令（cli_parse_args 直达）：真身在 cli_models.c / cli_gpu.c，
+ * 依赖 RPC 与渲染树；分发测试只验证「是否路由到该子命令」，以桩承接。 */
+int cli_cmd_models(int argc, char *argv[])
+{
+    (void)argc;
+    (void)argv;
+    return 0;
+}
+
+int cli_cmd_gpu(int argc, char *argv[])
+{
+    (void)argc;
+    (void)argv;
+    return 0;
+}
