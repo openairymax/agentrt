@@ -56,6 +56,8 @@ add_executable(airy_cli
     src/cmd/airy_cli_cmd_capability.c
     # 0.1.17 R5-G4 审批视图：tool.pending 只读视图 + tool.approve 决议回传
     src/cmd/airy_cli_cmd_approval.c
+    # 0.1.21 A-7：模型连接表自检视图（doctor 的 key 三态判据来源）
+    src/cmd/cli_models.c
     src/chat/cli_chat.c
     # cli_chat.c 域拆分（2026-08-27：2040 行 → 6 个职责模块）
     src/chat/cli_chat_usage.c
@@ -177,6 +179,7 @@ set(CLI_INC_DIRS
     # airy_dirent.h 等 POSIX 兼容头（Windows MSVC 下无 dirent.h，走
     # FindFirstFileA 实现；#112 实证 cmd_system/tui_complete C2065）
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/compat
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/config_unified
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/platform/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/ime
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/llm_d/include
