@@ -11,6 +11,8 @@
  * 与运行期一致——先看进程环境，再看 secrets.env 的非空值。
  */
 
+#include "airy_cli_cmd_internal.h"
+#include "cli_gw.h"
 #include "cli_internal.h"
 #include "platform_paths.h"
 #include "yaml_minimal.h"
@@ -112,6 +114,44 @@ static void emit_row(const struct yaml_node *row, size_t idx, const char *secret
     cli_outf("{\"schema\":1,\"name\":\"%s\",\"mode\":\"%s\",\"base_url\":\"%s\","
              "\"key_env\":\"%s\",\"has_key\":%d}\n",
              esc[0], esc[1], esc[2], esc[3], has_key);
+}
+
+/* C-19：模型槽位（t2/t1f/t1p）只读视图与热切换。读写都经 gateway 转发
+ * llm.slots_get / llm.slots_set，CLI 不直接改文件——配置面与运行期必须
+ * 同源，避免两处说法不一致。 */
+int cli_cmd_model(int argc, char *argv[])
+{
+    char params[640];
+    char esc_role[128];
+    char esc_model[512];
+    char *res = NULL;
+    int rc;
+
+    while (argc > 0 && strcmp(argv[0], "slot") == 0) {
+        argc--;
+        argv++;
+    }
+    if (argc == 0 || strcmp(argv[0], "get") == 0 || strcmp(argv[0], "list") == 0) {
+        rc = cli_gw_call("llm.slots_get", NULL, CLI_RPC_TIMEOUT_MS, &res);
+    } else if (strcmp(argv[0], "set") == 0 && argc >= 3) {
+        cli_json_esc(esc_role, sizeof(esc_role), argv[1]);
+        cli_json_esc(esc_model, sizeof(esc_model), argv[2]);
+        snprintf(params, sizeof(params), "{\"role\":\"%s\",\"model\":\"%s\"}", esc_role,
+                 esc_model);
+        rc = cli_gw_call("llm.slots_set", params, CLI_RPC_TIMEOUT_MS, &res);
+    } else {
+        cli_outf("用法: airy_cli model slot [get|list] | "
+                 "model slot set <t2|t1f|t1p> <model_id>\n");
+        return 2;
+    }
+    if (rc != 0) {
+        cli_outf("airy_cli: model slot 失败（%d）：%s\n", rc, cli_gw_last_err());
+        AIRY_FREE(res);
+        return 2;
+    }
+    cli_outf("%s\n", res ? res : "{}");
+    AIRY_FREE(res);
+    return 0;
 }
 
 int cli_cmd_models(int argc, char *argv[])
