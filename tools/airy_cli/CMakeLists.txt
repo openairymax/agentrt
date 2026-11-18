@@ -54,6 +54,8 @@ add_executable(airy_cli
     src/cmd/airy_cli_cmd_capability.c
     # 0.1.17 R5-G4 审批视图：tool.pending 只读视图 + tool.approve 决议回传
     src/cmd/airy_cli_cmd_approval.c
+    # 0.1.21 D-9：作业历史审计视图（tool.jobs / tool.job）
+    src/cmd/airy_cli_cmd_jobs.c
     # 0.1.21 A-7：模型连接表自检视图（doctor 的 key 三态判据来源）
     src/cmd/cli_models.c
     # 0.1.21 D-6：本地模型注册表 list/use/remove（与 airy-local 同数据面）
