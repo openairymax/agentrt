@@ -211,7 +211,13 @@ runs:
         git clone -q --filter=blob:none --sparse \
           "https://x-access-token:${GH_TOKEN}@github.com/openairymax/sdk.git" \
           agent-workload/sdk
-        git -C agent-workload/sdk fetch -q --depth 1 origin "${{ inputs.sdk_sha }}"
+        # 镜像作业在推送跑批启动之后才发布叶子仓：按 SHA 取料可能先撞上
+        # upload-pack "not our ref"。有限重试等镜像追平，仍缺失由其后
+        # checkout/test 兜底判红（fail-closed 语义不变）。
+        for _try in 1 2 3 4 5; do
+          git -C agent-workload/sdk fetch -q --depth 1 origin "${{ inputs.sdk_sha }}" && break
+          sleep 20
+        done
         git -C agent-workload/sdk checkout -q "${{ inputs.sdk_sha }}"
         git -C agent-workload/sdk submodule update --init --depth 1 -- tui
         test -f agent-workload/sdk/tui/scripts/airymaxrt
@@ -233,7 +239,10 @@ runs:
         git clone -q --filter=blob:none --sparse \
           "https://x-access-token:${GH_TOKEN}@github.com/openairymax/tools.git" \
           _tools
-        git -C _tools fetch -q --depth 1 origin "${{ inputs.tools_sha }}"
+        for _try in 1 2 3 4 5; do
+          git -C _tools fetch -q --depth 1 origin "${{ inputs.tools_sha }}" && break
+          sleep 20
+        done
         git -C _tools checkout -q "${{ inputs.tools_sha }}"
         git -C _tools sparse-checkout set scripts/ops/templates airy_depgraph
         test -f _tools/scripts/ops/templates/permission_rules.yaml
@@ -257,7 +266,10 @@ runs:
         git clone -q --filter=blob:none --sparse \
           "https://x-access-token:${GH_TOKEN}@github.com/openairymax/products.git" \
           agent-workload/products
-        git -C agent-workload/products fetch -q --depth 1 origin "${{ inputs.products_sha }}"
+        for _try in 1 2 3 4 5; do
+          git -C agent-workload/products fetch -q --depth 1 origin "${{ inputs.products_sha }}" && break
+          sleep 20
+        done
         git -C agent-workload/products checkout -q "${{ inputs.products_sha }}"
         git -C agent-workload/products sparse-checkout set --skip-checks \
           gateway_biz cupolas lang_gateway cognition canary
