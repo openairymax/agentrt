@@ -14,7 +14,7 @@
 #
 # 仅使用 Python 标准库，无第三方依赖。
 #
-# Generator version: 1.0.0
+# Generator version: 1.1.0
 
 import argparse
 import json
@@ -23,7 +23,7 @@ import sys
 
 from pathlib import Path
 
-GENERATOR_VERSION = "1.0.0"
+GENERATOR_VERSION = "1.1.0"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 AGENTRT_ROOT = SCRIPT_DIR.parents[1]
@@ -60,6 +60,20 @@ KIND_ENUM = {
     "task_submit": "GW_CAP_KIND_TASK_SUBMIT",
 }
 
+# 超时预算引用（0.1.21 C-21）：清单可写 "budget:<tier>" 代替毫秒字面量，
+# 生成期落为预算层哨兵，运行期由 gw_cap_ns_timeout 到预算树取毫秒，使
+# 网关转发超时与 llm_d/tool_d 共用同一真值源。两处各写一个数字必然漂移
+# （曾出现 90s 与 85s 只差 5s 余量）。静态初始化不允许函数调用，故表里
+# 只能放哨兵常量。
+BUDGET_REF = "budget:"
+BUDGET_EXPRS = {
+    "client": "GW_TMO_BUDGET_CLIENT",
+    "server": "GW_TMO_BUDGET_SERVER",
+    "provider": "GW_TMO_BUDGET_PROVIDER",
+    "tool": "GW_TMO_BUDGET_TOOL",
+    "tool_outer": "GW_TMO_BUDGET_TOOL_OUTER",
+}
+
 
 class GenError(Exception):
     """清单校验/渲染错误（中文说明，便于定位）"""
@@ -81,6 +95,19 @@ def need_int(value, where, minimum=1):
     if value < minimum:
         fail("%s: 期望 >= %d，实际 %d" % (where, minimum, value))
     return value
+
+
+def need_timeout(value, where):
+    """超时值 → C 表达式：整数毫秒，或 "budget:<tier>" 预算树引用。"""
+    if isinstance(value, str):
+        if not value.startswith(BUDGET_REF):
+            fail("%s: 仅支持整数毫秒或 \"budget:<tier>\"，实际 %r" % (where, value))
+        tier = value[len(BUDGET_REF):]
+        if tier not in BUDGET_EXPRS:
+            fail("%s: 未知预算层 %r（可选 %s）"
+                 % (where, tier, ", ".join(sorted(BUDGET_EXPRS))))
+        return BUDGET_EXPRS[tier]
+    return "%du" % need_int(value, where)
 
 
 def need_str(value, where, pattern=IDENT_RE):
@@ -136,7 +163,7 @@ def _parse_defaults(doc):
     if not isinstance(defaults, dict):
         fail("root.defaults: 期望对象")
     reject_unknown(defaults, ("timeout_ms", "version"), "defaults")
-    return (need_int(defaults.get("timeout_ms"), "defaults.timeout_ms"),
+    return (need_timeout(defaults.get("timeout_ms"), "defaults.timeout_ms"),
             need_int(defaults.get("version"), "defaults.version"))
 
 
@@ -223,7 +250,7 @@ def _parse_ns(item, i, socks, dflt, ns_map):
     _check_route(where, route, daemon, sock, socks)
 
     timeout = item.get("timeout_ms")
-    timeout = dflt[0] if timeout is None else need_int(timeout, where + ".timeout_ms")
+    timeout = dflt[0] if timeout is None else need_timeout(timeout, where + ".timeout_ms")
     prefix = opt_str(item, "prefix", where)
     l2_pass = need_bool(item["l2_pass"], where + ".l2_pass") if "l2_pass" in item else False
     _check_l2(item, where, prefix, l2_pass)
@@ -316,7 +343,7 @@ def render_policy(model):
     lines.append("")
     lines.append("static const gw_ns_pol_t GW_NS_POLICY[] = {")
     for ns in model["namespaces"]:
-        lines.append('    {"%s", "%s", %s, %s, %uu, %s, %d, %d},' % (
+        lines.append('    {"%s", "%s", %s, %s, %s, %s, %d, %d},' % (
             ns["ns"], ns["owner"],
             '"%s"' % ns["daemon"] if ns["daemon"] else "NULL",
             '"%s"' % ns["sock"] if ns["sock"] else "NULL",
