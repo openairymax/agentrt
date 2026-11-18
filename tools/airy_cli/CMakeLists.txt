@@ -109,6 +109,8 @@ add_executable(airy_cli
     src/tui/tui_keys.c
     src/tui/tui_input.c
     src/tui/tui_ime.c
+    # 0.1.21 迁出：terminal 输入法属纯体验面，随 TUI 宿主落在 CLI
+    src/tui/ime/airy_ime.c
     src/tui/tui_history.c
     src/tui/tui_render.c
     # cli_tui.c 二轮拆分（2026-08-27：1102 行 → 3 个职责模块）
@@ -207,7 +209,7 @@ set(CLI_INC_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/compat
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/config_unified
     ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/platform/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../commons/utils/ime
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tui/ime
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/llm_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/tool_d/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../daemons/common/include
@@ -223,6 +225,9 @@ if(WIN32)
 endif()
 
 install(TARGETS airy_cli RUNTIME DESTINATION bin)
+# 0.1.21 迁出：内置拼音词典随 TUI 宿主安装（磁盘只读，运行期查找路径不变）
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/tui/ime/data/airy_ime.dat
+        DESTINATION share/agentrt/ime)
 
 # 2.5.x 意图分辨启发式单测（纯函数，独立于 LLM/daemon）
 if(BUILD_TESTS)
@@ -235,6 +240,13 @@ if(BUILD_TESTS)
     target_include_directories(test_cli_cmdline PRIVATE ${CLI_INC_DIRS})
     target_link_libraries(test_cli_cmdline PRIVATE airy_coreloopthree airy_common)
     add_test(NAME cli_cmdline_dispatch COMMAND test_cli_cmdline)
+
+    # 0.1.21 迁出：内置拼音词典加载/查询（词典路径由 CTest 显式传入）
+    add_executable(test_cli_ime tests/test_ime.c src/tui/ime/airy_ime.c)
+    target_include_directories(test_cli_ime PRIVATE ${CLI_INC_DIRS})
+    target_link_libraries(test_cli_ime PRIVATE airy_common)
+    add_test(NAME cli_ime_dict
+             COMMAND test_cli_ime ${CMAKE_CURRENT_SOURCE_DIR}/src/tui/ime/data/airy_ime.dat)
 
     add_executable(test_cli_classify tests/test_cli_classify.c src/cmd/cli_classify.c)
     target_include_directories(test_cli_classify PRIVATE ${CLI_INC_DIRS})
