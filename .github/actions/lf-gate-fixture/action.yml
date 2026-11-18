@@ -182,7 +182,10 @@ inputs:
     # 0ba0a77：cupolas 审计夹具改用 win32 目录枚举（find 接口），Windows 腿
     # 的夹具发现不再依赖 POSIX dirent。判据消费路径不触，仅装配输入前进；
     # 不 bump 则该修正不进发行快照，Windows 审计用例仍按旧枚举取空集。
-    default: '0ba0a777d40d89d2ebdea1c3832f8d252ea15c9d'
+    # a30a0eb：cupolas 溢出文件大小改按内容实测（fopen+fseek/ftell）。旧 pin 下
+    # Windows 腿读 FindFirstFile 的目录索引大小，文件仍被追加持有故得 0，
+    # audit_overflow_tests 判「首个溢出文件为空」；缺口在 pin 未前推，不在判据面。
+    default: 'a30a0eb141689df4b1397967268ccc822848d594'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
