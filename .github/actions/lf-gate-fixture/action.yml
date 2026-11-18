@@ -112,7 +112,12 @@ inputs:
     # 17ea6c2：0.1.21 收尾批。permission_rules.yaml 的 external 授权集补
     # priv_exec（M3 组判据消费面），体积账基线按 Gate 41 实测重登记。
     # 旧 pin 的模板无该授权，M3 判「external 缺工具授权」整组红。
-    default: '17ea6c2802b45735b5b1ae52a3b834a76f5b2d7d'
+    # ce23a5a：0.1.21 收尾批判据面。G30 命令面行数带（cmd+core+chat ≤12000）
+    # 随 CLI 传输/注册表移出 cmd 恢复带内（13669 → 11988），function-name /
+    # header-shadow / file-length / fanout / ceiling / budget 六账按实测重登记，
+    # Gate 46 预检补 pytest-asyncio 探针。不 bump 则 CI 仍按旧基线判红：
+    # G30 报「命令面超带」、G46 在守卫内报 ImportError，红因皆指不到真因。
+    default: 'ce23a5a935fd2cdb7d076525eb353abbea045d88'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
@@ -172,7 +177,10 @@ inputs:
     # 业务面仍写死字面量，L1 判「预算树取料链断裂」，本地绿而 CI 红。
     # d1ce79f：cupolas/cognition 三处测试去掉 msvc 不支持的 unsetenv 与
     # 未导出的 _A_SUBDIR，Windows 腿的测试目标才可链接。
-    default: 'd1ce79f0c03b7ae164743828c2e8d81be67994b3'
+    # 0ba0a77：cupolas 审计夹具改用 win32 目录枚举（find 接口），Windows 腿
+    # 的夹具发现不再依赖 POSIX dirent。判据消费路径不触，仅装配输入前进；
+    # 不 bump 则该修正不进发行快照，Windows 审计用例仍按旧枚举取空集。
+    default: '0ba0a777d40d89d2ebdea1c3832f8d252ea15c9d'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
