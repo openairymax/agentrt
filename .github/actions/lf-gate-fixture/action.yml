@@ -67,7 +67,11 @@ inputs:
     # golden、Logs 合流 daemon 尾读）。旧 pin fe109e3 的 tui 无上述结构面，
     # 发行包 agentrt-tui 与门禁验证快照均停在缺口修复前；TUI cargo test
     # 599→620 全绿，判据消费面（scripts/airymaxrt 启动器）两 pin 零差异。
-    default: '260e36220f4584a23c31759872bd5fad4d93100e'
+    # 144a8f8：tui gitlink 前推至 06db91d（0.1.21 会话历史与任务入口落盘、
+    # 启动器与发行副本对齐）。旧 pin 260e362 的 tui 无 toolcat.rs 与
+    # session_store.rs，V0/B3 与 TD2 判据读不到结构面、构建腿缺件；
+    # AF1 双面一致判据要求启动器 pin 同步前推，否则取旧快照即报分叉。
+    default: '144a8f80e057fe7370f4cd646b6accbd327e6367'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
@@ -105,7 +109,10 @@ inputs:
     # 优先级，+12，RATCHET-JUSTIFY 已随提交），另修 bootstrap -r 帮助面的
     # 过期默认值（/tmp/agentrt → $AIRY_HOME/run）。不 bump 则 CI 的 Gate 42
     # 仍按旧账判「实测 79185 vs pin 79173」差异非零，本地绿而 CI 红。
-    default: 'b43da4a152b5c68f227814b726b4f132fddf0cdd'
+    # 17ea6c2：0.1.21 收尾批。permission_rules.yaml 的 external 授权集补
+    # priv_exec（M3 组判据消费面），体积账基线按 Gate 41 实测重登记。
+    # 旧 pin 的模板无该授权，M3 判「external 缺工具授权」整组红。
+    default: '17ea6c2802b45735b5b1ae52a3b834a76f5b2d7d'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
@@ -160,7 +167,10 @@ inputs:
     # yaml_size() 的 key==NULL 终点）。与旧 pin 单提交差，仅
     # cupolas/tests/unit/test_yaml_minimal.c，不触判据消费路径；不 bump 则
     # 该回归在 CI 中永不执行（pin 之外的测试树等于不存在）。
-    default: 'a562df44c67126e1ea6f32bc5acc9559c6570775'
+    # 6d29323：gateway_biz 的网关默认超时改由预算树 server 层给出（0.1.21
+    # C-21：超时统一档位表，provider ≤ server ≤ client）。旧 pin a562df4 的
+    # 业务面仍写死字面量，L1 判「预算树取料链断裂」，本地绿而 CI 红。
+    default: '6d293230e81beeaf1c6ff786e571d8bbd7659101'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
