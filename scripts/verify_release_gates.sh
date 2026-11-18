@@ -656,7 +656,11 @@ grep -Eq '^#define GW_LLM_DEFAULT_TIMEOUT_MS[[:space:]]+\(\(int\)airy_budget_ms\
 _prov_uses_prv=0
 grep -Fq 'airy_budget_ms(AIRY_BUDGET_PROVIDER)' "$PROVIDER_C" && _prov_uses_prv=1
 
-if [ -z "$_gw_ms" ] || [ -z "$_prov_ms" ] \
+# 业务面 gateway_biz 的宏取层校验：文件缺席视为取料链断裂（fail-closed），
+# 缺料即判红，不得静默降级。
+if [ ! -f "$GW_INTERNAL" ]; then
+    bad "L1 业务面 gateway_biz_internal.h 未检出（取料链断裂，无法校验预算树取层）"
+elif [ -z "$_gw_ms" ] || [ -z "$_prov_ms" ] \
    || [ "$_gw_uses_srv" -ne 1 ] || [ "$_prov_uses_prv" -ne 1 ]; then
     bad "L1 预算树取料链断裂（server=${_gw_ms:-<空>}ms provider=${_prov_ms:-<空>}ms gw取server层=$_gw_uses_srv provider取provider层=$_prov_uses_prv）"
 elif awk -v t="$_prov_ms" -v g="$_gw_ms" 'BEGIN { exit !(t < g) }'; then
