@@ -38,6 +38,11 @@ A4_WHITE_PATTERNS=(
     '.bash_history'
     '.Xauthority'
     '.sudo_as_admin_successful'
+    # CI 自带树：runner 在 $HOME 下自写诊断日志与检出/构建目录（GitHub
+    # hosted runner 的 HOME 即 /home/runner），与用例无关且并发变动。
+    # 白名单只放行宿主自带树，$HOME 下的应用/配置路径仍逐条判红。
+    'actions-runner/*'
+    'work/*'
 )
 
 a4_usage() {
