@@ -621,36 +621,63 @@ section "L" "R-5 provider 默认超时 < 网关 LLM 转发背压（连不上网�
 PROVIDER_C="$ROOT/daemons/providers/src/core/registry.c"
 LLM_METHODS="$ROOT/daemons/llm_d/src/rpc/methods.c"
 GW_INTERNAL="$(BIZ_FACE include/gateway_biz_internal.h)"
+# 0.1.21 C-21：超时不再各写字面量，统一由预算树档位表给出（provider ≤ server
+# ≤ client）。门禁以预算树为唯一取料点，再校验两个调用点确实取对应层，
+# 避免「档位表自洽、运行态另一套值」的空洞通过。
+BUDGET_C="$ROOT/commons/utils/config_unified/airy_budget.c"
 
 _gate_define() { # <file> <macro>  → 打印宏字面量（无则空）
     sed -n "s/^#define $2[[:space:]]*\([0-9][0-9.]*\).*/\1/p" "$1" | head -1
 }
-_prov_to="$(_gate_define "$PROVIDER_C" PROVIDER_DEFAULT_TIMEOUT_SEC)"
-_gw_ms="$(_gate_define "$GW_INTERNAL" GW_LLM_DEFAULT_TIMEOUT_MS)"
+
+_budget_ms() { # <档位名> <列 1=client 2=server 3=provider 4=tool> → 毫秒（无则空）
+    [ -f "$BUDGET_C" ] || return 0
+    awk -v p="$1" -v c="$2" '
+        index($0, "{\"" p "\",") {
+            line = $0
+            gsub(/[^0-9 \t]/, " ", line)
+            n = split(line, f, /[[:space:]]+/)
+            j = 0
+            for (k = 1; k <= n; k++)
+                if (f[k] != "") v[++j] = f[k]
+            if (j >= c) print v[c]
+            exit
+        }' "$BUDGET_C"
+}
+
+_gw_ms="$(_budget_ms default 2)"
+_prov_ms="$(_budget_ms default 3)"
 _retries="$(_gate_define "$LLM_METHODS" LLM_MAX_RETRIES)"
 _fast_ms="$(_gate_define "$LLM_METHODS" LLM_RETRY_FAST_FAIL_MS)"
 
-if [ -z "$_prov_to" ] || [ -z "$_gw_ms" ]; then
-    bad "L1 无法解析 PROVIDER_DEFAULT_TIMEOUT_SEC / GW_LLM_DEFAULT_TIMEOUT_MS（宏被删改）"
-elif awk -v t="$_prov_to" -v g="$_gw_ms" 'BEGIN { exit !(t * 1000 < g) }'; then
-    ok "L1 单次 provider 超时 ${_prov_to}s < 网关 LLM 背压 ${_gw_ms}ms（单次失败诊断先于网关返回）"
+_gw_uses_srv=0
+grep -Eq '^#define GW_LLM_DEFAULT_TIMEOUT_MS[[:space:]]+\(\(int\)airy_budget_ms\(AIRY_BUDGET_SERVER\)\)' \
+    "$GW_INTERNAL" && _gw_uses_srv=1
+_prov_uses_prv=0
+grep -Fq 'airy_budget_ms(AIRY_BUDGET_PROVIDER)' "$PROVIDER_C" && _prov_uses_prv=1
+
+if [ -z "$_gw_ms" ] || [ -z "$_prov_ms" ] \
+   || [ "$_gw_uses_srv" -ne 1 ] || [ "$_prov_uses_prv" -ne 1 ]; then
+    bad "L1 预算树取料链断裂（server=${_gw_ms:-<空>}ms provider=${_prov_ms:-<空>}ms gw取server层=$_gw_uses_srv provider取provider层=$_prov_uses_prv）"
+elif awk -v t="$_prov_ms" -v g="$_gw_ms" 'BEGIN { exit !(t < g) }'; then
+    ok "L1 provider 层 ${_prov_ms}ms < server 层 ${_gw_ms}ms（单次失败诊断先于网关返回）"
 else
-    bad "L1 单次 provider 超时 ${_prov_to}s 未小于网关背压 ${_gw_ms}ms（诊断会被网关超时吞掉）"
+    bad "L1 provider 层 ${_prov_ms}ms 未小于 server 层 ${_gw_ms}ms（诊断会被网关超时吞掉）"
 fi
 
 if grep -Fq ': 120.0' "$PROVIDER_C"; then
     bad "L2 provider 默认超时仍写死 120.0s（超过网关背压，超时倒挂回归）"
 else
-    ok "L2 provider 默认超时无 120.0s 硬编码残留（统一走 PROVIDER_DEFAULT_TIMEOUT_SEC）"
+    ok "L2 provider 默认超时无 120.0s 硬编码残留（统一走预算树 provider 层）"
 fi
 
-if [ -n "$_prov_to" ] && [ -n "$_gw_ms" ] && [ -n "$_retries" ] && [ -n "$_fast_ms" ] \
+if [ -n "$_gw_ms" ] && [ -n "$_prov_ms" ] && [ -n "$_retries" ] && [ -n "$_fast_ms" ] \
    && grep -Fq 'LLM_RETRY_FAST_FAIL_MS' "$LLM_METHODS"; then
-    if awk -v t="$_prov_to" -v r="$_retries" -v f="$_fast_ms" -v g="$_gw_ms" \
-         'BEGIN { exit !(r * f + t * 1000 < g) }'; then
-        ok "L3 重试最坏总耗时 ${_retries}×${_fast_ms}ms+${_prov_to}s < 网关背压 ${_gw_ms}ms"
+    if awk -v t="$_prov_ms" -v r="$_retries" -v f="$_fast_ms" -v g="$_gw_ms" \
+         'BEGIN { exit !(r * f + t < g) }'; then
+        ok "L3 重试最坏总耗时 ${_retries}×${_fast_ms}ms+${_prov_ms}ms < server 层 ${_gw_ms}ms"
     else
-        bad "L3 重试最坏总耗时越过网关背压（${_retries}×${_fast_ms}ms+${_prov_to}s）"
+        bad "L3 重试最坏总耗时越过网关背压（${_retries}×${_fast_ms}ms+${_prov_ms}ms ≥ ${_gw_ms}ms）"
     fi
 else
     bad "L3 缺 LLM_MAX_RETRIES / LLM_RETRY_FAST_FAIL_MS 或其使用点（重试预算护栏缺失）"
@@ -1299,7 +1326,9 @@ _MODE="$TUI_SRC/src/app/mode.rs"
 _POLL="$TUI_SRC/src/app/poll.rs"
 _DISP="$TUI_SRC/src/app/dispatch.rs"
 _TSK="$TUI_SRC/src/app/task.rs"
-for _f in "$_MODE" "$_POLL" "$_DISP" "$_TSK"; do
+# 0.1.21 D-11：工具可见性改由 tool.list 真实目录驱动，白名单猜测退役。
+_CAT="$TUI_SRC/src/app/toolcat.rs"
+for _f in "$_MODE" "$_POLL" "$_DISP" "$_TSK" "$_CAT"; do
     [ -f "$_f" ] || _v_missing="$_v_missing $(basename "$_f")"
 done
 if [ -n "$_v_missing" ]; then
@@ -1344,6 +1373,9 @@ else
         | sed -n 's/.*mod \([a-z0-9_]*\);.*/\1/p' | sort -u)
     _v4_leak=""
     while IFS= read -r -d '' _rf; do
+        # toolcat.rs 是工具名上屏的唯一装配点（label/event_line），其内部的
+        # tool.to_string() 即「原样呈现 tool_id」的受控出口，不算裸透传。
+        [ "$_rf" = "$_CAT" ] && continue
         _v4_skip=0
         for _m in $_v4_mods; do
             case "$_rf" in */"$_m".rs|*/"$_m"/*) _v4_skip=1; break ;; esac
@@ -1353,11 +1385,13 @@ else
         fi
     done < <(find "$TUI_SRC/src" -name '*.rs' -print0)
 
-    if grep -q 'TOOL_ACTIONS' "$_DISP" && grep -q '未知工具（已隐藏）' "$_DISP" \
+    if grep -q 'pub fn label' "$_CAT" && grep -q 'tool\.list' "$_CAT" \
+        && grep -q '未登记' "$_CAT" && grep -q 'toolcat::label' "$_DISP" \
+        && ! grep -q '未知工具（已隐藏）' "$_DISP" "$_CAT" \
         && [ -z "$_v4_leak" ]; then
-        ok "V4 标识符白名单兜底在位（V3.4：未登记名零透传）"
+        ok "V4 工具可见性由 tool.list 目录驱动（D-11：未登记名加标记不隐藏，零白名单猜测）"
     else
-        bad "V4 白名单兜底缺失或 tool.to_string() 裸透传回潮:${_v4_leak:- $_DISP}"
+        bad "V4 工具目录装配缺失或未知工具隐藏/裸透传回潮:${_v4_leak:- $_DISP}"
     fi
 fi
 
