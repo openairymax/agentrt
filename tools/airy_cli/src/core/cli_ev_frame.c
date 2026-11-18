@@ -175,7 +175,7 @@ size_t cli_ev_build(char *dst, size_t cap, unsigned seq, uint64_t ts,
                     unsigned dropped, int *trunc)
 {
     char head[EV_HEAD_MAX];
-    char stub[160];
+    char vbuf[160];
     const char *pl = payload;
     size_t pl_len = payload ? plen : 0;
     int tr = 0;
@@ -199,14 +199,14 @@ size_t cli_ev_build(char *dst, size_t cap, unsigned seq, uint64_t ts,
         if (cli_ev_str(payload, plen, "status", salv, sizeof(salv)) <= 0)
             (void)cli_ev_str(payload, plen, "code", salv, sizeof(salv));
         if (salv[0])
-            sl = (size_t)snprintf(stub, sizeof(stub),
+            sl = (size_t)snprintf(vbuf, sizeof(vbuf),
                                   "{\"truncated\":true,\"bytes\":%lu,\"status\":\"%s\"}",
                                   (unsigned long)pl_len, salv);
         else
-            sl = (size_t)snprintf(stub, sizeof(stub),
+            sl = (size_t)snprintf(vbuf, sizeof(vbuf),
                                   "{\"truncated\":true,\"bytes\":%lu}",
                                   (unsigned long)pl_len);
-        pl = stub;
+        pl = vbuf;
         pl_len = sl;
         hn = ev_head(head, sizeof(head), seq, ts, type, dropped, tr);
         need = (size_t)hn + pl_len + 2;
