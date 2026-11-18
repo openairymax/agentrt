@@ -48,9 +48,11 @@ jobs:
       # test_airy_effect 已在历史收敛中合并删除，test_ipc 随其退役单元
       # （commons/tests/unit/commons/unit/test_ipc.c，属已整体禁用的陈旧
       # 目录）一并删除——三者保留均会使 build 步骤因无此目标而硬失败。
+      # test_ime 随 ime 迁出 commons 一并移除：其源与用例已归 tools/airy_cli，
+      # 本 CMake 树不再注册该目标。
       SANITIZER_TARGETS: >-
         test_platform test_platform_time test_error test_logger test_token
-        test_cancel_token test_airy_ext test_airy_id test_airy_regex test_ime
+        test_cancel_token test_airy_ext test_airy_id test_airy_regex
         test_io
         test_gateway test_syscall_router test_jsonrpc
         test_rpc_handler test_gateway_auth
