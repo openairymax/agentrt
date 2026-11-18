@@ -230,6 +230,10 @@ static void cli_print_usage(void)
              "仍受服务端下限钳制）\n", cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %s--tui%s                  全屏 TUI 渲染层（agentrt-tui 子进程，退出码回传）\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_outf("  %s--events%s ndjson        事件流出口：stdout 只出 NDJSON 帧（可配 -p，管道多轮）\n",
+           cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_outf("  %s--quiet%s                事件模式下静音人类可读输出\n",
+           cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %s--continue%s, %s--resume%s   恢复上次会话上下文（读 mem_d 最近记忆装配视图）\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %s-V%s, %s--version%s          输出版本号（构建期 VERSION SSoT 注入）\n",
@@ -280,6 +284,18 @@ int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
             i++;
         } else if (strcmp(argv[i], "--tui") == 0) {
             g_cli_tui_mode = 1;
+        } else if (strcmp(argv[i], "--events") == 0) {
+            /* D-15（0.1.21）：stdout 只出 NDJSON 帧；当前仅 ndjson 一种线格式，
+             * 其它取值按用法错误拒绝，避免"看起来支持"的隐式降级。 */
+            if (i + 1 >= argc || strcmp(argv[i + 1], "ndjson") != 0) {
+                cli_outf("airy_cli: --events 仅支持 ndjson\n");
+                cli_print_usage();
+                return 2;
+            }
+            g_cli_events_mode = 1;
+            i++;
+        } else if (strcmp(argv[i], "--quiet") == 0) {
+            g_cli_quiet = 1;
         } else if (strcmp(argv[i], "--continue") == 0 ||
                    strcmp(argv[i], "--resume") == 0) {
             g_cli_resume_mode = 1;
@@ -291,26 +307,26 @@ int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             cli_print_usage();
             return 1;
-        } else if (!g_cli_print_mode && strcmp(argv[i], "paths") == 0) {
+        } else if (!g_cli_print_mode && !g_cli_events_mode && strcmp(argv[i], "paths") == 0) {
             /* 子命令按「已输出、正常终止」返回；失败仍走用法错误码。 */
             return cli_cmd_paths(argc - i - 1, argv + i + 1) == 0 ? 1 : 2;
-        } else if (!g_cli_print_mode && strcmp(argv[i], "models") == 0) {
+        } else if (!g_cli_print_mode && !g_cli_events_mode && strcmp(argv[i], "models") == 0) {
             return cli_cmd_models(argc - i - 1, argv + i + 1) == 0 ? 1 : 2;
-        } else if (!g_cli_print_mode && strcmp(argv[i], "model") == 0) {
+        } else if (!g_cli_print_mode && !g_cli_events_mode && strcmp(argv[i], "model") == 0) {
             return cli_cmd_model(argc - i - 1, argv + i + 1) == 0 ? 1 : 2;
-        } else if (!g_cli_print_mode && strcmp(argv[i], "key") == 0) {
+        } else if (!g_cli_print_mode && !g_cli_events_mode && strcmp(argv[i], "key") == 0) {
             return cli_cmd_key(argc - i - 1, argv + i + 1) == 0 ? 1 : 2;
-        } else if (!g_cli_print_mode && strcmp(argv[i], "gpu") == 0) {
+        } else if (!g_cli_print_mode && !g_cli_events_mode && strcmp(argv[i], "gpu") == 0) {
             return cli_cmd_gpu(argc - i - 1, argv + i + 1) == 0 ? 1 : 2;
         } else if (argv[i][0] == '-') {
             cli_outf("airy_cli: 未知选项 %s%s%s\n", cli_c(CLR_YELLOW), argv[i],
                    cli_c(CLR_RESET));
             cli_print_usage();
             return 2;
-        } else if (g_cli_print_mode && !*out_print_prompt) {
+        } else if ((g_cli_print_mode || g_cli_events_mode) && !*out_print_prompt) {
             *out_print_prompt = argv[i];
-        } else if (g_cli_print_mode) {
-            cli_outf("airy_cli: 多出的参数 %s%s%s（-p 只接受一个 prompt）\n",
+        } else if (g_cli_print_mode || g_cli_events_mode) {
+            cli_outf("airy_cli: 多出的参数 %s%s%s（单轮模式只接受一个 prompt）\n",
                    cli_c(CLR_YELLOW), argv[i], cli_c(CLR_RESET));
             cli_print_usage();
             return 2;
@@ -324,6 +340,13 @@ int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
     }
     if (g_cli_tui_mode && g_cli_print_mode) {
         cli_outf("airy_cli: %s--tui%s 与 %s-p%s 互斥（全屏渲染层 vs 无界面单轮）\n",
+               cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
+        return 2;
+    }
+    /* D-15（0.1.21）：stdout 的两种结构化出口互斥——事件流独占 stdout，
+     * TUI 需要终端控制权，二者与 --events 同用都会破坏帧的可解析性。 */
+    if (g_cli_events_mode && (g_cli_tui_mode || g_cli_json_mode)) {
+        cli_outf("airy_cli: %s--events%s 与 %s--tui/--json%s 互斥（stdout 归属冲突）\n",
                cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
         return 2;
     }

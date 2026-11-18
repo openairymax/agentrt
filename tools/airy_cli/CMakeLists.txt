@@ -36,6 +36,18 @@ set(CLI_GW_SRCS
     src/cmd/cli_gw_rpc.c
 )
 
+# 0.1.21 D-15 事件流出口：帧编码/桥接/输入面/会话循环 + SSE 传输。
+# 单独成组是因为只有可消费 NDJSON 的目标才需要它，避免所有网关客户端
+# 目标被 SSE 解码器拖重。
+set(CLI_EV_SRCS
+    src/core/cli_ev.c
+    src/core/cli_ev_frame.c
+    src/core/cli_ev_bridge.c
+    src/core/cli_ev_in.c
+    src/core/cli_ev_turn.c
+    src/cmd/cli_gw_sse.c
+)
+
 add_executable(airy_cli
     src/core/main.c
     # main.c 域拆分（2026-08-27：1930 行 → 3 个职责模块）
@@ -83,6 +95,8 @@ add_executable(airy_cli
     # 0.1.21 D-8：超时阶梯（rpc/tool.sync/tool.async/think）与 model.yaml
     # 子集读取，think 与各 RPC 调用点共用同一真相源
     src/core/cli_cfg.c
+    # 0.1.21 D-15：单调时钟（事件流/SSE/存活节拍共用，机制件独立于渲染域）
+    src/core/cli_clock.c
     src/core/cli_timeout.c
     src/core/cli_dag.c
     src/cmd/cli_cmds.c
@@ -108,6 +122,8 @@ add_executable(airy_cli
     src/core/cli_orch.c
     # 架构约束（2026-08-25）：统一网关客户端（所有客户端必须经 gateway 派发）
     ${CLI_GW_SRCS}
+    # 0.1.21 D-15：事件流出口（--events ndjson）
+    ${CLI_EV_SRCS}
     # 0.1.19 N4：会话存活节拍（代次比对 + stale 重建）
     src/cmd/cli_live.c
 )
@@ -287,6 +303,24 @@ if(BUILD_TESTS)
         add_test(NAME cli_chat_usage COMMAND test_cli_usage)
     endif()
 
+    # 0.1.21 D-15：事件流出口单测（帧编码/续传/截断/chunked/SSE 行）。
+    # 以内存 sink 替换输出写面（非桩：被替换的是 I/O 目标，编码逻辑全真跑）。
+    add_executable(test_cli_ev tests/test_cli_ev.c tests/cli_test_globals.c
+                   ${CLI_EV_SRCS} ${CLI_GW_SRCS} src/core/cli_clock.c)
+    target_include_directories(test_cli_ev PRIVATE ${CLI_INC_DIRS})
+    target_compile_definitions(test_cli_ev PRIVATE AIRY_HAS_CJSON=1)
+    if(AIRY_CJSON_INCLUDE_DIRS)
+        target_include_directories(test_cli_ev PRIVATE ${AIRY_CJSON_INCLUDE_DIRS})
+    endif()
+    target_link_libraries(test_cli_ev PRIVATE airy_coreloopthree airy_common
+                                               Threads::Threads)
+    if(TARGET cJSON OR TARGET cjson)
+        target_link_libraries(test_cli_ev PRIVATE $<IF:$<TARGET_EXISTS:cJSON>,cJSON,cjson>)
+    elseif(AIRY_CJSON_LIBRARIES)
+        target_link_libraries(test_cli_ev PRIVATE ${AIRY_CJSON_LIBRARIES})
+    endif()
+    add_test(NAME cli_ev_frames COMMAND test_cli_ev)
+
     # 0.1.17 R5-G4：审批面（/pending 只读视图 + /approve 决议回传）端到端——
     # mock 网关承接出站派发，断言 tool.approve 的 request_id/decision 逐字
     # 抵达、本地自检不出站、pending 三形态解析容错。与 cli_gw_e2e 同策略
@@ -298,7 +332,7 @@ if(BUILD_TESTS)
         add_executable(test_cli_approval tests/test_cli_approval.c
                        tests/cli_test_globals.c
                        src/cmd/airy_cli_cmd_approval.c ${CLI_GW_SRCS}
-                       src/render/cli_render.c src/core/cli_dag.c
+                       src/render/cli_render.c src/core/cli_clock.c src/core/cli_dag.c
                        src/core/cli_term.c
                        src/core/cli_timeout.c src/core/cli_cfg.c)
         target_include_directories(test_cli_approval PRIVATE ${CLI_INC_DIRS})
@@ -327,7 +361,7 @@ if(BUILD_TESTS)
         add_executable(test_cli_session tests/test_cli_session.c
                        tests/cli_test_globals.c
                        src/chat/cli_chat_session.c src/chat/cli_chat_history.c
-                       ${CLI_GW_SRCS} src/render/cli_render.c
+                       ${CLI_GW_SRCS} src/render/cli_render.c src/core/cli_clock.c
                        src/core/cli_dag.c src/core/cli_term.c)
         target_include_directories(test_cli_session PRIVATE ${CLI_INC_DIRS})
         target_compile_definitions(test_cli_session PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
@@ -350,7 +384,7 @@ if(BUILD_TESTS)
     if(NOT WIN32)
         add_executable(test_cli_errdesc tests/test_cli_errdesc.c
                        tests/cli_test_globals.c
-                       ${CLI_GW_SRCS} src/render/cli_render.c
+                       ${CLI_GW_SRCS} src/render/cli_render.c src/core/cli_clock.c
                        src/core/cli_dag.c src/core/cli_term.c)
         target_include_directories(test_cli_errdesc PRIVATE ${CLI_INC_DIRS})
         target_compile_definitions(test_cli_errdesc PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
@@ -372,7 +406,7 @@ if(BUILD_TESTS)
     if(NOT WIN32)
         add_executable(test_cli_plan_empty tests/test_cli_plan_empty.c
                        tests/cli_test_globals.c
-                       ${CLI_GW_SRCS} src/render/cli_render.c
+                       ${CLI_GW_SRCS} src/render/cli_render.c src/core/cli_clock.c
                        src/core/cli_dag.c src/core/cli_term.c)
         target_include_directories(test_cli_plan_empty PRIVATE ${CLI_INC_DIRS})
         target_compile_definitions(test_cli_plan_empty PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
@@ -397,7 +431,7 @@ if(BUILD_TESTS)
         add_executable(test_cli_live tests/test_cli_live.c
                        tests/cli_test_globals.c
                        src/cmd/cli_live.c ${CLI_GW_SRCS}
-                       src/render/cli_render.c src/core/cli_dag.c
+                       src/render/cli_render.c src/core/cli_clock.c src/core/cli_dag.c
                        src/core/cli_term.c)
         target_include_directories(test_cli_live PRIVATE ${CLI_INC_DIRS})
         target_compile_definitions(test_cli_live PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)

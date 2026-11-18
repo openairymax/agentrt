@@ -32,6 +32,7 @@
 
 #include "cli_internal.h" /* 家族公共头：commons/平台/引擎/守护进程客户端面 */
 #include "cli_gw.h"       /* 架构约束：统一经 gateway 派发 */
+#include "cli_ev.h"       /* 0.1.21 D-15：事件流出口（--events ndjson） */
 #include "cli_live.h"     /* N4 会话存活：后端重启后提示并重建会话视图 */
 
 #include "airy_cli_pipeline.h"
@@ -73,6 +74,11 @@ int g_cli_tui_mode = 0;
 /* 会话恢复视图模式（--continue / --resume，0.1.17 R5-G5）：启动时读一次
  * mem.recent 装配 g_history_*，前端不落任何本地会话状态。 */
 int g_cli_resume_mode = 0;
+/* 事件流出口模式（--events ndjson，0.1.21 D-15）：stdout 只出 NDJSON 帧，
+ * 人类可读输出改道 stderr；进程生命周期由 cli_ev_run 接管。 */
+int g_cli_events_mode = 0;
+/* 事件模式静音人类可读输出（--quiet）：仅保留帧与 stderr 错误。 */
+int g_cli_quiet = 0;
 
 #if !defined(_WIN32)
 static void cli_sigint_handler(int sig)
@@ -470,6 +476,10 @@ int main(int argc, char *argv[])
     int parse_rc = cli_parse_args(argc, argv, &loop.prompt);
     if (parse_rc != 0)
         return parse_rc == 1 ? 0 : 1;
+    if (g_cli_events_mode) {
+        cli_out_route_err(1);
+        return cli_ev_run(loop.prompt);
+    }
     /* 0.1.17 R5-G6 入口唯一化：--tui 为 CLI 的一个模式——调起 agentrt-tui
      * 子进程并回传退出码；CLI 父进程不初始化终端（保持零终端改性），
      * TUI 异常退出仅报错，不做接力。R5-G5：--resume/--continue 原样转发，
