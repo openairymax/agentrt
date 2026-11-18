@@ -66,8 +66,9 @@ jobs:
       # Gate 3（安全扫描）外部工具（trivy/gitleaks/cppcheck）缺失时按 skip 处理，
       # 不构成硬依赖，故此处不安装，避免拉长流水线。
       # Gate 46（生态四模块契约）在 runner 侧执行 ecosystem 四守卫，硬依赖
-      #   PyYAML（prompts 注册表）、pytest（markets/skills）、aiohttp（skills）；
-      # 三者一律显式安装——依赖缺失时 Gate 46 fail-closed 判红，不做 skip。
+      #   PyYAML（prompts 注册表）、pytest（markets/skills）、aiohttp 与
+      #   pytest-asyncio（skills 的异步用例）；一律显式安装——依赖缺失时
+      #   Gate 46 fail-closed 判红，不做 skip。
       - name: Install gate dependencies
         run: |
           sudo apt-get update
@@ -76,7 +77,8 @@ jobs:
             libsqlite3-dev libcjson-dev libcurl4-openssl-dev \
             libssl-dev zlib1g-dev libzstd-dev \
             libmicrohttpd-dev libwebsockets-dev libevent-dev \
-            python3 python3-pip python3-yaml python3-pytest python3-aiohttp
+            python3 python3-pip python3-yaml python3-pytest \
+            python3-pytest-asyncio python3-aiohttp
           python3 -m pip install --quiet 'lizard==1.23.0'
 
       # 组装门禁数据集，对齐 quality-gate.sh 的 PROJECT_ROOT 布局契约：
