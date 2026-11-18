@@ -57,9 +57,13 @@ jobs:
       # 子模块指针先于装配验证可达性：release 检出按 gitlink 精确取 SHA，
       # 未推送的指针只会以 checkout "not our ref" 的形式暴露，日志中无编译
       # 错误可循。此处逐个 gitlink 查 GitHub 提交面，缺失即列出并判红。
+      # 用 GH_TOKEN 而非 GITHUB_TOKEN：后者只作用于本仓，公开子仓靠匿名读
+      # 恰好通过，闭源子仓（atoms）则恒 404——查的是「指针可达」却报成
+      # 「未发布」（run 44312572826 实证）。跨仓读权在 App token 上，构建腿
+      # 检出子仓用的也是它。
       - name: Assert submodule pins are published
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: bash .github/scripts/check-submodule-pins.sh
 
   # Linux x86-64：container ubuntu:20.04 保证 glibc 2.31 基线（覆盖
