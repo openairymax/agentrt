@@ -181,6 +181,29 @@ static cJSON *dag_plan_json(const airy_task_plan_t *plan, const char *task_input
     return root;
 }
 
+/* DR-1 蓝图回灌：把已受理的计划登记进 roadmap L2，使同构任务后续可命中
+ * 语义缓存。消费 plan_clone 所有权；注册失败只降低缓存命中率、不阻断执行，
+ * 故仅留 trace 不上抛错误。 */
+static void dag_absorb_plan(cJSON *plan_clone)
+{
+    if (!plan_clone)
+        return;
+    cJSON *params = cJSON_CreateObject();
+    if (!params) {
+        cJSON_Delete(plan_clone);
+        return;
+    }
+    cJSON_AddItemToObject(params, "plan", plan_clone);
+
+    int err = 0;
+    cJSON *root = dag_rpc("sched.absorb", params, 10000, &err);
+    if (!root) {
+        cli_trace("blueprint", "sched.absorb failed (err=%d): L2 not updated", err);
+        return;
+    }
+    cJSON_Delete(root);
+}
+
 airy_err_t cli_dag_submit_remote(const airy_task_plan_t *plan, const char *task_input,
                                  const char *workspace_dir, char **out_dag_id)
 {
@@ -198,6 +221,8 @@ airy_err_t cli_dag_submit_remote(const airy_task_plan_t *plan, const char *task_
         cJSON_Delete(dag_obj);
         return AIRY_ERR_OUT_OF_MEMORY;
     }
+    /* 提交后 dag_obj 归 RPC 消费，回灌需先留副本。 */
+    cJSON *absorb_obj = cJSON_Duplicate(dag_obj, 1);
     cJSON_AddItemToObject(params, "dag", dag_obj);
 
     /* 架构约束（2026-08-25）：统一经 gateway 派发（sched.dag_submit →
@@ -205,15 +230,22 @@ airy_err_t cli_dag_submit_remote(const airy_task_plan_t *plan, const char *task_
     int err = 0;
     cJSON *root = dag_rpc("sched.dag_submit", params, 30000, &err);
 
-    if (!root)
+    if (!root) {
+        cJSON_Delete(absorb_obj);
         return (airy_err_t)err;
+    }
 
     cJSON *did = cJSON_GetObjectItem(root, "dag_id");
     if (!cJSON_IsString(did) || !did->valuestring || !did->valuestring[0]) {
+        cJSON_Delete(absorb_obj);
         cJSON_Delete(root);
         return AIRY_ERR_STATE_ERROR;
     }
     *out_dag_id = AIRY_STRDUP(did->valuestring);
+    if (*out_dag_id)
+        dag_absorb_plan(absorb_obj);
+    else
+        cJSON_Delete(absorb_obj);
     cJSON_Delete(root);
     return *out_dag_id ? AIRY_EOK : AIRY_ERR_OUT_OF_MEMORY;
 }
