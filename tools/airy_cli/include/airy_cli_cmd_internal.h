@@ -15,11 +15,15 @@
 
 #include <stddef.h>
 
+#include "cli_timeout.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define CLI_RPC_TIMEOUT_MS 10000
+/* 管理 RPC 缺省档（0.1.21 D-8）：实际毫秒数经超时阶梯解析（--timeout >
+ * env > model.yaml > 缺省），不再各自写死 10s。 */
+#define CLI_RPC_TIMEOUT_MS cli_tmo_ms(CLI_TMO_RPC)
 
 typedef struct {
     const char *ns;
