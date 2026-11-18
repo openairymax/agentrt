@@ -18,12 +18,6 @@
 #include "cli_render.h"
 #include "platform.h"
 
-#include <cjson/cJSON.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-
 #ifdef _WIN32
 #include <io.h>
 #include <sys/stat.h>

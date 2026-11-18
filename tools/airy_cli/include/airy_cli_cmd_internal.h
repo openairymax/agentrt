@@ -14,6 +14,12 @@
 #define AIRY_CLI_CMD_INTERNALS_H
 
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#include <cjson/cJSON.h>
 
 #include "cli_timeout.h"
 
