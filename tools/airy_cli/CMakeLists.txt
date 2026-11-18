@@ -75,6 +75,8 @@ add_executable(airy_cli
     # 0.1.21 A-7：模型连接表自检视图（doctor 的 key 三态判据来源）
     src/cmd/cli_models.c
     # 0.1.21 D-6：本地模型注册表 list/use/remove（与 airy-local 同数据面）
+    src/model/cli_model_store.c
+    src/model/cli_model_yaml.c
     src/model/cli_model_reg.c
     # 0.1.21 D-2：密钥装配引导（写 secrets.env 后经 llm.probe 立即验证）
     src/cmd/cli_key.c
@@ -471,7 +473,8 @@ if(BUILD_TESTS)
     # --force 生效，以及声明片段只改本实例键（第二实例声明保留）。
     if(NOT WIN32)
         add_executable(test_cli_model_reg tests/test_cli_model_reg.c
-                       tests/cli_test_globals.c src/model/cli_model_reg.c)
+                       tests/cli_test_globals.c src/model/cli_model_store.c
+                       src/model/cli_model_yaml.c src/model/cli_model_reg.c)
         target_include_directories(test_cli_model_reg PRIVATE ${CLI_INC_DIRS})
         target_compile_definitions(test_cli_model_reg PRIVATE AIRY_COMPLIANCE_IMPL)
         target_link_libraries(test_cli_model_reg PRIVATE airy_coreloopthree
