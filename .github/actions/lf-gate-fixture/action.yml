@@ -170,7 +170,9 @@ inputs:
     # 6d29323：gateway_biz 的网关默认超时改由预算树 server 层给出（0.1.21
     # C-21：超时统一档位表，provider ≤ server ≤ client）。旧 pin a562df4 的
     # 业务面仍写死字面量，L1 判「预算树取料链断裂」，本地绿而 CI 红。
-    default: '6d293230e81beeaf1c6ff786e571d8bbd7659101'
+    # d1ce79f：cupolas/cognition 三处测试去掉 msvc 不支持的 unsetenv 与
+    # 未导出的 _A_SUBDIR，Windows 腿的测试目标才可链接。
+    default: 'd1ce79f0c03b7ae164743828c2e8d81be67994b3'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
