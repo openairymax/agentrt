@@ -117,7 +117,9 @@ inputs:
     # header-shadow / file-length / fanout / ceiling / budget 六账按实测重登记，
     # Gate 46 预检补 pytest-asyncio 探针。不 bump 则 CI 仍按旧基线判红：
     # G30 报「命令面超带」、G46 在守卫内报 ImportError，红因皆指不到真因。
-    default: 'ce23a5a935fd2cdb7d076525eb353abbea045d88'
+    # 5024917：三表对齐的实测收敛（facade 78592 → 78581、tool_d 上限 17127），
+    # 旧 pin 下 g42 判「pin 滞后」、loc-ceiling 判「未登记 +3」，发行腿必红。
+    default: '50249179e38449e947891e857788a9f9458716c8'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
