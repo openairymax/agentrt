@@ -64,7 +64,7 @@ static void ev_push(unsigned seq, uint64_t ts, const char *type,
                     const char *pl, size_t plen, int tr)
 {
     ev_frame_t *f = &g_ev.ring[g_ev.ring_head];
-    char stub[96];
+    char vbuf[96];
 
     AIRY_FREE(f->pl);
     f->pl = NULL;
@@ -73,10 +73,10 @@ static void ev_push(unsigned seq, uint64_t ts, const char *type,
     f->trunc = tr;
     AIRY_STRNCPY_TERM(f->type, type, sizeof(f->type));
     if (plen > CLI_EV_KEEP) {
-        plen = (size_t)snprintf(stub, sizeof(stub),
+        plen = (size_t)snprintf(vbuf, sizeof(vbuf),
                                 "{\"truncated\":true,\"bytes\":%lu}",
                                 (unsigned long)plen);
-        pl = stub;
+        pl = vbuf;
         f->trunc = 1;
     }
     f->plen = plen;
