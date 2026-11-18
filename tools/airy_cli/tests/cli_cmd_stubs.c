@@ -3,7 +3,7 @@
 
 /**
  * @file cli_cmd_stubs.c
- * @brief CLI 命令分发测试的命令实现桩：CLI_COMMANDS 表引用的 33 个 cmd_*。
+ * @brief CLI 命令分发测试的命令实现桩：CLI_COMMANDS 表引用的 34 个 cmd_*。
  *
  * 分发测试（test_cli_cmdline.c）只关心 cli_dispatch_command 的匹配行为，
  * 不便把 cli_cmds.c 的整棵依赖树（render/RPC/daemon 客户端）拖进测试
@@ -101,6 +101,7 @@ CMD_STUB(cmd_a2a)
 CMD_STUB(cmd_metrics)
 CMD_STUB(cmd_alerts)
 CMD_STUB(cmd_tasks)
+CMD_STUB(cmd_jobs)
 CMD_STUB(cmd_info)
 CMD_STUB(cmd_notify)
 CMD_STUB(cmd_vault)
