@@ -1,5 +1,6 @@
 airy_assert_fail
 airy_assert_fail_msg
+airy_build_id
 airy_build_info
 airy_checkpoint_cleanup
 airy_checkpoint_create
@@ -66,6 +67,8 @@ airy_generate_session_id
 airy_generate_task_id
 airy_generate_uuid
 airy_get_assert_handler
+airy_gpu_class
+airy_gpu_probe
 airy_health_check_register
 airy_health_check_run
 airy_health_export_status
@@ -341,6 +344,7 @@ cb_reset
 cb_set_failover_config
 cb_state_to_string
 clock_gettime
+cog_grad_on
 gateway_get_config
 gateway_service_create
 gateway_service_destroy
