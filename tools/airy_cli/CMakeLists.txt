@@ -27,13 +27,17 @@ message(STATUS "airy_cli version (SSoT): ${AIRY_CLI_VERSION}")
 # 源/头分离布局（2026-08-19）：include/ 公共头，src/ 实现
 # 2026-08-27 目录原子化：src/ 按功能域组织
 #   core/ 入口与编排管线 · cmd/ 命令面 · chat/ 对话会话 · tui/ 终端界面 · render/ 渲染与展示
+#   net/ 网关传输与事件流 · model/ 本地模型注册表
+#   cmd/ 只放命令面向用户的编排（解析、视图、文案），传输与数据面实现
+#   归 net/ 与 model/——命令面行数带（G30 T7）按 cmd+core+chat 统计，把
+#   协议实现堆在 cmd/ 会挤占命令面的可读额度。
 
 # 网关客户端 SSoT（0.1.19 §452 分层：传输在 cli_gw.c，JSON-RPC 在
 # cli_gw_rpc.c，两者以 include/cli_gw_int.h 为唯一契约）。所有引用网关
 # 客户端的可执行目标一律展开此变量，禁止只链其中一半。
 set(CLI_GW_SRCS
     src/cmd/cli_gw.c
-    src/cmd/cli_gw_rpc.c
+    src/net/cli_gw_rpc.c
 )
 
 # 0.1.21 D-15 事件流出口：帧编码/桥接/输入面/会话循环 + SSE 传输。
@@ -45,7 +49,7 @@ set(CLI_EV_SRCS
     src/core/cli_ev_bridge.c
     src/core/cli_ev_in.c
     src/core/cli_ev_turn.c
-    src/cmd/cli_gw_sse.c
+    src/net/cli_gw_sse.c
 )
 
 add_executable(airy_cli
@@ -71,7 +75,7 @@ add_executable(airy_cli
     # 0.1.21 A-7：模型连接表自检视图（doctor 的 key 三态判据来源）
     src/cmd/cli_models.c
     # 0.1.21 D-6：本地模型注册表 list/use/remove（与 airy-local 同数据面）
-    src/cmd/cli_model_reg.c
+    src/model/cli_model_reg.c
     # 0.1.21 D-2：密钥装配引导（写 secrets.env 后经 llm.probe 立即验证）
     src/cmd/cli_key.c
     # 0.1.21 B-3：加速器能力快照（doctor 的 GPU 段与降级原因来源）
@@ -191,6 +195,8 @@ set(CLI_INC_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/chat
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tui
     ${CMAKE_CURRENT_SOURCE_DIR}/src/render
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/net
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/model
     ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/coreloopthree/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../atoms/taskflow/include
     # 0.1.16 B2/B4（include 面收口）：corekern include 路径已摘除——CLI
@@ -465,7 +471,7 @@ if(BUILD_TESTS)
     # --force 生效，以及声明片段只改本实例键（第二实例声明保留）。
     if(NOT WIN32)
         add_executable(test_cli_model_reg tests/test_cli_model_reg.c
-                       tests/cli_test_globals.c src/cmd/cli_model_reg.c)
+                       tests/cli_test_globals.c src/model/cli_model_reg.c)
         target_include_directories(test_cli_model_reg PRIVATE ${CLI_INC_DIRS})
         target_compile_definitions(test_cli_model_reg PRIVATE AIRY_COMPLIANCE_IMPL)
         target_link_libraries(test_cli_model_reg PRIVATE airy_coreloopthree
