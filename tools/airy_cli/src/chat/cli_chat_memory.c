@@ -64,7 +64,7 @@ static void seg_put(char *buf, size_t cap, size_t *off, const char *fmt, ...)
 
 /* 2.2.2.1：无信息量寒暄启发式——此类对话不应进记忆，避免垃圾累积
  * 污染语义检索（匹配时返回 1）。仅作写入门槛，不做强制语义判断。 */
-static int cli_chat_is_greeting(const char *s)
+static int cli_is_greeting(const char *s)
 {
     if (!s)
         return 0;
@@ -172,7 +172,7 @@ static int cli_chat_mem_record_gw(const char *input, const char *reply)
     if (!input || !input[0] || !reply || !reply[0])
         return -1;
     /* 寒暄/无信息量回复不写记忆（避免垃圾条目累积抬高检索噪声） */
-    if (strlen(reply) < 8 || cli_chat_is_greeting(input))
+    if (strlen(reply) < 8 || cli_is_greeting(input))
         return 0; /* 有意跳过，非失败 */
 
     char content[1800];
