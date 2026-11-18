@@ -150,6 +150,25 @@ void tui_get_size(cli_tui_t *t);
 void tui_write_literal(const char *s);
 void tui_clear_line(void);
 
+/* 字节缓冲扩容（input/complete/history 三域共用）：need 含终止符。
+ * 返回 0 表示可用，-1 表示扩容失败且原缓冲未动。 */
+static inline int tui_buf_grow(char **buf, size_t *cap, size_t need)
+{
+    size_t nc = *cap ? *cap : 256;
+    char *g;
+
+    while (nc < need)
+        nc *= 2;
+    if (nc <= *cap)
+        return 0;
+    g = (char *)AIRY_REALLOC(*buf, nc);
+    if (!g)
+        return -1;
+    *buf = g;
+    *cap = nc;
+    return 0;
+}
+
 /* keys 域（tui_keys.c） */
 int tui_wait_byte(cli_tui_t *t, char *out, int timeout_ms, int *eof);
 int tui_read_key(cli_tui_t *t, int timeout_ms, int *eof);
