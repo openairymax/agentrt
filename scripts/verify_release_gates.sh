@@ -1365,6 +1365,7 @@ _v2_engine="$ROOT/daemons/agent_d/src/run/agent_run_exec.c"
 _v2_task="$TUI_SRC/src/app/task.rs"
 _v2_block="$TUI_SRC/src/panels/chat/block.rs"
 _v2_mem="$TUI_SRC/src/memory.rs"
+_v2_mem_tests="$TUI_SRC/src/memory/tests.rs"
 _v2_sess="$TUI_SRC/src/app/session.rs"
 _v2_keys="$TUI_SRC/src/keys"
 _v2_panel="$TUI_SRC/src/app/panel.rs"
@@ -1381,7 +1382,8 @@ fi
 
 if grep -qF 'fn push(&mut self, role: &str, content: &str, tags: &str)' "$_v2_mem" \
     && grep -qF '不再提供携带思考链' "$_v2_mem" \
-    && grep -qF 'fn push_never_records_reasoning()' "$_v2_mem" \
+    && { grep -qF 'fn push_never_records_reasoning()' "$_v2_mem" 2>/dev/null \
+         || grep -qF 'fn push_never_records_reasoning()' "$_v2_mem_tests" 2>/dev/null; } \
     && grep -qF '恢复会话不得回灌思考链原文' "$_v2_sess" \
     && ! grep -q 'rec\.reasoning' "$_v2_sess"; then
     ok "V2.2 V4.2 思考链不落长期记忆且恢复不回灌（写入面无 reasoning 入参 + 恢复仅取 content）"
@@ -2164,6 +2166,28 @@ case $? in
     2) skip "SC1 缺 agent-linux kernel UAPI 源树（AIRY_SC_HEADER_SRC 未指向），跨仓比对跳过" ;;
     *) bad "SC1 [SC] 契约头漂移:$(sed -n 's/^  \[FAIL\] //p' "$_sc_log" | tr '\n' ' ')" ;;
 esac
+
+section "TD" "D-14 TUI 执行面收口（判据①零 agent.run / 判据⑤布局不存正文）"
+
+_TD_STORE="$TUI_SRC/src/app/session_store.rs"
+if [ -z "$TUI_SRC" ] || [ ! -d "$TUI_SRC/src" ]; then
+    skip "TD0 TUI 源树缺失（AIRY_GATE_TUI_SRC 未指向），D-14 执行面判据跳过"
+else
+    _td_run="$(grep -rn -F '"agent.run"' "$TUI_SRC/src" --include='*.rs' 2>/dev/null || true)"
+    if [ -z "$_td_run" ]; then
+        ok "TD1 TUI 零 agent.run（执行语义唯一入口 task.submit，判据①）"
+    else
+        bad "TD1 TUI 重新直发 agent.run:$(printf '\n%s' "$_td_run")"
+    fi
+
+    _td_dto="$(sed -n '/^struct TabDto {/,/^}/p' "$_TD_STORE" 2>/dev/null)"
+    if [ -n "$_td_dto" ] && printf '%s\n' "$_td_dto" | grep -q 'conv' \
+        && ! printf '%s\n' "$_td_dto" | grep -q 'messages'; then
+        ok "TD2 sessions.json 只存布局（TabDto 仅 title/conv，正文权威在 mem_d，判据⑤）"
+    else
+        bad "TD2 会话布局回退为存正文（session_store.rs 缺失或 TabDto 重新携带 messages）"
+    fi
+fi
 
 printf '\n门禁汇总: PASS=%d FAIL=%d\n' "$PASS" "$FAIL"
 if [ "$FAIL" -gt 0 ]; then
