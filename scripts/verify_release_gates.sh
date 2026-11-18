@@ -392,7 +392,7 @@ fi
 section "F" "9.7/S-02 长任务可取消 + 超时可诊断（稳定问题：Ctrl+C 假死/超时黑箱）"
 
 GW="$CLI/src/cmd/cli_gw.c"
-GW_RPC="$CLI/src/cmd/cli_gw_rpc.c"
+GW_RPC="$CLI/src/net/cli_gw_rpc.c"
 GW_INT="$CLI/include/cli_gw_int.h"
 if grep -Fq '#define CLI_GW_EXCH_CANCELED' "$GW_INT" \
    && grep -Fq '#define CLI_GW_EXCH_TIMEOUT' "$GW_INT"; then
