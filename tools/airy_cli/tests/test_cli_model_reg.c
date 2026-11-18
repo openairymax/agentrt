@@ -193,10 +193,15 @@ static void t_use(void)
     CHECK(run("use", "a", NULL, NULL) == 0, "use a rc");
     CHECK(has(reg, "active_model=a"), "active_model written");
     CHECK(has(frag, "OTHER_INSTANCE=keep"), "other instance key kept");
-    CHECK(has(frag, "AIRYRT_MANAGED_NAME=llama_server"), "decl name");
+    CHECK(has(frag, "AIRYRT_MANAGED_NAME=local_llm"), "decl name default");
     CHECK(has(frag, "AIRYRT_MANAGED_EP=tcp:11435"), "decl ep");
     CHECK(has(frag, "--ctx-size 2048"), "decl args from registry");
     CHECK(has(frag, "AIRYRT_MANAGED_MEM=512"), "decl mem");
+
+    /* 实例名归政策层：已声明则沿用，不被 CLI 覆盖。 */
+    wfile(frag, "OTHER_INSTANCE=keep\nAIRYRT_MANAGED_NAME=llama_server\n");
+    CHECK(run("use", "a", NULL, NULL) == 0, "use a again rc");
+    CHECK(has(frag, "AIRYRT_MANAGED_NAME=llama_server"), "policy name kept");
 
     CHECK(run("use", "b", NULL, NULL) == 2, "use b missing asset rc");
     CHECK(has(reg, "active_model=a"), "active unchanged after failed use");
