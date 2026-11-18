@@ -51,6 +51,15 @@ jobs:
           AIRY_COMMIT_REPO: ${{ github.workspace }}
         run: bash "$RUNNER_TEMP/airy-tools/scripts/ci/quality/gates/g47-commit-audit.sh"
 
+      # R6 反查要读基线侧各子模块 gitlink 指向的头文件：gitlink 是独立仓，
+      # 主仓检出不含其内容，未初始化时基线不可读、新增符号无法判定（以环境
+      # 错误 exit 2 判红）。初始化按 agentrt 树钉定的 SHA 检出叶子子仓，
+      # atoms 为 private，需 GH_TOKEN。
+      - name: Init submodules (baseline reads)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh
+
       - name: Test debt (R6) and ledger
         env:
           G48_REPO: ${{ github.workspace }}
