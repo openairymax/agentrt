@@ -640,6 +640,54 @@ static void test_fail_line_kinds(void)
     CHECK(cli_gw_fail_line(NULL, none, sizeof(none)) == 0, "fail_line null data returns 0");
 }
 
+/* D-10（0.1.21）：结构化失败载荷（failure 平铺在 error.data 根）四类归因
+ * 两两可区分；预算/影响节点/下一步都可读；未知原因原样透出，不被吞。 */
+static void test_fail_line_structured(void)
+{
+    static const struct {
+        const char *data;
+        int err;
+        const char *needle;
+    } cases[] = {
+        { "{\"origin\":\"agent_d\",\"code\":-110,\"reason\":\"budget_exhausted\","
+          "\"retryable\":false,\"budget_used\":8,\"budget_total\":8,"
+          "\"affected_node\":\"n3\",\"next_action\":\"resume\"}",
+          -110, "轮次预算耗尽" },
+        { "{\"origin\":\"agent_d\",\"code\":-5,\"reason\":\"tool_fuse\","
+          "\"retryable\":true,\"next_action\":\"retry\"}",
+          -5, "工具连续失败已熔断" },
+        { "{\"origin\":\"agent_d\",\"code\":-13,\"reason\":\"approval_denied\","
+          "\"retryable\":false,\"next_action\":\"inspect\"}",
+          -13, "操作未获审批" },
+        { "{\"origin\":\"agent_d\",\"code\":-111,\"reason\":\"provider_unreachable\","
+          "\"retryable\":true,\"next_action\":\"retry\"}",
+          -111, "模型服务不可达" },
+    };
+    char lines[4][320];
+    size_t n = sizeof(cases) / sizeof(cases[0]);
+    for (size_t i = 0; i < n; i++) {
+        lines[i][0] = '\0';
+        int rc = cli_gw_fail_line(cases[i].data, lines[i], sizeof(lines[i]));
+        CHECK(rc == cases[i].err, "structured fail keeps daemon code");
+        CHECK(strstr(lines[i], cases[i].needle) != NULL, "structured fail names the reason");
+        CHECK(strstr(lines[i], "下一步") != NULL, "structured fail states next action");
+    }
+    CHECK(strstr(lines[0], "预算 8/8") != NULL, "budget shown as used/total");
+    CHECK(strstr(lines[0], "影响节点 n3") != NULL, "affected node shown");
+    CHECK(strstr(lines[0], "continue") != NULL, "resume maps to continue hint");
+    CHECK(strstr(lines[1], "原样重试") != NULL, "retry maps to retry hint");
+    for (size_t i = 0; i < n; i++) {
+        for (size_t j = i + 1; j < n; j++)
+            CHECK(strcmp(lines[i], lines[j]) != 0, "structured reasons are distinguishable");
+    }
+
+    /* 新原因上线：CLI 不认识也必须原样透出，不能退化成空话 */
+    char fut[320] = "";
+    int rc = cli_gw_fail_line("{\"reason\":\"future_reason\",\"code\":-1}", fut, sizeof(fut));
+    CHECK(rc == -1, "unknown reason keeps code");
+    CHECK(strstr(fut, "future_reason") != NULL, "unknown reason passes through verbatim");
+}
+
 /* -32603 包装码下的端到端：错误码保真 + 默认一行 + --verbose 附原始 data。 */
 static void test_call_errdata(void)
 {
@@ -719,6 +767,7 @@ int main(void)
     test_call_renewal();
     test_call_canceled();
     test_fail_line_kinds();
+    test_fail_line_structured();
     test_call_errdata();
     test_health_online();
     test_health_offline();
