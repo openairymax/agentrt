@@ -17,7 +17,9 @@
 #include "cli_internal.h"
 
 #include "airy_defaults.h"
-#include "cli_gw.h" /* 架构约束 2026-08-25：统一经 gateway 派发 */
+#include "cli_cfg.h"    /* 0.1.21 D-8：model.yaml 子集读取已抽到 cfg 模块 */
+#include "cli_gw.h"     /* 架构约束 2026-08-25：统一经 gateway 派发 */
+#include "cli_timeout.h" /* 0.1.21 D-8：超时阶梯单一事实源 */
 
 #include "cli_prelude.h"
 
@@ -69,7 +71,9 @@ static cJSON *cli_think_rpc_round(const char *prompt, const char *gccp_answers, 
     /* 架构约束（2026-08-25）：统一经 gateway 派发（think.process →
      * gateway → SYS_SVC_CALL → think_d），禁止直连 think.sock。 */
     char *rpc_result = NULL;
-    int rc = cli_gw_call("think.process", params_json, 120000, &rpc_result);
+    /* D-8：think 档由超时阶梯给出（outer(预算树 think 层)），不再写死。 */
+    int rc = cli_gw_call("think.process", params_json,
+                         (int)cli_think_timeout_ms(), &rpc_result);
     AIRY_FREE(params_json);
     if (rc != AIRY_SUCCESS || !rpc_result) {
         AIRY_FREE(rpc_result);
@@ -236,112 +240,6 @@ airy_err_t cli_think_process_remote(const char *input, airy_task_plan_t **out_pl
 
 /* ==================== 双思考三模型配置统一读取 ==================== */
 
-/* 原地去行尾 CR/LF，跳过行首空白，再把 "key: value" 切成键（拷入 kbuf）
- * 与值起点；非 "key:" 行（空行、无冒号、键为空或超长）返回 -1。 */
-static int yaml_kv(char *line, char *kbuf, size_t kcap, const char **val)
-{
-    size_t len = strlen(line);
-
-    while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r'))
-        line[--len] = '\0';
-    const char *p = line;
-    while (*p == ' ' || *p == '\t')
-        p++;
-    const char *ks = p;
-    while (*p && *p != ':' && *p != ' ' && *p != '\t')
-        p++;
-    size_t kl = (size_t)(p - ks);
-    if (*p != ':' || kl == 0 || kl >= kcap)
-        return -1;
-    AIRY_MEMCPY(kbuf, ks, kl);
-    kbuf[kl] = '\0';
-    const char *v = p + 1;
-    while (*v == ' ' || *v == '\t')
-        v++;
-    *val = v;
-    return 0;
-}
-
-/* 取标量值：引号包裹截到闭引号；无引号截到空白、注释符或行尾
- * （timeout_ms: 120000 等数字键）。 */
-static void yaml_scalar(const char *after, char *out, size_t cap)
-{
-    const char *v;
-    size_t vl = 0;
-
-    out[0] = '\0';
-    if (*after == '"') {
-        v = after + 1;
-        while (v[vl] && v[vl] != '"' && vl + 1 < cap)
-            vl++;
-    } else {
-        v = after;
-        while (v[vl] && v[vl] != ' ' && v[vl] != '\t' && v[vl] != '#' && vl + 1 < cap)
-            vl++;
-    }
-    AIRY_MEMCPY(out, v, vl);
-    out[vl] = '\0';
-}
-
-/* 从 model.yaml 提取标量字段（BAN 合规：手写解析，禁 sscanf）。
- *
- * 结构约定（ecosystem/manager/model/model.yaml，C-19 起 slots 为单一
- * 事实源；think.*_model 三键已废弃，仅作兼容回落）：
- *   llm:
- *     model: "your-model-id"
- *   slots:
- *     t2: ""
- *     t1f: ""
- *     t1p: ""
- * 无缩进段标题（"name:"）切换当前段；目标段内缩进的 "key: \"value\""
- * 行命中即返回。返回 0 找到（含空串），-1 未找到/文件不可读。 */
-static int cli_think_cfg_yaml_get(const char *path, const char *section,
-                                  const char *key, char *out, size_t cap)
-{
-    if (!path || !section || !key || !out || cap == 0)
-        return -1;
-    out[0] = '\0';
-
-    FILE *f = fopen(path, "r");
-    if (!f)
-        return -1;
-
-    char line[512];
-    char cur[32] = "";
-    char kbuf[64];
-    int found = 0;
-    while (fgets(line, sizeof(line), f)) {
-        const char *after = NULL;
-
-        if (yaml_kv(line, kbuf, sizeof(kbuf), &after) != 0)
-            continue;
-        if (*after == '\0') {
-            /* 段标题行：key:（后无其他非空白） */
-            if (strlen(kbuf) < sizeof(cur))
-                AIRY_STRNCPY_TERM(cur, kbuf, sizeof(cur));
-            continue;
-        }
-        if (strcmp(cur, section) != 0 || strcmp(key, kbuf) != 0)
-            continue;
-        yaml_scalar(after, out, cap);
-        found = 1;
-        break;
-    }
-    fclose(f);
-    return found ? 0 : -1;
-}
-
-/* 定位 model.yaml：AIRY_MODEL_CONFIG > $AIRY_HOME/config/model.yaml */
-static void cli_think_cfg_path(char *path, size_t cap)
-{
-    const char *cfg = getenv("AIRY_MODEL_CONFIG");
-    if (cfg && cfg[0]) {
-        snprintf(path, cap, "%s", cfg);
-        return;
-    }
-    snprintf(path, cap, "%s/model.yaml", airy_config_dir());
-}
-
 /* env 读取仪式（AIRY_MODEL_T2/T1F/T1P）：清零后逐项覆盖非空值。
  * 两配置读取路径（load/explicit）共用，避免逐字重复。 */
 static void cli_think_env(char *t2, size_t t2c, char *t1f, size_t t1fc,
@@ -381,31 +279,31 @@ void cli_think_cfg_load(char *t2, size_t t2c, char *t1f, size_t t1fc,
         return;
 
     char path[AIRY_PATH_MAX];
-    cli_think_cfg_path(path, sizeof(path));
+    cli_cfg_path(path, sizeof(path));
 
     if (t2[0] == '\0')
-        cli_think_cfg_yaml_get(path, "slots", "t2", t2, t2c);
+        cli_cfg_yaml_get(path, "slots", "t2", t2, t2c);
     if (t1f[0] == '\0')
-        cli_think_cfg_yaml_get(path, "slots", "t1f", t1f, t1fc);
+        cli_cfg_yaml_get(path, "slots", "t1f", t1f, t1fc);
     if (t1p[0] == '\0')
-        cli_think_cfg_yaml_get(path, "slots", "t1p", t1p, t1pc);
+        cli_cfg_yaml_get(path, "slots", "t1p", t1p, t1pc);
 
     /* 兼容窗口：slots 未覆盖时回落废弃 think.*_model（think_d 侧同源
      * 回落并告警，CLI 只读展示不再提示第二次）。 */
     if (t2[0] == '\0')
-        cli_think_cfg_yaml_get(path, "think", "think2_slow_model", t2, t2c);
+        cli_cfg_yaml_get(path, "think", "think2_slow_model", t2, t2c);
     if (t1f[0] == '\0')
-        cli_think_cfg_yaml_get(path, "think", "think1_fast_model", t1f, t1fc);
+        cli_cfg_yaml_get(path, "think", "think1_fast_model", t1f, t1fc);
     if (t1p[0] == '\0')
-        cli_think_cfg_yaml_get(path, "think", "think1_prof_model", t1p, t1pc);
+        cli_cfg_yaml_get(path, "think", "think1_prof_model", t1p, t1pc);
 
     /* think 段留空 = 默认模型（v2：顶层 default_model 或 llm.model） */
     if (t2[0] && t1f[0] && t1p[0])
         return;
     char def_model[128] = "";
-    cli_think_cfg_yaml_get(path, "llm", "model", def_model, sizeof(def_model));
+    cli_cfg_yaml_get(path, "llm", "model", def_model, sizeof(def_model));
     if (def_model[0] == '\0')
-        cli_think_cfg_yaml_get(path, "", "default_model", def_model, sizeof(def_model));
+        cli_cfg_yaml_get(path, "", "default_model", def_model, sizeof(def_model));
     if (def_model[0]) {
         if (t2[0] == '\0')
             snprintf(t2, t2c, "%s", def_model);
@@ -417,31 +315,10 @@ void cli_think_cfg_load(char *t2, size_t t2c, char *t1f, size_t t1fc,
 }
 
 /* ── /orch 等待预算（T-19）────────────────────────────────────────── */
-/* 与 think_d 服务端同链对齐（svc.c 同优先级）：env AIRY_THINK_TIMEOUT_MS
- * > model.yaml [think] timeout_ms > commons SSoT 缺省。返回预算量子，
- * /orch 续期轮询以此为单轮额度。手写十进制解析（BAN 禁 sscanf）。 */
-static long long cli_dec_ms(const char *s)
-{
-    long long v = 0;
-    const char *p;
-
-    if (!s)
-        return 0;
-    for (p = s; *p >= '0' && *p <= '9'; p++)
-        v = v * 10 + (*p - '0');
-    return (p > s && v > 0 && v <= 0x7FFFFFFF) ? v : 0;
-}
-
+/* D-8（0.1.21）：解析与钳制统一由 cli_timeout 阶梯承担（think 档 =
+ * outer(think 层)，env AIRY_THINK_TIMEOUT_MS / model.yaml [think]
+ * timeout_ms 仍按原优先级生效）。此处保留原签名供 /orch 等调用方。 */
 uint32_t cli_think_timeout_ms(void)
 {
-    char path[AIRY_PATH_MAX];
-    char val[32];
-    long long v = cli_dec_ms(getenv("AIRY_THINK_TIMEOUT_MS"));
-
-    if (v <= 0) {
-        cli_think_cfg_path(path, sizeof(path));
-        if (cli_think_cfg_yaml_get(path, "think", "timeout_ms", val, sizeof(val)) == 0)
-            v = cli_dec_ms(val);
-    }
-    return (uint32_t)(v > 0 ? v : AIRY_THINK_TIMEOUT_DEFAULT_MS);
+    return (uint32_t)cli_tmo_ms(CLI_TMO_THINK);
 }

@@ -188,7 +188,10 @@ void cli_rpc_print(const char *ns, const char *method, const char *params_json)
     char *result = NULL;
     char full_method[160];
     snprintf(full_method, sizeof(full_method), "%s.%s", ns, method);
-    int rc = cli_gw_call(full_method, params_json, CLI_RPC_TIMEOUT_MS, &result);
+    int tmo_ms = cli_tmo_method(full_method);
+    /* D-8：打印实际生效值（--timeout/env/model.yaml/服务端下限均已解析）。 */
+    cli_trace("rpc", "%s timeout=%dms", full_method, tmo_ms);
+    int rc = cli_gw_call(full_method, params_json, tmo_ms, &result);
     if (rc != 0 || !result) {
         char line[160];
         snprintf(line, sizeof(line), "%s.%s 调用失败：%s", ns, method, cli_err_desc(rc));
@@ -207,11 +210,52 @@ void cli_rpc_print(const char *ns, const char *method, const char *params_json)
 
 /* ==================== /rpc + /daemons ==================== */
 
+/* /rpc 尾部 "--timeout <秒>"（0.1.21 D-8）：摘出覆盖值并返回毫秒，剩余
+ * 文本去掉该后缀作为 JSON 参数。未出现返回 0；缺值/非法返回 -1。 */
+static int rpc_timeout_arg(const char *in, char *out, size_t cap)
+{
+    const char *p = in;
+    const char *tail = NULL;
+    int sec = 0;
+    size_t n;
+
+    while ((p = strstr(p, "--timeout")) != NULL) {
+        if (p == in || p[-1] == ' ' || p[-1] == '\t')
+            tail = p;
+        p += 9;
+    }
+    if (!tail)
+        return 0;
+    p = tail + 9;
+    while (*p == ' ' || *p == '\t')
+        p++;
+    if (*p < '0' || *p > '9')
+        return -1;
+    while (*p >= '0' && *p <= '9') {
+        sec = sec * 10 + (*p - '0');
+        if (sec > 86400)
+            return -1;
+        p++;
+    }
+    while (*p == ' ' || *p == '\t')
+        p++;
+    if (sec <= 0 || *p != '\0')
+        return -1;
+    n = (size_t)(tail - in);
+    while (n > 0 && (in[n - 1] == ' ' || in[n - 1] == '\t'))
+        n--;
+    if (n + 1 > cap)
+        return -1;
+    AIRY_MEMCPY(out, in, n);
+    out[n] = '\0';
+    return sec * 1000;
+}
+
 int cmd_rpc(const char *arg, void *ctx)
 {
     (void)ctx;
     if (!arg || arg[0] == '\0') {
-        cli_print_status("Sub Agent:usage", "/rpc <ns>.<method> [json参数]");
+        cli_print_status("Sub Agent:usage", "/rpc <ns>.<method> [json参数] [--timeout 秒]");
         cli_outf("    例: /rpc mem.search {\"query\":\"hello\"}\n");
         cli_outf("        /rpc cupolas.check_permission {\"agent_id\":\"a\",\"action\":\"read\","
                "\"resource\":\"fs:///tmp/x\"}\n");
@@ -244,9 +288,23 @@ int cmd_rpc(const char *arg, void *ctx)
     method[mlen] = '\0';
 
     const char *params = NULL;
-    if (rest[mlen] == ' ') params = rest + mlen + 1;
+    char params_buf[4096];
+    int tmo_ms = 0;
+    if (rest[mlen] == ' ') {
+        tmo_ms = rpc_timeout_arg(rest + mlen + 1, params_buf, sizeof(params_buf));
+        if (tmo_ms < 0) {
+            cli_print_line("Sub Agent:用法", "--timeout 需要 1..86400 的秒数");
+            return 0;
+        }
+        params = params_buf[0] ? params_buf : NULL;
+    }
 
+    /* D-8：尾部 --timeout 对本次调用生效，结束后清除，避免污染后续命令。 */
+    if (tmo_ms > 0)
+        cli_tmo_set(tmo_ms);
     cli_rpc_print(ns_resolved, method, params);
+    if (tmo_ms > 0)
+        cli_tmo_set(0);
     return 0;
 }
 
