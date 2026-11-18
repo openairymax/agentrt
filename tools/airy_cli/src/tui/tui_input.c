@@ -16,16 +16,8 @@
 void tui_input_append(cli_tui_t *t, char c)
 {
     t->tab_active = 0; /* 编辑输入即离开补全模式 */
-    if (t->input_len + 2 > t->input_cap) {
-        size_t new_cap = t->input_cap ? t->input_cap * 2 : 256;
-        while (new_cap < t->input_len + 2)
-            new_cap *= 2;
-        char *grown = (char *)AIRY_REALLOC(t->input, new_cap);
-        if (!grown)
-            return;
-        t->input = grown;
-        t->input_cap = new_cap;
-    }
+    if (tui_buf_grow(&t->input, &t->input_cap, t->input_len + 2) != 0)
+        return;
     /* Insert at the edit position (mid-line typing) instead of appending,
      * so Ctrl+A / Left-arrow editing works before committing. */
     if (t->input_col >= t->input_len) {

@@ -23,16 +23,8 @@
 static void tui_tab_replace(cli_tui_t *t, size_t tok_start, size_t tok_len,
                             const char *text, size_t tlen)
 {
-    if (tok_start + tlen + 2 > t->input_cap) {
-        size_t new_cap = t->input_cap ? t->input_cap * 2 : 256;
-        while (new_cap < tok_start + tlen + 2)
-            new_cap *= 2;
-        char *grown = (char *)AIRY_REALLOC(t->input, new_cap);
-        if (!grown)
-            return;
-        t->input = grown;
-        t->input_cap = new_cap;
-    }
+    if (tui_buf_grow(&t->input, &t->input_cap, tok_start + tlen + 2) != 0)
+        return;
     AIRY_MEMMOVE(t->input + tok_start + tlen, t->input + tok_start + tok_len,
                  t->input_len - (tok_start + tok_len) + 1);
     AIRY_MEMCPY(t->input + tok_start, text, tlen);

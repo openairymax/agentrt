@@ -148,16 +148,9 @@ void tui_cmd_hist_save_draft(cli_tui_t *t)
         (t->input_len == 0 ||
          (t->cmd_hist_edit && memcmp(t->cmd_hist_edit, t->input, t->input_len) == 0)))
         return;
-    if (t->input_len + 1 > t->cmd_hist_edit_cap) {
-        size_t new_cap = t->cmd_hist_edit_cap ? t->cmd_hist_edit_cap * 2 : 128;
-        while (new_cap < t->input_len + 1)
-            new_cap *= 2;
-        char *grown = (char *)AIRY_REALLOC(t->cmd_hist_edit, new_cap);
-        if (!grown)
-            return;
-        t->cmd_hist_edit = grown;
-        t->cmd_hist_edit_cap = new_cap;
-    }
+    if (tui_buf_grow(&t->cmd_hist_edit, &t->cmd_hist_edit_cap,
+                     t->input_len + 1) != 0)
+        return;
     AIRY_MEMCPY(t->cmd_hist_edit, t->input, t->input_len);
     t->cmd_hist_edit[t->input_len] = '\0';
     t->cmd_hist_edit_len = t->input_len;
@@ -168,16 +161,8 @@ void tui_cmd_hist_apply(cli_tui_t *t, size_t idx)
 {
     const char *src = t->cmd_hist.entries[idx];
     size_t n = strlen(src);
-    if (n + 1 > t->input_cap) {
-        size_t new_cap = t->input_cap ? t->input_cap * 2 : 256;
-        while (new_cap < n + 1)
-            new_cap *= 2;
-        char *grown = (char *)AIRY_REALLOC(t->input, new_cap);
-        if (!grown)
-            return;
-        t->input = grown;
-        t->input_cap = new_cap;
-    }
+    if (tui_buf_grow(&t->input, &t->input_cap, n + 1) != 0)
+        return;
     AIRY_MEMCPY(t->input, src, n);
     t->input[n] = '\0';
     t->input_len = n;
