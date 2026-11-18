@@ -52,6 +52,7 @@ const cli_command_t CLI_COMMANDS[] = {
     {"/security", "安全状态（网络规则统计）", "/security", CLI_CAT_SECURITY, 0, cmd_security},
     {"/pending", "待审批工具调用（只读视图）", "/pending", CLI_CAT_SECURITY, 0, cmd_pending},
     {"/approve", "回传审批决议：/approve <request_id> allow|always|deny", "/approve <request_id> allow|always|deny", CLI_CAT_SECURITY, 1, cmd_approve},
+    {"/jobs", "作业历史：/jobs [n]（列表） /jobs show <job_id>（审计留痕）", "/jobs [n] | show <job_id>", CLI_CAT_SECURITY, 0, cmd_jobs},
 };
 
 #define CLI_COMMANDS_COUNT (sizeof(CLI_COMMANDS) / sizeof(CLI_COMMANDS[0]))
