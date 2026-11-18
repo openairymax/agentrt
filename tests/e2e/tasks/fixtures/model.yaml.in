@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+# L-8 回归夹具：单模型离线 mock 路由。__PORT__ 由 lib_tasks.sh 渲染。
+default_model: mock-1
+models:
+  - name: MockLLM
+    mode: api
+    api_format: chat
+    model_id: mock-1
+    base_url: http://127.0.0.1:__PORT__/v1
+    api_key_env: MOCK_API_KEY
+    max_output: 2048
+    max_retries: 0
+    input_cost_per_1k: 0.0
+    output_cost_per_1k: 0.0
+slots:
+  t2: mock-1
+  t1f: mock-1
+  t1p: mock-1
+think:
+  enabled: false
