@@ -10,7 +10,7 @@
 # 打印 <path> <repo> <sha> 并 fail-closed。
 #
 # 用法: assert-submodule-pins.sh [base-dir]
-# 依赖: gh CLI、GH_TOKEN/GITHUB_TOKEN（contents: read）、GITHUB_REPOSITORY
+# 依赖: gh CLI、GH_TOKEN（跨仓 contents: read，闭源子仓需要）、GITHUB_REPOSITORY
 set -uo pipefail
 
 BASE="${1:-.}"
@@ -55,10 +55,13 @@ while read -r _mode type sha path; do
             ;;
     esac
     name="${name%.git}"
-    if gh api "repos/$owner/$name/commits/$sha" --jq .sha >/dev/null 2>&1; then
+    if err=$(gh api "repos/$owner/$name/commits/$sha" --jq .sha 2>&1 >/dev/null); then
         echo "ok   $path $owner/$name $sha"
     else
-        echo "::error::$path pin $sha is not published to $owner/$name"
+        # 不可达有两种来源：指针真没推，或 token 读不到该仓（闭源子仓 +
+        # 作用域仅限本仓的 GITHUB_TOKEN）。把 API 原文一并打印，避免把
+        # 「无读权」误报成「未发布」（run 44312572826 实证）。
+        echo "::error::$path pin $sha is not reachable in $owner/$name: ${err%%$'\n'*}"
         fail=1
     fi
 done < <(git -C "$BASE" ls-tree HEAD | awk '$2 == "commit"')
