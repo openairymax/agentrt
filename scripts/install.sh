@@ -181,8 +181,19 @@ manifest_build() {
 
 # 安装逐件清单：path/size/sha256/tag + release.env 摘要 + build 段。
 # 卸载按 entries 逆序删除，故 entries 必须覆盖所有安装件（含 config/keys）。
+# 运行期自有的安装件：装机快照之后由启动器改写，清单仍逐件登记（卸载语义
+# 依赖完整清单），但不参与安装期摘要比对——profile.env 的 AIRYRT_LAUNCH_*
+# 声明由 agentrt-bootstrap.sh sup_write_decl 在首次启动时 upsert，装机时记录
+# 的 sha256 对这类文件必然过期（0.1.21 洁净 e2e A-2 实证）。
+rt_owned() {
+    case "$1" in
+        config/profile.env) return 0 ;;
+    esac
+    return 1
+}
+
 manifest_write() {
-    local h="$1" r env tmp lst f rel sz sha first=1 rc=0
+    local h="$1" r env tmp lst f rel sz sha mut first=1 rc=0
     r="$(rel_id "$h")"
     env="${h}/current/release.env"
     [ -f "$env" ] || env="${h}/release.env"
@@ -208,9 +219,10 @@ manifest_write() {
                 case "$rel" in *[\"\\]*) continue ;; esac
                 sz="$(wc -c < "$f" 2>/dev/null | tr -d ' ')"
                 sha="$(sha256_file "$f")"
+                if rt_owned "$rel"; then mut=', "mutable": 1'; else mut=''; fi
                 [ "$first" = "1" ] || printf ',\n'
-                printf '  {"path": "%s", "size": %s, "sha256": "%s", "tag": "tag:%s"}' \
-                    "$rel" "${sz:-0}" "$sha" "$r"
+                printf '  {"path": "%s", "size": %s, "sha256": "%s", "tag": "tag:%s"%s}' \
+                    "$rel" "${sz:-0}" "$sha" "$r" "$mut"
                 first=0
             done < "$lst"
             printf '\n  ]\n}\n'
