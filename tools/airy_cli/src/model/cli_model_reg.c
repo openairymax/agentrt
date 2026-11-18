@@ -447,7 +447,7 @@ static size_t mr_refs(const mr_yaml_t *y, const mr_kv_t *kv, const char *name,
     return (size_t)cnt;
 }
 
-/* 声明片段按当前安装态收敛：只更新本实例 (local_llm) 的 5 个键，
+/* 声明片段按当前安装态收敛：只更新本实例 (llama_server) 的 5 个键，
  * 同文件内其他键原样保留；无服务模型时只清本实例键，清空后才删文件。 */
 static int mr_sync(const mr_ctx_t *c, const mr_kv_t *reg)
 {
@@ -497,7 +497,7 @@ static int mr_sync(const mr_ctx_t *c, const mr_kv_t *reg)
     mr_get(reg, key, args, sizeof(args));
     snprintf(line, sizeof(line), "-m %s --host 127.0.0.1 --port %s%s%s",
              model, c->port, args[0] ? " " : "", args);
-    rc = mr_set(&frag, "AIRYRT_MANAGED_NAME", "local_llm");
+    rc = mr_set(&frag, "AIRYRT_MANAGED_NAME", "llama_server");
     rc |= mr_set(&frag, "AIRYRT_MANAGED_BIN", server);
     snprintf(line, sizeof(line), "tcp:%s", c->port);
     rc |= mr_set(&frag, "AIRYRT_MANAGED_EP", line);
