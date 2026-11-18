@@ -59,6 +59,13 @@ extern int g_cli_json_mode;
  * Every primitive streams straight to stdout (stream-safe, pipe/log
  * friendly).
  */
+/**
+ * @brief 输出面改道（0.1.21 D-15）：事件模式下 stdout 只出 NDJSON 帧，
+ *        人类可读输出（原语、状态、结果）整体走 stderr。
+ * @param on 1=改道 stderr；0=恢复 stdout
+ */
+void cli_out_route_err(int on);
+
 void cli_out(const char *s);
 void cli_outn(const char *s, size_t n);
 void cli_outc(char c);
@@ -223,6 +230,9 @@ void cli_print_turn(uint64_t elapsed_ms, const char *metrics);
 
 /**
  * @brief Monotonic wall-clock in milliseconds (for turn separators).
+ *
+ * 0.1.21 D-15：实现迁至 cli_clock.c（机制件），此处仅保持既有调用点
+ * 的 include 面不变。
  */
 uint64_t cli_now_ms(void);
 

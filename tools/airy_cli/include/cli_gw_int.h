@@ -58,6 +58,14 @@ int cli_gw_exchange(const char *method, const char *host, int port, const char *
  */
 int cli_gw_fail_line(const char *data_json, char *out, size_t cap);
 
+/* SSE 流式接入（0.1.21 D-15）：传输层导出连接/请求构造/发送/关闭四个
+ * 薄面，SSE 客户端只做「行翻译 + 续传」，不重复实现 HTTP 报文搬运。 */
+int cli_gw_conn_open(const char *host, int port, int timeout_ms);
+int cli_gw_req_build(const char *method, const char *host, int port,
+                     const char *path, const char *body, char *req, size_t reqsz);
+int cli_gw_req_send(int fd, const char *req, size_t reqn, const char *body);
+void cli_gw_conn_close(int fd);
+
 #ifdef __cplusplus
 }
 #endif

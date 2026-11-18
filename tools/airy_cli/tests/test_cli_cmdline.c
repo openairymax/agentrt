@@ -131,7 +131,9 @@ static int test_usage_table(void)
 {
     printf("  test_usage_table...\n");
     size_t n = cli_commands_count();
-    CHECK(n == 33);
+    /* 0.1.21 增补：D-9 作业历史视图 /jobs 入表后为 34。表增删必须同步
+     * 本处，作为命令面变更的显式评审点。 */
+    CHECK(n == 34);
     for (size_t i = 0; i < n; i++) {
         CHECK(CLI_COMMANDS[i].usage != NULL);
         CHECK(CLI_COMMANDS[i].usage[0] == '/');
@@ -169,6 +171,72 @@ static int test_paths_subcommand(void)
     return 0;
 }
 
+/* 0.1.21 D-15：--events ndjson 的线格式与 stdout 归属。事件模式独占
+ * stdout，裸词位一律按 prompt 处理（子命令不得抢占），与 --tui/--json
+ * 同用按用法错误拒绝。 */
+static int test_events_args(void)
+{
+    printf("  test_events_args...\n");
+    char a0[] = "airy_cli", a1[] = "--events", a2[] = "ndjson";
+    char a3[] = "json", a4[] = "--json", a5[] = "--tui", a6[] = "hello";
+    char a7[] = "paths", a8[] = "--quiet";
+    char *ok[] = {a0, a1, a2};
+    char *miss[] = {a0, a1};
+    char *bad[] = {a0, a1, a3};
+    char *js[] = {a0, a1, a2, a4};
+    char *tui[] = {a0, a1, a2, a5};
+    char *pr[] = {a0, a1, a2, a6};
+    char *sub[] = {a0, a1, a2, a7};
+    char *quiet[] = {a0, a1, a2, a8};
+    const char *pp = NULL;
+
+    /* 事件模式无 prompt 时落回事件会话（返回 0），由 stdin 帧驱动。 */
+    g_cli_events_mode = 0;
+    g_cli_quiet = 0;
+    g_cli_print_mode = 0;
+    g_cli_json_mode = 0;
+    g_cli_tui_mode = 0;
+    CHECK(cli_parse_args(3, ok, &pp) == 0);
+    CHECK(g_cli_events_mode == 1);
+    CHECK(pp == NULL);
+
+    g_cli_events_mode = 0;
+    pp = NULL;
+    CHECK(cli_parse_args(2, miss, &pp) == 2);
+    CHECK(cli_parse_args(3, bad, &pp) == 2);
+
+    g_cli_json_mode = 0;
+    CHECK(cli_parse_args(4, js, &pp) == 2);
+    g_cli_json_mode = 0;
+    CHECK(cli_parse_args(4, tui, &pp) == 2);
+    g_cli_tui_mode = 0;
+
+    /* 裸词是 prompt（返回 0 落回会话），子命令不得在事件模式生效 */
+    g_cli_events_mode = 0;
+    pp = NULL;
+    CHECK(cli_parse_args(4, pr, &pp) == 0);
+    CHECK(pp != NULL && strcmp(pp, "hello") == 0);
+
+    g_cli_events_mode = 0;
+    pp = NULL;
+    CHECK(cli_parse_args(4, sub, &pp) == 0);
+    CHECK(pp != NULL && strcmp(pp, "paths") == 0);
+
+    g_cli_events_mode = 0;
+    g_cli_quiet = 0;
+    pp = NULL;
+    CHECK(cli_parse_args(4, quiet, &pp) == 0);
+    CHECK(g_cli_quiet == 1);
+
+    g_cli_events_mode = 0;
+    g_cli_quiet = 0;
+    g_cli_print_mode = 0;
+    g_cli_json_mode = 0;
+    g_cli_tui_mode = 0;
+    printf("    PASSED\n");
+    return 0;
+}
+
 int main(void)
 {
     printf("test_cli_cmdline:\n");
@@ -178,6 +246,7 @@ int main(void)
     test_lookup_helpers();
     test_usage_table();
     test_paths_subcommand();
+    test_events_args();
     printf("ALL PASSED\n");
     return 0;
 }

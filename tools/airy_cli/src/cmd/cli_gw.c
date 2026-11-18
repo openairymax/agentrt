@@ -453,6 +453,31 @@ static void gw_close(int fd)
 #endif
 }
 
+/* ── 流式接入薄面（0.1.21 D-15）────────────────────────────────────
+ * gateway 的 /api/v1/agent/run/stream 是长连接逐行 SSE；RPC 层的一次性
+ * exchange 语义不适用。这里只把既有传输实现导出给 cli_gw_sse.c，报文
+ * 搬运逻辑仍在本文件单一实现，不做任何复制。 */
+int cli_gw_conn_open(const char *host, int port, int timeout_ms)
+{
+    return cli_gw_connect(host, port, timeout_ms);
+}
+
+int cli_gw_req_build(const char *method, const char *host, int port,
+                     const char *path, const char *body, char *req, size_t reqsz)
+{
+    return gw_build_req(method, host, port, path, body, req, reqsz);
+}
+
+int cli_gw_req_send(int fd, const char *req, size_t reqn, const char *body)
+{
+    return gw_send_req(fd, req, reqn, body);
+}
+
+void cli_gw_conn_close(int fd)
+{
+    gw_close(fd);
+}
+
 /* chunked 正文解码（CLI 侧 SSE 场景），返回 malloc'd 缓冲。 */
 static char *gw_chunked_plain(const char *body, size_t body_len, size_t *out_len)
 {

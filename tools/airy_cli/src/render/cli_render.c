@@ -37,6 +37,20 @@
 
 /* ---- 输出原语 ---- */
 
+/* 输出面路由（0.1.21 D-15）：事件模式下 stdout 被 NDJSON 帧独占，人类
+ * 可读输出整体改道 stderr，保证管道消费端读到的每一行都是合法帧。 */
+static int g_out_err;
+
+void cli_out_route_err(int on)
+{
+    g_out_err = on != 0;
+}
+
+static FILE *cli_out_fp(void)
+{
+    return g_out_err ? stderr : stdout;
+}
+
 void cli_out(const char *s)
 {
     if (!s) return;
@@ -46,12 +60,14 @@ void cli_out(const char *s)
 void cli_outn(const char *s, size_t n)
 {
     if (!s || n == 0) return;
-    fwrite(s, 1, n, stdout);
+    if (g_cli_quiet && g_cli_events_mode) return;
+    fwrite(s, 1, n, cli_out_fp());
 }
 
 void cli_outc(char c)
 {
-    fputc(c, stdout);
+    if (g_cli_quiet && g_cli_events_mode) return;
+    fputc(c, cli_out_fp());
 }
 
 void cli_outf(const char *fmt, ...)
@@ -260,11 +276,6 @@ void cli_print_turn(uint64_t elapsed_ms, const char *metrics)
     cli_print_status("turn", line);
 }
 
-uint64_t cli_now_ms(void)
-{
-    return airy_time_ns() / 1000000ULL;
-}
-
 /* ---- 执行体状态辅助（单一事实源） ---- */
 
 /* 终态串为 completed / semantic_failed / failed / canceled，其中
@@ -403,7 +414,7 @@ void cli_print_system_header(const char *t2, const char *t1f, const char *t1p)
     }
     cli_out(cli_c(CLR_RESET));
     cli_outc('\n');
-    fflush(stdout);
+    fflush(cli_out_fp());
 }
 
 /* ---- 执行结果呈现 ---- */
