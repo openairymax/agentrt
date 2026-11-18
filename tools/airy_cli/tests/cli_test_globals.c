@@ -17,3 +17,6 @@ volatile sig_atomic_t g_cli_cancel = 0;
 int g_cli_print_mode = 0;
 /* C-10（0.1.21）：cli_gw_rpc.c 的 --verbose 只读开关，主程序侧由 main.c 定义。 */
 int g_cli_verbose = 0;
+/* D-15（0.1.21）：事件流出口与静音开关，cli_render.c 与命令行解析共用。 */
+int g_cli_events_mode = 0;
+int g_cli_quiet = 0;

@@ -120,6 +120,10 @@ extern int g_cli_lang_output;
  * in main.c; read by the render layer to keep output clean. */
 extern int g_cli_print_mode;
 extern int g_cli_json_mode;
+/* 0.1.21 D-15：事件流出口（--events ndjson）与静音开关（--quiet）。
+ * 事件模式下 stdout 只承载 NDJSON 帧，人类可读输出改道 stderr。 */
+extern int g_cli_events_mode;
+extern int g_cli_quiet;
 /* C-10（0.1.21）：--verbose 打开失败归因的原始错误 data 输出；默认仅
  * 一行「失败在哪一环」。定义在 main.c，网关错误层只读。 */
 extern int g_cli_verbose;

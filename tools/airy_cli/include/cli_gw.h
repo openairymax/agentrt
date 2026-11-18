@@ -92,6 +92,10 @@ int cli_gw_probe(int timeout_ms, unsigned long long *epoch_out);
  */
 void cli_gw_endpoint(char *host, size_t host_len, int *port);
 
+/* 0.1.21 D-15：agent.run_stream SSE 端点。客户端不链接 gateway 内部头，
+ * 该常量是协议面（路由路径）在客户端的唯一副本，变更须两端同步评审。 */
+#define CLI_GW_RUN_STREAM_PATH "/api/v1/agent/run/stream"
+
 #ifdef __cplusplus
 }
 #endif
