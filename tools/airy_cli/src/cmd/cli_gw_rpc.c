@@ -12,6 +12,7 @@
  */
 
 #include "airy_memory.h"
+#include "airy_run_stream.h" /* D-10：失败载荷键名唯一权威 */
 #include "cli_gw.h"
 #include "cli_gw_int.h"
 #include "cli_gw_json.h"
@@ -132,6 +133,59 @@ static const char *const g_gw_stage_name[] = {
     "none", "input", "llm", "channel", "gen", "verify", "arbiter", "loop",
 };
 
+/* D-10（0.1.21）：失败语义中文呈现。daemon 已是唯一判据出处，CLI 只翻译，
+ * 不改码、不推断；未知值原样透出，便于新原因上线后立即可见。 */
+static const char *cli_fail_reason_name(const char *r)
+{
+    static const struct {
+        const char *key;
+        const char *name;
+    } names[] = {
+        {"budget_exhausted", "轮次预算耗尽"},
+        {"tool_fuse", "工具连续失败已熔断"},
+        {"approval_denied", "操作未获审批"},
+        {"empty_result", "模型返回空结果"},
+        {"provider_unreachable", "模型服务不可达"},
+        {"agent_error", "执行失败"},
+    };
+    for (size_t i = 0; r && i < sizeof(names) / sizeof(names[0]); i++) {
+        if (strcmp(r, names[i].key) == 0)
+            return names[i].name;
+    }
+    return r;
+}
+
+/* D-10：失败载荷 → 一行原因 + 一行下一步。返回原始 error code 供退出码使用。 */
+static int cli_fail_render(const cJSON *root, char *out, size_t cap)
+{
+    cJSON *reason = cJSON_GetObjectItem(root, AIRY_RS_K_REASON);
+    cJSON *code = cJSON_GetObjectItem(root, AIRY_RS_K_CODE);
+    cJSON *used = cJSON_GetObjectItem(root, AIRY_RS_K_BUDGET_USED);
+    cJSON *total = cJSON_GetObjectItem(root, AIRY_RS_K_BUDGET_TOTAL);
+    cJSON *node = cJSON_GetObjectItem(root, AIRY_RS_K_NODE);
+    cJSON *next = cJSON_GetObjectItem(root, AIRY_RS_K_NEXT_ACTION);
+    int err = cJSON_IsNumber(code) ? (int)code->valuedouble : 0;
+    const char *r = cJSON_IsString(reason) ? reason->valuestring : "";
+    const char *n = cJSON_IsString(node) ? node->valuestring : "";
+    const char *act = cJSON_IsString(next) ? next->valuestring : "";
+    int off = snprintf(out, cap, "失败原因：%s", cli_fail_reason_name(r));
+
+    if (off > 0 && (size_t)off < cap && cJSON_IsNumber(used) && cJSON_IsNumber(total))
+        off += snprintf(out + off, cap - (size_t)off, "（预算 %d/%d）", (int)used->valuedouble,
+                        (int)total->valuedouble);
+    if (off > 0 && (size_t)off < cap && n[0])
+        off += snprintf(out + off, cap - (size_t)off, "；影响节点 %s", n);
+    if (off > 0 && (size_t)off < cap) {
+        const char *hint = "人工排查后再试";
+        if (strcmp(act, AIRY_RS_NEXT_RETRY) == 0)
+            hint = "可原样重试";
+        else if (strcmp(act, AIRY_RS_NEXT_RESUME) == 0)
+            hint = "请用 continue 续跑，不要原样重发";
+        snprintf(out + off, cap - (size_t)off, "；下一步：%s", hint);
+    }
+    return err;
+}
+
 int cli_gw_fail_line(const char *data_json, char *out, size_t cap)
 {
     if (out && cap)
@@ -142,6 +196,12 @@ int cli_gw_fail_line(const char *data_json, char *out, size_t cap)
     cJSON *root = cJSON_Parse(data_json);
     if (!root)
         return 0;
+    /* D-10：结构化失败载荷优先——它比 stage 更贴近调用方需要的决策。 */
+    if (cJSON_IsString(cJSON_GetObjectItem(root, AIRY_RS_K_REASON))) {
+        int rc = cli_fail_render(root, out, cap);
+        cJSON_Delete(root);
+        return rc;
+    }
     cJSON *stage = cJSON_GetObjectItem(root, "stage");
     cJSON *rounds = cJSON_GetObjectItem(root, "grad_rounds");
     cJSON *rej = cJSON_GetObjectItem(root, "grad_rejections");
