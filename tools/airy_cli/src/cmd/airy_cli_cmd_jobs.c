@@ -16,12 +16,6 @@
 #include "cli_render.h"
 #include "platform.h"
 
-#include <cjson/cJSON.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-
 /* created_ms/finished_ms 为墙钟毫秒时间戳。 */
 static void cli_job_time(uint64_t ms, char *out, size_t cap)
 {
