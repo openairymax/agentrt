@@ -78,6 +78,10 @@ add_executable(airy_cli
     # M5-4 §266：cli_think.c 归位 core 域（远端两段式 P-A 主链是引擎壳
     # 机制，非渲染职责；render 域仅保留展示模块）
     src/core/cli_think.c
+    # 0.1.21 D-8：超时阶梯（rpc/tool.sync/tool.async/think）与 model.yaml
+    # 子集读取，think 与各 RPC 调用点共用同一真相源
+    src/core/cli_cfg.c
+    src/core/cli_timeout.c
     src/core/cli_dag.c
     src/cmd/cli_cmds.c
     # cli_render.c：渲染域唯一机制件（0.1.19 M5-3：直印化后体验渲染三件
@@ -208,7 +212,8 @@ if(BUILD_TESTS)
     # 命令实现以 cli_cmd_stubs.c 桩承接链接面，避免拖入 cli_cmds.c 的
     # render/RPC 依赖树；quit/tui 桩保留 ctx 副作用供断言分发去向。
     add_executable(test_cli_cmdline tests/test_cli_cmdline.c tests/cli_cmd_stubs.c
-                   tests/cli_test_globals.c src/core/airy_cli_cmdline.c)
+                   tests/cli_test_globals.c src/core/airy_cli_cmdline.c
+                   src/core/cli_timeout.c src/core/cli_cfg.c)
     target_include_directories(test_cli_cmdline PRIVATE ${CLI_INC_DIRS})
     target_link_libraries(test_cli_cmdline PRIVATE airy_coreloopthree airy_common)
     add_test(NAME cli_cmdline_dispatch COMMAND test_cli_cmdline)
@@ -220,6 +225,14 @@ if(BUILD_TESTS)
     # cli_classify.c 无外部符号引用，静态库按需抽取，无重链接负担。
     target_link_libraries(test_cli_classify PRIVATE airy_coreloopthree)
     add_test(NAME cli_classify_heuristic COMMAND test_cli_classify)
+
+    # 0.1.21 D-8：超时阶梯单测——四档缺省由预算树派生、env/yaml/--timeout
+    # 覆盖优先级、客户端上限低于服务端下限时向上钳制。纯函数，不触网关。
+    add_executable(test_cli_timeout tests/test_cli_timeout.c
+                   src/core/cli_timeout.c src/core/cli_cfg.c)
+    target_include_directories(test_cli_timeout PRIVATE ${CLI_INC_DIRS})
+    target_link_libraries(test_cli_timeout PRIVATE airy_common)
+    add_test(NAME cli_timeout_tiers COMMAND test_cli_timeout)
 
     # 0.1.16 审计 E2E：cli_gw 统一网关客户端（JSON-RPC over HTTP POST）
     # 端到端往返——本进程内 mock HTTP/1.1 服务端 + 真实 loopback socket，
@@ -284,7 +297,8 @@ if(BUILD_TESTS)
                        tests/cli_test_globals.c
                        src/cmd/airy_cli_cmd_approval.c ${CLI_GW_SRCS}
                        src/render/cli_render.c src/core/cli_dag.c
-                       src/core/cli_term.c)
+                       src/core/cli_term.c
+                       src/core/cli_timeout.c src/core/cli_cfg.c)
         target_include_directories(test_cli_approval PRIVATE ${CLI_INC_DIRS})
         target_compile_definitions(test_cli_approval PRIVATE AIRY_HAS_CJSON=1 AIRY_COMPLIANCE_IMPL)
         if(AIRY_CJSON_INCLUDE_DIRS)

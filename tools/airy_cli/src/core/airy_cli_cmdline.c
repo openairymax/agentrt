@@ -12,6 +12,7 @@
  */
 
 #include "cli_internal.h"
+#include "cli_timeout.h"
 #include "compat.h"
 
 #include <stdio.h>
@@ -224,6 +225,8 @@ static void cli_print_usage(void)
            cli_c(CLR_CYAN), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %s--verbose%s              失败时附原始错误 data（默认仅一行归因）\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_outf("  %s--timeout%s <秒>          覆盖客户端等待上限（1..86400，四档统一，"
+             "仍受服务端下限钳制）\n", cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %s--tui%s                  全屏 TUI 渲染层（agentrt-tui 子进程，退出码回传）\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %s--continue%s, %s--resume%s   恢复上次会话上下文（读 mem_d 最近记忆装配视图）\n",
@@ -264,6 +267,16 @@ int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
         } else if (strcmp(argv[i], "--verbose") == 0) {
             /* C-10（0.1.21）：失败归因默认一行，--verbose 附原始错误 data。 */
             g_cli_verbose = 1;
+        } else if (strcmp(argv[i], "--timeout") == 0) {
+            /* D-8（0.1.21）：四档统一覆盖；缺值/非法按用法错误退出。 */
+            int ms = (i + 1 < argc) ? cli_tmo_parse_sec(argv[i + 1]) : -1;
+            if (ms < 0) {
+                cli_outf("airy_cli: --timeout 需要 1..86400 的秒数\n");
+                cli_print_usage();
+                return 2;
+            }
+            cli_tmo_set(ms);
+            i++;
         } else if (strcmp(argv[i], "--tui") == 0) {
             g_cli_tui_mode = 1;
         } else if (strcmp(argv[i], "--continue") == 0 ||

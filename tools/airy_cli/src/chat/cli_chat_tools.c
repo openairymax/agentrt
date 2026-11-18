@@ -23,6 +23,7 @@
 #include "cli_internal.h"
 
 #include "cli_gw.h" /* 架构约束 2026-08-25：统一经 gateway 派发 */
+#include "cli_timeout.h" /* 0.1.21 D-8：工具等待上限统一超时阶梯 */
 
 #include "cli_prelude.h"
 #include "err_class.h" /* 0.1.19 N1：工具失败按 class/code/diag 透传 */
@@ -132,12 +133,11 @@ void cli_msgbuf_push(cli_chat_msgbuf_t *b, const char *role, const char *content
  * coding_v1 标准工作集）。tool_d 的 execute RPC 按该主体做 fail-closed
  * 权限判定，未显式 allow 的工具一律拒绝。 */
 #define CLI_TOOL_AGENT "coding_v1"
-#define CLI_TOOL_RPC_TIMEOUT_MS 30000
 
-/* C-11：作业轮询参数。工具自身预算由 tool_d 按元数据/请求夹取（上限
- * 600s），这里只负责等到终态，避免同步 execute 被 30s 链路超时截断。 */
+/* C-11/D-8：作业轮询参数。工具自身预算由 tool_d 按元数据/请求夹取（上限
+ * 600s），客户端等待上限来自超时阶梯（tool.async ≥ client 层），避免同步
+ * execute 被链路超时截断；单次 submit/poll 走 tool.sync 档。 */
 #define CLI_TOOL_POLL_MS 200
-#define CLI_TOOL_WAIT_MS 610000
 
 static const char *cli_json_str(cJSON *o, const char *key);
 
@@ -280,7 +280,8 @@ static char *chat_params(const char *id, const char *args_json, airy_err_t *perr
 static int chat_job_submit(const char *params_json, char *job_id, size_t cap)
 {
     char *body = NULL;
-    int ret = cli_gw_call("tool.submit", params_json, CLI_TOOL_RPC_TIMEOUT_MS, &body);
+    int ret = cli_gw_call("tool.submit", params_json, cli_tmo_ms(CLI_TMO_TOOL_SYNC),
+                          &body);
     cJSON *root;
     const char *id;
     int ok;
@@ -308,6 +309,7 @@ static char *chat_job_wait(const char *job_id)
     char *qj;
     char *body = NULL;
     long waited = 0;
+    const int wait_ms = cli_tmo_ms(CLI_TMO_TOOL_ASYNC);
 
     if (!q)
         return NULL;
@@ -324,7 +326,8 @@ static char *chat_job_wait(const char *job_id)
 
         AIRY_FREE(body);
         body = NULL;
-        if (cli_gw_call("tool.poll", qj, CLI_TOOL_RPC_TIMEOUT_MS, &body) != 0 || !body)
+        if (cli_gw_call("tool.poll", qj, cli_tmo_ms(CLI_TMO_TOOL_SYNC), &body) != 0 ||
+            !body)
             break;
         root = cJSON_Parse(body);
         state = cli_json_str(root, "state");
@@ -337,7 +340,7 @@ static char *chat_job_wait(const char *job_id)
             return out;
         }
         cJSON_Delete(root);
-        if (waited >= CLI_TOOL_WAIT_MS)
+        if (waited >= wait_ms)
             break;
         airy_sleep_ms(CLI_TOOL_POLL_MS);
         waited += CLI_TOOL_POLL_MS;
@@ -416,6 +419,8 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
 
     /* C-11：优先作业句柄（submit + poll），长任务不再被 30s 链路超时
      * 截断；submit 不可用时回退同步 execute，兼容旧网关/旧 tool_d。 */
+    cli_trace("chat", "tool timeout tiers sync=%dms async=%dms (D-8)",
+              cli_tmo_ms(CLI_TMO_TOOL_SYNC), cli_tmo_ms(CLI_TMO_TOOL_ASYNC));
     int job_ret = chat_job_submit(params_json, job_id, sizeof(job_id));
     if (job_ret == 0) {
         result_json = chat_job_wait(job_id);
@@ -427,8 +432,8 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
                                   out_ok);
         }
     } else {
-        int rpc_ret = cli_gw_call("tool.execute", params_json, CLI_TOOL_RPC_TIMEOUT_MS,
-                                  &result_json);
+        int rpc_ret = cli_gw_call("tool.execute", params_json,
+                                  cli_tmo_ms(CLI_TMO_TOOL_SYNC), &result_json);
         AIRY_FREE(params_json);
         if (rpc_ret != 0 || !result_json) {
             cli_trace("chat", "%s tool rpc fail tool=%s ret=%d (via gateway)", CLI_ICON_CROSS,
