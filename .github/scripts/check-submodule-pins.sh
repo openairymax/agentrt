@@ -27,6 +27,26 @@ command -v gh >/dev/null 2>&1 || die "gh CLI not available"
 export GH_TOKEN="$TOKEN"
 
 fail=0
+ERR=""
+# 提交面查询带有限重试：404 是终局（真的没有），限流/5xx/网络抖动不是。
+# 本判据坐在发行闸口上，一次瞬时失败会连坐整条装配腿，日志里只剩
+# 「未发布」的假象。
+pinned() {
+    local api="repos/$1/$2/commits/$3" out i
+
+    for i in 1 2 3; do
+        if out=$(gh api "$api" --jq .sha 2>&1 >/dev/null); then
+            return 0
+        fi
+        case "$out" in
+            *404*) break ;;
+        esac
+        sleep 5
+    done
+    ERR="${out%%$'\n'*}"
+    return 1
+}
+
 while read -r _mode type sha path; do
     [ "$type" = "commit" ] || continue
     url=$(git config -f "$BASE/.gitmodules" --get "submodule.$path.url") || {
@@ -55,13 +75,13 @@ while read -r _mode type sha path; do
             ;;
     esac
     name="${name%.git}"
-    if err=$(gh api "repos/$owner/$name/commits/$sha" --jq .sha 2>&1 >/dev/null); then
+    if pinned "$owner" "$name" "$sha"; then
         echo "ok   $path $owner/$name $sha"
     else
         # 不可达有两种来源：指针真没推，或 token 读不到该仓（闭源子仓 +
         # 作用域仅限本仓的 GITHUB_TOKEN）。把 API 原文一并打印，避免把
         # 「无读权」误报成「未发布」（run 44312572826 实证）。
-        echo "::error::$path pin $sha is not reachable in $owner/$name: ${err%%$'\n'*}"
+        echo "::error::$path pin $sha is not reachable in $owner/$name: $ERR"
         fail=1
     fi
 done < <(git -C "$BASE" ls-tree HEAD | awk '$2 == "commit"')
