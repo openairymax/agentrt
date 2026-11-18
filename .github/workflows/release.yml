@@ -54,6 +54,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash .github/scripts/assert-ci-green.sh "$GITHUB_SHA"
 
+      # 子模块指针先于装配验证可达性：release 检出按 gitlink 精确取 SHA，
+      # 未推送的指针只会以 checkout "not our ref" 的形式暴露，日志中无编译
+      # 错误可循。此处逐个 gitlink 查 GitHub 提交面，缺失即列出并判红。
+      - name: Assert submodule pins are published
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/check-submodule-pins.sh
+
   # Linux x86-64：container ubuntu:20.04 保证 glibc 2.31 基线（覆盖
   # Ubuntu 20.04+/Debian 11+/Pi OS Bullseye+）。平台命名规范：
   # OS-架构族-位宽（linux-x86-64 / linux-arm-64 …），下同；旧两代平台名由
