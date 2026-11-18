@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
+# SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
+# L-8 回归夹具：cupolas ACL 最小放行面。
+# 目标不是放行一切：只声明回归链路必需的三个主体/能力，其余保持默认拒绝。
+rules:
+  - agent: "coding_v1"
+    tool: "shell_run"
+    effect: "allow"
+  - agent: "external"
+    tool: "shell_run"
+    effect: "allow"
+  - agent: "external"
+    tool: "cap:agent.run"
+    effect: "allow"
+  - agent: "external"
+    tool: "cap:agent.control"
+    effect: "allow"
+  - agent: "tool_d"
+    tool: "shell_run"
+    effect: "allow"
