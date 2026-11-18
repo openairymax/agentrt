@@ -448,8 +448,8 @@ static size_t mr_refs(const mr_yaml_t *y, const mr_kv_t *kv, const char *name,
 }
 
 /* 声明片段按当前安装态收敛：只更新本实例的 5 个键，同文件内其他键原样保留；
- * 实例名归政策层——片段已声明 NAME 时沿用（ops 侧 airy-local 的声明），
- * 只在空片段上给中性缺省，机制核不写死厂商实例名；无服务模型时只清本实例键，
+ * 实例名归政策层——片段已声明 NAME 时沿用（ops 侧 airy-local 的声明），只在
+ * 空片段上给中性缺省，机制核不写死厂商实例名；无服务模型时只清本实例键，
  * 清空后才删文件。 */
 static int mr_sync(const mr_ctx_t *c, const mr_kv_t *reg)
 {
@@ -464,7 +464,6 @@ static int mr_sync(const mr_ctx_t *c, const mr_kv_t *reg)
     char asset[MR_VAL_MAX];
     char args[MR_VAL_MAX];
     char mem[64];
-    char iname[MR_NAME_MAX];
     char model[AIRY_PATH_MAX];
     char line[MR_VAL_MAX];
     char key[MR_NAME_MAX + 16];
@@ -498,11 +497,9 @@ static int mr_sync(const mr_ctx_t *c, const mr_kv_t *reg)
     snprintf(model, sizeof(model), "%s/%s", c->dir, asset);
     snprintf(key, sizeof(key), "model.%s.args", name);
     mr_get(reg, key, args, sizeof(args));
-    snprintf(line, sizeof(line), "-m %s --host 127.0.0.1 --port %s%s%s",
-             model, c->port, args[0] ? " " : "", args);
-    if (!mr_get(&frag, "AIRYRT_MANAGED_NAME", iname, sizeof(iname)) || !iname[0])
-        snprintf(iname, sizeof(iname), "%s", "local_llm");
-    rc = mr_set(&frag, "AIRYRT_MANAGED_NAME", iname);
+    if (!mr_get(&frag, "AIRYRT_MANAGED_NAME", line, sizeof(line)) || !line[0])
+        AIRY_MEMCPY(line, "local_llm", sizeof("local_llm"));
+    rc = mr_set(&frag, "AIRYRT_MANAGED_NAME", line);
     rc |= mr_set(&frag, "AIRYRT_MANAGED_BIN", server);
     snprintf(line, sizeof(line), "tcp:%s", c->port);
     rc |= mr_set(&frag, "AIRYRT_MANAGED_EP", line);
