@@ -186,77 +186,121 @@ static int cli_chain_field_num(const cJSON *obj, const char *key, double *out)
 }
 
 /* 类别 + content → 人类可读标签（content 为账本事件内容对象） */
-static void cli_chain_label(const char *cat, const cJSON *content, char *out, size_t cap)
+static void chain_label_chain(const cJSON *content, char *out, size_t cap)
 {
     char v[128] = "";
 
+    if (!cli_chain_field_str(content, "event", v, sizeof(v))) {
+        snprintf(out, cap, "决策链事件");
+        return;
+    }
+    if (strcmp(v, "gccp_confirm") == 0) {
+        snprintf(out, cap, "GCCP 意图确认");
+        return;
+    }
+    if (strcmp(v, "blueprint_hit") == 0) {
+        char layer[16] = "";
+        cli_chain_field_str(content, "layer", layer, sizeof(layer));
+        snprintf(out, cap, "蓝图命中 %s", layer[0] ? layer : "?");
+        return;
+    }
+    snprintf(out, cap, "决策 %s", v);
+}
+
+static void chain_lb_blueprint(const cJSON *content, char *out, size_t cap)
+{
+    char goal[160] = "";
+
+    if (cli_chain_field_str(content, "goal", goal, sizeof(goal)))
+        snprintf(out, cap, "蓝图 %s", goal);
+    else
+        snprintf(out, cap, "蓝图");
+}
+
+static void chain_label_command(const cJSON *content, char *out, size_t cap)
+{
+    char dag[64] = "";
+    char pid[64] = "";
+
+    if (cli_chain_field_str(content, "dag_id", dag, sizeof(dag)))
+        snprintf(out, cap, "提交 dag=%s", dag);
+    else if (cli_chain_field_str(content, "plan_id", pid, sizeof(pid)))
+        snprintf(out, cap, "计划 %s", pid);
+    else
+        snprintf(out, cap, "指令");
+}
+
+static void chain_label_verify(const cJSON *content, char *out, size_t cap)
+{
+    char verdict[32] = "";
+    char reason[160] = "";
+
+    cli_chain_field_str(content, "verdict", verdict, sizeof(verdict));
+    cli_chain_field_str(content, "reason", reason, sizeof(reason));
+    if (verdict[0])
+        snprintf(out, cap, "复核 %s%s%s", verdict, reason[0] ? " · " : "", reason);
+    else
+        snprintf(out, cap, "复核");
+}
+
+static void chain_label_progress(const cJSON *content, char *out, size_t cap)
+{
+    char st[32] = "";
+    char reason[160] = "";
+    double pg = 0;
+
+    cli_chain_field_str(content, "state", st, sizeof(st));
+    cli_chain_field_str(content, "reason", reason, sizeof(reason));
+    if (st[0] && cli_chain_field_num(content, "progress", &pg))
+        snprintf(out, cap, "进度 %s %.0f%%%s%s", st, pg * 100.0, reason[0] ? " · " : "", reason);
+    else if (st[0])
+        snprintf(out, cap, "进度 %s%s%s", st, reason[0] ? " · " : "", reason);
+    else
+        snprintf(out, cap, "进度");
+}
+
+static void chain_label_result(const cJSON *content, char *out, size_t cap)
+{
+    char st[32] = "";
+
+    if (cli_chain_field_str(content, "state", st, sizeof(st)))
+        snprintf(out, cap, "终态 %s", st);
+    else
+        snprintf(out, cap, "结果");
+}
+
+static void chain_label_issue(const cJSON *content, char *out, size_t cap)
+{
+    char reason[160] = "";
+    double rc = 0;
+
+    cli_chain_field_str(content, "reason", reason, sizeof(reason));
+    if (cli_chain_field_num(content, "rc", &rc))
+        snprintf(out, cap, "问题 rc=%.0f%s%s", rc, reason[0] ? " · " : "", reason);
+    else
+        snprintf(out, cap, "问题%s%s", reason[0] ? " " : "", reason);
+}
+
+static void cli_chain_label(const char *cat, const cJSON *content, char *out, size_t cap)
+{
     if (!cat)
         cat = "";
-    if (strcmp(cat, "chain") == 0) {
-        if (cli_chain_field_str(content, "event", v, sizeof(v))) {
-            if (strcmp(v, "gccp_confirm") == 0)
-                snprintf(out, cap, "GCCP 意图确认");
-            else if (strcmp(v, "blueprint_hit") == 0) {
-                char layer[16] = "";
-                cli_chain_field_str(content, "layer", layer, sizeof(layer));
-                snprintf(out, cap, "蓝图命中 %s", layer[0] ? layer : "?");
-            } else {
-                snprintf(out, cap, "决策 %s", v);
-            }
-        } else {
-            snprintf(out, cap, "决策链事件");
-        }
-    } else if (strcmp(cat, "blueprint") == 0) {
-        char goal[160] = "";
-        if (cli_chain_field_str(content, "goal", goal, sizeof(goal)))
-            snprintf(out, cap, "蓝图 %s", goal);
-        else
-            snprintf(out, cap, "蓝图");
-    } else if (strcmp(cat, "command") == 0) {
-        char dag[64] = "", pid[64] = "";
-        if (cli_chain_field_str(content, "dag_id", dag, sizeof(dag)))
-            snprintf(out, cap, "提交 dag=%s", dag);
-        else if (cli_chain_field_str(content, "plan_id", pid, sizeof(pid)))
-            snprintf(out, cap, "计划 %s", pid);
-        else
-            snprintf(out, cap, "指令");
-    } else if (strcmp(cat, "verify") == 0) {
-        char verdict[32] = "", reason[160] = "";
-        cli_chain_field_str(content, "verdict", verdict, sizeof(verdict));
-        cli_chain_field_str(content, "reason", reason, sizeof(reason));
-        if (verdict[0])
-            snprintf(out, cap, "复核 %s%s%s", verdict, reason[0] ? " · " : "", reason);
-        else
-            snprintf(out, cap, "复核");
-    } else if (strcmp(cat, "progress") == 0) {
-        char st[32] = "", reason[160] = "";
-        double pg = 0;
-        cli_chain_field_str(content, "state", st, sizeof(st));
-        cli_chain_field_str(content, "reason", reason, sizeof(reason));
-        if (st[0] && cli_chain_field_num(content, "progress", &pg))
-            snprintf(out, cap, "进度 %s %.0f%%%s%s", st, pg * 100.0,
-                     reason[0] ? " · " : "", reason);
-        else if (st[0])
-            snprintf(out, cap, "进度 %s%s%s", st, reason[0] ? " · " : "", reason);
-        else
-            snprintf(out, cap, "进度");
-    } else if (strcmp(cat, "result") == 0) {
-        char st[32] = "";
-        if (cli_chain_field_str(content, "state", st, sizeof(st)))
-            snprintf(out, cap, "终态 %s", st);
-        else
-            snprintf(out, cap, "结果");
-    } else if (strcmp(cat, "issue") == 0) {
-        char reason[160] = "";
-        double rc = 0;
-        cli_chain_field_str(content, "reason", reason, sizeof(reason));
-        if (cli_chain_field_num(content, "rc", &rc))
-            snprintf(out, cap, "问题 rc=%.0f%s%s", rc, reason[0] ? " · " : "", reason);
-        else
-            snprintf(out, cap, "问题%s%s", reason[0] ? " " : "", reason);
-    } else {
+    if (strcmp(cat, "chain") == 0)
+        chain_label_chain(content, out, cap);
+    else if (strcmp(cat, "blueprint") == 0)
+        chain_lb_blueprint(content, out, cap);
+    else if (strcmp(cat, "command") == 0)
+        chain_label_command(content, out, cap);
+    else if (strcmp(cat, "verify") == 0)
+        chain_label_verify(content, out, cap);
+    else if (strcmp(cat, "progress") == 0)
+        chain_label_progress(content, out, cap);
+    else if (strcmp(cat, "result") == 0)
+        chain_label_result(content, out, cap);
+    else if (strcmp(cat, "issue") == 0)
+        chain_label_issue(content, out, cap);
+    else
         snprintf(out, cap, "%s", cat[0] ? cat : "事件");
-    }
 }
 
 /* 长 content 截断（展示用，保持单行） */
@@ -272,6 +316,30 @@ static const char *cli_chain_trim(const char *s)
         buf[120] = '\0';
     }
     return buf;
+}
+
+/* 单事件渲染：-p 单行机器可读，交互态输出类别/序号/标签。 */
+static void chain_render_event(const cJSON *ev)
+{
+    const cJSON *file = cJSON_GetObjectItem(ev, "file");
+    const cJSON *content = cJSON_GetObjectItem(ev, "content");
+    char cat[32] = "";
+    double gseq = 0;
+
+    cli_chain_field_str(file, "category", cat, sizeof(cat));
+    cli_chain_field_num(file, "gseq", &gseq);
+    char *body = cJSON_IsObject(content) ? cJSON_PrintUnformatted(content) : NULL;
+    const char *shown = cli_chain_trim(body ? body : "");
+
+    if (g_cli_print_mode) {
+        cli_outf("  %s %llu %s\n", cat[0] ? cat : "event", (unsigned long long)gseq, shown);
+    } else {
+        char label[256];
+        cli_chain_label(cat, content, label, sizeof(label));
+        cli_outf("  [%s:%03llu] %s\n", cat[0] ? cat : "event", (unsigned long long)gseq, label);
+        cli_outf("      %s\n", shown);
+    }
+    AIRY_FREE(body);
 }
 
 static int cli_chain_render_task(const char *task_id)
@@ -317,28 +385,8 @@ static int cli_chain_render_task(const char *task_id)
         cli_print_status("Super Agent:chain", head);
     }
 
-    for (int i = 0; i < nev; i++) {
-        const cJSON *ev = cJSON_GetArrayItem(events, i);
-        const cJSON *file = cJSON_GetObjectItem(ev, "file");
-        const cJSON *content = cJSON_GetObjectItem(ev, "content");
-        char cat[32] = "";
-        double gseq = 0;
-        cli_chain_field_str(file, "category", cat, sizeof(cat));
-        cli_chain_field_num(file, "gseq", &gseq);
-        char *body = cJSON_IsObject(content) ? cJSON_PrintUnformatted(content) : NULL;
-        const char *shown = cli_chain_trim(body ? body : "");
-
-        if (g_cli_print_mode) {
-            cli_outf("  %s %llu %s\n", cat[0] ? cat : "event", (unsigned long long)gseq, shown);
-        } else {
-            char label[256];
-            cli_chain_label(cat, content, label, sizeof(label));
-            cli_outf("  [%s:%03llu] %s\n", cat[0] ? cat : "event",
-                     (unsigned long long)gseq, label);
-            cli_outf("      %s\n", shown);
-        }
-        AIRY_FREE(body);
-    }
+    for (int i = 0; i < nev; i++)
+        chain_render_event(cJSON_GetArrayItem(events, i));
     cJSON_Delete(res);
     return 0;
 }
@@ -392,109 +440,109 @@ int cmd_chain(const char *arg, void *ctx)
     return 0;
 }
 
-int cmd_hall(const char *arg, void *ctx)
+/* 网关调用失败的统一渲染：优先网关自述原因，其次错误码描述。 */
+static void hall_fail(const char *what, int rc)
 {
-    (void)ctx;
-    const char *sub = arg;
-    while (sub && (*sub == ' ' || *sub == '\t'))
-        sub++;
+    const char *why = cli_gw_last_err();
+    char line[224];
 
-    /* /hall audit：网关账本任务/事件计数。客户端不再持有索引，完整性
-     * 由账本单点负责（写入方 append-only，"已记录⟺可见"在 DEBUG 构建
-     * 写后回读断言），此处不宣称客户端核对过磁盘。 */
-    if (sub && strncmp(sub, "audit", 5) == 0) {
-        cJSON *res = NULL;
-        int rc = cli_gw_json("hall.tasks", NULL, CLI_HALL_GW_TIMEOUT_MS, &res);
-        if (rc != 0 || !res) {
-            const char *why = cli_gw_last_err();
-            char line[224];
-            snprintf(line, sizeof(line), "审计失败：%s",
-                     (why && why[0]) ? why : cli_err_desc(rc));
-            cli_print_line("Super Agent:事件流", line);
-            return 0;
-        }
-        const cJSON *tasks = cJSON_GetObjectItem(res, "tasks");
-        int n = cJSON_IsArray(tasks) ? cJSON_GetArraySize(tasks) : 0;
-        unsigned long long total = 0;
-        for (int i = 0; i < n; i++) {
-            double c = 0;
-            if (cli_chain_field_num(cJSON_GetArrayItem(tasks, i), "event_count", &c))
-                total += (unsigned long long)c;
-        }
-        if (g_cli_print_mode) {
-            cli_outf("hall audit tasks=%d events=%llu source=gateway\n", n, total);
-        } else {
-            char line[256];
-            snprintf(line, sizeof(line),
-                     "账本任务 %d 个 / 事件 %llu 条（源：网关账本；客户端不持有索引，"
-                     "完整性由账本单点负责）",
-                     n, total);
-            cli_print_status("Super Agent:hall", line);
-        }
-        cJSON_Delete(res);
-        return 0;
-    }
+    snprintf(line, sizeof(line), "%s：%s", what, (why && why[0]) ? why : cli_err_desc(rc));
+    cli_print_line("Super Agent:事件流", line);
+}
 
-    /* /hall replay [limit]：全局事件尾部（网关按 ts_utc/seq 排序），默认 8 条 */
-    if (sub && strncmp(sub, "replay", 6) == 0) {
-        long want = sub[6] ? strtol(sub + 6, NULL, 10) : 0;
-        size_t limit = want > 0 ? (size_t)want : 8;
-        cJSON *params = cJSON_CreateObject();
-        if (!params) {
-            cli_print_line("Super Agent:事件流", "回放失败：内存不足");
-            return 0;
-        }
-        cJSON_AddNumberToObject(params, "limit", (double)limit);
-
-        cJSON *res = NULL;
-        int rc = cli_gw_json("hall.stream", params, CLI_HALL_GW_TIMEOUT_MS, &res);
-        if (rc != 0 || !res) {
-            const char *why = cli_gw_last_err();
-            char line[224];
-            snprintf(line, sizeof(line), "回放失败：%s",
-                     (why && why[0]) ? why : cli_err_desc(rc));
-            cli_print_line("Super Agent:事件流", line);
-            return 0;
-        }
-        const cJSON *events = cJSON_GetObjectItem(res, "events");
-        int shown = cJSON_IsArray(events) ? cJSON_GetArraySize(events) : 0;
-        double total = 0;
-        cli_chain_field_num(res, "total", &total);
-
-        if (g_cli_print_mode) {
-            cli_outf("hall replay total=%llu shown=%d\n", (unsigned long long)total, shown);
-        } else {
-            char line[192];
-            snprintf(line, sizeof(line),
-                     "事件流全局回放 · 共 %llu 条（账本 ts_utc/seq 序，显示 %d）",
-                     (unsigned long long)total, shown);
-            cli_print_status("Super Agent:hall", line);
-        }
-        for (int i = 0; i < shown; i++) {
-            const cJSON *ev = cJSON_GetArrayItem(events, i);
-            const cJSON *file = cJSON_GetObjectItem(ev, "file");
-            const cJSON *content = cJSON_GetObjectItem(ev, "content");
-            char cat[32] = "", tid[128] = "";
-            cli_chain_field_str(file, "category", cat, sizeof(cat));
-            cli_chain_field_str(file, "task_id", tid, sizeof(tid));
-            char *body = cJSON_IsObject(content) ? cJSON_PrintUnformatted(content) : NULL;
-            cli_outf("  [%s] %s %s\n", cat[0] ? cat : "event", tid,
-                     cli_chain_trim(body ? body : ""));
-            AIRY_FREE(body);
-        }
-        cJSON_Delete(res);
-        return 0;
-    }
-
-    /* 无参数：任务统计 */
+/* /hall audit：网关账本任务/事件计数。客户端不再持有索引，完整性由账本
+ * 单点负责（写入方 append-only，"已记录⟺可见"在 DEBUG 构建写后回读
+ * 断言），此处不宣称客户端核对过磁盘。 */
+static int hall_audit(void)
+{
     cJSON *res = NULL;
     int rc = cli_gw_json("hall.tasks", NULL, CLI_HALL_GW_TIMEOUT_MS, &res);
     if (rc != 0 || !res) {
-        const char *why = cli_gw_last_err();
-        char line[224];
-        snprintf(line, sizeof(line), "任务统计失败：%s",
-                 (why && why[0]) ? why : cli_err_desc(rc));
-        cli_print_line("Super Agent:事件流", line);
+        hall_fail("审计失败", rc);
+        return 0;
+    }
+    const cJSON *tasks = cJSON_GetObjectItem(res, "tasks");
+    int n = cJSON_IsArray(tasks) ? cJSON_GetArraySize(tasks) : 0;
+    unsigned long long total = 0;
+    for (int i = 0; i < n; i++) {
+        double c = 0;
+        if (cli_chain_field_num(cJSON_GetArrayItem(tasks, i), "event_count", &c))
+            total += (unsigned long long)c;
+    }
+    if (g_cli_print_mode) {
+        cli_outf("hall audit tasks=%d events=%llu source=gateway\n", n, total);
+    } else {
+        char line[256];
+        snprintf(line, sizeof(line),
+                 "账本任务 %d 个 / 事件 %llu 条（源：网关账本；客户端不持有索引，"
+                 "完整性由账本单点负责）",
+                 n, total);
+        cli_print_status("Super Agent:hall", line);
+    }
+    cJSON_Delete(res);
+    return 0;
+}
+
+/* 全局回放单事件：类别 + 任务主键 + 截断后的 content。 */
+static void hall_replay_event(const cJSON *ev)
+{
+    const cJSON *file = cJSON_GetObjectItem(ev, "file");
+    const cJSON *content = cJSON_GetObjectItem(ev, "content");
+    char cat[32] = "";
+    char tid[128] = "";
+
+    cli_chain_field_str(file, "category", cat, sizeof(cat));
+    cli_chain_field_str(file, "task_id", tid, sizeof(tid));
+    char *body = cJSON_IsObject(content) ? cJSON_PrintUnformatted(content) : NULL;
+    cli_outf("  [%s] %s %s\n", cat[0] ? cat : "event", tid,
+             cli_chain_trim(body ? body : ""));
+    AIRY_FREE(body);
+}
+
+/* /hall replay [limit]：全局事件尾部（网关按 ts_utc/seq 排序），默认 8 条。 */
+static int hall_replay(const char *sub)
+{
+    long want = sub[6] ? strtol(sub + 6, NULL, 10) : 0;
+    size_t limit = want > 0 ? (size_t)want : 8;
+    cJSON *params = cJSON_CreateObject();
+    if (!params) {
+        cli_print_line("Super Agent:事件流", "回放失败：内存不足");
+        return 0;
+    }
+    cJSON_AddNumberToObject(params, "limit", (double)limit);
+
+    cJSON *res = NULL;
+    int rc = cli_gw_json("hall.stream", params, CLI_HALL_GW_TIMEOUT_MS, &res);
+    if (rc != 0 || !res) {
+        hall_fail("回放失败", rc);
+        return 0;
+    }
+    const cJSON *events = cJSON_GetObjectItem(res, "events");
+    int shown = cJSON_IsArray(events) ? cJSON_GetArraySize(events) : 0;
+    double total = 0;
+    cli_chain_field_num(res, "total", &total);
+
+    if (g_cli_print_mode) {
+        cli_outf("hall replay total=%llu shown=%d\n", (unsigned long long)total, shown);
+    } else {
+        char line[192];
+        snprintf(line, sizeof(line), "事件流全局回放 · 共 %llu 条（账本 ts_utc/seq 序，显示 %d）",
+                 (unsigned long long)total, shown);
+        cli_print_status("Super Agent:hall", line);
+    }
+    for (int i = 0; i < shown; i++)
+        hall_replay_event(cJSON_GetArrayItem(events, i));
+    cJSON_Delete(res);
+    return 0;
+}
+
+/* 无参数：任务统计。 */
+static int hall_summary(void)
+{
+    cJSON *res = NULL;
+    int rc = cli_gw_json("hall.tasks", NULL, CLI_HALL_GW_TIMEOUT_MS, &res);
+    if (rc != 0 || !res) {
+        hall_fail("任务统计失败", rc);
         return 0;
     }
     const cJSON *tasks = cJSON_GetObjectItem(res, "tasks");
@@ -509,6 +557,20 @@ int cmd_hall(const char *arg, void *ctx)
     }
     cJSON_Delete(res);
     return 0;
+}
+
+int cmd_hall(const char *arg, void *ctx)
+{
+    (void)ctx;
+    const char *sub = arg;
+    while (sub && (*sub == ' ' || *sub == '\t'))
+        sub++;
+
+    if (sub && strncmp(sub, "audit", 5) == 0)
+        return hall_audit();
+    if (sub && strncmp(sub, "replay", 6) == 0)
+        return hall_replay(sub);
+    return hall_summary();
 }
 
 int cmd_quit(const char *arg, void *ctx)
