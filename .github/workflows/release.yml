@@ -1516,6 +1516,11 @@ jobs:
       # main 补推，fail-soft；无 PAT 时跳过并告警）。
       GITHUB_REPO: ${{ github.repository }}
       GITHUB_PAT: ${{ secrets.GH_TOKEN }}
+      # 快照提交署名（R2 / COMMIT-AUDIT §4 / .mailmap）：发布自动化账号不得
+      # 出现在 Signed-off-by 中，快照以发布操作者（.mailmap 规范自然人身份）
+      # 提交并 -s 落署名；出现多操作者后改 repo variables 下发。
+      AIRY_SNAP_NAME: 'Liren Wang'
+      AIRY_SNAP_EMAIL: 'wangliren@spharx.cn'
       # 同 tag 重发/修复：OBS 预签名 PUT 按文件名覆盖，设置
       # AIRY_FORCE_UPLOAD=1 使发布永远覆盖远端同名附件，杜绝"跳过上传但
       # manifest 已按新 sha 重生成"的不一致。
