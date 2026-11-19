@@ -186,6 +186,67 @@ static int cli_fail_render(const cJSON *root, char *out, size_t cap)
     return err;
 }
 
+/* 旧式（无 reason 的结构化载荷）失败字段：一次取全，渲染与判空分治。 */
+typedef struct {
+    int stage;
+    int err;
+    unsigned rounds;
+    unsigned rej;
+    const char *node;
+    const char *detail;
+} cli_fail_f_t;
+
+/* 数值键取值：缺失或非数值返回 0（不写 *v）。 */
+static int cj_num(const cJSON *o, double *v)
+{
+    if (!o || !cJSON_IsNumber(o))
+        return 0;
+    *v = o->valuedouble;
+    return 1;
+}
+
+/* 字符串键取值：缺失或非字符串按空串（调用方无需再判 NULL）。 */
+static const char *cj_str(const cJSON *o)
+{
+    return (o && cJSON_IsString(o)) ? o->valuestring : "";
+}
+
+static void cli_fail_fields(cJSON *root, cli_fail_f_t *f)
+{
+    double v = 0;
+    cJSON *stats = cJSON_GetObjectItem(root, "stats");
+
+    f->stage = cj_num(cJSON_GetObjectItem(root, "stage"), &v) ? (int)v : 0;
+    f->rounds = cj_num(cJSON_GetObjectItem(root, "grad_rounds"), &v) ? (unsigned)v : 0;
+    f->rej = cj_num(cJSON_GetObjectItem(root, "grad_rejections"), &v) ? (unsigned)v : 0;
+    f->err = cj_num(stats ? cJSON_GetObjectItem(stats, "err_code") : NULL, &v)
+                 ? (int)v
+                 : 0;
+    f->node = cj_str(cJSON_GetObjectItem(root, "affected_node"));
+    f->detail = cj_str(cJSON_GetObjectItem(root, "err_detail"));
+}
+
+/* 把旧式载荷渲染成一行：阶段名 + （轮次/驳回/节点）+ 细节或错误码。 */
+static void cli_fail_render_leg(const cli_fail_f_t *f, char *out, size_t cap)
+{
+    int off;
+    int st = f->stage;
+    const char *sname = (st > 0 && (size_t)st < sizeof(g_gw_stage_name) / sizeof(g_gw_stage_name[0]))
+                            ? g_gw_stage_name[st]
+                            : "unknown";
+
+    off = snprintf(out, cap, "失败于 %s", sname);
+    if (off > 0 && (size_t)off < cap && (f->rounds || f->rej || f->node[0]))
+        off += snprintf(out + off, cap - (size_t)off, "（第 %u 轮，驳回 %u 次%s%s）", f->rounds,
+                        f->rej, f->node[0] ? "，节点 " : "", f->node);
+    if (off <= 0 || (size_t)off >= cap)
+        return;
+    if (f->detail[0])
+        snprintf(out + off, cap - (size_t)off, "：%s", f->detail);
+    else if (f->err)
+        snprintf(out + off, cap - (size_t)off, "：err=%d", f->err);
+}
+
 int cli_gw_fail_line(const char *data_json, char *out, size_t cap)
 {
     if (out && cap)
@@ -202,40 +263,15 @@ int cli_gw_fail_line(const char *data_json, char *out, size_t cap)
         cJSON_Delete(root);
         return rc;
     }
-    cJSON *stage = cJSON_GetObjectItem(root, "stage");
-    cJSON *rounds = cJSON_GetObjectItem(root, "grad_rounds");
-    cJSON *rej = cJSON_GetObjectItem(root, "grad_rejections");
-    cJSON *node = cJSON_GetObjectItem(root, "affected_node");
-    cJSON *detail = cJSON_GetObjectItem(root, "err_detail");
-    cJSON *stats = cJSON_GetObjectItem(root, "stats");
-    cJSON *code = stats ? cJSON_GetObjectItem(stats, "err_code") : NULL;
-    int err = (code && cJSON_IsNumber(code)) ? (int)code->valuedouble : 0;
-    int st = (stage && cJSON_IsNumber(stage)) ? (int)stage->valuedouble : 0;
-    unsigned nr = (rounds && cJSON_IsNumber(rounds)) ? (unsigned)rounds->valuedouble : 0;
-    unsigned nrej = (rej && cJSON_IsNumber(rej)) ? (unsigned)rej->valuedouble : 0;
-    const char *snode = (node && cJSON_IsString(node)) ? node->valuestring : "";
-    const char *sdet = (detail && cJSON_IsString(detail)) ? detail->valuestring : "";
-
-    if (st <= 0 && !sdet[0] && err == 0) {
+    cli_fail_f_t f;
+    cli_fail_fields(root, &f);
+    if (f.stage <= 0 && !f.detail[0] && f.err == 0) {
         cJSON_Delete(root);
         return 0;
     }
-    const char *sname = (st > 0 && (size_t)st < sizeof(g_gw_stage_name) / sizeof(g_gw_stage_name[0]))
-                            ? g_gw_stage_name[st]
-                            : "unknown";
-    int off = snprintf(out, cap, "失败于 %s", sname);
-    if (off > 0 && (size_t)off < cap && (nr || nrej || snode[0])) {
-        off += snprintf(out + off, cap - (size_t)off, "（第 %u 轮，驳回 %u 次%s%s）", nr, nrej,
-                        snode[0] ? "，节点 " : "", snode);
-    }
-    if (off > 0 && (size_t)off < cap) {
-        if (sdet[0])
-            snprintf(out + off, cap - (size_t)off, "：%s", sdet);
-        else if (err != 0)
-            snprintf(out + off, cap - (size_t)off, "：err=%d", err);
-    }
+    cli_fail_render_leg(&f, out, cap);
     cJSON_Delete(root);
-    return err;
+    return f.err;
 }
 
 /* JSON-RPC error 对象分诊：网关已应答即链路可达，绝不外溢为 transport（N1）。 */

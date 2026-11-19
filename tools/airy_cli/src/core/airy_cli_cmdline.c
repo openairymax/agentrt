@@ -257,6 +257,146 @@ static void cli_print_usage(void)
              "126 TUI 不可用。\n");
 }
 
+/* 开关型与自证型选项表（0.1.21 R18：左右分治，解析主循环只做查表）。
+ * flag 非空即置位开关；action 1=输出版本后正常终止，2=输出用法后终止。 */
+typedef struct {
+    const char *name;
+    int *flag;
+    int action;
+} cli_opt_t;
+
+static const cli_opt_t k_cli_opts[] = {
+    { "-p", &g_cli_print_mode, 0 },   { "--print", &g_cli_print_mode, 0 },
+    { "--json", &g_cli_json_mode, 0 }, { "--verbose", &g_cli_verbose, 0 },
+    { "--tui", &g_cli_tui_mode, 0 },  { "--quiet", &g_cli_quiet, 0 },
+    { "--continue", &g_cli_resume_mode, 0 },
+    { "--resume", &g_cli_resume_mode, 0 },
+    /* 版本自证取运行期身份（airy_build_id）：与 /health、启动横幅同一来源。 */
+    { "-V", NULL, 1 },                { "--version", NULL, 1 },
+    { "-h", NULL, 2 },                { "--help", NULL, 2 },
+};
+
+/* 返回 0=未命中；1=已消费；2=已终止（版本/帮助）。 */
+static int cli_opt_apply(const char *a)
+{
+    size_t i;
+    for (i = 0; i < sizeof(k_cli_opts) / sizeof(k_cli_opts[0]); i++) {
+        if (strcmp(a, k_cli_opts[i].name) != 0)
+            continue;
+        if (k_cli_opts[i].flag) {
+            *k_cli_opts[i].flag = 1;
+            return 1;
+        }
+        if (k_cli_opts[i].action == 1)
+            cli_outf("airy_cli %s\n", airy_build_id());
+        else
+            cli_print_usage();
+        return 2;
+    }
+    return 0;
+}
+
+/* 带值选项：--timeout <秒>（D-8 四档统一覆盖）、--events ndjson（D-15
+ * stdout 只出 NDJSON 帧，其它取值按用法错误拒绝，避免隐式降级）。
+ * 返回 0=未命中；1=已消费；2=用法错误。 */
+static int cli_vopt_apply(int argc, char *argv[], int *ip)
+{
+    const char *a = argv[*ip];
+    if (strcmp(a, "--timeout") == 0) {
+        int ms = (*ip + 1 < argc) ? cli_tmo_parse_sec(argv[*ip + 1]) : -1;
+        if (ms < 0) {
+            cli_outf("airy_cli: --timeout 需要 1..86400 的秒数\n");
+            cli_print_usage();
+            return 2;
+        }
+        cli_tmo_set(ms);
+        (*ip)++;
+        return 1;
+    }
+    if (strcmp(a, "--events") == 0) {
+        if (*ip + 1 >= argc || strcmp(argv[*ip + 1], "ndjson") != 0) {
+            cli_outf("airy_cli: --events 仅支持 ndjson\n");
+            cli_print_usage();
+            return 2;
+        }
+        g_cli_events_mode = 1;
+        (*ip)++;
+        return 1;
+    }
+    return 0;
+}
+
+/* 子命令表：仅在单轮/事件模式下不可用（这两模式的首个非选项 token 是
+ * prompt）。返回 0=未命中；1=已输出并正常终止；2=子命令自身失败。 */
+typedef struct {
+    const char *name;
+    int (*run)(int, char **);
+} cli_subcmd_t;
+
+static const cli_subcmd_t k_cli_subcmds[] = {
+    { "paths", cli_cmd_paths }, { "models", cli_cmd_models },
+    { "model", cli_cmd_model }, { "key", cli_cmd_key },
+    { "gpu", cli_cmd_gpu },
+};
+
+static int cli_cmd_apply(const char *a, int ac, char **av)
+{
+    size_t i;
+    if (g_cli_print_mode || g_cli_events_mode)
+        return 0;
+    for (i = 0; i < sizeof(k_cli_subcmds) / sizeof(k_cli_subcmds[0]); i++) {
+        if (strcmp(a, k_cli_subcmds[i].name) != 0)
+            continue;
+        return k_cli_subcmds[i].run(ac, av) == 0 ? 1 : 2;
+    }
+    return 0;
+}
+
+/* 非选项 token：单轮/事件模式下作为 prompt（只接受一个）。返回 0=消费；
+ * 2=用法错误。 */
+static int cli_pos_apply(const char *a, const char **prompt)
+{
+    if (a[0] == '-') {
+        cli_outf("airy_cli: 未知选项 %s%s%s\n", cli_c(CLR_YELLOW), a,
+                 cli_c(CLR_RESET));
+        cli_print_usage();
+        return 2;
+    }
+    if (!g_cli_print_mode && !g_cli_events_mode) {
+        cli_outf("airy_cli: 未知参数 %s%s%s（非选项参数仅可用于 %s-p%s 模式）\n",
+                 cli_c(CLR_YELLOW), a, cli_c(CLR_RESET), cli_c(CLR_CYAN),
+                 cli_c(CLR_RESET));
+        cli_print_usage();
+        return 2;
+    }
+    if (*prompt) {
+        cli_outf("airy_cli: 多出的参数 %s%s%s（单轮模式只接受一个 prompt）\n",
+                 cli_c(CLR_YELLOW), a, cli_c(CLR_RESET));
+        cli_print_usage();
+        return 2;
+    }
+    *prompt = a;
+    return 0;
+}
+
+/* 模式互斥：--tui 与 -p 互斥；--events 独占 stdout，与 --tui/--json 冲突。 */
+static int cli_mode_check(void)
+{
+    if (g_cli_tui_mode && g_cli_print_mode) {
+        cli_outf("airy_cli: %s--tui%s 与 %s-p%s 互斥（全屏渲染层 vs 无界面单轮）\n",
+                 cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_CYAN),
+                 cli_c(CLR_RESET));
+        return 2;
+    }
+    if (g_cli_events_mode && (g_cli_tui_mode || g_cli_json_mode)) {
+        cli_outf("airy_cli: %s--events%s 与 %s--tui/--json%s 互斥（stdout 归属冲突）\n",
+                 cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_CYAN),
+                 cli_c(CLR_RESET));
+        return 2;
+    }
+    return 0;
+}
+
 /* 命令行解析（2026-08-21 自 main 抽离降圈复杂度）：支持选项与
  * -p 模式 prompt 任意顺序（`-p --json "prompt"`、`--json -p "prompt"`、
  * `-p "prompt" --json` 均合法），首个非选项 token 作为 prompt（含空格的
@@ -265,90 +405,20 @@ static void cli_print_usage(void)
 int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
 {
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--print") == 0) {
-            g_cli_print_mode = 1;
-        } else if (strcmp(argv[i], "--json") == 0) {
-            g_cli_json_mode = 1;
-        } else if (strcmp(argv[i], "--verbose") == 0) {
-            /* C-10（0.1.21）：失败归因默认一行，--verbose 附原始错误 data。 */
-            g_cli_verbose = 1;
-        } else if (strcmp(argv[i], "--timeout") == 0) {
-            /* D-8（0.1.21）：四档统一覆盖；缺值/非法按用法错误退出。 */
-            int ms = (i + 1 < argc) ? cli_tmo_parse_sec(argv[i + 1]) : -1;
-            if (ms < 0) {
-                cli_outf("airy_cli: --timeout 需要 1..86400 的秒数\n");
-                cli_print_usage();
-                return 2;
-            }
-            cli_tmo_set(ms);
-            i++;
-        } else if (strcmp(argv[i], "--tui") == 0) {
-            g_cli_tui_mode = 1;
-        } else if (strcmp(argv[i], "--events") == 0) {
-            /* D-15（0.1.21）：stdout 只出 NDJSON 帧；当前仅 ndjson 一种线格式，
-             * 其它取值按用法错误拒绝，避免"看起来支持"的隐式降级。 */
-            if (i + 1 >= argc || strcmp(argv[i + 1], "ndjson") != 0) {
-                cli_outf("airy_cli: --events 仅支持 ndjson\n");
-                cli_print_usage();
-                return 2;
-            }
-            g_cli_events_mode = 1;
-            i++;
-        } else if (strcmp(argv[i], "--quiet") == 0) {
-            g_cli_quiet = 1;
-        } else if (strcmp(argv[i], "--continue") == 0 ||
-                   strcmp(argv[i], "--resume") == 0) {
-            g_cli_resume_mode = 1;
-        } else if (strcmp(argv[i], "-V") == 0 || strcmp(argv[i], "--version") == 0) {
-            /* 版本自证取运行期身份（airy_build_id）：与 /health、启动横幅
-             * 同一来源，现场三处对照不会出现两个说法。 */
-            cli_outf("airy_cli %s\n", airy_build_id());
+        int rc = cli_opt_apply(argv[i]);
+        if (rc == 2)
             return 1;
-        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
-            cli_print_usage();
-            return 1;
-        } else if (!g_cli_print_mode && !g_cli_events_mode && strcmp(argv[i], "paths") == 0) {
-            /* 子命令按「已输出、正常终止」返回；失败仍走用法错误码。 */
-            return cli_cmd_paths(argc - i - 1, argv + i + 1) == 0 ? 1 : 2;
-        } else if (!g_cli_print_mode && !g_cli_events_mode && strcmp(argv[i], "models") == 0) {
-            return cli_cmd_models(argc - i - 1, argv + i + 1) == 0 ? 1 : 2;
-        } else if (!g_cli_print_mode && !g_cli_events_mode && strcmp(argv[i], "model") == 0) {
-            return cli_cmd_model(argc - i - 1, argv + i + 1) == 0 ? 1 : 2;
-        } else if (!g_cli_print_mode && !g_cli_events_mode && strcmp(argv[i], "key") == 0) {
-            return cli_cmd_key(argc - i - 1, argv + i + 1) == 0 ? 1 : 2;
-        } else if (!g_cli_print_mode && !g_cli_events_mode && strcmp(argv[i], "gpu") == 0) {
-            return cli_cmd_gpu(argc - i - 1, argv + i + 1) == 0 ? 1 : 2;
-        } else if (argv[i][0] == '-') {
-            cli_outf("airy_cli: 未知选项 %s%s%s\n", cli_c(CLR_YELLOW), argv[i],
-                   cli_c(CLR_RESET));
-            cli_print_usage();
-            return 2;
-        } else if ((g_cli_print_mode || g_cli_events_mode) && !*out_print_prompt) {
-            *out_print_prompt = argv[i];
-        } else if (g_cli_print_mode || g_cli_events_mode) {
-            cli_outf("airy_cli: 多出的参数 %s%s%s（单轮模式只接受一个 prompt）\n",
-                   cli_c(CLR_YELLOW), argv[i], cli_c(CLR_RESET));
-            cli_print_usage();
-            return 2;
-        } else {
-            cli_outf("airy_cli: 未知参数 %s%s%s（非选项参数仅可用于 %s-p%s 模式）\n",
-                   cli_c(CLR_YELLOW), argv[i], cli_c(CLR_RESET),
-                   cli_c(CLR_CYAN), cli_c(CLR_RESET));
-            cli_print_usage();
-            return 2;
-        }
+        if (rc == 1)
+            continue;
+        rc = cli_vopt_apply(argc, argv, &i);
+        if (rc != 0)
+            return rc;
+        rc = cli_cmd_apply(argv[i], argc - i - 1, argv + i + 1);
+        if (rc != 0)
+            return rc;
+        rc = cli_pos_apply(argv[i], out_print_prompt);
+        if (rc != 0)
+            return rc;
     }
-    if (g_cli_tui_mode && g_cli_print_mode) {
-        cli_outf("airy_cli: %s--tui%s 与 %s-p%s 互斥（全屏渲染层 vs 无界面单轮）\n",
-               cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
-        return 2;
-    }
-    /* D-15（0.1.21）：stdout 的两种结构化出口互斥——事件流独占 stdout，
-     * TUI 需要终端控制权，二者与 --events 同用都会破坏帧的可解析性。 */
-    if (g_cli_events_mode && (g_cli_tui_mode || g_cli_json_mode)) {
-        cli_outf("airy_cli: %s--events%s 与 %s--tui/--json%s 互斥（stdout 归属冲突）\n",
-               cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_CYAN), cli_c(CLR_RESET));
-        return 2;
-    }
-    return 0;
+    return cli_mode_check();
 }
