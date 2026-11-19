@@ -211,7 +211,10 @@ void cli_rpc_print(const char *ns, const char *method, const char *params_json)
 /* ==================== /rpc + /daemons ==================== */
 
 /* /rpc 尾部 "--timeout <秒>"（0.1.21 D-8）：摘出覆盖值并返回毫秒，剩余
- * 文本去掉该后缀作为 JSON 参数。未出现返回 0；缺值/非法返回 -1。 */
+ * 文本去掉该后缀后写入 out 作为 JSON 参数。未出现返回 0；缺值/非法或
+ * 文本超出 cap 返回 -1。
+ * out 恒被写入（含无 --timeout 与空参数两种情形）：调用方据 out[0] 判空，
+ * 漏写会让其把未初始化栈内存当 JSON 发出，网关侧只能回 -32700。 */
 static int rpc_timeout_arg(const char *in, char *out, size_t cap)
 {
     const char *p = in;
@@ -219,13 +222,21 @@ static int rpc_timeout_arg(const char *in, char *out, size_t cap)
     int sec = 0;
     size_t n;
 
+    if (cap == 0)
+        return -1;
+    out[0] = '\0';
     while ((p = strstr(p, "--timeout")) != NULL) {
         if (p == in || p[-1] == ' ' || p[-1] == '\t')
             tail = p;
         p += 9;
     }
-    if (!tail)
+    if (!tail) {
+        n = strlen(in);
+        if (n + 1 > cap)
+            return -1;
+        AIRY_MEMCPY(out, in, n + 1);
         return 0;
+    }
     p = tail + 9;
     while (*p == ' ' || *p == '\t')
         p++;
@@ -293,7 +304,8 @@ int cmd_rpc(const char *arg, void *ctx)
     if (rest[mlen] == ' ') {
         tmo_ms = rpc_timeout_arg(rest + mlen + 1, params_buf, sizeof(params_buf));
         if (tmo_ms < 0) {
-            cli_print_line("Sub Agent:用法", "--timeout 需要 1..86400 的秒数");
+            cli_print_line("Sub Agent:用法",
+                           "参数过长或 --timeout 需要 1..86400 的秒数");
             return 0;
         }
         params = params_buf[0] ? params_buf : NULL;
