@@ -1365,6 +1365,7 @@ if(BUILD_TESTS)
             get_target_property(_srcdir "${_tgt}" SOURCE_DIR)
             if(_tgt MATCHES "^(test_|integ_|check_)" OR _srcdir MATCHES "/tests(/|$)")
                 target_compile_options("${_tgt}" PRIVATE -UNDEBUG)
+                set_property(GLOBAL APPEND PROPERTY AIRY_ASSERT_TARGETS "${_tgt}")
             endif()
         endforeach()
         get_property(_subs DIRECTORY "${_dir}" PROPERTY SUBDIRECTORIES)
@@ -1373,7 +1374,14 @@ if(BUILD_TESTS)
         endforeach()
     endfunction()
     airy_undef_ndebug_for_tests("${CMAKE_CURRENT_SOURCE_DIR}")
-    airy_print_info("Test targets: assert() re-enabled via -UNDEBUG (NDEBUG no-op fix)")
+    # 自证：机制只改编译选项，一旦判定条件或目录遍历失效就会静默退化为
+    # 「Release 下断言全灭」，而这正是它要消除的假绿灯。命中数为 0 即配置失败。
+    get_property(_assert_tgts GLOBAL PROPERTY AIRY_ASSERT_TARGETS)
+    list(LENGTH _assert_tgts _assert_n)
+    if(_assert_n EQUAL 0)
+        message(FATAL_ERROR "no test target matched -UNDEBUG injection: assert() would be a no-op in Release")
+    endif()
+    airy_print_info("Test targets: assert() re-enabled via -UNDEBUG (${_assert_n} targets)")
 endif()
 
 # 自定义目标：清理构建
