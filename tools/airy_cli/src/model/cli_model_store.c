@@ -6,7 +6,8 @@
  * @brief 本地模型注册表的键值存储与声明片段收敛（0.1.21 D-6）。
  *
  * 数据面与 ops 的 airy-local 同源：注册表 $AIRY_HOME/local/models/installed.env，
- * 服务注册 $AIRY_HOME/local/registry/installed.env，声明片段
+ * 服务注册 $AIRY_HOME/local/llamacpp/installed.env（旧路径 local/registry/
+ * installed.env 回退兼容），声明片段
  * $AIRY_HOME/config/managed.d/llamacpp.env。写路一律「读全量 → 原位改单键 →
  * 临时文件 + fsync + rename」，只动本实例的 AIRYRT_MANAGED_* 键，保留同文件
  * 内其他实例/其他键（airy-local 的整文件覆写会静默抹掉第二实例，此处不复刻）。
@@ -29,7 +30,13 @@ void mr_ctx_init(mr_ctx_t *c)
     snprintf(c->home, sizeof(c->home), "%s", (h && h[0]) ? h : airy_home_dir());
     snprintf(c->reg, sizeof(c->reg), "%s/local/models/installed.env", c->home);
     snprintf(c->dir, sizeof(c->dir), "%s/local/models", c->home);
-    snprintf(c->srv, sizeof(c->srv), "%s/local/registry/installed.env", c->home);
+    /* 服务注册的事实源是安装器的落位：airy-local 写
+     * local/llamacpp/installed.env。早期 CLI 读 local/registry/installed.env，
+     * 两处不一致时安装好的 llama-server 永远读不到，模型面板无法挂载自托管
+     * 服务。安装器路径优先，registry 旧路径作兼容回退。 */
+    snprintf(c->srv, sizeof(c->srv), "%s/local/llamacpp/installed.env", c->home);
+    if (!airy_file_exists(c->srv))
+        snprintf(c->srv, sizeof(c->srv), "%s/local/registry/installed.env", c->home);
     snprintf(c->frag, sizeof(c->frag), "%s/config/managed.d/llamacpp.env", c->home);
     snprintf(c->yaml, sizeof(c->yaml), "%s/config/model.yaml", c->home);
     snprintf(c->port, sizeof(c->port), "%s", (p && p[0]) ? p : "11435");
