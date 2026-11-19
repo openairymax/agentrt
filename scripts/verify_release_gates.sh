@@ -2227,7 +2227,7 @@ else
     fi
 fi
 
-section "VD" "版本自证：install.sh 兜底版本与 VERSION 一致"
+section "VD" "版本自证：install.sh / install.ps1 / latest 启动器兜底版本与 VERSION 一致"
 
 _vd_ver="$(tr -d '[:space:]' < "$ROOT/VERSION" 2>/dev/null || true)"
 _vd_fb="$(sed -n 's/^AIRY_VERSION="\${AIRY_VERSION:-\(v[0-9][0-9.]*\)}"$/\1/p' "$INSTALL" 2>/dev/null | head -1)"
@@ -2239,6 +2239,66 @@ elif [ "v$_vd_ver" = "$_vd_fb" ]; then
     ok "VD1 install.sh 兜底版本 ${_vd_fb} 与 VERSION 一致"
 else
     bad "VD1 install.sh 兜底版本 ${_vd_fb} 落后于 VERSION v${_vd_ver}（curl|bash 会装旧版）"
+fi
+
+# VD2：Windows 一键安装同一缺陷面（0.1.21-R07）。ps1 兜底落后会让
+# PowerShell 用户装到旧版，且与 sh 面版本口径分叉。
+_vd_ps1="$(sed -n 's/^[[:space:]]*else { "\(v[0-9][0-9.]*\)" }$/\1/p' "$INSTALL_PS1" 2>/dev/null | head -1)"
+if [ -z "$_vd_ver" ]; then
+    skip "VD2 install.ps1 版本自证跳过（VERSION 缺失）"
+elif [ -z "$_vd_ps1" ]; then
+    bad "VD2 install.ps1 未找到版本兜底赋值行（iwr|iex 场景无版本来源）"
+elif [ "v$_vd_ver" = "$_vd_ps1" ]; then
+    ok "VD2 install.ps1 兜底版本 ${_vd_ps1} 与 VERSION 一致"
+else
+    bad "VD2 install.ps1 兜底版本 ${_vd_ps1} 与 VERSION v${_vd_ver} 不一致"
+fi
+
+# VD3：latest/airymaxrt 是 release 通道分发的第三副本，版本必须读
+# install.env / 包根 VERSION，禁止硬编码字面量（否则升降级口径再次分叉）。
+_vd_lit="$(grep -oE '"v[0-9]+\.[0-9]+\.[0-9]+"' "$LATEST_RT" 2>/dev/null | head -1)"
+if [ ! -f "$LATEST_RT" ]; then
+    skip "VD3 latest/airymaxrt 缺失，跳过"
+elif [ -n "$_vd_lit" ]; then
+    bad "VD3 latest/airymaxrt 存在硬编码版本字面量 ${_vd_lit}（应读 install.env/VERSION）"
+elif grep -q '\.\./VERSION' "$LATEST_RT" 2>/dev/null; then
+    ok "VD3 latest/airymaxrt 版本取自 install.env/VERSION（无硬编码字面量）"
+else
+    bad "VD3 latest/airymaxrt 未发现包根 VERSION 兜底读取"
+fi
+
+# VD4：自托管工具链落包自证（0.1.21-R06）——函数必须在组装链上被调用，
+# 且行为双向正确：齐全放行、缺可执行/缺清单必须失败。
+_vd_pk=""
+for _c in "$ROOT/../tools/scripts/ci/release/lib-package.sh" \
+          "$ROOT/../../tools/scripts/ci/release/lib-package.sh"; do
+    [ -f "$_c" ] && { _vd_pk="$_c"; break; }
+done
+if [ -z "$_vd_pk" ]; then
+    skip "VD4 未找到 lib-package.sh（tools 仓不在门禁视野内）"
+elif ! grep -q 'if ! pkg_verify_ops_assets "\$out"' "$_vd_pk" 2>/dev/null; then
+    bad "VD4 pkg_assemble_full 未调用 pkg_verify_ops_assets（缺件包仍可出库）"
+elif bash -c '
+    set -euo pipefail
+    . "$1"
+    out="$2"
+    mkdir -p "$out/share/ops/bin" "$out/share/ops/lib" "$out/share/ops/templates"
+    : > "$out/share/ops/bin/airy-local"; chmod +x "$out/share/ops/bin/airy-local"
+    for f in llama-pin.list permission_rules.yaml secrets.env.example; do
+        : > "$out/share/ops/templates/$f"
+    done
+    : > "$out/share/ops/lib/platform.sh"
+    pkg_verify_ops_assets "$out" >/dev/null || { echo "正向：齐全件被拒"; exit 1; }
+    chmod -x "$out/share/ops/bin/airy-local"
+    pkg_verify_ops_assets "$out" >/dev/null 2>&1 && { echo "反向：缺可执行仍放行"; exit 1; }
+    chmod +x "$out/share/ops/bin/airy-local"
+    rm -f "$out/share/ops/templates/llama-pin.list"
+    pkg_verify_ops_assets "$out" >/dev/null 2>&1 && { echo "反向：缺 pin 清单仍放行"; exit 1; }
+    exit 0
+' _ "$_vd_pk" "$TMP/vd4" >/dev/null 2>&1; then
+    ok "VD4 落包自证双向正确（缺 airy-local / 缺 pin 清单均 fail-closed）"
+else
+    bad "VD4 落包自证双向失败（缺件包可出库）"
 fi
 
 printf '\n门禁汇总: PASS=%d FAIL=%d\n' "$PASS" "$FAIL"
