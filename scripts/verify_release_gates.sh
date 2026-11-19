@@ -2227,6 +2227,20 @@ else
     fi
 fi
 
+section "VD" "版本自证：install.sh 兜底版本与 VERSION 一致"
+
+_vd_ver="$(tr -d '[:space:]' < "$ROOT/VERSION" 2>/dev/null || true)"
+_vd_fb="$(sed -n 's/^AIRY_VERSION="\${AIRY_VERSION:-\(v[0-9][0-9.]*\)}"$/\1/p' "$INSTALL" 2>/dev/null | head -1)"
+if [ -z "$_vd_ver" ]; then
+    skip "VD0 VERSION 文件缺失，版本自证跳过"
+elif [ -z "$_vd_fb" ]; then
+    bad "VD1 install.sh 未找到 AIRY_VERSION 兜底赋值行（curl|bash 场景无版本来源）"
+elif [ "v$_vd_ver" = "$_vd_fb" ]; then
+    ok "VD1 install.sh 兜底版本 ${_vd_fb} 与 VERSION 一致"
+else
+    bad "VD1 install.sh 兜底版本 ${_vd_fb} 落后于 VERSION v${_vd_ver}（curl|bash 会装旧版）"
+fi
+
 printf '\n门禁汇总: PASS=%d FAIL=%d\n' "$PASS" "$FAIL"
 if [ "$FAIL" -gt 0 ]; then
     printf '  [GATE] WS-9 社区六类问题修复发布门禁未通过（方案 §4.9 / 9.8）\n'
