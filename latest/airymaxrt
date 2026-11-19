@@ -1457,6 +1457,8 @@ case "$CMD" in
         echo "用法: airymaxrt [airy_cli 参数]（默认进入 TUI 渲染层）"
         echo "      airymaxrt version     显示版本号（等同 --version）"
         echo "      airymaxrt cli [airy_cli 参数]  行式模式（不经 TUI 渲染层）"
+        echo "      airymaxrt local [setup|install|status|...]  自托管模型管理"
+        echo "                        （setup 为交互向导；直接透传 ops/airy-local）"
         echo "      airymaxrt profile [full|minimal|auto]  查看/切换运行画像（硬件自适应）"
         echo "      airymaxrt monitor   硬件监控：检测到能力增强自动恢复功能"
         echo "                        （monitor --daemon 后台常驻 / --stop 停止）"
@@ -1482,6 +1484,29 @@ case "$CMD" in
         FRONTEND_TUI=0
         shift
         CLI_ARGS=("$@")
+        ;;
+    local)
+        # 自托管统一入口：把向导/安装/状态/卸载透传给 ops/airy-local，
+        # 用户无需知道脚本在仓库或安装包的哪个位置——这是「没有交互页面」
+        # 的直接原因：此前本地模型完全没有可发现的命令入口。
+        _AL_BIN=""
+        for _c in "$AIRY_HOME/bin/airy-local" \
+                  "$AIRYRT_HOME/tools/scripts/ops/bin/airy-local" \
+                  "$SCRIPT_DIR/../../../../tools/scripts/ops/bin/airy-local"; do
+            if [ -x "$_c" ]; then
+                _AL_BIN="$_c"
+                break
+            fi
+        done
+        if [ -z "$_AL_BIN" ]; then
+            _AL_BIN="$(command -v airy-local 2>/dev/null || true)"
+        fi
+        if [ -z "$_AL_BIN" ]; then
+            log error "airy-local 未找到（安装包缺少 tools/scripts/ops/bin/airy-local）"
+            exit 1
+        fi
+        shift
+        exec "$_AL_BIN" "$@"
         ;;
     stop)
         # B13 收摊归一唯一入口：supervisor.shutdown（daemon 群随之退出）
