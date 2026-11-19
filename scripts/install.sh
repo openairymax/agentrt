@@ -1156,28 +1156,38 @@ path_rc_file() {
 }
 
 path_bootstrap() {
-    local rc
-    rc="$(path_rc_file)"
-    if [ -f "$rc" ] && grep -q '# >>> AgentRT PATH bootstrap <<<' "$rc" 2>/dev/null; then
-        log_info "PATH 引导: $rc 已包含 AgentRT PATH 行（幂等跳过）"
-        env_set "AIRY_PATH_RC=$rc"
+    local rc line written=0
+    # 只写一种 shell 的 rc 不足以覆盖真实终端：管道安装或 sudo 下 SHELL
+    # 可能缺失/被改写（落到 .profile），而用户实际开的是 bash/zsh 交互
+    # 终端——表现为「装完仍要手动 export PATH」。因此除当前 shell 的 rc
+    # 外，补齐已存在的 .bashrc/.profile/.zshrc；标记行保证幂等。
+    for rc in "$(path_rc_file)" "$HOME/.bashrc" "$HOME/.profile" "$HOME/.zshrc"; do
+        case "$rc" in ''|/dev/null) continue ;; esac
+        if [ ! -e "$rc" ] && [ "$rc" != "$(path_rc_file)" ]; then
+            continue
+        fi
+        if grep -q '# >>> AgentRT PATH bootstrap <<<' "$rc" 2>/dev/null; then
+            written=$((written + 1))
+            continue
+        fi
+        if [ "$(basename "$rc")" = "config.fish" ]; then
+            line="set -gx PATH \"${BIN_DIR}\" \$PATH"
+        else
+            line="export PATH=\"${BIN_DIR}:\$PATH\""
+        fi
+        if { printf '\n# >>> AgentRT PATH bootstrap <<<\n%s\n# <<< AgentRT PATH bootstrap <<<\n' "$line" ; } >> "$rc" 2>/dev/null; then
+            log_ok "PATH 引导: 已自动追加 ${BIN_DIR} 到 ${rc}（新开终端生效，或执行 source \"$rc\"）"
+            written=$((written + 1))
+        else
+            log_warn "PATH 引导: 无法写入 ${rc}，请手动执行:"
+            log_warn "  echo '${line}' >> \"$rc\" && source \"$rc\""
+        fi
+    done
+    env_set "AIRY_PATH_RC=$(path_rc_file)"
+    if [ "$written" -gt 0 ]; then
         env_set "AIRY_PATH_APPENDED=yes"
         return 0
     fi
-    local line
-    if [ "$(basename "$rc")" = "config.fish" ]; then
-        line="set -gx PATH \"${BIN_DIR}\" \$PATH"
-    else
-        line="export PATH=\"${BIN_DIR}:\$PATH\""
-    fi
-    if { printf '\n# >>> AgentRT PATH bootstrap <<<\n%s\n# <<< AgentRT PATH bootstrap <<<\n' "$line" ; } >> "$rc" 2>/dev/null; then
-        log_ok "PATH 引导: 已自动追加 ${BIN_DIR} 到 ${rc}（新开终端生效，或执行 source \"$rc\"）"
-        env_set "AIRY_PATH_RC=$rc"
-        env_set "AIRY_PATH_APPENDED=yes"
-        return 0
-    fi
-    log_warn "PATH 引导: 无法写入 ${rc}（自动追加失败），请手动执行:"
-    log_warn "  echo '${line}' >> \"$rc\" && source \"$rc\""
     env_set "AIRY_PATH_APPENDED=no"
     return 1
 }
@@ -1591,8 +1601,15 @@ EOF
     fi
     if [ -x "${AIRY_HOME}/bin/airymaxrt" ]; then
         mkdir -p "${BIN_DIR}"
-        ln -sf "${AIRY_HOME}/bin/airymaxrt" "${BIN_DIR}/airymaxrt"
-        log_ok "启动器软链: ${BIN_DIR}/airymaxrt → ${AIRY_HOME}/bin/airymaxrt"
+        # 软链是短命令的唯一入口，建链后必须回验可执行——目录不可写或
+        # 目标缺失时若只打印「已建立」，用户下次终端仍是 command not found。
+        if ln -sf "${AIRY_HOME}/bin/airymaxrt" "${BIN_DIR}/airymaxrt" &&
+           [ -x "${BIN_DIR}/airymaxrt" ]; then
+            log_ok "启动器软链: ${BIN_DIR}/airymaxrt → ${AIRY_HOME}/bin/airymaxrt"
+        else
+            log_warn "启动器软链创建失败: ${BIN_DIR}/airymaxrt（目录不可写？）"
+            log_warn "  兜底入口: ${AIRY_HOME}/bin/airymaxrt（可自行软链到 PATH 内目录）"
+        fi
     fi
 
     if [ -f "${AIRY_SRC_DIR}/tools/scripts/ops/bin/agentrt-bootstrap.sh" ]; then
