@@ -49,6 +49,11 @@ bash tools/scripts/git/commit-survey.sh <仓库路径>
 - `commit-msg` 钩子与 CI 门禁 `g47` 对新增提交一律拒绝机器身份（R2）；
 - 发布自动化账号（`AgentRT Release`、`agentrt-bot`）仅用于打标签与发行提交，
   不得出现在 `Signed-off-by` 中（R2）。
+- 0.1.21 发行快照 `008d62b3`（`release: update manifest.stable.json …`，
+  agentrt-bot 提交、无 Signed-off-by）由 `g47` 首轮审计暴露：发布机械提交此前
+  没有自然人署名通道。根修在 tools 仓 `publish-release.sh`（`ae0aa9d`）：
+  发布通道配置 `AIRY_SNAP_NAME/EMAIL`（发布操作者）后，快照以操作者身份
+  `-s` 落署名；该历史提交保留不改写。
 
 ## 5. P3 身份变体
 
