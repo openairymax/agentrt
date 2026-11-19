@@ -238,11 +238,29 @@ static int kk_readkey(char *out, size_t cap)
     return 0;
 }
 
+/* 逐行重写 secrets：命中 var= 即替换，返回 1 表示发生替换。 */
+static int kk_rewrite(FILE *rf, FILE *wf, const char *var, const char *key)
+{
+    char buf[1024];
+    int hit = 0;
+    while (fgets(buf, sizeof(buf), rf)) {
+        char *p = buf;
+        while (*p == ' ' || *p == '\t')
+            p++;
+        if (strncmp(p, var, strlen(var)) == 0 && p[strlen(var)] == '=') {
+            fprintf(wf, "%s=%s\n", var, key);
+            hit = 1;
+        } else {
+            fputs(buf, wf);
+        }
+    }
+    return hit;
+}
+
 /* A-7 同源文案：secrets.env 变量位写入（tmp + fsync + rename，权限 600）。 */
 int airy_cli_secret_store(const char *path, const char *var, const char *key, int *replaced)
 {
     char tmp[AIRY_PATH_MAX];
-    char buf[1024];
     FILE *rf = fopen(path, "r");
     int hit = 0;
 
@@ -254,17 +272,7 @@ int airy_cli_secret_store(const char *path, const char *var, const char *key, in
         return -1;
     }
     if (rf) {
-        while (fgets(buf, sizeof(buf), rf)) {
-            char *p = buf;
-            while (*p == ' ' || *p == '\t')
-                p++;
-            if (strncmp(p, var, strlen(var)) == 0 && p[strlen(var)] == '=') {
-                fprintf(wf, "%s=%s\n", var, key);
-                hit = 1;
-            } else {
-                fputs(buf, wf);
-            }
-        }
+        hit = kk_rewrite(rf, wf, var, key);
         fclose(rf);
     }
     if (!hit)
@@ -354,6 +362,31 @@ static int kk_probe(const char *model_id, const char *prov, char *reason, size_t
     return reachable ? 0 : 1;
 }
 
+/* 解析 key 子命令参数；返回 0 成功，2 为不认识参数。 */
+static int kk_parse_args(int argc, char *argv[], const char **model, const char **key,
+                         int *index, int *list, int *dry)
+{
+    for (int i = 0; i < argc; i++) {
+        if (strcmp(argv[i], "--model") == 0 && i + 1 < argc)
+            *model = argv[++i];
+        else if (strcmp(argv[i], "--provider") == 0 && i + 1 < argc)
+            *model = argv[++i];
+        else if (strcmp(argv[i], "--index") == 0 && i + 1 < argc)
+            *index = atoi(argv[++i]);
+        else if (strcmp(argv[i], "--key") == 0 && i + 1 < argc)
+            *key = argv[++i];
+        else if (strcmp(argv[i], "--list") == 0)
+            *list = 1;
+        else if (strcmp(argv[i], "--dry-run") == 0)
+            *dry = 1;
+        else {
+            cli_outf("agentrt key: 不认识参数 %s\n", argv[i]);
+            return 2;
+        }
+    }
+    return 0;
+}
+
 int cli_cmd_key(int argc, char *argv[])
 {
     kk_ctx_t ctx;
@@ -361,24 +394,8 @@ int cli_cmd_key(int argc, char *argv[])
     const char *key = NULL;
     int index = 0, list = 0, dry = 0;
 
-    for (int i = 0; i < argc; i++) {
-        if (strcmp(argv[i], "--model") == 0 && i + 1 < argc)
-            model = argv[++i];
-        else if (strcmp(argv[i], "--provider") == 0 && i + 1 < argc)
-            model = argv[++i];
-        else if (strcmp(argv[i], "--index") == 0 && i + 1 < argc)
-            index = atoi(argv[++i]);
-        else if (strcmp(argv[i], "--key") == 0 && i + 1 < argc)
-            key = argv[++i];
-        else if (strcmp(argv[i], "--list") == 0)
-            list = 1;
-        else if (strcmp(argv[i], "--dry-run") == 0)
-            dry = 1;
-        else {
-            cli_outf("agentrt key: 不认识参数 %s\n", argv[i]);
-            return 2;
-        }
-    }
+    if (kk_parse_args(argc, argv, &model, &key, &index, &list, &dry) != 0)
+        return 2;
 
     AIRY_MEMSET(&ctx, 0, sizeof(ctx));
     if (kk_load(&ctx) != 0)

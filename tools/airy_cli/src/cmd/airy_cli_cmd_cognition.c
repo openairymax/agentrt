@@ -323,6 +323,32 @@ static void cli_mem_render_chain(void)
     cJSON_Delete(root);
 }
 
+/* 渲染单条命中：取详情并输出序号/分数/摘要/记录号。 */
+static void mem_show_hit(cJSON *hit, size_t i)
+{
+    cJSON *rid = cJSON_GetObjectItem(hit, "record_id");
+    const char *id = cJSON_IsString(rid) ? rid->valuestring : "";
+    char gp[256]; snprintf(gp, sizeof(gp), "{\"record_id\":\"%s\"}", id);
+    char *g = NULL; cJSON *detail = NULL;
+    if (cli_gw_call("mem.get", gp, CLI_RPC_TIMEOUT_MS, &g) == 0 && g) { detail = cJSON_Parse(g); AIRY_FREE(g); } else { AIRY_FREE(g); }
+    char dcopy[8192]; dcopy[0] = '\0'; long dlen = 0;
+    if (detail) {
+        cJSON *dj = cJSON_GetObjectItem(detail, "data"); cJSON *lj = cJSON_GetObjectItem(detail, "length");
+        if (cJSON_IsString(dj) && dj->valuestring) {
+            size_t dl = strlen(dj->valuestring); if (dl >= sizeof(dcopy)) dl = sizeof(dcopy) - 1;
+            __builtin_memcpy(dcopy, dj->valuestring, dl); dcopy[dl] = '\0';
+            dlen = cJSON_IsNumber(lj) ? (long)lj->valuedouble : (long)dl;
+        }
+        cJSON_Delete(detail);
+    }
+    char sum[64]; cli_mem_summary(dcopy, sum, sizeof(sum));
+    cli_outf("  %-2zu %.3f  ", i + 1,
+             cJSON_IsNumber(cJSON_GetObjectItem(hit, "score"))
+                 ? cJSON_GetObjectItem(hit, "score")->valuedouble : 0.0);
+    cli_out(sum); if (dlen > 60) cli_outf("…");
+    cli_outf("  (%.*s)\n", 8, id);
+}
+
 static void cli_mem_render_search(const char *query)
 {
     char params[1024]; snprintf(params, sizeof(params), "{\"query\":\"%s\",\"limit\":5}", query);
@@ -337,29 +363,8 @@ static void cli_mem_render_search(const char *query)
     char hdr[192]; snprintf(hdr, sizeof(hdr), "检索记忆 '%s' · %zu 条命中", query, n);
     cli_print_status("Sub mem Agent", hdr);
 
-    for (size_t i = 0; i < n; i++) {
-        cJSON *hit = cJSON_GetArrayItem(results, (int)i);
-        const char *id = cJSON_IsString(cJSON_GetObjectItem(hit, "record_id")) ? cJSON_GetObjectItem(hit, "record_id")->valuestring : "";
-        char gp[256]; snprintf(gp, sizeof(gp), "{\"record_id\":\"%s\"}", id);
-        char *g = NULL; cJSON *detail = NULL;
-        if (cli_gw_call("mem.get", gp, CLI_RPC_TIMEOUT_MS, &g) == 0 && g) { detail = cJSON_Parse(g); AIRY_FREE(g); } else { AIRY_FREE(g); }
-        char dcopy[8192]; dcopy[0] = '\0'; long dlen = 0;
-        if (detail) {
-            cJSON *dj = cJSON_GetObjectItem(detail, "data"); cJSON *lj = cJSON_GetObjectItem(detail, "length");
-            if (cJSON_IsString(dj) && dj->valuestring) {
-                size_t dl = strlen(dj->valuestring); if (dl >= sizeof(dcopy)) dl = sizeof(dcopy) - 1;
-                __builtin_memcpy(dcopy, dj->valuestring, dl); dcopy[dl] = '\0';
-                dlen = cJSON_IsNumber(lj) ? (long)lj->valuedouble : (long)dl;
-            }
-            cJSON_Delete(detail);
-        }
-        char sum[64]; cli_mem_summary(dcopy, sum, sizeof(sum));
-        cli_outf("  %-2zu %.3f  ", i + 1,
-                 cJSON_IsNumber(cJSON_GetObjectItem(hit, "score"))
-                     ? cJSON_GetObjectItem(hit, "score")->valuedouble : 0.0);
-        cli_out(sum); if (dlen > 60) cli_outf("…");
-        cli_outf("  (%.*s)\n", 8, id);
-    }
+    for (size_t i = 0; i < n; i++)
+        mem_show_hit(cJSON_GetArrayItem(results, (int)i), i);
     cJSON_Delete(root);
 }
 

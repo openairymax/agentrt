@@ -494,37 +494,56 @@ static const char *cli_tool_action(const char *name)
     return CLI_TOOL_HIDDEN;
 }
 
-/* 失败摘要：常见网络错误映射为可读中文，其余取首行（plain 直印单行语义）。 */
-static void cli_tool_error_summary(const char *raw, char *out, size_t cap)
+/* 剥去 "Web fetch failed (...): " 前缀，返回错误正文起点。 */
+static const char *cli_tool_err_body(const char *raw)
 {
-    if (!out || cap == 0) return;
-    out[0] = '\0';
-    if (!raw || !raw[0]) return;
     const char *p = raw;
-    if (strncmp(p, "Web fetch failed", 16) == 0) {
-        const char *close = strchr(p, ')');
-        if (close && close[1] == ':') p = close + 2;
-        while (*p == ' ') p++;
-    }
-    const char *mapped = NULL;
+    if (strncmp(p, "Web fetch failed", 16) != 0)
+        return p;
+    const char *close = strchr(p, ')');
+    if (close && close[1] == ':') p = close + 2;
+    while (*p == ' ') p++;
+    return p;
+}
+
+/* 常见网络错误到中文摘要的映射；未命中返回 NULL。 */
+static const char *cli_tool_err_map(const char *p)
+{
     if (strstr(p, "timed out") || strstr(p, "Timeout") || strstr(p, "timeout"))
-        mapped = "连接超时";
-    else if (strstr(p, "refused") || strstr(p, "Failed to connect") || strstr(p, "couldn't connect"))
-        mapped = "连接被拒绝";
-    else if (strstr(p, "Could not resolve") || strstr(p, "getaddrinfo") || strstr(p, "resolve host"))
-        mapped = "无法解析域名";
-    else if (strstr(p, "404") || strstr(p, "Not Found"))
-        mapped = "页面不存在 (404)";
-    if (mapped) {
-        snprintf(out, cap, "%s", mapped);
-        return;
-    }
+        return "连接超时";
+    if (strstr(p, "refused") || strstr(p, "Failed to connect") || strstr(p, "couldn't connect"))
+        return "连接被拒绝";
+    if (strstr(p, "Could not resolve") || strstr(p, "getaddrinfo") || strstr(p, "resolve host"))
+        return "无法解析域名";
+    if (strstr(p, "404") || strstr(p, "Not Found"))
+        return "页面不存在 (404)";
+    return NULL;
+}
+
+/* 取首行：plain 直印单行语义。 */
+static void cli_tool_err_line(const char *p, char *out, size_t cap)
+{
     size_t o = 0;
     for (; p[o] && o + 1 < cap; o++) {
         if (p[o] == '\n' || p[o] == '\r') break;
         out[o] = p[o];
     }
     out[o] = '\0';
+}
+
+/* 失败摘要：常见网络错误映射为可读中文，其余取首行。 */
+static void cli_tool_error_summary(const char *raw, char *out, size_t cap)
+{
+    if (!out || cap == 0) return;
+    out[0] = '\0';
+    if (!raw || !raw[0]) return;
+    const char *p = cli_tool_err_body(raw);
+    const char *mapped = cli_tool_err_map(p);
+    if (mapped) {
+        snprintf(out, cap, "%s", mapped);
+        return;
+    }
+    cli_tool_err_line(p, out, cap);
 }
 
 /* 工具过程行：-p 走 stderr trace（stdout 留给最终答案，脚本可解析）；

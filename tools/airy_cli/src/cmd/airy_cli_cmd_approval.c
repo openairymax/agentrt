@@ -122,6 +122,38 @@ static const char *cli_approval_label(const char *decision)
     return "拒绝";
 }
 
+/* 取空格分隔的首个 token（上限 cap-1 字节）。 */
+static void ad_decision_copy(char *dst, size_t cap, const char *tok)
+{
+    size_t n = 0;
+    while (tok[n] && tok[n] != ' ' && n < cap - 1)
+        n++;
+    AIRY_MEMCPY(dst, tok, n);
+    dst[n] = '\0';
+}
+
+static int ad_decision_ok(const char *d)
+{
+    return strcmp(d, "allow") == 0 || strcmp(d, "always") == 0 ||
+           strcmp(d, "deny") == 0;
+}
+
+/* 打印决议回传结果（已回传走状态行，未生效走普通行）。 */
+static void ad_show_result(cJSON *root, const char *decision, const char *request_id)
+{
+    cJSON *resolved = cJSON_GetObjectItem(root, "resolved");
+    cJSON *rid = cJSON_GetObjectItem(root, "request_id");
+    int ok = cJSON_IsTrue(resolved);
+    char line[256];
+    snprintf(line, sizeof(line), "决议%s：%s（%s）", ok ? "已回传" : "未生效",
+             cli_approval_label(decision),
+             (cJSON_IsString(rid) && rid->valuestring) ? rid->valuestring : request_id);
+    if (ok)
+        cli_print_status("Sub approval Agent", line);
+    else
+        cli_print_line("Sub approval Agent", line);
+}
+
 int cmd_approve(const char *arg, void *ctx)
 {
     (void)ctx;
@@ -146,15 +178,9 @@ int cmd_approve(const char *arg, void *ctx)
     request_id[idlen] = '\0';
 
     char decision[16];
-    const char *tok = sp + 1;
-    size_t dlen = 0;
-    while (tok[dlen] && tok[dlen] != ' ' && dlen < sizeof(decision) - 1)
-        dlen++;
-    AIRY_MEMCPY(decision, tok, dlen);
-    decision[dlen] = '\0';
+    ad_decision_copy(decision, sizeof(decision), sp + 1);
 
-    if (strcmp(decision, "allow") != 0 && strcmp(decision, "always") != 0 &&
-        strcmp(decision, "deny") != 0) {
+    if (!ad_decision_ok(decision)) {
         cli_print_line("Sub approval Agent",
                        "决议非法（allow / always / deny）");
         return 0;
@@ -176,17 +202,7 @@ int cmd_approve(const char *arg, void *ctx)
         cli_print_line("Sub approval Agent", "审批决议响应解析失败");
         return 0;
     }
-    cJSON *resolved = cJSON_GetObjectItem(root, "resolved");
-    cJSON *rid = cJSON_GetObjectItem(root, "request_id");
-    int ok = cJSON_IsTrue(resolved);
-    char line[256];
-    snprintf(line, sizeof(line), "决议%s：%s（%s）", ok ? "已回传" : "未生效",
-             cli_approval_label(decision),
-             (cJSON_IsString(rid) && rid->valuestring) ? rid->valuestring : request_id);
-    if (ok)
-        cli_print_status("Sub approval Agent", line);
-    else
-        cli_print_line("Sub approval Agent", line);
+    ad_show_result(root, decision, request_id);
     cJSON_Delete(root);
     return 0;
 }

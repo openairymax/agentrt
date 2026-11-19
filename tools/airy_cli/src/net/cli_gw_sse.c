@@ -171,22 +171,41 @@ int cli_dc_feed(cli_dc_t *dc, const char *in, size_t n)
 
 /* ── SSE 行翻译 ────────────────────────────────────────────────── */
 
+/* 去尾 CR/LF，返回去尾后长度。 */
+static size_t sse_trim_eol(const char *line, size_t len)
+{
+    while (len > 0 && (line[len - 1] == '\r' || line[len - 1] == '\n'))
+        len--;
+    return len;
+}
+
+/* 剥 "data:" 前缀及可选后置空格；非 data 行返回 NULL。 */
+static const char *sse_data_payload(const char *line, size_t *len)
+{
+    size_t n = *len;
+
+    if (n < 5 || memcmp(line, "data:", 5) != 0)
+        return NULL;
+    line += 5;
+    n -= 5;
+    if (n > 0 && *line == ' ') {
+        line++;
+        n--;
+    }
+    *len = n;
+    return line;
+}
+
 int cli_sse_line(const char *line, size_t len, char *out, size_t cap)
 {
     if (!line || !out || cap == 0)
         return -1;
-    while (len > 0 && (line[len - 1] == '\r' || line[len - 1] == '\n'))
-        len--;
+    len = sse_trim_eol(line, len);
     if (len == 0 || line[0] == ':')
         return 0;
-    if (len < 5 || memcmp(line, "data:", 5) != 0)
+    line = sse_data_payload(line, &len);
+    if (!line)
         return 0;
-    line += 5;
-    len -= 5;
-    if (len > 0 && *line == ' ') {
-        line++;
-        len--;
-    }
     if (len == 6 && memcmp(line, "[DONE]", 6) == 0)
         return 0;
     if (len == 0)

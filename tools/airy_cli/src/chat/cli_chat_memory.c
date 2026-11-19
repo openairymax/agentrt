@@ -109,6 +109,30 @@ static int mem_echo(const char *rec, const char *input)
            strncmp(rec + sizeof(k_user) - 1, input, strlen(input)) == 0;
 }
 
+/* 追加单条命中的历史记忆；返回 1 表示已写入（段头仅在首条命中前输出）。 */
+static int mem_append_hit(cJSON *item, const char *input, char *out_buf,
+                          size_t out_size, size_t *off)
+{
+    cJSON *rid = cJSON_GetObjectItem(item, "record_id");
+    if (!cJSON_IsString(rid) || !rid->valuestring[0])
+        return 0;
+    char *rec = mem_get_text(rid->valuestring);
+    if (!rec)
+        return 0;
+    int used = 0;
+    if (!mem_echo(rec, input)) {
+        if (*off == 0)
+            seg_put(out_buf, out_size, off, "\n\n[相关历史记忆]");
+        /* UTF-8 边界回退：%.*s 精度是字节数，直接取 200 会切断
+         * 汉字/emoji，产生非法序列经 messages[].content 上报 400。 */
+        seg_put(out_buf, out_size, off, "\n- %.*s",
+                (int)cli_utf8_safe_len(rec, MEM_ITEM_MAX), rec);
+        used = 1;
+    }
+    AIRY_FREE(rec);
+    return used;
+}
+
 /* gateway 统一记忆注入（mem_d）。0.1.19 C3 起进程内 L1 回退通道退役，
  * gateway 不可达即不注入——记忆唯一事实源为 mem_d，不做本地伪存储。
  * 段头只在确有命中时输出：零命中仍注入空段会让模型看到无内容的提示块。 */
@@ -131,24 +155,9 @@ static int cli_chat_mem_inject_gw(const char *input, char *out_buf, size_t out_s
     int n_items = cJSON_IsArray(results) ? cJSON_GetArraySize(results) : 0;
     size_t off = 0;
     int kept = 0;
-    for (int i = 0; i < n_items && off < out_size - 1; i++) {
-        cJSON *rid = cJSON_GetObjectItem(cJSON_GetArrayItem(results, i), "record_id");
-        if (!cJSON_IsString(rid) || !rid->valuestring[0])
-            continue;
-        char *rec = mem_get_text(rid->valuestring);
-        if (!rec)
-            continue;
-        if (!mem_echo(rec, input)) {
-            if (kept == 0)
-                seg_put(out_buf, out_size, &off, "\n\n[相关历史记忆]");
-            /* UTF-8 边界回退：%.*s 精度是字节数，直接取 200 会切断
-             * 汉字/emoji，产生非法序列经 messages[].content 上报 400。 */
-            seg_put(out_buf, out_size, &off, "\n- %.*s", (int)cli_utf8_safe_len(rec, MEM_ITEM_MAX),
-                    rec);
-            kept++;
-        }
-        AIRY_FREE(rec);
-    }
+    for (int i = 0; i < n_items && off < out_size - 1; i++)
+        kept += mem_append_hit(cJSON_GetArrayItem(results, i), input, out_buf, out_size,
+                               &off);
     cJSON_Delete(root);
     return kept > 0 ? 0 : -1;
 }

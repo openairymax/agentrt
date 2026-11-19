@@ -108,47 +108,63 @@ def word_pinyin(word: str, char_py: dict) -> str:
     return "".join(parts)
 
 
-def build_entries(char_py: dict, jieba: dict, max_words: int, max_word_len: int):
-    """pinyin -> [(text, freq)]，候选按频次降序。"""
-    bucket = {}
+def word_ok(word: str, max_word_len: int) -> bool:
+    """词长度 1..max_word_len 且全为汉字。"""
+    n = sum(1 for ch in word if is_cjk_char(ch))
+    return 0 < n <= max_word_len
 
-    def add(text: str, freq: int):
-        """同文本去重合并（jieba 单字词与全字表单字可能重复）：保留高值。"""
-        p = word_pinyin(text, char_py)
-        if not p:
-            return
-        cands = bucket.setdefault(p, [])
-        for i, (t, f) in enumerate(cands):
-            if t == text:
-                cands[i] = (text, max(f, freq))
-                return
-        cands.append((text, freq))
 
-    # 1) 词组：按频次取 top max_words，长度 1..max_word_len
-    words = sorted(jieba.items(), key=lambda kv: kv[1], reverse=True)
-    picked = 0
+def pick_words(words, max_words: int, max_word_len: int):
+    """按频次顺序取 top max_words 的合法词。"""
+    out = []
     for word, freq in words:
-        n = sum(1 for ch in word if is_cjk_char(ch))
-        if n == 0 or n > max_word_len:
+        if not word_ok(word, max_word_len):
             continue
-        add(word, freq)
-        picked += 1
-        if picked >= max_words:
+        out.append((word, freq))
+        if len(out) >= max_words:
             break
+    return out
 
-    # 2) 全部汉字作为单字候选：字频 = 自身频次 + 该字在 top 词表中的
-    #    累计贡献（"国"常作词素出现于"中国"等高频词，单字频次偏低——
-    #    按标准字频统计（词内字累加）加权后排序符合输入法直觉）。
+
+def char_weights(jieba: dict, char_py: dict, words, max_word_len: int) -> dict:
+    """单字权重 = 自身频次 + 该字在 top 词表中的累计贡献。"""
     char_freq = {ch: jieba.get(ch, 1) for ch in char_py if is_cjk_char(ch)}
     for word, freq in words:
-        n = sum(1 for ch in word if is_cjk_char(ch))
-        if n == 0 or n > max_word_len:
+        if not word_ok(word, max_word_len):
             continue
         for ch in word:
             if ch in char_freq:
                 char_freq[ch] += freq
-    for ch, freq in char_freq.items():
-        add(ch, freq)
+    return char_freq
+
+
+def add_cand(bucket: dict, char_py: dict, text: str, freq: int):
+    """同文本去重合并（jieba 单字词与全字表单字可能重复）：保留高值。"""
+    p = word_pinyin(text, char_py)
+    if not p:
+        return
+    cands = bucket.setdefault(p, [])
+    for i, (t, f) in enumerate(cands):
+        if t == text:
+            cands[i] = (text, max(f, freq))
+            return
+    cands.append((text, freq))
+
+
+def build_entries(char_py: dict, jieba: dict, max_words: int, max_word_len: int):
+    """pinyin -> [(text, freq)]，候选按频次降序。"""
+    bucket = {}
+    words = sorted(jieba.items(), key=lambda kv: kv[1], reverse=True)
+
+    # 1) 词组：按频次取 top max_words，长度 1..max_word_len
+    for word, freq in pick_words(words, max_words, max_word_len):
+        add_cand(bucket, char_py, word, freq)
+
+    # 2) 全部汉字作为单字候选：字频 = 自身频次 + 该字在 top 词表中的
+    #    累计贡献（"国"常作词素出现于"中国"等高频词，单字频次偏低——
+    #    按标准字频统计（词内字累加）加权后排序符合输入法直觉）。
+    for ch, freq in char_weights(jieba, char_py, words, max_word_len).items():
+        add_cand(bucket, char_py, ch, freq)
 
     # 3) 每条拼音的候选按频次降序、同频按文本稳定排序
     entries = {}

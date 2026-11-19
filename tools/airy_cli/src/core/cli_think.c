@@ -27,6 +27,25 @@
 #include <cjson/cJSON.h>
 #endif
 
+/* 解外层 RPC 结果为内层 JSON 根（字符串包裹时再解析）；OWNER 转移。 */
+static cJSON *think_inner_parse(cJSON *outer)
+{
+    cJSON *inner = NULL;
+    if (cJSON_IsString(outer) && outer->valuestring)
+        inner = cJSON_Parse(outer->valuestring);
+    cJSON_Delete(outer);
+    return inner;
+}
+
+/* 失败收尾：释放 params、回填错误码并返回 NULL。 */
+static cJSON *think_rpc_fail(cJSON *params, int *err_out, int code)
+{
+    cJSON_Delete(params);
+    if (err_out)
+        *err_out = code;
+    return NULL;
+}
+
 /* 单轮 think.process RPC：携带 prompt 与可选 gccp_answers 经 gateway 调用
  * think_d，返回解析后的内层 JSON 根（OWNER，调用方 cJSON_Delete）。
  * 失败返回 NULL，err_out（可选）带回错误码。 */
@@ -36,37 +55,23 @@ static cJSON *cli_think_rpc_round(const char *prompt, const char *gccp_answers, 
         *err_out = AIRY_SUCCESS;
 
     cJSON *params = cJSON_CreateObject();
-    if (!params) {
-        if (err_out)
-            *err_out = AIRY_ERR_OUT_OF_MEMORY;
-        return NULL;
-    }
+    if (!params)
+        return think_rpc_fail(NULL, err_out, AIRY_ERR_OUT_OF_MEMORY);
     cJSON *prompt_str = cJSON_CreateString(prompt);
-    if (!prompt_str) {
-        cJSON_Delete(params);
-        if (err_out)
-            *err_out = AIRY_ERR_OUT_OF_MEMORY;
-        return NULL;
-    }
+    if (!prompt_str)
+        return think_rpc_fail(params, err_out, AIRY_ERR_OUT_OF_MEMORY);
     cJSON_AddItemToObject(params, "prompt", prompt_str);
     if (gccp_answers && gccp_answers[0]) {
         cJSON *ans_str = cJSON_CreateString(gccp_answers);
-        if (!ans_str) {
-            cJSON_Delete(params);
-            if (err_out)
-                *err_out = AIRY_ERR_OUT_OF_MEMORY;
-            return NULL;
-        }
+        if (!ans_str)
+            return think_rpc_fail(params, err_out, AIRY_ERR_OUT_OF_MEMORY);
         cJSON_AddItemToObject(params, "gccp_answers", ans_str);
     }
 
     char *params_json = cJSON_PrintUnformatted(params);
     cJSON_Delete(params);
-    if (!params_json) {
-        if (err_out)
-            *err_out = AIRY_ERR_OUT_OF_MEMORY;
-        return NULL;
-    }
+    if (!params_json)
+        return think_rpc_fail(NULL, err_out, AIRY_ERR_OUT_OF_MEMORY);
 
     /* 架构约束（2026-08-25）：统一经 gateway 派发（think.process →
      * gateway → SYS_SVC_CALL → think_d），禁止直连 think.sock。 */
@@ -84,21 +89,20 @@ static cJSON *cli_think_rpc_round(const char *prompt, const char *gccp_answers, 
 
     cJSON *outer = cJSON_Parse(rpc_result);
     AIRY_FREE(rpc_result);
-    if (!outer) {
-        if (err_out)
-            *err_out = AIRY_ERR_PARSE_ERROR;
-        return NULL;
-    }
-    cJSON *inner_root = NULL;
-    if (cJSON_IsString(outer) && outer->valuestring)
-        inner_root = cJSON_Parse(outer->valuestring);
-    cJSON_Delete(outer);
-    if (!inner_root) {
-        if (err_out)
-            *err_out = AIRY_ERR_PARSE_ERROR;
-        return NULL;
-    }
+    if (!outer)
+        return think_rpc_fail(NULL, err_out, AIRY_ERR_PARSE_ERROR);
+    cJSON *inner_root = think_inner_parse(outer);
+    if (!inner_root)
+        return think_rpc_fail(NULL, err_out, AIRY_ERR_PARSE_ERROR);
     return inner_root;
+}
+
+/* 拷贝字符串字段（缺失/非字符串则保持默认）。 */
+static void think_copy_field(cJSON *qj, const char *key, char *dst, size_t cap)
+{
+    cJSON *f = cJSON_GetObjectItem(qj, key);
+    if (cJSON_IsString(f) && f->valuestring)
+        AIRY_STRNCPY_TERM(dst, f->valuestring, cap);
 }
 
 /* think_d 返回的 gccp_questions JSON 数组 -> airy_gccp_probe_t。
@@ -138,26 +142,88 @@ static int cli_think_gccp_probe_build(const char *questions_json, airy_gccp_prob
         cJSON *qj = cJSON_GetArrayItem(arr, i);
         if (!qj)
             continue;
-        cJSON *f = cJSON_GetObjectItem(qj, "id");
-        if (cJSON_IsString(f) && f->valuestring)
-            AIRY_STRNCPY_TERM(probe->questions[i].id, f->valuestring,
-                              sizeof(probe->questions[i].id));
-        f = cJSON_GetObjectItem(qj, "question");
-        if (cJSON_IsString(f) && f->valuestring)
-            AIRY_STRNCPY_TERM(probe->questions[i].question, f->valuestring,
-                              sizeof(probe->questions[i].question));
-        f = cJSON_GetObjectItem(qj, "hint");
-        if (cJSON_IsString(f) && f->valuestring)
-            AIRY_STRNCPY_TERM(probe->questions[i].hint, f->valuestring,
-                              sizeof(probe->questions[i].hint));
-        f = cJSON_GetObjectItem(qj, "required");
+        airy_gccp_question_t *q = &probe->questions[i];
+        think_copy_field(qj, "id", q->id, sizeof(q->id));
+        think_copy_field(qj, "question", q->question, sizeof(q->question));
+        think_copy_field(qj, "hint", q->hint, sizeof(q->hint));
+        cJSON *f = cJSON_GetObjectItem(qj, "required");
         if (f && cJSON_IsTrue(f))
-            probe->questions[i].required = 1;
+            q->required = 1;
     }
 
     cJSON_Delete(arr);
     *out_probe = probe;
     return AIRY_SUCCESS;
+}
+
+/* 远端要求交互时收集答案并重发第二段。无交互则 *inner_out 原样返回（OWNER
+ * 不变）；有交互则原 inner 已释放，*inner_out 为新回包。失败返回错误码。 */
+static airy_err_t think_gccp_round(const char *input, cJSON *inner, cJSON **inner_out)
+{
+    cJSON *interact = cJSON_GetObjectItem(inner, "gccp_need_interaction");
+    if (!interact || !cJSON_IsTrue(interact)) {
+        *inner_out = inner;
+        return AIRY_SUCCESS;
+    }
+
+    cJSON *qjson = cJSON_GetObjectItem(inner, "gccp_questions");
+    const char *qstr = (cJSON_IsString(qjson) && qjson->valuestring) ?
+                           qjson->valuestring :
+                           "";
+    airy_gccp_probe_t *probe = NULL;
+    int perr = cli_think_gccp_probe_build(qstr, &probe);
+    cJSON_Delete(inner);
+    if (perr != AIRY_SUCCESS || !probe)
+        return (airy_err_t)perr;
+
+    /* 逐问收集答案。用户放弃（NULL）→ 空对象：引擎按默认约束收敛，
+     * 避免重发空答案导致再次挂起形成交互死循环。 */
+    char *answers = cli_gccp_interact(probe, NULL);
+    if (!answers) {
+        answers = AIRY_STRDUP("{}");
+        if (!answers) {
+            airy_gccp_probe_free(probe);
+            return AIRY_ERR_OUT_OF_MEMORY;
+        }
+    }
+    airy_gccp_probe_free(probe);
+
+    int rerr = AIRY_SUCCESS;
+    cJSON *next = cli_think_rpc_round(input, answers, &rerr);
+    AIRY_FREE(answers);
+    if (!next)
+        return (airy_err_t)rerr;
+
+    /* 二次挂起（远端仍要求交互）：放弃处理，错误由调用方可见化。 */
+    cJSON *again = cJSON_GetObjectItem(next, "gccp_need_interaction");
+    if (again && cJSON_IsTrue(again)) {
+        cJSON_Delete(next);
+        return AIRY_ERR_GCCP_INTERACTION;
+    }
+    *inner_out = next;
+    return AIRY_SUCCESS;
+}
+
+/* 从 think_d 回包提取 plan 段并解析为计划树。 */
+static airy_err_t think_plan_extract(cJSON *inner, airy_task_plan_t **out_plan)
+{
+    cJSON *plan_json = cJSON_GetObjectItem(inner, "plan");
+    int perr = AIRY_SUCCESS;
+
+    if (!cJSON_IsObject(plan_json)) {
+        perr = AIRY_ERR_PARSE_ERROR;
+    } else {
+        char *plan_str = cJSON_PrintUnformatted(plan_json);
+        if (!plan_str) {
+            perr = AIRY_ERR_OUT_OF_MEMORY;
+        } else {
+            perr = airy_plan_parse(plan_str, out_plan);
+            AIRY_FREE(plan_str);
+        }
+    }
+    if (perr == AIRY_SUCCESS && !*out_plan)
+        perr = AIRY_ERR_PARSE_ERROR;
+    return (airy_err_t)perr;
 }
 
 /* Remote dual-thinking via gateway → think_d (think.process, 120s timeout).
@@ -179,63 +245,13 @@ airy_err_t cli_think_process_remote(const char *input, airy_task_plan_t **out_pl
         return (airy_err_t)rerr;
 
     /* 第二段：think_d 请求交互——向用户展示远端问题集并收集答案后重发。 */
-    cJSON *interact = cJSON_GetObjectItem(inner, "gccp_need_interaction");
-    if (interact && cJSON_IsTrue(interact)) {
-        cJSON *qjson = cJSON_GetObjectItem(inner, "gccp_questions");
-        const char *qstr = (cJSON_IsString(qjson) && qjson->valuestring) ?
-                               qjson->valuestring :
-                               "";
-        airy_gccp_probe_t *probe = NULL;
-        int perr = cli_think_gccp_probe_build(qstr, &probe);
-        cJSON_Delete(inner);
-        inner = NULL;
-        if (perr != AIRY_SUCCESS || !probe)
-            return (airy_err_t)perr;
+    airy_err_t err = think_gccp_round(input, inner, &inner);
+    if (err != AIRY_SUCCESS)
+        return err;
 
-        /* 逐问收集答案。用户放弃（NULL）→ 空对象：引擎按默认约束收敛，
-         * 避免重发空答案导致再次挂起形成交互死循环。 */
-        char *answers = cli_gccp_interact(probe, NULL);
-        if (!answers) {
-            answers = AIRY_STRDUP("{}");
-            if (!answers) {
-                airy_gccp_probe_free(probe);
-                return AIRY_ERR_OUT_OF_MEMORY;
-            }
-        }
-        airy_gccp_probe_free(probe);
-
-        rerr = AIRY_SUCCESS;
-        inner = cli_think_rpc_round(input, answers, &rerr);
-        AIRY_FREE(answers);
-        if (!inner)
-            return (airy_err_t)rerr;
-
-        /* 二次挂起（远端仍要求交互）：放弃处理，错误由调用方可见化。 */
-        cJSON *again = cJSON_GetObjectItem(inner, "gccp_need_interaction");
-        if (again && cJSON_IsTrue(again)) {
-            cJSON_Delete(inner);
-            return AIRY_ERR_GCCP_INTERACTION;
-        }
-    }
-
-    cJSON *plan_json = cJSON_GetObjectItem(inner, "plan");
-    int perr = AIRY_SUCCESS;
-    if (!cJSON_IsObject(plan_json)) {
-        perr = AIRY_ERR_PARSE_ERROR;
-    } else {
-        char *plan_str = cJSON_PrintUnformatted(plan_json);
-        if (!plan_str) {
-            perr = AIRY_ERR_OUT_OF_MEMORY;
-        } else {
-            perr = airy_plan_parse(plan_str, out_plan);
-            AIRY_FREE(plan_str);
-        }
-    }
-    if (perr == AIRY_SUCCESS && !*out_plan)
-        perr = AIRY_ERR_PARSE_ERROR;
-
+    err = think_plan_extract(inner, out_plan);
     cJSON_Delete(inner);
-    return (airy_err_t)perr;
+    return err;
 }
 
 /* ==================== 双思考三模型配置统一读取 ==================== */
@@ -258,6 +274,56 @@ static void cli_think_env(char *t2, size_t t2c, char *t1f, size_t t1fc,
         snprintf(t1p, t1pc, "%s", e1p);
 }
 
+/* 三项均非空即视为已由 env/slots 确定。 */
+static int think_all_set(const char *t2, const char *t1f, const char *t1p)
+{
+    return t2[0] && t1f[0] && t1p[0];
+}
+
+/* slots 段覆盖空槽位。 */
+static void think_fill_slots(const char *path, char *t2, size_t t2c,
+                             char *t1f, size_t t1fc, char *t1p, size_t t1pc)
+{
+    if (t2[0] == '\0')
+        cli_cfg_yaml_get(path, "slots", "t2", t2, t2c);
+    if (t1f[0] == '\0')
+        cli_cfg_yaml_get(path, "slots", "t1f", t1f, t1fc);
+    if (t1p[0] == '\0')
+        cli_cfg_yaml_get(path, "slots", "t1p", t1p, t1pc);
+}
+
+/* 兼容窗口：slots 未覆盖时回落废弃 think.*_model（think_d 侧同源
+ * 回落并告警，CLI 只读展示不再提示第二次）。 */
+static void think_fill_legacy(const char *path, char *t2, size_t t2c,
+                              char *t1f, size_t t1fc, char *t1p, size_t t1pc)
+{
+    if (t2[0] == '\0')
+        cli_cfg_yaml_get(path, "think", "think2_slow_model", t2, t2c);
+    if (t1f[0] == '\0')
+        cli_cfg_yaml_get(path, "think", "think1_fast_model", t1f, t1fc);
+    if (t1p[0] == '\0')
+        cli_cfg_yaml_get(path, "think", "think1_prof_model", t1p, t1pc);
+}
+
+/* think 段留空 = 默认模型（v2：顶层 default_model 或 llm.model）。 */
+static void think_fill_default(const char *path, char *t2, size_t t2c,
+                               char *t1f, size_t t1fc, char *t1p, size_t t1pc)
+{
+    char def_model[128] = "";
+
+    cli_cfg_yaml_get(path, "llm", "model", def_model, sizeof(def_model));
+    if (def_model[0] == '\0')
+        cli_cfg_yaml_get(path, "", "default_model", def_model, sizeof(def_model));
+    if (def_model[0]) {
+        if (t2[0] == '\0')
+            snprintf(t2, t2c, "%s", def_model);
+        if (t1f[0] == '\0')
+            snprintf(t1f, t1fc, "%s", def_model);
+        if (t1p[0] == '\0')
+            snprintf(t1p, t1pc, "%s", def_model);
+    }
+}
+
 /* 双思考三模型配置统一读取，CLI 侧真相源对齐 think_d。
  *
  * 优先级（与 think_d svc_slot_resolve 同序）：env AIRY_MODEL_T2/T1F/T1P
@@ -275,43 +341,17 @@ void cli_think_cfg_load(char *t2, size_t t2c, char *t1f, size_t t1fc,
     if (!t2 || !t1f || !t1p || t2c == 0 || t1fc == 0 || t1pc == 0)
         return;
     cli_think_env(t2, t2c, t1f, t1fc, t1p, t1pc);
-    if (t2[0] && t1f[0] && t1p[0])
+    if (think_all_set(t2, t1f, t1p))
         return;
 
     char path[AIRY_PATH_MAX];
     cli_cfg_path(path, sizeof(path));
 
-    if (t2[0] == '\0')
-        cli_cfg_yaml_get(path, "slots", "t2", t2, t2c);
-    if (t1f[0] == '\0')
-        cli_cfg_yaml_get(path, "slots", "t1f", t1f, t1fc);
-    if (t1p[0] == '\0')
-        cli_cfg_yaml_get(path, "slots", "t1p", t1p, t1pc);
-
-    /* 兼容窗口：slots 未覆盖时回落废弃 think.*_model（think_d 侧同源
-     * 回落并告警，CLI 只读展示不再提示第二次）。 */
-    if (t2[0] == '\0')
-        cli_cfg_yaml_get(path, "think", "think2_slow_model", t2, t2c);
-    if (t1f[0] == '\0')
-        cli_cfg_yaml_get(path, "think", "think1_fast_model", t1f, t1fc);
-    if (t1p[0] == '\0')
-        cli_cfg_yaml_get(path, "think", "think1_prof_model", t1p, t1pc);
-
-    /* think 段留空 = 默认模型（v2：顶层 default_model 或 llm.model） */
-    if (t2[0] && t1f[0] && t1p[0])
+    think_fill_slots(path, t2, t2c, t1f, t1fc, t1p, t1pc);
+    think_fill_legacy(path, t2, t2c, t1f, t1fc, t1p, t1pc);
+    if (think_all_set(t2, t1f, t1p))
         return;
-    char def_model[128] = "";
-    cli_cfg_yaml_get(path, "llm", "model", def_model, sizeof(def_model));
-    if (def_model[0] == '\0')
-        cli_cfg_yaml_get(path, "", "default_model", def_model, sizeof(def_model));
-    if (def_model[0]) {
-        if (t2[0] == '\0')
-            snprintf(t2, t2c, "%s", def_model);
-        if (t1f[0] == '\0')
-            snprintf(t1f, t1fc, "%s", def_model);
-        if (t1p[0] == '\0')
-            snprintf(t1p, t1pc, "%s", def_model);
-    }
+    think_fill_default(path, t2, t2c, t1f, t1fc, t1p, t1pc);
 }
 
 /* ── /orch 等待预算（T-19）────────────────────────────────────────── */

@@ -30,43 +30,51 @@ static int env_present(const char *name)
     return v != NULL && v[0] != '\0';
 }
 
+/* 值语义：去首引号后非空且非引号/换行即视为已配置。 */
+static int env_value_set(const char *q)
+{
+    if (*q == '"')
+        q++;
+    return *q != '\0' && *q != '"' && *q != '\n' && *q != '\r';
+}
+
+/* 判断单行是否为 name= 且值非空。 */
+static int line_has_key(const char *line, const char *name)
+{
+    size_t nlen = strlen(name);
+    const char *p = line;
+    const char *q;
+
+    while (*p == ' ' || *p == '\t')
+        p++;
+    if (*p == '\0' || *p == '\n' || *p == '\r' || *p == '#')
+        return 0;
+    if (strncmp(p, name, nlen) != 0)
+        return 0;
+    q = p + nlen;
+    while (*q == ' ' || *q == '\t')
+        q++;
+    if (*q != '=')
+        return 0;
+    q++;
+    while (*q == ' ' || *q == '\t')
+        q++;
+    return env_value_set(q);
+}
+
 /* secrets.env 的值语义与运行期 sec_resolve_key 一致：允许两侧空白，
  * 双引号包裹视为字面值，引号内为空即视为未配置。 */
 static int file_has_key(const char *path, const char *name)
 {
     FILE *f;
     char line[512];
-    size_t nlen = strlen(name);
     int found = 0;
 
     f = fopen(path, "r");
     if (!f)
         return 0;
-    while (!found && fgets(line, sizeof(line), f)) {
-        char *p = line;
-        char *q;
-
-        while (*p == ' ' || *p == '\t')
-            p++;
-        if (*p == '\0' || *p == '\n' || *p == '\r' || *p == '#')
-            continue;
-        if (strncmp(p, name, nlen) != 0)
-            continue;
-        q = p + nlen;
-        while (*q == ' ' || *q == '\t')
-            q++;
-        if (*q != '=')
-            continue;
-        q++;
-        while (*q == ' ' || *q == '\t')
-            q++;
-        if (*q == '"') {
-            q++;
-            found = *q != '\0' && *q != '"' && *q != '\n' && *q != '\r';
-        } else {
-            found = *q != '\0' && *q != '\n' && *q != '\r';
-        }
-    }
+    while (!found && fgets(line, sizeof(line), f))
+        found = line_has_key(line, name);
     fclose(f);
     return found;
 }

@@ -50,23 +50,43 @@
  * 仅读，接收等待循环中命中即中断。 */
 extern volatile sig_atomic_t g_cli_cancel;
 
+/* 端口文件路径：AIRY_HOME 优先，回退 ~/.airymaxrt。返回 0/-1。 */
+static int cli_gw_port_path(char *path, size_t cap)
+{
+    const char *home = getenv("AIRY_HOME");
+    if (!home || !*home || home[0] == '$') {
+        const char *h = getenv("HOME");
+        if (!h || !*h)
+            return -1;
+        snprintf(path, cap, "%s/.airymaxrt/run/gateway.port", h);
+    } else {
+        snprintf(path, cap, "%s/run/gateway.port", home);
+    }
+    return 0;
+}
+
+/* 端口文件内容 → 端口号（仅接受纯数字，非法返回 -1）。 */
+static int cli_gw_parse_port(const char *buf)
+{
+    int p = 0;
+    for (const char *s = buf; *s; s++) {
+        if (*s == '\n' || *s == '\r')
+            break;
+        if (*s < '0' || *s > '9')
+            return -1;
+        p = p * 10 + (*s - '0');
+    }
+    return (p > 0 && p <= 65535) ? p : -1;
+}
+
 /* 读取 $AIRY_HOME/run/gateway.port（完整启动器在端口漂移后固化实际端口）。
  * 0.1.6h：gateway 被占漂移后，CLI 回退默认端口若与监听不一致会误报
  * "网关不在线"；与 TUI/轻量启动器同源读取，根治端口漂移断连。 */
 static int cli_gw_read_runtime_port(void)
 {
-    const char *home = getenv("AIRY_HOME");
     char path[512];
-    if (!home || !*home)
-        home = "$HOME"; /* 占位，实际下面展开 */
-    if (!home || !*home || home[0] == '$') {
-        const char *h = getenv("HOME");
-        if (!h || !*h)
-            return -1;
-        snprintf(path, sizeof(path), "%s/.airymaxrt/run/gateway.port", h);
-    } else {
-        snprintf(path, sizeof(path), "%s/run/gateway.port", home);
-    }
+    if (cli_gw_port_path(path, sizeof(path)) != 0)
+        return -1;
     FILE *fp = fopen(path, "r");
     if (!fp)
         return -1;
@@ -76,16 +96,7 @@ static int cli_gw_read_runtime_port(void)
         return -1;
     }
     fclose(fp);
-    /* 仅接受纯数字端口 */
-    int p = 0;
-    for (char *s = buf; *s; s++) {
-        if (*s == '\n' || *s == '\r')
-            break;
-        if (*s < '0' || *s > '9')
-            return -1;
-        p = p * 10 + (*s - '0');
-    }
-    return (p > 0 && p <= 65535) ? p : -1;
+    return cli_gw_parse_port(buf);
 }
 
 void cli_gw_endpoint(char *host, size_t host_len, int *port)
@@ -120,6 +131,50 @@ void cli_gw_endpoint(char *host, size_t host_len, int *port)
 }
 
 /* ── 底层 socket 连接（带超时）────────────────────────────────────── */
+
+#ifdef _WIN32
+/* 非阻塞 connect 后等待可写并校验 SO_ERROR；0=连通。 */
+static int gw_win_wait(SOCKET s, int timeout_ms)
+{
+    fd_set wf;
+    FD_ZERO(&wf);
+    FD_SET(s, &wf);
+    struct timeval tv;
+    tv.tv_sec = timeout_ms / 1000;
+    tv.tv_usec = (long)(timeout_ms % 1000) * 1000L;
+    if (select(0, NULL, &wf, NULL, &tv) <= 0)
+        return -1;
+    int soerr = 0;
+    int slen = sizeof(soerr);
+    getsockopt(s, SOL_SOCKET, SO_ERROR, (char *)&soerr, &slen);
+    return soerr == 0 ? 0 : -1;
+}
+#else
+/* 恢复阻塞模式（F_GETFL 失败时不动 flags，避免破坏 fd 标志位）。 */
+static void gw_posix_block(int s)
+{
+    int fl = fcntl(s, F_GETFL, 0);
+    if (fl >= 0)
+        (void)fcntl(s, F_SETFL, fl & ~O_NONBLOCK);
+}
+
+/* 非阻塞 connect 后 poll 等待可写并校验 SO_ERROR；0=连通。 */
+static int gw_posix_wait(int s, int timeout_ms)
+{
+    struct pollfd pfd;
+    pfd.fd = s;
+    pfd.events = POLLOUT;
+    pfd.revents = 0;
+    if (poll(&pfd, 1, timeout_ms) <= 0)
+        return -1;
+    int soerr = 0;
+    socklen_t slen = sizeof(soerr);
+    if (getsockopt(s, SOL_SOCKET, SO_ERROR, &soerr, &slen) != 0 || soerr != 0)
+        return -1;
+    return 0;
+}
+#endif
+
 static int cli_gw_connect(const char *host, int port, int timeout_ms)
 {
 #ifdef _WIN32
@@ -142,22 +197,10 @@ static int cli_gw_connect(const char *host, int port, int timeout_ms)
         WSACleanup();
         return -1;
     }
-    if (connect(s, (struct sockaddr *)&sa, sizeof(sa)) == 0) {
+    if (connect(s, (struct sockaddr *)&sa, sizeof(sa)) == 0)
         return (int)s;
-    }
-    fd_set wf;
-    FD_ZERO(&wf);
-    FD_SET(s, &wf);
-    struct timeval tv;
-    tv.tv_sec = timeout_ms / 1000;
-    tv.tv_usec = (long)(timeout_ms % 1000) * 1000L;
-    if (select(0, NULL, &wf, NULL, &tv) > 0) {
-        int soerr = 0;
-        int slen = sizeof(soerr);
-        getsockopt(s, SOL_SOCKET, SO_ERROR, (char *)&soerr, &slen);
-        if (soerr == 0)
-            return (int)s;
-    }
+    if (gw_win_wait(s, timeout_ms) == 0)
+        return (int)s;
     closesocket(s);
     WSACleanup();
     return -1;
@@ -178,26 +221,12 @@ static int cli_gw_connect(const char *host, int port, int timeout_ms)
         return -1;
     }
     if (connect(s, (struct sockaddr *)&sa, sizeof(sa)) == 0) {
-        int fl2 = fcntl(s, F_GETFL, 0);
-        if (fl2 >= 0)
-            (void)fcntl(s, F_SETFL, fl2 & ~O_NONBLOCK);
+        gw_posix_block(s);
         return s;
     }
-    if (errno == EINPROGRESS) {
-        struct pollfd pfd;
-        pfd.fd = s;
-        pfd.events = POLLOUT;
-        pfd.revents = 0;
-        if (poll(&pfd, 1, timeout_ms) > 0) {
-            int soerr = 0;
-            socklen_t slen = sizeof(soerr);
-            if (getsockopt(s, SOL_SOCKET, SO_ERROR, &soerr, &slen) == 0 && soerr == 0) {
-                int fl2 = fcntl(s, F_GETFL, 0);
-                if (fl2 >= 0)
-                    (void)fcntl(s, F_SETFL, fl2 & ~O_NONBLOCK);
-                return s;
-            }
-        }
+    if (errno == EINPROGRESS && gw_posix_wait(s, timeout_ms) == 0) {
+        gw_posix_block(s);
+        return s;
     }
     close(s);
     return -1;

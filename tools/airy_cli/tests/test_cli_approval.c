@@ -83,12 +83,13 @@ static void mock_send(int fd, const char *body)
     (void)send(fd, body, strlen(body), MSG_NOSIGNAL);
 }
 
-static void mock_handle(int fd)
+/* 读请求头（含首行），返回已收字节数；0 表示对端关闭。 */
+static size_t mock_read_head(int fd, char *buf, size_t cap)
 {
-    char buf[8192];
     size_t n = 0;
-    while (n + 1 < sizeof(buf)) {
-        ssize_t r = recv(fd, buf + n, sizeof(buf) - n - 1, 0);
+
+    while (n + 1 < cap) {
+        ssize_t r = recv(fd, buf + n, cap - n - 1, 0);
         if (r <= 0)
             break;
         n += (size_t)r;
@@ -96,32 +97,43 @@ static void mock_handle(int fd)
         if (strstr(buf, "\r\n\r\n"))
             break;
     }
-    if (n == 0)
-        return;
+    return n;
+}
 
+/* 补读 Content-Length 声明的剩余请求体；返回 body 起点，头不完整返回 NULL。 */
+static char *mock_read_body(int fd, char *buf, size_t cap, size_t *n)
+{
     char *he = strstr(buf, "\r\n\r\n");
-    if (!he)
-        return;
-    size_t hlen = (size_t)(he - buf) + 4;
-
+    size_t hlen;
     size_t clen = 0;
-    char *cl = strstr(buf, "Content-Length:");
+    char *cl;
+
+    if (!he)
+        return NULL;
+    hlen = (size_t)(he - buf) + 4;
+
+    cl = strstr(buf, "Content-Length:");
     if (!cl)
         cl = strstr(buf, "content-length:");
     if (cl)
         clen = (size_t)strtoul(cl + 15, NULL, 10);
 
-    while (n < hlen + clen) {
-        if (n + 1 >= sizeof(buf))
+    while (*n < hlen + clen) {
+        if (*n + 1 >= cap)
             break;
-        ssize_t r = recv(fd, buf + n, sizeof(buf) - n - 1, 0);
+        ssize_t r = recv(fd, buf + *n, cap - *n - 1, 0);
         if (r <= 0)
             break;
-        n += (size_t)r;
-        buf[n] = '\0';
+        *n += (size_t)r;
+        buf[*n] = '\0';
     }
-    char *body = (buf + hlen < buf + n) ? (buf + hlen) : (buf + n);
+    return (buf + hlen < buf + *n) ? (buf + hlen) : (buf + *n);
+}
 
+/* 记录本次请求 method/params 与 pending 应答体，并自增计数。 */
+static void mock_record(const char *body, char *method, size_t mcap,
+                        char *pending, size_t pcap)
+{
     pthread_mutex_lock(&g_lock);
     if (body && *body) {
         cJSON *root = cJSON_Parse(body);
@@ -141,13 +153,29 @@ static void mock_handle(int fd)
         }
     }
     g_reqs++;
-    char method[128];
-    snprintf(method, sizeof(method), "%s", g_last_method);
-    char pending_body[1024];
-    snprintf(pending_body, sizeof(pending_body), "%s", g_pending_body);
+    snprintf(method, mcap, "%s", g_last_method);
+    snprintf(pending, pcap, "%s", g_pending_body);
     pthread_mutex_unlock(&g_lock);
+}
 
+static void mock_handle(int fd)
+{
+    char buf[8192];
+    size_t n = mock_read_head(fd, buf, sizeof(buf));
+    char method[128];
+    char pending_body[1024];
     char resp[1200];
+    char *body;
+
+    if (n == 0)
+        return;
+
+    body = mock_read_body(fd, buf, sizeof(buf), &n);
+    if (!body)
+        return;
+
+    mock_record(body, method, sizeof(method), pending_body, sizeof(pending_body));
+
     if (strcmp(method, "tool.pending") == 0) {
         snprintf(resp, sizeof(resp), "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":%s}",
                  pending_body);

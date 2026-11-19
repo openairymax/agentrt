@@ -155,6 +155,35 @@ void cli_term_title(const char *title)
 #include <sys/ioctl.h>
 #endif
 
+#ifdef _WIN32
+/* 控制台窗口尺寸回填（句柄无效时保持原值）。 */
+static void term_size_win(int *rows, int *cols)
+{
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    if (!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))
+        return;
+    if (rows)
+        *rows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
+    if (cols)
+        *cols = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+}
+#else
+/* winsize 缺失时回退 COLUMNS/LINES，再退默认 80×24。 */
+static void term_size_fallback(int *rows, int *cols)
+{
+    if (cols) {
+        const char *env_cols = getenv("COLUMNS");
+        int c = env_cols ? atoi(env_cols) : 0;
+        *cols = (c > 0) ? c : 80;
+    }
+    if (rows) {
+        const char *env_rows = getenv("LINES");
+        int r = env_rows ? atoi(env_rows) : 0;
+        *rows = (r > 0) ? r : 24;
+    }
+}
+#endif
+
 void cli_term_size(int *out_rows, int *out_cols)
 {
     if (out_rows)
@@ -165,13 +194,7 @@ void cli_term_size(int *out_rows, int *out_cols)
         return;
 
 #ifdef _WIN32
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi)) {
-        if (out_rows)
-            *out_rows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
-        if (out_cols)
-            *out_cols = csbi.srWindow.Right - csbi.srWindow.Left + 1;
-    }
+    term_size_win(out_rows, out_cols);
 #else
     struct winsize ws;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_row > 0 && ws.ws_col > 0) {
@@ -185,16 +208,7 @@ void cli_term_size(int *out_rows, int *out_cols)
      * ① 环境变量 COLUMNS（多数 shell 导出）② 默认 80。否则折行计量
      * 依赖 cols=0 而失效，长行预览擦除不足导致最终形态与残留重叠
      * （2026-08-20 PTY 复现：fold_phys=1 而真实折行 22 行）。 */
-    if (out_cols) {
-        const char *env_cols = getenv("COLUMNS");
-        int c = env_cols ? atoi(env_cols) : 0;
-        *out_cols = (c > 0) ? c : 80;
-    }
-    if (out_rows) {
-        const char *env_rows = getenv("LINES");
-        int r = env_rows ? atoi(env_rows) : 0;
-        *out_rows = (r > 0) ? r : 24;
-    }
+    term_size_fallback(out_rows, out_cols);
 #endif
 }
 
@@ -403,6 +417,72 @@ static const char *const k_theme_light[CLI_TH_COUNT] = {
 #include <poll.h>
 #include <termios.h>
 
+/* 读净 OSC 应答（BEL/ST 终止或超时），返回写入字节数。 */
+static size_t term_read_osc(char *buf, size_t cap)
+{
+    size_t used = 0;
+    /* 循环条件预留 2 字节：ESC 分支单轮最多追加 2 字节（ESC + 下一字节），
+     * 上限 used ≤ 127 保证 buf[used]='\0' 不越界。 */
+    while (used + 2 < cap) {
+        struct pollfd pfd;
+        pfd.fd = STDIN_FILENO;
+        pfd.events = POLLIN;
+        if (poll(&pfd, 1, 300) <= 0)
+            break;
+        char ch;
+        if (read(STDIN_FILENO, &ch, 1) != 1)
+            break;
+        if (ch == 0x07)                 /* BEL：OSC 终止 */
+            break;
+        if (ch == 0x1b) {               /* ESC：可能 ESC \ (ST) */
+            buf[used++] = ch;
+            struct pollfd p2;
+            p2.fd = STDIN_FILENO;
+            p2.events = POLLIN;
+            if (poll(&p2, 1, 300) > 0 &&
+                read(STDIN_FILENO, &ch, 1) == 1) {
+                buf[used++] = ch;
+                if (ch == '\\')         /* ST：结束 */
+                    break;
+            }
+            continue;
+        }
+        buf[used++] = ch;
+    }
+    return used;
+}
+
+/* 解析 "rgb:RR/GG/BB"：每段 1~4 位 hex，返回 1 成功。 */
+static int term_parse_bg(const char *buf, unsigned char *or, unsigned char *og,
+                         unsigned char *ob)
+{
+    const char *p = strstr(buf, "rgb:");
+    if (!p)
+        return 0;
+    p += 4;
+    /* S5 修复：响应提前终止（如 "rgb:ff"）时循环 break，剩余分量未写入；
+     * 未初始化读为 UB。零初始化——缺省分量按黑色处理。 */
+    unsigned int vals[3] = {0, 0, 0};
+    for (int i = 0; i < 3; i++) {
+        char *end = NULL;
+        unsigned long v = strtoul(p, &end, 16);
+        if (end == p)
+            return 0;
+        /* 1 位 hex（如 "f"）按 ANSI 惯例放大到 0xff */
+        unsigned int width = (unsigned int)(end - p);
+        if (width <= 1 && v <= 0xf)
+            v = (v << 4) | v;
+        vals[i] = (unsigned int)(v > 255 ? v / 257 : v); /* 4 位 hex → 8 位 */
+        if (*end == '\0' || i == 2)
+            break;
+        p = end + 1; /* 跳过 '/' */
+    }
+    *or = (unsigned char)vals[0];
+    *og = (unsigned char)vals[1];
+    *ob = (unsigned char)vals[2];
+    return 1;
+}
+
 /* OSC 11 背景色查询（xterm/kitty/ghostty 等）：发出查询后在 300ms 内
  * 等待响应（poll 超时防止不支持 OSC 的终端阻塞启动）。响应形如
  *   ESC ] 11 ; rgb:RRRR/GGGG/BBBB ESC \
@@ -433,35 +513,7 @@ static int term_query_bg(unsigned char *or, unsigned char *og,
     fflush(stdout);
 
     char buf[128];
-    size_t used = 0;
-    /* 循环条件预留 2 字节：ESC 分支单轮最多追加 2 字节（ESC + 下一字节），
-     * 上限 used ≤ 127 保证 buf[used]='\0' 不越界。 */
-    while (used + 2 < sizeof(buf)) {
-        struct pollfd pfd;
-        pfd.fd = STDIN_FILENO;
-        pfd.events = POLLIN;
-        if (poll(&pfd, 1, 300) <= 0)
-            break;
-        char ch;
-        if (read(STDIN_FILENO, &ch, 1) != 1)
-            break;
-        if (ch == 0x07)                 /* BEL：OSC 终止 */
-            break;
-        if (ch == 0x1b) {               /* ESC：可能 ESC \ (ST) */
-            buf[used++] = ch;
-            struct pollfd p2;
-            p2.fd = STDIN_FILENO;
-            p2.events = POLLIN;
-            if (poll(&p2, 1, 300) > 0 &&
-                read(STDIN_FILENO, &ch, 1) == 1) {
-                buf[used++] = ch;
-                if (ch == '\\')         /* ST：结束 */
-                    break;
-            }
-            continue;
-        }
-        buf[used++] = ch;
-    }
+    size_t used = term_read_osc(buf, sizeof(buf));
 
     if (have_tio)
         (void)tcsetattr(STDIN_FILENO, TCSANOW, &saved);
@@ -469,31 +521,7 @@ static int term_query_bg(unsigned char *or, unsigned char *og,
     if (used == 0)
         return 0;
     buf[used] = '\0';
-    char *p = strstr(buf, "rgb:");
-    if (!p)
-        return 0;
-    p += 4;
-    /* S5 修复：响应提前终止（如 "rgb:ff"）时循环 break，剩余分量未写入；
-     * 未初始化读为 UB。零初始化——缺省分量按黑色处理。 */
-    unsigned int vals[3] = {0, 0, 0};
-    for (int i = 0; i < 3; i++) {
-        char *end = NULL;
-        unsigned long v = strtoul(p, &end, 16);
-        if (end == p)
-            return 0;
-        /* 1 位 hex（如 "f"）按 ANSI 惯例放大到 0xff */
-        unsigned int width = (unsigned int)(end - p);
-        if (width <= 1 && v <= 0xf)
-            v = (v << 4) | v;
-        vals[i] = (unsigned int)(v > 255 ? v / 257 : v); /* 4 位 hex → 8 位 */
-        if (*end == '\0' || i == 2)
-            break;
-        p = end + 1; /* 跳过 '/' */
-    }
-    *or = (unsigned char)vals[0];
-    *og = (unsigned char)vals[1];
-    *ob = (unsigned char)vals[2];
-    return 1;
+    return term_parse_bg(buf, or, og, ob);
 }
 #endif
 

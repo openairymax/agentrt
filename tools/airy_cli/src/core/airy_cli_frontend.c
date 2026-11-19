@@ -37,25 +37,14 @@ static int tui_bin_present(const char *path)
 #endif
 }
 
-/* 退出码约定：126 = 调起失败，128+N = 信号终止，其余透传 TUI 退出码。 */
-int cli_run_tui_frontend(int resume)
-{
-    char tui_bin[AIRY_PATH_MAX];
-    snprintf(tui_bin, sizeof(tui_bin), "%s/agentrt-tui", airy_bin_dir());
-    if (!tui_bin_present(tui_bin)) {
-        cli_print_line("Super Agent:tui",
-                       "agentrt-tui 未安装（$AIRY_HOME/bin/agentrt-tui 缺失），"
-                       "请重新执行安装。");
-        return 126;
-    }
-
-    const char *gw = getenv("AIRY_GATEWAY_URL");
-    const char *agf = getenv("AIRY_AGENT_FILE");
-
 #ifndef _WIN32
+/* POSIX 前端拉起：fork/execve + 等退出，返回 CLI 退出码。 */
+static int tui_run_posix(const char *tui_bin, const char *gw,
+                         const char *agf, int resume)
+{
     char *argv[8];
     int n = 0;
-    argv[n++] = tui_bin;
+    argv[n++] = (char *)tui_bin;
     if (gw && gw[0]) {
         argv[n++] = (char *)"--gateway-url";
         argv[n++] = (char *)gw;
@@ -101,7 +90,12 @@ int cli_run_tui_frontend(int resume)
         cli_print_line("Super Agent:tui", msg);
     }
     return rc;
+}
 #else
+/* Windows 前端拉起：拼命令行 + CreateProcess，返回码透传。 */
+static int tui_run_win(const char *tui_bin, const char *gw,
+                       const char *agf, int resume)
+{
     char cmd[AIRY_PATH_MAX + 256];
     snprintf(cmd, sizeof(cmd), "\"%s\"", tui_bin);
     if (gw && gw[0])
@@ -135,5 +129,26 @@ int cli_run_tui_frontend(int resume)
         cli_print_line("Super Agent:tui", msg);
     }
     return (int)code;
+}
+#endif
+
+/* 退出码约定：126 = 调起失败，128+N = 信号终止，其余透传 TUI 退出码。 */
+int cli_run_tui_frontend(int resume)
+{
+    char tui_bin[AIRY_PATH_MAX];
+    snprintf(tui_bin, sizeof(tui_bin), "%s/agentrt-tui", airy_bin_dir());
+    if (!tui_bin_present(tui_bin)) {
+        cli_print_line("Super Agent:tui",
+                       "agentrt-tui 未安装（$AIRY_HOME/bin/agentrt-tui 缺失），"
+                       "请重新执行安装。");
+        return 126;
+    }
+
+    const char *gw = getenv("AIRY_GATEWAY_URL");
+    const char *agf = getenv("AIRY_AGENT_FILE");
+#ifndef _WIN32
+    return tui_run_posix(tui_bin, gw, agf, resume);
+#else
+    return tui_run_win(tui_bin, gw, agf, resume);
 #endif
 }

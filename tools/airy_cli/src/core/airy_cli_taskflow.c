@@ -74,6 +74,24 @@ static void task_print_intent(const cJSON *res)
 }
 #endif /* AIRY_HAS_CJSON */
 
+/* 打印 task.submit 响应：-p/--json 原样输出，否则取 response 文本。 */
+static void task_show_result(cJSON *res)
+{
+    const cJSON *resp = cJSON_GetObjectItem(res, "response");
+
+    if (g_cli_json_mode) {
+        char *out = cJSON_PrintUnformatted(res);
+        if (out) {
+            cli_outf("%s\n", out);
+            AIRY_FREE(out);
+        }
+    } else if (cJSON_IsString(resp) && resp->valuestring && resp->valuestring[0]) {
+        cli_print_line("Super Agent", resp->valuestring);
+    } else {
+        cli_print_line("Super Agent", "任务已完成（无文本输出）。");
+    }
+}
+
 int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t turn_start)
 {
 #ifdef AIRY_HAS_CJSON
@@ -118,18 +136,7 @@ int cli_run_task_pipeline(cli_runtime_ctx_t *rt, const char *input, uint64_t tur
                  reason[0] ? " · " : "", reason[0] ? reason : "");
         cli_print_status("Sub agent_d Agent", line);
 
-        const cJSON *resp = cJSON_GetObjectItem(res, "response");
-        if (g_cli_json_mode) {
-            char *out = cJSON_PrintUnformatted(res);
-            if (out) {
-                cli_outf("%s\n", out);
-                AIRY_FREE(out);
-            }
-        } else if (cJSON_IsString(resp) && resp->valuestring && resp->valuestring[0]) {
-            cli_print_line("Super Agent", resp->valuestring);
-        } else {
-            cli_print_line("Super Agent", "任务已完成（无文本输出）。");
-        }
+        task_show_result(res);
     }
 
     cJSON_Delete(res);

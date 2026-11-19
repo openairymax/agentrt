@@ -155,6 +155,16 @@ static const char *cli_fail_reason_name(const char *r)
     return r;
 }
 
+/* 下一步动作 → 中文提示。 */
+static const char *cli_fail_hint(const char *act)
+{
+    if (strcmp(act, AIRY_RS_NEXT_RETRY) == 0)
+        return "可原样重试";
+    if (strcmp(act, AIRY_RS_NEXT_RESUME) == 0)
+        return "请用 continue 续跑，不要原样重发";
+    return "人工排查后再试";
+}
+
 /* D-10：失败载荷 → 一行原因 + 一行下一步。返回原始 error code 供退出码使用。 */
 static int cli_fail_render(const cJSON *root, char *out, size_t cap)
 {
@@ -175,14 +185,8 @@ static int cli_fail_render(const cJSON *root, char *out, size_t cap)
                         (int)total->valuedouble);
     if (off > 0 && (size_t)off < cap && n[0])
         off += snprintf(out + off, cap - (size_t)off, "；影响节点 %s", n);
-    if (off > 0 && (size_t)off < cap) {
-        const char *hint = "人工排查后再试";
-        if (strcmp(act, AIRY_RS_NEXT_RETRY) == 0)
-            hint = "可原样重试";
-        else if (strcmp(act, AIRY_RS_NEXT_RESUME) == 0)
-            hint = "请用 continue 续跑，不要原样重发";
-        snprintf(out + off, cap - (size_t)off, "；下一步：%s", hint);
-    }
+    if (off > 0 && (size_t)off < cap)
+        snprintf(out + off, cap - (size_t)off, "；下一步：%s", cli_fail_hint(act));
     return err;
 }
 
@@ -274,6 +278,37 @@ int cli_gw_fail_line(const char *data_json, char *out, size_t cap)
     return f.err;
 }
 
+/* provider 分诊结果的中文归因。 */
+static const char *gw_provider_msg(int pr)
+{
+    return (pr == 2) ? "请求被模型服务拒绝（请求体非法，如消息含无效 UTF-8 字符）"
+                     : "请求被模型服务拒绝或模型服务不可达（请检查消息内容与网络连通性）";
+}
+
+/* C-10（0.1.21）：-32603 只是网关的包装码，真实失败环在 error.data
+ * 里（stage/rounds/rejections/affected_node/err_detail）。默认压成
+ * 一行"失败在哪一环"；--verbose 再附原始 JSON。daemon 原始错误码
+ * （如 -110 未收敛）原样返回，-32603 不覆盖根因，-31 只作退出码。 */
+static int gw_err_internal(cJSON *err, const char *m, const char *home)
+{
+    cJSON *data = cJSON_GetObjectItem(err, "data");
+    char *data_json = data ? cJSON_PrintUnformatted(data) : NULL;
+    char line[320];
+    int real = cli_gw_fail_line(data_json, line, sizeof(line));
+
+    if (g_cli_verbose && data_json)
+        snprintf(g_cli_gw_err, sizeof(g_cli_gw_err), "%s%s；原始错误 data：%s",
+                 line[0] ? line : "网关服务内部错误", line[0] ? "" : m, data_json);
+    else if (line[0])
+        snprintf(g_cli_gw_err, sizeof(g_cli_gw_err), "%s", line);
+    else
+        snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
+                 "网关服务内部错误（%s），请查看 %s/logs/gateway_d.out",
+                 m[0] ? m : "Internal error", home);
+    AIRY_FREE(data_json);
+    return real != 0 ? real : AIRY_ERR_GENERIC_FAIL;
+}
+
 /* JSON-RPC error 对象分诊：网关已应答即链路可达，绝不外溢为 transport（N1）。 */
 static int cli_gw_rpc_err(cJSON *err, const char *method)
 {
@@ -285,33 +320,11 @@ static int cli_gw_rpc_err(cJSON *err, const char *method)
     int pr = cli_gw_provider_state(m);
 
     if (pr > 0) {
-        snprintf(g_cli_gw_err, sizeof(g_cli_gw_err), "%s；网关原文：%s",
-                 (pr == 2) ? "请求被模型服务拒绝（请求体非法，如消息含无效 UTF-8 字符）"
-                           : "请求被模型服务拒绝或模型服务不可达（请检查消息内容与网络连通性）",
-                 m);
+        snprintf(g_cli_gw_err, sizeof(g_cli_gw_err), "%s；网关原文：%s", gw_provider_msg(pr), m);
         return AIRY_ERR_GENERIC_FAIL;
     }
-    if (c == -32603) {
-        /* C-10（0.1.21）：-32603 只是网关的包装码，真实失败环在 error.data
-         * 里（stage/rounds/rejections/affected_node/err_detail）。默认压成
-         * 一行"失败在哪一环"；--verbose 再附原始 JSON。daemon 原始错误码
-         * （如 -110 未收敛）原样返回，-32603 不覆盖根因，-31 只作退出码。 */
-        cJSON *data = cJSON_GetObjectItem(err, "data");
-        char *data_json = data ? cJSON_PrintUnformatted(data) : NULL;
-        char line[320];
-        int real = cli_gw_fail_line(data_json, line, sizeof(line));
-        if (g_cli_verbose && data_json)
-            snprintf(g_cli_gw_err, sizeof(g_cli_gw_err), "%s%s；原始错误 data：%s",
-                     line[0] ? line : "网关服务内部错误", line[0] ? "" : m, data_json);
-        else if (line[0])
-            snprintf(g_cli_gw_err, sizeof(g_cli_gw_err), "%s", line);
-        else
-            snprintf(g_cli_gw_err, sizeof(g_cli_gw_err),
-                     "网关服务内部错误（%s），请查看 %s/logs/gateway_d.out",
-                     m[0] ? m : "Internal error", home);
-        AIRY_FREE(data_json);
-        return real != 0 ? real : AIRY_ERR_GENERIC_FAIL;
-    }
+    if (c == -32603)
+        return gw_err_internal(err, m, home);
     if (c == -32601) {
         snprintf(g_cli_gw_err, sizeof(g_cli_gw_err), "网关不支持该方法（%s）", method);
         return AIRY_ERR_NOT_SUPPORTED;

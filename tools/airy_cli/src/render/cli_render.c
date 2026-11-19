@@ -296,42 +296,48 @@ int cli_state_failed(const char *state)
            strcmp(state, "canceled") == 0;
 }
 
+/* 状态 → 图标渲染表（名称唯一，首匹配即返回）。 */
+static const struct { const char *name; const char *icon; } k_state_icon[] = {
+    {"completed", CLI_ICON_CHECK},   {"success", CLI_ICON_CHECK},
+    {"done", CLI_ICON_CHECK},        {"failed", CLI_ICON_CROSS},
+    {"error", CLI_ICON_CROSS},       {"semantic_failed", CLI_ICON_CROSS},
+    {"running", CLI_ICON_DIAMOND},   {"active", CLI_ICON_DIAMOND},
+    {"executing", CLI_ICON_DIAMOND}, {"pending", CLI_ICON_TODO},
+    {"queued", CLI_ICON_TODO},       {"ready", CLI_ICON_TODO},
+    {"scheduled", CLI_ICON_CLOCK},   {"canceled", CLI_ICON_CANCEL},
+};
+
 const char *cli_icon_for_state(const char *state)
 {
     if (!state) return CLI_ICON_BULLET;
-    if (strcmp(state, "completed") == 0 || strcmp(state, "success") == 0 ||
-        strcmp(state, "done") == 0) return CLI_ICON_CHECK;
-    if (strcmp(state, "failed") == 0 || strcmp(state, "error") == 0) return CLI_ICON_CROSS;
-    if (strcmp(state, "semantic_failed") == 0) return CLI_ICON_CROSS;
-    if (strcmp(state, "running") == 0 || strcmp(state, "active") == 0 ||
-        strcmp(state, "executing") == 0) return CLI_ICON_DIAMOND;
-    if (strcmp(state, "pending") == 0 || strcmp(state, "queued") == 0 ||
-        strcmp(state, "ready") == 0) return CLI_ICON_TODO;
-    if (strcmp(state, "scheduled") == 0) return CLI_ICON_CLOCK;
-    if (strcmp(state, "canceled") == 0) return CLI_ICON_CANCEL;
+    for (size_t i = 0; i < sizeof(k_state_icon) / sizeof(k_state_icon[0]); i++) {
+        if (strcmp(state, k_state_icon[i].name) == 0)
+            return k_state_icon[i].icon;
+    }
     return CLI_ICON_BULLET;
 }
+
+/* 状态 → 中文名渲染表（未命中回显原状态串）。 */
+static const struct { const char *name; const char *cn; } k_state_cn[] = {
+    {"completed", "完成"},      {"success", "完成"},
+    {"done", "完成"},           {"failed", "失败"},
+    {"semantic_failed", "无产出"}, {"canceled", "已取消"},
+    {"error", "出错"},          {"running", "执行中"},
+    {"active", "执行中"},       {"executing", "执行中"},
+    {"queued", "排队中"},       {"pending", "待处理"},
+    {"scheduled", "已调度"},    {"ready", "就绪"},
+    {"waiting", "等待中"},      {"skipped", "已跳过"},
+    {"retrying", "重试中"},     {"online", "在线"},
+    {"offline", "离线"},
+};
 
 const char *cli_state_cn(const char *state)
 {
     if (!state) return "未知";
-    if (strcmp(state, "completed") == 0 || strcmp(state, "success") == 0 ||
-        strcmp(state, "done") == 0) return "完成";
-    if (strcmp(state, "failed") == 0) return "失败";
-    if (strcmp(state, "semantic_failed") == 0) return "无产出";
-    if (strcmp(state, "canceled") == 0) return "已取消";
-    if (strcmp(state, "error") == 0) return "出错";
-    if (strcmp(state, "running") == 0 || strcmp(state, "active") == 0 ||
-        strcmp(state, "executing") == 0) return "执行中";
-    if (strcmp(state, "queued") == 0) return "排队中";
-    if (strcmp(state, "pending") == 0) return "待处理";
-    if (strcmp(state, "scheduled") == 0) return "已调度";
-    if (strcmp(state, "ready") == 0) return "就绪";
-    if (strcmp(state, "waiting") == 0) return "等待中";
-    if (strcmp(state, "skipped") == 0) return "已跳过";
-    if (strcmp(state, "retrying") == 0) return "重试中";
-    if (strcmp(state, "online") == 0) return "在线";
-    if (strcmp(state, "offline") == 0) return "离线";
+    for (size_t i = 0; i < sizeof(k_state_cn) / sizeof(k_state_cn[0]); i++) {
+        if (strcmp(state, k_state_cn[i].name) == 0)
+            return k_state_cn[i].cn;
+    }
     return state;
 }
 
@@ -537,6 +543,52 @@ static int cli_plan_topo_build(const airy_task_plan_t *plan, size_t count, size_
     return placed == count;
 }
 
+/* 节点依赖串：跳过空 id 与自依赖，返回 1 表示有依赖输出。 */
+static int cli_render_plan_deps(const airy_task_node_t *nd, const char *nid,
+                                char *deps, size_t cap)
+{
+    size_t dlen = 0;
+    int has_dep = 0;
+    deps[0] = '\0';
+    for (size_t d = 0; nd->task_node_depends_on && d < nd->task_node_depends_count; d++) {
+        const char *src_id = nd->task_node_depends_on[d];
+        if (!src_id || src_id[0] == '\0')
+            continue;
+        if (strcmp(src_id, nid) == 0)
+            continue;
+        if (has_dep && dlen < cap - 2)
+            dlen += (size_t)snprintf(deps + dlen, cap - dlen, ", ");
+        if (!has_dep) {
+            dlen = (size_t)snprintf(deps, cap, "  %s←%s ",
+                                    cli_c(CLR_DIM), cli_c(CLR_RESET));
+            has_dep = 1;
+        }
+        if (dlen < cap - 2)
+            dlen += (size_t)snprintf(deps + dlen, cap - dlen, "%s%s%s",
+                                     cli_c(CLR_CYAN), src_id, cli_c(CLR_DIM));
+    }
+    return has_dep;
+}
+
+/* 计划单节点两行渲染：序号/目标/处理器 + 依赖串。 */
+static void cli_render_plan_node(const airy_task_node_t *nd, size_t idx, const char *ig)
+{
+    const char *nid = (nd->task_node_id && nd->task_node_id[0]) ? nd->task_node_id : "node";
+    char handler[96] = "";
+    cli_node_handler(nd, handler, sizeof(handler));
+    const char *goal = nd->task_node_goal ? nd->task_node_goal : "";
+
+    cli_outf("%s%s%s%s %zu. %s%s%s  %s%s[%s]%s",
+             ig, cli_c(CLR_DIM), CLI_ICON_TODO, cli_c(CLR_RESET),
+             idx + 1,
+             cli_c(CLR_RESET), goal, cli_c(CLR_DIM),
+             cli_c(CLR_DIM), handler[0] ? handler : "?", cli_c(CLR_DIM), cli_c(CLR_RESET));
+
+    char deps[128];
+    int has_dep = cli_render_plan_deps(nd, nid, deps, sizeof(deps));
+    cli_outf("%s\n", has_dep ? deps : "");
+}
+
 void cli_print_plan_list(const airy_task_plan_t *plan)
 {
     if (g_cli_print_mode)
@@ -567,38 +619,7 @@ void cli_print_plan_list(const airy_task_plan_t *plan)
         const airy_task_node_t *nd = plan->task_plan_nodes ? plan->task_plan_nodes[order[r]] : NULL;
         if (!nd)
             continue;
-        const char *nid = (nd->task_node_id && nd->task_node_id[0]) ? nd->task_node_id : "node";
-        char handler[96] = "";
-        cli_node_handler(nd, handler, sizeof(handler));
-        const char *goal = nd->task_node_goal ? nd->task_node_goal : "";
-
-        cli_outf("%s%s%s%s %zu. %s%s%s  %s%s[%s]%s",
-                 ig, cli_c(CLR_DIM), CLI_ICON_TODO, cli_c(CLR_RESET),
-                 r + 1,
-                 cli_c(CLR_RESET), goal, cli_c(CLR_DIM),
-                 cli_c(CLR_DIM), handler[0] ? handler : "?", cli_c(CLR_DIM), cli_c(CLR_RESET));
-
-        char deps[128];
-        size_t dlen = 0;
-        int has_dep = 0;
-        for (size_t d = 0; nd->task_node_depends_on && d < nd->task_node_depends_count; d++) {
-            const char *src_id = nd->task_node_depends_on[d];
-            if (!src_id || src_id[0] == '\0')
-                continue;
-            if (strcmp(src_id, nid) == 0)
-                continue;
-            if (has_dep && dlen < sizeof(deps) - 2)
-                dlen += (size_t)snprintf(deps + dlen, sizeof(deps) - dlen, ", ");
-            if (!has_dep) {
-                dlen = (size_t)snprintf(deps, sizeof(deps), "  %s←%s ",
-                                        cli_c(CLR_DIM), cli_c(CLR_RESET));
-                has_dep = 1;
-            }
-            if (dlen < sizeof(deps) - 2)
-                dlen += (size_t)snprintf(deps + dlen, sizeof(deps) - dlen, "%s%s%s",
-                                         cli_c(CLR_CYAN), src_id, cli_c(CLR_DIM));
-        }
-        cli_outf("%s\n", has_dep ? deps : "");
+        cli_render_plan_node(nd, r, ig);
     }
 
     AIRY_FREE(order);
@@ -606,6 +627,31 @@ void cli_print_plan_list(const airy_task_plan_t *plan)
 }
 
 /* ---- 看板行 ---- */
+
+/* 看板状态样式：颜色/图标/进度条是否高亮。 */
+static void cli_board_style(const char *st, const char **col,
+                                  const char **icon, int *bright)
+{
+    *col = cli_c(CLR_DIM);
+    *icon = CLI_ICON_BULLET;
+    *bright = 0;
+    if (strcmp(st, "completed") == 0) {
+        *col = cli_c(CLR_GREEN); *icon = CLI_ICON_CHECK; *bright = 1;
+    } else if (strcmp(st, "failed") == 0) {
+        *col = cli_c(CLR_RED); *icon = CLI_ICON_CROSS; *bright = 0;
+    } else if (strcmp(st, "semantic_failed") == 0) {
+        *col = cli_c(CLR_YELLOW); *icon = CLI_ICON_CROSS; *bright = 0;
+    } else if (strcmp(st, "running") == 0 || strcmp(st, "active") == 0 ||
+               strcmp(st, "queued") == 0) {
+        *col = cli_c(CLR_DIM); *icon = CLI_ICON_DIAMOND;
+    } else if (strcmp(st, "pending") == 0) {
+        *col = cli_c(CLR_DIM); *icon = CLI_ICON_TODO;
+    } else if (strcmp(st, "scheduled") == 0) {
+        *col = cli_c(CLR_CYAN); *icon = CLI_ICON_CLOCK;
+    } else if (strcmp(st, "canceled") == 0) {
+        *col = cli_c(CLR_DIM); *icon = CLI_ICON_CANCEL;
+    }
+}
 
 void cli_board_line(const char *tag, const char *id, const char *state, double progress)
 {
@@ -623,25 +669,10 @@ void cli_board_line(const char *tag, const char *id, const char *state, double p
     }
 
     const char *st = state ? state : "?";
-    const char *st_col = cli_c(CLR_DIM);
-    const char *st_icon = CLI_ICON_BULLET;
+    const char *st_col = NULL;
+    const char *st_icon = NULL;
     int bar_bright = 0;
-    if (strcmp(st, "completed") == 0) {
-        st_col = cli_c(CLR_GREEN); st_icon = CLI_ICON_CHECK; bar_bright = 1;
-    } else if (strcmp(st, "failed") == 0) {
-        st_col = cli_c(CLR_RED); st_icon = CLI_ICON_CROSS; bar_bright = 0;
-    } else if (strcmp(st, "semantic_failed") == 0) {
-        st_col = cli_c(CLR_YELLOW); st_icon = CLI_ICON_CROSS; bar_bright = 0;
-    } else if (strcmp(st, "running") == 0 || strcmp(st, "active") == 0 ||
-               strcmp(st, "queued") == 0) {
-        st_col = cli_c(CLR_DIM); st_icon = CLI_ICON_DIAMOND;
-    } else if (strcmp(st, "pending") == 0) {
-        st_col = cli_c(CLR_DIM); st_icon = CLI_ICON_TODO;
-    } else if (strcmp(st, "scheduled") == 0) {
-        st_col = cli_c(CLR_CYAN); st_icon = CLI_ICON_CLOCK;
-    } else if (strcmp(st, "canceled") == 0) {
-        st_col = cli_c(CLR_DIM); st_icon = CLI_ICON_CANCEL;
-    }
+    cli_board_style(st, &st_col, &st_icon, &bar_bright);
 
     const char *g = cli_gutter(2);
     if (tag && tag[0])
