@@ -348,16 +348,22 @@ static int review_verdicts(const cli_review_job_t *jobs, int n)
     return produced;
 }
 
+/* 评审前置判定：环境关闭 / 无计划时跳过。 */
+static int review_skip(const airy_task_plan_t *plan)
+{
+    const char *env = getenv("AIRY_COGNITION_REVIEW");
+    if (env && env[0] == '0')
+        return 1;
+    return plan == NULL;
+}
+
 int cli_cognition_review(const char *agent_sock, const char *task, const airy_task_plan_t *plan,
                          char **out_report)
 {
     if (out_report)
         *out_report = NULL;
 
-    const char *env = getenv("AIRY_COGNITION_REVIEW");
-    if (env && env[0] == '0')
-        return 0;
-    if (!plan)
+    if (review_skip(plan))
         return 0;
 
     const char *sock = cli_review_agent_sock(agent_sock);

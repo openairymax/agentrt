@@ -55,23 +55,11 @@ static const char *ev_find(const char *js, size_t n, const char *key)
     return NULL;
 }
 
-/* 取顶层字符串值；0=未命中（或非字符串）。 */
-int cli_ev_str(const char *js, size_t n, const char *key, char *out, size_t cap)
+/* 读取字符串体（处理 \n/\t/\r 转义），返回写入字节数。 */
+static size_t ev_str_body(const char *js, size_t n, const char *p, char *out, size_t cap)
 {
-    const char *p;
     size_t o = 0;
 
-    if (!js || !out || cap == 0)
-        return 0;
-    out[0] = '\0';
-    p = ev_find(js, n, key);
-    if (!p)
-        return 0;
-    while (p < js + n && (*p == ' ' || *p == '\t'))
-        p++;
-    if (p >= js + n || *p != '"')
-        return 0;
-    p++;
     while (p < js + n && *p != '"') {
         char c = *p;
         if (c == '\\' && p + 1 < js + n) {
@@ -83,7 +71,25 @@ int cli_ev_str(const char *js, size_t n, const char *key, char *out, size_t cap)
         p++;
     }
     out[o] = '\0';
-    return (int)o;
+    return o;
+}
+
+/* 取顶层字符串值；0=未命中（或非字符串）。 */
+int cli_ev_str(const char *js, size_t n, const char *key, char *out, size_t cap)
+{
+    const char *p;
+
+    if (!js || !out || cap == 0)
+        return 0;
+    out[0] = '\0';
+    p = ev_find(js, n, key);
+    if (!p)
+        return 0;
+    while (p < js + n && (*p == ' ' || *p == '\t'))
+        p++;
+    if (p >= js + n || *p != '"')
+        return 0;
+    return (int)ev_str_body(js, n, p + 1, out, cap);
 }
 
 /* 取顶层数值（无符号）；0=未命中。 */

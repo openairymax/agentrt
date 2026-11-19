@@ -40,27 +40,21 @@ static int has_cand(const airy_ime_cand_t *c, int n, const char *text)
     return 0;
 }
 
-int main(int argc, char *argv[])
+/* 词典路径：命令行参数优先；未传时用编译期默认（CMake 注入
+ * AIRY_IME_TEST_DICT，指向源码树 data/airy_ime.dat）。 */
+static const char *ime_test_dict(int argc, char *argv[])
 {
-    /* 词典路径：命令行参数优先；未传时用编译期默认（CMake 注入
-     * AIRY_IME_TEST_DICT，指向源码树 data/airy_ime.dat）。 */
     const char *dict = (argc >= 2) ? argv[1] : NULL;
 #ifdef AIRY_IME_TEST_DICT
     if (!dict || !dict[0])
         dict = AIRY_IME_TEST_DICT;
 #endif
-    if (!dict || !dict[0]) {
-        fprintf(stderr, "用法: test_ime <airy_ime.dat>\n");
-        return 2;
-    }
+    return dict;
+}
 
-    /* 1. 加载成功 */
-    airy_ime_t *ime = airy_ime_load(dict);
-    CHECK(ime != NULL, "load success");
-
-    if (!ime)
-        return 1;
-
+/* 正常词典的查询用例：前缀命中/常见字/词组/非法输入/截断/ü。 */
+static void ime_test_query(airy_ime_t *ime)
+{
     /* 2. 全拼前缀：zhong → 中 / 中国 */
     airy_ime_cand_t cand[16];
     int n = airy_ime_query(ime, "zhong", cand, 16);
@@ -100,26 +94,46 @@ int main(int argc, char *argv[])
     /* 7. ü 以 v 表示（lü -> lv） */
     n = airy_ime_query(ime, "lv", cand, 16);
     CHECK(n > 0 && has_cand(cand, n, "绿"), "lv contains 绿 (lü)");
+}
 
-    airy_ime_destroy(ime);
-
-    /* 8. 损坏文件 fail-closed */
-    {
-        /* CI-2：路径带 PID，避免并行 ctest 下多个实例写同一文件互相踩踏。 */
-        char tmp[128];
-        snprintf(tmp, sizeof(tmp), "/tmp/airy_ime_corrupt_%d.dat", IME_GETPID());
-        FILE *f = fopen(tmp, "wb");
-        if (f) {
-            const char *bad = "AIRYIME1\x01\x00\x00\x00\xff\xff\xff\xff"
-                              "xxxxxxxxxxxxxxxxxxxxxxxx";
-            fwrite(bad, 1, strlen(bad) + 1, f);
-            fclose(f);
-        }
-        CHECK(airy_ime_load(tmp) == NULL, "corrupt file rejected (crc)");
-        CHECK(airy_ime_load(NULL) == NULL, "NULL path -> NULL");
-        CHECK(airy_ime_load("/nonexistent/airy_ime.dat") == NULL,
-              "missing file -> NULL");
+/* 8. 损坏文件 fail-closed。 */
+static void ime_test_corrupt(void)
+{
+    /* CI-2：路径带 PID，避免并行 ctest 下多个实例写同一文件互相踩踏。 */
+    char tmp[128];
+    snprintf(tmp, sizeof(tmp), "/tmp/airy_ime_corrupt_%d.dat", IME_GETPID());
+    FILE *f = fopen(tmp, "wb");
+    if (f) {
+        const char *bad = "AIRYIME1\x01\x00\x00\x00\xff\xff\xff\xff"
+                          "xxxxxxxxxxxxxxxxxxxxxxxx";
+        fwrite(bad, 1, strlen(bad) + 1, f);
+        fclose(f);
     }
+    CHECK(airy_ime_load(tmp) == NULL, "corrupt file rejected (crc)");
+    CHECK(airy_ime_load(NULL) == NULL, "NULL path -> NULL");
+    CHECK(airy_ime_load("/nonexistent/airy_ime.dat") == NULL,
+          "missing file -> NULL");
+}
+
+int main(int argc, char *argv[])
+{
+    const char *dict = ime_test_dict(argc, argv);
+
+    if (!dict || !dict[0]) {
+        fprintf(stderr, "用法: test_ime <airy_ime.dat>\n");
+        return 2;
+    }
+
+    /* 1. 加载成功 */
+    airy_ime_t *ime = airy_ime_load(dict);
+    CHECK(ime != NULL, "load success");
+
+    if (!ime)
+        return 1;
+
+    ime_test_query(ime);
+    airy_ime_destroy(ime);
+    ime_test_corrupt();
 
     if (g_fail) {
         fprintf(stderr, "test_ime: FAILED\n");

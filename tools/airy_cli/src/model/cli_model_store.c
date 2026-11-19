@@ -307,6 +307,32 @@ int mr_active(const mr_ctx_t *c, const mr_kv_t *kv, char *out, size_t cap)
     return 0;
 }
 
+/* 读 server 侧路径；加载失败返回 -1，缺失/不存在则置空串。 */
+static int ms_load_srv(const mr_ctx_t *c, char *server, size_t cap)
+{
+    mr_kv_t srv;
+    int rc = 0;
+
+    AIRY_MEMSET(&srv, 0, sizeof(srv));
+    if (mr_load(&srv, c->srv) != 0)
+        rc = -1;
+    if (rc == 0 &&
+        (!mr_get(&srv, "server", server, cap) || !airy_file_exists(server)))
+        server[0] = '\0';
+    mr_free(&srv);
+    return rc;
+}
+
+/* 清空声明片段：删除托管键，空则删文件。 */
+static int ms_clear(mr_kv_t *frag, const mr_ctx_t *c, const char *const *keys)
+{
+    for (size_t i = 0; i < MR_DECL_KEYS; i++)
+        mr_del(frag, keys[i]);
+    if (frag->n == 0)
+        return airy_file_exists(c->frag) ? airy_file_remove(c->frag) : 0;
+    return mr_save(frag, c->frag);
+}
+
 /* 声明片段按当前安装态收敛：只更新本实例的 5 个键，同文件内其他键原样保留；
  * 实例名归政策层——片段已声明 NAME 时沿用（ops 侧 airy-local 的声明），只在
  * 空片段上给中性缺省，机制核不写死厂商实例名；无服务模型时只清本实例键，
@@ -318,7 +344,6 @@ int mr_sync(const mr_ctx_t *c, const mr_kv_t *reg)
         "AIRYRT_MANAGED_ARGS", "AIRYRT_MANAGED_MEM"
     };
     mr_kv_t frag;
-    mr_kv_t srv = { 0 };
     char server[MR_VAL_MAX];
     char name[MR_NAME_MAX];
     char asset[MR_VAL_MAX];
@@ -327,30 +352,18 @@ int mr_sync(const mr_ctx_t *c, const mr_kv_t *reg)
     char model[AIRY_PATH_MAX];
     char line[MR_VAL_MAX];
     char key[MR_NAME_MAX + 16];
-    int rc = 0;
+    int rc;
 
     if (mr_load(&frag, c->frag) != 0)
         return -1;
-    AIRY_MEMSET(&srv, 0, sizeof(srv));
-    if (mr_load(&srv, c->srv) != 0)
-        rc = -1;
-    if (rc == 0 &&
-        (!mr_get(&srv, "server", server, sizeof(server)) ||
-         !airy_file_exists(server)))
-        server[0] = '\0';
-    mr_free(&srv);
+    rc = ms_load_srv(c, server, sizeof(server));
     if (rc != 0) {
         mr_free(&frag);
         return -1;
     }
     if (!server[0] || !mr_active(c, reg, name, sizeof(name)) ||
         !mr_asset(reg, name, asset, sizeof(asset))) {
-        for (size_t i = 0; i < MR_DECL_KEYS; i++)
-            mr_del(&frag, keys[i]);
-        if (frag.n == 0)
-            rc = airy_file_exists(c->frag) ? airy_file_remove(c->frag) : 0;
-        else
-            rc = mr_save(&frag, c->frag);
+        rc = ms_clear(&frag, c, keys);
         mr_free(&frag);
         return rc;
     }

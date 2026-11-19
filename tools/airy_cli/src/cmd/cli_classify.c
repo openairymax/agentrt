@@ -81,6 +81,83 @@ static int has_any(const char *input, const char *const *list, size_t n)
     return 0;
 }
 
+/* 输入是否以咨询引导词开头（"如何/怎么/介绍一下..."）。 */
+static int cls_consult_lead(const char *input)
+{
+    static const char *const consult_prefixes[] = {
+        "如何", "怎么", "怎样", "介绍一下", "解释", "为什么", "什么是",
+        "what is", "what are", "why ", "how to", "how do", "explain ",
+    };
+    for (size_t j = 0; j < sizeof(consult_prefixes) / sizeof(consult_prefixes[0]); j++) {
+        size_t plen = strlen(consult_prefixes[j]);
+        if (strncmp(input, consult_prefixes[j], plen) == 0)
+            return 1;
+    }
+    return 0;
+}
+
+/* 分析类咨询词命中且未含产物变更强动词 → 1（判 chat）。 */
+static int cls_analysis(const char *input)
+{
+    static const char *const analysis_marks[] = {
+        "分析", "比较", "对比", "评估", "总结", "讲解", "探讨", "研讨",
+        "剖析", "评测", "评价", "解析", "区别", "差异", "优缺点",
+        "利弊", "优劣",
+    };
+    if (!has_any(input, analysis_marks, sizeof(analysis_marks) / sizeof(analysis_marks[0])))
+        return 0;
+    return !has_any(input, artifact_verbs,
+                    sizeof(artifact_verbs) / sizeof(artifact_verbs[0]));
+}
+
+/* 任务词命中；场景动词需无描述性语境才计任务。 */
+static int cls_task_hit(const char *input)
+{
+    static const char *const task_marks[] = {
+        /* 中文命令式 */
+        "实现", "开发", "构建", "创建", "编写", "修复", "重构",
+        "部署", "设计", "添加", "支持", "优化", "迁移", "集成",
+        "写一个", "写一", "做一个", "实现一个", "帮我实现", "开发一个",
+        "生成", "安装", "配置", "删除", "更新", "下载",
+        /* 英文命令式 */
+        "create ", "create a", "create an", "write ", "write a", "write an",
+        "implement ", "implement a", "implement an", "build ", "build a",
+        "fix ", "fix a", "refactor ", "add ", "add a", "add an",
+        "support ", "optimize ", "migrate ", "integrate ", "update ",
+        "remove ", "delete ", "install ", "configure ",
+        "generate ", "generate a",
+        "deploy ", "start ", "stop ", "download ", "rename ", "move ",
+        "make a", "make an", "make ", "change ", "modify ", "convert ",
+    };
+    if (has_any(input, task_marks, sizeof(task_marks) / sizeof(task_marks[0])))
+        return 1;
+    for (size_t i = 0; i < sizeof(scenario_verbs) / sizeof(scenario_verbs[0]); i++) {
+        if (strstr(input, scenario_verbs[i]) &&
+            !scenario_verb_descriptive(input, scenario_verbs[i]))
+            return 1;
+    }
+    return 0;
+}
+
+/* 明确对话词命中（寒暄/检索/文件读改）。 */
+static int cls_chat_hit(const char *input)
+{
+    static const char *const chat_marks[] = {
+        "你好", "谢谢", "再见", "你是谁", "帮助", "请问", "你好呀",
+        "hello", "hi", "thanks", "thank you", "bye", "who are you",
+        "help me",
+        /* 联网检索/信息查询 → 聊天工具回路（web_search/web_fetch） */
+        "搜索", "查询", "搜索一下", "查一下", "了解",
+        "search ", "look up",
+        /* 本地文件读/查/编辑 → 聊天工具回路（fs_read/fs_list/fs_edit 等）：
+         * 查看、读取、修改单个文件属于日常操作，非工程任务
+         * （2026-08-16：此前被误路由到任务管线导致提交失败） */
+        "读取", "读一下", "读文件", "查看", "看看", "打开", "内容是什么",
+        "修改一下", "改一下", "编辑一下", "写入", "文件",
+    };
+    return has_any(input, chat_marks, sizeof(chat_marks) / sizeof(chat_marks[0]));
+}
+
 int cli_classify_heuristic(const char *input)
 {
     if (!input || input[0] == '\0')
@@ -100,23 +177,9 @@ int cli_classify_heuristic(const char *input)
         "please implement ", "please create ", "please build ",
         "please fix ", "please write ",
     };
-    static const char *const consult_prefixes[] = {
-        "如何", "怎么", "怎样", "介绍一下", "解释", "为什么", "什么是",
-        "what is", "what are", "why ", "how to", "how do", "explain ",
-    };
     for (size_t i = 0; i < sizeof(task_lead_marks) / sizeof(task_lead_marks[0]); i++) {
-        if (strstr(input, task_lead_marks[i])) {
-            int consult_lead = 0;
-            for (size_t j = 0;
-                 j < sizeof(consult_prefixes) / sizeof(consult_prefixes[0]); j++) {
-                size_t plen = strlen(consult_prefixes[j]);
-                if (strncmp(input, consult_prefixes[j], plen) == 0) {
-                    consult_lead = 1;
-                    break;
-                }
-            }
-            return consult_lead ? 0 : 1;
-        }
+        if (strstr(input, task_lead_marks[i]))
+            return cls_consult_lead(input) ? 0 : 1;
     }
 
     /* 强对话咨询词：讲解/解释/咨询类输入，即使含命令式动词也判 chat */
@@ -126,74 +189,23 @@ int cli_classify_heuristic(const char *input)
         "what is", "what are", "why ", "explain ", "how to", "how do",
         "tell me", "what's ",
     };
-    for (size_t i = 0; i < sizeof(consult_marks) / sizeof(consult_marks[0]); i++) {
-        if (strstr(input, consult_marks[i]))
-            return 0;
-    }
+    if (has_any(input, consult_marks, sizeof(consult_marks) / sizeof(consult_marks[0])))
+        return 0;
 
     /* 分析/评估/比较类咨询词（2026-08-22）：咨询语义判 chat，除非同现
-     * 产物变更强动词（"分析并修复"）。修复了"请帮我分析一下…在 ARM 设备
-     * 上运行容器化数据库…比较…"被"运行"误判为任务的缺陷。 */
-    static const char *const analysis_marks[] = {
-        "分析", "比较", "对比", "评估", "总结", "讲解", "探讨", "研讨",
-        "剖析", "评测", "评价", "解析", "区别", "差异", "优缺点",
-        "利弊", "优劣",
-    };
-    if (has_any(input, analysis_marks,
-                sizeof(analysis_marks) / sizeof(analysis_marks[0]))) {
-        if (!has_any(input, artifact_verbs,
-                     sizeof(artifact_verbs) / sizeof(artifact_verbs[0])))
-            return 0;
-        /* 含产物变更强动词：落入 task_marks 继续判定 */
-    }
+     * 产物变更强动词（"分析并修复"），此时落入任务词继续判定。 */
+    if (cls_analysis(input))
+        return 0;
 
     /* 明确任务词（中文/英文命令式，Claude Code/Codex 约定：命令式动词即任务）。
      * 场景描述动词（运行/测试/检查/启动/停止）单独处理：无描述性语境才计
      * 任务（2026-08-22，见 scenario_verb_descriptive）。 */
-    static const char *const task_marks[] = {
-        /* 中文命令式 */
-        "实现", "开发", "构建", "创建", "编写", "修复", "重构",
-        "部署", "设计", "添加", "支持", "优化", "迁移", "集成",
-        "写一个", "写一", "做一个", "实现一个", "帮我实现", "开发一个",
-        "生成", "安装", "配置", "删除", "更新", "下载",
-        /* 英文命令式 */
-        "create ", "create a", "create an", "write ", "write a", "write an",
-        "implement ", "implement a", "implement an", "build ", "build a",
-        "fix ", "fix a", "refactor ", "add ", "add a", "add an",
-        "support ", "optimize ", "migrate ", "integrate ", "update ",
-        "remove ", "delete ", "install ", "configure ",
-        "generate ", "generate a",
-        "deploy ", "start ", "stop ", "download ", "rename ", "move ",
-        "make a", "make an", "make ", "change ", "modify ", "convert ",
-    };
-    for (size_t i = 0; i < sizeof(task_marks) / sizeof(task_marks[0]); i++) {
-        if (strstr(input, task_marks[i]))
-            return 1;
-    }
-    for (size_t i = 0; i < sizeof(scenario_verbs) / sizeof(scenario_verbs[0]); i++) {
-        if (strstr(input, scenario_verbs[i]) &&
-            !scenario_verb_descriptive(input, scenario_verbs[i]))
-            return 1;
-    }
+    if (cls_task_hit(input))
+        return 1;
 
     /* 明确对话词：寒暄 + 联网检索 + 本地文件读/查/改（超级智能体日常操作） */
-    static const char *const chat_marks[] = {
-        "你好", "谢谢", "再见", "你是谁", "帮助", "请问", "你好呀",
-        "hello", "hi", "thanks", "thank you", "bye", "who are you",
-        "help me",
-        /* 联网检索/信息查询 → 聊天工具回路（web_search/web_fetch） */
-        "搜索", "查询", "搜索一下", "查一下", "了解",
-        "search ", "look up",
-        /* 本地文件读/查/编辑 → 聊天工具回路（fs_read/fs_list/fs_edit 等）：
-         * 查看、读取、修改单个文件属于日常操作，非工程任务
-         * （2026-08-16：此前被误路由到任务管线导致提交失败） */
-        "读取", "读一下", "读文件", "查看", "看看", "打开", "内容是什么",
-        "修改一下", "改一下", "编辑一下", "写入", "文件",
-    };
-    for (size_t i = 0; i < sizeof(chat_marks) / sizeof(chat_marks[0]); i++) {
-        if (strstr(input, chat_marks[i]))
-            return 0;
-    }
+    if (cls_chat_hit(input))
+        return 0;
 
     /* 未命中任何词表：交 LLM 兜底 */
     return -1;

@@ -215,29 +215,23 @@ void cli_rpc_print(const char *ns, const char *method, const char *params_json)
  * 文本超出 cap 返回 -1。
  * out 恒被写入（含无 --timeout 与空参数两种情形）：调用方据 out[0] 判空，
  * 漏写会让其把未初始化栈内存当 JSON 发出，网关侧只能回 -32700。 */
-static int rpc_timeout_arg(const char *in, char *out, size_t cap)
+/* 定位最后一个独立 "--timeout"（前为行首/空白）；未出现返回 NULL。 */
+static const char *rpc_find_timeout(const char *in)
 {
     const char *p = in;
     const char *tail = NULL;
-    int sec = 0;
-    size_t n;
-
-    if (cap == 0)
-        return -1;
-    out[0] = '\0';
     while ((p = strstr(p, "--timeout")) != NULL) {
         if (p == in || p[-1] == ' ' || p[-1] == '\t')
             tail = p;
         p += 9;
     }
-    if (!tail) {
-        n = strlen(in);
-        if (n + 1 > cap)
-            return -1;
-        AIRY_MEMCPY(out, in, n + 1);
-        return 0;
-    }
-    p = tail + 9;
+    return tail;
+}
+
+/* 解析 "--timeout" 后的秒数（<=86400 且后缀仅空白）；0/-1。 */
+static int rpc_parse_sec(const char *p, int *sec_out)
+{
+    int sec = 0;
     while (*p == ' ' || *p == '\t')
         p++;
     if (*p < '0' || *p > '9')
@@ -251,6 +245,28 @@ static int rpc_timeout_arg(const char *in, char *out, size_t cap)
     while (*p == ' ' || *p == '\t')
         p++;
     if (sec <= 0 || *p != '\0')
+        return -1;
+    *sec_out = sec;
+    return 0;
+}
+
+static int rpc_timeout_arg(const char *in, char *out, size_t cap)
+{
+    int sec = 0;
+    size_t n;
+
+    if (cap == 0)
+        return -1;
+    out[0] = '\0';
+    const char *tail = rpc_find_timeout(in);
+    if (!tail) {
+        n = strlen(in);
+        if (n + 1 > cap)
+            return -1;
+        AIRY_MEMCPY(out, in, n + 1);
+        return 0;
+    }
+    if (rpc_parse_sec(tail + 9, &sec) != 0)
         return -1;
     n = (size_t)(tail - in);
     while (n > 0 && (in[n - 1] == ' ' || in[n - 1] == '\t'))
@@ -504,6 +520,33 @@ int cmd_daemon(const char *arg, void *ctx)
 }
 
 #ifdef AIRY_HAS_CJSON
+/* 语义缓存一行统计 + 零命中告警。 */
+static void mem_stats_cache(const char *ns, const cJSON *cache)
+{
+    char line[200];
+    const cJSON *e = cJSON_GetObjectItem(cache, "entries");
+    const cJSON *h = cJSON_GetObjectItem(cache, "hits");
+    const cJSON *m = cJSON_GetObjectItem(cache, "misses");
+    const cJSON *r = cJSON_GetObjectItem(cache, "hit_rate");
+    const cJSON *v = cJSON_GetObjectItem(cache, "evictions");
+    const cJSON *s = cJSON_GetObjectItem(cache, "state");
+    /* 三态（D-4）：disabled/empty/active；hit_rate 仅在有查询样本时呈现，
+     * 未启用时固定 unavailable，避免 -1 被误读为零命中。 */
+    char rate[16];
+    if (cJSON_IsNumber(r) && r->valuedouble >= 0.0)
+        snprintf(rate, sizeof(rate), "%.1f%%", r->valuedouble * 100.0);
+    else
+        snprintf(rate, sizeof(rate), "unavailable");
+    snprintf(line, sizeof(line),
+             "semantic cache: state=%s entries=%d hits=%d misses=%d hit_rate=%s evictions=%d",
+             cJSON_IsString(s) ? s->valuestring : "unknown", e ? e->valueint : 0,
+             h ? h->valueint : 0, m ? m->valueint : 0, rate, v ? v->valueint : 0);
+    cli_sub_print(0, ns, line);
+    if (cJSON_IsTrue(cJSON_GetObjectItem(cache, "enabled")) &&
+        (!h || h->valueint == 0) && m && m->valueint > 0)
+        cli_sub_print(0, ns, "WARN: semantic cache 已启用但有查询零命中，缓存未生效");
+}
+
 /* mem_d 统计含语义缓存命中率与上下文台账两层子对象，默认视图下拆行可读渲染；
  * --print / --json 仍输出原始 JSON 供脚本消费。 */
 static void cli_mem_stats_show(const char *ns, const char *json)
@@ -524,29 +567,8 @@ static void cli_mem_stats_show(const char *ns, const char *json)
     }
 
     const cJSON *cache = cJSON_GetObjectItem(root, "cache");
-    if (cJSON_IsObject(cache)) {
-        const cJSON *e = cJSON_GetObjectItem(cache, "entries");
-        const cJSON *h = cJSON_GetObjectItem(cache, "hits");
-        const cJSON *m = cJSON_GetObjectItem(cache, "misses");
-        const cJSON *r = cJSON_GetObjectItem(cache, "hit_rate");
-        const cJSON *v = cJSON_GetObjectItem(cache, "evictions");
-        const cJSON *s = cJSON_GetObjectItem(cache, "state");
-        /* 三态（D-4）：disabled/empty/active；hit_rate 仅在有查询样本时呈现，
-         * 未启用时固定 unavailable，避免 -1 被误读为零命中。 */
-        char rate[16];
-        if (cJSON_IsNumber(r) && r->valuedouble >= 0.0)
-            snprintf(rate, sizeof(rate), "%.1f%%", r->valuedouble * 100.0);
-        else
-            snprintf(rate, sizeof(rate), "unavailable");
-        snprintf(line, sizeof(line),
-                 "semantic cache: state=%s entries=%d hits=%d misses=%d hit_rate=%s evictions=%d",
-                 cJSON_IsString(s) ? s->valuestring : "unknown", e ? e->valueint : 0,
-                 h ? h->valueint : 0, m ? m->valueint : 0, rate, v ? v->valueint : 0);
-        cli_sub_print(0, ns, line);
-        if (cJSON_IsTrue(cJSON_GetObjectItem(cache, "enabled")) &&
-            (!h || h->valueint == 0) && m && m->valueint > 0)
-            cli_sub_print(0, ns, "WARN: semantic cache 已启用但有查询零命中，缓存未生效");
-    }
+    if (cJSON_IsObject(cache))
+        mem_stats_cache(ns, cache);
 
     const cJSON *ledger = cJSON_GetObjectItem(root, "ledger");
     if (cJSON_IsObject(ledger)) {

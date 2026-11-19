@@ -46,6 +46,34 @@ void *cli_task_wait_worker(void *arg)
     return NULL;
 }
 
+/* 去尾换行；空行/全空白返回 0，否则返回去尾后长度。 */
+static size_t poll_trim_line(char *line)
+{
+    size_t n = strlen(line);
+
+    while (n > 0 && (line[n - 1] == '\n' || line[n - 1] == '\r'))
+        line[--n] = '\0';
+    if (n == 0)
+        return 0;
+    size_t nz = 0;
+    while (nz < n && (line[nz] == ' ' || line[nz] == '\t'))
+        nz++;
+    return (nz == n) ? 0 : n;
+}
+
+/* 中断指令：quit/exit/stop/取消…。 */
+static int poll_abort_line(const char *line)
+{
+    static const char *const k_abort[] = {
+        "quit", "exit", "abort", "stop", "cancel", "打断", "停止", "取消",
+    };
+    for (size_t i = 0; i < sizeof(k_abort) / sizeof(k_abort[0]); i++) {
+        if (strcmp(line, k_abort[i]) == 0)
+            return 1;
+    }
+    return 0;
+}
+
 int cli_task_poll_input(void)
 {
     if (g_cli_print_mode || g_cli_json_mode)
@@ -61,22 +89,9 @@ int cli_task_poll_input(void)
     char line[4096];
     if (!fgets(line, sizeof(line), stdin))
         return 0;
-    size_t n = strlen(line);
-    while (n > 0 && (line[n - 1] == '\n' || line[n - 1] == '\r'))
-        line[--n] = '\0';
-    if (n == 0)
+    if (poll_trim_line(line) == 0)
         return 0;
-    {
-        size_t nz = 0;
-        while (nz < n && (line[nz] == ' ' || line[nz] == '\t'))
-            nz++;
-        if (nz == n)
-            return 0;
-    }
-    if (strcmp(line, "quit") == 0 || strcmp(line, "exit") == 0 ||
-        strcmp(line, "abort") == 0 || strcmp(line, "stop") == 0 ||
-        strcmp(line, "cancel") == 0 || strcmp(line, "打断") == 0 ||
-        strcmp(line, "停止") == 0 || strcmp(line, "取消") == 0) {
+    if (poll_abort_line(line)) {
         g_cli_cancel = 1;
         return -1;
     }

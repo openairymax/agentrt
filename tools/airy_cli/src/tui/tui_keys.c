@@ -143,43 +143,25 @@ static void tui_win_enqueue_key(WORD vk, WCHAR wc, DWORD ctl)
 
 #endif /* _WIN32 */
 
-/* 带超时的按键等待。timeout_ms < 0 无限等待（原阻塞语义）。
- * 返回 1 有数据（*out 有效）；0 = 超时（*eof=0）或 EOF（*eof=1）。 */
-int tui_wait_byte(cli_tui_t *t, char *out, int timeout_ms, int *eof)
-{
 #ifdef _WIN32
-    (void)t;
-    /* 优先消耗上一个键事件翻译出的字节序列。 */
-    if (g_win_key_off < g_win_key_len) {
-        *out = g_win_key_buf[g_win_key_off++];
+/* 管道/文件：逐字节读（与 POSIX read 语义一致）。 */
+static int tui_win_pipe(HANDLE hin, char *out, int *eof)
+{
+    char c;
+    DWORD n = 0;
+
+    if (ReadFile(hin, &c, 1, &n, NULL) && n == 1) {
+        *out = c;
         *eof = 0;
         return 1;
     }
-    g_win_key_len = g_win_key_off = 0;
+    *eof = 1;
+    return 0;
+}
 
-    HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
-    if (hin == INVALID_HANDLE_VALUE || hin == NULL) {
-        *eof = 1;
-        return 0;
-    }
-    DWORD ms = (timeout_ms < 0) ? INFINITE : (DWORD)timeout_ms;
-    if (WaitForSingleObject(hin, ms) != WAIT_OBJECT_0) {
-        *eof = 0;
-        return 0;
-    }
-    if (GetFileType(hin) != FILE_TYPE_CHAR) {
-        /* 重定向的管道/文件：逐字节读（与 POSIX read 语义一致）。 */
-        char c;
-        DWORD n = 0;
-        if (ReadFile(hin, &c, 1, &n, NULL) && n == 1) {
-            *out = c;
-            *eof = 0;
-            return 1;
-        }
-        *eof = 1;
-        return 0;
-    }
-    /* 控制台：ReadConsoleInputW 取 KEY_EVENT，跳过非键事件后翻译。 */
+/* 控制台：ReadConsoleInputW 取 KEY_EVENT，跳过非键事件后翻译。 */
+static int tui_win_key(HANDLE hin, DWORD ms, char *out, int *eof)
+{
     for (;;) {
         INPUT_RECORD rec;
         DWORD n = 0;
@@ -202,14 +184,40 @@ int tui_wait_byte(cli_tui_t *t, char *out, int timeout_ms, int *eof)
             }
         }
     }
+}
+
+static int tui_win_wait(char *out, int timeout_ms, int *eof)
+{
+    /* 优先消耗上一个键事件翻译出的字节序列。 */
+    if (g_win_key_off < g_win_key_len) {
+        *out = g_win_key_buf[g_win_key_off++];
+        *eof = 0;
+        return 1;
+    }
+    g_win_key_len = g_win_key_off = 0;
+
+    HANDLE hin = GetStdHandle(STD_INPUT_HANDLE);
+    if (hin == INVALID_HANDLE_VALUE || hin == NULL) {
+        *eof = 1;
+        return 0;
+    }
+    DWORD ms = (timeout_ms < 0) ? INFINITE : (DWORD)timeout_ms;
+    if (WaitForSingleObject(hin, ms) != WAIT_OBJECT_0) {
+        *eof = 0;
+        return 0;
+    }
+    if (GetFileType(hin) != FILE_TYPE_CHAR)
+        return tui_win_pipe(hin, out, eof);
+    return tui_win_key(hin, ms, out, eof);
+}
 #else
-    struct pollfd pfd;
-    pfd.fd = STDIN_FILENO;
-    pfd.events = POLLIN;
-    pfd.revents = 0;
+/* 等 stdin 可读：EINTR 重试，resize tick 提前返回。 */
+static int tui_posix_poll(struct pollfd *pfd, int timeout_ms)
+{
     int r;
+
     for (;;) {
-        r = poll(&pfd, 1, timeout_ms);
+        r = poll(pfd, 1, timeout_ms);
         if (r >= 0 || errno != EINTR)
             break;
         /* SIGWINCH interrupted the wait: surface a resize tick so the caller
@@ -217,6 +225,17 @@ int tui_wait_byte(cli_tui_t *t, char *out, int timeout_ms, int *eof)
         if (g_tui_resize_pending)
             break;
     }
+    return r;
+}
+
+static int tui_posix_wait(char *out, int timeout_ms, int *eof)
+{
+    struct pollfd pfd;
+    pfd.fd = STDIN_FILENO;
+    pfd.events = POLLIN;
+    pfd.revents = 0;
+    int r = tui_posix_poll(&pfd, timeout_ms);
+
     if (r <= 0) {
         *eof = 0; /* 超时 / poll 错误 / resize tick */
         return 0;
@@ -228,6 +247,18 @@ int tui_wait_byte(cli_tui_t *t, char *out, int timeout_ms, int *eof)
     }
     *eof = 1; /* read 0 = EOF */
     return 0;
+}
+#endif
+
+/* 带超时的按键等待。timeout_ms < 0 无限等待（原阻塞语义）。
+ * 返回 1 有数据（*out 有效）；0 = 超时（*eof=0）或 EOF（*eof=1）。 */
+int tui_wait_byte(cli_tui_t *t, char *out, int timeout_ms, int *eof)
+{
+    (void)t;
+#ifdef _WIN32
+    return tui_win_wait(out, timeout_ms, eof);
+#else
+    return tui_posix_wait(out, timeout_ms, eof);
 #endif
 }
 

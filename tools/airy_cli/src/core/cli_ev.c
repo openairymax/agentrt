@@ -303,30 +303,25 @@ int cli_ev_note(const char *msg)
     return cli_ev_emit("notice", pl, strlen(pl));
 }
 
-/* 快照帧：当前状态 + 最近 8 帧 payload（时序升序），随后补发 seq>last_seq
- * 的缓冲帧（原 seq/ts，保证续传不重不漏）。 */
-void cli_ev_snap(unsigned last_seq)
+/* 取最近 8 帧（时序升序写入 recent）；返回帧数。 */
+static int ev_recent_fill(const ev_frame_t *recent[8])
 {
-    const ev_frame_t *recent[8];
-    const char *pl;
-    size_t cap = CLI_EV_KEEP + 8192;
-    char *buf;
-    unsigned upto = g_ev.seq;
     int nr = 0;
-    int n;
-    int i;
-
-    buf = (char *)AIRY_MALLOC(cap);
-    if (!buf)
-        return;
-    for (i = 0; i < g_ev.ring_n && nr < 8; i++) {
+    for (int i = 0; i < g_ev.ring_n && nr < 8; i++) {
         const ev_frame_t *f = &g_ev.ring[(g_ev.ring_head - 1 - i + CLI_EV_RING * 2) %
                                         CLI_EV_RING];
         recent[nr++] = f;
     }
-    n = snprintf(buf, cap, "{\"state\":\"%s\",\"last_seq\":%u,\"recent\":[",
-                 g_ev.state, last_seq);
-    for (i = nr - 1; i >= 0 && n > 0 && (size_t)n + 2 < cap; i--) {
+    return nr;
+}
+
+/* 拼 {"state":..,"last_seq":..,"recent":[frame,...]；返回已写长度。 */
+static int ev_snap_head(char *buf, size_t cap, const ev_frame_t *const *recent,
+                        int nr, unsigned last_seq)
+{
+    int n = snprintf(buf, cap, "{\"state\":\"%s\",\"last_seq\":%u,\"recent\":[",
+                     g_ev.state, last_seq);
+    for (int i = nr - 1; i >= 0 && n > 0 && (size_t)n + 2 < cap; i--) {
         size_t fl = recent[i]->pl ? recent[i]->plen : 2;
 
         if ((size_t)n + fl + 2 >= cap)
@@ -336,13 +331,14 @@ void cli_ev_snap(unsigned last_seq)
         AIRY_MEMCPY(buf + n, recent[i]->pl ? recent[i]->pl : "{}", fl);
         n += (int)fl;
     }
-    if (n > 0 && (size_t)n + 2 < cap) {
-        buf[n++] = ']';
-        buf[n++] = '}';
-        buf[n] = '\0';
-        (void)cli_ev_emit("snapshot", buf, (size_t)n);
-    }
-    for (i = 0; i < g_ev.ring_n && !g_ev.closed; i++) {
+    return n;
+}
+
+/* 补发 seq>last_seq 的缓冲帧（原 seq/ts）。 */
+static void ev_replay(unsigned last_seq, unsigned upto)
+{
+    const char *pl;
+    for (int i = 0; i < g_ev.ring_n && !g_ev.closed; i++) {
         const ev_frame_t *f = &g_ev.ring[(g_ev.ring_head - g_ev.ring_n + i +
                                           CLI_EV_RING * 2) % CLI_EV_RING];
         size_t need;
@@ -365,5 +361,29 @@ void cli_ev_snap(unsigned last_seq)
             g_ev.closed = 1;
         AIRY_FREE(fb);
     }
+}
+
+/* 快照帧：当前状态 + 最近 8 帧 payload（时序升序），随后补发 seq>last_seq
+ * 的缓冲帧（原 seq/ts，保证续传不重不漏）。 */
+void cli_ev_snap(unsigned last_seq)
+{
+    const ev_frame_t *recent[8];
+    size_t cap = CLI_EV_KEEP + 8192;
+    char *buf;
+    unsigned upto = g_ev.seq;
+    int n;
+
+    buf = (char *)AIRY_MALLOC(cap);
+    if (!buf)
+        return;
+    int nr = ev_recent_fill(recent);
+    n = ev_snap_head(buf, cap, recent, nr, last_seq);
+    if (n > 0 && (size_t)n + 2 < cap) {
+        buf[n++] = ']';
+        buf[n++] = '}';
+        buf[n] = '\0';
+        (void)cli_ev_emit("snapshot", buf, (size_t)n);
+    }
+    ev_replay(last_seq, upto);
     AIRY_FREE(buf);
 }

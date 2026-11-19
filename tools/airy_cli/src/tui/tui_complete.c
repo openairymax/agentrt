@@ -32,43 +32,52 @@ static void tui_tab_replace(cli_tui_t *t, size_t tok_start, size_t tok_len,
     t->input_col = tok_start + tlen;
 }
 
+/* 目录项是否参与补全：隐藏文件仅当前缀以 '.' 开头时补全；须匹配 base 前缀。 */
+static int tui_fs_match(const char *nm, const char *base, size_t blen)
+{
+    if (nm[0] == '.' && (blen == 0 || base[0] != '.'))
+        return 0;
+    return strncmp(nm, base, blen) == 0;
+}
+
+/* 拼全路径判断目录项是否为目录。 */
+static int tui_fs_isdir(const char *dir, const char *nm)
+{
+    char full[TUI_TAB_NAME_MAX];
+    struct stat st;
+
+    if (dir && dir[0])
+        snprintf(full, sizeof(full), "%s%c%s", dir, TUI_PATH_SEP, nm);
+    else
+        snprintf(full, sizeof(full), "%s", nm);
+#ifdef _WIN32
+    if (stat(full, &st) == 0 && (st.st_mode & _S_IFDIR))
+        return 1;
+#else
+    if (stat(full, &st) == 0 && S_ISDIR(st.st_mode))
+        return 1;
+#endif
+    return 0;
+}
+
 /* 目录遍历补全：dir 为目录路径（空串表示当前目录），base 为匹配前缀。 */
 static size_t tui_tab_complete_fs(cli_tui_t *t, const char *dir, const char *base)
 {
     size_t n = 0;
     const char *dpath = (dir && dir[0]) ? dir : ".";
     DIR *d = opendir(dpath);
+    size_t blen;
+
     if (!d)
         return 0;
 
-    size_t blen = strlen(base);
+    blen = strlen(base);
     struct dirent *e;
     while ((e = readdir(d)) != NULL && n < TUI_TAB_CAND_MAX) {
-        const char *nm = e->d_name;
-        if (nm[0] == '.') {
-            /* 隐藏文件仅当前缀以 '.' 开头时补全。 */
-            if (blen == 0 || base[0] != '.')
-                continue;
-        }
-        if (strncmp(nm, base, blen) != 0)
+        if (!tui_fs_match(e->d_name, base, blen))
             continue;
-
-        int is_dir = 0;
-        char full[TUI_TAB_NAME_MAX];
-        if (dir && dir[0])
-            snprintf(full, sizeof(full), "%s%c%s", dir, TUI_PATH_SEP, nm);
-        else
-            snprintf(full, sizeof(full), "%s", nm);
-        struct stat st;
-#ifdef _WIN32
-        if (stat(full, &st) == 0 && (st.st_mode & _S_IFDIR))
-            is_dir = 1;
-#else
-        if (stat(full, &st) == 0 && S_ISDIR(st.st_mode))
-            is_dir = 1;
-#endif
-        snprintf(t->tab_cand_strs[n], TUI_TAB_NAME_MAX, "%s%s", nm,
-                 is_dir ? (TUI_PATH_SEP_STR) : "");
+        snprintf(t->tab_cand_strs[n], TUI_TAB_NAME_MAX, "%s%s", e->d_name,
+                 tui_fs_isdir(dir, e->d_name) ? (TUI_PATH_SEP_STR) : "");
         n++;
     }
     closedir(d);

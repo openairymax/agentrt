@@ -91,11 +91,9 @@ static size_t airy_ime_lower_bound(const airy_ime_t *ime, const char *key)
     return lo;
 }
 
-airy_ime_t *airy_ime_load(const char *path)
+/* 整文件读入（失败返回 NULL；成功 *out_size 为字节数）。 */
+static uint8_t *ime_read_file(const char *path, size_t *out_size)
 {
-    if (!path || !path[0])
-        return NULL;
-
     FILE *f = fopen(path, "rb");
     if (!f)
         return NULL;
@@ -109,58 +107,80 @@ airy_ime_t *airy_ime_load(const char *path)
         return NULL;
     }
     rewind(f);
-
-    airy_ime_t *ime = (airy_ime_t *)AIRY_CALLOC(1, sizeof(*ime));
-    if (!ime) {
+    uint8_t *buf = (uint8_t *)AIRY_MALLOC((size_t)sz);
+    if (!buf) {
         fclose(f);
         return NULL;
     }
-    ime->buf = (const uint8_t *)AIRY_MALLOC((size_t)sz);
-    if (!ime->buf) {
-        AIRY_FREE(ime);
-        fclose(f);
-        return NULL;
-    }
-    if (fread((void *)ime->buf, 1, (size_t)sz, f) != (size_t)sz) {
+    if (fread(buf, 1, (size_t)sz, f) != (size_t)sz) {
         /* 读不满 = 文件异常，视为损坏 */
-        AIRY_FREE((void *)ime->buf);
-        AIRY_FREE(ime);
+        AIRY_FREE(buf);
         fclose(f);
         return NULL;
     }
     fclose(f);
-    ime->size = (size_t)sz;
+    *out_size = (size_t)sz;
+    return buf;
+}
 
-    /* magic/version/CRC 校验（fail-closed：损坏即拒绝加载） */
+/* magic/version/CRC 校验（fail-closed：损坏即拒绝加载）；成功导出表头字段。 */
+static int ime_validate_head(const airy_ime_t *ime, uint32_t *out_count,
+                             uint32_t *out_pool_off)
+{
     if (ime->size < AIRY_IME_HEADER_SIZE ||
-        memcmp(ime->buf, AIRY_IME_MAGIC, 8) != 0) {
-        goto corrupt;
-    }
+        memcmp(ime->buf, AIRY_IME_MAGIC, 8) != 0)
+        return -1;
     uint32_t ver = airy_ime_rd_u32(ime->buf + 8);
     uint32_t count = airy_ime_rd_u32(ime->buf + 12);
     uint32_t crc = airy_ime_rd_u32(ime->buf + 16);
     uint32_t pool_off = airy_ime_rd_u32(ime->buf + 20);
+
     if (ver != AIRY_IME_VERSION)
-        goto corrupt;
+        return -1;
     if (count > (ime->size - AIRY_IME_HEADER_SIZE) / AIRY_IME_ENTRY_SIZE)
-        goto corrupt;
+        return -1;
     if (pool_off < AIRY_IME_HEADER_SIZE + count * AIRY_IME_ENTRY_SIZE ||
         pool_off > ime->size)
-        goto corrupt;
+        return -1;
     if (airy_ime_crc32(ime->buf + AIRY_IME_HEADER_SIZE,
                        ime->size - AIRY_IME_HEADER_SIZE) != crc)
-        goto corrupt;
+        return -1;
+    *out_count = count;
+    *out_pool_off = pool_off;
+    return 0;
+}
+
+airy_ime_t *airy_ime_load(const char *path)
+{
+    uint32_t count = 0, pool_off = 0;
+    size_t size = 0;
+
+    if (!path || !path[0])
+        return NULL;
+
+    uint8_t *buf = ime_read_file(path, &size);
+    if (!buf)
+        return NULL;
+
+    airy_ime_t *ime = (airy_ime_t *)AIRY_CALLOC(1, sizeof(*ime));
+    if (!ime) {
+        AIRY_FREE(buf);
+        return NULL;
+    }
+    ime->buf = buf;
+    ime->size = size;
+
+    if (ime_validate_head(ime, &count, &pool_off) != 0) {
+        AIRY_FREE((void *)ime->buf);
+        AIRY_FREE(ime);
+        return NULL;
+    }
 
     ime->entry_count = count;
     ime->pool_off = pool_off;
     ime->entries = ime->buf + AIRY_IME_HEADER_SIZE;
     ime->pool = ime->buf + pool_off;
     return ime;
-
-corrupt:
-    AIRY_FREE((void *)ime->buf);
-    AIRY_FREE(ime);
-    return NULL;
 }
 
 void airy_ime_destroy(airy_ime_t *ime)
@@ -171,26 +191,24 @@ void airy_ime_destroy(airy_ime_t *ime)
     AIRY_FREE(ime);
 }
 
-int airy_ime_query(const airy_ime_t *ime, const char *pinyin,
-                   airy_ime_cand_t *out, int out_cap)
+/* 输入校验：非空且仅小写字母 [a-z]（ü 约定以 v 表示）。 */
+static int ime_pinyin_ok(const char *pinyin)
 {
-    if (!ime || !pinyin || !out || out_cap <= 0)
-        return 0;
-
-    /* 输入校验：仅小写字母 [a-z]（ü 约定以 v 表示） */
     size_t qlen = strlen(pinyin);
+
     if (qlen == 0)
         return 0;
     for (size_t i = 0; i < qlen; i++) {
         if (pinyin[i] < 'a' || pinyin[i] > 'z')
             return 0;
     }
+    return 1;
+}
 
-    /* 候选收集缓冲（堆上，前缀命中条目候选合并） */
-    airy_ime_cand_t *cands =
-        (airy_ime_cand_t *)AIRY_MALLOC(AIRY_IME_QUERY_CAP * sizeof(*cands));
-    if (!cands)
-        return 0;
+/* 前缀命中的条目候选合并进 cands；返回条数（上限 AIRY_IME_QUERY_CAP）。 */
+static int ime_collect(const airy_ime_t *ime, const char *pinyin, size_t qlen,
+                       airy_ime_cand_t *cands)
+{
     int n = 0;
 
     /* 二分定位首个 pinyin >= query，顺序扫描前缀命中条目 */
@@ -213,12 +231,12 @@ int airy_ime_query(const airy_ime_t *ime, const char *pinyin,
             n++;
         }
     }
-    if (n == 0) {
-        AIRY_FREE(cands);
-        return 0;
-    }
+    return n;
+}
 
-    /* 按频次降序稳定排序（同频保候选原始顺序） */
+/* 按频次降序稳定排序（同频保候选原始顺序）。 */
+static void ime_sort_cands(airy_ime_cand_t *cands, int n)
+{
     for (int i = 1; i < n; i++) {
         airy_ime_cand_t tmp = cands[i];
         int j = i - 1;
@@ -230,6 +248,31 @@ int airy_ime_query(const airy_ime_t *ime, const char *pinyin,
         }
         cands[j + 1] = tmp;
     }
+}
+
+int airy_ime_query(const airy_ime_t *ime, const char *pinyin,
+                   airy_ime_cand_t *out, int out_cap)
+{
+    if (!ime || !pinyin || !out || out_cap <= 0)
+        return 0;
+
+    if (!ime_pinyin_ok(pinyin))
+        return 0;
+    size_t qlen = strlen(pinyin);
+
+    /* 候选收集缓冲（堆上，前缀命中条目候选合并） */
+    airy_ime_cand_t *cands =
+        (airy_ime_cand_t *)AIRY_MALLOC(AIRY_IME_QUERY_CAP * sizeof(*cands));
+    if (!cands)
+        return 0;
+
+    int n = ime_collect(ime, pinyin, qlen, cands);
+    if (n == 0) {
+        AIRY_FREE(cands);
+        return 0;
+    }
+
+    ime_sort_cands(cands, n);
 
     int out_n = n < out_cap ? n : out_cap;
     for (int i = 0; i < out_n; i++)

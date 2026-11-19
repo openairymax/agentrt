@@ -95,6 +95,44 @@ static int ev_cancel(void)
     return 130;
 }
 
+/* 循环前停止判定：用户取消或出口已关闭。 */
+static int ev_pre_stop(int *cx)
+{
+    if (g_cli_cancel || cli_ev_in_cancel()) {
+        *cx = 1;
+        return 1;
+    }
+    return cli_ev_closed();
+}
+
+/* 读到帧后停止判定：终态宽限到期或增量停滞。 */
+static int ev_post_stop(uint64_t now, uint64_t last, int term, uint64_t grace)
+{
+    if (term)
+        return now >= grace;
+    if (now - last >= EV_STALL_MS) {
+        (void)cli_ev_note("run-stream stalled; aborting");
+        return 1;
+    }
+    return 0;
+}
+
+/* 处理一帧：<0 中止，1 终态（记录状态码与宽限点），0 继续。 */
+static int ev_frame_step(const char *buf, uint64_t now, uint64_t *grace,
+                         int *trc, int *term)
+{
+    int t = cli_ev_bridge(buf, strlen(buf));
+
+    if (t < 0)
+        return -1;
+    if (t == 1) {
+        *term = 1;
+        *trc = cli_ev_status(buf, strlen(buf));
+        *grace = now + EV_GRACE_MS;
+    }
+    return 0;
+}
+
 static int ev_stream(const char *goal)
 {
     char *body = ev_body(goal);
@@ -133,37 +171,22 @@ static int ev_stream(const char *goal)
         uint64_t now;
         int nr;
 
-        if (g_cli_cancel || cli_ev_in_cancel()) {
-            cx = 1;
-            break;
-        }
-        if (cli_ev_closed())
+        if (ev_pre_stop(&cx))
             break;
         nr = cli_sse_next(s, buf, CLI_SSE_EVMAX, EV_READ_MS);
         now = cli_now_ms();
         if (nr > 0) {
-            int t = cli_ev_bridge(buf, strlen(buf));
-
             last = now;
-            if (t < 0)
+            if (ev_frame_step(buf, now, &grace, &trc, &term) < 0)
                 break;
-            if (t == 1) {
-                term = 1;
-                trc = cli_ev_status(buf, strlen(buf));
-                grace = now + EV_GRACE_MS;
-            }
         } else if (nr < 0) {
             break;
         } else {
             (void)cli_ev_in_poll();
             (void)cli_ev_beat();
         }
-        if (term && now >= grace)
+        if (ev_post_stop(now, last, term, grace))
             break;
-        if (!term && now - last >= EV_STALL_MS) {
-            (void)cli_ev_note("run-stream stalled; aborting");
-            break;
-        }
     }
     cli_sse_close(s);
     AIRY_FREE(buf);

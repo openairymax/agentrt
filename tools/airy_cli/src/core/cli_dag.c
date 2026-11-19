@@ -611,6 +611,25 @@ void cli_dag_node_board_destroy(cli_dag_board_t *b)
     AIRY_FREE(b);
 }
 
+/* 查已注册节点槽，必要时在容量内新建；返回 NULL 表示无槽可用。 */
+static cli_dag_board_node_t *board_slot(cli_dag_board_t *b, const char *id)
+{
+    cli_dag_board_node_t *slot = NULL;
+
+    for (size_t k = 0; k < b->node_count; k++) {
+        if (strcmp(b->nodes[k].id, id) == 0) {
+            slot = &b->nodes[k];
+            break;
+        }
+    }
+    if (!slot && b->node_count < CLI_DAG_BOARD_MAX_NODES) {
+        slot = &b->nodes[b->node_count++];
+        AIRY_STRNCPY_TERM(slot->id, id, sizeof(slot->id));
+        slot->printed = 0;
+    }
+    return slot;
+}
+
 /* Diff node states in a fetched snapshot against the last board state and
  * print every node whose state changed. Returns 0 while the DAG is still
  * active, 1 once a terminal state is observed (caller stops polling).
@@ -638,18 +657,7 @@ int cli_dag_node_board_tick(cli_dag_board_t *b, const cli_dag_snapshot_t *snap)
         const char *goal_s = json_str(nj, "goal", "");
 
         /* Find or register the node slot. */
-        cli_dag_board_node_t *slot = NULL;
-        for (size_t k = 0; k < b->node_count; k++) {
-            if (strcmp(b->nodes[k].id, id_s) == 0) {
-                slot = &b->nodes[k];
-                break;
-            }
-        }
-        if (!slot && b->node_count < CLI_DAG_BOARD_MAX_NODES) {
-            slot = &b->nodes[b->node_count++];
-            AIRY_STRNCPY_TERM(slot->id, id_s, sizeof(slot->id));
-            slot->printed = 0;
-        }
+        cli_dag_board_node_t *slot = board_slot(b, id_s);
         if (!slot)
             continue;
 

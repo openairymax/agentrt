@@ -172,6 +172,30 @@ static void cli_job_list(int limit)
     cJSON_Delete(root);
 }
 
+/* /jobs show <job_id>：缺参时打印用法。 */
+static int jobs_show_arg(const char *arg)
+{
+    const char *job_id = arg[4] ? arg + 5 : NULL;
+    if (!job_id || job_id[0] == '\0') {
+        cli_print_line("Sub jobs Agent", "缺少 job_id");
+        cli_job_usage();
+        return 0;
+    }
+    cli_job_show(job_id);
+    return 0;
+}
+
+/* /jobs list [n]：非法/缺省条数回落 20。 */
+static int jobs_list_arg(const char *arg)
+{
+    int limit = 20;
+    const char *num = arg[4] ? arg + 5 : NULL;
+    if (num && num[0])
+        limit = atoi(num);
+    cli_job_list(limit > 0 ? limit : 20);
+    return 0;
+}
+
 int cmd_jobs(const char *arg, void *ctx)
 {
     (void)ctx;
@@ -180,24 +204,10 @@ int cmd_jobs(const char *arg, void *ctx)
         cli_job_list(20);
         return 0;
     }
-    if (strncmp(arg, "show", 4) == 0 && (arg[4] == '\0' || arg[4] == ' ')) {
-        const char *job_id = arg[4] ? arg + 5 : NULL;
-        if (!job_id || job_id[0] == '\0') {
-            cli_print_line("Sub jobs Agent", "缺少 job_id");
-            cli_job_usage();
-            return 0;
-        }
-        cli_job_show(job_id);
-        return 0;
-    }
-    if (strncmp(arg, "list", 4) == 0 && (arg[4] == '\0' || arg[4] == ' ')) {
-        int limit = 20;
-        const char *num = arg[4] ? arg + 5 : NULL;
-        if (num && num[0])
-            limit = atoi(num);
-        cli_job_list(limit > 0 ? limit : 20);
-        return 0;
-    }
+    if (strncmp(arg, "show", 4) == 0 && (arg[4] == '\0' || arg[4] == ' '))
+        return jobs_show_arg(arg);
+    if (strncmp(arg, "list", 4) == 0 && (arg[4] == '\0' || arg[4] == ' '))
+        return jobs_list_arg(arg);
     /* 纯数字视为条数，兼容 /jobs 10。 */
     if (arg[0] >= '0' && arg[0] <= '9') {
         int limit = atoi(arg);

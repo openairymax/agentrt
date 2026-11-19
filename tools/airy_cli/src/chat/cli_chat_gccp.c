@@ -26,7 +26,31 @@
 #include <cjson/cJSON.h>
 #endif
 
+/* 中断指令：视为意愿不足，放弃意图确认（避免 quit/stop 被当作答案）。 */
+static int gccp_is_abort(const char *line)
+{
+    static const char *const k_abort[] = {
+        "quit", "exit", "abort", "stop", "cancel", "打断", "停止", "取消",
+    };
+    for (size_t i = 0; i < sizeof(k_abort) / sizeof(k_abort[0]); i++) {
+        if (strcmp(line, k_abort[i]) == 0)
+            return 1;
+    }
+    return 0;
+}
+
 #ifdef AIRY_HAS_CJSON
+
+/* 单问展示（cJSON 分支：带颜色）。 */
+static void gccp_ask_question(const airy_gccp_question_t *q, size_t idx)
+{
+    cli_outf("  %sQ%zu%s [%s]%s %s\n", cli_c(CLR_CYAN), idx + 1, cli_c(CLR_RESET), q->id,
+             q->required ? "（建议回答）" : "", q->question);
+    if (q->hint[0])
+        cli_outf("      %s提示：%s%s\n", cli_c(CLR_GREEN), q->hint, cli_c(CLR_RESET));
+    cli_outf("  %s>%s ", cli_c(CLR_GREEN), cli_c(CLR_RESET));
+    fflush(stdout);
+}
 
 /**
   * @brief Ask the user the probe questions and collect answers (returns
@@ -63,12 +87,7 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
 
     for (size_t i = 0; i < probe->question_count; i++) {
         const airy_gccp_question_t *q = &probe->questions[i];
-        cli_outf("  %sQ%zu%s [%s]%s %s\n", cli_c(CLR_CYAN), i + 1, cli_c(CLR_RESET), q->id,
-                 q->required ? "（建议回答）" : "", q->question);
-        if (q->hint[0])
-            cli_outf("      %s提示：%s%s\n", cli_c(CLR_GREEN), q->hint, cli_c(CLR_RESET));
-        cli_outf("  %s>%s ", cli_c(CLR_GREEN), cli_c(CLR_RESET));
-        fflush(stdout);
+        gccp_ask_question(q, i);
 
         char line[1024];
         size_t line_len = 0;
@@ -79,10 +98,7 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
             break; /* 用户跳过：收敛，不再追问（不纠缠） */
         /* 中断指令：放弃意图确认（视为意愿不足），任务按默认约束
          * 继续；避免把 quit/stop 等当答案写入 Q 字段。 */
-        if (strcmp(line, "quit") == 0 || strcmp(line, "exit") == 0 ||
-            strcmp(line, "abort") == 0 || strcmp(line, "stop") == 0 ||
-            strcmp(line, "cancel") == 0 || strcmp(line, "打断") == 0 ||
-            strcmp(line, "停止") == 0 || strcmp(line, "取消") == 0) {
+        if (gccp_is_abort(line)) {
             cJSON_Delete(answers);
             cli_print_line("Dual Think:意图确认",
                            "已放弃意图确认，任务按默认约束继续执行。");
@@ -97,6 +113,17 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
 }
 
 #else /* !AIRY_HAS_CJSON */
+/* 单问展示（无 cJSON 分支：无色）。 */
+static void gccp_ask_plain(const airy_gccp_question_t *q, size_t idx)
+{
+    cli_outf("  Q%zu [%s]%s %s\n", idx + 1, q->id,
+             q->required ? "（建议回答）" : "", q->question);
+    if (q->hint[0])
+        cli_outf("      提示：%s\n", q->hint);
+    cli_outf("  > ");
+    fflush(stdout);
+}
+
 char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
 {
     (void)user_data;
@@ -127,21 +154,14 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
     p += n;
     for (size_t i = 0; i < probe->question_count; i++) {
         const airy_gccp_question_t *q = &probe->questions[i];
-        cli_outf("  Q%zu [%s]%s %s\n", i + 1, q->id, q->required ? "（建议回答）" : "", q->question);
-        if (q->hint[0])
-            cli_outf("      提示：%s\n", q->hint);
-        cli_outf("  > ");
-        fflush(stdout);
+        gccp_ask_plain(q, i);
         char line[1024];
         size_t line_len = 0;
         int rl = cli_tui_readline(cli_tui_get_default(), line, sizeof(line), &line_len);
         if (rl == 0)
             break;
         /* 中断指令：放弃意图确认（同 cJSON 分支，避免 quit/stop 当答案） */
-        if (strcmp(line, "quit") == 0 || strcmp(line, "exit") == 0 ||
-            strcmp(line, "abort") == 0 || strcmp(line, "stop") == 0 ||
-            strcmp(line, "cancel") == 0 || strcmp(line, "打断") == 0 ||
-            strcmp(line, "停止") == 0 || strcmp(line, "取消") == 0) {
+        if (gccp_is_abort(line)) {
             AIRY_FREE(json);
             cli_print_line("Dual Think:意图确认",
                            "已放弃意图确认，任务按默认约束继续执行。");
