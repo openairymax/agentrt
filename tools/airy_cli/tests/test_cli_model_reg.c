@@ -208,6 +208,41 @@ static void t_use(void)
     CHECK(run("use", "ghost", NULL, NULL) == 2, "use unknown rc");
 }
 
+/* 服务注册表双路径：安装器路径优先，旧 registry 路径回退。
+ * 回归背景：安装器 airy-local 写 local/llamacpp/installed.env，CLI 只读
+ * local/registry/installed.env，导致自托管服务在模型面板中永远缺席。 */
+static void t_use_installer_path(void)
+{
+    char reg[PATH_MAX], frag[PATH_MAX], srv[PATH_MAX], bin[PATH_MAX], dir[PATH_MAX];
+    char text[4096];
+
+    setup();
+    reg_path(reg, sizeof(reg));
+    frag_path(frag, sizeof(frag));
+    touch_asset("a.gguf");
+    wfile(reg, "model.a.asset=a.gguf\nmodel.a.mem=512\nactive_model=a\n");
+    pth(dir, sizeof(dir), "%s/local/llamacpp", g_home);
+    airy_mkdir_p(dir);
+    pth(bin, sizeof(bin), "%s/bin/llama-server", g_home);
+    pth(dir, sizeof(dir), "%s/bin", g_home);
+    airy_mkdir_p(dir);
+    wfile(bin, "bin");
+    pth(srv, sizeof(srv), "%s/local/llamacpp/installed.env", g_home);
+    pth(text, sizeof(text), "server=%s\n", bin);
+    wfile(srv, text);
+
+    CHECK(run("use", "a", NULL, NULL) == 0, "use via installer registry rc");
+    CHECK(has(frag, "AIRYRT_MANAGED_NAME=local_llm"), "installer path yields decl");
+
+    /* 两处并存时以安装器路径为准：把旧路径指向不存在的二进制，
+     * 声明仍应指向安装器登记的真实 server。 */
+    pth(srv, sizeof(srv), "%s/local/registry/installed.env", g_home);
+    wfile(srv, "server=/nonexistent/llama-server\n");
+    CHECK(run("use", "a", NULL, NULL) == 0, "prefer installer registry rc");
+    CHECK(has(frag, "AIRYRT_MANAGED_BIN="), "decl bin present");
+    CHECK(!has(frag, "/nonexistent/llama-server"), "legacy path not used");
+}
+
 /* remove 三态：默认 dry-run / 被引用拒绝 / --force 生效。 */
 static void t_remove(void)
 {
@@ -281,6 +316,7 @@ int main(void)
 {
     t_empty();
     t_use();
+    t_use_installer_path();
     t_remove();
     t_slot_ref();
     t_list_drift();
