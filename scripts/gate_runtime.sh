@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2025-2026 SPHARX Ltd.
 # SPDX-License-Identifier: AGPL-3.0-or-later OR Apache-2.0
 #
-# 自托管运行态门禁（C-6）：以真实进程验证 T-1~T-8 八项运行态判据。
+# 自托管运行态门禁（C-6）：以真实进程验证 T-1~T-9 九项运行态判据。
 # 每个场景独立起停、独立判定，任一项缺证据即由汇总行点名，不以整体 PASS 掩盖。
 #
 # 场景契约（方案 §18.1 C-6 场景表）：
@@ -14,6 +14,7 @@
 #   T-6 OOM/强杀后恢复：引擎可重建，请求自动恢复
 #   T-7 重启恢复：配置与计费账目跨重启保留，请求仍通
 #   T-8 日志可判读：启动/就绪/请求/失败四段均有可检索结构化字段
+#   T-9 配置生效自证：声明/注册/生效对账闭合、非法值拒绝启动、逃生可查、指纹可读
 #
 # 三值三码（SKIP 不计 PASS）：
 #   exit 0 = 有 PASS 且无 FAIL；1 = 有 FAIL；2 = 全部 SKIP（缺前置）
@@ -35,7 +36,7 @@ PASS_N=0
 FAIL_N=0
 SKIP_N=0
 KEEP="${AIRY_GATE_KEEP:-0}"
-STAGES="T-1 T-2 T-3 T-4 T-5 T-6 T-7 T-8"
+STAGES="T-1 T-2 T-3 T-4 T-5 T-6 T-7 T-8 T-9"
 SEL=""
 MODE="run"
 
@@ -45,6 +46,7 @@ skip() { printf 'SKIP  %s\n' "$*"; SKIP_N=$((SKIP_N + 1)); }
 
 LLAMA_PID=""
 LLM_PID=""
+THINK_PID=""
 FIX_PIDS=()
 PORT_LLAMA="${AIRY_GATE_PORT_LLAMA:-21435}"
 PORT_FIX="${AIRY_GATE_PORT_FIX:-21436}"
@@ -53,6 +55,7 @@ PORT_OK="${AIRY_GATE_PORT_OK:-21438}"
 
 cleanup() {
     [ -n "$LLM_PID" ] && kill -TERM "$LLM_PID" 2>/dev/null
+    [ -n "$THINK_PID" ] && kill -TERM "$THINK_PID" 2>/dev/null
     [ -n "$LLAMA_PID" ] && kill -KILL "$LLAMA_PID" 2>/dev/null
     rt_fix_stop_all
     [ "$KEEP" = "1" ] && printf 'NOTE  夹具保留于 %s\n' "$SB"
@@ -60,7 +63,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-usage() { sed -n '5,30p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '5,28p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -83,6 +86,16 @@ if [ -z "$LLM_D" ] || [ ! -x "$LLM_D" ]; then
     for _c in "$ROOT/build/bin/llm_d" "$ROOT/build/daemons/llm_d/llm_d" \
               /tmp/a6b/bin/llm_d "$HOME/.airymaxrt/current/bin/llm_d"; do
         [ -x "$_c" ] && LLM_D="$_c" && break
+    done
+fi
+
+# think_d 仅供 T-9 的 think.enabled 读回闭环；缺席时该项 SKIP 并点名。
+THINK_D="${AIRY_GATE_THINK:-}"
+[ -n "$THINK_D" ] && [ -d "$THINK_D" ] && THINK_D="$THINK_D/think_d"
+if [ -z "$THINK_D" ] || [ ! -x "$THINK_D" ]; then
+    for _c in "$ROOT/build/bin/think_d" "$ROOT/build/daemons/think_d/think_d" \
+              /tmp/a6b/bin/think_d "$HOME/.airymaxrt/current/bin/think_d"; do
+        [ -x "$_c" ] && THINK_D="$_c" && break
     done
 fi
 
@@ -395,6 +408,11 @@ rt_need_llama() {
     skip "$1：缺 llama-server 或 gguf 模型"; return 1
 }
 
+rt_need_think() {
+    [ -x "${THINK_D:-}" ] && return 0
+    skip "$1：缺 think_d 二进制（think.enabled 读回项）"; return 1
+}
+
 rt_need_local() {
     [ -x "$AIRY_LOCAL" ] || { skip "$1：缺 airy-local"; return 1; }
     return 0
@@ -411,7 +429,9 @@ rt_self_test() {
     if [ -x "$AIRY_LOCAL" ]; then pass "S0 制品通道可用 $AIRY_LOCAL"
     else skip "S0 缺 airy-local（T-1 将跳过）"; fi
     [ -n "${LLM_D:-}" ] && [ -x "$LLM_D" ] && pass "S0 llm_d=$LLM_D" \
-        || skip "S0 缺 llm_d（T-2~T-8 将跳过）"
+        || skip "S0 缺 llm_d（T-2~T-9 将跳过）"
+    [ -n "${THINK_D:-}" ] && [ -x "$THINK_D" ] && pass "S0 think_d=$THINK_D" \
+        || skip "S0 缺 think_d（T-9 think 项将跳过）"
     rt_need_llama "S0" && pass "S0 llama-server=$LLAMA model=$(basename "$MODEL")"
     if rt_fixture "$PORT_FIX" ok "$MODEL"; then
         local got
@@ -431,6 +451,7 @@ rt_list() {
     printf 'T-6 OOM 后恢复（引擎重建/请求恢复）\n'
     printf 'T-7 重启恢复（配置与账目保留）\n'
     printf 'T-8 日志可判读（四段结构化字段）\n'
+    printf 'T-9 配置生效自证（对账闭合/拒绝启动/逃生/指纹）\n'
 }
 
 # ── T-1 首次拉模：阶段进度、中断留痕、续传收敛、毒件 fail-closed ──
@@ -1107,6 +1128,135 @@ scn_t8() {
         pass "T-8 本地模式无误导性 NO-KEY 引导"
     fi
     rt_stop_llm
+}
+
+# ── T-9 配置生效自证（A-8）：声明/注册/生效对账，三值结局与指纹 ──
+rt_cfg_attest() { # <home> <base_url> <default_model>
+    local h="$1" base="$2" dm="$3"
+    cat >"$h/config/model.yaml" <<EOF
+default_model: $dm
+models:
+  - name: gate-attest
+    mode: api
+    base_url: $base
+    model_id: gate-attest
+    provision: external
+slots:
+  t2: $dm
+  t1f: $dm
+  t1p: $dm
+EOF
+}
+
+rt_att_fp() { # <log> <owner> <verdict> → 16 位指纹；未命中为空
+    sed -n "s/.*attest\[$2\]: verdict=$3 .*fp=\([0-9a-f]\{16\}\).*/\1/p" "$1" | tail -1
+}
+
+rt_wait_log() { # <log> <ERE> <秒>
+    local i=0
+    while [ "$i" -lt "$3" ]; do
+        grep -Eq "$2" "$1" 2>/dev/null && return 0
+        sleep 0.2
+        i=$((i + 1))
+    done
+    return 1
+}
+
+rt_think_stop() {
+    [ -n "$THINK_PID" ] && kill -TERM "$THINK_PID" 2>/dev/null
+    wait "$THINK_PID" 2>/dev/null
+    THINK_PID=""
+}
+
+scn_t9() {
+    rt_need_llm "T-9" || return 0
+
+    local h base fp_rej fp_esc out rc
+    base="http://127.0.0.1:$PORT_FIX"
+
+    # A 合法夹具：对账闭合、指纹可读、首次调用打印实际模型
+    h="$(rt_home t9a)"
+    rt_cfg_attest "$h" "$base" gate-attest
+    rt_start "$h" "$h/logs/llm.log"
+    if ! rt_wait_sock "$h" 20; then
+        fail "T-9 llm_d 首启未就绪（见 $h/logs/llm.log）"
+        rt_stop_llm
+        return 0
+    fi
+    if [ -n "$(rt_att_fp "$h/logs/llm.log" llm_d pass)" ] \
+        && grep -aq 'attest\[llm_d\]: verdict=pass checked=4 ok=4' "$h/logs/llm.log"; then
+        pass "T-9 合法配置对账闭合（checked=4 ok=4，指纹可见）"
+    else
+        fail "T-9 合法配置未闭合（$(grep -a 'attest\[llm_d\]' "$h/logs/llm.log" | tail -1)）"
+    fi
+    if rt_fixture "$PORT_FIX" ok "$MODEL"; then
+        out="$(rt_rpc "$h/run/llm.sock" complete \
+            '{"model":"gate-attest","messages":[{"role":"user","content":"t9"}],"max_tokens":8}' 30)"
+        if grep -aq 'ATTEST: first call declared=gate-attest actual=gate-attest' "$h/logs/llm.log"; then
+            pass "T-9 首次调用打印实际模型（declared=gate-attest actual=gate-attest）"
+        else
+            fail "T-9 缺首次调用实际模型日志：$(printf '%.120s' "$out")"
+        fi
+        rt_fix_stop_all
+    else
+        skip "T-9 夹具不可用，跳过首次调用日志项"
+    fi
+    rt_stop_llm
+
+    # B 非法 default_model：拒绝启动且非零退出
+    h="$(rt_home t9b)"
+    rt_cfg_attest "$h" "$base" ghost-model
+    timeout 30 env AIRY_HOME="$h" "$LLM_D" --manager "$h/config/model.yaml" >"$h/logs/llm.log" 2>&1
+    rc=$?
+    fp_rej="$(rt_att_fp "$h/logs/llm.log" llm_d reject)"
+    if [ "$rc" -ne 0 ] && [ -n "$fp_rej" ] \
+        && grep -aq '未闭合（拒绝启动）' "$h/logs/llm.log"; then
+        pass "T-9 非法 default_model 拒绝启动（rc=${rc}，指纹 ${fp_rej}）"
+    else
+        fail "T-9 非法 default_model 未按预期拒绝（rc=${rc}）"
+    fi
+
+    # C 逃生开关：同一夹具转 escaped、进程存活、指纹与 REJECT 逐位一致
+    h="$(rt_home t9c)"
+    rt_cfg_attest "$h" "$base" ghost-model
+    export AIRY_ALLOW_UNKNOWN_MODEL=1
+    rt_start "$h" "$h/logs/llm.log"
+    unset AIRY_ALLOW_UNKNOWN_MODEL
+    if rt_wait_sock "$h" 20; then
+        fp_esc="$(rt_att_fp "$h/logs/llm.log" llm_d escaped)"
+        if [ -n "$fp_esc" ] && [ "$fp_esc" = "$fp_rej" ]; then
+            pass "T-9 逃生开关生效且指纹不变（escaped fp=${fp_esc}）"
+        else
+            fail "T-9 逃生开关指纹异常（reject=${fp_rej:-NA} escaped=${fp_esc:-NA}）"
+        fi
+    else
+        fail "T-9 逃生开关下进程未存活（见 $h/logs/llm.log）"
+    fi
+    rt_stop_llm
+
+    # D think_d：think.enabled 声明值与 cog_grad_on 读回同值（异值必 reject）
+    rt_need_think "T-9" || return 0
+    h="$(rt_home t9d)"
+    rt_cfg_attest "$h" "$base" gate-attest
+    AIRY_HOME="$h" AIRY_THINK_ENABLED=0 "$THINK_D" >"$h/logs/think.log" 2>&1 &
+    THINK_PID=$!
+    if rt_wait_log "$h/logs/think.log" 'attest\[think_d\]: verdict=pass' 25 \
+        && grep -aq 'service ready .*enabled=0' "$h/logs/think.log"; then
+        pass "T-9 think_d 声明 enabled=0 与读回同值（verdict=pass checked=4）"
+    else
+        fail "T-9 think_d 对账未闭合（$(grep -a 'attest\[think_d\]' "$h/logs/think.log" | tail -1)）"
+    fi
+    rt_think_stop
+
+    h="$(rt_home t9e)"
+    rt_cfg_attest "$h" "$base" ghost-slot
+    timeout 30 env AIRY_HOME="$h" "$THINK_D" >"$h/logs/think.log" 2>&1
+    rc=$?
+    if [ "$rc" -ne 0 ] && grep -aq 'attest\[think_d\]: verdict=reject' "$h/logs/think.log"; then
+        pass "T-9 think_d 未注册槽位拒绝启动（rc=${rc}）"
+    else
+        fail "T-9 think_d 未按预期拒绝（rc=${rc}）"
+    fi
 }
 
 case "$MODE" in
