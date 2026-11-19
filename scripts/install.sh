@@ -109,7 +109,11 @@ if [ -n "${AIRY_VERSION:-}" ]; then
 elif [ -f "$(dirname "$0")/../VERSION" ]; then
     AIRY_VERSION="v$(cat "$(dirname "$0")/../VERSION" | tr -d '[:space:]')"
 fi
-AIRY_VERSION="${AIRY_VERSION:-v0.1.19}"
+_airy_ver_given=1; [ -n "${AIRY_VERSION:-}" ] || _airy_ver_given=0
+AIRY_VERSION="${AIRY_VERSION:-v0.1.21}"
+if [ "$_airy_ver_given" -eq 0 ]; then
+    log_warn "未指定 --version，使用兜底版本 ${AIRY_VERSION}（如需其他版本请加 --version vX.Y.Z）"
+fi
 AIRY_BUILD_JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 AIRY_MODE="${AIRY_MODE:-auto}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
@@ -1160,8 +1164,8 @@ path_bootstrap() {
     # 只写一种 shell 的 rc 不足以覆盖真实终端：管道安装或 sudo 下 SHELL
     # 可能缺失/被改写（落到 .profile），而用户实际开的是 bash/zsh 交互
     # 终端——表现为「装完仍要手动 export PATH」。因此除当前 shell 的 rc
-    # 外，补齐已存在的 .bashrc/.profile/.zshrc；标记行保证幂等。
-    for rc in "$(path_rc_file)" "$HOME/.bashrc" "$HOME/.profile" "$HOME/.zshrc"; do
+    # 外，补齐已存在的 .bashrc/.profile/.zshrc/.config/fish/config.fish；标记行保证幂等。
+    for rc in "$(path_rc_file)" "$HOME/.bashrc" "$HOME/.profile" "$HOME/.zshrc" "$HOME/.config/fish/config.fish"; do
         case "$rc" in ''|/dev/null) continue ;; esac
         if [ ! -e "$rc" ] && [ "$rc" != "$(path_rc_file)" ]; then
             continue
