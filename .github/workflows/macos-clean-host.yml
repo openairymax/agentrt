@@ -48,6 +48,9 @@ jobs:
             runner: macos-15-intel
             suffix: macos-x86-64
     runs-on: ${{ matrix.runner }}
+    # 超时护栏：裸机宿主构建+验证（无容器隔离），macOS runner 较慢，
+    # 对齐 build-test 重腿上限，防挂死拖到 6h 默认值
+    timeout-minutes: 120
     env:
       SUFFIX: ${{ matrix.suffix }}
     steps:

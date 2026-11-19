@@ -9,7 +9,16 @@ name: Codegen Checks
 on:
   push:
     branches: [main]
+    # 纯文档变更不触碰 codegen SSoT，跳过以省一轮无关结论
+    paths-ignore:
+      - '*.md'
+      - '**/*.md'
+      - 'docs/**'
   pull_request:
+    paths-ignore:
+      - '*.md'
+      - '**/*.md'
+      - 'docs/**'
   workflow_dispatch:
 
 permissions:
@@ -18,6 +27,7 @@ permissions:
 jobs:
   syscall-codegen-check:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,6 +66,7 @@ jobs:
   # 名，两套 SSoT 各自语义单一，互不牵连。
   daemon-codegen-check:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -112,6 +123,7 @@ jobs:
   ssot-registry-validate:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout (agentrt host, minimal)
         uses: actions/checkout@v4

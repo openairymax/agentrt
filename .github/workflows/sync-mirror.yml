@@ -17,9 +17,16 @@ on:
 # ATOMGIT_TOKEN（可选）：atomgit 访问令牌，用于读取私有子仓（atoms）
 # 的 mirror clone；缺省匿名克隆仅覆盖公开子仓。
 
+# 权限收口：推送走 PAT（GH_TOKEN），GITHUB_TOKEN 仅 checkout 读取。
+permissions:
+  contents: read
+
 jobs:
   sync:
     runs-on: ubuntu-latest
+    # 超时护栏：镜像同步含全历史克隆（fetch-depth 0）+ 多远端推送，
+    # 无 timeout 时挂死会拖到 GitHub 默认 6h 上限。
+    timeout-minutes: 30
     steps:
       # 不检出子模块：子模块镜像仓由本工作流创建/更新，检出即循环
       # 依赖；子模块数据源为 atomgit，见 .github/scripts/sync-mirror.sh。

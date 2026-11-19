@@ -78,6 +78,8 @@ jobs:
     # 用，workflow 解析直接失败）；改为首 step 计算 filter，
     # 各 step 按其输出短路——未选中平台零副作用快速退出。
     runs-on: ${{ matrix.runner }}
+    # 超时护栏：多平台容器镜像构建（基础包安装+交叉工具链），挂死即拦
+    timeout-minutes: 60
     steps:
       - name: Platform filter
         id: filter
