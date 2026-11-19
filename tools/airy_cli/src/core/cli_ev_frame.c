@@ -166,7 +166,7 @@ static int ev_head(char *b, size_t cap, unsigned seq, uint64_t ts,
     if (dropped)
         tl += snprintf(tail + tl, sizeof(tail) - (size_t)tl, ",\"dropped\":%u", dropped);
     return snprintf(b, cap,
-                    "{\"schema\":%d,\"seq\":%u,\"ts\":%llu,\"type\":\"%s\"%s,",
+                    "{\"schema\":%d,\"seq\":%u,\"ts\":%llu,\"type\":\"%s\"%s,\"payload\":",
                     CLI_EV_SCHEMA, seq, (unsigned long long)ts, type, tail);
 }
 

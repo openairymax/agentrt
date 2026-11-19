@@ -87,6 +87,8 @@ static void t_emit(void)
     CHECK_EQ(cli_ev_seq(), base + 2, "seq advances by one per frame");
     CHECK(strstr(g_sink, "\"schema\":1") != NULL, "frame carries schema");
     CHECK(strstr(g_sink, "\"type\":\"run_start\"") != NULL, "frame carries type");
+    CHECK(strstr(g_sink, "\"payload\":{") != NULL,
+          "payload is keyed (frames stay valid JSON)");
     CHECK(strstr(g_sink, f1) != NULL, "payload passed through verbatim");
     CHECK_EQ(count_nl(), 2, "one NDJSON line per frame");
     cli_ev_fini();
