@@ -370,14 +370,17 @@ jobs:
 
   # ==================== macOS 跨平台构建门禁 ====================
   macos-build:
-    # hosted runner 争抢治理：macos-latest 腿跨 workflow（本 job 与
-    # release.yml macos 腿）共享 ci-macos-runner-bus，串行不抢占，避免
-    # 多 workflow 齐发把 mac 配额打满排队；cancel-in-progress:false=公平等待
-    #（不杀测试中的 job）。
+    # hosted runner 争抢治理：macos-15-intel 池跨 workflow（本 job 与
+    # release.yml x86 腿）共享 ci-macos-intel-runner-bus，串行不抢占，
+    # 避免多 workflow 齐发把 mac 配额打满排队；cancel-in-progress:false=
+    # 公平等待（不杀测试中的 job）。池选型依据：macos-latest(arm64) 池
+    # 2026-11-18 连续两轮排队约 15 分钟被取消（未分配 runner），同窗口
+    # intel 池正常出跑（release x86 腿全绿）；x86-64 macOS 为发行一等
+    # 目标，arm 构建覆盖由 release arm 腿保留。
     concurrency:
-      group: ci-macos-runner-bus
+      group: ci-macos-intel-runner-bus
       cancel-in-progress: false
-    runs-on: macos-latest
+    runs-on: macos-15-intel
     # 超时护栏：无 timeout 时任一测试挂死会让 job 挂到 GitHub 默认 6h 上限，
     # 整轮门禁长期 in_progress、无结论。
     timeout-minutes: 90
