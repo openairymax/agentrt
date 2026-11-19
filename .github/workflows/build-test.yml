@@ -133,6 +133,21 @@ jobs:
           bash "$GATE" verify --verdict-dir "$VDIR" || rc=$?
           exit $rc
 
+      # L-8（0.1.21）：端到端任务闭环回归。五类故障注入（schema/unknown/
+      # netbreak/deny/restart）按 3 个 shard 轮转，每个 shard 独立判红；
+      # CI 档 SKIP 计为失败，故门禁不依赖「跑没跑到」。放在 ctest 之后与
+      # 其分步执行：用例需要真实拉起全量 daemon，与单测夹具的 HOME/端口
+      # 生命周期互不干扰。
+      - name: L-8 e2e task closed-loop (3 shards)
+        run: |
+          export AIRY_L8_BIN="${BUILD_DIR}/bin"
+          export AIRY_L8_CLI="${BUILD_DIR}/tools/airy_cli/airy_cli"
+          for s in 1 2 3; do
+            echo "::group::L-8 shard ${s}"
+            bash tests/e2e/tasks/run_tasks.sh --profile ci --shard "$s"
+            echo "::endgroup::"
+          done
+
       # A-5 运行时门禁（§17.1 A-5）：干净 AIRY_HOME 首启后静默 daemon 不得
       # 留 0 字节 .out，有输出者 .out 必须非空，且 sandbox 内 -size 0 命中 0。
       # 反例先行：AIRY_PREOPEN_OUT=1 下必须检出 0 字节文件，否则门禁失效。
