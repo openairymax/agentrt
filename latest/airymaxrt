@@ -2228,6 +2228,11 @@ if [ -f "$AIRY_HOME/bin/agentrt-env.sh" ]; then
     RUNTIME_DIR="${AIRY_HOME}/run"
     log debug "agentrt-env.sh 注入后恢复 AIRY_HOME=$AIRY_HOME RUNTIME_DIR=$RUNTIME_DIR"
 fi
+# 无安装面（源码树直接运行）时 cupolas_d 无口令可读，显式声明开发口径；
+# 安装布局带 config/install.env，由穹顶自行读取口令，不开这个开关。
+if [ -z "${AIRY_VAULT_PASSWORD:-}" ] && [ ! -f "$AIRY_HOME/config/install.env" ]; then
+    export AIRY_ALLOW_EMPTY_VAULT=1
+fi
 upd_boot_recover
 _near=""
 case "$CMD" in
