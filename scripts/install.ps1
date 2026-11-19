@@ -48,7 +48,7 @@ $AiryVersionSpecified = $false
 if ($env:AIRY_VERSION) { $AiryVersionSpecified = $true }
 $AIRY_VERSION = if ($env:AIRY_VERSION) { $env:AIRY_VERSION }
                 elseif (Test-Path (Join-Path $PSScriptRoot "..\VERSION")) { "v" + ((Get-Content (Join-Path $PSScriptRoot "..\VERSION")).Trim()) }
-                else { "v0.1.19" }
+                else { "v0.1.21" }
 $AIRY_REPO_URL = if ($env:AIRY_REPO_URL) { $env:AIRY_REPO_URL } else { "https://atomgit.com/openairymax/airymaxhub.git" }
 $AIRY_RELEASE_OWNER = if ($env:AIRY_RELEASE_OWNER) { $env:AIRY_RELEASE_OWNER } else { "openairymax/agentrt" }
 $AIRY_RELEASE_BASE  = if ($env:AIRY_RELEASE_BASE)  { $env:AIRY_RELEASE_BASE }  else { "https://atomgit.com/$AIRY_RELEASE_OWNER/releases/download" }
@@ -102,14 +102,30 @@ function Stop-Daemons {
     Start-Sleep -Seconds 1
 }
 
+# 卸载根校验：install.env 由磁盘文件提供，可能是陈旧或伪造的 AIRY_HOME。
+# 递归删除前必须确认目标"像安装根"且不是用户主目录/盘根——否则一条
+# 伪造的 AIRY_HOME=C:\Users\x 就会删掉整个用户目录（0.1.21-R03 加固）。
+function Test-InstallRoot {
+    param([string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+    $full = [System.IO.Path]::GetFullPath($Path).TrimEnd('\')
+    $userHome = [System.IO.Path]::GetFullPath($HOME).TrimEnd('\')
+    if ($full -eq $userHome) { return $false }
+    $root = [System.IO.Path]::GetPathRoot($full)
+    if ($full -eq $root.TrimEnd('\')) { return $false }
+    if (Test-Path (Join-Path $full "config\install.env")) { return $true }
+    if (Test-Path (Join-Path $full "bin")) { return $true }
+    return $false
+}
+
 function Uninstall-All {
-    param([string]$Home, [switch]$KeepData, [switch]$Yes)
-    $envFile = Join-Path $Home "config\install.env"
+    param([string]$Root, [switch]$KeepData, [switch]$Yes)
+    $envFile = Join-Path $Root "config\install.env"
     if (Test-Path $envFile) {
         $line = (Get-Content $envFile | Where-Object { $_ -like "AIRY_HOME=*" } | Select-Object -First 1)
-        if ($line) { $Home = $line.Substring($line.IndexOf("=") + 1) }
+        if ($line) { $Root = $line.Substring($line.IndexOf("=") + 1) }
     }
-    if (-not (Test-Path $Home)) { Write-Warn "未检测到安装（$Home 不存在），无需卸载"; return }
+    if (-not (Test-Path $Root)) { Write-Warn "未检测到安装（$Root 不存在），无需卸载"; return }
     $link = ""
     if (Test-Path $envFile) {
         $line = (Get-Content $envFile | Where-Object { $_ -like "AIRY_BIN_LINK=*" } | Select-Object -First 1)
@@ -117,26 +133,41 @@ function Uninstall-All {
     }
     if (-not $link) { $link = Join-Path $BIN_DIR "airymaxrt.cmd" }
 
-    Write-Warn "将卸载 AirymaxRT：$Home"
+    Write-Warn "将卸载 AirymaxRT：$Root"
+    if (-not (Test-Path (Join-Path $Root "config\install.env")) -and -not (Test-Path (Join-Path $Root "bin"))) {
+        Write-Err "拒绝卸载：$Root 不是 AirymaxRT 安装根（缺 config/install.env 与 bin/）"
+        return
+    }
+    if (-not (Test-InstallRoot $Root)) {
+        Write-Err "拒绝卸载：$Root 指向用户主目录或盘根，已中止"
+        return
+    }
     if (-not $Yes) {
         $ans = Read-Host "确认卸载？[y/N]"
         if ($ans -notin @("y","Y","yes","YES")) { Write-Info "已取消卸载"; return }
     }
     Stop-Daemons
-    if ($KeepData -and (Test-Path (Join-Path $Home "data"))) {
-        Remove-Item -Recurse -Force $Home
-        New-Item -ItemType Directory -Force -Path (Join-Path $Home "data") | Out-Null
-        Write-OK "已删除 $Home（保留 data/ 记忆数据）"
+    $keep = ($KeepData -and (Test-Path (Join-Path $Root "data")))
+    $stash = $null
+    if ($keep) {
+        $stash = Join-Path ([System.IO.Path]::GetTempPath()) ("airymaxrt-data-" + [guid]::NewGuid().ToString("N"))
+        Move-Item -LiteralPath (Join-Path $Root "data") -Destination $stash -Force
+    }
+    Remove-Item -LiteralPath $Root -Recurse -Force
+    if ($keep) {
+        New-Item -ItemType Directory -Force -Path (Join-Path $Root "data") | Out-Null
+        Move-Item -Path (Join-Path $stash "*") -Destination (Join-Path $Root "data") -Force
+        Remove-Item -LiteralPath $stash -Recurse -Force
+        Write-OK "已删除 $Root（保留 data/ 记忆数据）"
     } else {
-        Remove-Item -Recurse -Force $Home
-        Write-OK "已删除 $Home"
+        Write-OK "已删除 $Root"
     }
     if (Test-Path $link) { Remove-Item -Force $link; Write-OK "已移除启动器 $link" }
     Write-OK "卸载完成"
 }
 
 if ($Uninstall) {
-    Uninstall-All -Home $AIRY_HOME -KeepData:$KeepData -Yes:$Yes
+    Uninstall-All -Root $AIRY_HOME -KeepData:$KeepData -Yes:$Yes
     exit 0
 }
 

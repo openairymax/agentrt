@@ -1726,6 +1726,22 @@ post_install_selfcheck() {
         ver_installed="$(sed -n 's/^AIRY_VERSION=//p' "${AIRY_HOME}/config/install.env" 2>/dev/null | head -1)"
     fi
     log_ok "已安装版本: ${ver_installed:-v?}（通道: ${AIRY_CHANNEL}）"
+    # 版本一致性（0.1.21-R03）：install.env 记录值必须与包内 VERSION /
+    # release.env 同源。二者分叉时安装器会"装 A 报 B"，使 update、诊断、
+    # 版本自证全部失真，必须在安装收尾即 fail-closed。
+    local _pkg_ver="" _f
+    for _f in "${AIRY_HOME}/VERSION" "${AIRY_HOME}/current/VERSION" "${AIRY_HOME}/share/agentrt/VERSION"; do
+        [ -f "$_f" ] || continue
+        _pkg_ver="v$(tr -d '[:space:]' < "$_f")"
+        break
+    done
+    if [ -z "$_pkg_ver" ] && [ -f "${AIRY_HOME}/current/release.env" ]; then
+        _pkg_ver="$(sed -n 's/^AIRY_VERSION=//p' "${AIRY_HOME}/current/release.env" 2>/dev/null | head -1)"
+    fi
+    if [ -n "$_pkg_ver" ] && [ -n "$ver_installed" ] && [ "$_pkg_ver" != "$ver_installed" ]; then
+        log_err "安装自检失败：install.env 记录 ${ver_installed}，包内版本为 ${_pkg_ver}——已中止安装"
+        exit 1
+    fi
     if [ "${AIRY_CHANNEL}" != "stable" ]; then
         log_warn "${AIRY_CHANNEL} 通道为非生产通道；正式环境建议 'airymaxrt update --channel stable' 切回"
     fi
