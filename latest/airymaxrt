@@ -1402,6 +1402,27 @@ ver_resolve() {
     printf '%s' "${v#v}"
 }
 
+# 自托管服务可见性：managed.d 片段只是声明面，必须落到进程才算在线。
+# 此前 status 只列核心 daemon 群，用户装好 llama-server 后无从确认它是否
+# 被 supervisor 拉起——「自托管没有页面」的观感即来于此。
+_managed_rows() {
+    local _d="$AIRY_HOME/config/managed.d" _f _n _b _e _st
+    [ -d "$_d" ] || return 0
+    for _f in "$_d"/*.env; do
+        [ -f "$_f" ] || continue
+        _n="$(sed -n 's/^AIRYRT_MANAGED_NAME=//p' "$_f" 2>/dev/null | head -1)"
+        [ -n "$_n" ] || continue
+        _b="$(sed -n 's/^AIRYRT_MANAGED_BIN=//p' "$_f" 2>/dev/null | head -1)"
+        _e="$(sed -n 's/^AIRYRT_MANAGED_EP=//p' "$_f" 2>/dev/null | head -1)"
+        _st="offline"
+        if [ -n "$_b" ] && { pgrep -f "$_b" >/dev/null 2>&1 ||
+             pgrep -x "$(basename "$_b")" >/dev/null 2>&1; }; then
+            _st="online"
+        fi
+        printf '%s|%s|%s\n' "$_n" "$_st" "${_e:-}"
+    done
+}
+
 status_json() {
     local ok=1 k v
     local comp="" dm=""
@@ -1440,9 +1461,15 @@ status_json() {
     done
     stale="${stale%,}"
     wait_for_health "$GATEWAY_URL" 1 && gw=online
+    local mg="" _mn _ms _me
+    while IFS='|' read -r _mn _ms _me; do
+        [ -n "$_mn" ] || continue
+        mg="${mg}{\"name\":\"${_mn}\",\"state\":\"${_ms}\",\"ep\":\"${_me}\"},"
+    done <<< "$(_managed_rows)"
+    mg="${mg%,}"
     [ "$ok" = 1 ] && ok=true || ok=false
-    printf '{"ok":%s,"version":"%s","home":"%s","profile":"%s","components":{%s},"config":{"install_env":%s},"gateway":"%s","daemons":{%s},"config_stale":[%s]}\n' \
-        "$ok" "$ver" "$AIRY_HOME" "${AIRYRT_PROFILE:-auto}" "$comp" "$env_ok" "$gw" "$dm" "$stale"
+    printf '{"ok":%s,"version":"%s","home":"%s","profile":"%s","components":{%s},"config":{"install_env":%s},"gateway":"%s","daemons":{%s},"managed":[%s],"config_stale":[%s]}\n' \
+        "$ok" "$ver" "$AIRY_HOME" "${AIRYRT_PROFILE:-auto}" "$comp" "$env_ok" "$gw" "$dm" "$mg" "$stale"
     [ "$ok" = true ] || return 1
 }
 
@@ -1700,6 +1727,16 @@ case "$CMD" in
             log info "daemon 群: 核心链路（llm/think/agent/tool）全部就绪"
         else
             log warn "daemon 群: 核心链路未全部就绪（运行 airymaxrt 拉起，或查看 logs/ 诊断）"
+        fi
+        _mf="$(_managed_rows)"
+        if [ -n "$_mf" ]; then
+            printf '%s\n' "$_mf" | while IFS='|' read -r _mn _ms _me; do
+                if [ "$_ms" = "online" ]; then
+                    log info "自托管 $_mn: 在线（${_me:-local}）"
+                else
+                    log warn "自托管 $_mn: 未运行（${_me:-local}）——airymaxrt local status 查看"
+                fi
+            done
         fi
         _stale="$(_cfg_stale)"
         if [ -n "$_stale" ]; then
