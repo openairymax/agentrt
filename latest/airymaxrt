@@ -1633,10 +1633,18 @@ case "$CMD" in
         log info "画像: ${AIRYRT_PROFILE:-auto} · 架构: $(detect_arch) · 加速器: $(detect_accel)"
         log info "组件: CLI=${CLI_BIN:-缺失} GATEWAY=${GATEWAY_BIN:-缺失} LLM=${LLM_BIN:-缺失}"
         if [ -f "$AIRY_HOME/config/install.env" ]; then
-            _BP="$(sed -n 's/^AIRY_BIN_DIR_IN_PATH=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
             _BL="$(sed -n 's/^AIRY_BIN_LINK=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
             _BL="${_BL:-$HOME/.local/bin/airymaxrt}"
             _BD="${_BL%/airymaxrt}"
+            # 以当前 shell 的真实 PATH 判定，不读安装期快照
+            # AIRY_BIN_DIR_IN_PATH：安装后用户自行改了 PATH 或换了 shell，
+            # 快照会长期误报。
+            _BP="no"
+            _P_SEG="$PATH"
+            while [ -n "$_P_SEG" ]; do
+                [ "${_P_SEG%%:*}" = "$_BD" ] && { _BP="yes"; break; }
+                [ "${_P_SEG%%:*}" = "$_P_SEG" ] && _P_SEG="" || _P_SEG="${_P_SEG#*:}"
+            done
             if [ "$_BP" = "no" ]; then
                 log warn "PATH 引导: ${_BD} 不在 PATH 中——当前 shell 输入 airymaxrt 会报 command not found"
                 log warn "  临时生效: export PATH=\"${_BD}:\$PATH\""
@@ -1830,17 +1838,24 @@ case "$CMD" in
             fi
             if [ "$_seg" = "$_P_SEG" ]; then _P_SEG=""; else _P_SEG="${_P_SEG#*:}"; fi
         done
-        if [ "$_PATH_FOUND" = "1" ]; then
-            _dn_pass "PATH: ${_BD_D} 在 PATH 中"
-        else
-            _dn_warn "PATH: ${_BD_D} 不在 PATH 中——输入 airymaxrt 会报 command not found"
-            _RC_D="$HOME/.bashrc"
-            case "$(basename "${SHELL:-/bin/sh}")" in
-                zsh) _RC_D="$HOME/.zshrc" ;;
-                fish) _RC_D="$HOME/.config/fish/config.fish" ;;
-                sh|dash|ash) _RC_D="$HOME/.profile" ;;
-            esac
+        # 短命令自证：链接与 PATH 是两件独立的事。链接缺失时目录即使在
+        # PATH 里也敲不出 airymaxrt；链接在位但目录不在 PATH 时同样报
+        # command not found。分项判定，避免把两种故障混为一句「检查 PATH」。
+        _RC_D="$HOME/.bashrc"
+        case "$(basename "${SHELL:-/bin/sh}")" in
+            zsh) _RC_D="$HOME/.zshrc" ;;
+            fish) _RC_D="$HOME/.config/fish/config.fish" ;;
+            sh|dash|ash) _RC_D="$HOME/.profile" ;;
+        esac
+        if [ ! -x "$_BL_D" ]; then
+            _dn_warn "短命令: 缺少 ${_BL_D}（执行 airymaxrt reinstall 重建链接）"
+        elif [ "$_PATH_FOUND" != "1" ]; then
+            _dn_warn "短命令: ${_BD_D} 不在 PATH 中——输入 airymaxrt 会报 command not found"
             log warn "  永久生效: echo 'export PATH=\"${_BD_D}:\$PATH\"' >> \"${_RC_D}\" && source \"${_RC_D}\""
+        elif ! command -v airymaxrt >/dev/null 2>&1; then
+            _dn_warn "短命令: ${_BL_D} 在位但当前 shell 解析不到（重开终端或 hash -r）"
+        else
+            _dn_pass "短命令: airymaxrt → $(command -v airymaxrt)"
         fi
         _LD_MISS=""
         if command -v ldd >/dev/null 2>&1; then
