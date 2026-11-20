@@ -149,6 +149,13 @@ jobs:
               "$UMB/agent-workload/$r" \
               || echo "::warning::$r mirror unavailable, cross-repo check will skip it"
           done
+          # L-9 补丁回流判据以 commit 是否在 HEAD 祖先链上为唯一口径；浅克隆
+          # 只带一条提交，历史回流点一律「not found」（run 464e29 实证）。
+          # products 体量小，取全历史；其余两仓无祖先链判据，维持浅克隆。
+          if [ -d "$UMB/agent-workload/products/.git" ]; then
+            git -C "$UMB/agent-workload/products" fetch -q --unshallow \
+              || echo "::warning::products history not deepened, L-9 will fail"
+          fi
           # sdk 的 tui 子模块承载启动器与 TUI 判据面：G38-4 的
           # launcher_profile_parse 直接读取 tui/scripts/airymaxrt。顶层
           # 浅克隆不含子模块工作树，缺席即该探针结构性红（run #369 实证）。
