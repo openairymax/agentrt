@@ -197,6 +197,9 @@ int cli_dispatch_command(const char *input, void *ctx);
 int cli_parse_args(int argc, char *argv[], const char **out_print_prompt);
 
 char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data);
+/* 中断指令词表 SSoT（airy_cli_exec.c）：执行期 stdin 轮询与 GCCP 应答
+ * 共用，避免两处各持一份 quit/exit 列表而口径漂移。 */
+int cli_abort_word(const char *line);
 void cli_history_clear(void);
 
 /* 会话恢复视图装配（cli_chat_session.c，0.1.17 R5-G5）：--continue/--resume
