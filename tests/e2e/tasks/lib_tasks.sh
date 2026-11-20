@@ -22,6 +22,18 @@ L8_ROOT="$(cd "$L8_DIR/../../.." && pwd)"
 FX="$L8_DIR/fixtures"
 BIN="${AIRY_L8_BIN:-/tmp/rt21/bin}"
 CLI="${AIRY_L8_CLI:-/tmp/rt21/tools/airy_cli/airy_cli}"
+# 构建产物路径在入口即解析为绝对路径：守护进程在 $AIRY_HOME 内启动（sone 里的
+# cd 是刻意的），相对路径会在 cd 后指向错误位置——CI 传入的 ../build/bin 曾因此
+# 让九个守护进程全部 exec 失败、用例退化为 rc=10。此处的归一化对调用方的 cwd
+# 敏感（相对路径按调用目录解释），之后无论再 cd 到哪里都稳定。
+abspath() {
+    case "$1" in
+        /*) printf '%s' "$1" ;;
+        *) printf '%s/%s' "$PWD" "$1" ;;
+    esac
+}
+BIN="$(abspath "$BIN")"
+CLI="$(abspath "$CLI")"
 AIRY_HOME="${AIRY_HOME:-$(mktemp -d /tmp/airy-l8.XXXXXX)}"
 export AIRY_HOME
 GW_PORT="${AIRY_L8_GW_PORT:-18080}"
