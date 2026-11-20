@@ -196,9 +196,8 @@ void cli_cmd_list(const char *tok);
 int cli_dispatch_command(const char *input, void *ctx);
 int cli_parse_args(int argc, char *argv[], const char **out_print_prompt);
 
-char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data);
-/* 中断指令词表 SSoT（airy_cli_exec.c）：执行期 stdin 轮询与 GCCP 应答
- * 共用，避免两处各持一份 quit/exit 列表而口径漂移。 */
+/* 中断指令词表 SSoT（airy_cli_exec.c）：执行期 stdin 轮询与交互应答共用，
+ * 避免多处各持一份 quit/exit 列表而口径漂移。 */
 int cli_abort_word(const char *line);
 void cli_history_clear(void);
 
@@ -235,8 +234,6 @@ const char *cli_chat_reasoning_peek(void);
 void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t out_size);
 void cli_chat_mem_record(const char *input, const char *reply);
 
-/* cli_chat_gccp.c：GCCP 逐问交互 */
-
 /* cli_chat_history.c：历史缓冲 / 错误描述 / 系统提示词 */
 const char *cli_chat_err_desc(int err);
 void cli_history_add(const char *role, const char *content, const char *reasoning);
@@ -261,8 +258,6 @@ void cli_msgbuf_push(cli_chat_msgbuf_t *b, const char *role, const char *content
                      const char *tool_call_id, const char *tool_calls_json,
                      const char *reasoning_content);
 int cli_chat_tool_round(cli_chat_msgbuf_t *b, const llm_response_t *resp);
-
-airy_err_t cli_think_process_remote(const char *input, airy_task_plan_t **out_plan);
 
 /* 任务执行唯一通路：plan → gateway → sched_d（0.1.9 M1 1c 引擎壳化，
  * 本地 hall 降级与 sched.sock 开关已退役，失败即错误可见化）。 */
