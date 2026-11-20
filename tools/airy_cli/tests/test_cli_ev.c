@@ -321,7 +321,7 @@ static int t_dead_port(void)
 
     if (fd < 0)
         return 0;
-    memset(&sa, 0, sizeof(sa));
+    AIRY_MEMSET(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
     sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     if (bind(fd, (struct sockaddr *)&sa, sizeof(sa)) == 0 &&
