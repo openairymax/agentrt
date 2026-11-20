@@ -139,14 +139,45 @@ jobs:
       # 其分步执行：用例需要真实拉起全量 daemon，与单测夹具的 HOME/端口
       # 生命周期互不干扰。
       - name: L-8 e2e task closed-loop (3 shards)
+        env:
+          # 固定证据根：失败时下面的取证步骤与 artifact 才能拿到真实案例日志
+          # 与 daemon 输出（此前落在 mktemp 目录，随 job 退出湮灭，rc=10 无迹可查）。
+          AIRY_HOME: ${{ runner.temp }}/airy-l8
         run: |
           export AIRY_L8_BIN="${BUILD_DIR}/bin"
           export AIRY_L8_CLI="${BUILD_DIR}/tools/airy_cli/airy_cli"
+          rm -rf "$AIRY_HOME"
           for s in 1 2 3; do
             echo "::group::L-8 shard ${s}"
             bash tests/e2e/tasks/run_tasks.sh --profile ci --shard "$s"
             echo "::endgroup::"
           done
+
+      # L-8 取证：rc=10（环境不可用）与断言失败都必须能凭日志定位。用例日志
+      # 与 daemon stderr 直接 tail 进 Actions 输出（免凭据可读），同时整目录
+      # 传 artifact 供逐行比对。
+      - name: Dump L-8 evidence on failure
+        if: failure()
+        run: |
+          H="${RUNNER_TEMP}/airy-l8"
+          [ -d "$H" ] || exit 0
+          echo "== L-8 evidence tree =="
+          find "$H" -maxdepth 4 \( -name '*.log' -o -name '*.txt' \) | sort || true
+          for f in "$H"/logs/*.log "$H"/cases/*/logs/*.log; do
+            [ -f "$f" ] || continue
+            echo "::group::L-8 log $f"
+            tail -n 60 "$f"
+            echo "::endgroup::"
+          done
+
+      - name: Upload L-8 evidence artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: l8-evidence
+          path: ${{ runner.temp }}/airy-l8
+          if-no-files-found: ignore
+          retention-days: 14
 
       # A-5 运行时门禁（§17.1 A-5）：干净 AIRY_HOME 首启后静默 daemon 不得
       # 留 0 字节 .out，有输出者 .out 必须非空，且 sandbox 内 -size 0 命中 0。
