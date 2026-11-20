@@ -71,7 +71,10 @@ inputs:
     # 启动器与发行副本对齐）。旧 pin 260e362 的 tui 无 toolcat.rs 与
     # session_store.rs，V0/B3 与 TD2 判据读不到结构面、构建腿缺件；
     # AF1 双面一致判据要求启动器 pin 同步前推，否则取旧快照即报分叉。
-    default: '144a8f80e057fe7370f4cd646b6accbd327e6367'
+    # ea6a149：tui gitlink 前推至 9767d61（启动器承接自托管模型管理与
+    # 安装面 vault 选用）。该前推改动 scripts/airymaxrt，latest 发布面已
+    # 同步，pin 不随之前推即报「latest 与 sdk 启动器分叉」。
+    default: 'ea6a1498ea6f5f0ee6f3a3570f16a0613ab3fcef'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
