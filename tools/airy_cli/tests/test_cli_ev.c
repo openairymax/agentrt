@@ -239,18 +239,24 @@ static void t_opts(void)
 
     need = cli_ev_stream_body(body, sizeof(body), "goal \"q\"", "{\"model\":\"m1\"}");
     CHECK(need > 0 && need < sizeof(body), "body fits");
-    CHECK(strstr(body, "\"params\":{\"model\":\"m1\",\"goal\":\"goal \\\"q\\\"\"") != NULL,
-             "opts merged before authoritative fields");
-    CHECK(strstr(body, "\"mode\":\"auto\",\"client\":\"cli\"") != NULL,
+    CHECK(strstr(body, "\"params\":{\"mode\":\"auto\",\"model\":\"m1\","
+                       "\"goal\":\"goal \\\"q\\\"\"") != NULL,
+             "opts merged after default mode");
+    CHECK(strstr(body, "\"client\":\"cli\"") != NULL,
              "authoritative fields traced");
 
     (void)cli_ev_stream_body(body, sizeof(body), "g", "{}");
-    CHECK(strstr(body, "\"params\":{\"goal\":\"g\"") != NULL,
-             "empty opts leaves params clean");
+    CHECK(strstr(body, "\"params\":{\"mode\":\"auto\",\"goal\":\"g\"") != NULL,
+             "empty opts falls back to auto mode");
 
     (void)cli_ev_stream_body(body, sizeof(body), "g", NULL);
-    CHECK(strstr(body, "\"params\":{\"goal\":\"g\"") != NULL,
-             "absent opts leaves params clean");
+    CHECK(strstr(body, "\"params\":{\"mode\":\"auto\",\"goal\":\"g\"") != NULL,
+             "absent opts falls back to auto mode");
+
+    (void)cli_ev_stream_body(body, sizeof(body), "g", "{\"mode\":\"task\"}");
+    CHECK(strstr(body, "\"params\":{\"mode\":\"task\",\"goal\":\"g\"") != NULL,
+             "caller mode overrides without duplication");
+    CHECK(strstr(body, "\"mode\":\"auto\"") == NULL, "no duplicate mode key");
 }
 
 static void t_sse_line(void)

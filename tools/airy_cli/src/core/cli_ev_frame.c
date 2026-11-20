@@ -186,6 +186,8 @@ size_t cli_ev_stream_body(char *dst, size_t cap, const char *goal,
     size_t gn = strlen(goal ? goal : "");
     size_t xl = (opts && opts[0] == '{') ? strlen(opts) : 0;
     size_t inner = xl > 2 ? xl - 2 : 0;
+    char mode[16];
+    int has_mode = inner && cli_ev_str(opts, xl, "mode", mode, sizeof(mode)) > 0;
     char *esc;
     int m;
 
@@ -195,8 +197,8 @@ size_t cli_ev_stream_body(char *dst, size_t cap, const char *goal,
     (void)cli_ev_esc(esc, 2 * gn + 1, goal);
     m = snprintf(dst, cap,
                  "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"task.submit_stream\","
-                 "\"params\":{%.*s%s\"goal\":\"%s\",\"mode\":\"auto\","
-                 "\"client\":\"cli\"}}",
+                 "\"params\":{%s%.*s%s\"goal\":\"%s\",\"client\":\"cli\"}}",
+                 has_mode ? "" : "\"mode\":\"auto\",",
                  inner ? (int)inner : 0, inner ? opts + 1 : "",
                  inner ? "," : "", esc);
     AIRY_FREE(esc);

@@ -75,7 +75,8 @@ int cli_ev_obj(const char *json, size_t len, const char *key, char *out,
                size_t cap);
 
 /* task.submit_stream 请求体：goal 由 CLI 转义，opts（可空）成员并入
- * params，其后 CLI 权威字段（goal/mode/client）覆盖同名项。返回应有长度。 */
+ * params；goal/client 由 CLI 权威赋值，mode 缺省为 auto 且可由 opts 覆写
+ * （opts 已带 mode 时不重复下发）。返回应有长度。 */
 size_t cli_ev_stream_body(char *dst, size_t cap, const char *goal,
                           const char *opts);
 
