@@ -98,7 +98,11 @@ jobs:
           set -euo pipefail
           UMB="$RUNNER_TEMP/airymaxhub"
           mkdir -p "$UMB/agent-workload"
-          git clone -q --depth 1 https://github.com/openairymax/tools.git "$UMB/tools"
+          # tools 必须带提交历史：Gate 41 审的就是基线文件的 git 历史（pin 上升
+          # 须在提交消息里带 RATCHET-JUSTIFY）。深度 1 会让「脚本入库」锚点退化
+          # 成浅克隆根，审计循环空转即过——门禁在、判据不在。故取全量提交图，
+          # blob 按需惰性获取（--filter=blob:none），审计读到的仍是真实文件内容。
+          git clone -q --filter=blob:none https://github.com/openairymax/tools.git "$UMB/tools"
           git clone -q --depth 1 https://atomgit.com/openairymax/docs.git "$UMB/docs" \
             || git clone -q --depth 1 https://github.com/openairymax/docs.git "$UMB/docs"
           # docs 的 docs-workload 子模块承载 SSoT 权威源注册表等判据
