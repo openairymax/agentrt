@@ -273,6 +273,106 @@ static void t_sse_line(void)
     CHECK_EQ(cli_sse_line("data: [DONE]", 12, out, sizeof(out)), 0, "DONE sentinel ignored");
 }
 
+/* 查询应答载荷：ok 分支内嵌 result 原文，失败分支转义 error。 */
+static void t_query_payload(void)
+{
+    char out[256];
+    size_t n;
+
+    printf("  t_query_payload...\n");
+    n = cli_ev_query_payload(out, sizeof(out), "q7", 1,
+                             "{\"agents\":[{\"id\":\"a1\"}]}", NULL);
+    CHECK(n > 0 && n < sizeof(out), "ok payload fits");
+    CHECK(strcmp(out, "{\"id\":\"q7\",\"ok\":true,\"result\":"
+                      "{\"agents\":[{\"id\":\"a1\"}]}}") == 0,
+          "result embedded verbatim");
+    n = cli_ev_query_payload(out, sizeof(out), "q8", 1, NULL, NULL);
+    CHECK(strstr(out, "\"result\":null") != NULL, "absent result is null");
+    n = cli_ev_query_payload(out, sizeof(out), "q9", 0, NULL,
+                             "gateway \"offline\"");
+    CHECK(strstr(out, "\"ok\":false") != NULL, "failure marked");
+    CHECK(strstr(out, "\"error\":\"gateway \\\"offline\\\"\"") != NULL,
+          "error escaped");
+    CHECK(strstr(out, "result") == NULL, "no result on failure");
+    {
+        char tmp[64];
+        size_t want = cli_ev_query_payload(NULL, 0, "q7", 1, "{\"a\":1}", NULL);
+
+        CHECK_EQ(cli_ev_query_payload(tmp, sizeof(tmp), "q7", 1, "{\"a\":1}", NULL),
+                 want, "dry run reports the filled length");
+        CHECK(strcmp(tmp, "{\"id\":\"q7\",\"ok\":true,\"result\":{\"a\":1}}") == 0,
+              "dry run and fill agree");
+    }
+}
+
+#ifndef _WIN32
+
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+/* 取一个刚释放的本机端口：保证 connect 被立即拒绝（非桩服务端）。 */
+static int t_dead_port(void)
+{
+    struct sockaddr_in sa;
+    socklen_t sl = sizeof(sa);
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    int port = 0;
+
+    if (fd < 0)
+        return 0;
+    memset(&sa, 0, sizeof(sa));
+    sa.sin_family = AF_INET;
+    sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if (bind(fd, (struct sockaddr *)&sa, sizeof(sa)) == 0 &&
+        getsockname(fd, (struct sockaddr *)&sa, &sl) == 0)
+        port = ntohs(sa.sin_port);
+    close(fd);
+    return port;
+}
+
+/* 输入帧端到端：stdin 真管道喂 query 帧，网关指向已释放端口，
+ * 断言回帧是 ok:false 的 query_result（解析 → 调用 → 载荷 → 写出全真跑）。 */
+static void t_query_frame(void)
+{
+    static const char q[] =
+        "{\"type\":\"input\",\"kind\":\"query\",\"id\":\"q7\","
+        "\"method\":\"hall.board\",\"params\":{}}\n";
+    char url[64];
+    int pfd[2];
+    int saved;
+    int port = t_dead_port();
+
+    printf("  t_query_frame...\n");
+    CHECK(port > 0, "dead port picked");
+    if (port <= 0)
+        return;
+    snprintf(url, sizeof(url), "127.0.0.1:%d", port);
+    (void)setenv("AIRY_GATEWAY_URL", url, 1);
+    CHECK_EQ(pipe(pfd), 0, "stdin pipe");
+    saved = dup(0);
+    (void)write(pfd[1], q, sizeof(q) - 1);
+    (void)dup2(pfd[0], 0);
+    close(pfd[0]);
+    close(pfd[1]);
+    cli_ev_io_set(sink_wr, NULL);
+    CHECK_EQ(cli_ev_init(), 0, "init");
+    cli_ev_begin();
+    sink_reset();
+    (void)cli_ev_in_poll();
+    CHECK(strstr(g_sink, "\"type\":\"query_result\"") != NULL,
+          "query answered as a result frame");
+    CHECK(strstr(g_sink, "\"id\":\"q7\"") != NULL, "id echoed");
+    CHECK(strstr(g_sink, "\"ok\":false") != NULL, "unreachable gateway fails");
+    CHECK(strstr(g_sink, "\"error\":\"") != NULL, "failure carries a reason");
+    (void)dup2(saved, 0);
+    close(saved);
+    cli_ev_fini();
+    (void)unsetenv("AIRY_GATEWAY_URL");
+}
+
+#endif /* !_WIN32 */
+
 int main(void)
 {
     printf("test_cli_ev:\n");
@@ -284,6 +384,10 @@ int main(void)
     t_chunked();
     t_sse_line();
     t_opts();
+    t_query_payload();
+#ifndef _WIN32
+    t_query_frame();
+#endif
     printf(g_fail ? "FAILED\n" : "ALL PASSED\n");
     return g_fail;
 }

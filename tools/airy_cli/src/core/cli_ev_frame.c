@@ -205,6 +205,30 @@ size_t cli_ev_stream_body(char *dst, size_t cap, const char *goal,
     return m > 0 ? (size_t)m : 0;
 }
 
+/* 查询应答载荷：result 原样内嵌（调用方保证它是合法 JSON 原文），
+ * id/error 走转义；ok=0 时不带 result 字段。 */
+size_t cli_ev_query_payload(char *dst, size_t cap, const char *id, int ok,
+                            const char *result, const char *error)
+{
+    char eid[512];
+    char eerr[1024];
+    int n;
+
+    (void)cli_ev_esc(eid, sizeof(eid), id ? id : "");
+    if (ok) {
+        const char *res = (result && *result) ? result : "null";
+
+        n = snprintf(dst, cap, "{\"id\":\"%s\",\"ok\":true,\"result\":%s}",
+                     eid, res);
+    } else {
+        (void)cli_ev_esc(eerr, sizeof(eerr), error ? error : "");
+
+        n = snprintf(dst, cap, "{\"id\":\"%s\",\"ok\":false,\"error\":\"%s\"}",
+                     eid, eerr);
+    }
+    return n > 0 ? (size_t)n : 0;
+}
+
 int cli_ev_is_term(const char *type)
 {
     return type && strcmp(type, "run_end") == 0;

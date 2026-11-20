@@ -17,6 +17,12 @@
  * "opts":{...}}。opts 成员并入 task.submit_stream 的 params（history /
  * model / gccp_answers / resume 等运行侧选项），goal/mode/client 由 CLI
  * 权威赋值，同名项以 CLI 为准。一帧一轮。
+ *
+ * D-15 扩展（观察面读）：{"type":"input","kind":"query","id":"q7",
+ * "method":"hall.board","params":{...}}。CLI 经 cli_gw_call 同步取值后
+ * 回一帧 {"type":"query_result","payload":{"id":"q7","ok":true,
+ * "result":<原样 JSON>}}；失败为 {"id":"q7","ok":false,"error":"..."}。
+ * 查询只读面板数据，不进入 run 事件语义。
  */
 
 #ifndef AIRY_CLI_EV_H
@@ -79,6 +85,11 @@ int cli_ev_obj(const char *json, size_t len, const char *key, char *out,
  * （opts 已带 mode 时不重复下发）。返回应有长度。 */
 size_t cli_ev_stream_body(char *dst, size_t cap, const char *goal,
                           const char *opts);
+
+/* 查询应答载荷：ok=1 时内嵌 result 原文（空按 null），ok=0 时带 error。
+ * 纯函数，返回应有长度（cap 不足同 snprintf）。 */
+size_t cli_ev_query_payload(char *dst, size_t cap, const char *id, int ok,
+                            const char *result, const char *error);
 
 /* 事件桥：服务端事件 → 帧；返回 1=终态，0=继续，-1=输出已关闭。 */
 int cli_ev_bridge(const char *json, size_t len);
