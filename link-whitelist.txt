@@ -50,7 +50,10 @@ market_d: airy_platform_libs airy_market_service airy_core airy_security_dome
 channel_d: airy_platform_libs airy_common svc_common airy_core airy_security_dome
 notify_d: airy_platform_libs airy_common svc_common airy_core airy_coreloop_hooks airy_security_dome
 mem_d: airy_platform_libs airy_common airy_mem_service airy_core airy_security_dome
-agent_d: airy_platform_libs airy_common airy_agent_service airy_core airy_security_dome
+# R16 执行中复核管线（execution_review 门禁 → t2 → t1f）在 agent_d 进程内
+# 复用 coreloopthree 的复核编排（agent_review.c 经 airy_execution_review_create
+# 入口），与 tool_d/sched_d/think_d 同属「执行体进程内复用」事实基线。
+agent_d: airy_platform_libs airy_common airy_agent_service airy_coreloopthree airy_core airy_security_dome
 # a2a_d（0.1.19 §250）：允许集对齐 linkgate 直接捕获集——airy_common /
 # airy_protocols 从未在 a2a_d 直接声明，系经 airy_a2a_service PUBLIC
 # （svc_common→airy_common、airy_protocols）传播的历史闭包快照残留。
