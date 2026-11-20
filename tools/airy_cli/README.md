@@ -23,7 +23,6 @@ airy_cli/
 │   ├── airy_cli_pipeline.h         # 编排管线
 │   ├── airy_cli_exec.h             # 执行接口
 │   ├── cli_gw.h                    # 统一网关客户端
-│   ├── cli_review.h                # 认知阶段并行子 agent 审查
 │   ├── daemon_cmds.h               # daemon 命令面
 │   ├── airy_cli_cmd_internal.h     # 命令内部契约
 │   └── cli_term.h                  # 终端能力（尺寸回退链等）
@@ -48,7 +47,6 @@ airy_cli/
 | 渲染 | `render` | Markdown 渲染、实时看板、banner、思考过程展示、输出格式化 |
 | 统一网关 | `cmd/cli_gw` | 所有客户端流量统一经 gateway 派发，CLI 自身亦为网关客户端接入 |
 | 命令面 | `cmd` | system / cognition / capability 三类命令命名空间 |
-| 并行审查 | `cmd/cli_review` | 认知阶段并行子 agent 审查（事实/风险） |
 
 ## 构建与测试
 

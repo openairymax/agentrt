@@ -86,7 +86,6 @@ add_executable(airy_cli
     # cli_chat.c 域拆分（2026-08-27：2040 行 → 6 个职责模块）
     src/chat/cli_chat_usage.c
     src/chat/cli_chat_memory.c
-    src/chat/cli_chat_gccp.c
     src/chat/cli_chat_history.c
     src/chat/cli_chat_tools.c
     # cli_chat.c 二轮拆分（2026-08-27：802 行 → 4 个职责模块；C-01 ⑤：cli_chat_stream.c 退役 → 3）
@@ -124,8 +123,6 @@ add_executable(airy_cli
     # tui_input.c 二轮拆分（2026-08-27：835 行 → 3 个职责模块）
     src/tui/tui_complete.c
     src/tui/tui_line_readline.c
-    # 阶段 4（item 4）: 认知阶段并行子 agent 审查（事实/风险）
-    src/cmd/cli_review.c
     # S-5 编排管线：/orch 命令（orchestrator 七阶段流程编排）
     src/core/cli_orch.c
     # 架构约束（2026-08-25）：统一网关客户端（所有客户端必须经 gateway 派发）
