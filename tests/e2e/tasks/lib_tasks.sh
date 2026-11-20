@@ -423,7 +423,13 @@ chk_case() { # <case> <resp> <want-status> <want-board> <verdict> <board-before>
 }
 
 td_gate() { # TUI 执行面静态门禁（判据①：零 agent.run），证据落 $EV/td-gate.log
-    local tui="$L8_ROOT/../sdk/tui" gate="$L8_ROOT/scripts/verify_release_gates.sh"
+    # TUI 位置随布局而变：门禁取料（lf-gate-fixture）把它物化在仓内
+    # agent-workload/sdk/tui，本地伞仓则与仓同级（../sdk/tui）。只认同级
+    # 会让 CI 侧取到空树、TD1 以「环境不可用」判红——候选集合与
+    # verify_release_gates.sh 的 TUI 解析同源。
+    local tui gate="$L8_ROOT/scripts/verify_release_gates.sh"
+    tui="$L8_ROOT/agent-workload/sdk/tui"
+    [ -d "$tui" ] || tui="$L8_ROOT/../sdk/tui"
     if [ ! -d "$tui/src" ] || [ ! -f "$gate" ]; then
         skipc "TUI 源树或门禁脚本缺失，TD1 静态证据不可得（$tui）"
         return
