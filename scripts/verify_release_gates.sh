@@ -1065,8 +1065,30 @@ gw_cap_row() {
 # cli_gw_json，或经 CLI 内部 DAG 信封原语 dag_rpc（cli_dag.c 静态转发 method，
 # 语义等价于直调）。仅放宽“调用表达式形态”，不放宽“必须存在用户面调用”这一事实。
 _cli_calls_cap() {
-    grep -rqE "(cli_gw_call|cli_gw_json|dag_rpc)\(\"$1\"" "$CLI/src" 2>/dev/null
+    grep -rqE "(cli_gw_call|cli_gw_json|dag_rpc)\(\"$1\"" "$CLI/src" 2>/dev/null && return 0
+    # 命名空间级动态转发：第二参数为变量（非字面量）时，cli_rpc_print 在
+    # 运行期拼装 ns.<用户输入>，由 CLI_COMMANDS 对用户公开（/agents spawn
+    # 等），与字面量直调等价可达。字面量方法（如 think.lang_stats）不构成
+    # 同命名空间其他能力的证据——只放宽转发形态，不放宽可达事实。
+    grep -rqE "cli_rpc_print\(\"${1%%.*}\", *[A-Za-z_]" "$CLI/src" 2>/dev/null
 }
+
+# 面二：复合能力。部分能力不作为独立用户命令存在，但由上游用户面能力经
+# 服务内部一跳承载；此时「用户面调用方」这一事实由上跳能力承担，而本能力
+# 的消费方必须在服务侧有字面量取证。两证据缺一即断链，不因复合而放宽。
+#   think.process：规划链自 0.1.19 起归 gateway task.submit，CLI 只发
+#   task.submit_stream；agent_d 在执行 run 时按 socket + 方法名调用认知
+#   引擎（agent_run_exec.c 的 run_rpc("think.sock", "process")），故取证 =
+#   CLI 的 task.submit_stream + agent_d 的 socket/方法对。
+_dr1_composite() {
+    case "$1" in
+        think.process)
+            grep -rqE '"think\.sock", *"process"' "$ROOT/daemons/agent_d/src" 2>/dev/null &&
+                grep -rq 'task\.submit_stream' "$CLI/src" 2>/dev/null ;;
+        *) return 1 ;;
+    esac
+}
+
 ERRS="$ROOT/commons/utils/error/error_codes.h"
 ERRC="$ROOT/commons/utils/error/err_class.h"
 # 可读名称面取证：错误目录表已从 handler.c 独立为静态单元（error_catalog.c），
@@ -1105,7 +1127,7 @@ for _cap in llm.complete think.process think.lang_process think.lang_postprocess
     # 注册字面量在 include/ 声明面与 src/ 实现面两处均合法，扫描面随归位同步扩为二者。
     grep -rq "\"$_m\"" "$ROOT/daemons/${_ns}_d/src" "$ROOT/daemons/${_ns}_d/include" 2>/dev/null \
         || _t2_bad="$_t2_bad $_cap(服务面未注册 $_m)"
-    if ! _cli_calls_cap "$_cap"; then
+    if ! _cli_calls_cap "$_cap" && ! _dr1_composite "$_cap"; then
         if [ "$_m" != "get_stats" ] || \
            ! grep -rq '%s\.get_stats' "$CLI/src" 2>/dev/null; then
             _t2_bad="$_t2_bad $_cap(无用户面调用方)"
