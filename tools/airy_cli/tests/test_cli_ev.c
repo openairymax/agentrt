@@ -216,6 +216,43 @@ static void t_chunked(void)
     cli_dc_free(&dc);
 }
 
+static void t_opts(void)
+{
+    static const char frame[] =
+        "{\"type\":\"input\",\"kind\":\"prompt\",\"text\":\"hi\","
+        "\"opts\":{\"model\":\"m1\",\"history\":[{\"role\":\"user\",\"text\":\"a}b\"}]}}";
+    char out[512];
+    char body[1024];
+    size_t need;
+
+    printf("  t_opts...\n");
+    CHECK_EQ(cli_ev_obj(frame, sizeof(frame) - 1, "opts", out, sizeof(out)),
+             (int)strlen("{\"model\":\"m1\",\"history\":[{\"role\":\"user\",\"text\":\"a}b\"}]}"),
+             "opts object extracted whole");
+    CHECK(strstr(out, "\"a}b\"") != NULL, "brace inside string not a boundary");
+    CHECK_EQ(cli_ev_obj(frame, sizeof(frame) - 1, "text", out, sizeof(out)), 0,
+             "non-object value rejected");
+    CHECK_EQ(cli_ev_obj("{\"opts\":{\"a\":1", 13, "opts", out, sizeof(out)), 0,
+             "unbalanced object rejected");
+    CHECK_EQ(cli_ev_obj("{\"opts\":{}}", 11, "opts", out, 2), 0,
+             "insufficient buffer rejected");
+
+    need = cli_ev_stream_body(body, sizeof(body), "goal \"q\"", "{\"model\":\"m1\"}");
+    CHECK(need > 0 && need < sizeof(body), "body fits");
+    CHECK(strstr(body, "\"params\":{\"model\":\"m1\",\"goal\":\"goal \\\"q\\\"\"") != NULL,
+             "opts merged before authoritative fields");
+    CHECK(strstr(body, "\"mode\":\"auto\",\"client\":\"cli\"") != NULL,
+             "authoritative fields traced");
+
+    (void)cli_ev_stream_body(body, sizeof(body), "g", "{}");
+    CHECK(strstr(body, "\"params\":{\"goal\":\"g\"") != NULL,
+             "empty opts leaves params clean");
+
+    (void)cli_ev_stream_body(body, sizeof(body), "g", NULL);
+    CHECK(strstr(body, "\"params\":{\"goal\":\"g\"") != NULL,
+             "absent opts leaves params clean");
+}
+
 static void t_sse_line(void)
 {
     char out[256];
@@ -240,6 +277,7 @@ int main(void)
     t_trunc();
     t_chunked();
     t_sse_line();
+    t_opts();
     printf(g_fail ? "FAILED\n" : "ALL PASSED\n");
     return g_fail;
 }

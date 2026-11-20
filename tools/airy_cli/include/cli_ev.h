@@ -12,6 +12,11 @@
  *
  * 反向控制固定「CLI 问、TUI 答」：高风险管理动作提交前发 control_request，
  * 超时按拒绝处理（fail-closed）。
+ *
+ * 输入帧附带轮次选项：{"type":"input","kind":"prompt","text":"...",
+ * "opts":{...}}。opts 成员并入 task.submit_stream 的 params（history /
+ * model / gccp_answers / resume 等运行侧选项），goal/mode/client 由 CLI
+ * 权威赋值，同名项以 CLI 为准。一帧一轮。
  */
 
 #ifndef AIRY_CLI_EV_H
@@ -64,6 +69,16 @@ int cli_ev_num(const char *json, size_t len, const char *key,
 int cli_ev_is_term(const char *type);
 int cli_ev_esc(char *dst, size_t cap, const char *src);
 
+/* 取顶层对象/数组字段的原文（含首尾括号，字符串内括号不计数）。
+ * 不完整或越界即返回 0：宁可丢弃选项，也不产出非法 JSON。 */
+int cli_ev_obj(const char *json, size_t len, const char *key, char *out,
+               size_t cap);
+
+/* task.submit_stream 请求体：goal 由 CLI 转义，opts（可空）成员并入
+ * params，其后 CLI 权威字段（goal/mode/client）覆盖同名项。返回应有长度。 */
+size_t cli_ev_stream_body(char *dst, size_t cap, const char *goal,
+                          const char *opts);
+
 /* 事件桥：服务端事件 → 帧；返回 1=终态，0=继续，-1=输出已关闭。 */
 int cli_ev_bridge(const char *json, size_t len);
 /* run_end 状态 → 进程退出码：0 完成/暂停，130 取消，1 失败。 */
@@ -74,6 +89,9 @@ int cli_ev_finish(const char *code);
 /* stdin 输入帧（hello/input/control_response）解析与分发。 */
 int cli_ev_in_poll(void);
 int cli_ev_in_prompt(char *out, size_t cap);
+/* 取走本轮 prompt 帧随附的 opts 对象（一次性；无则返回 0）。
+ * 约定一帧一轮：连续入队时以最后一次 prompt 帧的 opts 为准。 */
+int cli_ev_in_opts(char *out, size_t cap);
 /* 输入帧 kind=cancel 已到达（粘性；运行循环据此中断当前轮）。 */
 int cli_ev_in_cancel(void);
 

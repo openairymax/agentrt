@@ -61,25 +61,15 @@ static int ev_risk(const char *s)
     return 0;
 }
 
-static char *ev_body(const char *goal)
+static char *ev_body(const char *goal, const char *opts)
 {
     size_t n = strlen(goal ? goal : "");
-    char *esc = (char *)AIRY_MALLOC(2 * n + 1);
-    char *body = (char *)AIRY_MALLOC(2 * n + 512);
-    int m;
+    size_t xl = (opts && opts[0] == '{') ? strlen(opts) : 0;
+    char *body = (char *)AIRY_MALLOC(2 * n + xl + 512);
 
-    if (!esc || !body) {
-        AIRY_FREE(esc);
-        AIRY_FREE(body);
+    if (!body)
         return NULL;
-    }
-    (void)cli_ev_esc(esc, 2 * n + 1, goal);
-    m = snprintf(body, 2 * n + 512,
-                 "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"task.submit_stream\","
-                 "\"params\":{\"goal\":\"%s\",\"mode\":\"auto\",\"client\":\"cli\"}}",
-                 esc);
-    AIRY_FREE(esc);
-    if (m <= 0) {
+    if (cli_ev_stream_body(body, 2 * n + xl + 512, goal, opts) == 0) {
         AIRY_FREE(body);
         return NULL;
     }
@@ -133,9 +123,9 @@ static int ev_frame_step(const char *buf, uint64_t now, uint64_t *grace,
     return 0;
 }
 
-static int ev_stream(const char *goal)
+static int ev_stream(const char *goal, const char *opts)
 {
-    char *body = ev_body(goal);
+    char *body = ev_body(goal, opts);
     char *buf = (char *)AIRY_MALLOC(CLI_SSE_EVMAX);
     cli_sse_t *s;
     uint64_t last;
@@ -198,33 +188,36 @@ static int ev_stream(const char *goal)
     return 1;
 }
 
-static int ev_turn(const char *goal)
+static int ev_turn(const char *goal, const char *opts)
 {
     if (ev_risk(goal) && !cli_ev_ask("shell.exec", goal, EV_ASK_MS)) {
         (void)cli_ev_note("high-risk action denied; submit aborted");
         (void)cli_ev_finish("denied");
         return 1;
     }
-    return ev_stream(goal);
+    return ev_stream(goal, opts);
 }
 
 int cli_ev_run(const char *prompt)
 {
     char *buf = (char *)AIRY_MALLOC(EV_IN_MAX);
+    char *opts = (char *)AIRY_MALLOC(EV_IN_MAX);
     int tty = EV_TTY();
     int more;
     int rc = 0;
 
     cli_ev_init();
     cli_ev_begin();
-    if (!buf) {
+    if (!buf || !opts) {
         (void)cli_ev_note("out of memory for input buffer");
         (void)cli_ev_finish("oom");
         cli_ev_fini();
+        AIRY_FREE(buf);
+        AIRY_FREE(opts);
         return 1;
     }
     if (prompt && *prompt) {
-        rc = ev_turn(prompt);
+        rc = ev_turn(prompt, NULL);
         more = !tty;
     } else {
         more = 1;
@@ -234,14 +227,16 @@ int cli_ev_run(const char *prompt)
 
         if (pr <= 0)
             break;
+        (void)cli_ev_in_opts(opts, EV_IN_MAX);
         if (!buf[0])
             continue;
         cli_ev_begin();
-        rc = ev_turn(buf);
+        rc = ev_turn(buf, opts);
         if (tty)
             break;
     }
     cli_ev_fini();
     AIRY_FREE(buf);
+    AIRY_FREE(opts);
     return rc;
 }
