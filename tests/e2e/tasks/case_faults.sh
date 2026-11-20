@@ -156,21 +156,22 @@ case_net() { # 断网：工具已执行后杀掉 provider → 可重试续跑
             "netbreak/$m: retryable=true"
     done
     mset mode tool
-    mset command "echo net-ok >> $AIRY_HOME/net-marker"
+    # 标记写进 sandbox workspace：tool_d 的 Landlock 只放行 workspace 写。
+    mset command "echo net-ok >> $WS/net-marker"
     mset hang_after_tool 0
     mup || { ck 0 "netbreak: mock 恢复失败"; return; }
     t0=$(rcase net2)
-    submit "$EV/net2.json" "安装 firefox 并验证（断网恢复后续跑）" "$(crit "test -f $AIRY_HOME/net-marker")"
+    submit "$EV/net2.json" "安装 firefox 并验证（断网恢复后续跑）" "$(crit "test -f $WS/net-marker")"
     chk_case net2 "$EV/net2.json" completed completed pass "$EV/before-net2.json" "$t0"
 }
 
 case_restart() { # 守护重启：running→paused，凭令牌续跑且不重复执行
     mset mode hang
     mset hang_after_tool 8
-    mset command "echo r1 >> $AIRY_HOME/rst-marker"
+    mset command "echo r1 >> $WS/rst-marker"
     local t0 bg i=0 tok
     t0=$(rcase restart)
-    submit "$EV/rs0.json" "安装 firefox 并验证（守护重启注入）" "$(crit "test -f $AIRY_HOME/rst-marker")" &
+    submit "$EV/rs0.json" "安装 firefox 并验证（守护重启注入）" "$(crit "test -f $WS/rst-marker")" &
     bg=$!
     while [ "$i" -lt 120 ]; do
         [ "$(turn_state)" = "running" ] && break
@@ -189,10 +190,10 @@ case_restart() { # 守护重启：running→paused，凭令牌续跑且不重复
     mset hang_after_tool 0
     # 续跑沿用本次闭环起点 t0：真实工具调用发生在被中断那一轮，jobs 审计按用例起点取。
     board "$EV/before-rs1.json"
-    submit_resume "$EV/rs1.json" "$tok" "$(crit "test -f $AIRY_HOME/rst-marker" 'test "$(wc -l < '"$AIRY_HOME"'/rst-marker)" -eq 1')" \
+    submit_resume "$EV/rs1.json" "$tok" "$(crit "test -f $WS/rst-marker" 'test "$(wc -l < '"$WS"'/rst-marker)" -eq 1')" \
         "安装 firefox 并验证（守护重启注入）"
     chk_case rs1 "$EV/rs1.json" completed completed pass "$EV/before-rs1.json" "$t0"
-    ck "$([ "$(wc -l <"$AIRY_HOME/rst-marker" 2>/dev/null || echo 0)" -eq 1 ] && echo 1 || echo 0)" \
+    ck "$([ "$(wc -l <"$WS/rst-marker" 2>/dev/null || echo 0)" -eq 1 ] && echo 1 || echo 0)" \
         "restart: 续跑后标记仅 1 行（无重复执行）"
 }
 
