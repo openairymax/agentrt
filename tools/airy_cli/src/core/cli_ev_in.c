@@ -12,6 +12,7 @@
  */
 
 #include "cli_ev.h"
+#include "cli_gw.h"
 #include "cli_render.h"
 #include "airy_memory.h"
 #include "string_compat.h"
@@ -35,6 +36,7 @@
 #define IN_LINE_MAX 65536
 #define IN_PR_MAX (1024u * 1024u)
 #define IN_RID_MAX 24
+#define IN_QUERY_MS 3000
 
 static struct {
     int opened;
@@ -192,6 +194,48 @@ static void in_opts_set(const char *js, size_t n)
     }
 }
 
+/* 观察面读：仅面板查询，同步取一次网关，回一帧 query_result。
+ * 失败不回退重试，避免 TUI 查询节拍被拖长；id 由调用方生成并原样回显。 */
+static void in_query(const char *js, size_t n)
+{
+    char id[64];
+    char method[64];
+    char *params;
+    char *res = NULL;
+    char *pl;
+    const char *err;
+    size_t need;
+    int rc;
+
+    if (cli_ev_str(js, n, "id", id, sizeof(id)) <= 0) {
+        (void)cli_ev_note("query frame without id");
+        return;
+    }
+    if (cli_ev_str(js, n, "method", method, sizeof(method)) <= 0) {
+        (void)cli_ev_note("query frame without method");
+        return;
+    }
+    params = (char *)AIRY_MALLOC(n + 1);
+    if (!params)
+        return;
+    if (cli_ev_obj(js, n, "params", params, n + 1) <= 0)
+        params[0] = '\0';
+    rc = cli_gw_call(method, params[0] ? params : NULL, IN_QUERY_MS, &res);
+    AIRY_FREE(params);
+    /* 失败原因一次性取走（静态缓冲），两趟拼装复用同一份文本。 */
+    err = rc == 0 ? NULL : cli_gw_err_take();
+    need = cli_ev_query_payload(NULL, 0, id, rc == 0, res, err);
+    pl = (char *)AIRY_MALLOC(need + 1);
+    if (!pl) {
+        AIRY_FREE(res);
+        return;
+    }
+    (void)cli_ev_query_payload(pl, need + 1, id, rc == 0, res, err);
+    AIRY_FREE(res);
+    (void)cli_ev_emit("query_result", pl, need);
+    AIRY_FREE(pl);
+}
+
 static void in_input(const char *js, size_t n)
 {
     char kind[16];
@@ -203,6 +247,10 @@ static void in_input(const char *js, size_t n)
     }
     if (strcmp(kind, "cancel") == 0) {
         g_in.cancel = 1;
+        return;
+    }
+    if (strcmp(kind, "query") == 0) {
+        in_query(js, n);
         return;
     }
     if (strcmp(kind, "confirm") == 0) {
