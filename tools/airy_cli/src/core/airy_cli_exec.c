@@ -61,8 +61,8 @@ static size_t poll_trim_line(char *line)
     return (nz == n) ? 0 : n;
 }
 
-/* 中断指令：quit/exit/stop/取消…。 */
-static int poll_abort_line(const char *line)
+/* 中断指令：quit/exit/stop/取消…（执行期轮询与 GCCP 应答共用同一词表）。 */
+int cli_abort_word(const char *line)
 {
     static const char *const k_abort[] = {
         "quit", "exit", "abort", "stop", "cancel", "打断", "停止", "取消",
@@ -91,7 +91,7 @@ int cli_task_poll_input(void)
         return 0;
     if (poll_trim_line(line) == 0)
         return 0;
-    if (poll_abort_line(line)) {
+    if (cli_abort_word(line)) {
         g_cli_cancel = 1;
         return -1;
     }

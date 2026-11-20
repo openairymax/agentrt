@@ -26,19 +26,6 @@
 #include <cjson/cJSON.h>
 #endif
 
-/* 中断指令：视为意愿不足，放弃意图确认（避免 quit/stop 被当作答案）。 */
-static int gccp_is_abort(const char *line)
-{
-    static const char *const k_abort[] = {
-        "quit", "exit", "abort", "stop", "cancel", "打断", "停止", "取消",
-    };
-    for (size_t i = 0; i < sizeof(k_abort) / sizeof(k_abort[0]); i++) {
-        if (strcmp(line, k_abort[i]) == 0)
-            return 1;
-    }
-    return 0;
-}
-
 #ifdef AIRY_HAS_CJSON
 
 /* 单问展示（cJSON 分支：带颜色）。 */
@@ -98,7 +85,7 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
             break; /* 用户跳过：收敛，不再追问（不纠缠） */
         /* 中断指令：放弃意图确认（视为意愿不足），任务按默认约束
          * 继续；避免把 quit/stop 等当答案写入 Q 字段。 */
-        if (gccp_is_abort(line)) {
+        if (cli_abort_word(line)) {
             cJSON_Delete(answers);
             cli_print_line("Dual Think:意图确认",
                            "已放弃意图确认，任务按默认约束继续执行。");
@@ -161,7 +148,7 @@ char *cli_gccp_interact(const airy_gccp_probe_t *probe, void *user_data)
         if (rl == 0)
             break;
         /* 中断指令：放弃意图确认（同 cJSON 分支，避免 quit/stop 当答案） */
-        if (gccp_is_abort(line)) {
+        if (cli_abort_word(line)) {
             AIRY_FREE(json);
             cli_print_line("Dual Think:意图确认",
                            "已放弃意图确认，任务按默认约束继续执行。");
