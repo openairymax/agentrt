@@ -11,9 +11,11 @@ name: Quality Gates
 # 「26 gates」而实际跑 46 门，判红时连「红在哪一门」都要回编排器反查。
 # 双副本 = 漏改 = 视图与事实分叉（与本仓 SHA 单点同一纪律）。
 #
-# 双 job 结构：quality-gate 跑伞仓全量门禁编排器；release-gates 跑本仓
+# 四 job 结构：quality-gate 跑伞仓全量门禁编排器；release-gates 跑本仓
 # WS-9 发布门禁编排器（scripts/verify_release_gates.sh，0.1.19 §3.4
-# 「门禁脚本在而不生效」→ L1 接线 fail-closed，详见该 job 注释）。
+# 「门禁脚本在而不生效」→ L1 接线 fail-closed，详见该 job 注释）；
+# workflow-lint 静态校验全部工作流（actionlint，版本与 sha256 双固定）；
+# ci-consistency 校验安装器兜底版本漂移与 release.yml 的作业图不变量。
 #
 # 纯文档变更跳过；同一 ref 的并发运行自动取消；构建树外化到 runner
 # temp，不落源码区。
@@ -269,3 +271,58 @@ jobs:
 
       - name: Run release gates (WS-9, A~AH)
         run: bash scripts/verify_release_gates.sh
+
+  # ==================== 工作流静态校验 ====================
+  # 工作流只在触发时才被 GitHub 解析：语法、表达式、本地复用引用（uses:
+  # ./.github/workflows/x.yml 的存在性与 workflow_call 契约）错误，此前要
+  # 等到 tag 推送才暴露。本作业把解析前移到每次推送，且 linter 版本与
+  # sha256 双固定——校验器自身不能成为供应链变量。
+  workflow-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout (agentrt host, minimal)
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Install actionlint
+        run: |
+          set -euo pipefail
+          ver=1.7.12
+          sha=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+          curl -fsSL -o "$RUNNER_TEMP/actionlint.tgz" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ver}/actionlint_${ver}_linux_amd64.tar.gz"
+          echo "${sha}  $RUNNER_TEMP/actionlint.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/actionlint.tgz" -C "$RUNNER_TEMP" actionlint
+
+      # shellcheck 集成关闭：本作业的判据是工作流语法/表达式/复用引用，
+      # shell 片段由门禁侧独立检查，两条判据不叠加到同一红因上。
+      - name: Lint workflows
+        run: |
+          "$RUNNER_TEMP/actionlint" -shellcheck= .github/workflows/*.yml
+
+  # ==================== 仓库一致性（版本与发行图） ====================
+  # 两处判据都是「错一次就要等发版才疼」的静态事实，放在每次推送前校验。
+  ci-consistency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout (agentrt host, minimal)
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      # release 拓扑闸门解析 YAML；依赖显式声明，不吃 runner 预装。
+      - name: Install yaml
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3 python3-yaml
+
+      - name: Installer version drift
+        run: bash .github/scripts/check-version-drift.sh
+
+      - name: Release topology
+        run: python3 .github/scripts/check-release-topology.py
