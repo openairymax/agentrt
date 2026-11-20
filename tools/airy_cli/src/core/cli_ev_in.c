@@ -52,6 +52,8 @@ static struct {
     char *pr;
     size_t prlen;
     size_t prcap;
+    char *opts;
+    size_t optslen;
 } g_in;
 
 #ifndef _WIN32
@@ -172,6 +174,24 @@ static void in_resp(const char *js, size_t n)
     g_in.decision = (strncmp(opt, "allow", 5) == 0) ? 1 : -1;
 }
 
+static void in_opts_set(const char *js, size_t n)
+{
+    char *buf;
+
+    AIRY_FREE(g_in.opts);
+    g_in.opts = NULL;
+    g_in.optslen = 0;
+    buf = (char *)AIRY_MALLOC(n + 1);
+    if (!buf)
+        return;
+    if (cli_ev_obj(js, n, "opts", buf, n + 1) > 0) {
+        g_in.opts = buf;
+        g_in.optslen = strlen(buf);
+    } else {
+        AIRY_FREE(buf);
+    }
+}
+
 static void in_input(const char *js, size_t n)
 {
     char kind[16];
@@ -193,6 +213,8 @@ static void in_input(const char *js, size_t n)
         (void)cli_ev_note("input frame kind ignored");
         return;
     }
+    /* 选项与文本同帧到达：先落 opts 再入队，保证消费方取到同一轮的行 */
+    in_opts_set(js, n);
     txt = (char *)AIRY_MALLOC(n + 1);
     if (!txt)
         return;
@@ -329,6 +351,20 @@ int cli_ev_in_prompt(char *out, size_t cap)
 int cli_ev_in_cancel(void)
 {
     return g_in.cancel;
+}
+
+int cli_ev_in_opts(char *out, size_t cap)
+{
+    if (!out || cap == 0)
+        return 0;
+    out[0] = '\0';
+    if (!g_in.opts || g_in.optslen == 0 || g_in.optslen >= cap)
+        return 0;
+    AIRY_MEMCPY(out, g_in.opts, g_in.optslen + 1);
+    AIRY_FREE(g_in.opts);
+    g_in.opts = NULL;
+    g_in.optslen = 0;
+    return (int)(strlen(out));
 }
 
 int cli_ev_ask(const char *tool, const char *target, int timeout_ms)

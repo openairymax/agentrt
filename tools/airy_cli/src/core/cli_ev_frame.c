@@ -122,6 +122,87 @@ int cli_ev_typeof(const char *json, size_t len, char *out, size_t cap)
     return ev_type_ok(out) ? 1 : 0;
 }
 
+/* 从值起点扫描到配对结束括号：返回原文长度（含首尾），0=不完整。 */
+static size_t ev_obj_span(const char *p, size_t n)
+{
+    size_t i;
+    size_t depth = 0;
+    int in_str = 0;
+
+    for (i = 0; i < n; i++) {
+        char c = p[i];
+
+        if (in_str) {
+            if (c == '\\') {
+                i++;
+                continue;
+            }
+            if (c == '"')
+                in_str = 0;
+            continue;
+        }
+        if (c == '"') {
+            in_str = 1;
+            continue;
+        }
+        if (c == '{' || c == '[') {
+            depth++;
+        } else if (c == '}' || c == ']') {
+            if (depth == 0)
+                return 0;
+            if (--depth == 0)
+                return i + 1;
+        }
+    }
+    return 0;
+}
+
+int cli_ev_obj(const char *js, size_t n, const char *key, char *out, size_t cap)
+{
+    const char *p;
+    size_t len;
+
+    if (!js || !out || cap == 0)
+        return 0;
+    out[0] = '\0';
+    p = ev_find(js, n, key);
+    if (!p)
+        return 0;
+    while (p < js + n && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r'))
+        p++;
+    if (p >= js + n || (*p != '{' && *p != '['))
+        return 0;
+    len = ev_obj_span(p, (size_t)(js + n - p));
+    if (len == 0 || len >= cap)
+        return 0;
+    AIRY_MEMCPY(out, p, len);
+    out[len] = '\0';
+    return (int)len;
+}
+
+size_t cli_ev_stream_body(char *dst, size_t cap, const char *goal,
+                          const char *opts)
+{
+    size_t gn = strlen(goal ? goal : "");
+    size_t xl = (opts && opts[0] == '{') ? strlen(opts) : 0;
+    size_t inner = xl > 2 ? xl - 2 : 0;
+    char *esc;
+    int m;
+
+    esc = (char *)AIRY_MALLOC(2 * gn + 1);
+    if (!esc)
+        return 0;
+    (void)cli_ev_esc(esc, 2 * gn + 1, goal);
+    m = snprintf(dst, cap,
+                 "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"task.submit_stream\","
+                 "\"params\":{%.*s%s\"goal\":\"%s\",\"mode\":\"auto\","
+                 "\"client\":\"cli\"}}",
+                 inner ? (int)inner : 0, inner ? opts + 1 : "",
+                 inner ? "," : "", esc);
+    AIRY_FREE(esc);
+    return m > 0 ? (size_t)m : 0;
+}
+
 int cli_ev_is_term(const char *type)
 {
     return type && strcmp(type, "run_end") == 0;
