@@ -246,7 +246,7 @@ if(BUILD_TESTS)
     target_link_libraries(test_cli_cmdline PRIVATE airy_coreloopthree airy_common)
     add_test(NAME cli_cmdline_dispatch COMMAND test_cli_cmdline)
 
-    # 0.1.22：带值选项的端到端回归。--events/--timeout 曾在解析层被当成
+    # 0.1.21 补丁：带值选项的端到端回归。--events/--timeout 曾在解析层被当成
     # 终止码，进程零输出、rc=0 静默退出；上面的单测只锁 cli_parse_args 的
     # 返回值，这里补一条真正拉起二进制的判据（无网关时应出 run_end 失败帧）。
     add_test(NAME cli_bin_events_silent
