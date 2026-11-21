@@ -345,15 +345,20 @@ static int load_wr(const void *s, size_t n, void *ud)
 #ifdef __linux__
 static long rss_kb(void)
 {
+    char buf[128];
+    char *p = buf;
     FILE *f = fopen("/proc/self/statm", "r");
-    long pages = 0;
-    long res = 0;
+    long res;
 
     if (!f)
         return -1;
-    if (fscanf(f, "%ld %ld", &pages, &res) != 2)
-        res = -1;
+    if (!fgets(buf, sizeof(buf), f)) {
+        fclose(f);
+        return -1;
+    }
     fclose(f);
+    (void)strtoul(p, &p, 10);
+    res = (long)strtoul(p, &p, 10);
     return res < 0 ? -1 : res * (sysconf(_SC_PAGESIZE) / 1024);
 }
 #endif
