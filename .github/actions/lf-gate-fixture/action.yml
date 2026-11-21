@@ -86,7 +86,11 @@ inputs:
     # 投影并入帧信封身份）。旧 pin 的 tui 只把 run_end 的 data 段当终态，
     # 而服务端把身份放在信封上，成功轮次被判「missing field session_id」并
     # 落失败卡片；发行包与门禁快照必须同源前推。
-    default: 'a74786d84b6fa1795d2ade0d2ad9b9d4fe15a206'
+    # ff21273：tui gitlink 前推至 02f5b42（发行启动器采纳运行期端口事实，
+    # 与 agentrt latest/airymaxrt 逐字节一致）。旧 pin 的 scripts/airymaxrt
+    # 仍按缺省端口预写并忽视已在线栈，AF1 双面判据报分叉，发行件也会在
+    # 运行中的 gateway 旁边另起一个。
+    default: 'ff21273dde8d92f547a8b35e21d9533fa0c2699f'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
