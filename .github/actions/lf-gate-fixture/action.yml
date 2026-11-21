@@ -127,7 +127,10 @@ inputs:
     # d6d5fdb：0.1.22 补丁批判据面。facade 账 pin 收敛至实测 79634，G37 性能
     # 证据的 release 绑定 0.1.22。不 bump 则 g42 仍按旧账判「pin 滞后」、
     # PerfBudgetG37 判「release 0.1.22 != VERSION」。
-    default: 'd6d5fdb6a9b3cf2e8b8d9683e124c745f6ae328e'
+    # 6334749：U4 轮次链补账后的 facade pin 79652（+18，1b9078b09 的 CLI
+    # 写入标注），RATCHET-JUSTIFY 随该提交。不 bump 则 LocBudget/g42 按
+    # 79634 判「实测多 18 行」。
+    default: '6334749043c867599073247d42c3d4d063a6acec'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
