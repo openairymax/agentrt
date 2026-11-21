@@ -7,8 +7,8 @@
  *
  * --tui 模式与 /tui 切换的唯一实现：airy_cli 调起 agentrt-tui 子进程
  * （继承终端 stdio），父进程等待并回传退出码。TUI 异常退出只渲染可判读
- * 错误，不做任何接力降级；gateway 地址经 AIRY_GATEWAY_URL 环境变量以
- * --gateway-url 下沉（TUI 缺省自读 run/gateway.port）。
+ * 错误，不做任何接力降级。TUI 的运行与观察面读全部经事件管道（D-15），
+ * 不再需要网关地址参数；探针仍可经自身参数自读 run/gateway.port。
  */
 
 #include "cli_internal.h"
@@ -39,16 +39,11 @@ static int tui_bin_present(const char *path)
 
 #ifndef _WIN32
 /* POSIX 前端拉起：fork/execve + 等退出，返回 CLI 退出码。 */
-static int tui_run_posix(const char *tui_bin, const char *gw,
-                         const char *agf, int resume)
+static int tui_run_posix(const char *tui_bin, const char *agf, int resume)
 {
     char *argv[8];
     int n = 0;
     argv[n++] = (char *)tui_bin;
-    if (gw && gw[0]) {
-        argv[n++] = (char *)"--gateway-url";
-        argv[n++] = (char *)gw;
-    }
     if (agf && agf[0]) {
         argv[n++] = (char *)"--agent-file";
         argv[n++] = (char *)agf;
@@ -93,14 +88,10 @@ static int tui_run_posix(const char *tui_bin, const char *gw,
 }
 #else
 /* Windows 前端拉起：拼命令行 + CreateProcess，返回码透传。 */
-static int tui_run_win(const char *tui_bin, const char *gw,
-                       const char *agf, int resume)
+static int tui_run_win(const char *tui_bin, const char *agf, int resume)
 {
     char cmd[AIRY_PATH_MAX + 256];
     snprintf(cmd, sizeof(cmd), "\"%s\"", tui_bin);
-    if (gw && gw[0])
-        snprintf(cmd + strlen(cmd), sizeof(cmd) - strlen(cmd),
-                 " --gateway-url \"%s\"", gw);
     if (agf && agf[0])
         snprintf(cmd + strlen(cmd), sizeof(cmd) - strlen(cmd),
                  " --agent-file \"%s\"", agf);
@@ -144,11 +135,10 @@ int cli_run_tui_frontend(int resume)
         return 126;
     }
 
-    const char *gw = getenv("AIRY_GATEWAY_URL");
     const char *agf = getenv("AIRY_AGENT_FILE");
 #ifndef _WIN32
-    return tui_run_posix(tui_bin, gw, agf, resume);
+    return tui_run_posix(tui_bin, agf, resume);
 #else
-    return tui_run_win(tui_bin, gw, agf, resume);
+    return tui_run_win(tui_bin, agf, resume);
 #endif
 }
