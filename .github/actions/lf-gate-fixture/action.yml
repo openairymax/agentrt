@@ -82,7 +82,11 @@ inputs:
     # 下发并把门禁收口误判为断流，发行包与门禁快照会停在缺陷面。
     # e8d6747：tui gitlink 前推至 e3b2d6f（单测专用构造按约定抑制
     # dead_code），旧 pin 下 tui 的 clippy -D warnings 判红。
-    default: 'e8d674795e7696603aaac0e7da7ffbdf55643bc6'
+    # a74786d：tui gitlink 前推至 84b0f4d（终态落定按本轮补齐会话号与正文，
+    # 投影并入帧信封身份）。旧 pin 的 tui 只把 run_end 的 data 段当终态，
+    # 而服务端把身份放在信封上，成功轮次被判「missing field session_id」并
+    # 落失败卡片；发行包与门禁快照必须同源前推。
+    default: 'a74786d84b6fa1795d2ade0d2ad9b9d4fe15a206'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
@@ -147,7 +151,9 @@ inputs:
     # bffe928：门禁收口修复后的 facade pin 79673（+19，agentrt 55505cb2e
     # 的 ev_gate/ev_gate_end），RATCHET-JUSTIFY 随该提交。不 bump 则
     # LocBudget 判「实测多 19 行」、g42 判「超账 +19」。
-    default: 'bffe928f23a4a321543eed363b1f580d8beaab9b'
+    # ea0d3bb：facade pin 79690（+17，daemons a396477 的运行期 CA 包探测）。
+    # 不 bump 则 Gate 18/42 按 79673 判超账，发行腿必红。
+    default: 'ea0d3bb6474cfff59a7c990a8f2778d599de0a8a'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
