@@ -230,6 +230,16 @@ static int test_events_args(void)
 
     g_cli_events_mode = 0;
     g_cli_quiet = 0;
+    char a9[] = "--timeout", a10[] = "5";
+    char *tmo[] = {a0, a9, a10, a1, a2, a6};
+    pp = NULL;
+    CHECK(cli_parse_args(6, tmo, &pp) == 0);
+    CHECK(g_cli_events_mode == 1);
+    CHECK(pp != NULL && strcmp(pp, "hello") == 0);
+    g_cli_events_mode = 0;
+
+    g_cli_events_mode = 0;
+    g_cli_quiet = 0;
     g_cli_print_mode = 0;
     g_cli_json_mode = 0;
     g_cli_tui_mode = 0;
@@ -237,16 +247,25 @@ static int test_events_args(void)
     return 0;
 }
 
+/* 用例返回值必须聚合成进程退出码：旧 main 逐个调用却丢弃返回值，
+ * 断言失败仍打印 ALL PASSED，门禁形同虚设（--events 静默退出即由此
+ * 漏检）。 */
 int main(void)
 {
+    int fail = 0;
+
     printf("test_cli_cmdline:\n");
-    test_exact_hits();
-    test_prefix_disambiguation();
-    test_unknown_and_fallthrough();
-    test_lookup_helpers();
-    test_usage_table();
-    test_paths_subcommand();
-    test_events_args();
+    fail |= test_exact_hits();
+    fail |= test_prefix_disambiguation();
+    fail |= test_unknown_and_fallthrough();
+    fail |= test_lookup_helpers();
+    fail |= test_usage_table();
+    fail |= test_paths_subcommand();
+    fail |= test_events_args();
+    if (fail) {
+        printf("FAILURES\n");
+        return 1;
+    }
     printf("ALL PASSED\n");
     return 0;
 }
