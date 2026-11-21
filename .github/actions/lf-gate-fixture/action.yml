@@ -74,7 +74,9 @@ inputs:
     # ea6a149：tui gitlink 前推至 9767d61（启动器承接自托管模型管理与
     # 安装面 vault 选用）。该前推改动 scripts/airymaxrt，latest 发布面已
     # 同步，pin 不随之前推即报「latest 与 sdk 启动器分叉」。
-    default: 'ea6a1498ea6f5f0ee6f3a3570f16a0613ab3fcef'
+    # 10450b7：tui gitlink 前推至 7c3a73a（0.1.21.1 crate 版本与 Cargo.lock
+    # 同步），使门禁验证的快照与 0.1.21.1 发行装配同源。
+    default: '10450b7c511e879e0ca72f80adf2e5cdbd465120'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
