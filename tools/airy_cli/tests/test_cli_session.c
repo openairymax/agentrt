@@ -392,6 +392,52 @@ static void test_role_records(void)
     CHECK(g_history_reasonings[1] == NULL, "role: metadata reasoning not re-injected (B4)");
 }
 
+static void test_turn_tagging(void)
+{
+    char params[1024];
+    char method[128];
+    int reqs;
+
+    /* 写入面：mem.write 的 metadata.tags 标注 turn:N（TUI 召回按同一
+     * 标注还原轮次），且只写输入与回复、不带思考链。 */
+    body_clear();
+    snprintf(g_body, sizeof(g_body), "{}");
+    mock_reset();
+    cli_chat_mem_record("请解释锁竞争的原因", "锁竞争来自共享队列的无界等待与忙等重试");
+
+    pthread_mutex_lock(&g_lock);
+    snprintf(params, sizeof(params), "%s", g_last_params);
+    snprintf(method, sizeof(method), "%s", g_last_method);
+    reqs = g_reqs;
+    pthread_mutex_unlock(&g_lock);
+
+    const char *t = strstr(params, "turn:");
+    long first = t ? strtol(t + 5, NULL, 10) : -1;
+    CHECK(reqs == 1 && strcmp(method, "mem.write") == 0,
+          "turn: memory write dispatches mem.write");
+    CHECK(first >= 1, "turn: write tags the turn number");
+    CHECK(strstr(params, "reasoning") == NULL, "turn: write carries no reasoning (B4)");
+
+    /* 恢复面：按读回记录的 turn:N 回填计数，续写轮次单调衔接。 */
+    body_clear();
+    snprintf(g_body, sizeof(g_body),
+             "{\"records\":[{\"data\":\"用户: 旧问题\\nAgentRT: 旧回答\","
+             "\"metadata\":\"{\\\"kind\\\":\\\"chat\\\",\\\"tags\\\":\\\"chat,turn:7\\\"}\"}]}");
+    mock_reset();
+    cli_session_restore();
+
+    snprintf(g_body, sizeof(g_body), "{}");
+    mock_reset();
+    cli_chat_mem_record("继续刚才的话题", "接着上一轮的结论继续展开说明");
+
+    pthread_mutex_lock(&g_lock);
+    snprintf(params, sizeof(params), "%s", g_last_params);
+    pthread_mutex_unlock(&g_lock);
+    t = strstr(params, "turn:");
+    CHECK(t && strtol(t + 5, NULL, 10) == 8,
+          "turn: resumed session continues from the tagged turn");
+}
+
 static void test_prefix_variants(void)
 {
     body_clear();
@@ -513,6 +559,7 @@ int main(void)
     test_request_contract();
     test_turn_split();
     test_role_records();
+    test_turn_tagging();
     test_prefix_variants();
     test_malformed_records();
     test_budget_clamp();

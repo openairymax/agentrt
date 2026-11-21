@@ -233,6 +233,9 @@ const char *cli_chat_reasoning_peek(void);
 /* cli_chat_memory.c：对话记忆注入/写回（gateway mem_d 优先，L1 回退） */
 void cli_chat_mem_inject_system(const char *input, char *out_buf, size_t out_size);
 void cli_chat_mem_record(const char *input, const char *reply);
+/* 轮次标注（0.1.21 B1）：mem.write 的 metadata.tags 标注 turn:N，恢复会话时
+ * 按读回记录回填计数，使 --continue 后的续写轮次与历史单调衔接。 */
+void cli_chat_mem_turn_note(unsigned long turn);
 
 /* cli_chat_history.c：历史缓冲 / 错误描述 / 系统提示词 */
 const char *cli_chat_err_desc(int err);

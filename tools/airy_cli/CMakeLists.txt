@@ -380,6 +380,7 @@ if(BUILD_TESTS)
         add_executable(test_cli_session tests/test_cli_session.c
                        tests/cli_test_globals.c
                        src/chat/cli_chat_session.c src/chat/cli_chat_history.c
+                       src/chat/cli_chat_memory.c
                        ${CLI_GW_SRCS} src/render/cli_render.c src/core/cli_clock.c
                        src/core/cli_dag.c src/core/cli_term.c)
         target_include_directories(test_cli_session PRIVATE ${CLI_INC_DIRS})
