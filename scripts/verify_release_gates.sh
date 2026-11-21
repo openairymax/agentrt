@@ -1338,10 +1338,17 @@ else
         bad "U3 agent_d 轮次约束兜底缺失"
     fi
 
-    if grep -q 'fn mem_push_tagged' "$_TASK" && grep -q 'turn:' "$_MEM"; then
-        ok "U4 记忆写入-召回轮次标注链路存在（turn:N）"
+    # 0.1.22：记忆写入面自 TUI 迁至 CLI（TUI 只读，写归运行侧），
+    # turn 标注随之落在 cli_chat_mem_record_gw 的 metadata.tags；
+    # TUI 召回面 parse_turn 仍解析同一标注，链路判定随结构迁移。
+    _u4_cli_mem="$CLI/src/chat/cli_chat_memory.c"
+    _u4_cli_sess="$CLI/src/chat/cli_chat_session.c"
+    if grep -q 'turn:%lu' "$_u4_cli_mem" \
+        && grep -q 'cli_chat_mem_turn_note' "$_u4_cli_mem" "$_u4_cli_sess" \
+        && grep -q 'turn:' "$_MEM"; then
+        ok "U4 记忆写入-召回轮次标注链路存在（CLI 写 mem.write 标注 turn:N，恢复回填计数）"
     else
-        bad "U4 记忆轮次标注链路断裂"
+        bad "U4 记忆轮次标注链路断裂（CLI 写入面缺 turn 标注或 TUI 召回不解析）"
     fi
 fi
 
@@ -1440,15 +1447,19 @@ else
     bad "V2.1 V4.1 思考链默认上屏回潮（result 直出或 System 消息渲染路径复活）"
 fi
 
-if grep -qF 'fn push(&mut self, role: &str, content: &str, tags: &str)' "$_v2_mem" \
-    && grep -qF '不再提供携带思考链' "$_v2_mem" \
-    && { grep -qF 'fn push_never_records_reasoning()' "$_v2_mem" 2>/dev/null \
-         || grep -qF 'fn push_never_records_reasoning()' "$_v2_mem_tests" 2>/dev/null; } \
+# 0.1.22：写入面迁至 CLI（TUI 只读后无任何写入口）。判据随结构改为
+# 「CLI 写入签名只含 input+reply」+「TUI 无 push/save 写入口」+「恢复不取
+# reasoning」，三者任一回潮即红（语义不变，锚点跟随真实结构）。
+_v2_cli_mem="$CLI/src/chat/cli_chat_memory.c"
+if ! grep -qE '(^|[[:space:]])fn (push|save)\(' "$_v2_mem" \
+    && grep -qF 'static int cli_chat_mem_record_gw(const char *input, const char *reply)' "$_v2_cli_mem" \
+    && grep -qF '只写用户输入与回复' "$_v2_cli_mem" \
+    && grep -qF 'fn legacy_reasoning_never_reaches_recall()' "$_v2_mem_tests" \
     && grep -qF '恢复会话不得回灌思考链原文' "$_v2_sess" \
     && ! grep -q 'rec\.reasoning' "$_v2_sess"; then
-    ok "V2.2 V4.2 思考链不落长期记忆且恢复不回灌（写入面无 reasoning 入参 + 恢复仅取 content）"
+    ok "V2.2 V4.2 思考链不落长期记忆且恢复不回灌（CLI 写入仅 input+reply + TUI 无写入口 + 恢复仅取 content）"
 else
-    bad "V2.2 V4.2 思考链落长期记忆或恢复回灌回潮（memory.rs 写入面 / session.rs 恢复面）"
+    bad "V2.2 V4.2 思考链落长期记忆或恢复回灌回潮（CLI 写入面 / memory.rs 写入口 / session.rs 恢复面）"
 fi
 
 if grep -qF '打开思考链独立视图（Alt+E）' "$_v2_panel" \
