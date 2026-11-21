@@ -163,7 +163,7 @@ inputs:
     # 23846f6：端口发布改走 commons 既有 airy_io_write_file()（tmp + rename），
     # facade pin 随实测收紧至 79710。旧 pin 下 INV-10 判「未声明的裸 fopen
     # 写点」、G42 判「实测 79710 vs pin 79713」差异非零，两门禁同时红。
-    default: '23846f62b6cb0f60e01f76e3c62e08d5b3d38d33'
+    default: '23846f6dc1b1d95e98c3f83873eb5fbd19c2503c'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
