@@ -1338,7 +1338,7 @@ else
         bad "U3 agent_d 轮次约束兜底缺失"
     fi
 
-    # 0.1.22：记忆写入面自 TUI 迁至 CLI（TUI 只读，写归运行侧），
+    # 0.1.21 补丁：记忆写入面自 TUI 迁至 CLI（TUI 只读，写归运行侧），
     # turn 标注随之落在 cli_chat_mem_record_gw 的 metadata.tags；
     # TUI 召回面 parse_turn 仍解析同一标注，链路判定随结构迁移。
     _u4_cli_mem="$CLI/src/chat/cli_chat_memory.c"
@@ -1447,7 +1447,7 @@ else
     bad "V2.1 V4.1 思考链默认上屏回潮（result 直出或 System 消息渲染路径复活）"
 fi
 
-# 0.1.22：写入面迁至 CLI（TUI 只读后无任何写入口）。判据随结构改为
+# 0.1.21 补丁：写入面迁至 CLI（TUI 只读后无任何写入口）。判据随结构改为
 # 「CLI 写入签名只含 input+reply」+「TUI 无 push/save 写入口」+「恢复不取
 # reasoning」，三者任一回潮即红（语义不变，锚点跟随真实结构）。
 _v2_cli_mem="$CLI/src/chat/cli_chat_memory.c"
