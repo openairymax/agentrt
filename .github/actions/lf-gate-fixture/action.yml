@@ -133,7 +133,10 @@ inputs:
     # 3e49fe3：R17 修正后的 facade pin 79654（+2，agentrt 08d39cfe1 的
     # 带值选项返回码显式分支），RATCHET-JUSTIFY 随该提交。不 bump 则
     # LocBudget/g42 按 79652 判「实测多 2 行」。
-    default: '3e49fe310d58b9944500fd9ec94e14521f3704a5'
+    # 43c83a1：同上账本 + g41 例外登记（3e49fe3 的机器标签未顶行，已按
+    # 豁免文件补登，数值不变）。门禁在 tools 检出内审计其自身历史，
+    # pin 须前推到含该豁免文件的提交，否则仍判 rose 79652 -> 79654。
+    default: '43c83a1afc22036c35fd78262dd5d5eb64043162'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
