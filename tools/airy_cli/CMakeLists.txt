@@ -337,6 +337,8 @@ if(BUILD_TESTS)
         target_link_libraries(test_cli_ev PRIVATE ${AIRY_CJSON_LIBRARIES})
     endif()
     add_test(NAME cli_ev_frames COMMAND test_cli_ev)
+    # 10k 帧压测在 1s 内收口；超时只用于截断异常挂起，不作为性能判据。
+    set_tests_properties(cli_ev_frames PROPERTIES TIMEOUT 120)
 
     # 0.1.17 R5-G4：审批面（/pending 只读视图 + /approve 决议回传）端到端——
     # mock 网关承接出站派发，断言 tool.approve 的 request_id/decision 逐字
