@@ -110,7 +110,7 @@ elif [ -f "$(dirname "$0")/../VERSION" ]; then
     AIRY_VERSION="v$(cat "$(dirname "$0")/../VERSION" | tr -d '[:space:]')"
 fi
 _airy_ver_given=1; [ -n "${AIRY_VERSION:-}" ] || _airy_ver_given=0
-AIRY_VERSION="${AIRY_VERSION:-v0.1.21}"
+AIRY_VERSION="${AIRY_VERSION:-v0.1.22}"
 if [ "$_airy_ver_given" -eq 0 ]; then
     log_warn "未指定 --version，使用兜底版本 ${AIRY_VERSION}（如需其他版本请加 --version vX.Y.Z）"
 fi
