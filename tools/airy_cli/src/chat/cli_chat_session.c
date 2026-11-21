@@ -19,6 +19,7 @@
 #include "cli_internal.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #ifdef AIRY_HAS_CJSON
@@ -105,6 +106,14 @@ static void cli_session_add_record(cJSON *item)
             role = rj->valuestring;
         /* metadata.reasoning 有意不读：0.1.18 B4 禁止恢复时回灌思考链
          * （§12.4 步 4）。旧记录中该字段仍存在，忽略即可。 */
+        /* 轮次标注链：写入侧在 metadata.tags 标注 turn:N，恢复时回填
+         * 计数，使 --continue 后的续写轮次与历史单调衔接。 */
+        cJSON *tags = cJSON_GetObjectItem(md, "tags");
+        if (cJSON_IsString(tags) && tags->valuestring) {
+            const char *t = strstr(tags->valuestring, "turn:");
+            if (t)
+                cli_chat_mem_turn_note(strtoul(t + 5, NULL, 10));
+        }
     }
 
     if (role) {

@@ -38,6 +38,12 @@
 #define MEM_LIMIT 3
 #define MEM_ITEM_MAX 200
 
+/* 轮次标注（0.1.21 B1）：CLI 是记忆唯一写入方，写 mem.write 时在
+ * metadata.tags 标注 turn:N；TUI 召回面按同一标注还原轮次（memory.rs
+ * parse_turn），故两端轮次口径同源。计数跨 --continue 续写单调：
+ * cli_chat_session.c 恢复时按读回的 tags 回填最大值。 */
+static unsigned long g_mem_turn;
+
 /* 有界追加：snprintf 的返回值是"若空间足够会写多少"，直接累加会越过
  * 缓冲边界；此处统一按实际可用空间收敛，调用方无需重复这段算术。 */
 static void seg_put(char *buf, size_t cap, size_t *off, const char *fmt, ...)
@@ -198,8 +204,14 @@ static int cli_chat_mem_record_gw(const char *input, const char *reply)
     cJSON_AddStringToObject(params, "data", content);
     cJSON *meta = cJSON_CreateObject();
     if (meta) {
+        char tags[40];
+        g_mem_turn++;
         cJSON_AddStringToObject(meta, "source", "cli");
         cJSON_AddStringToObject(meta, "kind", "chat");
+        /* turn:N 是写入-召回链路的轮次锚点：TUI 召回按同一标注还原
+         * MemoryHit::turn，会话恢复亦以它为去重/排序依据。 */
+        snprintf(tags, sizeof(tags), "chat,turn:%lu", g_mem_turn);
+        cJSON_AddStringToObject(meta, "tags", tags);
         cJSON_AddItemToObject(params, "metadata", meta);
     }
     cJSON *root = NULL;
@@ -219,6 +231,14 @@ void cli_chat_mem_record(const char *input, const char *reply)
         return;
 
     (void)cli_chat_mem_record_gw(input, reply);
+}
+
+/* 恢复会话时按读回记录回填轮次：取最大值而非覆盖，倒序回放亦得同一终值，
+ * 且不因记录缺 tags（旧数据）把计数拉回 0。 */
+void cli_chat_mem_turn_note(unsigned long turn)
+{
+    if (turn > g_mem_turn)
+        g_mem_turn = turn;
 }
 
 #endif /* AIRY_HAS_CJSON */
