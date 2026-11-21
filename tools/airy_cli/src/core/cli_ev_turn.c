@@ -76,6 +76,27 @@ static char *ev_body(const char *goal, const char *opts)
     return body;
 }
 
+/* 门禁帧：服务端给出目标确认类 task_state 后会关闭 run-stream，等待客户端
+ * 确认后重发；这是本轮的正常收口，不是断流（与 CLI 非事件入口同义）。 */
+static int ev_gate(const char *buf)
+{
+    char st[24];
+
+    if (!buf || cli_ev_str(buf, strlen(buf), "state", st, sizeof(st)) <= 0)
+        return 0;
+    return strcmp(st, "needs_intent") == 0 || strcmp(st, "needs_criteria") == 0;
+}
+
+/* 门禁收口：以终态帧告知出口本轮已停等确认，不报错误。 */
+static int ev_gate_end(void)
+{
+    static const char pl[] = "{\"type\":\"run_end\",\"status\":\"needs_intent\"}";
+
+    if (!cli_ev_terminal())
+        (void)cli_ev_emit("run_end", pl, sizeof(pl) - 1);
+    return 1;
+}
+
 static int ev_cancel(void)
 {
     static const char pl[] = "{\"type\":\"run_end\",\"status\":\"cancelled\"}";
@@ -133,6 +154,7 @@ static int ev_stream(const char *goal, const char *opts)
     int term = 0;
     int trc = 1;
     int cx = 0;
+    int gate = 0;
 
     if (!body || !buf) {
         AIRY_FREE(body);
@@ -167,6 +189,8 @@ static int ev_stream(const char *goal, const char *opts)
         now = cli_now_ms();
         if (nr > 0) {
             last = now;
+            if (ev_gate(buf))
+                gate = 1;
             if (ev_frame_step(buf, now, &grace, &trc, &term) < 0)
                 break;
         } else if (nr < 0) {
@@ -184,6 +208,8 @@ static int ev_stream(const char *goal, const char *opts)
         return ev_cancel();
     if (term)
         return trc;
+    if (gate)
+        return ev_gate_end();
     (void)cli_ev_finish("stream_lost");
     return 1;
 }
