@@ -11,6 +11,7 @@
  */
 
 #include "cli_ev.h"
+#include "cli_clock.h"
 #include "cli_sse.h"
 #include "airy_memory.h"
 
@@ -311,6 +312,101 @@ static void t_query_payload(void)
 #include <sys/socket.h>
 #include <unistd.h>
 
+/* 10k 事件/s 压测（D-15-23 判据⑤）：真实编码路径配内存 sink，逐帧核对
+ * seq 单调与总字节；环形缓冲只留最近 64 帧，常驻内存不随帧数增长。 */
+#define LOAD_N 10000
+#define LOAD_RSS_KB 8192
+
+static unsigned g_load_seq;
+static int g_load_order;
+static size_t g_load_bytes;
+
+static int load_wr(const void *s, size_t n, void *ud)
+{
+    const char *p = (const char *)s;
+    size_t i = 0;
+    unsigned v;
+
+    (void)ud;
+    while (i + 6 <= n && memcmp(p + i, "\"seq\":", 6) != 0)
+        i++;
+    if (i + 6 > n) {
+        g_load_order = 1;
+        return (int)n;
+    }
+    v = (unsigned)strtoul(p + i + 6, NULL, 10);
+    if (v != g_load_seq)
+        g_load_order = 1;
+    g_load_seq = v + 1;
+    g_load_bytes += n;
+    return (int)n;
+}
+
+#ifdef __linux__
+static long rss_kb(void)
+{
+    FILE *f = fopen("/proc/self/statm", "r");
+    long pages = 0;
+    long res = 0;
+
+    if (!f)
+        return -1;
+    if (fscanf(f, "%ld %ld", &pages, &res) != 2)
+        res = -1;
+    fclose(f);
+    return res < 0 ? -1 : res * (sysconf(_SC_PAGESIZE) / 1024);
+}
+#endif
+
+static void t_load(void)
+{
+    char pl[2048];
+    uint64_t t0;
+    uint64_t dt;
+    unsigned base;
+    long rss0 = -1;
+    int i;
+
+    printf("  t_load...\n");
+#ifdef __linux__
+    rss0 = rss_kb();
+#endif
+    cli_ev_io_set(load_wr, NULL);
+    CHECK_EQ(cli_ev_init(), 0, "init");
+    cli_ev_begin();
+    base = cli_ev_seq();
+    g_load_seq = base + 1;
+    g_load_order = 0;
+    g_load_bytes = 0;
+    t0 = cli_now_ms();
+    for (i = 0; i < LOAD_N; i++) {
+        int n = snprintf(pl, sizeof(pl),
+                         "{\"type\":\"text_delta\",\"i\":%d,\"text\":\"%01900d\"}",
+                         i, i);
+
+        if (cli_ev_emit("text_delta", pl, (size_t)n) != 0) {
+            CHECK(0, "emit under load");
+            break;
+        }
+    }
+    dt = cli_now_ms() - t0;
+    printf("    %d frames in %lu ms (%lu ev/s, %lu bytes)\n", LOAD_N,
+           (unsigned long)dt, (unsigned long)(dt ? LOAD_N * 1000 / dt : 0),
+           (unsigned long)g_load_bytes);
+    CHECK_EQ(cli_ev_seq(), base + LOAD_N, "seq continuous under load");
+    CHECK_EQ(g_load_order, 0, "frames arrive in seq order");
+    CHECK_EQ(cli_ev_dropped(), 0, "no frame dropped under load");
+    CHECK(dt <= 1000, "10k frames within one second");
+#ifdef __linux__
+    if (rss0 >= 0) {
+        long rss1 = rss_kb();
+
+        CHECK(rss1 < 0 || rss1 - rss0 < LOAD_RSS_KB, "resident set stays bounded");
+    }
+#endif
+    cli_ev_fini();
+}
+
 /* 取一个刚释放的本机端口：保证 connect 被立即拒绝（非桩服务端）。 */
 static int t_dead_port(void)
 {
@@ -386,6 +482,7 @@ int main(void)
     t_opts();
     t_query_payload();
 #ifndef _WIN32
+    t_load();
     t_query_frame();
 #endif
     printf(g_fail ? "FAILED\n" : "ALL PASSED\n");
