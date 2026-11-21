@@ -80,7 +80,9 @@ inputs:
     # 902e2d8：tui gitlink 前推至 1fe1b67（运行轮 goal 取用户原文、门禁帧
     # 结算、断点查询用例补挂事件管道）。旧 pin 的 tui 把增强提示当目标
     # 下发并把门禁收口误判为断流，发行包与门禁快照会停在缺陷面。
-    default: '902e2d8dcc110a9b45a8f8bda12130dbb9c23cd7'
+    # e8d6747：tui gitlink 前推至 e3b2d6f（单测专用构造按约定抑制
+    # dead_code），旧 pin 下 tui 的 clippy -D warnings 判红。
+    default: 'e8d674795e7696603aaac0e7da7ffbdf55643bc6'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
@@ -142,7 +144,10 @@ inputs:
     # pin 须前推到含该豁免文件的提交，否则仍判 rose 79652 -> 79654。
     # 22d1c34：豁免文件补回顶行 RATCHET-WAIVER-JUSTIFY。aa47a35 只改版本号
     # 未带该行，g41 判整份豁免不采信；补记后 3e49fe3 的 +2 重新成立。
-    default: '22d1c34942a91c221604e94046c5eac1626dda6e'
+    # bffe928：门禁收口修复后的 facade pin 79673（+19，agentrt 55505cb2e
+    # 的 ev_gate/ev_gate_end），RATCHET-JUSTIFY 随该提交。不 bump 则
+    # LocBudget 判「实测多 19 行」、g42 判「超账 +19」。
+    default: 'bffe928f23a4a321543eed363b1f580d8beaab9b'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
