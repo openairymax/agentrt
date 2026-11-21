@@ -163,7 +163,10 @@ inputs:
     # 23846f6：端口发布改走 commons 既有 airy_io_write_file()（tmp + rename），
     # facade pin 随实测收紧至 79710。旧 pin 下 INV-10 判「未声明的裸 fopen
     # 写点」、G42 判「实测 79710 vs pin 79713」差异非零，两门禁同时红。
-    default: '23846f6dc1b1d95e98c3f83873eb5fbd19c2503c'
+    # c89befc：发布平面收口。附件删除改以附件表复核（id 消失才算删掉），
+    # 同名多条删净后 fail-closed；上传与校验拆分，校验不过按新对象重建一次。
+    # 不 bump 则重发仍跑旧上传逻辑，三支 .sig 继续判红（run 44952571961 实证）。
+    default: 'c89befceef91b01be3cff72d9de41079ed09d0ab'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
