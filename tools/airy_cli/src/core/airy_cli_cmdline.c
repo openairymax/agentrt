@@ -410,9 +410,14 @@ int cli_parse_args(int argc, char *argv[], const char **out_print_prompt)
             return 1;
         if (rc == 1)
             continue;
+        /* 带值选项：1=已消费本轮（含值的 i 已前移），2=用法错误。
+         * 旧实现把「已消费」也当终止返回，--events/--timeout 一出现即
+         * 静默退出（rc=0、零输出）。 */
         rc = cli_vopt_apply(argc, argv, &i);
-        if (rc != 0)
-            return rc;
+        if (rc == 2)
+            return 2;
+        if (rc == 1)
+            continue;
         rc = cli_cmd_apply(argv[i], argc - i - 1, argv + i + 1);
         if (rc != 0)
             return rc;
