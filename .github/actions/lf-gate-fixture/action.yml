@@ -137,10 +137,9 @@ inputs:
     # 43c83a1：同上账本 + g41 例外登记（3e49fe3 的机器标签未顶行，已按
     # 豁免文件补登，数值不变）。门禁在 tools 检出内审计其自身历史，
     # pin 须前推到含该豁免文件的提交，否则仍判 rose 79652 -> 79654。
-    # aa47a35：G37 证据与账本注释回绑 0.1.21。PerfBudgetG37 要求证据的
-    # release 字段等于 VERSION，两者都退回 0.1.21 才不再自相矛盾；体积
-    # 数值与 g41 豁免判据不变。不 bump 则 G37 判「release 0.1.21 != VERSION」。
-    default: 'aa47a351d66b1bada1246efc4a0fe184743e86a1'
+    # 22d1c34：豁免文件补回顶行 RATCHET-WAIVER-JUSTIFY。aa47a35 只改版本号
+    # 未带该行，g41 判整份豁免不采信；补记后 3e49fe3 的 +2 重新成立。
+    default: '22d1c34942a91c221604e94046c5eac1626dda6e'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
