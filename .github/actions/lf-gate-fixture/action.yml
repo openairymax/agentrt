@@ -130,7 +130,10 @@ inputs:
     # 6334749：U4 轮次链补账后的 facade pin 79652（+18，1b9078b09 的 CLI
     # 写入标注），RATCHET-JUSTIFY 随该提交。不 bump 则 LocBudget/g42 按
     # 79634 判「实测多 18 行」。
-    default: '6334749043c867599073247d42c3d4d063a6acec'
+    # 3e49fe3：R17 修正后的 facade pin 79654（+2，agentrt 08d39cfe1 的
+    # 带值选项返回码显式分支），RATCHET-JUSTIFY 随该提交。不 bump 则
+    # LocBudget/g42 按 79652 判「实测多 2 行」。
+    default: '3e49fe310d58b9944500fd9ec94e14521f3704a5'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
