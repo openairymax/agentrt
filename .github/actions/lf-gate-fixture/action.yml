@@ -193,7 +193,11 @@ inputs:
     # d523345：cupolas 溢出用例改按内容测大小、NULL 统计从零值起步。旧 pin 下
     # Windows 腿读目录索引大小得 0、读未初始化栈判非零，audit_overflow_tests
     # 两处假红；缺口在 pin 未前推，不在判据面。
-    default: 'd523345ca18e019fcf67910682ef1cbd588f2e57'
+    # 5fe4920：0.1.22 补丁批的产品面。cupolas gitlink 前推到 351166d
+    # （R13：生产模式未配置口令时拒绝开库），本 action 物化的 cupolas 源
+    # 因而与 tools 账 `cupolas=17656` 同源。不 bump 则发行装配缺 R13，
+    # 且 g42 按旧树实测 17604 判「与 pin 差 52 行」。
+    default: '5fe492075b1d654e5615ee36af2b8099eb5ef134'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
