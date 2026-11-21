@@ -77,7 +77,10 @@ inputs:
     # 8e82624：tui gitlink 回退至 0.1.21 crate 元数据。当前发行线仍是
     # 0.1.21，0.1.22 不存在；crate 字段此前被一并 bump，与 VERSION 脱节。
     # 退回后门禁验证的快照与 v0.1.21 重发装配同源。
-    default: '8e826240b5ef04667e28861a0758e4b888fcc98e'
+    # 902e2d8：tui gitlink 前推至 1fe1b67（运行轮 goal 取用户原文、门禁帧
+    # 结算、断点查询用例补挂事件管道）。旧 pin 的 tui 把增强提示当目标
+    # 下发并把门禁收口误判为断流，发行包与门禁快照会停在缺陷面。
+    default: '902e2d8dcc110a9b45a8f8bda12130dbb9c23cd7'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
