@@ -2324,6 +2324,15 @@ launch_frontend() {
 }
 
 GATEWAY_ALIVE=0
+# run/gateway.port 由 gateway_d 绑定成功后发布，描述「当前运行栈的真实端口」。
+# 启动器先采纳该事实，避免按缺省端口误判离线后在运行中的栈旁再起一个 gateway。
+if [ -s "$RUNTIME_DIR/gateway.port" ]; then
+    _rt_gw_port="$(sed -n '1s/[^0-9]//gp' "$RUNTIME_DIR/gateway.port" 2>/dev/null | head -1)"
+    if [ -n "$_rt_gw_port" ] && wait_for_health "http://127.0.0.1:${_rt_gw_port}" 1; then
+        GATEWAY_PORT="$_rt_gw_port"
+        GATEWAY_URL="http://127.0.0.1:${GATEWAY_PORT}"
+    fi
+fi
 if wait_for_health "$GATEWAY_URL" 1; then
     GATEWAY_ALIVE=1
     log info "gateway 在线（${GATEWAY_URL}），本次复用（不重复拉起）"
@@ -2458,7 +2467,8 @@ else
         log warn "gateway_d 未找到，对话功能不可用（仅 CLI 降级可用）"
     fi
     mkdir -p "$RUNTIME_DIR" 2>/dev/null || true
-    printf '%s\n' "$GATEWAY_PORT" > "$RUNTIME_DIR/gateway.port" 2>/dev/null || true
+    # 端口事实的唯一写入者是绑定方 gateway_d；启动器只消费该文件，
+    # 不预写——预写会在 gateway 未起或改端口时留下与真实监听不符的值。
 
     # 期望态声明写入画像（supervisor 启动时只读装载）
     launch_decl_sync "$CORE_LIST"
