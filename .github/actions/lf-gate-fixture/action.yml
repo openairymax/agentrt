@@ -74,9 +74,9 @@ inputs:
     # ea6a149：tui gitlink 前推至 9767d61（启动器承接自托管模型管理与
     # 安装面 vault 选用）。该前推改动 scripts/airymaxrt，latest 发布面已
     # 同步，pin 不随之前推即报「latest 与 sdk 启动器分叉」。
-    # 10450b7：tui gitlink 前推至 7c3a73a（0.1.21.1 crate 版本与 Cargo.lock
-    # 同步），使门禁验证的快照与 0.1.21.1 发行装配同源。
-    default: '10450b7c511e879e0ca72f80adf2e5cdbd465120'
+    # 920fe6d：tui gitlink 前推至 cb4dc9c（0.1.22 crate 版本与 Cargo.lock
+    # 同步），使门禁验证的快照与 0.1.22 发行装配同源。
+    default: '920fe6d30167484bb3a3c0ecdd4944d8d2af49fc'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
@@ -124,7 +124,10 @@ inputs:
     # G30 报「命令面超带」、G46 在守卫内报 ImportError，红因皆指不到真因。
     # 5024917：三表对齐的实测收敛（facade 78592 → 78581、tool_d 上限 17127），
     # 旧 pin 下 g42 判「pin 滞后」、loc-ceiling 判「未登记 +3」，发行腿必红。
-    default: '50249179e38449e947891e857788a9f9458716c8'
+    # d6d5fdb：0.1.22 补丁批判据面。facade 账 pin 收敛至实测 79634，G37 性能
+    # 证据的 release 绑定 0.1.22。不 bump 则 g42 仍按旧账判「pin 滞后」、
+    # PerfBudgetG37 判「release 0.1.22 != VERSION」。
+    default: 'd6d5fdb6a9b3cf2e8b8d9683e124c745f6ae328e'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
