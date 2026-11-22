@@ -21,11 +21,35 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+#ifdef _WIN32
+#include <process.h>
+#define CLI_GETPID() ((unsigned)_getpid())
+#else
+#include <unistd.h>
+#define CLI_GETPID() ((unsigned)getpid())
+#endif
 
 #ifdef AIRY_HAS_CJSON
 #include "cli_gw_json.h"
 
 #define CLI_SESSION_GW_TIMEOUT_MS 6000
+/* 探测窗口：只用于发现"最近一条 CLI 记录"的会话标识，不用于装配正文。 */
+#define CLI_SESSION_PROBE 32
+
+/* 本进程会话标识。首次使用时按时间 + pid 生成，之后稳定；--continue 探测到
+ * 上次 CLI 会话后改写为同一标识，使续写轮次落回原会话而不是新建一支。 */
+static char g_cli_conv[40];
+
+const char *cli_session_conv(void)
+{
+    if (!g_cli_conv[0]) {
+        snprintf(g_cli_conv, sizeof(g_cli_conv), "sess_%08lx%04x", (unsigned long)time(NULL),
+                 CLI_GETPID() & 0xFFFFu);
+    }
+    return g_cli_conv;
+}
 
 /* 装配上限：cli_history_capacity() 是消息条数预算，一条记录最多展开为
  * user + assistant 两条，故记录数取预算的一半，恰好不触发 FIFO 成对丢弃。 */
@@ -80,8 +104,35 @@ static void cli_session_add_turn(const char *data)
     AIRY_FREE(reply);
 }
 
-/* 单条记录还原。metadata 在 mem.recent 契约中是字符串形态的 stored JSON，
- * 亦容忍对象形态；无 metadata / 无法解析即按 CLI 整轮线格式拆分。 */
+/* metadata 在 mem.recent 契约中是字符串形态的 stored JSON，亦容忍对象形态。
+ * 返回解析后的对象；*owned 表示调用方需 cJSON_Delete。 */
+static cJSON *cli_session_md(cJSON *item, int *owned)
+{
+    *owned = 0;
+    cJSON *mdj = cJSON_GetObjectItem(item, "metadata");
+    if (cJSON_IsString(mdj) && mdj->valuestring) {
+        cJSON *md = cJSON_Parse(mdj->valuestring);
+        *owned = md != NULL;
+        return md;
+    }
+    return cJSON_IsObject(mdj) ? mdj : NULL;
+}
+
+/* 会话归属判定：已采纳会话标识时按 metadata.conv 精确匹配；否则回退为
+ * source=="cli"——旧 CLI 记录没有 conv，既不能丢弃，也不能把 TUI 记录
+ * 拉进 CLI 的恢复视图。 */
+static int cli_session_owned(cJSON *md)
+{
+    if (!md)
+        return 0;
+    cJSON *cv = cJSON_GetObjectItem(md, "conv");
+    if (g_cli_conv[0])
+        return cJSON_IsString(cv) && cv->valuestring && strcmp(cv->valuestring, g_cli_conv) == 0;
+    cJSON *src = cJSON_GetObjectItem(md, "source");
+    return cJSON_IsString(src) && src->valuestring && strcmp(src->valuestring, "cli") == 0;
+}
+
+/* 单条记录还原。无 metadata / 无法解析即按 CLI 整轮线格式拆分。 */
 static void cli_session_add_record(cJSON *item)
 {
     cJSON *dataj = cJSON_GetObjectItem(item, "data");
@@ -89,14 +140,12 @@ static void cli_session_add_record(cJSON *item)
         return;
     const char *data = dataj->valuestring;
 
-    cJSON *mdj = cJSON_GetObjectItem(item, "metadata");
     int md_owned = 0;
-    cJSON *md = NULL;
-    if (cJSON_IsString(mdj) && mdj->valuestring) {
-        md = cJSON_Parse(mdj->valuestring);
-        md_owned = 1;
-    } else if (cJSON_IsObject(mdj)) {
-        md = mdj;
+    cJSON *md = cli_session_md(item, &md_owned);
+    if (!cli_session_owned(md)) {
+        if (md_owned)
+            cJSON_Delete(md);
+        return;
     }
 
     const char *role = NULL;
@@ -127,16 +176,66 @@ static void cli_session_add_record(cJSON *item)
         cJSON_Delete(md);
 }
 
-void cli_session_restore(void)
+/* 采纳最近一条 CLI 记录的 conv：--continue 应续写上次 CLI 会话，而不是每次
+ * 新建会话把历史劈成两支。只认 source=="cli" 且带 conv 的新记录，TUI 写入
+ * 不参与。探测窗口有界（CLI_SESSION_PROBE），代价可忽略。 */
+static int cli_session_adopt(cJSON *records)
+{
+    int n = cJSON_IsArray(records) ? cJSON_GetArraySize(records) : 0;
+    for (int i = 0; i < n; i++) {
+        int owned = 0;
+        cJSON *md = cli_session_md(cJSON_GetArrayItem(records, i), &owned);
+        int hit = 0;
+        if (md) {
+            cJSON *src = cJSON_GetObjectItem(md, "source");
+            cJSON *cv = cJSON_GetObjectItem(md, "conv");
+            if (cJSON_IsString(src) && src->valuestring &&
+                strcmp(src->valuestring, "cli") == 0 && cJSON_IsString(cv) &&
+                cv->valuestring && strncmp(cv->valuestring, "sess_", 5) == 0) {
+                snprintf(g_cli_conv, sizeof(g_cli_conv), "%s", cv->valuestring);
+                hit = 1;
+            }
+        }
+        if (owned)
+            cJSON_Delete(md);
+        if (hit)
+            return 1;
+    }
+    return 0;
+}
+
+static cJSON *cli_session_fetch(size_t limit, const char *conv, int *rc_out)
 {
     cJSON *params = cJSON_CreateObject();
-    if (!params)
-        return;
-    cJSON_AddNumberToObject(params, "limit", (double)cli_session_records_want());
-
+    if (!params) {
+        *rc_out = AIRY_ERR_OUT_OF_MEMORY;
+        return NULL;
+    }
+    cJSON_AddNumberToObject(params, "limit", (double)limit);
+    if (conv)
+        cJSON_AddStringToObject(params, "conv", conv);
     cJSON *root = NULL;
-    int rc = cli_gw_json("mem.recent", params, CLI_SESSION_GW_TIMEOUT_MS, &root);
-    if (rc != 0) {
+    *rc_out = cli_gw_json("mem.recent", params, CLI_SESSION_GW_TIMEOUT_MS, &root);
+    return *rc_out == 0 ? root : NULL;
+}
+
+void cli_session_restore(void)
+{
+    int rc = 0;
+    cJSON *probe = cli_session_fetch(CLI_SESSION_PROBE, NULL, &rc);
+    if (!probe) {
+        cli_print_line("Sub session Agent",
+                       rc == AIRY_ERR_PROTOCOL ? "会话恢复失败：mem.recent 响应无法解析"
+                                               : "会话恢复失败：记忆服务不可达（mem.recent）");
+        return;
+    }
+    int adopted = cli_session_adopt(cJSON_GetObjectItem(probe, "records"));
+    cJSON_Delete(probe);
+
+    /* 采纳到会话标识就走 mem_d 侧过滤；没有标识（全为旧记录）则取全局
+     * 最近记录，由 cli_session_owned 按 source=cli 客户端过滤。 */
+    cJSON *root = cli_session_fetch(cli_session_records_want(), adopted ? g_cli_conv : NULL, &rc);
+    if (!root) {
         cli_print_line("Sub session Agent",
                        rc == AIRY_ERR_PROTOCOL ? "会话恢复失败：mem.recent 响应无法解析"
                                                : "会话恢复失败：记忆服务不可达（mem.recent）");

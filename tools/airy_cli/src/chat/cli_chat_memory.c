@@ -208,6 +208,9 @@ static int cli_chat_mem_record_gw(const char *input, const char *reply)
         g_mem_turn++;
         cJSON_AddStringToObject(meta, "source", "cli");
         cJSON_AddStringToObject(meta, "kind", "chat");
+        /* 会话归属：--continue 按此过滤，避免把别的会话（含 TUI）记录
+         * 灌进本轮上下文（S-P1-16）。 */
+        cJSON_AddStringToObject(meta, "conv", cli_session_conv());
         /* turn:N 是写入-召回链路的轮次锚点：TUI 召回按同一标注还原
          * MemoryHit::turn，会话恢复亦以它为去重/排序依据。 */
         snprintf(tags, sizeof(tags), "chat,turn:%lu", g_mem_turn);
