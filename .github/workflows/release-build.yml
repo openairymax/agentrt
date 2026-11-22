@@ -820,6 +820,30 @@ jobs:
           path: ${{ env.artifact_name }}.*
           if-no-files-found: error
 
+      # x86-32 安装腿实跑（B4 残余收口）：release 形态 zip 走 install.ps1
+      # -FromFile，再以安装后的 AIRY_HOME 启动 32 位 airy_cli。x64 腿的
+      # 安装冒烟在 build-test 内，x86-32 无独立构建腿，故在唯一产出该制品
+      # 的发布平面上就地验证「装出来的树」而非「构建出来的树」。
+      - name: Install smoke (zip, x86-32)
+        shell: pwsh
+        env:
+          PROCESSOR_ARCHITECTURE: x86
+        run: |
+          $zip = Join-Path $PWD "${{ env.artifact_name }}.zip"
+          if (-not (Test-Path $zip)) { throw "zip 缺失: $zip" }
+          $prefix = Join-Path $env:RUNNER_TEMP "airy-smoke-x86"
+          $binDir = Join-Path $env:RUNNER_TEMP "airy-smoke-x86-bin"
+          & pwsh -NoProfile -File scripts/install.ps1 -Mode binary `
+            -FromFile $zip -Prefix $prefix -BinDir $binDir -Yes
+          if ($LASTEXITCODE -ne 0) { throw "install.ps1 exited $LASTEXITCODE" }
+          foreach ($rel in @("config\install.env", "config\profile.env", "bin\airy_cli.exe")) {
+            if (-not (Test-Path (Join-Path $prefix $rel))) { throw "installed tree missing $rel" }
+          }
+          $env:AIRY_HOME = $prefix
+          $env:PATH = "$prefix\bin;$env:VCPKG_INSTALLATION_ROOT\installed\x86-windows\bin;$env:PATH"
+          & "$prefix\bin\airy_cli.exe" --version
+          if ($LASTEXITCODE -ne 0) { throw "installed x86 airy_cli failed to run (exit $LASTEXITCODE)" }
+
   # RISC-V (linux-riscv64) 门禁腿：focal(20.04) amd64 宿主交叉编译，零 QEMU
   # 执行（qemu-user 仅用于产物冒烟）。历史形态是 linux/riscv64 容器全模拟，
   # 每轮撞 6h 单 job 上限后被降级为 dispatch-only + continue-on-error，tag
