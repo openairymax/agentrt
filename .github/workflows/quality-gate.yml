@@ -242,15 +242,17 @@ jobs:
       # 构建子日志一并归档：Gate 1 判红时视图只有 dump_cmake_err 截取的
       # 末 40 行，configure.log/build.log 本体落在 runner 临时目录，
       # 不随 run 保存就等于判据蒸发。
+      # 条件取 cancelled 一并覆盖：手动取消的 run 同样需要判据，
+      # 否则「有红但被取消」这一路径又会退回无据可查。
       - name: Upload gate log artifact
-        if: failure()
+        if: always() && (failure() || cancelled())
         uses: actions/upload-artifact@v4
         with:
           name: quality-gate-logs
           path: |
             /tmp/quality-gate.log
             ${{ runner.temp }}/agentrt-quality-gate-build/*.log
-          if-no-files-found: ignore
+          if-no-files-found: warn
           retention-days: 14
 
   # ==================== 本仓 WS-9 发布门禁（fail-closed 接线） ====================
@@ -326,12 +328,12 @@ jobs:
 
       # artifact 兜底：无需凭据即可从 run 页面取到断言级完整输出。
       - name: Upload release gate log artifact
-        if: failure()
+        if: always() && (failure() || cancelled())
         uses: actions/upload-artifact@v4
         with:
           name: release-gate-logs
           path: /tmp/release-gates.log
-          if-no-files-found: ignore
+          if-no-files-found: warn
           retention-days: 14
 
   # ==================== 工作流静态校验 ====================
