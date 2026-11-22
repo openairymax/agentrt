@@ -1,0 +1,243 @@
+name: Release Publish
+# R26 三段式第三段：GitHub 快通道 / atomgit SSoT / npm 薄壳（≤5 作业）。
+# 本段启动即代表构建与打包签名两段全部成功，故段首作业不再重列 needs；
+# publish-npm 仍串行在 publish-atomgit 之后，保持数据权威面先行。
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', github.event.inputs.version) }}
+
+jobs:
+
+  # 发布镜像（快通道）：同一 canonical publish-dist 直传 GitHub
+  # Releases——保证 tag 与 Releases 二进制附件同步可见。附件字节与
+  # atomgit 同源（不经慢通道回拉）；幂等（同名同大小
+  # 跳过/元数据对齐）；tag 前置校验 fail-closed。GH 完成后 dispatch
+  # mirror-release.yml 把 Gitee 段放到独立 run 后台幂等续跑（Gitee 外网
+  # 限速慢，内联会拖长 release run；异步后本 run 墙钟 ≈ atomgit 段）。
+  publish-mirror:
+    if: success() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    # GH 快通道（SKIP_GITEE=1）无长杆；60min 与 mirror-release.yml 同口径，
+    # 封顶避免数据面停滞把 job 挂到默认上限。
+    timeout-minutes: 60
+    environment: release
+    permissions:
+      contents: write
+      actions: write
+    concurrency:
+      # 独立单段并发组：仅 github 上下文（env 上下文在 job 级 concurrency
+      # 求值期不可用，会导致"Invalid workflow file / 0 jobs"校验失败）。
+      # ref_name 对 tag/手动触发均唯一。
+      group: publish-mirror-${{ github.ref_name }}
+      cancel-in-progress: false
+    env:
+      # 同仓 Releases 上传 + 同仓 workflow dispatch：GITHUB_TOKEN
+      # 在 contents:write / actions:write 下已足够（R27 最小权限）。
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITEE_TOKEN: ${{ secrets.GT_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Init submodules (tools)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh tools
+
+      - name: Download publish-dist
+        uses: actions/download-artifact@v4
+        with:
+          name: agentrt-${{ env.VERSION }}-publish-dist
+          path: dist
+
+      - name: Mirror release to GitHub (fast channel)
+        run: |
+          # SKIP_GITEE=1：本段只做 GH 快通道；Gitee 由下一步 dispatch 的
+          # mirror-release.yml 在独立 run 幂等补齐（读同一 publish-dist）。
+          SKIP_GITEE=1 \
+            bash _tools/scripts/ci/release/publish-mirror.sh "${{ env.VERSION }}" dist
+
+      - name: Dispatch Gitee mirror (async, non-blocking)
+        if: success()
+        run: |
+          # 同一 canonical publish-dist（release_run_id 定位）交给
+          # mirror-release.yml 在后台续跑 Gitee；GH 段幂等跳过。concurrency
+          # group=mirror-release-${{ inputs.version }} 保证同版本不叠跑。
+          # dispatch 失败只告警不阻塞（GH 快通道已完成，Gitee 可稍后手动
+          # 触发 mirror-release.yml 补齐）。
+          gh workflow run mirror-release.yml \
+            --repo "${{ github.repository }}" --ref main \
+            -f version="${{ env.VERSION }}" \
+            -f fetch_missing=false \
+            -f release_run_id="${{ github.run_id }}" \
+            || { echo "::warning::Gitee mirror dispatch 失败（GH 快通道已完成，Gitee 稍后可手动补齐）"; exit 0; }
+          echo "已 dispatch mirror-release.yml（version=${{ env.VERSION }}, run_id=${{ github.run_id }}）"
+
+  # 慢通道：atomgit（SSoT）上传 + latest/ 指针切换。与 publish-mirror
+  # 并行，互不阻塞；SKIP_SIGN=1 复用 finalize 的规范签名集（manifest 幂等
+  # 保护不再重生成，.asc 恒一致）。独立 concurrency 组，单段失败可只重跑
+  # 本 job 幂等续传（AIRY_FORCE_UPLOAD=1 先删后传）。latest/ 只在全部附件
+  # 上传并校验通过后才提交（指针切换绑定 SSoT 补齐），失败自动 cancel
+  # 恢复语义由重跑保持。
+
+
+  # 慢通道：atomgit（SSoT）上传 + latest/ 指针切换。与 publish-mirror
+  # 并行，互不阻塞；SKIP_SIGN=1 复用 finalize 的规范签名集（manifest 幂等
+  # 保护不再重生成，.asc 恒一致）。独立 concurrency 组，单段失败可只重跑
+  # 本 job 幂等续传（AIRY_FORCE_UPLOAD=1 先删后传）。latest/ 只在全部附件
+  # 上传并校验通过后才提交（指针切换绑定 SSoT 补齐），失败自动 cancel
+  # 恢复语义由重跑保持。
+  publish-atomgit:
+    if: success() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    # 单文件 PUT 上限 60min；重试按"次数上限 8 + 墙钟预算 2h"计，故单 job
+    # 最坏约 2h（预算耗尽即停）；封顶 300min 使"上传挂死"以失败态终止
+    # （fail-fast，进入可重跑的重试路径），而非静默耗尽默认 360min 上限。
+    timeout-minutes: 300
+    environment: release
+    permissions:
+      contents: write
+    concurrency:
+      # 见 publish-mirror 注：job 级 concurrency 仅可用 github 等上下文。
+      group: publish-atomgit-${{ github.ref_name }}
+      cancel-in-progress: false
+    env:
+      ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
+      ATOMGIT_REPO: openairymax/agentrt
+      # manifest commit 双端同步所需（publish-release.sh 阶段 5 向 GitHub
+      # main 补推，fail-soft；无 PAT 时跳过并告警）。
+      GITHUB_REPO: ${{ github.repository }}
+      GITHUB_PAT: ${{ secrets.GH_TOKEN }}
+      # 快照提交署名（R2 / COMMIT-AUDIT §4 / .mailmap）：发布自动化账号不得
+      # 出现在 Signed-off-by 中，快照以发布操作者（.mailmap 规范自然人身份）
+      # 提交并 -s 落署名；出现多操作者后改 repo variables 下发。
+      AIRY_SNAP_NAME: 'Liren Wang'
+      AIRY_SNAP_EMAIL: 'wangliren@spharx.cn'
+      # 同 tag 重发/修复：OBS 预签名 PUT 按文件名覆盖，设置
+      # AIRY_FORCE_UPLOAD=1 使发布永远覆盖远端同名附件，杜绝"跳过上传但
+      # manifest 已按新 sha 重生成"的不一致。
+      AIRY_FORCE_UPLOAD: '1'
+      # runner 布局与本地伞仓不同（agentrt 即工作树根，scripts/ 在根下），
+      # 显式指定安装器 SSoT；AIRY_LAUNCHER_SRC 默认已指向
+      # agent-workload/sdk/tui/scripts/airymaxrt（init-submodules 补齐）。
+      AIRY_INSTALLER_SRC: ${{ github.workspace }}/scripts/install.sh
+      AIRY_INSTALLER_PS1_SRC: ${{ github.workspace }}/scripts/install.ps1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      - name: Init submodules (tools)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh tools
+
+      - name: Download publish-dist
+        uses: actions/download-artifact@v4
+        with:
+          name: agentrt-${{ env.VERSION }}-publish-dist
+          path: dist
+
+      - name: Publish to atomgit (SSoT upload + latest/ pointer switch)
+        run: |
+          test -n "$(ls dist/agentrt-${{ env.VERSION }}-*.tar.gz 2>/dev/null)" || {
+            echo "::error::publish-dist 无 tar.gz 制品，中止发布"; exit 1
+          }
+          # SKIP_SIGN=1：签名集已由 finalize-dist 固化于 publish-dist，
+          # 本段只上传 + 更新 latest/，绝不再重签（避免跨端字节漂移）。
+          # RELEASE_NOTES_FILE 与 finalize 同源（manifest 幂等不重生成）。
+          SKIP_SIGN=1 RELEASE_NOTES_FILE="$PWD/dist/notes.txt" \
+            bash _tools/scripts/ci/release/publish-release.sh "${{ env.VERSION }}" dist
+
+  # B12（0.1.18，N-5）：npm 薄壳通道 publish。needs publish-atomgit——数据
+  # 权威面（含阶段 4.6 的 download/latest/ 附件刷新）成功后才允许动 npm，
+  # 防"附件新、npm 旧 / npm 新、附件旧"漂移。0.1.19 决策（台账 §349）：npm
+  # registry 组织面未开通期间该 job 为非阻断观察面（continue-on-error），
+  # 失败仍以红步 + 告警留痕；NPM_TOKEN 就绪后删除 continue-on-error 即恢复
+  # fail-closed。dist-tag 按通道分层：stable 占 latest（恒新），rc/beta 挂
+  # 各自通道标、不污染 latest。
+
+
+  # B12（0.1.18，N-5）：npm 薄壳通道 publish。needs publish-atomgit——数据
+  # 权威面（含阶段 4.6 的 download/latest/ 附件刷新）成功后才允许动 npm，
+  # 防"附件新、npm 旧 / npm 新、附件旧"漂移。0.1.19 决策（台账 §349）：npm
+  # registry 组织面未开通期间该 job 为非阻断观察面（continue-on-error），
+  # 失败仍以红步 + 告警留痕；NPM_TOKEN 就绪后删除 continue-on-error 即恢复
+  # fail-closed。dist-tag 按通道分层：stable 占 latest（恒新），rc/beta 挂
+  # 各自通道标、不污染 latest。
+  publish-npm:
+    needs: [publish-atomgit]
+    if: success() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    environment: release
+    permissions:
+      contents: read
+    concurrency:
+      group: publish-npm-${{ github.ref_name }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Preflight NPM_TOKEN
+        id: pre
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # 凭据缺失时显式跳过（告警留痕），避免把"外部账号未开通"伪装成
+          # 代码失败；凭据存在但发布失败仍会红步，漂移可被看见。
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::warning::NPM_TOKEN 未配置，npm 薄壳通道本轮跳过（非阻断观察面）"
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish @openairymax/agentrt
+        if: steps.pre.outputs.skip != '1'
+        working-directory: packaging/npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          ver="${VERSION#v}"
+          case "$ver" in
+            *-rc*)   dist=rc ;;
+            *-beta*) dist=beta ;;
+            *)       dist=latest ;;
+          esac
+          # N-4 版本注入：包版本 = release tag（去 v 前缀，semver 合规）。
+          npm --no-git-tag-version version "$ver"
+          # 幂等续传：单段重跑时精确版本已在 registry → 跳过 publish 仅校验。
+          if [ "$(npm view "@openairymax/agentrt@$ver" version 2>/dev/null || true)" = "$ver" ]; then
+            echo "npm @openairymax/agentrt@${ver} 已存在，跳过 publish（续传语义）"
+          else
+            npm publish --tag "$dist"
+          fi
+          # fail-closed 回验：registry 必须可精确取到本轮版本。
+          [ "$(npm view "@openairymax/agentrt@$ver" version 2>/dev/null || true)" = "$ver" ] || {
+            echo "::error::npm 回验失败：registry 无 @openairymax/agentrt@${ver}"; exit 1; }
+          # N-4 保鲜：stable 发布后 latest dist-tag 必须指向本轮版本。
+          if [ "$dist" = "latest" ]; then
+            [ "$(npm view @openairymax/agentrt dist-tags.latest 2>/dev/null || true)" = "$ver" ] || {
+              echo "::error::dist-tag latest 未指向 ${ver}（npm 面保鲜断裂）"; exit 1; }
+          fi

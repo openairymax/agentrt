@@ -1,0 +1,830 @@
+name: Release Build Matrix
+# R26 三段式第一段：门禁绿前置 + 九平台构建矩阵（≤5 作业）。
+# 由 release.yml 以 workflow_call 编排；触发面与版本 SSoT 仍由调用方
+# （release.yml）单点定义，本文件不自带 on: push。
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', github.event.inputs.version) }}
+
+jobs:
+  # 门禁绿前置（0.1.20 快照同源的另一半）：被发行的 commit 必须是门禁
+  # Build & Test 与 Quality Gates 实际跑过并判绿的 commit。发行平面原先对
+  # 目标 commit 从未经过门禁即聚合发行物——上游一推进，「门禁验证的树」与
+  # 「发行装配的树」即分叉，且事后无从证明二进制对应哪一判据。tag 常紧随
+  # main push 打出，故按 sha 轮询等待门禁终态，而不要求维护者人工择时；
+  # 判红、被取消、或该 commit 根本没有 push 运行（非 push tip、被
+  # paths-ignore 跳过的纯文档 commit）一律 fail-closed，不设跳过通道——
+  # 跳过会让「绿」与被发行内容脱钩，正是本判据要消除的形态。门禁清单在
+  # 脚本内单点声明，严禁在此复制。
+  ci-green:
+    runs-on: ubuntu-latest
+    # 门禁最坏 150min/作业 + 队列余量；超时即红，不无限占用 runner
+    timeout-minutes: 260
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Assert gate workflows green at this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .github/scripts/assert-ci-green.sh "$GITHUB_SHA"
+
+      # 子模块指针先于装配验证可达性：release 检出按 gitlink 精确取 SHA，
+      # 未推送的指针只会以 checkout "not our ref" 的形式暴露，日志中无编译
+      # 错误可循。此处逐个 gitlink 查 GitHub 提交面，缺失即列出并判红。
+      # 用 GH_TOKEN 而非 GITHUB_TOKEN：后者只作用于本仓，公开子仓靠匿名读
+      # 恰好通过，闭源子仓（atoms）则恒 404——查的是「指针可达」却报成
+      # 「未发布」（run 44312572826 实证）。跨仓读权在 App token 上，构建腿
+      # 检出子仓用的也是它。
+      - name: Assert submodule pins are published
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/check-submodule-pins.sh
+
+  # Linux x86-64：container ubuntu:20.04 保证 glibc 2.31 基线（覆盖
+  # Ubuntu 20.04+/Debian 11+/Pi OS Bullseye+）。平台命名规范：
+  # OS-架构族-位宽（linux-x86-64 / linux-arm-64 …），下同；旧两代平台名由
+  # manifest 别名覆盖（见 publish-release.sh ALIAS）。GitHub Actions
+  # 容器作业仅支持 Linux runner，macOS/Windows 必须拆分为独立作业。
+
+  # 五条 Linux 腿合并为一个矩阵作业（R26/R29：单流水线 ≤5 作业）。
+  # 每条腿的容器镜像/平台/脚本以矩阵值原样传入，构建、finalize 与打包
+  # 语义与拆分前逐字一致；矩阵值中的 script 即原 job 的容器脚本体。
+  build-linux:
+    name: build-linux (${{ matrix.leg }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - leg: x86-64
+            runner: ubuntu-latest
+            image: ghcr.io/openairymax/agentrt-qemu-toolchain:amd64-20260906-1@sha256:99d3ac35030b3a19ef36277b443e011005224ee53b6187e8a60ca40b429def82
+            platform: linux/amd64
+            container_leg: x86-64
+            envs: -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage
+            airy_jobs: ''
+            variant: x86-64
+            suffix: linux-x86-64
+            tui_leg: ''
+            tui_image: ''
+            tui_platform: ''
+            tui_cross: ''
+            script: |
+              export DEBIAN_FRONTEND=noninteractive
+              export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+              cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release \
+                -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF -DAIRY_BUILD_ALL=ON \
+                -DOPENSSL_ROOT_DIR=/usr/local -DCMAKE_PREFIX_PATH=/usr/local \
+                -DCMAKE_INSTALL_PREFIX="$PWD/$STAGE_DIR"
+              cmake --build "$BUILD_DIR" -j"$(nproc)"
+              cmake --install "$BUILD_DIR"
+              # Rust TUI（SSoT：build-tui.sh 收敛 header 注入 + cargo 缺失兜底；
+              # x86-64 为门禁产品腿，TUI 属 REQUIRED_SUBTREE，fail-hard）
+              AIRY_TUI_FAIL_HARD=1 bash /src/.github/scripts/build-tui.sh agent-workload/sdk/tui "$STAGE_DIR/bin"
+              # Python 运行时依赖（完全体包 lib/，fail-closed：子树缺失即腿失败，
+              # 发布预检仅作兜底）
+              bash /src/.github/scripts/copy-python-runtime.sh "$STAGE_DIR" \
+                || { echo "::error::python 运行时四子树拷贝失败（lib/ 完整性必需）"; exit 1; }
+              # 完全体 finalize：容器内收集运行时 .so + fail-closed 校验
+              bash /src/.github/scripts/finalize-linux-libs.sh "$STAGE_DIR" /src/_tools
+          - leg: riscv64-cross
+            runner: ubuntu-latest
+            image: ubuntu:20.04
+            platform: linux/amd64
+            container_leg: riscv64-cross
+            envs: -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage -e AIRY_JOBS -e AIRY_WORKSPACE=/tmp/airywork -e AIRY_SUITE=focal
+            airy_jobs: ''
+            variant: riscv-64
+            suffix: linux-riscv-64
+            tui_leg: ''
+            tui_image: ''
+            tui_platform: ''
+            tui_cross: ''
+            script: |
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -qq
+              apt-get install -y -qq --no-install-recommends \
+                build-essential make perl curl ca-certificates xz-utils file \
+                python3 python3-pip pkg-config git \
+                gcc-riscv64-linux-gnu g++-riscv64-linux-gnu qemu-user-static
+              # 交叉工具链 + focal ports riscv64 sysroot：布局见
+              # bootstrap-cross-toolchain.sh（root/ 工具链与目标 libc，
+              # sysroot/ 第三方依赖）。AIRY_WORKSPACE 显式给出——CI 里 /src 就是
+              # agentrt 根，dirname 推定会落到不可写的 /。
+              TC=/tmp/airywork/airymaxrt-build/riscv64-toolchain
+              bash /src/_tools/scripts/ci/release/bootstrap-cross-toolchain.sh riscv64
+              # 四依赖（cJSON/OpenSSL/libcurl/libwebsockets）交叉自编译进
+              # sysroot，与 libc 同源，避免 focal 旧符号与双 OpenSSL ABI。
+              AIRY_CROSS_TRIPLE=riscv64-linux-gnu \
+              AIRY_CROSS_SYSROOT="$TC/sysroot" \
+              AIRY_CROSS_TC="$TC" \
+                bash /src/_tools/scripts/ci/release/lib-builddeps.sh
+              # 交叉 cmake：工具链文件已固定 sysroot 与 PKG_CONFIG_LIBDIR。
+              # OpenSSL 装在 lib/riscv64-linux-gnu，FindOpenSSL 不默认搜
+              # multiarch 子目录，显式给出库与头路径（与 lib-builddeps 同源）。
+              cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release \
+                -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF -DAIRY_BUILD_ALL=ON \
+                -DCMAKE_TOOLCHAIN_FILE="$TC/toolchain-riscv64.cmake" \
+                -DOPENSSL_SSL_LIBRARY="$TC/sysroot/usr/lib/riscv64-linux-gnu/libssl.so" \
+                -DOPENSSL_CRYPTO_LIBRARY="$TC/sysroot/usr/lib/riscv64-linux-gnu/libcrypto.so" \
+                -DOPENSSL_INCLUDE_DIR="$TC/sysroot/usr/include" \
+                -DCMAKE_INSTALL_PREFIX="$PWD/$STAGE_DIR"
+              cmake --build "$BUILD_DIR" -j"${AIRY_JOBS:-$(nproc)}"
+              cmake --install "$BUILD_DIR"
+              # Rust TUI 交叉（门禁产品腿，TUI 属 REQUIRED_SUBTREE：fail-closed）。
+              # 链接器定案同本地 build.sh：GNU ld 2.34 无法合并 RISC-V
+              # attributes，rust-lld 复制为 ld.lld 置于交叉 gcc 的
+              # COMPILER_PATH 目录，gcc 仍作 driver 保留库路径，
+              # -fuse-ld=lld 只换链接器。RUSTFLAGS 用 target 专属变量，
+              # 避免宿主侧 build script 被 riscv sysroot 污染。
+              curl --proto =https --tlsv1.2 -sSf --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal
+              export PATH="$HOME/.cargo/bin:$PATH"
+              rustup target add riscv64gc-unknown-linux-gnu
+              RUST_LLD="$(find "$HOME/.rustup/toolchains" -name rust-lld -path "*/lib/rustlib/x86_64-unknown-linux-gnu/bin/*" 2>/dev/null | head -1)"
+              [ -n "$RUST_LLD" ] || { echo "::error::[riscv-64] rust-lld 缺失（无法替换 GNU ld）"; exit 1; }
+              cp -f "$RUST_LLD" "$TC/root/usr/riscv64-linux-gnu/bin/ld.lld"
+              chmod 755 "$TC/root/usr/riscv64-linux-gnu/bin/ld.lld"
+              export LD_LIBRARY_PATH="$TC/root/usr/lib/x86_64-linux-gnu:$HOME/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib:${LD_LIBRARY_PATH:-}"
+              export CARGO_TARGET_RISCV64GC_UNKNOWN_LINUX_GNU_LINKER="$TC/root/usr/bin/riscv64-linux-gnu-gcc"
+              export CARGO_TARGET_RISCV64GC_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=-fuse-ld=lld -C link-arg=-Wl,--sysroot=$TC/root -C link-arg=-L$TC/sysroot/usr/lib/riscv64-linux-gnu -C link-arg=-Wl,-rpath-link,$TC/sysroot/usr/lib/riscv64-linux-gnu"
+              # ring 等含 C/asm 的 crate 经 cc-rs 编译：目标专属 CC/AR/CFLAGS
+              export CC_riscv64gc_unknown_linux_gnu="$TC/root/usr/bin/riscv64-linux-gnu-gcc"
+              export AR_riscv64gc_unknown_linux_gnu="$TC/root/usr/bin/riscv64-linux-gnu-ar"
+              export CFLAGS_riscv64gc_unknown_linux_gnu="--sysroot=$TC/root -I$TC/root/usr/riscv64-linux-gnu/include -I$TC/sysroot/usr/include -I$TC/sysroot/usr/include/riscv64-linux-gnu"
+              export AIRY_RT_VERSION_FILE=/src/VERSION
+              export AGENTRT_RS_RUN_STREAM_H=/src/commons/include/airy_run_stream.h
+              export CARGO_TARGET_DIR=/tmp/tui-target-riscv
+              (cd agent-workload/sdk/tui && cargo build --release --target riscv64gc-unknown-linux-gnu) \
+                || { echo "::error::[riscv-64] TUI 交叉构建失败（bin/agentrt-tui 发布完整性必需）"; exit 1; }
+              mkdir -p "$STAGE_DIR/bin"
+              cp -f /tmp/tui-target-riscv/riscv64gc-unknown-linux-gnu/release/agentrt-tui "$STAGE_DIR/bin/" \
+                || { echo "::error::[riscv-64] TUI 产物缺失"; exit 1; }
+              # Python 运行时依赖（完全体包 lib/，fail-closed）
+              bash /src/.github/scripts/copy-python-runtime.sh "$STAGE_DIR" \
+                || { echo "::error::python 运行时四子树拷贝失败（lib/ 完整性必需）"; exit 1; }
+              # 完全体 finalize：readelf + sysroot 走交叉收集（宿主 ldd 无法分析
+              # 异架构 ELF；系统核心库由目标机提供，不入包）。
+              READELF=/usr/bin/riscv64-linux-gnu-readelf
+              [ -x "$READELF" ] || READELF="$TC/root/usr/bin/riscv64-linux-gnu-readelf"
+              bash /src/.github/scripts/finalize-linux-libs.sh "$STAGE_DIR" /src/_tools \
+                "$READELF" "$TC/sysroot"
+              # qemu-user 冒烟：产物必须可执行。-L 指向 overlay 根——riscv64
+              # 目标 ELF 的 PT_INTERP 是 /lib/ld-linux-riscv64-lp64d.so.1，而
+              # 工具链 root 把目标 libc 放在 usr/riscv64-linux-gnu/lib，故用
+              # 软链补齐 /lib 与 /opt（包内 lib/ + sysroot 依赖）。
+              SMOKE=/tmp/smoke-riscv
+              rm -rf "$SMOKE"
+              mkdir -p "$SMOKE/opt"
+              ln -s "$TC/root/usr/riscv64-linux-gnu/lib" "$SMOKE/lib"
+              ln -s "$PWD/$STAGE_DIR/lib" "$SMOKE/opt/stage-lib"
+              ln -s "$TC/sysroot/usr/lib/riscv64-linux-gnu" "$SMOKE/opt/deps"
+              LD_LIBRARY_PATH=/opt/stage-lib:/opt/deps \
+                qemu-riscv64-static -L "$SMOKE" "$PWD/$STAGE_DIR/bin/airy_cli" --version \
+                || { echo "::error::[riscv-64] qemu 冒烟失败（产物不可执行）"; exit 1; }
+          - leg: x86-32
+            runner: ubuntu-latest
+            image: ghcr.io/openairymax/agentrt-qemu-toolchain:i386-20260906-1@sha256:1266ca270863b1a79a341acd65ca867a745f068ede80fa6f6c099ba8cbd3b76b
+            platform: linux/386
+            container_leg: x86-32
+            envs: -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage -e AIRY_JOBS
+            airy_jobs: '2'
+            variant: x86-32
+            suffix: linux-x86-32
+            tui_leg: 'tui-i686-cross'
+            tui_image: 'ghcr.io/openairymax/agentrt-qemu-toolchain:amd64-20260906-1@sha256:99d3ac35030b3a19ef36277b443e011005224ee53b6187e8a60ca40b429def82'
+            tui_platform: 'linux/amd64'
+            tui_cross: |
+              set -euo pipefail
+              apt-get update -qq && apt-get install -y -qq --no-install-recommends gcc-multilib
+              curl --proto =https --tlsv1.2 -sSf --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal
+              export PATH="$HOME/.cargo/bin:$PATH"
+              rustup target add i686-unknown-linux-gnu
+              # 链接需 -m32（32 位 crt/start files，gcc-multilib 提供）
+              export CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER=gcc
+              export RUSTFLAGS="-C link-arg=-m32"
+              # agentrt-rs/build.rs 需 airy_run_stream.h：显式注入直布局路径
+              export AGENTRT_RS_RUN_STREAM_H=/src/commons/include/airy_run_stream.h
+              export CARGO_TARGET_DIR=/tmp/tui-target
+              # x86-32 门禁产品腿，TUI 属 REQUIRED_SUBTREE：fail-closed
+              (cd /src/agent-workload/sdk/tui && cargo build --release --target i686-unknown-linux-gnu) \
+                || { echo "::error::[x86-32] TUI 交叉构建失败（bin/agentrt-tui 发布完整性必需）"; exit 1; }
+              mkdir -p /src/stage/bin
+              cp -f /tmp/tui-target/i686-unknown-linux-gnu/release/agentrt-tui /src/stage/bin/ \
+                || { echo "::error::[x86-32] TUI 产物缺失"; exit 1; }
+            script: |
+              # fail-fast：容器内架构必须为 i386。uname 在 32 位容器返回
+              # 内核架构（x86_64），禁用；dpkg 视角才可信。
+              [ "$(dpkg --print-architecture)" = "i386" ] || {
+                echo "::error::[x86-32] container arch != i386: $(dpkg --print-architecture)"; exit 1; }
+              # cmake/cJSON/OpenSSL/libcurl/libwebsockets 已
+              # 由镜像构建期 lib-builddeps.sh 固化（/usr/local）。
+              export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+              cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release \
+                -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF -DAIRY_BUILD_ALL=ON \
+                -DOPENSSL_ROOT_DIR=/usr/local -DCMAKE_PREFIX_PATH=/usr/local \
+                -DCMAKE_INSTALL_PREFIX="$PWD/$STAGE_DIR"
+              cmake --build "$BUILD_DIR" -j"${AIRY_JOBS:-$(nproc)}"
+              cmake --install "$BUILD_DIR"
+              # Python 运行时依赖（完全体包 lib/，fail-closed）
+              bash /src/.github/scripts/copy-python-runtime.sh "$STAGE_DIR" \
+                || { echo "::error::python 运行时四子树拷贝失败（lib/ 完整性必需）"; exit 1; }
+              # 完全体 finalize：容器内收集运行时 .so + fail-closed 校验（host
+              # 无 /usr/local 自编译库，收集必 not found；.collected 不入包）
+              bash /src/.github/scripts/finalize-linux-libs.sh "$STAGE_DIR" /src/_tools
+          - leg: arm-32
+            runner: ubuntu-24.04-arm
+            image: ghcr.io/openairymax/agentrt-qemu-toolchain:arm32-20260906-1@sha256:2a661a6c33f69e00e2210e12ce185f82355218427fecfcf2ba2e75e8163d6477
+            platform: linux/arm/v7
+            container_leg: arm-32
+            envs: -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage -e AIRY_JOBS
+            airy_jobs: '2'
+            variant: arm-32
+            suffix: linux-arm-32
+            tui_leg: 'tui-arm32-cross'
+            tui_image: 'ghcr.io/openairymax/agentrt-qemu-toolchain:arm64-20260906-1@sha256:598a269f97744d81d80c67ffd7516f7f79ad33b8bc904346a56a5c31d3dbc146'
+            tui_platform: 'linux/arm64'
+            tui_cross: |
+              set -euo pipefail
+              # 仅装 gcc-arm-linux-gnueabihf 不够：arm64 容器内 cross
+              # sysroot（libc6-dev-armhf-cross 提供的
+              # /usr/arm-linux-gnueabihf/include）缺席时，gcc 的 stdint.h
+              # fallback 宿主头会令含 C 代码的 crate（如 ring）编译 fatal，
+              # arm-32 包 TUI 静默缺失。显式补 cross C 库头。
+              apt-get update -qq && apt-get install -y -qq --no-install-recommends \
+                gcc-arm-linux-gnueabihf libc6-dev-armhf-cross
+              curl --proto =https --tlsv1.2 -sSf --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal
+              export PATH="$HOME/.cargo/bin:$PATH"
+              rustup target add armv7-unknown-linux-gnueabihf
+              export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc
+              # agentrt-rs/build.rs 需 airy_run_stream.h：显式注入绝对路径
+              export AGENTRT_RS_RUN_STREAM_H=/src/commons/include/airy_run_stream.h
+              export CARGO_TARGET_DIR=/tmp/tui-target-arm32
+              # arm-32 门禁产品腿，TUI 属 REQUIRED_SUBTREE：fail-closed
+              (cd /src/agent-workload/sdk/tui && cargo build --release --target armv7-unknown-linux-gnueabihf) \
+                || { echo "::error::[arm-32] TUI 交叉构建失败（bin/agentrt-tui 发布完整性必需）"; exit 1; }
+              mkdir -p /src/stage/bin
+              cp -f /tmp/tui-target-arm32/armv7-unknown-linux-gnueabihf/release/agentrt-tui /src/stage/bin/ \
+                || { echo "::error::[arm-32] TUI 产物缺失"; exit 1; }
+            script: |
+              # fail-fast：容器内架构必须为 armhf。uname 在 AArch32 compat
+              # 下返回内核架构（aarch64），禁用；dpkg 才可信。
+              [ "$(dpkg --print-architecture)" = "armhf" ] || {
+                echo "::error::[arm-32] container arch != armhf: $(dpkg --print-architecture)"; exit 1; }
+              export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+              cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release \
+                -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF -DAIRY_BUILD_ALL=ON \
+                -DOPENSSL_ROOT_DIR=/usr/local -DCMAKE_PREFIX_PATH=/usr/local \
+                -DCMAKE_INSTALL_PREFIX="$PWD/$STAGE_DIR"
+              cmake --build "$BUILD_DIR" -j"${AIRY_JOBS:-$(nproc)}"
+              cmake --install "$BUILD_DIR"
+              # Python 运行时依赖（完全体包 lib/，fail-closed）
+              bash /src/.github/scripts/copy-python-runtime.sh "$STAGE_DIR" \
+                || { echo "::error::python 运行时四子树拷贝失败（lib/ 完整性必需）"; exit 1; }
+              # 完全体 finalize：容器内收集运行时 .so + fail-closed 校验（host
+              # 无 /usr/local 自编译库，收集必 not found；.collected 不入包）
+              bash /src/.github/scripts/finalize-linux-libs.sh "$STAGE_DIR" /src/_tools
+          - leg: arm-64
+            runner: ubuntu-24.04-arm
+            image: ghcr.io/openairymax/agentrt-qemu-toolchain:arm64-20260906-1@sha256:598a269f97744d81d80c67ffd7516f7f79ad33b8bc904346a56a5c31d3dbc146
+            platform: linux/arm64
+            container_leg: arm-64
+            envs: -e BUILD_DIR=/tmp/airy-build -e STAGE_DIR=stage
+            airy_jobs: ''
+            variant: arm-64
+            suffix: linux-arm-64
+            tui_leg: ''
+            tui_image: ''
+            tui_platform: ''
+            tui_cross: ''
+            script: |
+              export DEBIAN_FRONTEND=noninteractive
+              # Rust 工具链仅供 agentrt-tui 构建（arm-64 门禁产品腿，TUI 属
+              # REQUIRED_SUBTREE）；rustup 安装失败时下方 cargo 步骤将
+              # fail-closed，不降级。
+              if ! (curl --proto '=https' --tlsv1.2 -sSf --retry 3 https://sh.rustup.rs | sh -s -- -y --profile minimal); then
+                echo "warn: rustup 安装失败（后续 cargo 步骤将 fail-closed）"
+              fi
+              export PATH="$HOME/.cargo/bin:$PATH"
+              export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+              cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release \
+                -DBUILD_TESTS=OFF -DENABLE_SANITIZERS=OFF -DAIRY_BUILD_ALL=ON \
+                -DOPENSSL_ROOT_DIR=/usr/local -DCMAKE_PREFIX_PATH=/usr/local \
+                -DCMAKE_INSTALL_PREFIX="$PWD/$STAGE_DIR"
+              cmake --build "$BUILD_DIR" -j"$(nproc)"
+              cmake --install "$BUILD_DIR"
+              # Rust TUI（agentrt-tui）：fail-closed——构建失败/缺件即腿失败
+              export AGENTRT_RS_RUN_STREAM_H="$PWD/commons/include/airy_run_stream.h"
+              export PATH="$HOME/.cargo/bin:$PATH"
+              export CARGO_TARGET_DIR=/tmp/tui-target
+              (cd agent-workload/sdk/tui && cargo build --release) \
+                || { echo "::error::[arm-64] TUI 构建失败（bin/agentrt-tui 发布完整性必需）"; exit 1; }
+              cp -f /tmp/tui-target/release/agentrt-tui "$STAGE_DIR/bin/" \
+                || { echo "::error::[arm-64] TUI 产物缺失"; exit 1; }
+              # Python 运行时依赖（完全体包 lib/，fail-closed）
+              bash /src/.github/scripts/copy-python-runtime.sh "$STAGE_DIR" \
+                || { echo "::error::python 运行时四子树拷贝失败（lib/ 完整性必需）"; exit 1; }
+              # 完全体 finalize：容器内收集运行时 .so + fail-closed 校验（host
+              # 无 /usr/local 自编译库，收集必 not found；.collected 不入包）
+              bash /src/.github/scripts/finalize-linux-libs.sh "$STAGE_DIR" /src/_tools
+    env:
+      AIRY_JOBS: ${{ matrix.airy_jobs }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Init submodules (agent-workload, tools)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh agent-workload tools
+
+      # 32 位腿的 TUI 交叉构建（64 位腿为空矩阵值，本步跳过）
+      - name: Build TUI (cross in toolchain container)
+        if: matrix.tui_cross != ''
+        uses: ./.github/actions/lf-build-container
+        with:
+          image: ${{ matrix.tui_image }}
+          platform: ${{ matrix.tui_platform }}
+          leg: ${{ matrix.tui_leg }}
+          script: ${{ matrix.tui_cross }}
+
+      - name: Build in ${{ matrix.leg }} container
+        uses: ./.github/actions/lf-build-container
+        with:
+          image: ${{ matrix.image }}
+          platform: ${{ matrix.platform }}
+          leg: ${{ matrix.container_leg }}
+          envs: ${{ matrix.envs }}
+          script: ${{ matrix.script }}
+
+      # 打包：lf-package 统一模板（staging 汇总 cp 硬失败防坏包）。
+      - name: Package and upload (tar.gz)
+        uses: ./.github/actions/lf-package
+        with:
+          version: ${{ env.VERSION }}
+          platform-tag: ${{ matrix.variant }}
+          artifact-suffix: ${{ matrix.suffix }}
+
+  # macOS 两条腿（arm-64 / x86-64）合并为矩阵作业：两台 runner 的步骤
+  # 完全同构，仅 runner、并发总线与平台标记不同（步骤体取自原 arm-64
+  # job 原文）。分属不同物理 runner 池，用独立并发组串行不抢占。
+  build-macos:
+    name: build-macos (${{ matrix.leg }})
+    concurrency:
+      group: ${{ matrix.bus }}
+      cancel-in-progress: false
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - leg: macos-arm-64
+            runner: macos-latest
+            bus: ci-macos-runner-bus
+            variant: arm-64
+            suffix: macos-arm-64
+          - leg: macos-x86-64
+            runner: macos-15-intel
+            bus: ci-macos-intel-runner-bus
+            variant: x86-64
+            suffix: macos-x86-64
+    env:
+      # 构建目录位于源码树外（工作区上级目录）
+      BUILD_DIR: ../build
+      STAGE_DIR: stage
+      VERSION: ${{ env.VERSION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Init submodules (agent-workload, tools)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh agent-workload tools
+
+      - name: Install build dependencies
+        run: |
+          brew install cmake ninja pkgconf sqlite cjson curl openssl zlib zstd \
+            libmicrohttpd libwebsockets libevent nghttp2
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+
+      - name: Configure
+        run: |
+          export PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig:$(brew --prefix zlib)/lib/pkgconfig:$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix curl)/lib/pkgconfig"
+          # brew openssl 为 keg-only：libwebsockets.h 直接 #include <openssl/ssl.h>
+          # 不经 pkg-config 的 TU 需要显式 -I/-L（CFLAGS/LDFLAGS 是
+          # CMAKE_C_FLAGS / CMAKE_EXE_LINKER_FLAGS 的环境初值，全 target 生效）
+          # arm64 Homebrew 头文件在 $(brew --prefix)/include，clang 不自动搜索，
+          # 一并 -I。
+          export CFLAGS="-I$(brew --prefix)/include -I$(brew --prefix openssl)/include"
+          # Apple Silicon 默认不搜 /opt/homebrew/lib：gateway_d 链接
+          # -lmicrohttpd 等裸库名需 -L$(brew --prefix)/lib。
+          export LDFLAGS="-L$(brew --prefix)/lib -L$(brew --prefix openssl)/lib"
+          cmake -S . -B ${{ env.BUILD_DIR }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTS=OFF \
+            -DENABLE_SANITIZERS=OFF \
+            -DAIRY_BUILD_ALL=ON \
+            -DCMAKE_INSTALL_PREFIX="${{ env.STAGE_DIR }}"
+
+      - name: Build
+        run: |
+          cmake --build ${{ env.BUILD_DIR }} --config Release --parallel
+
+      - name: Install (aggregate bin/)
+        run: |
+          cmake --install ${{ env.BUILD_DIR }} --config Release
+
+      - name: Deploy bootstrap script
+        run: |
+          if [ -f "_tools/scripts/ops/bin/agentrt-bootstrap.sh" ]; then
+            cp -f "_tools/scripts/ops/bin/agentrt-bootstrap.sh" "${{ env.STAGE_DIR }}/bin/agentrt-bootstrap.sh"
+            chmod 755 "${{ env.STAGE_DIR }}/bin/agentrt-bootstrap.sh"
+          fi
+
+      - name: Build TUI + copy Python runtime
+        run: |
+          # TUI 构建收敛共享脚本（airymax header 注入 + cargo + 部署，见
+          # .github/scripts/build-tui.sh；macOS 为门禁产品腿，fail-hard）
+          AIRY_TUI_FAIL_HARD=1 bash .github/scripts/build-tui.sh agent-workload/sdk/tui "${{ env.STAGE_DIR }}/bin"
+          # Python 运行时依赖（完全体包 lib/，fail-closed）
+          bash .github/scripts/copy-python-runtime.sh "${{ env.STAGE_DIR }}" \
+            || { echo "::error::python 运行时四子树拷贝失败（lib/ 完整性必需）"; exit 1; }
+
+      # macOS dylib 自包含：otool -L 递归收集非系统 dylib 入 lib/，
+      # install_name_tool 重写为 @executable_path/../lib/，ad-hoc 重签，
+      # fail-closed 校验（干净机无 brew 依赖亦可启动 daemon 群）。
+      - name: Bundle macOS runtime dylibs (self-contained)
+        run: bash _tools/scripts/ci/release/bundle-macos-dylibs.sh "${{ env.STAGE_DIR }}"
+
+      # 干净机"可启"冒烟：逐个启动 bin/ Mach-O，要求无 dyld 加载失败
+      # （非系统依赖全部自包含）。托管 runner 为一次性干净 VM。
+      - name: Smoke-run packaged daemons (clean-machine proxy)
+        run: bash _tools/scripts/ci/release/smoke-macos-runtime.sh "${{ env.STAGE_DIR }}"
+
+      # 打包：lf-package 统一模板（macOS 原生腿无 bootstrap 部署——
+      # bin/agentrt-bootstrap.sh 为 Linux daemon 编排脚本）。
+      - name: Package and upload (tar.gz)
+        uses: ./.github/actions/lf-package
+        with:
+          version: ${{ env.VERSION }}
+          platform-tag: ${{ matrix.variant }}
+          artifact-suffix: ${{ matrix.suffix }}
+          with-bootstrap: 'false'
+
+  # macOS x86-64 (Intel)：macos-15-intel 原生 runner（Intel 存量社区用户
+  # 需 x86-64 包）。打包步骤与 arm-64 同构，仅 platform 标记与制品名不同。
+  # Intel runner 的 brew prefix 为 /usr/local，Configure 步骤一律
+  # $(brew --prefix) 动态解析，无需区分 prefix。
+
+
+  # Windows x64：原生 runner（无 container）。vcpkg 已预装于
+  # windows-latest（$env:VCPKG_INSTALLATION_ROOT）。zip 包必须与 tar.gz 包
+  # 保持完全体一致（config 模板 + permission_rules + maths-toolkit +
+  # platform 标记），防止 Windows 包缺失组件。
+  build-windows-x86-64:
+    # Windows 为完整产品腿：tag/dispatch 均入发布矩阵，zip 经 release 聚合
+    # 进入 publish REQUIRED_BIN/SUBTREE 预检（任一 daemon/CLI/TUI/python
+    # 缺失即中止发布）。与 build-test windows-build 共享
+    # ci-windows-runner-bus，防 MSVC 腿双 workflow 并跑占满 hosted 配额。
+    concurrency:
+      group: ci-windows-runner-bus
+      cancel-in-progress: false
+    runs-on: windows-latest
+    # gate 语义：构建失败/zip 不完整即本腿失败（不静默缺件）。
+    continue-on-error: false
+    env:
+      # 构建目录位于源码树外（工作区上级目录）
+      BUILD_DIR: ../build
+      STAGE_DIR: stage
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Init submodules (agent-workload, tools)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh agent-workload tools
+
+      # vcpkg 二进制缓存恢复（key 随本 workflow 内容失效并回退前缀 key；
+      # vcpkg classic 模式加性缓存天然正确）
+      - name: Restore vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/vcpkg-cache
+          key: vcpkg-cache-${{ runner.os }}-release-${{ hashFiles('.github/workflows/release.yml') }}
+          restore-keys: |
+            vcpkg-cache-${{ runner.os }}-
+
+      - name: Install build dependencies
+        shell: pwsh
+        # runner.temp 只能在 step 级 env 解析（job 级 env 无 runner context，
+        # GitHub 判整个 workflow 无效）。
+        env:
+          VCPKG_BINARY_SOURCES: "clear;files,${{ runner.temp }}/vcpkg-cache,readwrite"
+        run: |
+          # vcpkg 包名：curl（非 libcurl）、libmicrohttpd/libwebsockets（带 lib- 前缀）
+          vcpkg install sqlite3 cjson curl openssl zlib libmicrohttpd libwebsockets libevent nghttp2 --triplet x64-windows
+          # Rust 工具链（agentrt-tui 完全体包组件）
+          Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile "$env:TEMP\rustup-init.exe"
+          & "$env:TEMP\rustup-init.exe" -y --profile minimal --default-toolchain stable
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          cmake -S . -B ${{ env.BUILD_DIR }} `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DBUILD_TESTS=OFF `
+            -DENABLE_SANITIZERS=OFF `
+            -DAIRY_BUILD_ALL=ON `
+            -DBUILD_DAEMON=ON -DBUILD_CLI=ON `
+            -DCMAKE_INSTALL_PREFIX="${{ env.STAGE_DIR }}"
+
+      - name: Build
+        shell: pwsh
+        run: |
+          # MSVC 编译失败时把错误以 ::error:: 上报为 annotation（日志下载需
+          # admin，annotation 匿名 API 可读）。警告洪流会淹没真实错误且 GH
+          # annotation 有长度限制：优先筛出 error C*/LNK*/fatal 行，无错误行
+          # 时才回退到日志尾部。合并为单条多行消息。
+          $buildLog = Join-Path $env:RUNNER_TEMP "build.log"
+          cmake --build ${{ env.BUILD_DIR }} --config Release --parallel 2>&1 | Tee-Object -FilePath $buildLog
+          if ($LASTEXITCODE -ne 0) {
+            $lines = Get-Content $buildLog
+            # C2220 的前一行即被升级的 warning（含真实告警码），一并纳入
+            $errIdx = 0..($lines.Count - 1) | Where-Object { $lines[$_] -match ': error |error C[0-9]+|fatal error|error LNK[0-9]+' }
+            $errs = foreach ($i in $errIdx) { $lines[[Math]::Max(0, $i - 1)..$i] }
+            $tail = if ($errs) { $errs | Select-Object -Last 60 } else { $lines | Select-Object -Last 60 }
+            $msg = ("MSVC build failed (exit {0})`n{1}" -f $LASTEXITCODE, ($tail -join "`n"))
+            if ($msg.Length -gt 60000) { $msg = $msg.Substring($msg.Length - 60000) }
+            $msg = $msg.Replace('%', '%25').Replace("`r", '').Replace("`n", '%0A')
+            Write-Output "::error::$msg"
+            exit $LASTEXITCODE
+          }
+
+      - name: Install (aggregate bin/)
+        run: |
+          cmake --install ${{ env.BUILD_DIR }} --config Release
+
+      - name: Build TUI + copy Python runtime
+        shell: pwsh
+        env:
+          # agentrt-rs/build.rs 依赖 airy_run_stream.h、tui/build.rs 依赖 VERSION：
+          # Windows 布局下两者默认相对路径均找不到，显式注入 checkout 直布局路径。
+          AGENTRT_RS_RUN_STREAM_H: ${{ github.workspace }}/commons/include/airy_run_stream.h
+          AIRY_RT_VERSION_FILE: ${{ github.workspace }}/VERSION
+        run: |
+          $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+          $env:CARGO_TARGET_DIR = "$env:RUNNER_TEMP\tui-target"
+          Push-Location "agent-workload/sdk/tui"
+          & cargo build --release
+          if ($LASTEXITCODE -ne 0) { throw "[windows] TUI 构建失败（exit $LASTEXITCODE，bin/agentrt-tui.exe 发布完整性必需）" }
+          Pop-Location
+          if (Test-Path "$env:CARGO_TARGET_DIR\release\agentrt-tui.exe") {
+            Copy-Item "$env:CARGO_TARGET_DIR\release\agentrt-tui.exe" "${{ env.STAGE_DIR }}\bin\" -Force
+          } else { throw "[windows] TUI 产物缺失: $env:CARGO_TARGET_DIR\release\agentrt-tui.exe" }
+          New-Item -ItemType Directory -Path "${{ env.STAGE_DIR }}\lib" -Force | Out-Null
+          foreach ($p in @("agent-workload/ecosystem/agents/airymax_agents","agent-workload/ecosystem/agents/airymax_agents_rs","agent-workload/ecosystem/agents/orchestration","agent-workload/sdk/sdk-python/agentrt")) {
+            if (-not (Test-Path $p)) { throw "[windows] python 运行时子树缺失: $p" }
+            Copy-Item -Path $p -Destination "${{ env.STAGE_DIR }}\lib\" -Recurse -Force
+          }
+
+      # 自含性判据（0.1.20 W2）：zip 直接取自安装树，安装树缺 vcpkg 运行时
+      # DLL 即等于发行包缺。资产一致性判据只证"字节与清单一致"，不证"字节
+      # 能跑"——v0.1.20 包内 0 个 vcpkg DLL 而流水线全绿，正是缺这道题。
+      - name: Assert package self-containment
+        shell: pwsh
+        run: |
+          & _tools/scripts/ci/release/assert-win-selfcontained.ps1 -BinDir "${{ env.STAGE_DIR }}\bin"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # zip 包与 tar.gz 完全体一致（install.ps1 二进制模式依赖 config 模板）。
+      - name: Package (zip)
+        shell: pwsh
+        run: |
+          $VERSION = "${{ env.VERSION }}"; $VERSION_NUM = $VERSION.TrimStart('v')
+          $pkgDir = "pkg\agentrt-$VERSION_NUM"
+          New-Item -ItemType Directory -Path "$pkgDir\config" -Force | Out-Null
+          New-Item -ItemType Directory -Path "$pkgDir\modules" -Force | Out-Null
+          Copy-Item -Path "${{ env.STAGE_DIR }}\*" -Destination "$pkgDir\" -Recurse -Force
+          foreach ($cfg in @("agent-workload\ecosystem\manager\configs\agentrt.yaml","agent-workload\ecosystem\manager\model\model.yaml","_tools\scripts\ops\templates\secrets.env.example","_tools\scripts\ops\templates\permission_rules.yaml")) {
+            if (Test-Path $cfg) { Copy-Item -Path $cfg -Destination "$pkgDir\config\" -Force }
+          }
+          if (Test-Path "agent-workload\ecosystem\markets\tools\maths-toolkit") {
+            Copy-Item -Path "agent-workload\ecosystem\markets\tools\maths-toolkit" -Destination "$pkgDir\modules\" -Recurse -Force
+          }
+          if (Test-Path "_tools\scripts\ops\bin\agentrt-bootstrap.sh") {
+            Copy-Item -Path "_tools\scripts\ops\bin\agentrt-bootstrap.sh" -Destination "$pkgDir\bin\" -Force
+          }
+          # 版本 SSoT 随包落地（与 tar.gz 腿同语义）：解包态无 install.env，
+          # 启动器以包根 VERSION 自述版本。缺失即包无法自证版本。
+          Copy-Item -Path "VERSION" -Destination "$pkgDir\VERSION" -Force
+          # 构建身份随包（A-1）：与 lf-package 同语义，安装期并入安装清单。
+          $sha12 = (git rev-parse --short=12 HEAD).Trim()
+          New-Item -ItemType Directory -Path "$pkgDir\share\agentrt" -Force | Out-Null
+          "AIRY_BUILD_ID=run${{ github.run_id }}.${{ github.run_attempt }}-g$sha12" | Out-File -FilePath "$pkgDir\share\agentrt\build.env" -Encoding ascii
+          New-Item -ItemType File -Path "$pkgDir\platform-x86-64" -Force | Out-Null
+          $artifact = "agentrt-$VERSION-windows-x86-64"
+          Compress-Archive -Path "pkg\*" -DestinationPath "$artifact.zip"
+          # 校验和（Windows 无 sha256sum，用 Get-FileHash）
+          (Get-FileHash -Algorithm SHA256 "$artifact.zip").Hash.ToLower() + "  $artifact.zip" | Out-File -FilePath "$artifact.zip.sha256"
+          "artifact_name=$artifact" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.artifact_name }}
+          path: ${{ env.artifact_name }}.*
+          if-no-files-found: error
+
+  # Windows x86-32：x64 主机上 vcpkg x86-windows triplet + MSVC -A Win32
+  # 构建。x64 宿主硬件兼容 i386，32 位用户态环境（受限旧机、WOW64 兼容面）
+  # 仍可安装。
+
+
+  # Windows x86-32：x64 主机上 vcpkg x86-windows triplet + MSVC -A Win32
+  # 构建。x64 宿主硬件兼容 i386，32 位用户态环境（受限旧机、WOW64 兼容面）
+  # 仍可安装。
+  build-windows-x86-32:
+    # 与 x64 腿显式 needs 串行：同一 run 内两腿永不共时请求
+    # ci-windows-runner-bus（同组并发会互顶取消）；跨 workflow 仍由本腿占组
+    # 与 build-test windows-build 公平串行。
+    needs: build-windows-x86-64
+    concurrency:
+      group: ci-windows-runner-bus
+      cancel-in-progress: false
+    runs-on: windows-latest
+    continue-on-error: false
+    env:
+      # 构建目录位于源码树外；与 x64 腿异目录防 generator 互踩
+      BUILD_DIR: ../build-x86
+      STAGE_DIR: stage
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+
+      - name: Init submodules (agent-workload, tools)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: bash .github/scripts/init-submodules.sh agent-workload tools
+
+      # vcpkg 二进制缓存与 x64 腿分离（triplet 不同，产物不互通）
+      - name: Restore vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/vcpkg-cache-x86
+          key: vcpkg-cache-x86-${{ runner.os }}-release-${{ hashFiles('.github/workflows/release.yml') }}
+          restore-keys: |
+            vcpkg-cache-x86-${{ runner.os }}-
+
+      - name: Install build dependencies
+        shell: pwsh
+        env:
+          VCPKG_BINARY_SOURCES: "clear;files,${{ runner.temp }}/vcpkg-cache-x86,readwrite"
+        run: |
+          # port 清单与 x64 腿一致（nghttp2：HTTP/2 在 Windows 禁用仍入清单
+          # 保持两腿依赖面同构），仅 triplet 换 x86-windows
+          vcpkg install sqlite3 cjson curl openssl zlib libmicrohttpd libwebsockets libevent nghttp2 --triplet x86-windows
+          # Rust 工具链（宿主 x64）+ i686-pc-windows-msvc target（TUI 32 位产物）
+          # i586（tier 2）在 hotfix 发行常缺 std 二进制；i686 为 tier 1 随
+          # 每个发行必发，部署面无差
+          Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile "$env:TEMP\rustup-init.exe"
+          & "$env:TEMP\rustup-init.exe" -y --profile minimal --default-toolchain stable
+          $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+          rustup target add i686-pc-windows-msvc
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          cmake -S . -B ${{ env.BUILD_DIR }} -A Win32 `
+            -DVCPKG_TARGET_TRIPLET=x86-windows `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DBUILD_TESTS=OFF `
+            -DENABLE_SANITIZERS=OFF `
+            -DAIRY_BUILD_ALL=ON `
+            -DBUILD_DAEMON=ON -DBUILD_CLI=ON `
+            -DCMAKE_INSTALL_PREFIX="${{ env.STAGE_DIR }}"
+
+      - name: Build
+        shell: pwsh
+        run: |
+          # 错误数据集语义与 x64 腿一致（::error:: annotation 匿名可读）
+          $buildLog = Join-Path $env:RUNNER_TEMP "build-x86.log"
+          cmake --build ${{ env.BUILD_DIR }} --config Release --parallel 2>&1 | Tee-Object -FilePath $buildLog
+          if ($LASTEXITCODE -ne 0) {
+            $lines = Get-Content $buildLog
+            $errIdx = 0..($lines.Count - 1) | Where-Object { $lines[$_] -match ': error |error C[0-9]+|fatal error|error LNK[0-9]+' }
+            $errs = foreach ($i in $errIdx) { $lines[[Math]::Max(0, $i - 1)..$i] }
+            $tail = if ($errs) { $errs | Select-Object -Last 60 } else { $lines | Select-Object -Last 60 }
+            $msg = ("MSVC x86 build failed (exit {0})`n{1}" -f $LASTEXITCODE, ($tail -join "`n"))
+            if ($msg.Length -gt 60000) { $msg = $msg.Substring($msg.Length - 60000) }
+            $msg = $msg.Replace('%', '%25').Replace("`r", '').Replace("`n", '%0A')
+            Write-Output "::error::$msg"
+            exit $LASTEXITCODE
+          }
+
+      - name: Install (aggregate bin/)
+        run: |
+          cmake --install ${{ env.BUILD_DIR }} --config Release
+
+      - name: Build TUI (i686) + copy Python runtime
+        shell: pwsh
+        env:
+          AGENTRT_RS_RUN_STREAM_H: ${{ github.workspace }}/commons/include/airy_run_stream.h
+          AIRY_RT_VERSION_FILE: ${{ github.workspace }}/VERSION
+        run: |
+          $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+          $env:CARGO_TARGET_DIR = "$env:RUNNER_TEMP\tui-target-x86"
+          Push-Location "agent-workload/sdk/tui"
+          & cargo build --release --target i686-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw "[windows-x86-32] TUI 构建失败（exit $LASTEXITCODE，bin/agentrt-tui.exe 发布完整性必需）" }
+          Pop-Location
+          $tuiExe = "$env:CARGO_TARGET_DIR\i686-pc-windows-msvc\release\agentrt-tui.exe"
+          if (Test-Path $tuiExe) {
+            Copy-Item $tuiExe "${{ env.STAGE_DIR }}\bin\" -Force
+          } else { throw "[windows-x86-32] TUI 产物缺失: $tuiExe" }
+          New-Item -ItemType Directory -Path "${{ env.STAGE_DIR }}\lib" -Force | Out-Null
+          foreach ($p in @("agent-workload/ecosystem/agents/airymax_agents","agent-workload/ecosystem/agents/airymax_agents_rs","agent-workload/ecosystem/agents/orchestration","agent-workload/sdk/sdk-python/agentrt")) {
+            if (-not (Test-Path $p)) { throw "[windows-x86-32] python 运行时子树缺失: $p" }
+            Copy-Item -Path $p -Destination "${{ env.STAGE_DIR }}\lib\" -Recurse -Force
+          }
+
+      # 自含性判据：与 x64 腿同款（判据实现单点在 tools 仓，两腿不复制）
+      - name: Assert package self-containment
+        shell: pwsh
+        run: |
+          & _tools/scripts/ci/release/assert-win-selfcontained.ps1 -BinDir "${{ env.STAGE_DIR }}\bin"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # zip 包与 x64 腿完全体一致；install.ps1 PROCESSOR_ARCHITECTURE=x86
+      # 分支按此命名消费。
+      - name: Package (zip)
+        shell: pwsh
+        run: |
+          $VERSION = "${{ env.VERSION }}"; $VERSION_NUM = $VERSION.TrimStart('v')
+          $pkgDir = "pkg\agentrt-$VERSION_NUM"
+          New-Item -ItemType Directory -Path "$pkgDir\config" -Force | Out-Null
+          New-Item -ItemType Directory -Path "$pkgDir\modules" -Force | Out-Null
+          Copy-Item -Path "${{ env.STAGE_DIR }}\*" -Destination "$pkgDir\" -Recurse -Force
+          foreach ($cfg in @("agent-workload\ecosystem\manager\configs\agentrt.yaml","agent-workload\ecosystem\manager\model\model.yaml","_tools\scripts\ops\templates\secrets.env.example","_tools\scripts\ops\templates\permission_rules.yaml")) {
+            if (Test-Path $cfg) { Copy-Item -Path $cfg -Destination "$pkgDir\config\" -Force }
+          }
+          if (Test-Path "agent-workload\ecosystem\markets\tools\maths-toolkit") {
+            Copy-Item -Path "agent-workload\ecosystem\markets\tools\maths-toolkit" -Destination "$pkgDir\modules\" -Recurse -Force
+          }
+          if (Test-Path "_tools\scripts\ops\bin\agentrt-bootstrap.sh") {
+            Copy-Item -Path "_tools\scripts\ops\bin\agentrt-bootstrap.sh" -Destination "$pkgDir\bin\" -Force
+          }
+          # 版本 SSoT 随包落地（与 tar.gz 腿同语义）：解包态无 install.env，
+          # 启动器以包根 VERSION 自述版本。缺失即包无法自证版本。
+          Copy-Item -Path "VERSION" -Destination "$pkgDir\VERSION" -Force
+          # 构建身份随包（A-1）：与 lf-package 同语义，安装期并入安装清单。
+          $sha12 = (git rev-parse --short=12 HEAD).Trim()
+          New-Item -ItemType Directory -Path "$pkgDir\share\agentrt" -Force | Out-Null
+          "AIRY_BUILD_ID=run${{ github.run_id }}.${{ github.run_attempt }}-g$sha12" | Out-File -FilePath "$pkgDir\share\agentrt\build.env" -Encoding ascii
+          New-Item -ItemType File -Path "$pkgDir\platform-x86-32" -Force | Out-Null
+          $artifact = "agentrt-$VERSION-windows-x86-32"
+          Compress-Archive -Path "pkg\*" -DestinationPath "$artifact.zip"
+          (Get-FileHash -Algorithm SHA256 "$artifact.zip").Hash.ToLower() + "  $artifact.zip" | Out-File -FilePath "$artifact.zip.sha256"
+          "artifact_name=$artifact" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.artifact_name }}
+          path: ${{ env.artifact_name }}.*
+          if-no-files-found: error
+
+  # RISC-V (linux-riscv64) 门禁腿：focal(20.04) amd64 宿主交叉编译，零 QEMU
+  # 执行（qemu-user 仅用于产物冒烟）。历史形态是 linux/riscv64 容器全模拟，
+  # 每轮撞 6h 单 job 上限后被降级为 dispatch-only + continue-on-error，tag
+  # 发布时直接 skip，发行面长期无 riscv 制品——RISC-V 并非缺失而是从未参与
+  # 门禁。交叉形态沿用 i686/armhf 的成熟路径（bootstrap 工具链 → 交叉
+  # builddeps → 交叉 cmake → Rust TUI 交叉 → readelf 收集），基线仍在
+  # focal 内（glibc 2.31），与 x86-64/arm-64 一致。
