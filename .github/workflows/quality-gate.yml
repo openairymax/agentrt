@@ -225,17 +225,25 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
+          # 第三参为 artifact 名：issue 正文里必须能指回随 run 归档的完整
+          # 日志，否则一周后回看只剩一条已消失的 /tmp 路径。
           [ -f /tmp/quality-gate.log ] && \
-            bash .github/scripts/ci-debug-dump.sh "quality gates" "/tmp/quality-gate.log" || true
+            bash .github/scripts/ci-debug-dump.sh "quality gates" \
+              "/tmp/quality-gate.log" "quality-gate-logs" || true
 
       # artifact 兜底：ci-debug issue 依赖 GH_TOKEN 与 issue 可写，
       # artifact 无需凭据即可从 run 页面取到完整 46 门禁日志。
+      # 构建子日志一并归档：Gate 1 判红时视图只有 dump_cmake_err 截取的
+      # 末 40 行，configure.log/build.log 本体落在 runner 临时目录，
+      # 不随 run 保存就等于判据蒸发。
       - name: Upload gate log artifact
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: quality-gate-logs
-          path: /tmp/quality-gate.log
+          path: |
+            /tmp/quality-gate.log
+            ${{ runner.temp }}/agentrt-quality-gate-build/*.log
           if-no-files-found: ignore
           retention-days: 14
 
@@ -280,8 +288,41 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends python3 python3-yaml
 
+      # 判据是 137 条断言，判红时视图只显示「exit code 1」，红在哪一条
+      # 无从取证。与 quality-gate 腿同口径：完整输出先落盘，断言名与汇总
+      # 行提为 annotation，日志随后进 ci-debug issue 与 artifact。
       - name: Run release gates (WS-9, A~AH)
-        run: bash scripts/verify_release_gates.sh
+        run: |
+          set +e
+          bash scripts/verify_release_gates.sh > /tmp/release-gates.log 2>&1
+          rc=$?
+          if [ $rc -ne 0 ]; then
+            grep -E '^\s*\[FAIL\]|门禁汇总' /tmp/release-gates.log \
+              | sed -E 's/\x1b\[[0-9;]*m//g; s/^/::error::  /' | head -20
+            echo "::error::release gates FAILED rc=$rc"
+          fi
+          grep -vE 'libselinux\.so\.1: no version information' /tmp/release-gates.log \
+            | sed -E 's/\x1b\[[0-9;]*m//g' | tail -n 200
+          exit $rc
+
+      - name: Dump release gate log to ci-debug issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          [ -f /tmp/release-gates.log ] && \
+            bash .github/scripts/ci-debug-dump.sh "release gates" \
+              "/tmp/release-gates.log" "release-gate-logs" || true
+
+      # artifact 兜底：无需凭据即可从 run 页面取到断言级完整输出。
+      - name: Upload release gate log artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-gate-logs
+          path: /tmp/release-gates.log
+          if-no-files-found: ignore
+          retention-days: 14
 
   # ==================== 工作流静态校验 ====================
   # 工作流只在触发时才被 GitHub 解析：语法、表达式、本地复用引用（uses:
