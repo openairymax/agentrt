@@ -809,4 +809,45 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      # 安装腿实跑：ctest 只证明二进制可测，不证明发行形态可装。安装器
+      # 的包布局解析、前缀落地、画像固化、daemon 完整性校验任一环断裂都会
+      # 让用户装出半成品，而构建腿全绿。此处按 release 包布局（顶层
+      # agentrt-<ver>）自行装配 zip，走 install.ps1 -FromFile，再以安装后
+      # 的 AIRY_HOME 启动 airy_cli——验证"装出来的树"而非"构建出来的树"。
+      - name: Install smoke (binary zip)
+        shell: pwsh
+        run: |
+          $ver = (Get-Content VERSION).Trim()
+          $stage = Join-Path $env:RUNNER_TEMP "smoke-stage"
+          $pkgDir = Join-Path $env:RUNNER_TEMP "smoke-pkg\agentrt-$ver"
+          $zip = Join-Path $env:RUNNER_TEMP "agentrt-$ver.zip"
+          $prefix = Join-Path $env:RUNNER_TEMP "airy-smoke"
+          $binDir = Join-Path $env:RUNNER_TEMP "airy-smoke-bin"
+          cmake --install ${{ env.BUILD_DIR }} --config Release --prefix $stage
+          if ($LASTEXITCODE -ne 0) { throw "cmake --install failed" }
+          New-Item -ItemType Directory -Force -Path $pkgDir | Out-Null
+          Copy-Item "$stage\*" $pkgDir -Recurse -Force
+          Copy-Item VERSION $pkgDir -Force
+          # 与 release 制品同形（平台标记 + VERSION）；安装器不读，仅为包布局一致
+          Set-Content -Path (Join-Path $pkgDir "platform-x86-64") -Value ""
+          Compress-Archive -Path $pkgDir -DestinationPath $zip -Force
+          & pwsh -NoProfile -File scripts/install.ps1 -Mode binary `
+            -FromFile $zip -Prefix $prefix -BinDir $binDir -Yes
+          if ($LASTEXITCODE -ne 0) { throw "install.ps1 exited $LASTEXITCODE" }
+          foreach ($rel in @("config\install.env", "config\profile.env", "bin\airy_cli.exe")) {
+            if (-not (Test-Path (Join-Path $prefix $rel))) {
+              throw "installed tree missing $rel"
+            }
+          }
+          if (-not (Select-String -Path (Join-Path $prefix "config\profile.env") `
+                -Pattern '^AIRY_PROFILE=(full|minimal)$' -Quiet)) {
+            throw "profile.env 未固化 full|minimal 判定"
+          }
+          # 部署树运行：PATH 需含 vcpkg 运行时 DLL（构建期 applocal 已关闭）
+          $env:AIRY_HOME = $prefix
+          $env:PATH = "$prefix\bin;$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin;$env:PATH"
+          & "$prefix\bin\airy_cli.exe" --version
+          if ($LASTEXITCODE -ne 0) {
+            throw "installed airy_cli failed to run (exit $LASTEXITCODE)"
+          }
 
