@@ -1433,6 +1433,20 @@ finalize_install() {
     } > "${AIRY_HOME}/config/install.env"
     chmod 600 "${AIRY_HOME}/config/install.env"
 
+    # S-P0-01（D-11）：落默认 agent 定义。TUI/daemon 的缺省解析目标是
+    # $AIRY_HOME/agents/main.agent.yaml；发布包此前不含该文件，导致无参
+    # 启动按 cwd 相对路径解析失败。已存在时保留用户修改。
+    mkdir -p "${AIRY_HOME}/agents"
+    if [ ! -f "${AIRY_HOME}/agents/main.agent.yaml" ]; then
+        cat > "${AIRY_HOME}/agents/main.agent.yaml" <<'AIRY_AGENT_EOF'
+# AgentRT 默认 agent 定义（install.sh 生成；改名/改角色后保留即可）
+# role 必须是 ecosystem/agents 已知角色，未知值会归一化到 coding。
+role: coding
+name: main
+AIRY_AGENT_EOF
+        chmod 644 "${AIRY_HOME}/agents/main.agent.yaml"
+    fi
+
     cat > "${AIRY_HOME}/bin/agentrt-env.sh" <<'AIRY_ENV_EOF'
 #!/bin/sh
 AIRY_HOME="${AIRY_HOME:-__AIRY_HOME__}"
