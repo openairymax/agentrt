@@ -18,6 +18,7 @@
 #include "cli_internal.h"
 #include "platform_misc.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -333,6 +334,60 @@ static int ms_clear(mr_kv_t *frag, const mr_ctx_t *c, const char *const *keys)
     return mr_save(frag, c->frag);
 }
 
+/* 参数串中是否已出现该开关：按空白分词并允许 =value 写法，避免
+ * "-c"/"--ctx-size" 被子串误判（如 -cpu 不算命中 -c）。 */
+static int ms_has(const char *args, const char *flag)
+{
+    size_t n = strlen(flag);
+    const char *p = args;
+
+    while ((p = strstr(p, flag)) != NULL) {
+        int head = (p == args) || (p[-1] == ' ');
+        int tail = (p[n] == '\0') || (p[n] == ' ') || (p[n] == '=');
+        if (head && tail)
+            return 1;
+        p += n;
+    }
+    return 0;
+}
+
+static size_t ms_cat(char *out, size_t cap, size_t used, const char *fmt, ...)
+{
+    va_list ap;
+    int n;
+
+    if (used >= cap)
+        return cap;
+    va_start(ap, fmt);
+    n = vsnprintf(out + used, cap - used, fmt, ap);
+    va_end(ap);
+    if (n < 0)
+        return cap;
+    return (used + (size_t)n < cap) ? used + (size_t)n : cap;
+}
+
+/* 托管启动参数 = 机制必需项 + 策略 args。
+ *   -c   上下文窗口来自 model.yaml 的 context_window（SSoT），未声明不写；
+ *   --jinja 是工具调用（chat template）的机制前提，恒置；
+ *   -ngl 由策略环境变量 AIRY_LOCAL_GPU_LAYERS 给出，CPU-only 机器不写。
+ * 策略已显式给出同名开关时不重复，避免两处策略打架。 */
+static void ms_compose(char *out, size_t cap, const char *model, const char *port,
+                       int ctx, const char *policy)
+{
+    const char *ngl = getenv("AIRY_LOCAL_GPU_LAYERS");
+    size_t used = (size_t)snprintf(out, cap, "-m %s --host 127.0.0.1 --port %s",
+                                   model, port);
+
+    if (ctx > 0 && !ms_has(policy, "-c") && !ms_has(policy, "--ctx-size"))
+        used = ms_cat(out, cap, used, " -c %d", ctx);
+    if (!ms_has(policy, "--jinja"))
+        used = ms_cat(out, cap, used, " --jinja");
+    if (ngl && ngl[0] && !ms_has(policy, "-ngl") && !ms_has(policy, "--n-gpu-layers"))
+        used = ms_cat(out, cap, used, " -ngl %s", ngl);
+    if (policy[0])
+        ms_cat(out, cap, used, " %s", policy);
+}
+
 /* 声明片段按当前安装态收敛：只更新本实例的 5 个键，同文件内其他键原样保留；
  * 实例名归政策层——片段已声明 NAME 时沿用（ops 侧 airy-local 的声明），只在
  * 空片段上给中性缺省，机制核不写死厂商实例名；无服务模型时只清本实例键，
@@ -376,8 +431,8 @@ int mr_sync(const mr_ctx_t *c, const mr_kv_t *reg)
     rc |= mr_set(&frag, "AIRYRT_MANAGED_BIN", server);
     snprintf(line, sizeof(line), "tcp:%s", c->port);
     rc |= mr_set(&frag, "AIRYRT_MANAGED_EP", line);
-    snprintf(line, sizeof(line), "-m %s --host 127.0.0.1 --port %s%s%s",
-             model, c->port, args[0] ? " " : "", args);
+    ms_compose(line, sizeof(line), model, c->port,
+               mr_ctx_tokens(c, asset), args);
     rc |= mr_set(&frag, "AIRYRT_MANAGED_ARGS", line);
     snprintf(key, sizeof(key), "model.%s.mem", name);
     if (mr_get(reg, key, mem, sizeof(mem)))

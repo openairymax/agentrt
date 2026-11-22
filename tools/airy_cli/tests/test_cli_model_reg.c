@@ -312,6 +312,39 @@ static void t_list_drift(void)
     CHECK(run("list", "--json", NULL, NULL) == 0, "json list rc");
 }
 
+/* context_window 映射托管启动参数：声明 8k → -c 8192 + --jinja；
+ * 策略已显式给出 -c/--ctx-size 时不重复，避免两处策略打架。 */
+static void t_use_ctx(void)
+{
+    char reg[PATH_MAX], frag[PATH_MAX], yaml[PATH_MAX], srv[PATH_MAX];
+    char bin[PATH_MAX], text[4096];
+
+    setup();
+    reg_path(reg, sizeof(reg));
+    frag_path(frag, sizeof(frag));
+    yaml_path(yaml, sizeof(yaml));
+    touch_asset("a.gguf");
+    wfile(reg, "model.a.asset=a.gguf\nmodel.a.mem=512\n");
+    wfile(yaml, "models:\n  - name: local\n    mode: local\n    model_id: a\n"
+                "    context_window: 8k\n");
+    pth(bin, sizeof(bin), "%s/bin", g_home);
+    airy_mkdir_p(bin);
+    pth(bin, sizeof(bin), "%s/bin/llama-server", g_home);
+    wfile(bin, "bin");
+    pth(srv, sizeof(srv), "%s/local/registry/installed.env", g_home);
+    pth(text, sizeof(text), "server=%s\n", bin);
+    wfile(srv, text);
+
+    CHECK(run("use", "a", NULL, NULL) == 0, "use with ctx rc");
+    CHECK(has(frag, "-c 8192"), "ctx mapped to -c");
+    CHECK(has(frag, "--jinja"), "jinja enabled for tool calls");
+
+    wfile(reg, "model.a.asset=a.gguf\nmodel.a.args=-c 2048\n");
+    CHECK(run("use", "a", NULL, NULL) == 0, "use with policy ctx rc");
+    CHECK(has(frag, "-c 2048"), "policy ctx kept");
+    CHECK(!has(frag, "-c 8192"), "declared ctx not duplicated");
+}
+
 int main(void)
 {
     t_empty();
@@ -320,6 +353,7 @@ int main(void)
     t_remove();
     t_slot_ref();
     t_list_drift();
+    t_use_ctx();
     printf("test_cli_model_reg: %s\n", g_fail ? "FAIL" : "PASS");
     return g_fail;
 }

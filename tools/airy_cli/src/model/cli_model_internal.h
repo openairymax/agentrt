@@ -33,6 +33,7 @@ typedef struct {
     char name[MR_NAME_MAX];
     char id[MR_NAME_MAX];
     int local;
+    int ctx; /* context_window 解析后的 token 数；0 = 未声明 */
 } mr_row_t;
 
 typedef struct {
@@ -69,6 +70,7 @@ int mr_active(const mr_ctx_t *c, const mr_kv_t *kv, char *out, size_t cap);
 int mr_sync(const mr_ctx_t *c, const mr_kv_t *reg);
 
 void mr_yaml_load(const mr_ctx_t *c, mr_yaml_t *y);
+int mr_ctx_tokens(const mr_ctx_t *c, const char *asset);
 void mr_stem(const char *asset, char *out, size_t cap);
 int mr_same(const char *a, const char *name, const char *stem);
 size_t mr_refs(const mr_yaml_t *y, const mr_kv_t *kv, const char *name,

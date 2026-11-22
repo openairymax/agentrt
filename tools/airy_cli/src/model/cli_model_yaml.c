@@ -17,11 +17,36 @@
 #include "yaml_minimal.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static const char *mr_node(const struct yaml_node *n, const char *key)
 {
     return yaml_as_string(yaml_get(n, key), "");
+}
+
+/* token 字面量解析（4k/16k/128k/1M/2M 与纯十进制）；0 = 非法或未声明。
+ * 与 llm_d 的 svc_tokens_parse 同口径，CLI 侧不链接 daemons 故本地持有。 */
+static int mr_tokens(const char *s)
+{
+    char *end = NULL;
+    long v;
+    long mul = 1;
+
+    if (!s || !*s)
+        return 0;
+    v = strtol(s, &end, 10);
+    if (end == s || v <= 0)
+        return 0;
+    if (*end == 'k' || *end == 'K')
+        mul = 1024;
+    else if (*end == 'm' || *end == 'M')
+        mul = 1024 * 1024;
+    else if (*end)
+        return 0;
+    if (v > 2147483647L / mul)
+        return 0;
+    return (int)(v * mul);
 }
 
 void mr_yaml_load(const mr_ctx_t *c, mr_yaml_t *y)
@@ -57,10 +82,32 @@ void mr_yaml_load(const mr_ctx_t *c, mr_yaml_t *y)
         snprintf(r->id, sizeof(r->id), "%s", mr_node(row, "model_id"));
         r->local = strcmp(mr_node(row, "mode"), "local") == 0 ||
                    strcmp(mr_node(row, "provision"), "managed") == 0;
+        r->ctx = mr_tokens(mr_node(row, "context_window"));
         if (r->id[0])
             y->nrow++;
     }
     yaml_destroy(doc);
+}
+
+/* 托管工件对应的 context_window（token 数）；未声明/解析失败返回 0，
+ * 由调用方决定「不写 -c」而不是猜一个窗口。 */
+int mr_ctx_tokens(const mr_ctx_t *c, const char *asset)
+{
+    mr_yaml_t y;
+    char stem[MR_NAME_MAX];
+    int ctx = 0;
+
+    mr_stem(asset, stem, sizeof(stem));
+    mr_yaml_load(c, &y);
+    if (!y.ok)
+        return 0;
+    for (size_t i = 0; i < y.nrow; i++) {
+        if (y.row[i].local && mr_same(y.row[i].id, "", stem)) {
+            ctx = y.row[i].ctx;
+            break;
+        }
+    }
+    return ctx;
 }
 
 /* 工件名去目录与 .gguf 后缀，用于和 model.yaml 的 model_id 对齐。 */
