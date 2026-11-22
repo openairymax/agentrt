@@ -4,6 +4,7 @@ param(
     [string]$Mode = "auto",
     [string]$BinDir,
     [string]$Channel = "stable",
+    [string]$Profile = "auto",
     [string]$FromFile,
     [switch]$Uninstall,
     [switch]$KeepData,
@@ -28,8 +29,9 @@ if ($Help) {
     Write-Host "  卸载:     powershell -ExecutionPolicy Bypass -File install.ps1 -Uninstall [-KeepData] [-Yes]"
     Write-Host ""
     Write-Host "参数:"
-    Write-Host "  -Prefix <path>      安装根目录（默认 ~\.airymaxrt）"
+    Write-Host "  -Prefix <path>      安装根目录（默认 %LOCALAPPDATA%\airymaxrt）"
     Write-Host "  -Mode <mode>        安装模式: auto|binary|hybrid|source（默认 auto）"
+    Write-Host "  -Profile <p>        运行画像: auto|full|minimal（默认 auto，按硬件评估）"
     Write-Host "  -BinDir <path>      可执行文件链接目录（默认 ~\.local\bin）"
     Write-Host "  -Channel <channel>  发布通道: stable|rc|beta（默认 stable）"
     Write-Host "  -FromFile <file>    从本地制品文件安装"
@@ -40,10 +42,17 @@ if ($Help) {
     exit 0
 }
 
-if ($env:AIRY_HOME -and (Join-Path $env:AIRY_HOME "") -ne (Join-Path $HOME ".airymaxrt\")) {
-    Write-Warn "已忽略环境变量 AIRY_HOME=$env:AIRY_HOME（防残留劫持）；安装位置统一为 ~\.airymaxrt，非默认位置请用 -Prefix"
+$DefaultHome = if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA "airymaxrt" }
+               else { Join-Path $HOME ".airymaxrt" }
+if ($env:AIRY_HOME -and $env:AIRY_HOME.TrimEnd('\') -ne $DefaultHome.TrimEnd('\')) {
+    Write-Warn "已忽略环境变量 AIRY_HOME=$env:AIRY_HOME（防残留劫持）；安装位置默认 $DefaultHome，非默认位置请用 -Prefix"
 }
-$AIRY_HOME    = if ($Prefix) { $Prefix } else { Join-Path $HOME ".airymaxrt" }
+$AIRY_HOME    = if ($Prefix) { $Prefix } else { $DefaultHome }
+$AiryProfile  = if ($env:AIRY_PROFILE) { $env:AIRY_PROFILE } elseif ($Profile) { $Profile } else { "auto" }
+if (@('auto', 'full', 'minimal') -notcontains $AiryProfile) {
+    Write-Err "非法 -Profile: $AiryProfile（支持 auto|full|minimal）"
+    exit 1
+}
 $AiryVersionSpecified = $false
 if ($env:AIRY_VERSION) { $AiryVersionSpecified = $true }
 $AIRY_VERSION = if ($env:AIRY_VERSION) { $env:AIRY_VERSION }
@@ -430,6 +439,63 @@ function Init-Secrets {
     if (Test-Path $srcModel) { Copy-Item $srcModel (Join-Path $AIRY_HOME "config") -Force -ErrorAction SilentlyContinue }
 }
 
+# S-P1-04：Windows 安装腿固化运行画像（与 POSIX install.sh persist_profile 同判据）。
+# 只写硬件快照与 full/minimal 判定；AIRYRT_LAUNCH_* 声明由 supervisor 首次启动
+# 按内置表 upsert，与本文件无关。探测失败且未显式指定画像时 fail-closed，
+# 不静默降级为 minimal。
+function Get-Accel {
+    if (Get-Command nvidia-smi -ErrorAction SilentlyContinue) { return "cuda" }
+    if (Get-Command rocminfo -ErrorAction SilentlyContinue) { return "rocm" }
+    if (Get-Command sycl-ls -ErrorAction SilentlyContinue) { return "sycl" }
+    return "none"
+}
+
+function Save-Profile {
+    $memTotal = 0
+    $memAvail = 0
+    try {
+        $os = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+        $memTotal = [int64]$os.TotalVisibleMemorySize
+        $memAvail = [int64]$os.FreePhysicalMemory
+    } catch {
+        $memTotal = 0
+        $memAvail = 0
+    }
+    $cores = [Environment]::ProcessorCount
+    if ($cores -lt 1) { $cores = 1 }
+    $profile = $AiryProfile
+    if ($profile -eq "auto") {
+        if ($memTotal -eq 0) {
+            Write-Err "硬件探测失败，无法自动评估画像；请用 -Profile full|minimal 显式指定后重试"
+            exit 1
+        }
+        # 与 install.sh 同一门槛：总内存 ≥2.5 GiB、可用 ≥1.5 GiB、核数 ≥3
+        if ($memTotal -ge 2621440 -and $memAvail -ge 1572864 -and $cores -ge 3) {
+            $profile = "full"
+        } else {
+            $profile = "minimal"
+        }
+    } elseif ($memTotal -eq 0) {
+        Write-Warn "硬件探测失败，按显式画像 $profile 继续（硬件快照置 0）"
+    }
+    $arch = switch ($env:PROCESSOR_ARCHITECTURE) {
+        "AMD64" { "x86_64" }
+        "ARM64" { "aarch64" }
+        "x86"   { "i686" }
+        default { "unknown" }
+    }
+    @(
+        "# AgentRT 运行画像（由 install.ps1 生成，airymaxrt 启动器读取）",
+        "AIRY_PROFILE=$profile",
+        "AIRY_HW_ARCH=$arch",
+        "AIRY_HW_MEM_TOTAL_KIB=$memTotal",
+        "AIRY_HW_MEM_AVAIL_KIB=$memAvail",
+        "AIRY_HW_CPU_CORES=$cores",
+        "AIRY_HW_ACCEL=$(Get-Accel)"
+    ) | Set-Content -Path (Join-Path $AIRY_HOME "config\profile.env") -Encoding UTF8
+    Write-OK "运行画像已固化: $profile（详情见 config\profile.env）"
+}
+
 function Finalize-Install {
     $envFile = Join-Path $AIRY_HOME "config\install.env"
     $link = Join-Path $BIN_DIR "airymaxrt.cmd"
@@ -598,6 +664,7 @@ if (-not $installed) {
 
 Init-Secrets
 Finalize-Install
+Save-Profile
 if ($installed) { Verify-Daemons -Strict } else { Verify-Daemons }
 
 Write-Host ""
