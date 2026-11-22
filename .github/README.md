@@ -62,12 +62,41 @@ AgentRT 的每一次提交与每一个版本发布都由这里的流水线驱动
 | **Mirror Sync** | push（main 与 `v*` tag）/ 托管平台 webhook / 手动触发 | 主仓与叶子子模块的源码及 tag 单向同步到镜像托管平台 |
 | **Mirror Release Artifacts** | 手动触发 / 托管平台 webhook | 历史版本二进制产物回填到 GitHub / Gitee Releases |
 
-> Release 覆盖 8 个平台：Linux x86-64 / x86-32 / arm-64 / arm-32，
-> macOS arm-64 / x86-64，Windows x86-64 / x86-32。另有 RISC-V 腿作为仅手动
-> 触发的金丝雀，用于提前暴露交叉编译问题，不进入正式发布矩阵。
+> Release 覆盖 9 个平台：Linux x86-64 / x86-32 / arm-64 / arm-32 / riscv-64，
+> macOS arm-64 / x86-64，Windows x86-64 / x86-32。RISC-V 腿在 focal amd64 宿主
+> 上交叉编译（不做全模拟），产物经 qemu-user 冒烟后进入发行矩阵。
 
 发布是“fail-closed”的：任一平台构建失败、或干净环境无法安装/启动，都会阻断
 发布，不会产出带病制品。
+
+## 跨仓流水线边界（谁编译谁测试）
+
+四个仓各有一条 `.github/workflows/`，边界按“谁拥有该语言/装配，谁编译并测试”
+划分，不重复构建同一份源码：
+
+- **叶子语言单元**在自己仓内编译并跑测试：`sdk`（Python 包 + Rust TUI）、
+  `ecosystem`（Python 策略载荷）。
+- **装配仓只验装配**：`products` 校验 pin 可达、gitlink 与 `.gitmodules` 一致、
+  模块目录非空、C 源码面存在；产品件的真实编译与测试不在这里重复。
+- **机制核与产品件的真实编译、跨平台测试与发行**只在 `agentrt`：C 构建系统
+  把叶子子模块（atoms/commons/daemons/gateway/heapstore/protocols）与
+  `products` 装配件（cupolas/gateway_biz/…）编成同一套二进制，`build-test`
+  四腿（Linux 覆盖 / Linux canary-off / macOS / Windows）承担测试面。
+
+| 仓 | 流水线 | 作业数 | 编译面 | 测试/门禁面 |
+|---|---|---|---|---|
+| `agentrt` | Build & Test | 4 | 全部叶子 + `products` 装配件（C） | 四腿构建、ctest、覆盖率、Windows 安装烟测 |
+| `agentrt` | Quality Gates | 4 | —（复用构建缓存） | 伞仓 46 门 + 发布门禁 + actionlint + 一致性 |
+| `agentrt` | Release（三段） | 3 / 5 / 3 / 3 | 九平台矩阵（Linux 5 / macOS 2 / Windows 2） | 干净环境安装核验、签名、三端发布 |
+| `agentrt` | Sanitizers / Codegen / 其余 | 各 1~3 | 插桩子集 / 生成代码 | ASan+UBSan / 契约一致性 / 审计与同步 |
+| `sdk` | CI | 2 | sdk-python、tui（`cargo check --locked`） | pytest 全量、Rust 编译面 |
+| `ecosystem` | CI | 2 | 五模块语法面（`compileall`） | YAML/JSON 解析、四模块 pytest |
+| `products` | CI | 1 | 不编译（仅 C 源码面存在性） | pin/gitlink/非空/一致性 |
+
+每个仓遵守同一条失败域规则：**1 失败域 = 1 作业，单文件作业数 ≤5**；超出时用
+矩阵腿或可复用工作流合并，而不是继续堆作业。跨仓判据（如 `products` 的 pin、
+`sdk/tui` 的启动器）由 `agentrt` 门禁按同一 pin 取料校验，避免两份副本各自
+定义“什么算对”。
 
 ## 一个版本是怎么发布的
 
@@ -96,7 +125,7 @@ macOS Clean-Host。
 
 | 资产 | 说明 |
 |---|---|
-| `agentrt-<版本>-<平台>.tar.gz` / `.zip` | 平台自包含安装包（Linux/macOS 为 tar.gz，Windows 为 zip）。平台矩阵：Linux x86-64 / x86-32 / arm-64 / arm-32，macOS arm-64 / x86-64，Windows x86-64 / x86-32 |
+| `agentrt-<版本>-<平台>.tar.gz` / `.zip` | 平台自包含安装包（Linux/macOS 为 tar.gz，Windows 为 zip）。平台矩阵：Linux x86-64 / x86-32 / arm-64 / arm-32 / riscv-64，macOS arm-64 / x86-64，Windows x86-64 / x86-32 |
 | 同名 `.sha256` | 安装包的 SHA-256 校验文件 |
 | 同名 `.sig` | 安装包的分离签名 |
 | `manifest.<channel>.json`（+ `.asc`） | 本版本全部资产的清单及清单的分离签名——发布字节的权威（正式 stable 版为 `manifest.stable.json`） |
