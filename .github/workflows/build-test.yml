@@ -161,6 +161,9 @@ jobs:
         run: |
           H="${RUNNER_TEMP}/airy-l8"
           [ -d "$H" ] || exit 0
+          # 二进制并入证据根再归档：upload-artifact 拒绝工作区外的路径
+          # （../build 会被判 Invalid pattern），故先拷进来。
+          cp -a "${BUILD_DIR}/bin" "$H/bin" 2>/dev/null || true
           echo "== L-8 evidence tree =="
           find "$H" -maxdepth 4 \( -name '*.log' -o -name '*.txt' \) | sort || true
           for f in "$H"/logs/*.log "$H"/cases/*/logs/*.log; do
@@ -189,9 +192,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: l8-evidence
-          path: |
-            ${{ runner.temp }}/airy-l8
-            ${{ env.BUILD_DIR }}/bin
+          path: ${{ runner.temp }}/airy-l8
           if-no-files-found: ignore
           retention-days: 14
 
