@@ -171,12 +171,30 @@ sone() { # sone <daemon> [args...]
     echo $! >"$AIRY_HOME/run/$n.pid"
 }
 
+dstat() { # dstat <daemon> <pid>：记录未及拆卸即已死亡的守护（含 wait 退出码）
+    # 静默消失的守护是本档最贵的一类故障：后续 RPC 只会看到「不可达」，
+    # 没有退出码就成了猜测。rc=139/134 直接指向 SIGSEGV/SIGABRT，
+    # 与服务日志里的 fatal 追踪互为印证。必须放在 kill 之前调用。
+    local n="$1" pid="$2" rc
+    kill -0 "$pid" 2>/dev/null && return 0
+    wait "$pid" 2>/dev/null
+    rc=$?
+    if [ "$rc" -eq 127 ]; then
+        printf 'daemon: %s exited before teardown (status unavailable)\n' "$n" | tee -a "$EV/checks.log"
+    else
+        printf 'daemon: %s exited before teardown (rc=%s)\n' "$n" "$rc" | tee -a "$EV/checks.log"
+    fi
+    tail -n 40 "$LOGS/$n.log" >"$EV/daemon-$n-exit.log" 2>/dev/null || true
+    return 0
+}
+
 down() {
     local n pid
     mdown
     for n in gateway_d agent_d sched_d mem_d tool_d think_d llm_d notify_d cupolas_d; do
         [ -f "$AIRY_HOME/run/$n.pid" ] || continue
         pid=$(cat "$AIRY_HOME/run/$n.pid" 2>/dev/null || true)
+        [ -n "$pid" ] && dstat "$n" "$pid"
         [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
     done
     sleep 0.4
