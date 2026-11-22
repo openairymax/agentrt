@@ -11,7 +11,9 @@
 # 卫生策略：每次调用先关闭此前 open 的 ci-debug issue（至多保留一个），
 # 全绿后自然不再产生。
 #
-# 用法: ci-debug-dump.sh "<标题后缀>" "<日志文件>"
+# 用法: ci-debug-dump.sh "<标题后缀>" "<日志文件>" ["<artifact 名>"]
+# 第三参可选：该日志随 run 归档的 artifact 名。提供时正文写明 artifact
+# 与 run 链接，回看时不必依赖已消失的 runner 临时文件。
 # 依赖：bash + python3/python + GH_TOKEN（org repo 写权限）。
 # 不依赖 gh CLI/curl；Windows runner 的 Git Bash 路径语义与原生 python
 # 不一致（D:\... 路径、/tmp 映射），故整段提炼+API 全在 python 内完成，
@@ -20,6 +22,7 @@ set -uo pipefail
 
 TITLE_SUFFIX="${1:?usage: ci-debug-dump.sh <title-suffix> <logfile>}"
 LOGFILE="${2:?usage: ci-debug-dump.sh <title-suffix> <logfile>}"
+ARTIFACT="${3:-}"
 
 if [ -z "${GH_TOKEN:-}" ]; then
     echo "ci-debug-dump: skip (no GH_TOKEN)"
@@ -34,6 +37,7 @@ command -v python3 >/dev/null 2>&1 || PY="python"
 REPO="${GITHUB_REPOSITORY:-openairymax/agentrt}" \
 LABEL="ci-debug" \
 LOGFILE="$LOGFILE" \
+ARTIFACT="$ARTIFACT" \
 TITLE_SUFFIX="$TITLE_SUFFIX" \
 RUN_ID="${GITHUB_RUN_ID:-?}" \
 JOB_NAME="${GITHUB_JOB:-?}" \
@@ -50,6 +54,7 @@ repo = os.environ["REPO"]
 label = os.environ["LABEL"]
 tok = os.environ["GH_TOKEN"]
 logfile = os.environ["LOGFILE"]
+artifact = os.environ.get("ARTIFACT", "")
 suffix = os.environ["TITLE_SUFFIX"]
 run_id = os.environ["RUN_ID"]
 job = os.environ["JOB_NAME"]
@@ -96,10 +101,21 @@ def build_body():
 
 body_log = build_body()
 
+# 取证定位段：临时文件随 runner 销毁而消失，正文必须给出随 run 归档的
+# 完整日志出处，否则一周后回看只剩一条失效路径。
+run_url = f"https://github.com/{repo}/actions/runs/{run_id}"
+if artifact:
+    evidence = (f"Artifact: {artifact}（随 run 归档，run 页面可下载；"
+                f"下方正文为节选）")
+else:
+    evidence = "Artifact: 无（下方为节选，完整日志见 run 页面）"
+
 body = f"""Job: {job}
 Step: {suffix}
 Run: {run_id}
-Log: {logfile}
+{run_url}
+Log: {logfile}（runner 临时文件，运行结束即销毁）
+{evidence}
 
 ```
 {body_log}
