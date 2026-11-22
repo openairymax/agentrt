@@ -315,10 +315,10 @@ static void body_two_turns(void)
              "{\"records\":["
              "{\"record_id\":\"r2\",\"created_at\":1789566001,"
              "\"data\":\"用户: 第二个问题\\nAgentRT: 第二个回答\\n[reasoning] 第二段思考\","
-             "\"metadata\":\"{\\\"kind\\\":\\\"chat\\\"}\"},"
+             "\"metadata\":\"{\\\"source\\\":\\\"cli\\\",\\\"kind\\\":\\\"chat\\\"}\"},"
              "{\"record_id\":\"r1\",\"created_at\":1789566000,"
              "\"data\":\"用户: 第一个问题\\nAgentRT: 第一个回答\","
-             "\"metadata\":\"{\\\"kind\\\":\\\"chat\\\"}\"}],\"total\":2}");
+             "\"metadata\":\"{\\\"source\\\":\\\"cli\\\",\\\"kind\\\":\\\"chat\\\"}\"}],\"total\":2}");
 }
 
 /* n 条整轮记录，权威口径新→旧。 */
@@ -327,7 +327,8 @@ static void body_many_turns(int n)
     size_t off = (size_t)snprintf(g_body, sizeof(g_body), "{\"records\":[");
     for (int i = n - 1; i >= 0 && off < sizeof(g_body) - 128; i--) {
         off += (size_t)snprintf(g_body + off, sizeof(g_body) - off,
-                                "%s{\"data\":\"用户: Q%d\\nAgentRT: A%d\"}",
+                                "%s{\"data\":\"用户: Q%d\\nAgentRT: A%d\","
+                                "\"metadata\":{\"source\":\"cli\"}}",
                                 (i == n - 1) ? "" : ",", i, i);
     }
     snprintf(g_body + off, sizeof(g_body) - off, "],\"total\":%d}", n);
@@ -377,10 +378,12 @@ static void test_role_records(void)
     body_clear();
     snprintf(g_body, sizeof(g_body),
              "{\"records\":["
-             "{\"data\":\"系统内部记录\",\"metadata\":\"{\\\"role\\\":\\\"system\\\"}\"},"
-             "{\"data\":\"助手侧记录\",\"metadata\":\"{\\\"role\\\":\\\"assistant\\\","
-             "\\\"reasoning\\\":\\\"思考X\\\"}\"},"
-             "{\"data\":\"用户侧记录\",\"metadata\":{\"role\":\"user\"}}],\"total\":3}");
+             "{\"data\":\"系统内部记录\",\"metadata\":\"{\\\"source\\\":\\\"cli\\\","
+             "\\\"role\\\":\\\"system\\\"}\"},"
+             "{\"data\":\"助手侧记录\",\"metadata\":\"{\\\"source\\\":\\\"cli\\\","
+             "\\\"role\\\":\\\"assistant\\\",\\\"reasoning\\\":\\\"思考X\\\"}\"},"
+             "{\"data\":\"用户侧记录\",\"metadata\":{\"source\":\"cli\","
+             "\"role\":\"user\"}}],\"total\":3}");
     mock_reset();
     cli_session_restore();
 
@@ -422,7 +425,8 @@ static void test_turn_tagging(void)
     body_clear();
     snprintf(g_body, sizeof(g_body),
              "{\"records\":[{\"data\":\"用户: 旧问题\\nAgentRT: 旧回答\","
-             "\"metadata\":\"{\\\"kind\\\":\\\"chat\\\",\\\"tags\\\":\\\"chat,turn:7\\\"}\"}]}");
+             "\"metadata\":\"{\\\"source\\\":\\\"cli\\\",\\\"kind\\\":\\\"chat\\\","
+             "\\\"tags\\\":\\\"chat,turn:7\\\"}\"}]}");
     mock_reset();
     cli_session_restore();
 
@@ -443,7 +447,9 @@ static void test_prefix_variants(void)
     body_clear();
     /* 无前缀 → 原样 user 单条；有前缀无回复分隔 → 剥离 8 字节前缀后 user 单条。 */
     snprintf(g_body, sizeof(g_body),
-             "{\"records\":[{\"data\":\"用户: 只有提问\"},{\"data\":\"随手一句\"}]}");
+             "{\"records\":[{\"data\":\"用户: 只有提问\","
+             "\"metadata\":{\"source\":\"cli\"}},"
+             "{\"data\":\"随手一句\",\"metadata\":{\"source\":\"cli\"}}]}");
     mock_reset();
     cli_session_restore();
 
@@ -459,7 +465,8 @@ static void test_malformed_records(void)
     snprintf(g_body, sizeof(g_body),
              "{\"records\":["
              "{\"data\":\"   \"},{\"data\":123},{\"record_id\":\"x\"},"
-             "{\"data\":\"用户: 有效记录\\nAgentRT: 有效回复\"}]}");
+             "{\"data\":\"用户: 有效记录\\nAgentRT: 有效回复\","
+             "\"metadata\":{\"source\":\"cli\"}}]}");
     mock_reset();
     cli_session_restore();
     CHECK(g_history_count == 2 && content_at(0, "有效记录"),

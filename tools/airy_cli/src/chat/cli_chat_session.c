@@ -118,18 +118,20 @@ static cJSON *cli_session_md(cJSON *item, int *owned)
     return cJSON_IsObject(mdj) ? mdj : NULL;
 }
 
-/* 会话归属判定：已采纳会话标识时按 metadata.conv 精确匹配；否则回退为
- * source=="cli"——旧 CLI 记录没有 conv，既不能丢弃，也不能把 TUI 记录
- * 拉进 CLI 的恢复视图。 */
+/* 会话归属判定：source=="cli" 是硬前提（TUI/外部记录不进 CLI 恢复视图）；
+ * 记录带 conv 时按采纳的会话标识精确隔离，无 conv 的旧记录保留——升级前
+ * 写入的会话不能被丢弃。mem_d 作用域查询已按 conv 过滤，此处为第二道闸。 */
 static int cli_session_owned(cJSON *md)
 {
     if (!md)
         return 0;
-    cJSON *cv = cJSON_GetObjectItem(md, "conv");
-    if (g_cli_conv[0])
-        return cJSON_IsString(cv) && cv->valuestring && strcmp(cv->valuestring, g_cli_conv) == 0;
     cJSON *src = cJSON_GetObjectItem(md, "source");
-    return cJSON_IsString(src) && src->valuestring && strcmp(src->valuestring, "cli") == 0;
+    if (!cJSON_IsString(src) || !src->valuestring || strcmp(src->valuestring, "cli") != 0)
+        return 0;
+    cJSON *cv = cJSON_GetObjectItem(md, "conv");
+    if (g_cli_conv[0] && cJSON_IsString(cv) && cv->valuestring)
+        return strcmp(cv->valuestring, g_cli_conv) == 0;
+    return 1;
 }
 
 /* 单条记录还原。无 metadata / 无法解析即按 CLI 整轮线格式拆分。 */
