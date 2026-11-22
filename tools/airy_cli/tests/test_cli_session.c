@@ -19,7 +19,9 @@
  *   - 超量记录按 FIFO 成对丢弃，条数不超预算上限；
  *   - 网关不可达、响应不可解析均降级为错误提示且不崩溃；
  *   - 视图完全由权威响应导出：重复装配（中间清空）结果逐字一致，前端不落
- *     任何本地会话状态。
+ *     任何本地会话状态；
+ *   - 会话归属：先以无作用域窗口探测最近 CLI 会话标识，再按该标识取正文，
+ *     非本次会话的记录不得混入恢复视图。
  *
  * @owner: team-B
  */
@@ -59,10 +61,14 @@ static int g_srv_fd = -1;
 static pthread_t g_srv_thr;
 static _Atomic int g_stop = 0;
 
+/* 请求流水容量：恢复先探测会话标识、再取正文，需按序核对两次出站参数。 */
+#define MOCK_REQ_LOG 8
+
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 static _Atomic int g_reqs = 0;
 static char g_last_method[128] = "";
 static char g_last_params[1024] = "";
+static char g_req_params[MOCK_REQ_LOG][1024];
 static char g_body[16384] = "";
 static char g_raw[256] = "";
 
@@ -136,10 +142,19 @@ static char *mock_read_body(int fd, char *buf, size_t cap, size_t *n)
     return (buf + hlen < buf + *n) ? (buf + hlen) : (buf + *n);
 }
 
+/* 读取第 i 次请求的 params 副本；越界或未发生返回空串。 */
+static void mock_params_at(int i, char *out, size_t cap)
+{
+    pthread_mutex_lock(&g_lock);
+    snprintf(out, cap, "%s", (i >= 0 && i < MOCK_REQ_LOG) ? g_req_params[i] : "");
+    pthread_mutex_unlock(&g_lock);
+}
+
 /* 记录本次请求的 method/params，并自增计数。 */
 static void mock_record(const char *body)
 {
     pthread_mutex_lock(&g_lock);
+    int slot = g_reqs;
     if (body && *body) {
         cJSON *root = cJSON_Parse(body);
         if (root) {
@@ -151,6 +166,8 @@ static void mock_record(const char *body)
                 char *ps = cJSON_PrintUnformatted(p);
                 if (ps) {
                     snprintf(g_last_params, sizeof(g_last_params), "%s", ps);
+                    if (slot >= 0 && slot < MOCK_REQ_LOG)
+                        snprintf(g_req_params[slot], sizeof(g_req_params[slot]), "%s", ps);
                     free(ps);
                 }
             }
@@ -338,11 +355,14 @@ static void body_many_turns(int n)
 
 static void test_request_contract(void)
 {
+    char probe[1024];
     body_two_turns();
     mock_reset();
     cli_session_restore();
-    CHECK(g_reqs == 1 && strcmp(g_last_method, "mem.recent") == 0,
-          "request: dispatches mem.recent");
+    mock_params_at(0, probe, sizeof(probe));
+    CHECK(g_reqs == 2 && strcmp(g_last_method, "mem.recent") == 0,
+          "request: dispatches mem.recent (probe + assembly)");
+    CHECK(strstr(probe, "\"conv\"") == NULL, "request: probe window is unscoped");
     CHECK(req_limit() == (long)(cli_history_capacity() / 2),
           "request: limit matches half of message budget");
 
@@ -352,7 +372,8 @@ static void test_request_contract(void)
     body_two_turns();
     mock_reset();
     cli_session_restore();
-    CHECK(req_limit() == 6, "request: limit follows AIRY_CHAT_HISTORY_ROUNDS");
+    CHECK(req_limit() == 6 && g_reqs == 2,
+          "request: limit follows AIRY_CHAT_HISTORY_ROUNDS");
     unsetenv("AIRY_CHAT_HISTORY_ROUNDS");
 }
 
@@ -477,7 +498,7 @@ static void test_malformed_records(void)
     snprintf(g_body, sizeof(g_body), "{\"total\":0}");
     mock_reset();
     cli_session_restore();
-    CHECK(g_history_count == 0 && g_reqs == 1, "malformed: missing records tolerated");
+    CHECK(g_history_count == 0 && g_reqs == 2, "malformed: missing records tolerated");
 
     body_clear();
     snprintf(g_body, sizeof(g_body), "{\"records\":\"nope\"}");
@@ -524,8 +545,32 @@ static void test_no_local_state(void)
     mock_reset();
     cli_session_restore();
     CHECK(g_history_count == first_count && g_history_count > 0 &&
-              strcmp(g_history_contents[0], first_content) == 0 && g_reqs == 1,
+              strcmp(g_history_contents[0], first_content) == 0 && g_reqs == 2,
           "state: view fully derived from authority, no local session state");
+}
+
+/* 会话归属：探测窗口只用于发现最近 CLI 会话标识，正文按该标识取；其他
+ * 会话的记录即使混在同一响应里也不得进入恢复视图。 */
+static void test_conv_scoping(void)
+{
+    char fetch[1024];
+    body_clear();
+    snprintf(g_body, sizeof(g_body),
+             "{\"records\":["
+             "{\"data\":\"用户: 新会话问题\\nAgentRT: 新会话回答\","
+             "\"metadata\":{\"source\":\"cli\",\"conv\":\"sess_00000000deadbeef\"}},"
+             "{\"data\":\"用户: 旧会话问题\\nAgentRT: 旧会话回答\","
+             "\"metadata\":{\"source\":\"cli\",\"conv\":\"sess_00000000feedface\"}}]}");
+    mock_reset();
+    cli_session_restore();
+    mock_params_at(1, fetch, sizeof(fetch));
+
+    CHECK(g_reqs == 2, "conv: probe then scoped fetch");
+    CHECK(strstr(fetch, "\"conv\":\"sess_00000000deadbeef\"") != NULL,
+          "conv: fetch scoped to the newest CLI conversation");
+    CHECK(g_history_count == 2 && content_at(0, "新会话问题") &&
+              content_at(1, "新会话回答"),
+          "conv: records from other conversations filtered out");
 }
 
 static void test_degraded_paths(void)
@@ -571,6 +616,7 @@ int main(void)
     test_malformed_records();
     test_budget_clamp();
     test_no_local_state();
+    test_conv_scoping();
     test_degraded_paths();
 
     mock_stop();
