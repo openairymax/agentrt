@@ -1643,7 +1643,7 @@ section "Z" "B8 架构文档名实一致（V8.3 roadmap_status 实例状态名�
 # 0.1.21 L-11：注册形态由逐条 register 收敛为 method_desc_t 表 + register_all，
 # 门禁断言「名字在注册表且经表驱动注册」而非固定调用式，避免把重构误判为回潮。
 if grep -q '"roadmap_status"' "$_zrr" \
-    && grep -q 'method_dispatcher_register_all' "$_zrr" \
+    && grep -q 'disp_register_all' "$_zrr" \
     && [ -n "$(gw_cap_row "sched.roadmap_status")" ] \
     && grep -q '`roadmap_status`' "$ROOT/daemons/sched_d/README.md" \
     && grep -q 'roadmap_status' "$ROOT/daemons/gateway_d/README.md" \
