@@ -370,6 +370,61 @@ function Fetch-PrebuiltModule {
     Write-OK "$Name 预编译模块就位: $dest"
 }
 
+function Get-SrcApp {
+    # 源码应用根：airymaxhub 布局为 <root>/agent-workload（与 install.sh 的
+    # AIRY_SRC_APP 同语义）；扁平布局（仓库根即 agent-workload）回落 root。
+    $app = Join-Path $AIRY_SRC_DIR "agent-workload"
+    if (Test-Path (Join-Path $app "agentrt\VERSION")) { return $app }
+    return $AIRY_SRC_DIR
+}
+
+function Stage-PyRt {
+    # 源码模式下 cmake 只产出 C/C++ 二进制；守护进程依赖的 Python 运行时
+    # 需从源码树镜像到 lib/（与 install.sh 的 install_python_deps 同语义）。
+    $srcApp = Get-SrcApp
+    $libDir = Join-Path $AIRY_HOME "lib"
+    New-Item -ItemType Directory -Force -Path $libDir | Out-Null
+    foreach ($p in @("ecosystem\agents\airymax_agents",
+                     "ecosystem\agents\airymax_agents_rs",
+                     "ecosystem\agents\orchestration",
+                     "sdk\sdk-python\agentrt")) {
+        $src = Join-Path $srcApp $p
+        if (Test-Path $src) {
+            Copy-Item -Path $src -Destination $libDir -Recurse -Force
+        } else {
+            Write-Warn "跳过源码 python 运行时（缺失）: $p"
+        }
+    }
+}
+
+function Build-Tui {
+    $srcTui = Join-Path (Get-SrcApp) "sdk\tui"
+    if (-not (Test-Path $srcTui)) { return }
+    $cargo = Get-Command cargo -ErrorAction SilentlyContinue
+    if (-not $cargo -and (Test-Path (Join-Path $HOME ".cargo\bin\cargo.exe"))) {
+        $env:PATH = (Join-Path $HOME ".cargo\bin") + [IO.Path]::PathSeparator + $env:PATH
+        $cargo = Get-Command cargo -ErrorAction SilentlyContinue
+    }
+    if (-not $cargo) { Write-Warn "cargo 不可用，跳过 agentrt-tui"; return }
+    $env:AIRY_HOME = $AIRY_HOME
+    $env:CARGO_TARGET_DIR = Join-Path $AIRY_HOME "target"
+    New-Item -ItemType Directory -Force -Path (Join-Path $AIRY_HOME "logs") | Out-Null
+    $log = Join-Path $AIRY_HOME "logs\tui-build.log"
+    Push-Location $srcTui
+    try { cargo build --release *> $log } finally { Pop-Location }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warn "TUI 构建失败（/tui 与 --tui 不可用），日志: $log"
+        return
+    }
+    $exe = Join-Path $env:CARGO_TARGET_DIR "release\agentrt-tui.exe"
+    if (Test-Path $exe) {
+        Copy-Item $exe (Join-Path $AIRY_HOME "bin\agentrt-tui.exe") -Force
+        Write-OK "agentrt-tui 部署完成"
+    } else {
+        Write-Warn "TUI 产物未落地: $exe"
+    }
+}
+
 function Build-FromSource {
     if (-not (Test-Path (Join-Path $AIRY_SRC_DIR ".git"))) {
         Write-Info "git 拉取 airymaxhub（$AIRY_REPO_URL）…"
@@ -384,8 +439,7 @@ function Build-FromSource {
     } else {
         Write-Info "airymaxhub 源码已存在，复用本地源码树"
     }
-    $srcApp = Join-Path $AIRY_SRC_DIR "agent-workload"
-    if (-not (Test-Path (Join-Path $srcApp "agentrt\VERSION"))) { $srcApp = $AIRY_SRC_DIR }
+    $srcApp = Get-SrcApp
     $verFile = Join-Path $srcApp "agentrt\VERSION"
     if (Test-Path $verFile) {
         $realVer = (Get-Content $verFile -Raw).Trim()
@@ -410,7 +464,7 @@ function Build-FromSource {
     if (Test-Path $mrLib) { $cmakeArgs += " -DMEMORYROVOL_PRO_LIB=$mrLib" }
 
     Write-Info "cmake 配置…"
-    cmake -S (Join-Path $AIRY_SRC_DIR "agentrt") -B $buildDir $cmakeArgs
+    cmake -S (Join-Path $srcApp "agentrt") -B $buildDir $cmakeArgs
     if ($LASTEXITCODE -ne 0) { Write-Err "cmake 配置失败"; throw "cmake configure failed" }
 
     Write-Info "构建…"
@@ -421,6 +475,8 @@ function Build-FromSource {
     cmake --install $buildDir --config Release
     $binDir = Join-Path $buildDir "bin\Release"
     if (Test-Path $binDir) { Copy-Item (Join-Path $binDir "*") (Join-Path $AIRY_HOME "bin") -Recurse -Force -ErrorAction SilentlyContinue }
+    Stage-PyRt
+    Build-Tui
     Write-OK "源码构建安装完成"
 }
 
@@ -438,9 +494,10 @@ function Init-Secrets {
     } else {
         Write-OK "secrets.env 已存在，跳过"
     }
-    $srcYaml = Join-Path $AIRY_SRC_DIR "ecosystem\manager\configs\agentrt.yaml"
+    $srcEco = Join-Path (Get-SrcApp) "ecosystem"
+    $srcYaml = Join-Path $srcEco "manager\configs\agentrt.yaml"
     if (Test-Path $srcYaml) { Copy-Item $srcYaml (Join-Path $AIRY_HOME "config") -Force -ErrorAction SilentlyContinue }
-    $srcModel = Join-Path $AIRY_SRC_DIR "ecosystem\manager\model\model.yaml"
+    $srcModel = Join-Path $srcEco "manager\model\model.yaml"
     if (Test-Path $srcModel) { Copy-Item $srcModel (Join-Path $AIRY_HOME "config") -Force -ErrorAction SilentlyContinue }
 }
 
