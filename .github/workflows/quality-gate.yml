@@ -19,6 +19,10 @@ name: Quality Gates
 #
 # 纯文档变更跳过；同一 ref 的并发运行自动取消；构建树外化到 runner
 # temp，不落源码区。
+# 账本注记：门禁脚本与 LOC 账本 pin 都在伞仓 tools 侧。业务批一旦让
+# facade/core/cupolas 或单守护进程行数增长，须先在 tools 提交 pin 与
+# RATCHET-JUSTIFY，再推本仓；空提交不会重新入闸（paths-ignore 下零文件
+# 变更的推送被跳过），重跑须带真实变更或走 workflow_dispatch。
 
 on:
   push:
