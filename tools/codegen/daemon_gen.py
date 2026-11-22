@@ -573,7 +573,7 @@ def render_header(d):
         lines.append("int svc_activate(daemon_event_driver_t *driver, "
                      "daemon_bootstrap_sd_t *bsd);")
     if "attach" not in noop:
-        lines.append("void svc_attach(void *dispatcher);")
+        lines.append("int svc_attach(void *dispatcher);")
     if "teardown" not in noop:
         lines.append("void svc_teardown(void);")
     lines += [
