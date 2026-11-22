@@ -203,10 +203,16 @@ jobs:
           # 每 job 仅 ≤10 条且被截尾：46 门禁判红时，视图里只剩「某门 FAILED」
           # 而无判据，红因不可取证（Build & Test 腿的 ci-debug issue 已证明
           # 该通道是本仓唯一可匿名取证路径，此处按同口径接线）。
+          # 日志自带首尾：解释器起不来、脚本被信号截断时，文件里仍留下命令
+          # 与退出码，artifact 不会是一份无信息的空文件。
           set +e
-          bash "$RUNNER_TEMP/airymaxhub/tools/scripts/ci/quality/gates/quality-gate.sh" \
-            > /tmp/quality-gate.log 2>&1
+          script="$RUNNER_TEMP/airymaxhub/tools/scripts/ci/quality/gates/quality-gate.sh"
+          : > /tmp/quality-gate.log
+          printf '# command: bash %s\n# started: %s\n' \
+            "$script" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /tmp/quality-gate.log
+          bash "$script" >> /tmp/quality-gate.log 2>&1
           rc=$?
+          printf '# exit code: %s\n' "$rc" >> /tmp/quality-gate.log
           # 判红门禁名与汇总行提为 annotation：它们在完整日志里散落各处，
           # 只靠 tail 窗口会被挤出视图，是取证的第一入口。
           # 回显统一剥 ANSI 颜色码：annotation 与视图都不渲染转义序列，
@@ -294,8 +300,12 @@ jobs:
       - name: Run release gates (WS-9, A~AH)
         run: |
           set +e
-          bash scripts/verify_release_gates.sh > /tmp/release-gates.log 2>&1
+          : > /tmp/release-gates.log
+          printf '# command: bash scripts/verify_release_gates.sh\n# started: %s\n' \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> /tmp/release-gates.log
+          bash scripts/verify_release_gates.sh >> /tmp/release-gates.log 2>&1
           rc=$?
+          printf '# exit code: %s\n' "$rc" >> /tmp/release-gates.log
           if [ $rc -ne 0 ]; then
             grep -E '^\s*\[FAIL\]|门禁汇总' /tmp/release-gates.log \
               | sed -E 's/\x1b\[[0-9;]*m//g; s/^/::error::  /' | head -20
