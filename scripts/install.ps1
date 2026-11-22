@@ -14,6 +14,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# 本脚本路径：$PSCommandPath 在函数作用域内仍指向脚本本身；而
+# $MyInvocation.MyCommand.Path 在函数内为 $null（其 MyCommand 是该函数），
+# 曾导致「安装位置固化」一步 Copy-Item 参数绑定失败（Windows 安装烟测实证）。
+$ScriptPath = $PSCommandPath
+
 function Write-Info  { Write-Host "[INFO] $args" -ForegroundColor Cyan }
 function Write-OK    { Write-Host "[ OK ] $args" -ForegroundColor Green }
 function Write-Warn  { Write-Host "[WARN] $args" -ForegroundColor Yellow }
@@ -584,7 +589,7 @@ exit $LASTEXITCODE
     Copy-Item $launcher $link -Force
     Write-OK "启动器: $link → $launcher"
 
-    Copy-Item $MyInvocation.MyCommand.Path (Join-Path $AIRY_HOME "scripts\install.ps1") -Force -ErrorAction SilentlyContinue
+    Copy-Item $ScriptPath (Join-Path $AIRY_HOME "scripts\install.ps1") -Force -ErrorAction SilentlyContinue
     Write-OK "安装位置已固化: install.env + airymaxrt.cmd"
 }
 
