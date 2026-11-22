@@ -71,7 +71,7 @@ jobs:
         run: |
           # 同一 canonical publish-dist（release_run_id 定位）交给
           # mirror-release.yml 在后台续跑 Gitee；GH 段幂等跳过。concurrency
-          # group=mirror-release-${{ inputs.version }} 保证同版本不叠跑。
+          # group=mirror-release-<version> 保证同版本不叠跑。
           # dispatch 失败只告警不阻塞（GH 快通道已完成，Gitee 可稍后手动
           # 触发 mirror-release.yml 补齐）。
           gh workflow run mirror-release.yml \

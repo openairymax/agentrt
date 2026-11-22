@@ -405,7 +405,6 @@ jobs:
       # 构建目录位于源码树外（工作区上级目录）
       BUILD_DIR: ../build
       STAGE_DIR: stage
-      VERSION: ${{ env.VERSION }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
