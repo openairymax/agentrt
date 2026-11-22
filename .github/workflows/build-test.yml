@@ -169,13 +169,29 @@ jobs:
             tail -n 60 "$f"
             echo "::endgroup::"
           done
+          # 崩溃现场符号化：daemon_crash 写出的「模块(+0x偏移)」帧就地还原为
+          # 文件:行。构建产物与证据同源，免去失败后下载二进制的往返；二进制
+          # 仍随 artifact 上传，供本地复算。
+          for f in "$H"/logs/*.log "$H"/cases/*/logs/*.log; do
+            [ -f "$f" ] || continue
+            grep -oE '[^ ()]+\(\+0x[0-9a-fA-F]+\)' "$f" | sort -u | while read -r fr; do
+              m=${fr%%(*}; m=${m##*/}
+              o=${fr#*+}; o=${o%)}
+              [ -x "${BUILD_DIR}/bin/$m" ] || continue
+              echo "::group::symbolize $f $fr"
+              addr2line -f -C -e "${BUILD_DIR}/bin/$m" "$o" || true
+              echo "::endgroup::"
+            done
+          done
 
       - name: Upload L-8 evidence artifact
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: l8-evidence
-          path: ${{ runner.temp }}/airy-l8
+          path: |
+            ${{ runner.temp }}/airy-l8
+            ${{ env.BUILD_DIR }}/bin
           if-no-files-found: ignore
           retention-days: 14
 
