@@ -1855,16 +1855,20 @@ fi
 # 出现 contents 读取或 base64 解码时判为第二事实源；release 管理面 CRUD
 # 端点（创建 Release/上传/删除附件）是发布链合法职责，不误判。客户端
 # 消费面（install.sh/install.ps1/latest 启动器/npm 薄壳）零 API 直读零豁免。
+_rel_plane=("$ROOT/.github/workflows/release.yml")
+for _f in "$ROOT"/.github/workflows/release-*.yml; do
+    [ -f "$_f" ] && _rel_plane+=("$_f")
+done
 _ae2_client="$(grep -rn 'api\.atomgit\.com' \
     "$ROOT/scripts/install.sh" "$ROOT/scripts/install.ps1" \
     "$ROOT/latest/airymaxrt" "$ROOT/packaging/npm" 2>/dev/null || true)"
-_ae2_rel="$(grep -n 'api\.atomgit\.com' "$ROOT/.github/workflows/release.yml" 2>/dev/null \
+_ae2_rel="$(grep -n 'api\.atomgit\.com' "${_rel_plane[@]}" 2>/dev/null \
     | grep -E 'contents|base64' || true)"
 if [ -z "$_ae2_client" ] && [ -z "$_ae2_rel" ]; then
-    ok "AE2 V12.2 第二事实源零命中（客户端面零 API 直读；release.yml 零 contents/base64 消费）"
+    ok "AE2 V12.2 第二事实源零命中（客户端面零 API 直读；release 平面零 contents/base64 消费）"
 else
     [ -n "$_ae2_client" ] && bad "AE2 客户端消费面 API 直读残留: $(echo "$_ae2_client" | tr '\n' ' ')"
-    [ -n "$_ae2_rel" ] && bad "AE2 release.yml contents/base64 消费残留: $(echo "$_ae2_rel" | tr '\n' ' ')"
+    [ -n "$_ae2_rel" ] && bad "AE2 release 平面 contents/base64 消费残留: $(echo "$_ae2_rel" | tr '\n' ' ')"
 fi
 
 # N-1~N-5：npm 薄壳契约——包名固定、唯一网络目标为 release 附件面、
@@ -1907,7 +1911,8 @@ if [ -f "$PUBLISH" ]; then
 else
     skip "AE4 发布侧断言（hub tools 仓未检出，CI 侧兜底）"
 fi
-_ry="$ROOT/.github/workflows/release.yml"
+_ry="$ROOT/.github/workflows/release-publish.yml"
+[ -f "$_ry" ] || _ry="$ROOT/.github/workflows/release.yml"
 grep -q '^  publish-npm:' "$_ry" || _ae4_bad="$_ae4_bad publish-npm job 缺失"
 grep -qF 'needs: [publish-atomgit]' "$_ry" || _ae4_bad="$_ae4_bad publish-npm 未强绑附件刷新 job"
 if [ -z "$_ae4_bad" ]; then
