@@ -205,7 +205,7 @@ static void add_tools(cJSON *params)
  * 数组、role/content 须字符串、stream 字段不写（daemon 侧默认非流式）、
  * tool_calls 必须是数组、消息数 ≤ MAX_MESSAGES_PER_REQUEST。
  * 不写 max_tokens：输出上限由 llm_d 依 model.yaml 的 max_output 裁决，
- * 客户端写死会覆盖用户配置。 */
+ * 客户端写死会覆盖用户配置；temperature 同理归模型条目与 daemon 默认。 */
 static cJSON *params_build(const char *model, const cli_chat_msgbuf_t *buf, int with_tools)
 {
     cJSON *params = cJSON_CreateObject();
@@ -218,7 +218,6 @@ static cJSON *params_build(const char *model, const cli_chat_msgbuf_t *buf, int 
         cJSON_Delete(params);
         return NULL;
     }
-    cJSON_AddNumberToObject(params, "temperature", 0.7);
     if (with_tools)
         add_tools(params);
     return params;
