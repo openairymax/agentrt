@@ -326,15 +326,32 @@ sync_root() {
       return 1
     fi
   fi
-  local pair label url
+  local pair label url err2
   for pair in \
     "github|https://x-access-token:${GH_TOKEN}@github.com/${GH_ORG}/${ROOT_REPO}.git" \
     "gitee|https://oauth2:${GT_TOKEN}@gitee.com/${GT_ORG}/${ROOT_REPO}.git"; do
     label="${pair%%|*}"
     url="${pair#*|}"
-    git -C "$GITHUB_WORKSPACE" push -q "$url" \
-      "${main_ref}:refs/heads/main" \
-      || { echo "::error::agentrt: push $label (main) failed"; rc=1; }
+    # 快照过期不是分叉：main_ref 是运行开始时的 SSoT 快照，期间若有人
+    # 直接推送镜像（发布前实操即如此），远端 tip 领先快照，非 force 推送
+    # 被拒。此时重取 SSoT 再试一次；仍被拒才是 SSoT 落后于镜像的真分叉，
+    # 必须大声失败（镜像语义 = 与 SSoT 一致，不得静默覆盖）。
+    if ! err="$(git -C "$GITHUB_WORKSPACE" push -q "$url" \
+        "${main_ref}:refs/heads/main" 2>&1)"; then
+      log "  $label main: snapshot stale, re-fetch SSoT and retry once"
+      if ! err2="$(timeout 300 git -C "$GITHUB_WORKSPACE" fetch -q \
+          "$(src_url "$ROOT_REPO")" "+refs/heads/main:${main_ref}" 2>&1)"; then
+        echo "::error::agentrt: atomgit main fetch failed: $(printf '%s' "$err2" | redact | tr '\n' ' ' | tail -c 300)"
+        rc=1
+        continue
+      fi
+      if ! err="$(git -C "$GITHUB_WORKSPACE" push -q "$url" \
+          "${main_ref}:refs/heads/main" 2>&1)"; then
+        echo "::error::agentrt: push $label (main) failed after refetch: $(printf '%s' "$err" | redact | tr '\n' ' ' | tail -c 300)"
+        rc=1
+        continue
+      fi
+    fi
     git -C "$GITHUB_WORKSPACE" push -q --force --tags "$url" \
       || { echo "::error::agentrt: push $label (tags) failed"; rc=1; }
   done
