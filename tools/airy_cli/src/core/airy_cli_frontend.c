@@ -26,6 +26,20 @@
 #include <windows.h>
 #endif
 
+/* S-P0-02：错误提示里的日志路径必须可直接打开。用户 cwd 各异，相对
+ * logs/agentrt-tui.log 只会在报错时误导排查；以机制侧 paths 为唯一来源。 */
+static const char *tui_log_file(void)
+{
+    static char buf[AIRY_PATH_MAX + 32];
+    airy_paths_view_t v;
+
+    if (airy_paths_query(&v) == AIRY_SUCCESS && v.log[0])
+        snprintf(buf, sizeof(buf), "%s/agentrt-tui.log", v.log);
+    else
+        snprintf(buf, sizeof(buf), "agentrt-tui.log");
+    return buf;
+}
+
 /* TUI 二进制存在性判定（不区分平台的差异只在此处）。 */
 static int tui_bin_present(const char *path)
 {
@@ -72,16 +86,16 @@ static int tui_run_posix(const char *tui_bin, const char *agf, int resume)
         }
     }
     if (WIFSIGNALED(st)) {
-        char msg[128];
-        snprintf(msg, sizeof(msg), "TUI 异常终止（信号 %d），日志: logs/agentrt-tui.log",
-                 WTERMSIG(st));
+        char msg[AIRY_PATH_MAX + 64];
+        snprintf(msg, sizeof(msg), "TUI 异常终止（信号 %d），日志: %s",
+                 WTERMSIG(st), tui_log_file());
         cli_print_line("Super Agent:tui", msg);
         return 128 + WTERMSIG(st);
     }
     int rc = WIFEXITED(st) ? WEXITSTATUS(st) : 126;
     if (rc != 0) {
-        char msg[160];
-        snprintf(msg, sizeof(msg), "TUI 退出码 %d，日志: logs/agentrt-tui.log", rc);
+        char msg[AIRY_PATH_MAX + 64];
+        snprintf(msg, sizeof(msg), "TUI 退出码 %d，日志: %s", rc, tui_log_file());
         cli_print_line("Super Agent:tui", msg);
     }
     return rc;
@@ -115,8 +129,8 @@ static int tui_run_win(const char *tui_bin, const char *agf, int resume)
     CloseHandle(pi.hProcess);
     if (code != 0 && code != STILL_ACTIVE) {
         char msg[160];
-        snprintf(msg, sizeof(msg), "TUI 退出码 %lu，日志: logs/agentrt-tui.log",
-                 (unsigned long)code);
+        snprintf(msg, sizeof(msg), "TUI 退出码 %lu，日志: %s",
+                 (unsigned long)code, tui_log_file());
         cli_print_line("Super Agent:tui", msg);
     }
     return (int)code;
