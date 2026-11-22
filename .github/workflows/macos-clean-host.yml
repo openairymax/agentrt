@@ -11,8 +11,9 @@ name: macOS Clean-Host Verify
 # （product 内容与正式发布一致）。
 #
 # 触发：
-#   - workflow_dispatch（版本由输入指定）。tag 仅在真正创建发行版时打
-#     （atomgit SSoT 单向同步），核验类运行一律 dispatch。
+#   - workflow_dispatch（版本由输入指定；手工复核用）；
+#   - workflow_run（Release 成功完成后自动核验该 tag，版本取 tag 名）。
+#     tag 仅在真正创建发行版时打（atomgit SSoT 单向同步）。
 # 两腿（arm-64 / x86-64）结构完全同构，matrix 收敛；各自验证对应架构
 # 发布包。判定全在脚本内 fail-closed：job 结论 success 即出证。
 #
@@ -26,6 +27,12 @@ on:
       version:
         description: '待核验产品版本（如 vX.Y.Z；留空则取本树 VERSION，零硬编码）'
         required: false
+  # 发行段完成后自动核验：不需要 actions:write，也不依赖人工 dispatch。
+  # Release 是三段式唯一顶层 run（package/publish 为 reusable workflow，
+  # 不产生独立 run），故监听 Release 完成即可保证制品已发布。
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
 
 permissions:
   contents: read
@@ -37,6 +44,8 @@ concurrency:
 jobs:
   clean-host:
     name: macOS ${{ matrix.arch }} clean-host
+    # 自动触发只在发行成功时核验；手工 dispatch 一律执行。
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -57,16 +66,22 @@ jobs:
       - name: Checkout (workflow + verify script)
         uses: actions/checkout@v4
         with:
+          # 自动核验时取发行 run 的确切提交，安装器与制品同源；dispatch 取当前树。
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 1
           submodules: false
 
       - name: "Resolve product version (SSoT: VERSION file)"
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_TAG: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
           if [ -n "${INPUT_VERSION}" ]; then
             VERSION="${INPUT_VERSION}"
+          elif [ "${EVENT_NAME}" = "workflow_run" ] && printf '%s' "${RUN_TAG}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([a-z0-9]+)?$'; then
+            VERSION="${RUN_TAG}"
           else
             VERSION="v$(tr -d '[:space:]' < VERSION)"
           fi
