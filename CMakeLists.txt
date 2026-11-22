@@ -180,9 +180,16 @@ airy_print_info("Sanitizers:       ${ENABLE_SANITIZERS}")
 # libcjson.so.1 等非系统库，目标机无该库则 "error while loading shared
 # libraries"）。全部二进制携带 $ORIGIN/../lib RUNPATH；发布打包时把
 # 非系统核心 .so 随包放入 lib/，安装后无需目标机预装 cJSON/OpenSSL 等。
-set(CMAKE_BUILD_RPATH "$ORIGIN/../lib")
-set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
+if(APPLE)
+    # dyld 不识别 $ORIGIN：可执行文件在 bin/ 里用 @executable_path/../lib，
+    # 同目录内的 dylib 互相引用用 @loader_path（安装后 lib/ 内自洽）。
+    set(CMAKE_BUILD_RPATH "@loader_path/../lib")
+    set(CMAKE_INSTALL_RPATH "@loader_path;@executable_path/../lib")
+else()
+    set(CMAKE_BUILD_RPATH "$ORIGIN/../lib")
+    set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
+endif()
 
 # 传递依赖自包含（0.1.19 洁净环境 e2e 根因）：发行版 ld.so 默认生成
 # DT_RUNPATH，仅对**直接依赖**生效、不传给子依赖。第三方 .so（如
