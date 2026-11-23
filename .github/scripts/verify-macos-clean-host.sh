@@ -282,6 +282,7 @@ CLI_OUT="$AH/logs/clean-host-cli.out"
 CLI_ERR="$AH/logs/clean-host-cli.err"
 ATT="$AH/logs/clean-host-attempts.log"
 : >"$ATT"
+printf '%s phase4-online-done\n' "$(date -u +%H:%M:%SZ)" >>"$ATT"
 # probe_state <snapshot> → "gw=<online|offline|none> n=<N> m=<M> off=<n>"
 probe_state() {
     local o="$1" gw sum n m off
@@ -316,8 +317,8 @@ smoke_fail() {
         head -n 10 "$CLI_ERR" 2>/dev/null || true
         echo "== launcher 日志尾部 12 行 =="
         tail -n 12 "$LOGF" 2>/dev/null | cut -c 1-150 || true
-        echo "== gateway_d.out 尾部 12 行 =="
-        tail -n 12 "$AH/logs/gateway_d.out" 2>/dev/null | cut -c 1-150 || true
+        echo "== gateway_d.out 尾部 40 行（[SIG] 触发行必须在窗口内）=="
+        tail -n 40 "$AH/logs/gateway_d.out" 2>/dev/null | cut -c 1-150 || true
         echo "== 决定性证据：HTTP 直连计时（GET /health = CLI 判据同源）=="
         curl -sS --max-time 5 -o /dev/null \
             -w 'GET /health code=%{http_code} total=%{time_total}s\n' \
@@ -332,6 +333,17 @@ smoke_fail() {
         echo "ESTABLISHED 计数: $(lsof -nP -iTCP:"${GWP}" 2>/dev/null | grep -c ESTABLISHED || true)"
         echo "== 决定性证据：gateway MHD/线程池启动行 =="
         grep -nE "MHD|thread|pool|HTTP gateway" "$AH/logs/gateway_d.out" 2>/dev/null | head -10 || true
+        echo "== 决定性证据：gateway 停机触发源（SIG/自停/重启计数）=="
+        grep -nE "\[SIG\]|stopped unexpectedly|Gateway service starting|HTTP gateway" \
+            "$AH/logs/gateway_d.out" 2>/dev/null | tail -12 || true
+        echo "== 决定性证据：supervisor 子进程死因（exit/signal/restart/backoff）=="
+        grep -nE "gateway|exit|signal|restart|backoff|FAILED" \
+            "$AH/logs/supervisor_d.out" 2>/dev/null | tail -20 || true
+        echo "== 决定性证据：进程表（启动时刻/父子关系）=="
+        ps -Ao pid,ppid,lstart,command 2>/dev/null \
+            | grep -E '_d( |$)|airy_cli|airymaxrt' | grep -v grep | head -20 || true
+        echo "== 决定性证据：gateway 重启次数 =="
+        grep -c "Gateway service starting" "$AH/logs/gateway_d.out" 2>/dev/null || true
     } >"$EV" 2>&1 || true
     dump_file "CLI 冒烟取证" "$EV"
     fail "$*"
@@ -355,7 +367,12 @@ while [ "$_i" -lt 60 ]; do
     fi
     _o="$(cat "$CLI_OUT" 2>/dev/null || true)"
     _st="$(probe_state "$_o")"
-    printf '%s attempt=%s rc=%s %s\n' "$(date -u +%H:%M:%SZ)" "$_i" "$_rc" "$_st" >>"$ATT"
+    _gwhttp="$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 \
+        "http://127.0.0.1:${GWP}/health" 2>/dev/null || true)"
+    _gpids="$(pgrep -f 'gateway_d' 2>/dev/null | tr '\n' ',' || true)"
+    printf '%s attempt=%s rc=%s %s gwhttp=%s gpids=%s\n' \
+        "$(date -u +%H:%M:%SZ)" "$_i" "$_rc" "$_st" "${_gwhttp:-none}" \
+        "${_gpids:-none}" >>"$ATT"
     if smoke_ok "$_st"; then
         OUT="$_o"; _ok=1; break
     fi
