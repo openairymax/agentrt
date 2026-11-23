@@ -13,7 +13,11 @@ name: macOS Clean-Host Verify
 # 触发：
 #   - workflow_dispatch（版本由输入指定；手工复核用）；
 #   - workflow_run（Release 成功完成后自动核验该 tag，版本取 tag 名）。
-#     tag 仅在真正创建发行版时打（atomgit SSoT 单向同步）。
+#     tag 仅在真正创建发行版时打（atomgit SSoT 单向同步）；
+#   - repository_dispatch（types=macos-clean-host，payload 带 version）：
+#     仅需 contents 写权限即可触发，用于发布 run 判红后补证——此时
+#     workflow_run 不成立，而经典 PAT 的 workflow_dispatch 需要 workflow
+#     scope（fine-grained 令牌一律 403），故以 dispatch 事件留出程序化通道。
 # 两腿（arm-64 / x86-64）结构完全同构，matrix 收敛；各自验证对应架构
 # 发布包。判定全在脚本内 fail-closed：job 结论 success 即出证。
 #
@@ -33,6 +37,10 @@ on:
   workflow_run:
     workflows: ["Release"]
     types: [completed]
+  # 程序化补证通道：与 workflow_dispatch 的 version 入参同义，由下方
+  # env 表达式归一（inputs.version 为空时取 client_payload.version）。
+  repository_dispatch:
+    types: [macos-clean-host]
 
 permissions:
   contents: read
@@ -73,7 +81,7 @@ jobs:
 
       - name: "Resolve product version (SSoT: VERSION file)"
         env:
-          INPUT_VERSION: ${{ github.event.inputs.version }}
+          INPUT_VERSION: ${{ github.event.inputs.version || github.event.client_payload.version }}
           EVENT_NAME: ${{ github.event_name }}
           RUN_TAG: ${{ github.event.workflow_run.head_branch }}
         run: |
