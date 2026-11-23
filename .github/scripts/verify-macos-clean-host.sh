@@ -332,7 +332,10 @@ smoke_fail() {
         lsof -nP -iTCP:"${GWP}" 2>/dev/null | head -15 || true
         echo "ESTABLISHED 计数: $(lsof -nP -iTCP:"${GWP}" 2>/dev/null | grep -c ESTABLISHED || true)"
         echo "== 决定性证据：gateway MHD/线程池启动行 =="
-        grep -nE "MHD|thread|pool|HTTP gateway" "$AH/logs/gateway_d.out" 2>/dev/null | head -10 || true
+        # 注意：日志每行前缀均含 [thread:，故关键字必须锚定到语义短语，
+        # 否则 head -10 恒等于文件前 10 行（取证失真）。
+        grep -nE "MHD_start_daemon|http_gateway_start|probe_listen|listening|thread pool" \
+            "$AH/logs/gateway_d.out" 2>/dev/null | head -10 || true
         echo "== 决定性证据：gateway 停机触发源（SIG/自停/重启计数）=="
         grep -nE "\[SIG\]|stopped unexpectedly|Gateway service starting|HTTP gateway" \
             "$AH/logs/gateway_d.out" 2>/dev/null | tail -12 || true
