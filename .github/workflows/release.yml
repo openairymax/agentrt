@@ -36,7 +36,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # 发布正文契约前置：正文结构只在装配段校验（release-package.yml 的
+  # Generate release notes），失败点排在九平台构建之后。契约违规要等
+  # 矩阵跑完才暴露（tag run 45238559586 已为坏正文启动全矩阵，
+  # Quality Gates 45239752727 判红即该违规）。本作业只读检出，复用同一个
+  # check-release-notes.sh（判定实现单点，不复制规则），秒级失败。
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', github.event.inputs.version) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Assert release notes contract
+        run: bash .github/scripts/check-release-notes.sh "RELEASE_NOTES.d/${VERSION}.md"
+
   build:
+    needs: [preflight]
     uses: ./.github/workflows/release-build.yml
     secrets: inherit
     permissions:
