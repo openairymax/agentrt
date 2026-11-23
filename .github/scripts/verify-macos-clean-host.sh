@@ -270,14 +270,76 @@ info "gateway online（127.0.0.1:${GWP}）"
 info "CLI 冒烟: airy_cli -p /daemons"
 # airy_cli -p 输出到 stdout；启动器自身亦写该日志，直接调用独立进程断言。
 # macOS 无 timeout(1)：以后台 + 轮询实现 30s 超时（bash3.2 兼容）。
+#
+# 采样语义（rc5 实证修正）：旧实现「出现汇总行即锁定首次快照」，而汇总行在
+# 任何状态都会打印——瞬时态（前端流式会话刚起、gateway 尚未对新连接就绪）
+# 被当作终态。现改为「断言成立才收敛」：每轮取一次完整快照，最多 60 轮
+# ×2s；判据本身一条不放宽（gateway online + 无 offline + N==M 且 M>0）。
 OUT=""
 _i=0
+_ok=0
 CLI_OUT="$AH/logs/clean-host-cli.out"
-# 冒烟失败时输出经 annotation 通道出证（job log 需 admin）
-smoke_fail() { dump_file "CLI 冒烟输出" "$CLI_OUT"; fail "$*"; }
+CLI_ERR="$AH/logs/clean-host-cli.err"
+ATT="$AH/logs/clean-host-attempts.log"
+: >"$ATT"
+# probe_state <snapshot> → "gw=<online|offline|none> n=<N> m=<M> off=<n>"
+probe_state() {
+    local o="$1" gw sum n m off
+    gw="$(printf '%s\n' "$o" | awk '$1 == "gateway" { print $2; exit }')"
+    sum="$(printf '%s\n' "$o" | grep -E '^online [0-9]+/[0-9]+$' | tail -1)"
+    n="${sum#online }"; n="${n%%/*}"
+    m="${sum#*/}"
+    off="$(printf '%s\n' "$o" | grep -c ' offline' || true)"
+    printf 'gw=%s n=%s m=%s off=%s' "${gw:-none}" "${n:-?}" "${m:-?}" "${off:-0}"
+}
+smoke_ok() {
+    local st="$1" n m
+    case "$st" in
+        "gw=online n="*" off=0") ;;
+        *) return 1 ;;
+    esac
+    n="${st#*n=}"; n="${n%% *}"
+    m="${st#*m=}"; m="${m%% *}"
+    [ -n "$n" ] && [ -n "$m" ] && [ "$n" = "$m" ] && [ "$m" -gt 0 ]
+}
+# 冒烟失败取证（annotation 通道，job log 需 admin）。dump_file 只保尾部
+# 9900B，故决定性证据（HTTP 直连计时/连接面/MHD 线程池行）置于尾部。
+smoke_fail() {
+    local EV="$AH/logs/clean-host-cli-evidence.txt"
+    {
+        echo "== 断言终态: attempts=${_i} ok=${_ok} =="
+        echo "== 逐轮快照摘要（尾部 15 轮）=="
+        tail -n 15 "$ATT" 2>/dev/null || true
+        echo "== 末轮 CLI stdout（前 30 行）=="
+        head -n 30 "$CLI_OUT" 2>/dev/null || true
+        echo "== 末轮 CLI stderr（前 10 行）=="
+        head -n 10 "$CLI_ERR" 2>/dev/null || true
+        echo "== launcher 日志尾部 12 行 =="
+        tail -n 12 "$LOGF" 2>/dev/null | cut -c 1-150 || true
+        echo "== gateway_d.out 尾部 12 行 =="
+        tail -n 12 "$AH/logs/gateway_d.out" 2>/dev/null | cut -c 1-150 || true
+        echo "== 决定性证据：HTTP 直连计时（GET /health = CLI 判据同源）=="
+        curl -sS --max-time 5 -o /dev/null \
+            -w 'GET /health code=%{http_code} total=%{time_total}s\n' \
+            "http://127.0.0.1:${GWP}/health" 2>&1 || true
+        echo "GET /health body: $(curl -sS --max-time 5 "http://127.0.0.1:${GWP}/health" 2>&1 | head -c 200)"
+        echo "== 决定性证据：POST / ping（launcher 健康探测同源）=="
+        curl -sS --max-time 5 -o /dev/null \
+            -w 'POST / code=%{http_code} total=%{time_total}s\n' \
+            -X POST "http://127.0.0.1:${GWP}/" 2>&1 || true
+        echo "== 决定性证据：gateway 连接面（LISTEN/ESTABLISHED）=="
+        lsof -nP -iTCP:"${GWP}" 2>/dev/null | head -15 || true
+        echo "ESTABLISHED 计数: $(lsof -nP -iTCP:"${GWP}" 2>/dev/null | grep -c ESTABLISHED || true)"
+        echo "== 决定性证据：gateway MHD/线程池启动行 =="
+        grep -nE "MHD|thread|pool|HTTP gateway" "$AH/logs/gateway_d.out" 2>/dev/null | head -10 || true
+    } >"$EV" 2>&1 || true
+    dump_file "CLI 冒烟取证" "$EV"
+    fail "$*"
+}
 while [ "$_i" -lt 60 ]; do
-    _o=""
-    "$AH/bin/airy_cli" -p /daemons >"$CLI_OUT" 2>/dev/null &
+    _i=$((_i + 1))
+    _rc=0
+    "$AH/bin/airy_cli" -p /daemons >"$CLI_OUT" 2>"$CLI_ERR" &
     _cpid=$!
     _t=0
     while [ "$_t" -lt 30 ] && kill -0 "$_cpid" 2>/dev/null; do
@@ -285,30 +347,35 @@ while [ "$_i" -lt 60 ]; do
     done
     if kill -0 "$_cpid" 2>/dev/null; then
         kill -KILL "$_cpid" 2>/dev/null || true
-    else
         wait "$_cpid" 2>/dev/null || true
-        _o="$(cat "$CLI_OUT" 2>/dev/null || true)"
+        _rc=124
+        : >"$CLI_OUT"
+    else
+        wait "$_cpid" 2>/dev/null || _rc=$?
     fi
-    if [ -n "$_o" ] && printf '%s' "$_o" | grep -q '^online '; then
-        OUT="$_o"; break
+    _o="$(cat "$CLI_OUT" 2>/dev/null || true)"
+    _st="$(probe_state "$_o")"
+    printf '%s attempt=%s rc=%s %s\n' "$(date -u +%H:%M:%SZ)" "$_i" "$_rc" "$_st" >>"$ATT"
+    if smoke_ok "$_st"; then
+        OUT="$_o"; _ok=1; break
     fi
-    _i=$((_i + 1))
     sleep 2
 done
 printf '%s\n' "$OUT" >"$CLI_OUT" 2>/dev/null || true
 printf '%s\n' "$OUT" | sed 's/^/    /' | head -30
-printf '%s\n' "$OUT" | grep -q "gateway online" || smoke_fail "冒烟断言失败: gateway 非 online"
+summary_of() { printf '%s\n' "$OUT" | grep -E '^online [0-9]+/[0-9]+$' | tail -1; }
+printf '%s\n' "$OUT" | grep -q "gateway online" || smoke_fail "冒烟断言失败: gateway 非 online（${_i} 轮采样）"
 if printf '%s\n' "$OUT" | grep -q " offline"; then
-    smoke_fail "冒烟断言失败: 存在 offline daemon"
+    smoke_fail "冒烟断言失败: 存在 offline daemon（${_i} 轮采样）"
 fi
-SUMMARY="$(printf '%s\n' "$OUT" | grep -E '^online [0-9]+/[0-9]+$' | tail -1)"
-[ -n "$SUMMARY" ] || smoke_fail "冒烟断言失败: 缺汇总行 online N/M"
+SUMMARY="$(summary_of)"
+[ -n "$SUMMARY" ] || smoke_fail "冒烟断言失败: 缺汇总行 online N/M（${_i} 轮采样）"
 N="${SUMMARY#online }"; N="${N%%/*}"
 M="${SUMMARY#*/}"
 if [ "$N" != "$M" ] || [ "$M" -le 0 ]; then
     smoke_fail "冒烟断言失败: 汇总 ${SUMMARY}（要求 N==M 且 M>0）"
 fi
-info "CLI 冒烟通过: $SUMMARY"
+info "CLI 冒烟通过: $SUMMARY（采样 ${_i} 轮）"
 
 # ─── 阶段 6：收尾 ─────────────────────────────────────────────────────────
 kill -TERM "$L_PID" 2>/dev/null || true
