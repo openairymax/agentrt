@@ -90,7 +90,11 @@ inputs:
     # 与 agentrt latest/airymaxrt 逐字节一致）。旧 pin 的 scripts/airymaxrt
     # 仍按缺省端口预写并忽视已在线栈，AF1 双面判据报分叉，发行件也会在
     # 运行中的 gateway 旁边另起一个。
-    default: 'ff21273dde8d92f547a8b35e21d9533fa0c2699f'
+    # 9540efc：tui gitlink 前推至 ce2bd83（前端空参数数组按 POSIX 惯用式
+    # 展开）。macOS 系统 bash 3.2 在 set -u 下把空数组的 "${arr[@]}" 判为
+    # unbound variable，启动器直死、gateway 随之退出；旧 pin 的发行包
+    # bin/airymaxrt-full 仍带该缺陷，干净机核验恒报 gateway offline。
+    default: '9540efc5493a0ac72a7aae98ab8e0876ad990fc5'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
