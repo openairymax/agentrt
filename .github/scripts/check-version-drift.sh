@@ -44,10 +44,10 @@ check() {
     local file="$1" got="$2"
 
     if [ -z "$got" ]; then
-        echo "::error::$file 未找到兜底版本文面量（应为 $want）" >&2
+        echo "::error::${file} 未找到兜底版本文面量（应为 ${want}）" >&2
         rc=1
     elif [ "$got" != "$want" ]; then
-        echo "::error::$file 兜底版本 $got 与 VERSION 漂移（应为 $want）" >&2
+        echo "::error::${file} 兜底版本 ${got} 与 VERSION 漂移（应为 ${want}）" >&2
         rc=1
     else
         echo "ok: $file 兜底版本 $got 与 VERSION 一致"

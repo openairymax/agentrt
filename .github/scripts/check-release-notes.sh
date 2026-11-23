@@ -16,7 +16,7 @@ if [ -z "$file" ]; then
     exit 2
 fi
 if [ ! -f "$file" ]; then
-    echo "::error::缺发布说明 $file（发行正文 SSoT 必须随 tag 入库）"
+    echo "::error::缺发布说明 ${file}（发行正文 SSoT 必须随 tag 入库）"
     exit 1
 fi
 
