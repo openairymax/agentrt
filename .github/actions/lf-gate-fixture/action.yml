@@ -170,7 +170,9 @@ inputs:
     # 同主题提交（判据、理由与数值一律不动），facade pin 随之抬到 80829（实测
     # +71，daemons 958436c 的 supervisor_d 启动就绪判定）。不 bump 则 g41 仍按
     # 旧 SHA 判失配、L-9 判「未回流」、LocBudget/g42 按 80758 判超账。
-    default: '24b15120d4784889f7ee139a6853ad6ea58d013e'
+    # 1a14bd6：把容量边告警（S-P2-02）记进 facade 账（80851）。此前 pin 停
+    # 在 80829，LocBudget/g42 会按旧账判超。
+    default: '1a14bd6b6a08fc45a31dc8483f3fdc15089d7dc7'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
