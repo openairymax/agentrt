@@ -87,7 +87,13 @@ if [ -f "${AIRY_MODEL_CONFIG:-$AIRY_CFG_DIR/model.yaml}" ]; then
 else
     MODEL_CONFIG="${AIRY_MODEL_CONFIG:-$AIRYRT_HOME/ecosystem/manager/model/model.yaml}"
 fi
-AGENT_FILE="${AIRY_AGENT_FILE:-agents/main.agent.yaml}"
+# S-P0-01：agent 定义不设 cwd 相对的默认值。显式给了 AIRY_AGENT_FILE 就原样
+# 下发（TUI/daemon 各有解析与失败语义）；未给时优先安装态的 main 定义，
+# 不存在则不导出——由 gateway 用内置默认 spec，避免幽灵路径直接阻断启动。
+AGENT_FILE="${AIRY_AGENT_FILE:-}"
+if [ -z "$AGENT_FILE" ] && [ -f "${AIRY_HOME}/agents/main.agent.yaml" ]; then
+    AGENT_FILE="${AIRY_HOME}/agents/main.agent.yaml"
+fi
 
 LOG_FILE="$LOG_DIR/airymaxrt.log"
 AIRYRT_LOG_LEVEL="${AIRYRT_LOG_LEVEL:-info}"
@@ -2305,7 +2311,11 @@ launch_frontend() {
         return 0
     fi
     export AIRY_GATEWAY_URL="$GATEWAY_URL"
-    export AIRY_AGENT_FILE="$AGENT_FILE"
+    if [ -n "$AGENT_FILE" ]; then
+        export AIRY_AGENT_FILE="$AGENT_FILE"
+    else
+        unset AIRY_AGENT_FILE
+    fi
     # A-9 H4：标记启动来源，CLI 据此绑定父进程死亡联动（PDEATHSIG）。
     export AIRY_LAUNCHED_BY="airymaxrt"
     if [ "$FRONTEND_TUI" = "1" ] && [ -t 0 ] && [ -t 1 ]; then
