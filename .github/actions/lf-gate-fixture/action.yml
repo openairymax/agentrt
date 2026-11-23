@@ -172,7 +172,10 @@ inputs:
     # 旧 SHA 判失配、L-9 判「未回流」、LocBudget/g42 按 80758 判超账。
     # 1a14bd6：把容量边告警（S-P2-02）记进 facade 账（80851）。此前 pin 停
     # 在 80829，LocBudget/g42 会按旧账判超。
-    default: '1a14bd6b6a08fc45a31dc8483f3fdc15089d7dc7'
+    # 5edf322：agent_d / tool_d 两条 ceiling 豁免按实测重登记（+2 / +13，
+    # daemons e1ad43c / 38c584d 的拒绝与截断归因告警）。不 bump 则 LocCeiling
+    # 仍按 9539 / 18028 判「grew beyond registered」，发行腿必红。
+    default: '5edf3229b24fd50937516f7b26106b133e38269d'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
