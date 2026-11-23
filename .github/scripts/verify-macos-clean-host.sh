@@ -178,7 +178,14 @@ _i=0
 # macOS 自带 nc(1)，优先 nc -z；无 nc 再回退 /dev/tcp（Linux bash 语义）。
 _HAVE_NC=0
 command -v nc >/dev/null 2>&1 && _HAVE_NC=1
+# 启动器先死则探测无意义：空等到 120 轮只会把日志刷满停机尾行。
+# 早退保留探测时刻，避免把「启动期就死」误记为「起来后又不可达」。
+_DEAD_AT=""
 while [ "$_i" -lt 120 ]; do
+    if ! kill -0 "$L_PID" 2>/dev/null; then
+        _DEAD_AT="$_i"
+        break
+    fi
     if [ "$_HAVE_NC" = "1" ]; then
         if nc -z -w 1 127.0.0.1 "$GWP" >/dev/null 2>&1; then
             _GW_OK=1; break
@@ -253,6 +260,11 @@ if [ "$_GW_OK" != "1" ]; then
         tail -n 20 "$AH/logs/airymaxrt.log" 2>/dev/null | cut -c 1-150 || true
         echo "== 死因判定（核心证据，务必保留）=="
         echo "gateway TCP 不可达: 127.0.0.1:${GWP}（探测 ${_i}s）"
+        if [ -n "$_DEAD_AT" ]; then
+            echo "launcher 早退: 第 ${_DEAD_AT} 次探测前已退出"
+        else
+            echo "launcher 早退: 未触发（满轮探测）"
+        fi
         echo "launcher $L_STATE"
         echo "判读: 『进入流式 CLI』后 daemon 群秒停 → 前端进程非预期退出带动"
         echo "cleanup（CLI -p 分支）；『进入交互界面（Rust TUI）』→ TUI 非 TTY 死；"
