@@ -128,6 +128,9 @@ jobs:
             exit 1
           }
           cp -f "$NOTES_FILE" dist/notes.txt
+          # 结构判定（三段 / 段行数 / 总行数）只在这里实现一次：
+          # 推送期的 quality-gate 与发布期的本步共用同一脚本。
+          bash .github/scripts/check-release-notes.sh "$NOTES_FILE"
           if [ "$IS_RC" = 1 ] && ! grep -q '候选版本' dist/notes.txt; then
             echo "候选版本（RC）：仅供测试与预览，生产部署请等待正式版。" >> dist/notes.txt
           fi
@@ -136,13 +139,6 @@ jobs:
           echo "发布说明已生成（社区面向，${lines} 行）"
           if [ "$lines" -gt 12 ]; then
             echo "::error::发布说明 ${lines} 行，超出 12 行上限"
-            exit 1
-          fi
-          # 三段式是公开面契约（R30）：标题必须渲染成标题（`##` 后带空格），
-          # 且只能有概述/说明/其他三段；多一段、少一段或标题不渲染都算破坏。
-          heads="$(grep '^## ' dist/notes.txt | tr -d ' ' | paste -sd, -)"
-          if [ "$heads" != "##概述,##说明,##其他" ]; then
-            echo "::error::发布说明须且仅须三段标题（概述/说明/其他），实际：${heads:-<无>}"
             exit 1
           fi
 

@@ -52,6 +52,13 @@ jobs:
           submodules: false
           fetch-depth: 1
 
+      # 发行正文的公开面契约在推送期就校验，而不是等到打 tag 才由发布
+      # 装箱发现；判定逻辑与发布侧同源（.github/scripts/check-release-notes.sh）。
+      - name: Check release notes
+        run: |
+          ver="$(tr -d ' \r\n' < VERSION)"
+          bash .github/scripts/check-release-notes.sh "RELEASE_NOTES.d/v${ver}.md"
+
       # 数据集完整性：agentrt 为 workflow 宿主仓，其 6 个叶子子模块
       # （atoms/commons/daemons/gateway/heapstore/protocols，SHA 由
       # agentrt 树 gitlink 钉定）是本作业的源码底料——门禁
