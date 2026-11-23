@@ -407,7 +407,7 @@ M="${SUMMARY#*/}"
 if [ "$N" != "$M" ] || [ "$M" -le 0 ]; then
     smoke_fail "冒烟断言失败: 汇总 ${SUMMARY}（要求 N==M 且 M>0）"
 fi
-info "CLI 冒烟通过: $SUMMARY（采样 ${_i} 轮）"
+info "CLI 冒烟通过: ${SUMMARY}（采样 ${_i} 轮）"
 
 # ─── 阶段 6：收尾 ─────────────────────────────────────────────────────────
 kill -TERM "$L_PID" 2>/dev/null || true
