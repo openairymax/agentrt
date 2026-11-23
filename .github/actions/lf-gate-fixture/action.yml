@@ -178,7 +178,9 @@ inputs:
     # 78be765：tool_d 的发现结果改为单一所有权后实测回落 18041 → 18030，
     # 账本随之收紧并在注释里记下先增后回落的归因。不 bump 则 LocCeiling
     # 按旧账 18041 判「shrunk below registered」。
-    default: '78be765f4c5139118a8f4a8cee64ce7d37a4c28c'
+    # 898b9ee：facade 账按实测收敛到 80838（-13，插件发现单所有权与就绪
+    # 记账并户）。Gate 42 要求 pin 与实测逐数对齐，不 bump 则按 80851 判滞后。
+    default: '898b9ee57c970b9b711bee1bed1bea789680d80e'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
