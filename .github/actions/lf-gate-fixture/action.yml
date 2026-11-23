@@ -166,7 +166,11 @@ inputs:
     # c89befc：发布平面收口。附件删除改以附件表复核（id 消失才算删掉），
     # 同名多条删净后 fail-closed；上传与校验拆分，校验不过按新对象重建一次。
     # 不 bump 则重发仍跑旧上传逻辑，三支 .sig 继续判红（run 44952571961 实证）。
-    default: 'c89befceef91b01be3cff72d9de41079ed09d0ab'
+    # 24b1512：历史复位后的登记面重校。g41 的七条豁免与 L-9 第 4 项改指现役
+    # 同主题提交（判据、理由与数值一律不动），facade pin 随之抬到 80829（实测
+    # +71，daemons 958436c 的 supervisor_d 启动就绪判定）。不 bump 则 g41 仍按
+    # 旧 SHA 判失配、L-9 判「未回流」、LocBudget/g42 按 80758 判超账。
+    default: '24b15120d4784889f7ee139a6853ad6ea58d013e'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
