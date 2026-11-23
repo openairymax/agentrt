@@ -2313,9 +2313,11 @@ launch_frontend() {
             clear_front_screen
             log info "进入交互界面（Ctrl+C 退出）"
         fi
-        set -- --tui "${CLI_ARGS[@]}"
+        # bash 3.2（macOS 系统自带）在 set -u 下把空数组的 "${arr[@]}"
+        # 判为 unbound variable（4.4 才修正）；此处按 POSIX 惯用式展开。
+        set -- --tui ${CLI_ARGS[@]+"${CLI_ARGS[@]}"}
     else
-        set -- "${CLI_ARGS[@]}"
+        set -- ${CLI_ARGS[@]+"${CLI_ARGS[@]}"}
     fi
     "$CLI_BIN" "$@" <&0 &
     TUI_PID=$!
