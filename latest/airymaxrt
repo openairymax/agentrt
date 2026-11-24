@@ -1945,6 +1945,16 @@ case "$CMD" in
             _dn_warn "运行库: 平台无 ldd，跳过动态库解析检查"
         fi
 
+        # 交互宿主以产物为准：install.env 的 AIRY_TUI 只补充缺失原因，
+        # 否则用户只能看到「/tui 不可用」，无从判断是缺 cargo、构建失败
+        # 还是部署失败（S30 假绿灯清理）。
+        if [ -x "$AIRY_HOME/bin/agentrt-tui" ]; then
+            _dn_pass "交互宿主: agentrt-tui 在位"
+        else
+            _dn_tui="$(sed -n 's/^AIRY_TUI=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
+            _dn_warn "交互宿主: agentrt-tui 缺失（记录: ${_dn_tui:-未安装}）——/tui 不可用，修法: airymaxrt reinstall"
+        fi
+
         # 运行目录与 daemon 控制口：目录不可写则 daemon 起不来；控制口全无
         # 说明未拉起（WARN），部分在线说明有成员掉队（WARN）。
         if mkdir -p "$RUNTIME_DIR" 2>/dev/null && [ -w "$RUNTIME_DIR" ]; then

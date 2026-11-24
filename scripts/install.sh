@@ -1096,26 +1096,37 @@ install_maths_toolkit() {
 }
 
 build_tui() {
+    # 只记录状态，不直接写 install.env：finalize_install 会在本函数之后整体
+    # 重写该文件，就地写入会被覆盖（能力缺口静默丢失）。
+    AIRY_TUI_STATE="absent:no-source"
     [ -d "${AIRY_SRC_APP}/sdk/tui" ] || return 0
     export AIRY_HOME
     if ! command -v cargo >/dev/null 2>&1 && [ -x "$HOME/.cargo/bin/cargo" ]; then
         export PATH="$HOME/.cargo/bin:$PATH"
     fi
-    command -v cargo >/dev/null 2>&1 || { log_warn "cargo 不可用，跳过 agentrt-tui"; return 0; }
+    if ! command -v cargo >/dev/null 2>&1; then
+        AIRY_TUI_STATE="absent:cargo-missing"
+        log_warn "cargo 不可用，跳过 agentrt-tui；能力缺口已记入 install.env（doctor 会告警）"
+        return 0
+    fi
     export CARGO_TARGET_DIR="${AIRY_HOME}/target"
     mkdir -p "${AIRY_HOME}/logs"
     log_info "构建 agentrt-tui（Rust TUI，产物 → ${CARGO_TARGET_DIR}）…"
     # 构建日志落盘而非丢弃：失败时给出可复现的命令，而不是只报「跳过」。
     if ! ( cd "${AIRY_SRC_APP}/sdk/tui" && cargo build --release ) \
             >"${AIRY_HOME}/logs/tui-build.log" 2>&1; then
+        AIRY_TUI_STATE="absent:build-failed"
         log_warn "TUI 构建失败（/tui 与 --tui 将不可用），日志: ${AIRY_HOME}/logs/tui-build.log"
+        log_warn "能力缺口已记入 install.env；修法: 修复后执行 airymaxrt reinstall"
         return 0
     fi
     # 部署成功与否以产物落地为准，不以构建返回码为准。
     if ! cp -f "${CARGO_TARGET_DIR}/release/agentrt-tui" "${AIRY_HOME}/bin/agentrt-tui"; then
+        AIRY_TUI_STATE="absent:deploy-failed"
         log_warn "TUI 产物未能部署到 ${AIRY_HOME}/bin/agentrt-tui（/tui 不可用）"
         return 0
     fi
+    AIRY_TUI_STATE="present"
     log_ok "agentrt-tui 部署完成"
 }
 
@@ -1430,6 +1441,8 @@ finalize_install() {
         echo "AIRY_BIN_LINK=${BIN_DIR}/airymaxrt"
         echo "INSTALLED_AT=$(date -Is 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S%z')"
         echo "AIRY_VAULT_PASSWORD=${vault_password}"
+        # 交互宿主能力缺口：doctor 读此键告警，避免「装了但 /tui 不可用」静默。
+        echo "AIRY_TUI=${AIRY_TUI_STATE:-absent:not-built}"
     } > "${AIRY_HOME}/config/install.env"
     chmod 600 "${AIRY_HOME}/config/install.env"
 
