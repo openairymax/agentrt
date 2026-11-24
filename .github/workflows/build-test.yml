@@ -132,6 +132,13 @@ jobs:
           bash "$GATE" verify --verdict-dir "$VDIR" || rc=$?
           exit $rc
 
+      # A-6-07 路径一致性门禁（S30-P1-9「gate_paths.sh 进 CI」）：启动器、
+      # CLI 与 doctor 必须解析出同一套路径（HOME/BIN/LIB/RUN/LOG/CONFIG/
+      # DATA/TMP/CACHE/WORKSPACE 十个键单一取值）。此前只在施工期手跑，
+      # 本次接入构建腿——路径回归自此在合入前暴露，而非装机后才发现。
+      - name: A-6-07 path consistency gate
+        run: bash scripts/gate_paths.sh --cli "${BUILD_DIR}/tools/airy_cli/airy_cli"
+
       # L-8（0.1.21）：端到端任务闭环回归。五类故障注入（schema/unknown/
       # netbreak/deny/restart）按 3 个 shard 轮转，每个 shard 独立判红；
       # CI 档 SKIP 计为失败，故门禁不依赖「跑没跑到」。放在 ctest 之后与
