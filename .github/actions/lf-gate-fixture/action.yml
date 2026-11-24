@@ -94,7 +94,11 @@ inputs:
     # 展开）。macOS 系统 bash 3.2 在 set -u 下把空数组的 "${arr[@]}" 判为
     # unbound variable，启动器直死、gateway 随之退出；旧 pin 的发行包
     # bin/airymaxrt-full 仍带该缺陷，干净机核验恒报 gateway offline。
-    default: '9540efc5493a0ac72a7aae98ab8e0876ad990fc5'
+    # 621beab：tui gitlink 前推至 7fc3c67（记忆镜像按会话分段水合 +
+    # 无 HOME 安装根自愈）。启动器 scripts/airymaxrt 与 latest 发布面
+    # 逐字节一致；旧 pin 9540efc 的 tui 仍停在 ce2bd83，AF1 双面判据
+    # 取到旧快照即报「latest 与 sdk 启动器分叉」。
+    default: '621beab4c55004bb4a0e7d2b24ef3ecde87192f7'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
@@ -184,7 +188,11 @@ inputs:
     # 按旧账 18041 判「shrunk below registered」。
     # 898b9ee：facade 账按实测收敛到 80838（-13，插件发现单所有权与就绪
     # 记账并户）。Gate 42 要求 pin 与实测逐数对齐，不 bump 则按 80851 判滞后。
-    default: '898b9ee57c970b9b711bee1bed1bea789680d80e'
+    # 56b3109：大厅域退役后的台账收敛——core 账 pin 80233 → 75881（只降）、
+    # INV-10 写点删去大厅持久化条目、函数名台账按现树重建、ABI 白名单删去
+    # 四个已不存在的公共头。不 bump 则 INV-10 判「声明文件不存在」、
+    # Gate 18/42 按旧账判「pin 滞后」。
+    default: '56b3109f398241c05ee586ddc0857c66fa789c96'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
