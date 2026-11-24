@@ -82,7 +82,9 @@ build_cmd() {
     [ -n "$RE" ] && CMD+=(-R "$RE")
     [ -n "$EX" ] && CMD+=(-E "$EX")
     [ "$1" = 1 ] && CMD+=(--rerun-failed)
-    CMD+=("${EXTRA[@]}")
+    # macOS 自带 bash 3.2：空数组在 set -u 下直接展开会报 unbound，
+    # 用 ${arr[@]+...} 形式兼容（Linux/Windows 的 bash 4+ 语义不变）。
+    CMD+=(${EXTRA[@]+"${EXTRA[@]}"})
 }
 
 exec_run() {
