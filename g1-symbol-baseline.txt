@@ -298,10 +298,6 @@ airy_trace_span_end
 airy_trace_span_start
 airy_unregister_degradation
 airy_version_string
-airy_work_hall_auth_count
-airy_work_hall_authorize
-airy_work_hall_claim
-airy_work_hall_revoke_execution
 am_acknowledge
 am_active_alert_count
 am_add_rule
