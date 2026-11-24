@@ -680,6 +680,10 @@ function Finalize-Install {
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 if ($env:AIRY_HOME) { $root = $env:AIRY_HOME }
+# supervisor prefers AIRY_HOME (falling back to the OS user profile root);
+# export it so status/doctor/start always share one root, even when this
+# script is invoked directly.
+$env:AIRY_HOME = $root
 $bin = Join-Path $root 'bin'
 $run = Join-Path $root 'run'
 $sup = Join-Path $bin 'supervisor_d.exe'
