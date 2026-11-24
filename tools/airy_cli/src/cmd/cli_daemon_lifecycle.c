@@ -128,7 +128,7 @@ int cli_daemon_start(const char *ns)
     return 0;
 }
 
-static int cli_daemon_wait(const char *ns, int want_online, int timeout_ms)
+int cli_daemon_wait(const char *ns, int want_online, int timeout_ms)
 {
     int waited = 0;
     while ((cli_daemon_online(ns) != 0) != want_online) {
