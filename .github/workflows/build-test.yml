@@ -605,13 +605,14 @@ jobs:
           groups: agent-workload
           gh_token: ${{ secrets.GH_TOKEN }}
 
-      # gateway_d 的装配输入 products/gateway_biz：与门禁腿共用同一 pin，
-      # 只取产品件（sdk/tools 腿在 Windows 无消费面，不取以省时）。
+      # gateway_d 的装配输入 products/gateway_biz，以及安装腿复刻发行布局
+      # 所需的 tools 配置模板：与门禁腿共用同一 pin，保证「安装腿验证的
+      # 包形态」即「发行打包的包形态」。sdk 腿在 Windows 无消费面，不取。
       - name: Fetch gateway_biz product (pinned)
         uses: ./.github/actions/lf-gate-fixture
         with:
           gh_token: ${{ secrets.GH_TOKEN }}
-          legs: products
+          legs: products tools
 
       # vcpkg 二进制缓存恢复（须在 install 之前；key 随 workflow 内容变化
       # 自动失效并回退前缀 key；加性缓存由 vcpkg 自身保证正确性）
