@@ -1009,7 +1009,6 @@ section "S" "R1-c 执行体角色词汇表 SSoT（字面量零外泄 + 权威点
 for _a in \
     commons/utils/cognition/agent_vocab.h \
     commons/utils/cognition/agent_vocab.c \
-    atoms/coreloopthree/include/hall_store.h \
     atoms/coreloopthree/src/config/yaml_loader_parse.c \
     daemons/gateway_d/src/bootstrap/gw_boot.c \
     tools/airy_cli/src/cmd/cli_review.c; do
@@ -1033,8 +1032,13 @@ _s2=""
 [ -e "$ROOT/daemons/common/src/svc/agent_vocab.c" ] && _s2="$_s2 daemons 侧重复实现"
 grep -q 'agent_vocab_canonical' "$ROOT/commons/utils/cognition/agent_vocab.c" 2>/dev/null \
     || _s2="$_s2 归一化符号缺失"
-grep -q 'agent_vocab_canonical' "$ROOT/atoms/coreloopthree/src/work_hall/work_hall_agent.c" 2>/dev/null \
-    || _s2="$_s2 归一化边界缺失"
+# 0.1.21 S30-P0-4：大厅域整体退役，角色词表的授权/归一化边界消费者随之
+# 消失。判据不再对已不存在的边界文件取字面证据，改为证明「单点实现、
+# 无第二张表」这一仍然成立的结构事实。
+_s2_dup="$(grep -rE '"(product_manager|architect|backend|frontend|devops|security|tester)"' \
+    "$ROOT/atoms" --include='*.c' 2>/dev/null \
+    | grep -vFf "$TMP/s_allow" || true)"
+[ -n "$_s2_dup" ] && _s2="$_s2 atoms 侧重复角色表"
 [ -e "$ROOT/daemons/common/include/agent_vocab.h" ] \
     && _s2="$_s2 兼容壳头复活（0.1.19 已拆除，裸名 include 须经 -I 直解 commons 权威）"
 [ -e "$ROOT/daemons/common/include/platform.h" ] \
@@ -1043,10 +1047,8 @@ grep -q 'agent_vocab_canonical' "$ROOT/atoms/coreloopthree/src/work_hall/work_ha
     && _s2="$_s2 兼容重导出壳复活（施工线⑦已拆除，consumer 应直引 commons/utils/compat）"
 grep -q 'agent_vocab_resolve' "$ROOT/commons/utils/cognition/agent_vocab.c" 2>/dev/null \
     || _s2="$_s2 严格解析符号缺失"
-grep -q 'agent_vocab_resolve' "$ROOT/atoms/coreloopthree/src/work_hall/work_hall_auth.c" 2>/dev/null \
-    || _s2="$_s2 权限判定未用严格解析（fail-open 风险）"
 if [ -z "$_s2" ]; then
-    ok "S2 SSoT 权威点唯一（commons 实现 + 兼容壳头已拆除 [agent_vocab/platform/compat] + 归一化边界单点 + 权限判定严格解析）"
+    ok "S2 SSoT 权威点唯一（commons 实现 + 兼容壳头已拆除 [agent_vocab/platform/compat] + 角色表无第二副本 + 严格解析在位）"
 else
     bad "S2 SSoT 结构异常:$_s2"
 fi
@@ -1686,53 +1688,28 @@ else
     bad "AA3 V5.3 gate 阈值判定或数值暴露链缺失（compress.c/ledger_handlers.c）"
 fi
 
-_wp="$ROOT/atoms/coreloopthree/src/work_hall/work_hall_persist.c"
-_whh="$ROOT/atoms/coreloopthree/include/work_hall.h"
-_whc="$ROOT/atoms/coreloopthree/src/work_hall/work_hall.c"
-_wha="$ROOT/atoms/coreloopthree/src/work_hall/work_hall_agent.c"
-section "AB" "B7 工作大厅超时与重启恢复（V7.1~V7.3 语义防回潮）"
+section "AB" "B7 工作大厅退役防回潮（S30-P0-4 裁决：状态权威收敛至 sched_d DAG）"
 
-if grep -q 'if (wh_state_terminal(en->state))' "$_wp" \
-    && grep -q 'strcmp(state, "skipped") == 0' "$_whc" \
-    && ! grep -q 'strcmp(en->state, "completed") == 0' "$_wp" \
-    && grep -q 'snprintf(en->state, sizeof(en->state), "failed")' "$_wp" \
-    && ! grep -q 'normalize them to canceled' "$_wp"; then
-    ok "AB1 V7.2 非终态中断恢复为 failed（终态集收敛至 wh_state_terminal，skipped 计入终态）"
+# 大厅状态机（work_hall）、事件存储（hall_store）与治理（governance）在
+# 0.1.21 整体退役，V7.x 的超时/恢复语义不再有承载件。原 AB1~AB5 对已删
+# 文件取字面证据，恒红且无法证伪运行面。判据改为守卫退役边界本身：
+# 目录不复活、符号不外泄、两处生产必需件仍在归位路径、权威 DAG 引擎在位。
+_ab_bad=""
+[ -d "$ROOT/atoms/coreloopthree/src/work_hall" ] && _ab_bad="$_ab_bad 大厅目录复活"
+_ab_hits="$(grep -rn 'airy_work_hall_\|airy_hall_store_\|airy_governance_' \
+    "$ROOT/atoms" "$ROOT/daemons" "$ROOT/tools" \
+    --include='*.c' --include='*.h' 2>/dev/null | grep -v '/tests/' || true)"
+[ -n "$_ab_hits" ] && _ab_bad="$_ab_bad 大厅符号外泄"
+[ -f "$ROOT/atoms/coreloopthree/src/dispatch/artifact_validator.c" ] \
+    || _ab_bad="$_ab_bad 产物验证器未归位"
+[ -f "$ROOT/atoms/coreloopthree/src/registry/agent_registry.c" ] \
+    || _ab_bad="$_ab_bad 执行单元注册表未归位"
+[ -f "$ROOT/daemons/sched_d/src/dag/sched_dag_engine.c" ] \
+    || _ab_bad="$_ab_bad sched_d DAG 权威缺失"
+if [ -z "$_ab_bad" ]; then
+    ok "AB1 大厅域已退役且状态权威唯一（sched_d DAG；验证器/注册表归位在位，符号零外泄）"
 else
-    bad "AB1 V7.2 非终态恢复语义回潮（work_hall_persist.c 归一化为 canceled）"
-fi
-
-if grep -q 'WF_NREF(airy_work_hall_entry_t, input_json)' "$_wp" \
-    && grep -q 'WF_I32(airy_work_hall_entry_t, redispatch_count)' "$_wp" \
-    && grep -q 'wf_fill(e, en, wf_entry_flds' "$_wp" \
-    && grep -q 'AIRY_STRDUP(s)' "$_wp"; then
-    ok "AB2 V7.2 恢复字段持久化（读写同源字段表单点声明，save/load 共用）"
-else
-    bad "AB2 V7.2 恢复字段持久化缺失（input_json/redispatch_count 未落盘或未恢复）"
-fi
-
-if grep -q 'hall->redispatch_max <= 0' "$_wp" \
-    && grep -q 'en->redispatch_count >= hall->redispatch_max' "$_wp" \
-    && grep -q 'en->redispatch_at = (uint64_t)airy_time_ns()' "$_wp"; then
-    ok "AB3 V7.2 预算内重派重新布防（redispatch_at 按当前时基重算）"
-else
-    bad "AB3 V7.2 重启后重派未重新布防（work_hall_persist.c）"
-fi
-
-if grep -q 'wh_json_language(input_json' "$_wha" \
-    && grep -q '请求输入面（input_json 顶层）优先于节点声明面' "$_wha"; then
-    ok "AB4 V7.3 language 取自请求（请求输入面优先于节点声明面）"
-else
-    bad "AB4 V7.3 language 请求面优先语义缺失（work_hall_agent.c）"
-fi
-
-if grep -q 'AIRY_WORK_HALL_DEFAULT_TIMEOUT_MS 300000' "$_whh" \
-    && grep -q 'AIRY_WORK_HALL_TIMEOUT_MS' "$_whh" \
-    && grep -q 'AIRY_WORK_HALL_TIMEOUT_MS' "$_whc" \
-    && grep -q 'getenv(' "$_whc"; then
-    ok "AB5 V7.1 超时 SSoT（默认 300000 + AIRY_WORK_HALL_TIMEOUT_MS 覆盖）"
-else
-    bad "AB5 V7.1 超时默认值或 env 覆盖链缺失（work_hall.h/work_hall.c）"
+    bad "AB1 大厅域退役回潮:$_ab_bad"
 fi
 
 section "AC" "B10 update 事务化与互斥（版本目录+current 原子切换 / mkdir 互斥 / intent 幂等重放 V10.1~V10.4 防回潮）"
