@@ -88,14 +88,6 @@ jobs:
   # 本 job 幂等续传（AIRY_FORCE_UPLOAD=1 先删后传）。latest/ 只在全部附件
   # 上传并校验通过后才提交（指针切换绑定 SSoT 补齐），失败自动 cancel
   # 恢复语义由重跑保持。
-
-
-  # 慢通道：atomgit（SSoT）上传 + latest/ 指针切换。与 publish-mirror
-  # 并行，互不阻塞；SKIP_SIGN=1 复用 finalize 的规范签名集（manifest 幂等
-  # 保护不再重生成，.asc 恒一致）。独立 concurrency 组，单段失败可只重跑
-  # 本 job 幂等续传（AIRY_FORCE_UPLOAD=1 先删后传）。latest/ 只在全部附件
-  # 上传并校验通过后才提交（指针切换绑定 SSoT 补齐），失败自动 cancel
-  # 恢复语义由重跑保持。
   publish-atomgit:
     if: success() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
