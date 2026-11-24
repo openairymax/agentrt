@@ -132,6 +132,10 @@ extern int g_cli_verbose;
  * 退出码，CLI 自身不初始化终端。与 -p 互斥。 */
 extern int g_cli_tui_mode;
 
+/* 行式前端模式（--legacy-tui，S30-P0-2）：默认交互宿主已切 Rust TUI，
+ * 本开关用于无 TUI 产物的环境与排障对照。 */
+extern int g_cli_legacy_tui;
+
 /* 会话恢复视图模式（--continue / --resume，0.1.17 R5-G5）：启动时读一次
  * mem.recent 装配 g_history_*，前端不落任何本地会话状态。 */
 extern int g_cli_resume_mode;

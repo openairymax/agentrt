@@ -230,6 +230,8 @@ static void cli_print_usage(void)
              "仍受服务端下限钳制）\n", cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %s--tui%s                  全屏 TUI 渲染层（agentrt-tui 子进程，退出码回传）\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_outf("  %s--legacy-tui%s           行式前端（默认交互宿主为 TUI，本项用于无 TUI 环境）\n",
+           cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %s--events%s ndjson        事件流出口：stdout 只出 NDJSON 帧（可配 -p，管道多轮）\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %s--quiet%s                事件模式下静音人类可读输出\n",
@@ -252,7 +254,8 @@ static void cli_print_usage(void)
              "密钥装配引导（写入后立即连通验证）\n", cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %sgpu%s [--json]             加速器能力快照（驱动/版本/后端/降级原因）\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET));
-    cli_outf("交互模式：直接运行 airy_cli 进入对话；输入 /help 查看命令。\n");
+    cli_outf("交互模式：直接运行 airy_cli 进入全屏 TUI；--legacy-tui 使用行式前端。"
+             "输入 /help 查看命令。\n");
     cli_outf("退出码：0 成功；1 用法错误或本轮未拿到结果（-p 下可判定）；"
              "126 TUI 不可用。\n");
 }
@@ -269,6 +272,7 @@ static const cli_opt_t k_cli_opts[] = {
     { "-p", &g_cli_print_mode, 0 },   { "--print", &g_cli_print_mode, 0 },
     { "--json", &g_cli_json_mode, 0 }, { "--verbose", &g_cli_verbose, 0 },
     { "--tui", &g_cli_tui_mode, 0 },  { "--quiet", &g_cli_quiet, 0 },
+    { "--legacy-tui", &g_cli_legacy_tui, 0 },
     { "--continue", &g_cli_resume_mode, 0 },
     { "--resume", &g_cli_resume_mode, 0 },
     /* 版本自证取运行期身份（airy_build_id）：与 /health、启动横幅同一来源。 */
@@ -390,6 +394,12 @@ static int cli_mode_check(void)
     }
     if (g_cli_events_mode && (g_cli_tui_mode || g_cli_json_mode)) {
         cli_outf("airy_cli: %s--events%s 与 %s--tui/--json%s 互斥（stdout 归属冲突）\n",
+                 cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_CYAN),
+                 cli_c(CLR_RESET));
+        return 2;
+    }
+    if (g_cli_legacy_tui && g_cli_print_mode) {
+        cli_outf("airy_cli: %s--legacy-tui%s 与 %s-p%s 互斥（行式前端 vs 无界面单轮）\n",
                  cli_c(CLR_YELLOW), cli_c(CLR_RESET), cli_c(CLR_CYAN),
                  cli_c(CLR_RESET));
         return 2;

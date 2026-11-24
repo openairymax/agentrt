@@ -45,6 +45,7 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <io.h>
 #else
 #include <unistd.h>
 #include <signal.h>
@@ -71,6 +72,9 @@ int g_cli_json_mode = 0;
 int g_cli_verbose = 0;
 /* 全屏 TUI 渲染层模式（--tui，0.1.17 R5-G6）。 */
 int g_cli_tui_mode = 0;
+/* 行式（进程内）前端模式（--legacy-tui，S30-P0-2）：默认交互宿主已是
+ * Rust TUI，本开关只用于无 TUI 产物的环境与排障对照。 */
+int g_cli_legacy_tui = 0;
 /* 会话恢复视图模式（--continue / --resume，0.1.17 R5-G5）：启动时读一次
  * mem.recent 装配 g_history_*，前端不落任何本地会话状态。 */
 int g_cli_resume_mode = 0;
@@ -464,6 +468,17 @@ static void cli_bind_pdeath(void)
 #endif
 }
 
+/* 交互宿主选择（S30-P0-2）：默认 Rust TUI 需要真终端；管道/重定向下
+ * 落回行式前端，避免无参数启动在脚本里被全屏渲染阻塞。 */
+static int cli_stdio_tty(void)
+{
+#ifdef _WIN32
+    return _isatty(_fileno(stdin)) && _isatty(_fileno(stdout));
+#else
+    return isatty(STDIN_FILENO) && isatty(STDOUT_FILENO);
+#endif
+}
+
 int main(int argc, char *argv[])
 {
     cli_loop_t loop = {0};
@@ -487,6 +502,14 @@ int main(int argc, char *argv[])
      * （会话权威在 mem_d，两个前端各自只读装配，均不落本地会话状态）。 */
     if (g_cli_tui_mode)
         return cli_run_tui_frontend(g_cli_resume_mode);
+    /* S30-P0-2：默认交互宿主为 Rust TUI。三条路径保留行式前端：显式
+     * --legacy-tui、stdio 非 TTY、TUI 产物缺失（126，安装期能力缺口已
+     * 由 doctor 告警）。其余退出码原样回传，不做静默接力。 */
+    if (!g_cli_print_mode && !g_cli_json_mode && !g_cli_legacy_tui && cli_stdio_tty()) {
+        int tui_rc = cli_run_tui_frontend(g_cli_resume_mode);
+        if (tui_rc != 126)
+            return tui_rc;
+    }
     cli_boot_term();
     if (!g_cli_print_mode)
         cli_tui_create(&loop.tui);
