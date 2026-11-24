@@ -44,7 +44,13 @@ if [ -n "${AIRY_HOME:-}" ] && [ ! -d "${AIRY_HOME}" ]; then
     printf '\033[1;33m[WARN]\033[0m AIRY_HOME=%s 不存在（疑似终端残留环境变量），已忽略并回退统一路径\n' "$AIRY_HOME" >&2
     AIRY_HOME=""
 fi
-AIRY_HOME="${AIRY_HOME:-$HOME/.airymaxrt}"
+if [ -z "${AIRY_HOME:-}" ]; then
+    if [ -z "${HOME:-}" ]; then
+        printf '\033[1;31m[ERROR]\033[0m HOME 未设置且无 AIRY_HOME：无法确定安装根。请在 cron/systemd/精简容器中显式设置 HOME 或 AIRY_HOME。\n' >&2
+        exit 1
+    fi
+    AIRY_HOME="$HOME/.airymaxrt"
+fi
 export AIRY_HOME
 # §12.12 唯一事实源：安装/更新面只读 release 附件（releases/download），
 # 禁止经由仓库 API 直读分支文件作为第二事实源。
@@ -127,19 +133,33 @@ log() {
     printf '%s\n' "$line" >>"$LOG_FILE"
 }
 
-path_rc_file() {
+path_rc_files() {
+    # HOME 缺失（systemd/cron）时没有用户级 rc 可写，直接返回空表。
+    [ -n "${HOME:-}" ] || return 0
     case "$(basename "${SHELL:-/bin/sh}")" in
         zsh) echo "$HOME/.zshrc" ;;
         fish) echo "$HOME/.config/fish/config.fish" ;;
         sh|dash|ash) echo "$HOME/.profile" ;;
-        *) echo "$HOME/.bashrc" ;;
+        *)
+            echo "$HOME/.bashrc"
+            # P1-2：bash 登录 shell / ssh 登录只读 ~/.bash_profile（存在时
+            # 它自己不一定 source .bashrc），只写 .bashrc 会出现「新终端
+            # 仍然 command not found」。两处都写，已含引导行的自动跳过。
+            if [ -f "$HOME/.bash_profile" ]; then
+                echo "$HOME/.bash_profile"
+            fi
+            ;;
     esac
 }
 path_self_heal() {
     [ -f "$AIRY_HOME/config/install.env" ] || return 0
     local _binl _bind
     _binl="$(sed -n 's/^AIRY_BIN_LINK=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
-    _binl="${_binl:-$HOME/.local/bin/airymaxrt}"
+    if [ -z "$_binl" ] && [ -n "${HOME:-}" ]; then
+        _binl="$HOME/.local/bin/airymaxrt"
+    fi
+    # 无 install.env 的 AIRY_BIN_LINK 且无 HOME：没有可自愈的目标路径。
+    [ -n "$_binl" ] || return 0
     _bind="${_binl%/airymaxrt}"
     local _in_path=0 _p _seg
     _p="$PATH"
@@ -149,21 +169,33 @@ path_self_heal() {
         if [ "$_seg" = "$_p" ]; then _p=""; else _p="${_p#*:}"; fi
     done
     [ "$_in_path" = "1" ] && return 0
-    local _rc _line
-    _rc="$(path_rc_file)"
-    if grep -q '# >>> AgentRT PATH bootstrap <<<' "$_rc" 2>/dev/null; then
-        log debug "PATH 自愈: $_rc 已含引导行，跳过"
-        return 0
-    fi
-    if [ "$(basename "$_rc")" = "config.fish" ]; then
-        _line="set -gx PATH \"${_bind}\" \$PATH"
-    else
-        _line="export PATH=\"${_bind}:\$PATH\""
-    fi
-    if printf '\n# >>> AgentRT PATH bootstrap <<<\n%s\n# <<< AgentRT PATH bootstrap <<<\n' "$_line" >> "$_rc" 2>/dev/null; then
-        log warn "PATH 自愈: 已自动将 ${_bind} 追加到 ${_rc}（新开终端生效，或 source \"$_rc\"）"
-    else
-        log warn "PATH 自愈: 无法写入 ${_rc}——手动执行: echo '${_line}' >> \"$_rc\" && source \"$_rc\""
+    local _rc _line _rcs _n=0
+    # P1-2：登录 shell 与交互 shell 读的 rc 不同（bash 登录读 .bash_profile），
+    # 逐个补写；已含引导行的跳过，避免同一目录被多文件重复追加。
+    _rcs="$(path_rc_files)"
+    while IFS= read -r _rc; do
+        [ -n "$_rc" ] || continue
+        if grep -q '# >>> AgentRT PATH bootstrap <<<' "$_rc" 2>/dev/null; then
+            log debug "PATH 自愈: $_rc 已含引导行，跳过"
+            _n=$((_n + 1))
+            continue
+        fi
+        if [ "$(basename "$_rc")" = "config.fish" ]; then
+            _line="set -gx PATH \"${_bind}\" \$PATH"
+        else
+            _line="export PATH=\"${_bind}:\$PATH\""
+        fi
+        if printf '\n# >>> AgentRT PATH bootstrap <<<\n%s\n# <<< AgentRT PATH bootstrap <<<\n' "$_line" >> "$_rc" 2>/dev/null; then
+            log warn "PATH 自愈: 已自动将 ${_bind} 追加到 ${_rc}（新开终端生效，或 source \"$_rc\"）"
+            _n=$((_n + 1))
+        else
+            log warn "PATH 自愈: 无法写入 ${_rc}——手动执行: echo '${_line}' >> \"$_rc\" && source \"$_rc\""
+        fi
+    done <<EOF
+${_rcs}
+EOF
+    if [ "$_n" = "0" ]; then
+        log warn "PATH 自愈: 未找到可写的 shell 配置文件——手动将 ${_bind} 加入 PATH"
     fi
 }
 
@@ -1443,6 +1475,13 @@ status_json() {
         fi
     done
     comp="${comp%,}"
+    # TUI 是可选能力件：缺失不算安装不完整（服务端/无 cargo 主机本就无此件），
+    # 但必须可被 machine-readable 面看见，避免「status 全绿、--tui 到运行时才 126」。
+    if [ -x "$AIRY_HOME/bin/agentrt-tui" ]; then
+        comp="${comp},\"tui\":true"
+    else
+        comp="${comp},\"tui\":false"
+    fi
     local env_ok=false pkg_ok=false ver
     [ -f "$AIRY_HOME/config/install.env" ] && env_ok=true
     [ -f "$SCRIPT_DIR/../VERSION" ] && pkg_ok=true
@@ -1883,6 +1922,14 @@ case "$CMD" in
                 _dn_fail "$_dn_nm: 缺失或不可执行"
             fi
         done
+        # TUI 缺失是能力缺口而非安装损坏：判定为 WARN，并给出两条可执行修法，
+        # 避免用户到 airy_cli --tui 才看到 126。
+        if [ -x "$AIRY_HOME/bin/agentrt-tui" ]; then
+            _dn_pass "agentrt-tui: $AIRY_HOME/bin/agentrt-tui"
+        else
+            _dn_warn "agentrt-tui: 缺失——/tui 与 airymaxrt --tui 不可用（源码安装需 cargo；二进制安装请确认包内含该件）"
+            log warn "  修法: 安装 cargo 后执行 airymaxrt reinstall，或改用 airymaxrt cli 进行一次性对话"
+        fi
         if [ ! -f "$AIRY_HOME/config/secrets.env" ]; then
             _dn_warn "secrets.env: 缺失——API 模式请在 $AIRY_CFG_DIR/secrets.env 写 <KEY>=<值>，或把模型行改为 mode: local"
         else
@@ -1943,16 +1990,6 @@ case "$CMD" in
             fi
         else
             _dn_warn "运行库: 平台无 ldd，跳过动态库解析检查"
-        fi
-
-        # 交互宿主以产物为准：install.env 的 AIRY_TUI 只补充缺失原因，
-        # 否则用户只能看到「/tui 不可用」，无从判断是缺 cargo、构建失败
-        # 还是部署失败（S30 假绿灯清理）。
-        if [ -x "$AIRY_HOME/bin/agentrt-tui" ]; then
-            _dn_pass "交互宿主: agentrt-tui 在位"
-        else
-            _dn_tui="$(sed -n 's/^AIRY_TUI=//p' "$AIRY_HOME/config/install.env" 2>/dev/null | head -1)"
-            _dn_warn "交互宿主: agentrt-tui 缺失（记录: ${_dn_tui:-未安装}）——/tui 不可用，修法: airymaxrt reinstall"
         fi
 
         # 运行目录与 daemon 控制口：目录不可写则 daemon 起不来；控制口全无
@@ -2317,6 +2354,10 @@ launch_frontend() {
     # 直接跳过前端，以 daemon count 为口径打印运行态。
     if [ "${#CLI_ARGS[@]}" -eq 0 ] && stdin_is_null; then
         _FRONTEND_SKIPPED=1
+        # 不静默：stdin=/dev/null 在 IDE 内建终端、管道与部分 Windows 终端里很常见，
+        # 旧行为只打 debug，用户看到的就是「短命令没起界面」。显式给出判据与修法。
+        log warn "未进入交互界面：stdin 不是终端（/dev/null 或非 TTY）"
+        log warn "  需要 TUI：在真实终端执行 airymaxrt --tui；一次性对话：airymaxrt cli"
         boot_line "守护进程群运行中（daemon count=$(daemon_count)）"
         return 0
     fi
