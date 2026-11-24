@@ -99,37 +99,36 @@ jobs:
       # HOME/XDG/TMPDIR 下执行，跑完比对真实 $HOME 快照（路径+size+mtime）。
       # 瞬态 flaky 仍按一次 rerun-failed 吸收：rerun 不走 gate（避免把首轮
       # 的 HOME 污染判定覆盖成 PASS），污染结论由 verify 终判。
+      # ctest 调用与失败取证只走 .github/scripts/run-ctest.sh（三平台同源）。
       - name: Run tests under HOME isolation (tests + tools legs, auto-retry once)
         run: |
           GATE="scripts/gate_home_isolate.sh"
           VDIR="${RUNNER_TEMP}/airy-gate-a4"
+          RUN=".github/scripts/run-ctest.sh"
           run_leg() {
-            leg="$1"; filter="$2"; log="$3"; rlog="$4"
-            # shellcheck disable=SC2086
+            leg="$1"; shift
+            case "$leg" in
+              tests) log=/tmp/ctest.log; rlog=/tmp/ctest-rerun.log ;;
+              tools) log=/tmp/ctest-tools.log; rlog=/tmp/ctest-tools-rerun.log ;;
+            esac
             bash "$GATE" run --leg "$leg" --verdict-dir "$VDIR" -- \
-              ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure \
-              -j"$(nproc)" --timeout 240 $filter > "$log" 2>&1
+              bash "$RUN" --tag "$leg" --log "$log" "$@"
             rc=$?
             if [ $rc -eq 0 ]; then
               return 0
             fi
             echo "::error::A-4 $leg 腿 FAILED rc=$rc (attempt 1)，自动 rerun-failed…"
-            awk '/The following tests FAILED:/,/Errors while running CTest/' "$log" | sed 's/^/::error::  /' | head -40
-            grep -E '^\s*[0-9]+/[0-9]+ Testing|FAILED|Failed' "$log" | sed 's/^/::error::  /' | head -40
-            ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure --rerun-failed \
-              --timeout 240 > "$rlog" 2>&1
+            bash "$RUN" --tag "$leg" --rerun --log "$rlog"
             rc2=$?
             if [ $rc2 -eq 0 ]; then
               echo "::warning::A-4 $leg 腿 attempt1 失败但 rerun-failed 全过（flaky），用例层放行；隔离结论由 verify 终判"
               return 0
             fi
-            echo "::error::A-4 $leg 腿 rerun FAILED rc=$rc2"
-            tail -n 40 "$rlog" | sed 's/^/::error::  /'
             return $rc2
           }
           rc=0
-          run_leg tests '-E ^cli_' /tmp/ctest.log /tmp/ctest-rerun.log || rc=$?
-          run_leg tools '-R ^cli_' /tmp/ctest-tools.log /tmp/ctest-tools-rerun.log || rc=$?
+          run_leg tests --exclude '^cli_' || rc=$?
+          run_leg tools --regex '^cli_' || rc=$?
           bash "$GATE" verify --verdict-dir "$VDIR" || rc=$?
           exit $rc
 
@@ -388,34 +387,26 @@ jobs:
       # ctest 同样在 A-4 隔离沙箱下执行（写真实 $HOME 即判红）。
       - name: Run tests (ctest, auto-retry once, HOME isolated)
         run: |
-          set +e
-          bash scripts/gate_home_isolate.sh run --leg tests \
-            --verdict-dir "${RUNNER_TEMP}/airy-gate-a4-canary-off" -- \
-            ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure -j"$(nproc)" \
-              --timeout 240 > /tmp/canary-off-ctest.log 2>&1
+          RUN=".github/scripts/run-ctest.sh"
+          VDIR="${RUNNER_TEMP}/airy-gate-a4-canary-off"
+          bash scripts/gate_home_isolate.sh run --leg tests --verdict-dir "$VDIR" -- \
+            bash "$RUN" --tag canary-off --log /tmp/canary-off-ctest.log
           rc=$?
           if [ $rc -eq 0 ]; then
             exit 0
           fi
-          echo "::error::ctest FAILED rc=$rc (attempt 1)，自动 rerun-failed…"
-          awk '/The following tests FAILED:/,/Errors while running CTest/' \
-            /tmp/canary-off-ctest.log | sed 's/^/::error::  /' | head -40
-          grep -E '::error::A-4' /tmp/canary-off-ctest.log | sed 's/^/::error::  /' | head -20
-          ctest --test-dir "${{ env.BUILD_DIR }}" --output-on-failure --rerun-failed \
-            --timeout 240 > /tmp/canary-off-ctest-rerun.log 2>&1
+          bash "$RUN" --tag canary-off --rerun --log /tmp/canary-off-ctest-rerun.log
           rc2=$?
           if [ $rc2 -eq 0 ]; then
             # 用例层 flaky 放行，但隔离结论不能跟着放行：首轮若写了真实
             # $HOME，verdict 仍是 FAIL，这里必须判红。
-            if [ "$(head -1 "${RUNNER_TEMP}/airy-gate-a4-canary-off/leg-tests.verdict" 2>/dev/null)" != "PASS" ]; then
+            if [ "$(head -1 "${VDIR}/leg-tests.verdict" 2>/dev/null)" != "PASS" ]; then
               echo "::error::A-4 隔离门禁判红：真实 \$HOME 被写入（见 offenders-tests.txt）"
               exit 1
             fi
             echo "::warning::ctest attempt1 失败但 rerun-failed 全过（flaky），门禁放行"
             exit 0
           fi
-          echo "::error::ctest rerun FAILED rc=$rc2"
-          tail -n 40 /tmp/canary-off-ctest-rerun.log | sed 's/^/::error::  /'
           exit $rc2
 
       - name: Upload logs artifact
@@ -520,35 +511,10 @@ jobs:
 
       - name: Run tests (ctest, auto-retry once)
         run: |
-          # --timeout 240：单测超时护栏——防 macOS ctest 挂死无结论。
-          # 瞬态 flaky（macOS runner 慢负载下定时敏感单测首轮偶发红、
-          # 同环境 rerun-failed 即全过）经一次自动重试吸收；真实回归
-          # rerun 仍失败 → fail-closed（exit rc2）。门禁口径：首轮失败但
-          # rerun-failed 全过视为 flaky 放行，明细留档。
-          set +e
-          ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure -j"$(sysctl -n hw.ncpu)" \
-            --timeout 240 > /tmp/macos-ctest.log 2>&1
-          rc=$?
-          if [ $rc -eq 0 ]; then
-            exit 0
-          fi
-          echo "::error::macOS ctest FAILED rc=$rc (attempt 1)，自动 rerun-failed…"
-          grep -E 'The following tests FAILED:|Test #|Passed|Failed|\*\*\*|Timeout|Subprocess aborted' \
-            /tmp/macos-ctest.log | sed 's/^/::error::  /' | head -50
-          tail -n 20 /tmp/macos-ctest.log | sed 's/^/::error::  /'
-          ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure --rerun-failed \
-            --timeout 240 > /tmp/macos-rerun.log 2>&1
-          rc2=$?
-          if [ $rc2 -eq 0 ]; then
-            echo "::warning::macOS ctest attempt1 失败但 rerun-failed 全过（flaky），门禁放行"
-            exit 0
-          fi
-          echo "::error::macOS ctest rerun FAILED rc=$rc2"
-          # 断言级失败明细：rerun 双败时 tail 窗口内可能全是 PASS 行；
-          # 全量抓取 [FAIL] 行定位具体断言。
-          grep -E '\[FAIL\]' /tmp/macos-rerun.log | head -30 | sed 's/^/::error::  /' || true
-          tail -n 40 /tmp/macos-rerun.log | sed 's/^/::error::  /'
-          exit $rc2
+          # 超时/并发/失败取证/一次性 rerun 放行由 run-ctest.sh 统一定义
+          # （与 linux、windows、sanitizer 腿同一实现，判据不再各写一份）。
+          bash .github/scripts/run-ctest.sh --tag macos --retry \
+            --log /tmp/macos-ctest.log
 
       # 失败（含 rerun 仍失败）即把首轮与 rerun 日志落 ci-debug issue（公共
       # issue 匿名 API 可读，供排障拉取）；flaky 放行的场景不在此触发
@@ -558,8 +524,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           bash .github/scripts/ci-debug-dump.sh "macos ctest" "/tmp/macos-ctest.log"
-          if [ -f /tmp/macos-rerun.log ]; then
-            bash .github/scripts/ci-debug-dump.sh "macos ctest rerun" "/tmp/macos-rerun.log"
+          if [ -f /tmp/macos-ctest-rerun.log ]; then
+            bash .github/scripts/ci-debug-dump.sh "macos ctest rerun" "/tmp/macos-ctest-rerun.log"
           fi
 
       # 与 linux 腿同口径，日志直传 artifact 作为免凭据兜底取证。
@@ -570,7 +536,7 @@ jobs:
           name: macos-ctest-logs
           path: |
             /tmp/macos-ctest.log
-            /tmp/macos-rerun.log
+            /tmp/macos-ctest-rerun.log
           if-no-files-found: ignore
           retention-days: 14
 
@@ -690,9 +656,11 @@ jobs:
         shell: pwsh
         run: |
           $env:PATH = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin;$env:PATH"
-          $ctestLog = Join-Path $env:RUNNER_TEMP "ctest.log"
-          ctest --test-dir ${{ env.BUILD_DIR }} -C Release --output-on-failure --timeout 240 2>&1 | Tee-Object -FilePath $ctestLog
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # 与 linux/macOS/sanitizer 腿共用唯一入口（.github/scripts/run-ctest.sh）；
+          # 本腿不启用 rerun 放行，首轮失败即红（Windows 崩溃多为确定性回归）。
+          $log = (Join-Path $env:RUNNER_TEMP "ctest.log") -replace '\\', '/'
+          bash .github/scripts/run-ctest.sh --tag windows --config Release --log $log
+          exit $LASTEXITCODE
 
       # ctest SegFault 栈捕获（cdb）。windows runner 带 Windows SDK Debugging
       # Tools 时，对失败测试跑 cdb，crash 断点上 .ecxr + k 输出符号化调用栈，

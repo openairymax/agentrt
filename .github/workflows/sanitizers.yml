@@ -143,19 +143,20 @@ jobs:
           set +e
           bash scripts/gate_home_isolate.sh run --leg tests \
             --verdict-dir "${RUNNER_TEMP}/airy-gate-a4-san" -- \
-            ctest --test-dir ${{ env.BUILD_DIR }} --output-on-failure -j"$(nproc)" \
-              --timeout 300 -R '${{ env.SANITIZER_CTEST_RE }}' \
-              > /tmp/sanitizer-ctest.log 2>&1
+            bash .github/scripts/run-ctest.sh --tag sanitizer --timeout 300 \
+              --regex '${{ env.SANITIZER_CTEST_RE }}' --log /tmp/sanitizer-ctest.log
           rc=$?
           if [ $rc -eq 0 ]; then
             tail -n 4 /tmp/sanitizer-ctest.log
             exit 0
           fi
-          echo "::error::sanitizer ctest FAILED rc=$rc"
-          # sanitizer 报告在断言行之后（SUMMARY/ERROR 行），逐类抓取定位。
-          grep -E 'ERROR: (Address|Leak|UndefinedBehavior)Sanitizer|runtime error:|SUMMARY: |The following tests FAILED:|^[[:space:]]+[0-9]+ - |::error::A-4' \
+          # sanitizer 报告在断言行之后（SUMMARY/ERROR 行），逐类抓取定位；
+          # 通用失败块已由 run-ctest.sh 输出，这里避免重复打印。
+          if [ "$(head -1 "${RUNNER_TEMP}/airy-gate-a4-san/leg-tests.verdict" 2>/dev/null)" != "PASS" ]; then
+            echo "::error::A-4 隔离门禁判红：真实 \$HOME 被写入（见 offenders-tests.txt）"
+          fi
+          grep -E 'ERROR: (Address|Leak|UndefinedBehavior)Sanitizer|runtime error:|SUMMARY: |::error::A-4' \
             /tmp/sanitizer-ctest.log | head -60 | sed 's/^/::error::  /'
-          tail -n 60 /tmp/sanitizer-ctest.log | sed 's/^/::error::  /'
           exit $rc
 
       - name: Dump ctest log to ci-debug issue
