@@ -449,16 +449,21 @@ static void dm_status(const char **ns, size_t n)
     }
 }
 
+/* 单守护进程动作结果上报：行模式与 Sub Agent 模式共用同一落点。 */
+static void dm_report(const char *ns, const char *st, int fail)
+{
+    if (g_cli_print_mode)
+        cli_outf("%s %s\n", ns, st);
+    else
+        cli_sub_print(fail, ns, st);
+}
+
 static void dm_start(const char **ns, size_t n)
 {
     for (size_t i = 0; i < n; i++) {
         if (cli_daemon_start(ns[i]) != 0)
             continue;
-        const char *st = cli_daemon_wait_online(ns[i], 8000) ? "started" : "starting";
-        if (g_cli_print_mode)
-            cli_outf("%s %s\n", ns[i], st);
-        else
-            cli_sub_print(0, ns[i], st);
+        dm_report(ns[i], cli_daemon_wait(ns[i], 1, 8000) ? "started" : "starting", 0);
     }
 }
 
@@ -466,11 +471,7 @@ static void dm_stop(const char **ns, size_t n)
 {
     for (size_t i = 0; i < n; i++) {
         int rc = cli_daemon_stop(ns[i]);
-        const char *st = rc == 0 ? "stopped" : "stop failed (timeout)";
-        if (g_cli_print_mode)
-            cli_outf("%s %s\n", ns[i], st);
-        else
-            cli_sub_print(rc != 0, ns[i], st);
+        dm_report(ns[i], rc == 0 ? "stopped" : "stop failed (timeout)", rc != 0);
     }
 }
 
@@ -480,11 +481,7 @@ static void dm_restart(const char **ns, size_t n)
         cli_daemon_stop(ns[i]);
         if (cli_daemon_start(ns[i]) != 0)
             continue;
-        const char *st = cli_daemon_wait_online(ns[i], 8000) ? "restarted" : "restarting";
-        if (g_cli_print_mode)
-            cli_outf("%s %s\n", ns[i], st);
-        else
-            cli_sub_print(0, ns[i], st);
+        dm_report(ns[i], cli_daemon_wait(ns[i], 1, 8000) ? "restarted" : "restarting", 0);
     }
 }
 

@@ -76,7 +76,7 @@ int cli_daemon_bin(const char *ns, char *buf, size_t cap);
 int cli_daemon_online(const char *ns);
 int cli_daemon_start(const char *ns);
 int cli_daemon_stop(const char *ns);
-int cli_daemon_wait_online(const char *ns, int timeout_ms);
+int cli_daemon_wait(const char *ns, int want_online, int timeout_ms);
 
 #ifdef __cplusplus
 }

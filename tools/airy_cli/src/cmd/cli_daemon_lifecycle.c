@@ -128,21 +128,10 @@ int cli_daemon_start(const char *ns)
     return 0;
 }
 
-static int cli_daemon_wait_offline(const char *ns, int timeout_ms)
+static int cli_daemon_wait(const char *ns, int want_online, int timeout_ms)
 {
     int waited = 0;
-    while (cli_daemon_online(ns)) {
-        airy_sleep_ms(200);
-        waited += 200;
-        if (waited >= timeout_ms) return 0;
-    }
-    return 1;
-}
-
-int cli_daemon_wait_online(const char *ns, int timeout_ms)
-{
-    int waited = 0;
-    while (!cli_daemon_online(ns)) {
+    while ((cli_daemon_online(ns) != 0) != want_online) {
         airy_sleep_ms(200);
         waited += 200;
         if (waited >= timeout_ms) return 0;
@@ -159,7 +148,7 @@ int cli_daemon_stop(const char *ns)
     char *result = NULL;
     daemon_rpc_call(cli_ns_sock(ns), "shutdown", "{}", &result, 3000);
     AIRY_FREE(result);
-    if (!cli_daemon_wait_offline(ns, 5000)) return -1;
+    if (!cli_daemon_wait(ns, 0, 5000)) return -1;
     return 0;
 }
 
