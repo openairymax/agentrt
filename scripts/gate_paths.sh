@@ -28,6 +28,10 @@ for _c in "$CLI" "$ROOT/build/tools/airy_cli/airy_cli" "$ROOT/tools/airy_cli/air
     [ -x "$_c" ] && CLI="$_c" && break
 done
 [ -x "$CLI" ] || { printf 'gate_paths: 缺 airy_cli（%s）\n' "$CLI" >&2; exit 2; }
+# 绝对化：下方把 CLI 以符号链接放进沙箱 bin/，相对路径的链接目标会按链接
+# 所在目录解析而悬空，doctor 随即看不到 CLI、退化为兜底路径，判据误红。
+CLI="$(cd -P "$(dirname "$CLI")" && pwd)/$(basename "$CLI")"
+[ -x "$CLI" ] || { printf 'gate_paths: airy_cli 不可执行（%s）\n' "$CLI" >&2; exit 2; }
 
 LAUNCH="$ROOT/latest/airymaxrt"
 [ -f "$LAUNCH" ] || { printf 'gate_paths: 缺启动器 %s\n' "$LAUNCH" >&2; exit 2; }
@@ -60,7 +64,10 @@ _OUT="$(AIRY_HOME="$_BASE" bash "$LAUNCH" doctor 2>&1 || true)"
 _ESC="$(printf '\033')"
 _DLOG="$(printf '%s\n' "$_OUT" | sed "s/${_ESC}\[[0-9;]*m//g" |
     sed -n 's/.*airy_cli paths log=\([^ ]*\).*/\1/p' | head -1)"
-[ -n "$_DLOG" ] || fail "doctor 未自证路径来源（路径来源行缺失）"
+if [ -z "$_DLOG" ]; then
+    printf '%s\n' "$_OUT" | sed "s/${_ESC}\[[0-9;]*m//g" | tail -n 20 | sed 's/^/  doctor| /' >&2
+    fail "doctor 未自证路径来源（路径来源行缺失）"
+fi
 [ "$_DLOG" = "$_WANT_LOG" ] || fail "doctor 日志根与 paths 快照不一致: $_DLOG != $_WANT_LOG"
 
 grep -q 'LOG_DIR="\$(_pget log)"' "$LAUNCH" || fail "启动器丢失 _pget log 取值链"
