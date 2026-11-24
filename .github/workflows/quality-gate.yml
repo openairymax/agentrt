@@ -308,6 +308,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends python3 python3-yaml
 
+      # S30-P1-10：gateway/deploy/k8s 清单此前「仅清单、未验证」。以固定
+      # 版本 + 校验和的 kubeconform 严格模式在合入前否决非法清单；未知 CRD
+      # 放行但汇总计数照实输出。与 release gates 分步，判红时归因清晰。
+      - name: Validate Kubernetes manifests (kubeconform strict)
+        run: bash .github/scripts/check-k8s-manifests.sh
+
       # 判据是 137 条断言，判红时视图只显示「exit code 1」，红在哪一条
       # 无从取证。与 quality-gate 腿同口径：完整输出先落盘，断言名与汇总
       # 行提为 annotation，日志随后进 ci-debug issue 与 artifact。
