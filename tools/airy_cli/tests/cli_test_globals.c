@@ -20,3 +20,6 @@ int g_cli_verbose = 0;
 /* D-15（0.1.21）：事件流出口与静音开关，cli_render.c 与命令行解析共用。 */
 int g_cli_events_mode = 0;
 int g_cli_quiet = 0;
+/* S30-P0-2（0.1.21）：--legacy-tui 开关，命令行解析读、运行时选前端； */
+/* 默认宿主切 Rust TUI 后由 main.c 定义，测试目标同源补齐。 */
+int g_cli_legacy_tui = 0;
