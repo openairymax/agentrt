@@ -828,6 +828,13 @@ jobs:
           New-Item -ItemType Directory -Force -Path $pkgDir | Out-Null
           Copy-Item "$stage\*" $pkgDir -Recurse -Force
           Copy-Item VERSION $pkgDir -Force
+          # 与发行包同形：release-build 打包会把 _tools 的配置模板随包分发，
+          # 安装器据此部署 cupolas 规则面。此处若不复刻，安装腿的 config 面
+          # 与发行形态分叉，规则部署链就失去唯一实证。
+          $cfgDir = Join-Path $pkgDir "config"
+          New-Item -ItemType Directory -Force -Path $cfgDir | Out-Null
+          Copy-Item "_tools\scripts\ops\templates\permission_rules.yaml" $cfgDir -Force
+          Copy-Item "_tools\scripts\ops\templates\secrets.env.example" $cfgDir -Force
           # 与 release 制品同形（平台标记 + VERSION）；安装器不读，仅为包布局一致
           Set-Content -Path (Join-Path $pkgDir "platform-x86-64") -Value ""
           Compress-Archive -Path $pkgDir -DestinationPath $zip -Force
@@ -850,4 +857,21 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "installed airy_cli failed to run (exit $LASTEXITCODE)"
           }
+          # 安装自证链：启动器子命令是用户唯一入口，必须能回答「装好了吗」
+          # 与「能跑吗」。status/doctor 直接读安装树，任一环断裂都意味着
+          # 装得上却用不了；规则面与 TUI 态同属安装产物，一并断言。
+          if (-not (Test-Path (Join-Path $prefix "config\cupolas\permission_rules.yaml"))) {
+            throw "permission_rules.yaml not deployed under config\cupolas"
+          }
+          if (-not (Select-String -Path (Join-Path $prefix "config\install.env") `
+                -Pattern '^AIRY_TUI=' -Quiet)) {
+            throw "AIRY_TUI missing from install.env"
+          }
+          $statusJson = & "$binDir\airymaxrt.cmd" status --json
+          if ($LASTEXITCODE -ne 0) { throw "airymaxrt status --json exited $LASTEXITCODE" }
+          $st = $statusJson | ConvertFrom-Json
+          if (-not $st.ok) { throw "status reports incomplete install" }
+          if ($st.version -ne "v$ver") { throw "status version '$($st.version)' != v$ver" }
+          & "$binDir\airymaxrt.cmd" doctor
+          if ($LASTEXITCODE -ne 0) { throw "airymaxrt doctor exited $LASTEXITCODE" }
 
