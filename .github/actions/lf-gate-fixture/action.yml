@@ -195,7 +195,10 @@ inputs:
     # ba1bfd9：新增 Gate 52（测试运行宏假绿灯静态扫描，扫描器自带判定矩阵
     # 自证）。旧 pin 不执行该门，收窄后的运行宏在 CI 侧无守卫；新 pin 与
     # 判据面单差该门禁及其编排注册，其余基线不变。
-    default: 'ba1bfd9077d0a9b9165187ff499d9b1de1a0b06c'
+    # 05a723b：三本账 pin 按实测收敛（core 75881→75868、facade 81937→81924，
+    # 只降不升，target 不动）。Gate 42 要求 pin 与代码逐数对齐，不 bump 则
+    # 仍按旧账判「滞后」；与 ba1bfd9 的判据面单差基线两行。
+    default: '05a723be896fe0fe1056c22aeba64ae81f221f2d'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
