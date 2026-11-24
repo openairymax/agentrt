@@ -5,10 +5,11 @@ name: Quality Gates
 # 按来源直取到临时区、组装出 quality-gate.sh 期望的 PROJECT_ROOT
 # 布局后运行，不递归 clone 伞仓子模块图。
 #
-# 门禁清单不在本文件复制：编排器与全部门禁（当前 46 门）的权威定义在
-# tools/scripts/ci/quality/gates/quality-gate.sh。此处曾手抄一份 26 门的
-# 编号—名称对照表，门禁增补只落在 tools 侧，副本随即失真——step 名写
-# 「26 gates」而实际跑 46 门，判红时连「红在哪一门」都要回编排器反查。
+# 门禁清单不在本文件复制：编排器与全部门禁的权威定义在
+# tools/scripts/ci/quality/gates/quality-gate.sh。此处曾手抄一份门数写死的
+# 编号—名称对照表，门禁增补只落在 tools 侧，副本随即失真——step 名与实际
+# 门数不符，判红时连「红在哪一门」都要回编排器反查。故本文件只按路径
+# 引用编排器，不复述门数与门名。
 # 双副本 = 漏改 = 视图与事实分叉（与本仓 SHA 单点同一纪律）。
 #
 # 四 job 结构：quality-gate 跑伞仓全量门禁编排器；release-gates 跑本仓
@@ -205,13 +206,13 @@ jobs:
               || echo "::warning::products nested submodules unavailable, Gate M will fail"
           fi
 
-      - name: Run quality gates (46 gates)
+      - name: Run quality gates (tools orchestrator)
         env:
           # 构建产物一律树外化（工程铁律 a）：落到 runner temp，不落源码区。
           QUALITY_GATE_BUILD_DIR: ${{ runner.temp }}/agentrt-quality-gate-build
         run: |
           # 全量输出先落盘再回显。Actions 完整日志匿名不可下载，annotation
-          # 每 job 仅 ≤10 条且被截尾：46 门禁判红时，视图里只剩「某门 FAILED」
+          # 每 job 仅 ≤10 条且被截尾：任一判红时，视图里只剩「某门 FAILED」
           # 而无判据，红因不可取证（Build & Test 腿的 ci-debug issue 已证明
           # 该通道是本仓唯一可匿名取证路径，此处按同口径接线）。
           # 日志自带首尾：解释器起不来、脚本被信号截断时，文件里仍留下命令
@@ -249,7 +250,7 @@ jobs:
               "/tmp/quality-gate.log" "quality-gate-logs" || true
 
       # artifact 兜底：ci-debug issue 依赖 GH_TOKEN 与 issue 可写，
-      # artifact 无需凭据即可从 run 页面取到完整 46 门禁日志。
+      # artifact 无需凭据即可从 run 页面取到完整门禁日志。
       # 构建子日志一并归档：Gate 1 判红时视图只有 dump_cmake_err 截取的
       # 末 40 行，configure.log/build.log 本体落在 runner 临时目录，
       # 不随 run 保存就等于判据蒸发。
