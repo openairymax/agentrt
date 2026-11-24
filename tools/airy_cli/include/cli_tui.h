@@ -45,15 +45,6 @@ int cli_tui_create(cli_tui_t **out_tui);
 void cli_tui_destroy(cli_tui_t *tui);
 
 /**
- * @brief Get the process-wide TUI engine (NULL when none was created).
- *
- * Convenience accessor for subsystems that need to route input through the
- * line-mode engine (e.g. GCCP interactions) without threading a handle
- * through every call chain.
- */
-cli_tui_t *cli_tui_get_default(void);
-
-/**
  * @brief Read one full line of user input.
  *
  * TTY: raw-mode key handling with full readline-style editing.

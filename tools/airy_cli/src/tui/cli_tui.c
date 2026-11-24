@@ -24,14 +24,6 @@
 
 #include "cli_tui_internal.h"
 
-/* Process-wide engine handle (accessor for GCCP etc.). */
-static cli_tui_t *g_default_tui;
-
-cli_tui_t *cli_tui_get_default(void)
-{
-    return g_default_tui;
-}
-
 #ifndef _WIN32
 volatile sig_atomic_t g_tui_resize_pending;
 
@@ -92,8 +84,6 @@ int cli_tui_create(cli_tui_t **out_tui)
     if (!t)
         return -1;
     *out_tui = t;
-    if (!g_default_tui)
-        g_default_tui = t;
     /* Recall past submitted commands (Up / Ctrl+R) from the previous session. */
     tui_cmd_hist_load(t);
     /* 2.2.3 内置拼音输入法：词典加载失败仅降级（ime==NULL），不阻断
@@ -126,7 +116,5 @@ void cli_tui_destroy(cli_tui_t *t)
     tui_cmd_hist_reset(t);
     AIRY_FREE(t->input);
     airy_ime_destroy(t->ime); /* 可为 NULL */
-    if (g_default_tui == t)
-        g_default_tui = NULL;
     AIRY_FREE(t);
 }
