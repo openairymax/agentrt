@@ -39,6 +39,17 @@ int cli_gw_json(const char *method, cJSON *params, int timeout_ms, cJSON **out_r
 int cli_gw_json_q(const char *method, cJSON *params, int timeout_ms, int renewals,
                   cJSON **out_root);
 
+/**
+ * @brief result 被再包一层 JSON 字符串时的解包（与 TUI 客户端同容错）。
+ *
+ * 两个终端的 result 形态曾出现差异：一侧返回对象，另一侧返回「对象的
+ * JSON 字符串」。入参 root 的所有权在解包成功时被释放；未命中时原样返回，
+ * 调用方始终按单一所有权 cJSON_Delete 即可。
+ * @param root 解析后的 result（可 NULL）
+ * @return 解包后的对象或原 root
+ */
+cJSON *cli_json_unwrap(cJSON *root);
+
 #ifdef __cplusplus
 }
 #endif

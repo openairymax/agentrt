@@ -501,3 +501,12 @@ int cli_gw_json(const char *method, cJSON *params, int timeout_ms, cJSON **out_r
 {
     return cli_gw_json_q(method, params, timeout_ms, 0, out_root);
 }
+
+cJSON *cli_json_unwrap(cJSON *root)
+{
+    cJSON *inner = cJSON_IsString(root) ? cJSON_Parse(root->valuestring) : NULL;
+    if (!inner)
+        return root;
+    cJSON_Delete(root);
+    return inner;
+}

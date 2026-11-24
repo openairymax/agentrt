@@ -12,6 +12,7 @@
 #include "daemon_cmds.h"
 #include "airy_cli_cmd_internal.h"
 #include "cli_gw.h"
+#include "cli_gw_json.h"
 #include "airy_memory.h"
 #include "cli_render.h"
 #include "platform.h"
@@ -29,16 +30,6 @@ static void cli_approval_time(uint64_t ts, char *out, size_t cap)
     if (airy_localtime_r(&t, &ltm) == 0 && strftime(out, cap, "%m-%d %H:%M:%S", &ltm) > 0)
         return;
     snprintf(out, cap, "%llu", (unsigned long long)ts);
-}
-
-/* result 可能被再包一层字符串（与 TUI 客户端同容错）。 */
-static cJSON *cli_approval_unwrap(cJSON *root)
-{
-    cJSON *inner = cJSON_IsString(root) ? cJSON_Parse(root->valuestring) : NULL;
-    if (!inner)
-        return root;
-    cJSON_Delete(root);
-    return inner;
 }
 
 static const char *cli_approval_str(cJSON *obj, const char *key, const char *fallback)
@@ -84,7 +75,7 @@ int cmd_pending(const char *arg, void *ctx)
         cli_print_line("Sub approval Agent", "审批服务不可用（tool.pending）");
         return 0;
     }
-    cJSON *root = cli_approval_unwrap(cJSON_Parse(res));
+    cJSON *root = cli_json_unwrap(cJSON_Parse(res));
     AIRY_FREE(res);
     if (!root) {
         cli_print_line("Sub approval Agent", "审批响应解析失败");
@@ -196,7 +187,7 @@ int cmd_approve(const char *arg, void *ctx)
         cli_print_line("Sub approval Agent", "审批决议回传失败（tool.approve）");
         return 0;
     }
-    cJSON *root = cli_approval_unwrap(cJSON_Parse(res));
+    cJSON *root = cli_json_unwrap(cJSON_Parse(res));
     AIRY_FREE(res);
     if (!root) {
         cli_print_line("Sub approval Agent", "审批决议响应解析失败");

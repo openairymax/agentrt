@@ -12,6 +12,7 @@
 #include "daemon_cmds.h"
 #include "airy_cli_cmd_internal.h"
 #include "cli_gw.h"
+#include "cli_gw_json.h"
 #include "airy_memory.h"
 #include "cli_render.h"
 #include "platform.h"
@@ -29,16 +30,6 @@ static void cli_job_time(uint64_t ms, char *out, size_t cap)
     if (airy_localtime_r(&t, &ltm) == 0 && strftime(out, cap, "%m-%d %H:%M:%S", &ltm) > 0)
         return;
     snprintf(out, cap, "%llu", (unsigned long long)ms);
-}
-
-/* result 可能被再包一层字符串（与 TUI 客户端同容错）。 */
-static cJSON *cli_job_unwrap(cJSON *root)
-{
-    cJSON *inner = cJSON_IsString(root) ? cJSON_Parse(root->valuestring) : NULL;
-    if (!inner)
-        return root;
-    cJSON_Delete(root);
-    return inner;
 }
 
 static const char *cli_job_str(cJSON *obj, const char *key, const char *fallback)
@@ -93,7 +84,7 @@ static void cli_job_show(const char *job_id)
         cli_print_line("Sub jobs Agent", "作业查询不可用（tool.job）");
         return;
     }
-    cJSON *root = cli_job_unwrap(cJSON_Parse(res));
+    cJSON *root = cli_json_unwrap(cJSON_Parse(res));
     AIRY_FREE(res);
     if (!root) {
         cli_print_line("Sub jobs Agent", "作业响应解析失败");
@@ -146,7 +137,7 @@ static void cli_job_list(int limit)
         cli_print_line("Sub jobs Agent", "作业历史不可用（tool.jobs）");
         return;
     }
-    cJSON *root = cli_job_unwrap(cJSON_Parse(res));
+    cJSON *root = cli_json_unwrap(cJSON_Parse(res));
     AIRY_FREE(res);
     if (!root) {
         cli_print_line("Sub jobs Agent", "作业历史解析失败");
