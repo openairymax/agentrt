@@ -192,7 +192,10 @@ inputs:
     # INV-10 写点删去大厅持久化条目、函数名台账按现树重建、ABI 白名单删去
     # 四个已不存在的公共头。不 bump 则 INV-10 判「声明文件不存在」、
     # Gate 18/42 按旧账判「pin 滞后」。
-    default: '56b3109f398241c05ee586ddc0857c66fa789c96'
+    # ba1bfd9：新增 Gate 52（测试运行宏假绿灯静态扫描，扫描器自带判定矩阵
+    # 自证）。旧 pin 不执行该门，收窄后的运行宏在 CI 侧无守卫；新 pin 与
+    # 判据面单差该门禁及其编排注册，其余基线不变。
+    default: 'ba1bfd9077d0a9b9165187ff499d9b1de1a0b06c'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
@@ -262,7 +265,10 @@ inputs:
     # （R13：生产模式未配置口令时拒绝开库），本 action 物化的 cupolas 源
     # 因而与 tools 账 `cupolas=17656` 同源。不 bump 则发行装配缺 R13，
     # 且 g42 按旧树实测 17604 判「与 pin 差 52 行」。
-    default: '5fe492075b1d654e5615ee36af2b8099eb5ef134'
+    # 70ab3f2：cupolas 与 memoryrovol 的 RUN_TEST 改为比较失败计数水位
+    # （断言失败不再被宏吞掉后仍报通过）。判据消费面只涉测试宏，产品源
+    # 零差异；不 bump 则 Gate 52 与打包取到旧宏，假绿灯面仍在。
+    default: '70ab3f2676667561994f23233edfa5caae198510'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
