@@ -50,19 +50,11 @@
  * 仅读，接收等待循环中命中即中断。 */
 extern volatile sig_atomic_t g_cli_cancel;
 
-/* 端口文件路径：AIRY_HOME 优先，回退 ~/.airymaxrt。返回 0/-1。 */
-static int cli_gw_port_path(char *path, size_t cap)
+/* 端口文件路径：安装根 SSoT 由 platform_paths 解析（AIRY_HOME / install.env
+ * 发现 / 用户主目录逐级回落），客户端与服务端同源，禁止本地再拼一套。 */
+static void cli_gw_port_path(char *path, size_t cap)
 {
-    const char *home = getenv("AIRY_HOME");
-    if (!home || !*home || home[0] == '$') {
-        const char *h = getenv("HOME");
-        if (!h || !*h)
-            return -1;
-        snprintf(path, cap, "%s/.airymaxrt/run/gateway.port", h);
-    } else {
-        snprintf(path, cap, "%s/run/gateway.port", home);
-    }
-    return 0;
+    snprintf(path, cap, "%s/run/gateway.port", airy_home_dir());
 }
 
 /* 端口文件内容 → 端口号（仅接受纯数字，非法返回 -1）。 */
@@ -85,8 +77,7 @@ static int cli_gw_parse_port(const char *buf)
 static int cli_gw_read_runtime_port(void)
 {
     char path[512];
-    if (cli_gw_port_path(path, sizeof(path)) != 0)
-        return -1;
+    cli_gw_port_path(path, sizeof(path));
     FILE *fp = fopen(path, "r");
     if (!fp)
         return -1;
