@@ -91,6 +91,38 @@ else
   echo "auth: GH_TOKEN not set, private submodule (atoms) may fail"
 fi
 
+# 叶子 gitlink 的远端可达性预检：镜像竞态最终必然由 retry 兜住，但
+# 「SHA 根本没推上 GitHub」与「镜像尚未同步」的失败外观完全相同（都是
+# git submodule update 退出 128），而前者重试六次也只能得到同一条含糊
+# 报错。故先用一次只读 API 查询把两者分开：仅 HTTP 404/422 判为「远端
+# 无此对象」并直接点名仓与 SHA；其余（限流、网络、认证）只告警不拦截，
+# 交回 retry 逻辑，避免把基础设施抖动误判成代码问题。
+sub_url_name() {
+  git -C . config --file .gitmodules "submodule.$1.url" 2>/dev/null |
+    sed -e 's#.*/##' -e 's#\.git$##'
+}
+
+pin_reach() {
+  local path name sha code
+  for path in $(sub_paths .); do
+    name=$(sub_url_name "$path")
+    sha=$(git rev-parse "HEAD:$path" 2>/dev/null) || continue
+    [ -n "$sha" ] || continue
+    code=$(curl -s -o /dev/null -w '%{http_code}' \
+      -H "Authorization: token ${GH_TOKEN:-}" \
+      "https://api.github.com/repos/openairymax/${name}/commits/${sha}" 2>/dev/null)
+    case "$code" in
+      200) printf 'pin: %s@%.7s reachable\n' "$name" "$sha" ;;
+      404 | 422)
+        echo "::error::gitlink ${path}@${sha} 不在 github.com/openairymax/${name}——随本次提交先推叶子仓再推宿主仓"
+        return 1
+        ;;
+      *) echo "warn: pin check ${name}@${sha:0:7} inconclusive (HTTP ${code:-none})" ;;
+    esac
+  done
+  return 0
+}
+
 # 1) 叶子子模块（agentrt 直接子模块，SHA 由 agentrt 树 gitlink 钉定）
 #
 # 竞态容错：agentrt main 推上 GitHub 的瞬间，sync-mirror workflow 才刚开始
@@ -99,6 +131,9 @@ fi
 # error: ... not found"），submodule update 立即失败（exit 128，19:05 run
 # 实证：build-test/codegen 三作业同一秒全挂）。叶子仓往往在数分钟内补齐，
 # 故对失败做有限重试（每次重跑幂等），而非一次失败即红。
+pin_rc=0
+pin_reach || pin_rc=1
+
 init_rc=1
 for attempt in 1 2 3 4 5 6; do
   # sync 重算 .git/modules 内的 URL，避免镜像切换后沿用旧地址；
@@ -114,6 +149,7 @@ for attempt in 1 2 3 4 5 6; do
   sleep 30
 done
 rc=$init_rc
+[ "$pin_rc" -eq 0 ] || rc=1
 
 # 1b) fail-closed：叶子工作树必须真正 populate（判据见 empty_paths）
 missing=$(empty_paths .)
