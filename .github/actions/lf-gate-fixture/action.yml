@@ -98,7 +98,12 @@ inputs:
     # 无 HOME 安装根自愈）。启动器 scripts/airymaxrt 与 latest 发布面
     # 逐字节一致；旧 pin 9540efc 的 tui 仍停在 ce2bd83，AF1 双面判据
     # 取到旧快照即报「latest 与 sdk 启动器分叉」。
-    default: '621beab4c55004bb4a0e7d2b24ef3ecde87192f7'
+    # f7a0301：tui gitlink 前推至 2317501（子任务委派呈现为动作行；暂停
+    # 说明以 run_end.stop_reason 的原话为准）。旧 pin 621beab 的 tui 无
+    # stop_reason 消费面，N7-3 判据读不到即报「用户侧仍表现为无原因停住」；
+    # 同快照的启动器新增二进制账，latest 发布面已同步，两者与门禁取到的
+    # 快照逐字节一致，AF1 双面判据不因本前推而变。
+    default: 'f7a030104d9d0a6b4026f97d0775c6e9abca3065'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
