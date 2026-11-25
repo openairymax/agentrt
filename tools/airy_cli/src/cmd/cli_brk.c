@@ -34,9 +34,7 @@ int cli_brk_read(const char *json, cli_brk_t *out)
 {
     if (!out)
         return 0;
-    out->open = 0;
-    out->total = 0;
-    out->breaks = 0;
+    memset(out, 0, sizeof(*out));
     if (!json || !json[0])
         return 0;
 
@@ -61,7 +59,7 @@ int cli_brk_read(const char *json, cli_brk_t *out)
         out->breaks = brk->valuedouble;
     }
     cJSON_Delete(root);
-    return seen ? 1 : 0;
+    return seen;
 }
 
 void cli_brk_show(const char *ns, const char *json)
