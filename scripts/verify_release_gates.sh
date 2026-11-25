@@ -2319,6 +2319,81 @@ else
     bad "VD4 落包自证双向失败（缺件包可出库）"
 fi
 
+section "N7" "N-7 轮次终止契约（stop_reason 单一事实源：库→守护→TUI 三面同名，硬上限已删）"
+
+_rs_hdr="$ROOT/commons/include/airy_run_stream.h"
+if grep -q '#define AIRY_RS_K_STOP_REASON  "stop_reason"' "$_rs_hdr" 2>/dev/null; then
+    ok "N7-1 停止原因键名收口 commons/include/airy_run_stream.h（AIRY_RS_K_STOP_REASON）"
+else
+    bad "N7-1 运行流契约缺 AIRY_RS_K_STOP_REASON（键名无单一事实源）"
+fi
+
+_exec="$ROOT/daemons/agent_d/src/run/agent_run_exec.c"
+_n7_emit="$(grep -c 'AIRY_RS_K_STOP_REASON' "$_exec" 2>/dev/null || true)"
+if [ "${_n7_emit:-0}" -ge 2 ]; then
+    ok "N7-2 run_end 与 error 两帧均下发 stop_reason（${_n7_emit} 处）"
+else
+    bad "N7-2 终态帧下发点不足 2 处（run_end/error 至少各一，实测 ${_n7_emit:-0}）"
+fi
+
+if [ -n "${TUI_SRC:-}" ] && [ -d "$TUI_SRC/src" ]; then
+    if grep -rq 'stop_reason' "$TUI_SRC/src" 2>/dev/null; then
+        ok "N7-3 TUI 消费 stop_reason（停止原因可呈现，非零反馈）"
+    else
+        bad "N7-3 TUI 未消费 stop_reason（用户侧仍表现为无原因停住）"
+    fi
+else
+    skip "N7-3 TUI 源树不可见，消费面判据跳过"
+fi
+
+# 硬上限删除：默认续跑至完成，32 轮编译期常量不得复活（仅安全阀可留）。
+if grep -rqE 'ROUNDS_HARD|_ROUNDS_MAX' "$ROOT/daemons/agent_d/src" 2>/dev/null; then
+    bad "N7-4 轮次硬上限常量仍存在（与「续跑至完成」口径冲突）"
+else
+    ok "N7-4 轮次硬上限常量零命中（续跑策略由 stop_reason 三条件裁决）"
+fi
+
+section "N8" "N-8 Subagent 接入运行链（工具注册 / 分派 / 深度并发配置化 / 单测）"
+
+_pol="$ROOT/daemons/agent_d/src/run/agent_sub_policy.h"
+if grep -q '#define AGENT_SUB_TOOL "subagent.spawn"' "$_pol" 2>/dev/null; then
+    ok "N8-1 委派工具名收口 AGENT_SUB_TOOL=subagent.spawn"
+else
+    bad "N8-1 委派工具名未收口（工具目录无法稳定注册）"
+fi
+
+_loop="$ROOT/daemons/agent_d/src/run/agent_run_loop.c"
+if grep -q 'run_cat_add(r->catalog, AGENT_SUB_TOOL' "$_loop" 2>/dev/null; then
+    ok "N8-2 工具目录注册 subagent.spawn（模型可见可调）"
+else
+    bad "N8-2 工具目录未注册 subagent.spawn（委派仍为库内孤岛）"
+fi
+
+if grep -q 'sub_is_tool(c->tname)' "$_loop" 2>/dev/null; then
+    ok "N8-3 工具循环按 sub_is_tool 分派（点号全等判据单点）"
+else
+    bad "N8-3 工具循环未分派 subagent（注册了也走不到）"
+fi
+
+if grep -q 'AGENT_SUB_ENV_DEPTH' "$ROOT/daemons/agent_d/src/run/agent_sub_policy.c" 2>/dev/null \
+   && grep -q 'AGENT_SUB_ENV_CONC' "$ROOT/daemons/agent_d/src/run/agent_sub_policy.c" 2>/dev/null; then
+    ok "N8-4 深度与并发上限走环境（AIRY_SUBAGENT_MAX_DEPTH/CONC），非编译期常量"
+else
+    bad "N8-4 深度/并发上限未配置化（仍为编译期常量）"
+fi
+
+if grep -q 'sub_enter()' "$ROOT/daemons/agent_d/src/run/agent_run_sub.c" 2>/dev/null; then
+    ok "N8-5 生命周期 sub_enter/sub_leave 成对（预算与上限随任务回收）"
+else
+    bad "N8-5 缺 sub_enter 生命周期（预算泄漏、上限不可回收）"
+fi
+
+if grep -q 'test_sub_policy.c' "$ROOT/daemons/agent_d/tests/CMakeLists.txt" 2>/dev/null; then
+    ok "N8-6 委派判据单测纳入构建（test_sub_policy）"
+else
+    bad "N8-6 委派判据无单测（回归无护栏）"
+fi
+
 printf '\n门禁汇总: PASS=%d FAIL=%d\n' "$PASS" "$FAIL"
 if [ "$FAIL" -gt 0 ]; then
     printf '  [GATE] WS-9 社区六类问题修复发布门禁未通过（方案 §4.9 / 9.8）\n'
