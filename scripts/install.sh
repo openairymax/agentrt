@@ -203,11 +203,15 @@ manifest_write() {
     [ -f "$env" ] || env="${h}/release.env"
     tmp="${h}/.${MANIFEST_JSON}.$$"
     lst="${tmp}.lst"
+    # 逻辑视图登记：顶层 bin/lib/include/share 是指向 current/<d> 的符号
+    # 链接，清单按用户可见路径（bin/x）落条，与 status --json 的逐件自证
+    # 同址——按物理路径（releases/<rel>/bin/x）登记会让状态面永远查不到
+    # 版本。find 以尾斜杠参数穿透目录链接；releases/ 是这些链接背后的
+    # 物理存储，整目录由卸载布局段回收，不逐件重复登记。
     {
-        for f in releases config keys modules scripts bin lib include share; do
-            [ -d "${h}/${f}" ] || continue
-            [ -L "${h}/${f}" ] && continue
-            find "${h}/${f}" \( -type f -o -type l \) 2>/dev/null
+        for f in config keys modules scripts bin lib include share; do
+            [ -e "${h}/${f}" ] || continue
+            find "${h}/${f}/" \( -type f -o -type l \) 2>/dev/null
         done
     } | LC_ALL=C sort -u > "$lst" || rc=1
     if [ "$rc" = "0" ]; then
@@ -498,7 +502,7 @@ uninst_env_home() {
 
 # 删除集合（执行序）：keep=0 整根；purge 清顶层非 data；否则按清单逆序。
 uninst_plan() {
-    local root="$1" keep="$2" p rel
+    local root="$1" keep="$2" p
     if [ "$keep" != "1" ]; then
         printf '%s\n' "$root"
         return 0
@@ -511,9 +515,6 @@ uninst_plan() {
         done
         return 0
     fi
-    for p in current share include lib bin; do
-        [ -L "${root}/${p}" ] && printf '%s\n' "${root}/${p}"
-    done
     if [ -f "${root}/${MANIFEST_JSON}" ]; then
         # 先落快照再逐行输出：清单自身排在被删集合首位，若边删边读，
         # 消费端可能先删掉清单、生产端随后读到空文件。
@@ -525,10 +526,14 @@ uninst_plan() {
             [ -n "$p" ] && printf '%s/%s\n' "$root" "$p"
         done < "$_lst"
         rm -f "$_lst"
-    else
-        rel="$(rel_id "$root")"
-        [ -n "$rel" ] && [ -d "${root}/releases/${rel}" ] && printf '%s\n' "${root}/releases/${rel}"
     fi
+    # 布局层回收必须排在逐件删除之后：清单按逻辑路径（bin/x）登记，
+    # 这些路径要经 current 链接才落到 releases/，链接先断则逐件全落空。
+    # releases/ 是逻辑件背后的物理存储，整目录回收（亦覆盖无清单的旧装）。
+    for p in current share include lib bin releases; do
+        [ -e "${root}/${p}" ] || [ -L "${root}/${p}" ] || continue
+        printf '%s\n' "${root}/${p}"
+    done
     for p in venv target logs src tmp run build; do
         [ -e "${root}/${p}" ] && printf '%s\n' "${root}/${p}"
     done
