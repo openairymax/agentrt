@@ -471,6 +471,11 @@ jobs:
       # 需 --break-system-packages 装入 PATH 上的 python3
       - name: Install build dependencies (Homebrew)
         run: |
+          # 共享 runner 上前一次被中断的 brew 事务会在 tmp/.cellar 留下半成品，
+          # 重入时报 "File exists"。临时暂存区可丢弃，清掉后重装，
+          # 避免代码无变化却因宿主机状态变红。
+          brew_stage="$(brew --prefix)/var/homebrew/tmp/.cellar"
+          if [ -d "$brew_stage" ]; then rm -rf "$brew_stage"; fi
           brew install cmake ninja pkgconf sqlite cjson curl openssl zlib zstd \
             libmicrohttpd libwebsockets libevent nghttp2
           python3 -m pip install --break-system-packages pyyaml

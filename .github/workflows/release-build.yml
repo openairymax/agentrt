@@ -419,6 +419,10 @@ jobs:
 
       - name: Install build dependencies
         run: |
+          # 与 build-test.yml 同源：共享 runner 上中断的 brew 事务会留下
+          # tmp/.cellar 半成品，重入报 "File exists"。临时暂存区可丢弃。
+          brew_stage="$(brew --prefix)/var/homebrew/tmp/.cellar"
+          if [ -d "$brew_stage" ]; then rm -rf "$brew_stage"; fi
           brew install cmake ninja pkgconf sqlite cjson curl openssl zlib zstd \
             libmicrohttpd libwebsockets libevent nghttp2
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
