@@ -176,14 +176,6 @@ jobs:
   # 冒烟，一次 rc 全链出证（install→daemon→gateway→CLI）。容器内无任何
   # 开发工具链（脚本 fail-closed 断言），等价用户干净机。门禁：publish
   # needs 本 job，e2e 不过则不发布。
-
-
-  # 容器洁净 e2e 门禁：在洁净 ubuntu:20.04 容器（与 build-linux-x86-64 腿
-  # 工具链镜像同 glibc 2.31 基线）内，对聚合后的 release-dist 制品执行
-  # install.sh --from-file 离线安装 → 启动 daemon 群 → airy_cli /daemons
-  # 冒烟，一次 rc 全链出证（install→daemon→gateway→CLI）。容器内无任何
-  # 开发工具链（脚本 fail-closed 断言），等价用户干净机。门禁：publish
-  # needs 本 job，e2e 不过则不发布。
   e2e-clean-room:
     needs: [release]
     if: success() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
@@ -287,36 +279,6 @@ jobs:
               /w/dist/install.sh \
               "/w/dist/agentrt-${{ env.VERSION }}-linux-x86-64.tar.gz" \
               $PREV_ARG $FULL_ARG
-
-  # ─── 发布拓扑：三段式拆分 ─────────────────────────────────────────────
-  # 动机：旧单 job 串行 atomgit(SSoT 上传, 外网每连接 15-30KB/s, 大包
-  # ~1.5h) → GH/Gitee 镜像，release run 墙钟被慢通道拉长到数小时，且任一
-  # 环节失败都要整体重跑。三段式拆分，全部门禁维持"e2e 绿后才发布"：
-  #
-  #   1) finalize-dist：cosign 签名 + manifest + GPG asc 一次性"产物化"
-  #      （publish-release.sh SKIP_UPLOAD=1，阶段 0-3 即退，零远端写入）。
-  #      签名集成为三端共享的规范字节；manifest 幂等保护不再重生成、
-  #      .asc 与正文恒一致——后续任何 job 都不再触碰签名内容。
-  #   2) publish-mirror：从 finalize 的 publish-dist 直传 GitHub Releases
-  #      （快通道，先于 atomgit 可见、数分钟内完成），随后 dispatch
-  #      mirror-release.yml 在独立 run 后台幂等续跑 Gitee（不阻塞本 run）。
-  #   3) publish-atomgit：SSoT 慢通道上传 + latest/ 指针切换（指针只在
-  #      上传完成后才提交，install/update 永远指向已就绪制品）——与 GH
-  #      快通道并行，互不阻塞；独立 concurrency 组支持单段重跑续传。
-  #   4) publish-npm：B12（N-5）npm 薄壳通道，needs publish-atomgit。
-  #      0.1.19 决策：npm registry 组织面尚未开通（外部账号前置），该通道
-  #      降级为**非阻断观察面**——仍与附件刷新同 run 绑定、失败留红可见，
-  #      但不再阻断整条 release；凭据就绪后须恢复 fail-closed（见台账 §349）。
-  #
-  # 发布顺序语义（社区面向文档化）：GH 数分钟先行可见 → atomgit SSoT
-  # ~1.5h 并行补齐 → Gitee 后台幂等镜像。atomgit 仍是数据权威（SSoT），
-  # GH/Gitee 只是镜像下载面，不改变主平台定位。
-  # 密钥与令牌来自受保护 Environment 'release' secrets（需维护者一次
-  # Approve；审批先于 finalize 签名与任何对外写入，仍是发布安全阀）。
-  # 紧急 fallback：下载 publish-dist 附件后本地执行
-  #   _tools/scripts/ci/release/publish-release.sh <ver> <dist_dir>
-  # （私钥副本存维护者本地发布台）。
-
 
   # ─── 发布拓扑：三段式拆分 ─────────────────────────────────────────────
   # 动机：旧单 job 串行 atomgit(SSoT 上传, 外网每连接 15-30KB/s, 大包
