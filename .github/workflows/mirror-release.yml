@@ -79,7 +79,7 @@ env:
 
 jobs:
   mirror:
-    name: Mirror ${{ inputs.version || github.event.client_payload.version }} to GitHub + Gitee + atomgit
+    name: Mirror ${{ inputs.version || github.event.client_payload.version }} to GitHub + atomgit
     runs-on: ubuntu-latest
     # 有界执行：上传步若对端 socket 假死（无低速中断的 curl 会无界等待），
     # job 超时兜底退出并释放并发位。Gitee 附件上传带宽可达低至 ~24KB/s：
@@ -131,8 +131,12 @@ jobs:
           mkdir -p dist
           ls -la dist/ || true
 
-      - name: Mirror to GitHub + Gitee
+      - name: Mirror to GitHub
         env:
+          # Gitee 段由下方 mirror-gitee 分片并行补齐：单 job 串行上传全量
+          # 在 runner 失联时会整面回填归零（2026-11-25 run 45686577824
+          # 45min 失联实证），分片后单片段失败只损失该片，重试成本可控。
+          SKIP_GITEE: '1'
           # 缺件回填开关（publish-mirror.sh 读 FETCH_MISSING=1）
           FETCH_MISSING: ${{ env.FETCH_MISSING }}
           # 回填引导的 API 查询凭据（匿名在 CI 侧可能受限）
@@ -166,3 +170,85 @@ jobs:
             exit 0
           fi
           bash _tools/scripts/ci/release/publish-release.sh "${VERSION}" dist
+
+  # Gitee 附件上传分片：9 个平台包合计 ~300MB，单 job 串行上传的失败半径
+  # 过大——2026-11-25 run 45686577824 在 45min 时 runner 失联，整面回填归零，
+  # 且 Gitee 长期停在上一轮构建。按平台包轮转切片，四片并行、互不阻塞
+  # （fail-fast: false），单片失联只损失该片；清单/安装件/发布说明各片重复
+  # 携带，脚本幂等（同名同内容跳过），先到者落地、其余只做内容校验。版本
+  # 窗口收敛由主 job 统一执行（SKIP_PRUNE），避免多片并发删除同一超窗版本。
+  mirror-gitee:
+    name: Mirror ${{ inputs.version || github.event.client_payload.version }} to Gitee (shard ${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      GITEE_TOKEN: ${{ secrets.GT_TOKEN }}
+      ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
+    steps:
+      - name: Checkout (workflow only)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Init submodules (tools)
+        run: bash .github/scripts/init-submodules.sh tools
+
+      # 分片不做 atomgit 全量回填引导：四片各拉一遍全量既慢又无意义，
+      # 故此处 fail-closed（与主 job 的 FETCH_MISSING 兜底语义不同）。
+      - name: Download release-dist artifact
+        run: |
+          set -euo pipefail
+          RUN_ID="${RELEASE_RUN_ID:-}"
+          if [ -z "${RUN_ID:-}" ]; then
+            RUN_ID="$(gh run list -R openairymax/agentrt --workflow=release.yml \
+              --branch "${VERSION}" --status success --limit 1 \
+              --json databaseId --jq '.[0].databaseId' || true)"
+          fi
+          if [ -z "${RUN_ID:-}" ]; then
+            echo "::error::未找到 ${VERSION} 的 release run，分片无法定位制品"
+            exit 1
+          fi
+          gh run download "${RUN_ID}" -R openairymax/agentrt \
+            -n "agentrt-${VERSION}-publish-dist" -D dist \
+            || gh run download "${RUN_ID}" -R openairymax/agentrt \
+                 -n "agentrt-${VERSION}-release-dist" -D dist
+          ls -la dist/ | head -40
+
+      - name: Prepare shard
+        # 平台包按 LC_ALL=C 排序后轮转切片（i-1 % 4 + 1 == shard）：排序键
+        # 与 glob 展开顺序无关，四片的并集恰好等于全量、交集为空。侧车
+        # （.sha256/.sig）与包同名同序，随包同片搬运。
+        run: |
+          set -euo pipefail
+          mkdir -p dist-shard
+          for f in dist/manifest.*.json dist/manifest.*.json.asc \
+                   dist/install.sh dist/install.ps1 dist/notes.txt; do
+            [ -e "$f" ] && cp -f "$f" dist-shard/ || true
+          done
+          ls dist/agentrt-"${VERSION}"-*.tar.gz dist/agentrt-"${VERSION}"-*.zip 2>/dev/null \
+            | LC_ALL=C sort > "$RUNNER_TEMP/pkgs.lst" || true
+          i=0
+          while IFS= read -r p; do
+            i=$((i + 1))
+            [ $(( (i - 1) % 4 + 1 )) -eq "${{ matrix.shard }}" ] || continue
+            cp -l "$p" dist-shard/ 2>/dev/null || cp -f "$p" dist-shard/
+            cp -f "$p.sha256" "$p.sig" dist-shard/ 2>/dev/null || true
+          done < "$RUNNER_TEMP/pkgs.lst"
+          echo "shard ${{ matrix.shard }} 载荷："
+          ls -l dist-shard/ | sed 's/^/  /'
+
+      - name: Mirror shard to Gitee
+        env:
+          FETCH_MISSING: '0'
+          SKIP_PRUNE: '1'
+          RELEASE_NOTES: ${{ env.NOTES }}
+        run: |
+          bash _tools/scripts/ci/release/publish-mirror.sh "${VERSION}" dist-shard
