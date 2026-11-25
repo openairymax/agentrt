@@ -271,7 +271,13 @@ inputs:
     # 70ab3f2：cupolas 与 memoryrovol 的 RUN_TEST 改为比较失败计数水位
     # （断言失败不再被宏吞掉后仍报通过）。判据消费面只涉测试宏，产品源
     # 零差异；不 bump 则 Gate 52 与打包取到旧宏，假绿灯面仍在。
-    default: '70ab3f2676667561994f23233edfa5caae198510'
+    # 9fea1e8：gateway_biz 与 gateway_d 的裸名解析面改挂
+    # GATEWAY_COMMON_INCLUDE_DIRS（gateway 分层后 aipc/ 与 hall/ 子目录
+    # 里的头在业务面不可解析，Linux 与 macOS 同一错误）；同批 cupolas
+    # gitlink 前进到 666305f（S30-P1-6 策略基线 YAML 单点导入 PDP 运行集）。
+    # 旧 pin 的业务面仍只挂 src/gateway 根，Build & Test 必红；且基线用例
+    # 不在旧测试树内，等于永不执行。
+    default: '9fea1e84ae3e0d67975748380a2a49a5e8487c29'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
