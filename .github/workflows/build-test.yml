@@ -853,6 +853,23 @@ jobs:
           $st = $statusJson | ConvertFrom-Json
           if (-not $st.ok) { throw "status reports incomplete install" }
           if ($st.version -ne "v$ver") { throw "status version '$($st.version)' != v$ver" }
+          # 安装树自证：status 报出的每个二进制版本/sha256/大小必须与磁盘实际
+          # 字节一致、drift 归零——防止"清单写一套、文件是另一套"的静默腐坏。
+          # binaries[].version 取安装清单 tag 后缀（不带 v），与 POSIX 同契约。
+          $bare = $ver -replace '^v', ''
+          if ($st.bin_drift -ne 0) { throw "bin_drift=$($st.bin_drift)（安装树与清单不一致）" }
+          $binFiles = Get-ChildItem (Join-Path $prefix "bin") -File
+          if ($binFiles.Count -ne $st.binaries.Count) {
+            throw "status binaries $($st.binaries.Count) != 磁盘 $($binFiles.Count)"
+          }
+          foreach ($f in $binFiles) {
+            $b = $st.binaries | Where-Object { $_.name -eq $f.Name }
+            if (-not $b) { throw "status 未列出二进制 $($f.Name)" }
+            if ($b.version -ne $bare) { throw "$($f.Name) 版本 '$($b.version)' != $bare" }
+            $diskSha = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower()
+            if ($b.sha256 -ne $diskSha) { throw "$($f.Name) sha256 与磁盘不一致" }
+            if ($b.size -ne $f.Length) { throw "$($f.Name) size $($b.size) != 磁盘 $($f.Length)" }
+          }
           & "$binDir\airymaxrt.cmd" doctor
           if ($LASTEXITCODE -ne 0) { throw "airymaxrt doctor exited $LASTEXITCODE" }
 
