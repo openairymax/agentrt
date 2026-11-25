@@ -33,6 +33,12 @@ on:
       - '**/*.md'
       - 'docs/**'
   pull_request:
+  # 按需重跑通道：workflow_dispatch 需要 Actions:write 权限的凭据，
+  # 伞仓侧（tools/app 令牌）只持有仓库写权限，触发被拒。repository_dispatch
+  # 走仓库写通道，与 atomgit webhook 同形态，供门禁脚本/SSoT 变更后
+  # 无源码改动时重新入闸（否则只能靠空提交，而空提交被 paths-ignore 跳过）。
+  repository_dispatch:
+    types: [quality-gate]
   workflow_dispatch:
 
 permissions:
