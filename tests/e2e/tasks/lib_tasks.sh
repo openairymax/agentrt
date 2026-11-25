@@ -421,7 +421,14 @@ chk_case() { # <case> <resp> <want-status> <want-board> <verdict> <board-before>
         ru=$(pyf "$resp" 'd.get("error",{}).get("data",{}).get("budget_used",0)')
         rl=$(pyf "$resp" 'd.get("error",{}).get("data",{}).get("budget_total",0)')
     fi
-    if [ "${ru:-0}" -le "${rl:-0}" ] && [ "${rl:-0}" -ge 1 ]; then
+    # N-7：rounds_limit=0 表示不设轮次上限（默认），此时只校验已用轮次为正整数。
+    if [ "${rl:-0}" -eq 0 ]; then
+        if [ "${ru:-0}" -ge 1 ]; then
+            ck 1 "轮次不设上限且已用轮次有效（$ru/∞）"
+        else
+            ck 0 "轮次不设上限但已用轮次异常（${ru:-?}/∞）"
+        fi
+    elif [ "${ru:-0}" -le "${rl:-0}" ] && [ "${rl:-0}" -ge 1 ]; then
         ck 1 "轮次预算不越界（$ru/$rl）"
     else
         ck 0 "轮次预算不越界（${ru:-?}/${rl:-?}）"
