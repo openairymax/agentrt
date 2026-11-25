@@ -22,7 +22,10 @@
 #   阶段 4  gateway TCP：按 run/gateway.port（缺省 8080）探测。
 #   阶段 5  CLI 冒烟：$AH/bin/airy_cli -p /daemons，断言 gateway online、
 #           无 offline、online N==M 且 M>0。
-#   阶段 6  收尾：TERM 启动器 → EXIT trap 回收 daemon 群。
+#   阶段 6  安装树自证：status --json 报出的每个二进制（name/size/sha256/
+#           version）与磁盘实际字节逐项一致，bin_drift 归零——防"清单一套、
+#           文件另一套"的静默腐坏（§33.3 #20）。
+#   阶段 7  收尾：TERM 启动器 → EXIT trap 回收 daemon 群。
 #
 # 用法：verify-macos-clean-host.sh <install.sh> <tarball> [airymaxrt-full]
 #   第三参存在时预置到 $AH/bin/airymaxrt-full（离线自举）。
@@ -409,7 +412,61 @@ if [ "$N" != "$M" ] || [ "$M" -le 0 ]; then
 fi
 info "CLI 冒烟通过: ${SUMMARY}（采样 ${_i} 轮）"
 
-# ─── 阶段 6：收尾 ─────────────────────────────────────────────────────────
+# ─── 阶段 6：安装树自证（status --json 与安装清单逐条目对账）──────────────
+info "阶段 6 安装树自证: airymaxrt status --json"
+STV="$(sed -n 's/^AIRY_VERSION=//p' "$AH/config/install.env" 2>/dev/null | head -1)"
+[ -n "$STV" ] || fail "install.env 缺 AIRY_VERSION，无法核对安装树版本"
+MF="$AH/install-manifest.json"
+[ -f "$MF" ] || fail "安装清单缺失: $MF"
+SJ="$AH/logs/clean-host-status.json"
+SJE="$AH/logs/clean-host-status.err"
+# 退出码不作判据：status 在组件缺失时按设计返回非 0；本节只核对安装树字节，
+# 缺失项由下方逐项断言兜住。
+bash "$AH/bin/airymaxrt-full" status --json >"$SJ" 2>"$SJE" || true
+if ! grep -q '"bin_drift":0' "$SJ"; then
+    dump_file "status --json" "$SJ"
+    dump_file "status --json stderr" "$SJE"
+    fail "bin_drift 非 0（安装树与清单不一致）"
+fi
+# 条数相等即无静默漏报：status 必须逐件覆盖 bin/。
+find "$AH/bin" -type f >"$AH/logs/bin.lst"
+CNT_DISK="$(wc -l <"$AH/logs/bin.lst" | tr -d ' ')"
+CNT_ST="$(grep -o '{"name":' "$SJ" | wc -l | tr -d ' ')"
+if [ "$CNT_DISK" != "$CNT_ST" ]; then
+    dump_file "status --json" "$SJ"
+    fail "status binaries=${CNT_ST} != 磁盘 ${CNT_DISK}（有件未被报告）"
+fi
+grep -F '"path": "bin/' "$MF" >"$AH/logs/man-bin.lst" || true
+# 逐件：size/sha256 必须等于磁盘实测（防"报清单不报磁盘"）；清单登记件另须
+# version=清单 tag 后缀且 drift=false。核验侧预置的 airymaxrt-full 不在清单内，
+# 版本如实报 unknown——只校验其字节，不伪造登记。
+BAD=0
+while IFS= read -r f; do
+    bn="$(basename "$f")"
+    sz="$(wc -c <"$f" 2>/dev/null | tr -d ' ')"
+    sh="$(shasum -a 256 "$f" | awk '{print $1}')"
+    if ! grep -qF "{\"name\":\"${bn}\",\"size\":${sz},\"sha256\":\"${sh}\"" "$SJ"; then
+        BAD=$((BAD + 1))
+        echo "  !! ${bn} size/sha256 与 status 不符" >&2
+        continue
+    fi
+    ln="$(awk -v p="\"path\": \"bin/${bn}\"" 'index($0, p) { print; exit }' "$MF")"
+    [ -n "$ln" ] || continue
+    tg="${ln#*\"tag\": \"}"; tg="${tg%%\"*}"; tg="${tg#tag:}"
+    [ -n "$tg" ] || tg=unknown
+    if ! grep -qF "{\"name\":\"${bn}\",\"size\":${sz},\"sha256\":\"${sh}\",\"version\":\"${tg}\",\"drift\":false}" "$SJ"; then
+        BAD=$((BAD + 1))
+        echo "  !! ${bn} 版本/drift 与清单不符（期望 ${tg}）" >&2
+    fi
+done <"$AH/logs/bin.lst"
+if [ "$BAD" -ne 0 ]; then
+    dump_file "status --json" "$SJ"
+    dump_file "安装清单 bin 条目" "$AH/logs/man-bin.lst"
+    fail "安装树自证失败: ${BAD} 个二进制与 status/清单不符"
+fi
+info "安装树自证通过: ${CNT_DISK} 个二进制 size/sha256 一致、清单登记件版本齐（${STV}，drift=0）"
+
+# ─── 阶段 7：收尾 ─────────────────────────────────────────────────────────
 kill -TERM "$L_PID" 2>/dev/null || true
 sleep 3
 kill -KILL "$L_PID" 2>/dev/null || true
