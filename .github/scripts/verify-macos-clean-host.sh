@@ -428,18 +428,25 @@ if ! grep -q '"bin_drift":0' "$SJ"; then
     dump_file "status --json stderr" "$SJE"
     fail "bin_drift 非 0（安装树与清单不一致）"
 fi
-# 条数相等即无静默漏报：status 必须逐件覆盖 bin/。
-find "$AH/bin" -type f >"$AH/logs/bin.lst"
+# 条数相等即无静默漏报：status 必须逐件覆盖 bin/。取件口径与 status_bins
+# 完全一致（bin/* 且 [ -f ] 为真，含指向文件的符号链接；安装器落地的是
+# 符号链接链，find -type f 会把它们全部漏掉）。
+: >"$AH/logs/bin.lst"
+for _f in "$AH"/bin/*; do
+    [ -f "$_f" ] && printf '%s\n' "$_f" >>"$AH/logs/bin.lst"
+done
+grep -F '"path": "bin/' "$MF" >"$AH/logs/man-bin.lst" || true
 CNT_DISK="$(wc -l <"$AH/logs/bin.lst" | tr -d ' ')"
 CNT_ST="$(grep -o '{"name":' "$SJ" | wc -l | tr -d ' ')"
 if [ "$CNT_DISK" != "$CNT_ST" ]; then
     dump_file "status --json" "$SJ"
+    dump_file "安装清单 bin 条目" "$AH/logs/man-bin.lst"
     fail "status binaries=${CNT_ST} != 磁盘 ${CNT_DISK}（有件未被报告）"
 fi
-grep -F '"path": "bin/' "$MF" >"$AH/logs/man-bin.lst" || true
 # 逐件：size/sha256 必须等于磁盘实测（防"报清单不报磁盘"）；清单登记件另须
 # version=清单 tag 后缀且 drift=false。核验侧预置的 airymaxrt-full 不在清单内，
-# 版本如实报 unknown——只校验其字节，不伪造登记。
+# 版本如实报 unknown——只校验其字节，不伪造登记；其余件未登记即判失败
+# （清单漏登会让状态面永远无从自证，属本阶段要拦的静默腐坏）。
 BAD=0
 while IFS= read -r f; do
     bn="$(basename "$f")"
@@ -451,9 +458,14 @@ while IFS= read -r f; do
         continue
     fi
     ln="$(awk -v p="\"path\": \"bin/${bn}\"" 'index($0, p) { print; exit }' "$MF")"
-    [ -n "$ln" ] || continue
-    tg="${ln#*\"tag\": \"}"; tg="${tg%%\"*}"; tg="${tg#tag:}"
-    [ -n "$tg" ] || tg=unknown
+    tg="unknown"
+    if [ -n "$ln" ]; then
+        tg="${ln#*\"tag\": \"}"; tg="${tg%%\"*}"; tg="${tg#tag:}"
+        [ -n "$tg" ] || tg=unknown
+    elif [ "$bn" != "airymaxrt-full" ]; then
+        BAD=$((BAD + 1))
+        echo "  !! ${bn} 未登记在安装清单（状态面无版本可核）" >&2
+    fi
     if ! grep -qF "{\"name\":\"${bn}\",\"size\":${sz},\"sha256\":\"${sh}\",\"version\":\"${tg}\",\"drift\":false}" "$SJ"; then
         BAD=$((BAD + 1))
         echo "  !! ${bn} 版本/drift 与清单不符（期望 ${tg}）" >&2
