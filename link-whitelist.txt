@@ -51,8 +51,11 @@ channel_d: airy_platform_libs airy_common svc_common airy_core airy_security_dom
 notify_d: airy_platform_libs airy_common svc_common airy_core airy_coreloop_hooks airy_security_dome
 mem_d: airy_platform_libs airy_common airy_mem_service airy_core airy_security_dome
 # R16 执行中复核：整链由 think_d 承载（think.review pipeline 档），agent_d 只做
-# 一次 RPC 取判定并持有 L1 判定词汇，故不再直链 coreloopthree。
-agent_d: airy_platform_libs airy_common airy_agent_service airy_core airy_security_dome
+# 一次 RPC 取判定并持有 L1 判定词汇。
+# N-8（0.1.21）：子任务委派接入 coreloopthree 的 delegate 生命周期原语
+# （create/assign/collect/cancel）——只取 delegate.o，认知链仍经 think_d；
+# 该边为「机制原语复用」，不是把认知引擎搬进 daemon。
+agent_d: airy_platform_libs airy_common airy_agent_service airy_core airy_coreloopthree airy_security_dome
 # a2a_d（0.1.19 §250）：允许集对齐 linkgate 直接捕获集——airy_common /
 # airy_protocols 从未在 a2a_d 直接声明，系经 airy_a2a_service PUBLIC
 # （svc_common→airy_common、airy_protocols）传播的历史闭包快照残留。
