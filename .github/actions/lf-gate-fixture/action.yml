@@ -279,7 +279,12 @@ inputs:
     # 不在旧测试树内，等于永不执行。
     # 22130a7：大厅读侧的包含写法改为裸名。上一条只换了挂载面，映射文件
     # 仍按 src/gateway 根拼 gateway/ 前缀，指向分层后已不存在的路径。
-    default: '22130a76bf579eb2c5c037c97f851bb1c878e033'
+    # 630a051：大厅读侧的符号面收敛到 commons 原语。分层删除了本地
+    # hall_event_flatten 与 gw_hall_read_file，业务面调用改指 hall_evt_flat_file
+    # 与 airy_io_read_file；hall_evt_flat_file 的声明在 AIRY_HAS_CJSON 守卫内，
+    # 业务面同口径声明该宏并补挂 commons/utils/io 包含面。旧 pin 下业务面仍按
+    # 已不存在的符号编译，公有三腿同一错误。
+    default: '630a051b6a5df7a9c88c359982027bec62623a11'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
