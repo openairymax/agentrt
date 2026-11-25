@@ -289,7 +289,14 @@ inputs:
     # 与 airy_io_read_file；hall_evt_flat_file 的声明在 AIRY_HAS_CJSON 守卫内，
     # 业务面同口径声明该宏并补挂 commons/utils/io 包含面。旧 pin 下业务面仍按
     # 已不存在的符号编译，公有三腿同一错误。
-    default: '630a051b6a5df7a9c88c359982027bec62623a11'
+    # 4be53f1：cupolas 前进至 f295ff0（策略基线用例的临时夹具分两级建目录，
+    # 建目录与写文件失败均显式判负）。旧 pin 的 t_mkdir/t_write 返回 void 并
+    # 忽略失败：干净 runner 上 AIRY_TMP_DIR 整体不存在，写入被静默吞掉，
+    # 6 次 dpolicy_base_load 全红——Linux 两腿与 Windows 腿同为
+    # 14 pass / 21 fail，macOS 因临时根已存在而通过，三腿差异只由夹具目录
+    # 是否存在解释。判据消费路径不触，仅装配输入前进；不 bump 则该修正
+    # 在 CI 中永不执行。
+    default: '4be53f1cf0b80501cf044420cd67259ff0b4f509'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
