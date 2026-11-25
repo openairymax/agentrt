@@ -34,7 +34,7 @@ int cli_brk_read(const char *json, cli_brk_t *out)
 {
     if (!out)
         return 0;
-    memset(out, 0, sizeof(*out));
+    AIRY_MEMSET(out, 0, sizeof(*out));
     if (!json || !json[0])
         return 0;
 
