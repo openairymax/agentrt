@@ -606,7 +606,15 @@ function Save-Profile {
 # 安装逐件清单：与 POSIX install.sh 的 install-manifest.json 同 schema
 # （schema/release/build/entries[path,size,sha256,tag]）。启动器 status 据此
 # 逐件对账并给出 bin_drift，是"安装树自证"的跨平台统一事实源；缺此清单时
-# status 只能报 version=unknown 且无从发现"清单与磁盘不一致"。
+# status 只能报 version=unknown 且无从发现"清单与磁盘不一致"。摘要一律经
+# .NET 计算：不依赖 Get-FileHash 所在模块的自动加载，任意宿主同结果。
+function Get-Sha256([string]$Path) {
+    $h = [System.Security.Cryptography.SHA256]::Create()
+    $s = [System.IO.File]::OpenRead($Path)
+    try { return ([System.BitConverter]::ToString($h.ComputeHash($s)) -replace '-', '').ToLower() }
+    finally { $s.Dispose(); $h.Dispose() }
+}
+
 function Write-InstallManifest {
     $tagVer = ([string]$AIRY_VERSION) -replace '^v', ''
     $items = @()
@@ -616,7 +624,7 @@ function Write-InstallManifest {
         $files = @(Get-ChildItem -LiteralPath $dir -Recurse -File -ErrorAction SilentlyContinue | Sort-Object FullName)
         foreach ($f in $files) {
             $r = $f.FullName.Substring($AIRY_HOME.Length + 1).Replace('\', '/')
-            $sha = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLower()
+            $sha = Get-Sha256 $f.FullName
             $items += ('  {{"path": "{0}", "size": {1}, "sha256": "{2}", "tag": "tag:{3}"}}' -f $r, $f.Length, $sha, $tagVer)
         }
     }
@@ -757,6 +765,16 @@ function Get-EnvValue([string]$Key) {
     return ''
 }
 
+# status 自证要在任意 PowerShell 宿主成立：Get-FileHash 属 Utility 模块，
+# 模块自动加载在受限/异构宿主里可能整段缺席（Windows 腿实证），改用 .NET
+# 直接算摘要，不依赖任何模块解析。
+function Get-Sha256([string]$Path) {
+    $h = [System.Security.Cryptography.SHA256]::Create()
+    $s = [System.IO.File]::OpenRead($Path)
+    try { return ([System.BitConverter]::ToString($h.ComputeHash($s)) -replace '-', '').ToLower() }
+    finally { $s.Dispose(); $h.Dispose() }
+}
+
 function Invoke-Doctor {
     $fatal = 0
     foreach ($n in @('airy_cli', 'supervisor_d', 'gateway_d', 'agent_d')) {
@@ -835,7 +853,7 @@ if ($cmd -eq 'status') {
         } catch { $manIndex = @{} }
     }
     foreach ($f in @(Get-ChildItem -LiteralPath $bin -File -ErrorAction SilentlyContinue)) {
-        $sha = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLower()
+        $sha = Get-Sha256 $f.FullName
         $e = $manIndex[('bin/' + $f.Name)]
         $bver = 'unknown'
         $drift = $false
