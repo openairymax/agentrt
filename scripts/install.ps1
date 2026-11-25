@@ -603,6 +603,39 @@ function Save-Profile {
     Write-OK "运行画像已固化: $profile（详情见 config\profile.env）"
 }
 
+# 安装逐件清单：与 POSIX install.sh 的 install-manifest.json 同 schema
+# （schema/release/build/entries[path,size,sha256,tag]）。启动器 status 据此
+# 逐件对账并给出 bin_drift，是"安装树自证"的跨平台统一事实源；缺此清单时
+# status 只能报 version=unknown 且无从发现"清单与磁盘不一致"。
+function Write-InstallManifest {
+    $tagVer = ([string]$AIRY_VERSION) -replace '^v', ''
+    $items = @()
+    foreach ($rel in @('bin', 'config', 'keys', 'modules', 'scripts', 'lib', 'include', 'share', 'releases')) {
+        $dir = Join-Path $AIRY_HOME $rel
+        if (-not (Test-Path -LiteralPath $dir)) { continue }
+        $files = @(Get-ChildItem -LiteralPath $dir -Recurse -File -ErrorAction SilentlyContinue | Sort-Object FullName)
+        foreach ($f in $files) {
+            $r = $f.FullName.Substring($AIRY_HOME.Length + 1).Replace('\', '/')
+            $sha = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLower()
+            $items += ('  {{"path": "{0}", "size": {1}, "sha256": "{2}", "tag": "tag:{3}"}}' -f $r, $f.Length, $sha, $tagVer)
+        }
+    }
+    $body = @(
+        '{',
+        '  "schema": 1,',
+        ('  "release": "{0}",' -f $tagVer),
+        ('  "build": "v{0} release=unknown",' -f $tagVer),
+        '  "entries": [',
+        ($items -join ",`n"),
+        '  ]',
+        '}'
+    ) -join "`n"
+    # 无 BOM UTF-8 + LF：与 POSIX manifest_write 逐字节同构（PS 5.1 的
+    # -Encoding UTF8 会写 BOM，非 PowerShell 消费方解析即失败）。
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText((Join-Path $AIRY_HOME 'install-manifest.json'), $body + "`n", $utf8)
+}
+
 function Finalize-Install {
     $envFile = Join-Path $AIRY_HOME "config\install.env"
     $link = Join-Path $BIN_DIR "airymaxrt.cmd"
@@ -787,6 +820,37 @@ if ($cmd -eq 'status') {
     }
     $comps['agentrt-tui'] = Test-Path (Join-Path $bin 'agentrt-tui.exe')
     $port = Get-GwPort
+    # 安装树自证：逐件与 install-manifest.json 对账（与 POSIX status_bins 同
+    # 契约：name/size/sha256/version/drift；version 取 tag 后缀，不带 v）。
+    $bins = @()
+    $driftN = 0
+    $manPath = Join-Path $root 'install-manifest.json'
+    $manIndex = @{}
+    if (Test-Path -LiteralPath $manPath) {
+        try {
+            $man = Get-Content -LiteralPath $manPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            foreach ($e in @($man.entries)) {
+                if ($e -and $e.path) { $manIndex[[string]$e.path] = $e }
+            }
+        } catch { $manIndex = @{} }
+    }
+    foreach ($f in @(Get-ChildItem -LiteralPath $bin -File -ErrorAction SilentlyContinue)) {
+        $sha = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLower()
+        $e = $manIndex[('bin/' + $f.Name)]
+        $bver = 'unknown'
+        $drift = $false
+        if ($e) {
+            if ($e.tag) { $bver = ([string]$e.tag) -replace '^tag:', '' }
+            if ($e.sha256 -and ([string]$e.sha256) -ne $sha) { $drift = $true; $driftN = $driftN + 1 }
+        }
+        $bins += [pscustomobject]@{
+            name = $f.Name
+            size = $f.Length
+            sha256 = $sha
+            version = $bver
+            drift = $drift
+        }
+    }
     $st = [ordered]@{
         ok = ($fatal -eq 0)
         home = $root
@@ -796,6 +860,8 @@ if ($cmd -eq 'status') {
         gateway_port = $port
         gateway_ready = (Test-Port $port)
         components = $comps
+        binaries = @($bins)
+        bin_drift = $driftN
     }
     if ($asJson) { $st | ConvertTo-Json -Depth 4; exit 0 }
     foreach ($k in $st.Keys) { Write-Host ("{0}: {1}" -f $k, $st[$k]) }
@@ -899,6 +965,9 @@ exit $LASTEXITCODE
     }
 
     Copy-Item $ScriptPath (Join-Path $AIRY_HOME "scripts\install.ps1") -Force -ErrorAction SilentlyContinue
+    # 清单必须在全部安装件落地之后写（含 scripts\install.ps1 副本），否则清单
+    # 天生缺件、status 的 bin_drift 语义失效。
+    Write-InstallManifest
     Write-OK "安装位置已固化: install.env + airymaxrt.cmd"
 }
 
