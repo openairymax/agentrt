@@ -771,9 +771,9 @@ fi
 
 section "N" "B3 南向 A-IPC 客户端面归一（gateway/src AF_UNIX 白名单）"
 
-_aipc_face="$ROOT/gateway/src/gateway/gateway_aipc_client.c"
+_aipc_face="$ROOT/gateway/src/gateway/aipc/gateway_aipc_client.c"
 if [ ! -f "$_aipc_face" ]; then
-    bad "N1 缺失南向统一客户端面: gateway/src/gateway/gateway_aipc_client.c（客户端面被删除）"
+    bad "N1 缺失南向统一客户端面: gateway/src/gateway/aipc/gateway_aipc_client.c（客户端面被删除）"
 else
     _aipc_offenders="$(grep -rl 'socket(AF_UNIX' "$ROOT/gateway/src" --include='*.c' \
         | grep -v 'gateway_aipc_client.c' || true)"
