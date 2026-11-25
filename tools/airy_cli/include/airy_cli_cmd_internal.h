@@ -54,6 +54,20 @@ const char *cli_ns_sock(const char *ns);
 /* Generic daemon method call via gateway, render result as sub-agent line. */
 void cli_rpc_print(const char *ns, const char *method, const char *params_json);
 
+/* 熔断读数视图（cli_brk.c，0.1.21 §33.2 #5）：llm.health_check 发布的
+ * breakers[] 与 circuit_breaks 是唯一来源，此处只读取出，不设阈值。 */
+typedef struct {
+    int open;      /* state != closed 的 breaker 数 */
+    int total;     /* breaker 总数 */
+    double breaks; /* 累计跳闸（rejects + budget_tmo） */
+} cli_brk_t;
+
+/* 结果体含熔断字段返回 1 并填 out；否则返回 0（旧版 daemon 静默跳过）。 */
+int cli_brk_read(const char *json, cli_brk_t *out);
+
+/* /daemon(s) 的附加行：同一判据的渲染点。 */
+void cli_brk_show(const char *ns, const char *json);
+
 /* 本地模型注册表子命令（cli_model_reg.c，0.1.21 D-6）：
  * list / use / remove；返回 0 成功、2 失败（与 cli_cmd_* 约定一致）。 */
 int cli_model_reg(int argc, char *argv[]);

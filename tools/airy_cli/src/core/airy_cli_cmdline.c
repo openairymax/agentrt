@@ -254,6 +254,8 @@ static void cli_print_usage(void)
              "密钥装配引导（写入后立即连通验证）\n", cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("  %sgpu%s [--json]             加速器能力快照（驱动/版本/后端/降级原因）\n",
            cli_c(CLR_CYAN), cli_c(CLR_RESET));
+    cli_outf("  %sbreakers%s [--json]        熔断读数（未闭合/总数/累计跳闸）\n",
+           cli_c(CLR_CYAN), cli_c(CLR_RESET));
     cli_outf("交互模式：直接运行 airy_cli 进入全屏 TUI；--legacy-tui 使用行式前端。"
              "输入 /help 查看命令。\n");
     cli_outf("退出码：0 成功；1 用法错误或本轮未拿到结果（-p 下可判定）；"
@@ -340,7 +342,7 @@ typedef struct {
 static const cli_subcmd_t k_cli_subcmds[] = {
     { "paths", cli_cmd_paths }, { "models", cli_cmd_models },
     { "model", cli_cmd_model }, { "key", cli_cmd_key },
-    { "gpu", cli_cmd_gpu },
+    { "gpu", cli_cmd_gpu }, { "breakers", cli_cmd_breakers },
 };
 
 static int cli_cmd_apply(const char *a, int ac, char **av)

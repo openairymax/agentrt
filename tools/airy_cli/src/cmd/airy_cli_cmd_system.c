@@ -337,13 +337,18 @@ int cmd_rpc(const char *arg, void *ctx)
 }
 
 /* 一次 health_check 探测：rc 与结果体双条件，与 /daemon status 的
- * cli_daemon_online 保持同一判据来源（daemon_rpc_client 的返回约定）。 */
-static int daemon_state(const char *ns, const char *method)
+ * cli_daemon_online 保持同一判据来源（daemon_rpc_client 的返回约定）。
+ * out 非空时移交结果体所有权（调用方 AIRY_FREE），供熔断视图复用同一次
+ * 探测，不重复打点。 */
+static int daemon_state(const char *ns, const char *method, char **out)
 {
     char *result = NULL;
     int rc = daemon_rpc_call(cli_ns_sock(ns), method, NULL, &result, 6000);
     int up = (rc == 0 && result) ? 1 : 0;
-    AIRY_FREE(result);
+    if (out && up)
+        *out = result;
+    else
+        AIRY_FREE(result);
     return up;
 }
 
@@ -358,9 +363,12 @@ int cmd_daemons(const char *arg, void *ctx)
     const cli_daemon_desc_t *tab = dcount ? dyn : CLI_DAEMONS;
     cli_print_status("Super Agent:daemon", "health check");
     for (size_t i = 0; i < total; i++) {
-        int up = daemon_state(tab[i].ns, tab[i].health_method);
+        char *js = NULL;
+        int up = daemon_state(tab[i].ns, tab[i].health_method, &js);
         if (g_cli_print_mode) cli_outf("%s %s\n", tab[i].ns, up ? "online" : "offline");
         else cli_print_status(tab[i].ns, up ? "在线 100%" : "离线 0%");
+        cli_brk_show(tab[i].ns, js);
+        AIRY_FREE(js);
         online += up;
     }
     /* gateway 在线判据唯一化（0.1.19 §458）：此前此处手写 TCP 连通性探测，
@@ -441,11 +449,14 @@ static void dm_free(const char **ns, size_t n)
 static void dm_status(const char **ns, size_t n)
 {
     for (size_t i = 0; i < n; i++) {
-        int up = cli_daemon_online(ns[i]);
+        char *js = NULL;
+        int up = daemon_state(ns[i], "health_check", &js);
         if (g_cli_print_mode)
             cli_outf("%s %s\n", ns[i], up ? "online" : "offline");
         else
             cli_print_status(ns[i], up ? "在线 100%" : "离线 0%");
+        cli_brk_show(ns[i], js);
+        AIRY_FREE(js);
     }
 }
 

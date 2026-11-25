@@ -167,6 +167,9 @@ int cli_cmd_model(int argc, char *argv[]);
  * 无 GPU / GPU 在但驱动不可用 / GPU 可用，并打印降级原因。 */
 int cli_cmd_gpu(int argc, char *argv[]);
 
+/* 0.1.21 §33.2 #5：熔断读数（单行 JSON 或人读行），doctor 熔断段数据源。 */
+int cli_cmd_breakers(int argc, char *argv[]);
+
 /* 0.1.21 D-2：密钥装配引导（选行 → 写 secrets.env → llm.probe 立即验证）。
  * 返回 0 成功、2 失败；中途取消不落盘。 */
 int cli_cmd_key(int argc, char *argv[]);

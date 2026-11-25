@@ -82,6 +82,8 @@ add_executable(airy_cli
     src/cmd/cli_key.c
     # 0.1.21 B-3：加速器能力快照（doctor 的 GPU 段与降级原因来源）
     src/cmd/cli_gpu.c
+    # 0.1.21 §33.2 #5：熔断读数（/daemon(s) 附加行与 doctor 熔断段同源）
+    src/cmd/cli_brk.c
     src/chat/cli_chat.c
     # cli_chat.c 域拆分（2026-08-27：2040 行 → 6 个职责模块）
     src/chat/cli_chat_usage.c
