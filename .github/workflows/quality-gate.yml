@@ -205,11 +205,29 @@ jobs:
               || echo "::warning::ecosystem nested submodules unavailable, Gate 5/7 will fail"
           fi
           # §254a：cupolas 叶子挂点迁出至 products 装配仓，Gate M（R-6 PDP
-          # 双 Schema）直接消费 products/cupolas/src/permission/。顶层浅克隆
-          # 不含子模块工作树，须显式初始化；memoryrovol（update=none）自动豁免。
+          # 双 Schema）直接消费 products/cupolas/src/permission/，Compile /
+          # CrossRepo / INV-10 / LayerBoundary 等十余门也以该树为输入。
+          # 顶层浅克隆不含子模块工作树，须显式初始化；memoryrovol
+          # （update=none）自动豁免。
+          #
+          # 镜像竞态：products 的 gitlink 先落库、cupolas 镜像尚未同步时，
+          # 浅取拿不到钉定 SHA。此前只打 warning，下游十余门各自报「文件
+          # 不存在」，真实原因被埋在噪声里。这里重试三次（20s/40s 退避），
+          # 仍失败即 fail-fast 报一条可执行错误，不再让下游门禁替它背锅。
           if [ -d "$UMB/agent-workload/products" ]; then
-            git -C "$UMB/agent-workload/products" submodule update --init --recursive \
-              || echo "::warning::products nested submodules unavailable, Gate M will fail"
+            for attempt in 1 2 3; do
+              if git -C "$UMB/agent-workload/products" submodule update \
+                   --init --recursive; then
+                break
+              fi
+              if [ "$attempt" = 3 ]; then
+                echo "::error::products nested submodules unavailable (mirror sync race or missing gitlink)"
+                exit 1
+              fi
+              sleep $((attempt * 20))
+            done
+            test -f "$UMB/agent-workload/products/cupolas/CMakeLists.txt" \
+              || { echo "::error::products/cupolas tree incomplete"; exit 1; }
           fi
 
       - name: Run quality gates (tools orchestrator)
