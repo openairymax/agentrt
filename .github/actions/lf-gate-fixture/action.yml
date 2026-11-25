@@ -296,7 +296,12 @@ inputs:
     # 14 pass / 21 fail，macOS 因临时根已存在而通过，三腿差异只由夹具目录
     # 是否存在解释。判据消费路径不触，仅装配输入前进；不 bump 则该修正
     # 在 CI 中永不执行。
-    default: '4be53f1cf0b80501cf044420cd67259ff0b4f509'
+    # da64952：cupolas 前进至 3277285（夹具根改取运行期临时目录）。f295ff0
+    # 的两级建目录仍以编译期 AIRY_TMP_DIR 为根，Windows 该常量是
+    # C:\ProgramData\agentrt\tmp，干净主机上其父目录不存在而 _mkdir 不逐级
+    # 创建，t_mkdir()==0 首条即失败并连带 21 条断言（windows-build 实证）。
+    # 新快照改用 airy_tmp_dir() 与 airy_mkdir_p()，失败打印 errno，输出无缓冲。
+    default: 'da6495285d246eae021df8139affcebe567004de'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
