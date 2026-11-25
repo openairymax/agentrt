@@ -4,18 +4,14 @@ airy_build_id
 airy_build_info
 airy_checkpoint_cleanup
 airy_checkpoint_create
-airy_checkpoint_delete
 airy_checkpoint_destroy
 airy_checkpoint_get_stats
 airy_checkpoint_ids
 airy_checkpoint_init
-airy_checkpoint_list
-airy_checkpoint_restore
 airy_checkpoint_save
 airy_checkpoint_set_auto_hook
 airy_checkpoint_shutdown
 airy_checkpoint_trigger_auto
-airy_checkpoint_verify
 airy_cog_fail_policy
 airy_cog_set_disp
 airy_cognition_create_ex_take
@@ -92,7 +88,6 @@ airy_ipc_recv
 airy_ipc_reply
 airy_ipc_send
 airy_loop_create
-airy_loop_create_snapshot
 airy_loop_dag_cancel
 airy_loop_dag_register_handler
 airy_loop_dag_set_cancel_flag
@@ -199,8 +194,6 @@ airy_sandbox_manager_init
 airy_scheduler_dep_result_free
 airy_set_assert_handler
 airy_shutdown
-airy_snapshot_create
-airy_snapshot_restore
 airy_strlcat
 airy_strlcpy
 airy_strncpy_safe
