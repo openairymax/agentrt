@@ -1461,6 +1461,45 @@ _managed_rows() {
     done
 }
 
+# 清单字段取值：$1=清单 $2=条目标识（"path": "bin/x"）$3=字段名。
+# 清单逐条目一行（install.sh manifest_write），按行匹配即可，无需 JSON 解析器。
+man_field() {
+    [ -f "$1" ] || return 0
+    awk -v p="\"path\": \"$2\"" -v f="\"$3\": \"" '
+        index($0, p) && index($0, f) {
+            rest = substr($0, index($0, f) + length(f))
+            print substr(rest, 1, index(rest, "\"") - 1)
+            exit
+        }' "$1"
+}
+
+# 每二进制版本与 sha256（0.1.21 §33.2 #6）：版本取安装清单为该件登记的发布
+# 标识，sha256 取当前文件实测值；两者不符即 drift——就地覆盖式升级把同目录
+# 混成两个发布时，这一列是唯一可机器判定的证据（§33.3 #20）。
+status_bins() {
+    local h="$1" mf="$1/install-manifest.json" f rel sz sha ver msha drift
+    local out="" drift_n=0
+    for f in "$h"/bin/*; do
+        [ -f "$f" ] || continue
+        rel="bin/$(basename "$f")"
+        sz="$(wc -c < "$f" 2>/dev/null | tr -d ' \n')"
+        case "${sz:-}" in ''|*[!0-9]*) sz=0 ;; esac
+        sha="$(sha256_file "$f")"
+        [ -n "$sha" ] || sha="unknown"
+        ver="$(man_field "$mf" "$rel" tag)"
+        ver="${ver#tag:}"
+        [ -n "$ver" ] || ver="unknown"
+        msha="$(man_field "$mf" "$rel" sha256)"
+        drift=false
+        if [ -n "$msha" ] && [ "$msha" != "$sha" ]; then
+            drift=true
+            drift_n=$((drift_n + 1))
+        fi
+        out="${out}{\"name\":\"$(basename "$f")\",\"size\":${sz},\"sha256\":\"${sha}\",\"version\":\"${ver}\",\"drift\":${drift}},"
+    done
+    printf '%s|%s' "${out%,}" "$drift_n"
+}
+
 status_json() {
     local ok=1 k v
     local comp="" dm=""
@@ -1513,8 +1552,13 @@ status_json() {
     done <<< "$(_managed_rows)"
     mg="${mg%,}"
     [ "$ok" = 1 ] && ok=true || ok=false
-    printf '{"ok":%s,"version":"%s","home":"%s","profile":"%s","components":{%s},"config":{"install_env":%s},"gateway":"%s","daemons":{%s},"managed":[%s],"config_stale":[%s]}\n' \
-        "$ok" "$ver" "$AIRY_HOME" "${AIRYRT_PROFILE:-auto}" "$comp" "$env_ok" "$gw" "$dm" "$mg" "$stale"
+    local _bins _bdrift
+    _bins="$(status_bins "$AIRY_HOME")"
+    _bdrift="${_bins##*|}"
+    _bins="${_bins%|*}"
+    [ -n "${_bdrift:-}" ] || _bdrift=0
+    printf '{"ok":%s,"version":"%s","home":"%s","profile":"%s","components":{%s},"binaries":[%s],"bin_drift":%s,"config":{"install_env":%s},"gateway":"%s","daemons":{%s},"managed":[%s],"config_stale":[%s]}\n' \
+        "$ok" "$ver" "$AIRY_HOME" "${AIRYRT_PROFILE:-auto}" "$comp" "$_bins" "$_bdrift" "$env_ok" "$gw" "$dm" "$mg" "$stale"
     [ "$ok" = true ] || return 1
 }
 
@@ -2382,8 +2426,17 @@ launch_frontend() {
     fi
     "$CLI_BIN" "$@" <&0 &
     TUI_PID=$!
-    wait "$TUI_PID" || return $?
-    return 0
+    # 前端死因不能被吞掉：wait 对信号终止的子进程返回 128+signum
+    # （129=HUP、130=INT、143=TERM）。旧实现 `wait || return $?` 让
+    # 「界面一闪即退」在启动器日志里没有任何可判读痕迹。
+    local front_rc=0
+    wait "$TUI_PID" || front_rc=$?
+    if [ "$front_rc" -ge 128 ] && [ "$front_rc" -le 192 ]; then
+        log warn "前端被信号终止（rc=$front_rc，signal=$((front_rc - 128))）"
+    elif [ "$front_rc" -ne 0 ]; then
+        log warn "前端退出（rc=$front_rc）"
+    fi
+    return "$front_rc"
 }
 
 GATEWAY_ALIVE=0
