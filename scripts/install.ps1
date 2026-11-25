@@ -306,7 +306,7 @@ function Install-Binary {
         $expectSha = (Get-Content "$zip.sha256").Split(' ')[0]
     }
     if ($expectSha) {
-        $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+        $hash = Get-Sha256 $zip
         if ($hash -ne $expectSha.ToLower()) {
             Write-Err "sha256 校验失败，拒绝安装"
             $script:BinaryFatal = $true
