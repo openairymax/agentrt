@@ -103,7 +103,11 @@ inputs:
     # stop_reason 消费面，N7-3 判据读不到即报「用户侧仍表现为无原因停住」；
     # 同快照的启动器新增二进制账，latest 发布面已同步，两者与门禁取到的
     # 快照逐字节一致，AF1 双面判据不因本前推而变。
-    default: 'f7a030104d9d0a6b4026f97d0775c6e9abca3065'
+    # 53e9f19：tui gitlink 前推至 dcb158e（单实例文件锁）。旧 pin f7a0301
+    # 的 tui 无 single.rs 锁面，手动二次启动会在运行栈旁再起一个实例，
+    # 门禁与发行包都取不到「第二个实例被拒绝」的行为；本笔只改 src，
+    # 启动器 scripts/airymaxrt 两 pin 零差异，AF1 双面判据不因本前推而变。
+    default: '53e9f190f2288cd624f759462890f546ae169cbe'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
