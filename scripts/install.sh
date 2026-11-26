@@ -1055,11 +1055,16 @@ install_python_deps() {
             || cp -r "${AIRY_SRC_APP}/sdk/sdk-python/agentrt" "${AIRY_HOME}/lib/"
     fi
     if command -v python3 >/dev/null 2>&1; then
-        if PYTHONPATH="${AIRY_HOME}/lib" python3 -c "import agentrt, airymax_agents, orchestration" 2>/dev/null; then
+        if PYTHONPATH="${AIRY_HOME}/lib" python3 -c "import agentrt, airymax_agents, airymax_agents.runner, orchestration" 2>/dev/null; then
             log_ok "Python 依赖可导入 (agentrt/airymax_agents/orchestration)"
         else
-            log_warn "lib/ 导入校验失败（检查源码包结构）"
+            log_err "Python SDK 导入校验失败：${AIRY_HOME}/lib 下 agentrt/airymax_agents/orchestration 不可导入"
+            log_err "agent.spawn 将以 ERR_SVC_NOT_READY 失败。请检查发行包 lib/ 完整性，并用以下命令复现："
+            log_err "  PYTHONPATH=${AIRY_HOME}/lib python3 -c 'import airymax_agents.runner'"
+            exit 1
         fi
+    else
+        log_warn "未找到 python3：Python 形态 agent 不可用（Rust agent 不受影响）"
     fi
 }
 
@@ -1482,6 +1487,10 @@ export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-$AIRY_HOME/data/agentrt/cache
 export AIRY_AGENT_ACL="${AIRY_AGENT_ACL:-}"
 export PATH="${AIRY_HOME}/bin:$PATH"
 export LD_LIBRARY_PATH="${AIRY_HOME}/lib:${LD_LIBRARY_PATH:-}"
+# 0.1.21 D4：Python 形态 agent 由 `python3 -m airymax_agents.runner` 拉起，
+# 三包以目录形态随发行物落在 $AIRY_HOME/lib，必须进 Python 搜索路径，
+# 否则干净安装下 spawn 直接 ERR_SVC_NOT_READY。
+export PYTHONPATH="${AIRY_HOME}/lib${PYTHONPATH:+:$PYTHONPATH}"
 AIRY_ENV_EOF
     sed "s|__AIRY_HOME__|${AIRY_HOME}|g" "${AIRY_HOME}/bin/agentrt-env.sh" > "${AIRY_HOME}/bin/agentrt-env.sh.tmp" && \
         mv "${AIRY_HOME}/bin/agentrt-env.sh.tmp" "${AIRY_HOME}/bin/agentrt-env.sh"
