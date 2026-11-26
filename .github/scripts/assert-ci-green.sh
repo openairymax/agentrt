@@ -9,8 +9,8 @@
 # 门禁实际跑过并判绿的 commit。
 #
 # 判据（fail-closed，无跳过通道）：GATES 内每个工作流都必须在 head_sha 上
-# 有一条 push 或 workflow_dispatch 事件运行，且其终态 conclusion 为 success。
-# 据此：
+# 有一条 push、workflow_dispatch 或 repository_dispatch 事件运行，且其终态
+# conclusion 为 success。据此：
 #   - 无运行 → 红。该 commit 从未被任何门禁验证：非某次 push 的 tip（一次
 #     push 只为 tip 建运行），或纯文档变更被 paths-ignore 跳过且无人补验。
 #     发行须让门禁真正跑过发行 commit——被 paths-ignore 豁免的树若要发行，
@@ -46,13 +46,20 @@ die() {
 command -v gh >/dev/null 2>&1 || die "gh CLI not available on this runner"
 [ -n "$TOKEN" ] || die "GH_TOKEN/GITHUB_TOKEN missing (need actions:read)"
 
-# 该 sha 上某门禁工作流的最新 push/dispatch 运行状态，输出
+# 该 sha 上某门禁工作流的最新重验运行状态，输出
 # "<status> <conclusion>"，无运行输出 "absent -"。head_sha 交由 API 侧
 # 过滤，event 侧排除 PR 运行（其 head_sha 为 PR 头，非本仓 push 面）。
+# repository_dispatch 与 workflow_dispatch 同为 quality-gate.yml 声明的
+# 「同 sha 补验」通道：伞仓侧令牌只持有仓库写权限，workflow_dispatch 被
+# 拒，重入闸只能走 repository_dispatch（见该工作流 on: 注释）。此前只认
+# push/workflow_dispatch，SSoT（tools 账本）修正后的补验绿被无视，发行
+# 平台永远停在旧的红上——0.1.21 第三轮重发实证（门禁红由 tools 基线滞后
+# 引起，修正后以 repository_dispatch 补验判绿，ci-green 仍判红）。
 gate_state() {
   gh api "repos/$REPO/actions/workflows/$1/runs" \
     -X GET -f head_sha="$SHA" -f per_page=100 \
-    --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")] |
+    --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch"
+            or .event == "repository_dispatch")] |
            if length == 0 then "absent -"
            else (.[0].status + " " + (.[0].conclusion // "-")) end'
 }
