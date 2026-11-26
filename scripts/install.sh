@@ -1452,7 +1452,17 @@ finalize_install() {
         echo "INSTALLED_AT=$(date -Is 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S%z')"
         echo "AIRY_VAULT_PASSWORD=${vault_password}"
         # 交互宿主能力缺口：doctor 读此键告警，避免「装了但 /tui 不可用」静默。
-        echo "AIRY_TUI=${AIRY_TUI_STATE:-absent:not-built}"
+        # 二进制发行包已随包附带 agentrt-tui、不跑源码构建时 AIRY_TUI_STATE
+        # 从未赋值，旧实现直接回落 absent:not-built 造成假告警；以落地产物
+        # 为准判定。
+        if [ -z "${AIRY_TUI_STATE:-}" ]; then
+            if [ -x "${AIRY_HOME}/bin/agentrt-tui" ]; then
+                AIRY_TUI_STATE="present:bundled"
+            else
+                AIRY_TUI_STATE="absent:not-built"
+            fi
+        fi
+        echo "AIRY_TUI=${AIRY_TUI_STATE}"
     } > "${AIRY_HOME}/config/install.env"
     chmod 600 "${AIRY_HOME}/config/install.env"
 
