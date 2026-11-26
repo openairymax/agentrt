@@ -2356,21 +2356,24 @@ fi
 section "N8" "N-8 Subagent 接入运行链（工具注册 / 分派 / 深度并发配置化 / 单测）"
 
 _pol="$ROOT/daemons/agent_d/src/run/agent_sub_policy.h"
-if grep -q '#define AGENT_SUB_TOOL "subagent.spawn"' "$_pol" 2>/dev/null; then
-    ok "N8-1 委派工具名收口 AGENT_SUB_TOOL=subagent.spawn"
+# 工具名既要收口为常量，又必须符合 Provider function.name 正则
+# ^[a-zA-Z0-9_-]+$：越界字符（如点号）会让整套 tools 被 400 拒收，
+# agent.run 直接失败（285H 实机复现）。
+if grep -qE '#define AGENT_SUB_TOOL "[A-Za-z0-9_-]+"' "$_pol" 2>/dev/null; then
+    ok "N8-1 委派工具名收口 subagent_spawn，且符合 Provider function.name 正则"
 else
-    bad "N8-1 委派工具名未收口（工具目录无法稳定注册）"
+    bad "N8-1 委派工具名未收口或含 Provider 拒绝字符（agent.run 会整体 400）"
 fi
 
 _loop="$ROOT/daemons/agent_d/src/run/agent_run_loop.c"
 if grep -q 'run_cat_add(r->catalog, AGENT_SUB_TOOL' "$_loop" 2>/dev/null; then
-    ok "N8-2 工具目录注册 subagent.spawn（模型可见可调）"
+    ok "N8-2 工具目录注册 subagent_spawn（模型可见可调）"
 else
-    bad "N8-2 工具目录未注册 subagent.spawn（委派仍为库内孤岛）"
+    bad "N8-2 工具目录未注册 subagent_spawn（委派仍为库内孤岛）"
 fi
 
 if grep -q 'sub_is_tool(c->tname)' "$_loop" 2>/dev/null; then
-    ok "N8-3 工具循环按 sub_is_tool 分派（点号全等判据单点）"
+    ok "N8-3 工具循环按 sub_is_tool 分派（全等判据单点）"
 else
     bad "N8-3 工具循环未分派 subagent（注册了也走不到）"
 fi
