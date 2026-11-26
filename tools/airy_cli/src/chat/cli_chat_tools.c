@@ -465,12 +465,11 @@ static char *cli_chat_exec_tool(const char *tool_id, const char *args_json, int 
 
 /* ---- 工具过程直印（0.1.19 自 airy_cli_output.c 迁入消费点） ----
  *
- * 0.1.18 B3（V3.4）：未登记工具标识符不得越过渲染边界进入用户面——
- * 白名单外一律显示兜底串并记日志，禁止原样透传。与 TUI 侧
- * app/dispatch.rs::tool_action 同源同语义；机制跟消费走，render 面不再
- * 持有工具领域知识。 */
-
-static const char CLI_TOOL_HIDDEN[] = "未知工具（已隐藏）";
+ * 0.1.21 D-11：工具可见性以真实注册目录为准，客户端不再用白名单猜测并
+ * 隐藏未登记标识符。把未知工具藏起来会让「工具明明跑了、界面却空白」
+ * 比显示内部标识符更难诊断，也让新增工具在旧客户端上完全不可见。与
+ * TUI 侧 app/toolcat.rs::label 同源同语义：能映射出中文动作就用动作名，
+ * 否则原样显示 tool_id。 */
 
 static const char *cli_tool_action(const char *name)
 {
@@ -479,19 +478,26 @@ static const char *cli_tool_action(const char *name)
         {"fs_read", "读取文件"},   {"fs_write", "写入文件"},
         {"fs_list", "列出目录"},   {"fs_ls", "列出目录"},
         {"fs_info", "查看文件信息"}, {"fs_mkdir", "创建目录"},
-        {"fs_rm", "删除文件"},     {"agent.spawn", "派生智能体"},
-        {"agent.invoke", "调用智能体"}, {"think.depth", "深度思考"},
-        {"memory.get", "读取记忆"}, {"memory.put", "写入记忆"},
+        {"fs_rm", "删除文件"},     {"fs_glob", "匹配文件"},
+        {"fs_grep", "搜索内容"},   {"fs_edit", "编辑文件"},
+        {"fs_delete", "删除文件"}, {"shell_run", "执行命令"},
+        {"git_exec", "执行 Git 命令"}, {"git_diff", "查看差异"},
+        {"git_apply", "应用补丁"}, {"tool_create", "创建工具"},
+        {"priv_exec", "特权执行"}, {"maths_eval", "数学计算"},
+        {"maths_stats", "数学统计"}, {"maths_plot", "绘制图形"},
+        {"agent.spawn", "派生智能体"}, {"agent.invoke", "调用智能体"},
+        {"think.depth", "深度思考"}, {"memory.get", "读取记忆"},
+        {"memory.put", "写入记忆"},
     };
     if (!name || !name[0])
-        return CLI_TOOL_HIDDEN;
+        return "";
     for (size_t i = 0; i < sizeof(map) / sizeof(map[0]); i++) {
         if (strcmp(name, map[i].tool) == 0)
             return map[i].action;
     }
-    /* 只记长度、不记标识符本身：日志不应成为第二处泄漏面（与 TUI 侧一致）。 */
-    AIRY_LOG_WARN("airy_cli: 未登记工具标识符已按白名单隐藏 (len=%zu)", strlen(name));
-    return CLI_TOOL_HIDDEN;
+    /* 未映射不等于未登记：原样上屏，只记长度以便发现新工具未配动作名。 */
+    AIRY_LOG_WARN("airy_cli: 工具无动作名映射，按原始标识符显示 (len=%zu)", strlen(name));
+    return name;
 }
 
 /* 剥去 "Web fetch failed (...): " 前缀，返回错误正文起点。 */
