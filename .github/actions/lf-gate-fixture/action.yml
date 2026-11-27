@@ -107,7 +107,13 @@ inputs:
     # 的 tui 无 single.rs 锁面，手动二次启动会在运行栈旁再起一个实例，
     # 门禁与发行包都取不到「第二个实例被拒绝」的行为；本笔只改 src，
     # 启动器 scripts/airymaxrt 两 pin 零差异，AF1 双面判据不因本前推而变。
-    default: '53e9f190f2288cd624f759462890f546ae169cbe'
+    # 501bd13：tui gitlink 前推至 6c4146f（status/启动面采纳 run/gateway.port
+    # 真实端口）。旧 pin 53e9f19 的 scripts/airymaxrt 仍按缺省 8080 探测，
+    # 285H 实机（真实端口 2027）恒报「gateway: 离线」；且旧采纳逻辑用
+    # sed -n '1s/[^0-9]//gp'，全数字内容不触发替换 → 取空串，采纳形同虚设。
+    # latest 发布面已同步（逐字节一致），pin 不随之前推即报 AF1 分叉，
+    # 发行包 bin/airymaxrt-full 也会继续带该缺陷。
+    default: '501bd13e3ea5557b7d4898749e58808fde07cca8'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false

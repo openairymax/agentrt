@@ -537,6 +537,23 @@ wait_for_health() {
     return 1
 }
 
+# run/gateway.port 由 gateway_d 绑定成功后发布，描述「当前运行栈的真实端口」。
+# 启动与 status 都必须先采纳该事实，否则按缺省端口误判离线
+# （285H 实机：真实端口 2027，status 按 8080 探测报「gateway: 离线」）。
+# 旧实现用 sed -n '1s/[^0-9]//gp' 取端口：文件本身全为数字时不发生替换，
+# 带 p 标志的替换不打印，结果恒为空、采纳逻辑形同虚设；改用 tr 取数字。
+adopt_gateway_port() {
+    [ -s "$RUNTIME_DIR/gateway.port" ] || return 1
+    local p
+    p="$(tr -cd '0-9' < "$RUNTIME_DIR/gateway.port" 2>/dev/null | head -c 5)"
+    [ -n "$p" ] || return 1
+    [ "$p" -ge 1 ] 2>/dev/null && [ "$p" -le 65535 ] 2>/dev/null || return 1
+    wait_for_health "http://127.0.0.1:${p}" 1 || return 1
+    GATEWAY_PORT="$p"
+    GATEWAY_URL="http://127.0.0.1:${GATEWAY_PORT}"
+    return 0
+}
+
 _sock_alive() {
     local path="$1"
     [ -S "$path" ] || return 1
@@ -1544,6 +1561,7 @@ status_json() {
         stale="${stale}\"${sd}\","
     done
     stale="${stale%,}"
+    adopt_gateway_port || true
     wait_for_health "$GATEWAY_URL" 1 && gw=online
     local mg="" _mn _ms _me
     while IFS='|' read -r _mn _ms _me; do
@@ -1800,6 +1818,7 @@ case "$CMD" in
                 log info "PATH 引导: ${_BD} 已在 PATH 中（输入 airymaxrt 即可启动）"
             fi
         fi
+        adopt_gateway_port || true
         if wait_for_health "$GATEWAY_URL" 1; then
             log info "gateway: 在线（${GATEWAY_URL}）"
         else
@@ -2440,15 +2459,7 @@ launch_frontend() {
 }
 
 GATEWAY_ALIVE=0
-# run/gateway.port 由 gateway_d 绑定成功后发布，描述「当前运行栈的真实端口」。
-# 启动器先采纳该事实，避免按缺省端口误判离线后在运行中的栈旁再起一个 gateway。
-if [ -s "$RUNTIME_DIR/gateway.port" ]; then
-    _rt_gw_port="$(sed -n '1s/[^0-9]//gp' "$RUNTIME_DIR/gateway.port" 2>/dev/null | head -1)"
-    if [ -n "$_rt_gw_port" ] && wait_for_health "http://127.0.0.1:${_rt_gw_port}" 1; then
-        GATEWAY_PORT="$_rt_gw_port"
-        GATEWAY_URL="http://127.0.0.1:${GATEWAY_PORT}"
-    fi
-fi
+adopt_gateway_port || true
 if wait_for_health "$GATEWAY_URL" 1; then
     GATEWAY_ALIVE=1
     log info "gateway 在线（${GATEWAY_URL}），本次复用（不重复拉起）"
