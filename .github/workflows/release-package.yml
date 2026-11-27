@@ -7,6 +7,12 @@ on:
 permissions:
   contents: read
 
+# 可复用工作流：组名不得与调用方 release.yml 的 release-<ref> 重合，
+# 重合即调用方与自身互斥、把自己取消。聚合与签名不可打断，同 ref 排队。
+concurrency:
+  group: release-package-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', github.event.inputs.version) }}
 

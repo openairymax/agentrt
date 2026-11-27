@@ -21,6 +21,12 @@ on:
 permissions:
   contents: read
 
+# 镜像同步串行：远端 ref 更新原子，取消在途不损坏数据；同 ref 只留最新
+# 一次，避免多次推送排队把 tag 同步拖到发布窗口之后。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   sync:
     runs-on: ubuntu-latest

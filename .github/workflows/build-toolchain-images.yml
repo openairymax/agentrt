@@ -43,6 +43,12 @@ permissions:
   contents: read
   packages: write
 
+# 同 ref 串行：一次性 tag 由 run_number 生成，并行只会重复构建；
+# 镜像按 tag 原子发布，取消在途构建不留半成品。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # matrix 四腿并行：arm64/arm32
   # 切 GitHub 官方原生 ARM64 runner（ubuntu-24.04-arm，public repo 免费

@@ -24,6 +24,11 @@ on:
 permissions:
   contents: read
 
+# 校验类作业无副作用：同 ref 只保留最新结论，旧的一律取消。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   syscall-codegen-check:
     runs-on: ubuntu-latest
