@@ -1501,9 +1501,11 @@ else
         bad "W2 控制面滚动契约退化（钳位缺失或固定常量翻页回潮）"
     fi
 
+    # 默认值锚定语义面而非单一文件：构造点可拆文（App::new 已迁 app/build.rs），
+    # 判据只问「默认关」这一事实，不绑定它写在哪个文件里，否则拆分即假红。
     if grep -q 'let mut mouse_on = app\.mouse_capture' "$_w_entry" \
         && grep -q 'app\.mouse_capture != mouse_on' "$_w_entry" \
-        && grep -q 'mouse_capture: false' "$TUI_SRC/src/app/mod.rs"; then
+        && grep -q 'mouse_capture: false' "$TUI_SRC"/src/app/*.rs; then
         ok "W3 鼠标捕获唯一执行点在位（V11.1：默认关，Ctrl+M 会话级差分切换）"
     else
         bad "W3 鼠标捕获执行点散落或默认态回潮"
