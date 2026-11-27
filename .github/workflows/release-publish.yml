@@ -43,7 +43,7 @@ jobs:
       GITEE_TOKEN: ${{ secrets.GT_TOKEN }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
           submodules: false
@@ -125,7 +125,7 @@ jobs:
       AIRY_INSTALLER_PS1_SRC: ${{ github.workspace }}/scripts/install.ps1
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           submodules: false
@@ -182,7 +182,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: false
 

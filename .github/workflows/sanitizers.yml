@@ -63,7 +63,7 @@ jobs:
         ^(commons_test_|gateway_test|syscall_router_test|jsonrpc_test|rpc_handler_test|gateway_auth_test|kernel_state|corekern_deep|memory_engine|oom_handler)$
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: false
           fetch-depth: 1

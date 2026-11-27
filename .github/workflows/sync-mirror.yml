@@ -33,7 +33,7 @@ jobs:
       # persist-credentials:false：本步之后所有网络操作走 URL 内嵌
       # PAT / 匿名 HTTPS，不需要保留凭据。
       - name: Checkout (no submodules)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           submodules: false

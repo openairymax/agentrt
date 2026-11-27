@@ -54,7 +54,7 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Checkout (agentrt host, minimal)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: false
           fetch-depth: 1
@@ -307,7 +307,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout (agentrt host, minimal)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: false
           fetch-depth: 1
@@ -388,7 +388,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout (agentrt host, minimal)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: false
           fetch-depth: 1
@@ -416,7 +416,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout (agentrt host, minimal)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: false
           fetch-depth: 1

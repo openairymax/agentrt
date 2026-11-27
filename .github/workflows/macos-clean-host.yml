@@ -72,7 +72,7 @@ jobs:
       SUFFIX: ${{ matrix.suffix }}
     steps:
       - name: Checkout (workflow + verify script)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # 自动核验时取发行 run 的确切提交，安装器与制品同源；dispatch 取当前树。
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}

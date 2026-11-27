@@ -94,7 +94,7 @@ jobs:
       GITEE_TOKEN: ${{ secrets.GT_TOKEN }}
     steps:
       - name: Checkout (workflow only)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
           submodules: false
@@ -193,7 +193,7 @@ jobs:
       ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
     steps:
       - name: Checkout (workflow only)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
           submodules: false
