@@ -161,6 +161,36 @@ static void in_push(const char *txt)
     g_in.pr_ready = 1;
 }
 
+/* N-9：agent_d 侧审批凭据（"a%" 序列）的裁决回帧桥接。TUI 决议后经
+ * input/confirm 帧流回，这里转成网关 tool.approve（request_id + decision
+ * 三态逐字透传），去往 tool_d 的 pending——凭据对上即放行对应的 execute；
+ * always 是持久授权，压缩成 allow 会改变授权语义。失败只回 notice 不断
+ * 流：裁决丢失走 tool_d 的窗口超时 fail-closed。 */
+static void in_appr_bridge(const char *rid, const char *js, size_t n)
+{
+    char opt[32];
+    char params[192];
+    char *res = NULL;
+
+    if (cli_ev_str(js, n, "behavior", opt, sizeof(opt)) <= 0 &&
+        cli_ev_str(js, n, "decision", opt, sizeof(opt)) <= 0)
+        return;
+    if (strcmp(opt, "allow") != 0 && strcmp(opt, "always") != 0 && strcmp(opt, "deny") != 0) {
+        (void)cli_ev_note("approval decision ignored: unknown behavior");
+        return;
+    }
+    int pn = snprintf(params, sizeof(params), "{\"request_id\":\"%s\",\"decision\":\"%s\"}",
+                      rid, opt);
+    if (pn <= 0 || (size_t)pn >= sizeof(params))
+        return;
+    if (cli_gw_call("tool.approve", params, IN_QUERY_MS, &res) == 0) {
+        AIRY_FREE(res);
+        return;
+    }
+    AIRY_FREE(res);
+    (void)cli_ev_note("approval forward failed; tool_d will time out denied");
+}
+
 static void in_resp(const char *js, size_t n)
 {
     char rid[IN_RID_MAX];
@@ -168,8 +198,14 @@ static void in_resp(const char *js, size_t n)
 
     if (cli_ev_str(js, n, "request_id", rid, sizeof(rid)) <= 0)
         (void)cli_ev_str(js, n, "id", rid, sizeof(rid));
-    if (rid[0] && strcmp(rid, g_in.rid) != 0)
+    if (!rid[0])
         return;
+    if (strcmp(rid, g_in.rid) != 0) {
+        /* 非本地凭据：agent_d 发起的交互审批经 TUI 裁决后流回，桥接为
+         * 网关 tool.approve；CLI 本地 ask 的凭据（"c%"）仍走 g_in.decision。 */
+        in_appr_bridge(rid, js, n);
+        return;
+    }
     if (cli_ev_str(js, n, "behavior", opt, sizeof(opt)) <= 0 &&
         cli_ev_str(js, n, "decision", opt, sizeof(opt)) <= 0)
         return;

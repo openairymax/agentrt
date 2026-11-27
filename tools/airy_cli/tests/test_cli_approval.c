@@ -20,10 +20,12 @@
 
 #include "daemon_cmds.h"
 #include "cli_gw.h"
+#include "cli_ev.h"
 #include "cli_render.h"
 
 #include <arpa/inet.h>
 #include <cjson/cJSON.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <signal.h>
@@ -355,6 +357,62 @@ static void test_gateway_offline(void)
     setenv("AIRY_GATEWAY_URL", saved, 1);
 }
 
+/* N-9：事件面裁决桥接。agent_d 侧凭据（"a%" 序列）的 confirm 帧经 stdin
+ * 事件面进入（TUI 决议回帧），桥接为网关 tool.approve——request_id 与
+ * decision 三态逐字抵达 mock 网关；本地凭据不受影响。stdin 经 pipe+dup2
+ * 换面，事件面按真实路径消费（cli_ev_in_poll 全真跑，无桩）。 */
+static void test_ev_in_bridge(void)
+{
+    static const struct
+    {
+        const char *behavior;
+        const char *decision;
+    } cases[] = {
+        {"allow", "allow"},
+        {"always", "always"},
+        {"deny", "deny"},
+    };
+
+    int pf[2];
+    if (pipe(pf) != 0)
+        return;
+    int saved_stdin = dup(0);
+    dup2(pf[0], 0);
+    close(pf[0]);
+
+    CHECK(cli_ev_init() == 0, "bridge: ev init");
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        char frame[128];
+        int fn = snprintf(frame, sizeof(frame),
+                          "{\"type\":\"input\",\"kind\":\"confirm\","
+                          "\"request_id\":\"a%zu\",\"behavior\":\"%s\"}\n",
+                          i, cases[i].behavior);
+        mock_reset();
+        (void)!write(pf[1], frame, (size_t)fn);
+        close(pf[1]);
+        int polls = 0;
+        while (cli_ev_in_poll() > 0 && polls < 10)
+            polls++;
+        CHECK(g_reqs == 1 && strcmp(g_last_method, "tool.approve") == 0,
+              "bridge: confirm dispatches tool.approve");
+        char want_rid[8];
+        snprintf(want_rid, sizeof(want_rid), "a%zu", i);
+        CHECK(req_params_is("request_id", want_rid), "bridge: request_id verbatim");
+        CHECK(req_params_is("decision", cases[i].decision), "bridge: decision verbatim");
+
+        if (i + 1 < sizeof(cases) / sizeof(cases[0])) {
+            if (pipe(pf) != 0)
+                break;
+            dup2(pf[0], 0);
+            close(pf[0]);
+        }
+    }
+    cli_ev_fini();
+
+    dup2(saved_stdin, 0);
+    close(saved_stdin);
+}
+
 int main(void)
 {
     if (mock_start() != 0) {
@@ -365,6 +423,7 @@ int main(void)
     test_approve_roundtrip();
     test_approve_selfcheck();
     test_pending_view();
+    test_ev_in_bridge();
     test_gateway_offline();
 
     mock_stop();

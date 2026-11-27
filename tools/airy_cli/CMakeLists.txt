@@ -357,9 +357,12 @@ if(BUILD_TESTS)
     # （→ corekern airy_rt.h），链接面对齐 test_cli_usage（coreloopthree
     # 传递 usage requirements 承载解析链）。
     if(NOT WIN32)
+        # N-9：事件面裁决桥接（cli_ev_in 的 confirm→tool.approve）与审批命令
+        # 同目标验证——mock 网关是唯一出站断言面，CLI_EV_SRCS 全量编入。
         add_executable(test_cli_approval tests/test_cli_approval.c
                        tests/cli_test_globals.c
                        src/cmd/airy_cli_cmd_approval.c ${CLI_GW_SRCS}
+                       ${CLI_EV_SRCS}
                        src/render/cli_render.c src/core/cli_clock.c src/core/cli_dag.c
                        src/core/cli_term.c
                        src/core/cli_timeout.c src/core/cli_cfg.c)
