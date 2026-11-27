@@ -229,10 +229,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist-shard
-          for f in dist/manifest.*.json dist/manifest.*.json.asc \
-                   dist/install.sh dist/install.ps1 dist/notes.txt; do
-            [ -e "$f" ] && cp -f "$f" dist-shard/ || true
-          done
+          # 共享小件只随 1 号分片上载：Gitee 附件列表不返回体积，判定「同件」
+          # 只能靠名字，四片各传一份就会在发行页堆出同名多份；收敛到单分片后
+          # 分片并集仍等于全量，且不再依赖远端体积元数据。
+          if [ "${{ matrix.shard }}" -eq 1 ]; then
+            for f in dist/manifest.*.json dist/manifest.*.json.asc \
+                     dist/install.sh dist/install.ps1 dist/notes.txt; do
+              [ -e "$f" ] && cp -f "$f" dist-shard/ || true
+            done
+          fi
           ls dist/agentrt-"${VERSION}"-*.tar.gz dist/agentrt-"${VERSION}"-*.zip 2>/dev/null \
             | LC_ALL=C sort > "$RUNNER_TEMP/pkgs.lst" || true
           i=0
