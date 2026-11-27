@@ -113,7 +113,11 @@ inputs:
     # sed -n '1s/[^0-9]//gp'，全数字内容不触发替换 → 取空串，采纳形同虚设。
     # latest 发布面已同步（逐字节一致），pin 不随之前推即报 AF1 分叉，
     # 发行包 bin/airymaxrt-full 也会继续带该缺陷。
-    default: '501bd13e3ea5557b7d4898749e58808fde07cca8'
+    # 8f49718：501bd13 的「对齐子仓指针」把 console 等七个叶子子仓换成
+    # 改名后的独立谱系，console 由库 crate 变回 agentrt-cli 二进制，第二
+    # 用户面复活（T6 判红）；本笔保留 tui 6c4146f，其余七腿恢复为 53e9f19
+    # 实测通过的取值。tui 未变，AF1 双面判据不因本前推而变。
+    default: '8f4971848302c4db71c59e04d7c9570ac9196e95'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
