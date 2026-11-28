@@ -60,6 +60,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: bash .github/scripts/init-submodules.sh
 
+      # 基线侧 gitlink 可能已不在子仓默认分支的可达历史里：子仓谱系重写后
+      # 旧 pin 成为悬挂对象，全量克隆同样取不到，R6 便以「基线不可读」判红
+      # （run 46087726819 实证：gateway@775ea17 在远端存在却不在克隆内）。
+      # 按 SHA 定向取回基线 pin，使审计能读到基线头文件；取不到即红。
+      - name: Fetch baseline submodule pins
+        if: env.AIRY_COMMIT_BASE != ''
+        run: |
+          set -euo pipefail
+          git ls-tree -r "$AIRY_COMMIT_BASE" | while read -r meta path; do
+            set -- $meta
+            [ "$1" = "160000" ] || continue
+            sha="$3"
+            git -C "$path" cat-file -e "$sha^{commit}" 2>/dev/null && continue
+            echo "fetch base pin: $path@${sha:0:12}"
+            git -C "$path" fetch -q --depth 1 origin "$sha"
+          done
+
       - name: Test debt (R6) and ledger
         env:
           G48_REPO: ${{ github.workspace }}
