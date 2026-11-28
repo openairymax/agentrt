@@ -1496,7 +1496,10 @@ export AIRY_WORKSPACE_DIR="$AIRY_HOME/data/agentrt/workspaces"
 export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-$AIRY_HOME/data/agentrt/cache/pycache}"
 export AIRY_AGENT_ACL="${AIRY_AGENT_ACL:-}"
 export PATH="${AIRY_HOME}/bin:$PATH"
-export LD_LIBRARY_PATH="${AIRY_HOME}/lib:${LD_LIBRARY_PATH:-}"
+# 0.1.21 收敛：不再导出 LD_LIBRARY_PATH。发行包内 daemon 均带
+# RPATH=$ORIGIN/../lib，无需环境变量即可解析私有 .so；导出反而污染宿主
+# 子进程——python3 的 _sqlite3 会优先加载包内旧 libsqlite3.so.0（缺
+# sqlite3_deserialize）导致导入失败，agent 无法执行（实机复现）。
 # 0.1.21 D4：Python 形态 agent 由 `python3 -m airymax_agents.runner` 拉起，
 # 三包以目录形态随发行物落在 $AIRY_HOME/lib，必须进 Python 搜索路径，
 # 否则干净安装下 spawn 直接 ERR_SVC_NOT_READY。
