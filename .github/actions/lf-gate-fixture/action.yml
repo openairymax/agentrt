@@ -323,7 +323,10 @@ inputs:
     # 4584fc0）。da64952 所指的快照经上一轮「对齐子仓指针」误换到重写谱系，
     # cupolas 实测 17464 与账本 pin 17880 不符、测试运行宏无条件 PASS，
     # Gate 18/42/52 与 INV-10 因此恒红；恢复后三者与实测重新对齐。
-    default: 'd342473c32713d7ef581362701a3d9b1cb74b94b'
+    # d641297：cupolas 前进至 397663e（口令生成改拒绝采样并按字符类保底）。
+    # 旧实现对随机字节取模 66，特殊字符区永不出现，cupolas_security_tests
+    # 的 password_has_special 恒红；新快照保证四类字符各至少一位。
+    default: 'd641297e3d9ddcd40e25880cfdd5ace29cf7fac4'
   legs:
     description: >-
       取料腿选择（空格分隔：sdk tools products）。默认三腿全取；仅需产品件
