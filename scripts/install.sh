@@ -127,9 +127,6 @@ elif [ -f "$(dirname "$0")/../VERSION" ]; then
 fi
 _airy_ver_given=1; [ -n "${AIRY_VERSION:-}" ] || _airy_ver_given=0
 AIRY_VERSION="${AIRY_VERSION:-v0.1.21}"
-if [ "$_airy_ver_given" -eq 0 ]; then
-    log_warn "未指定 --version，使用兜底版本 ${AIRY_VERSION}（如需其他版本请加 --version vX.Y.Z）"
-fi
 AIRY_BUILD_JOBS="${AIRY_BUILD_JOBS:-$(nproc 2>/dev/null || echo 4)}"
 AIRY_MODE="${AIRY_MODE:-auto}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
@@ -330,6 +327,7 @@ AirymaxRT 安装器
   --profile PROFILE  功能档位: full|minimal|auto（默认 auto）
   --channel CHANNEL  发布通道: stable|rc|beta（默认 stable）
   --from-file FILE   从本地制品文件安装
+  --version VER      指定安装版本（如 v0.1.21；默认取发布清单最新）
   --reinstall        强制重装
   --uninstall        卸载
   --keep-data        卸载时保留用户数据（按安装清单逆序删除其余）
@@ -350,6 +348,7 @@ while [ $# -gt 0 ]; do
         --profile)   AIRY_PROFILE="$2"; shift 2 ;;
         --channel)   AIRY_CHANNEL="$2"; shift 2 ;;
         --from-file) AIRY_FROM_FILE="$2"; shift 2 ;;
+        --version)   AIRY_VERSION="$2"; AIRY_VERSION_SPECIFIED=1; _airy_ver_given=1; shift 2 ;;
         --uninstall) UNINSTALL=1; shift ;;
         --reinstall) REINSTALL=1; shift ;;
         --keep-data) KEEP_DATA=1; shift ;;
@@ -362,6 +361,10 @@ while [ $# -gt 0 ]; do
         *) log_err "未知参数: $1（--help 查看用法）"; exit 1 ;;
     esac
 done
+
+if [ "$_airy_ver_given" -eq 0 ]; then
+    log_warn "未指定 --version，使用兜底版本 ${AIRY_VERSION}（如需其他版本请加 --version vX.Y.Z）"
+fi
 
 if [ "$DRY_RUN" = "1" ] && [ "$UNINSTALL" != "1" ]; then
     log_err "--dry-run 仅用于 --uninstall"; exit 1
@@ -1966,7 +1969,12 @@ main() {
     stage 2 5 "获取运行时"
     local release_url="${AIRY_RELEASE_URL:-}"
     if [ -z "$release_url" ] && [ "${AIRY_MODE:-auto}" != "source" ]; then
-        release_url="${AIRY_RELEASE_BASE}/latest/manifest.${AIRY_CHANNEL}.json"
+        # 指定版本时锁定该版本发布面的清单，避免 --version 被 latest 指针吞掉。
+        if [ "$AIRY_VERSION_SPECIFIED" = "1" ]; then
+            release_url="${AIRY_RELEASE_BASE}/${AIRY_VERSION}/manifest.${AIRY_CHANNEL}.json"
+        else
+            release_url="${AIRY_RELEASE_BASE}/latest/manifest.${AIRY_CHANNEL}.json"
+        fi
     fi
     if [ -n "$AIRY_FROM_FILE" ]; then
         install_binary "$AIRY_FROM_FILE"; _bin_rc=$?
