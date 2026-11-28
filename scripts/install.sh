@@ -81,7 +81,7 @@ normalize_home() {
 }
 
 discover_install_home() {
-    local _h="${AIRY_HOME:-}" _link _real
+    local _h="${AIRY_HOME:-}" _link _real _hp
     if [ -n "$_h" ]; then
         _h="$(normalize_home "$_h")"
         if is_install_home "$_h"; then printf '%s' "$_h"; return 0; fi
@@ -101,8 +101,9 @@ discover_install_home() {
             if [ -n "$_real" ] && [ -f "${_real}/../config/install.env" ]; then
                 _h="$(normalize_home "$(sed -n 's/^AIRY_HOME=//p' "${_real}/../config/install.env" 2>/dev/null | head -1)")"
                 if is_install_home "$_h"; then
+                    _hp="$(cd -P "$_h" 2>/dev/null && pwd || printf '%s' "$_h")"
                     case "$_real" in
-                        "${_h}/bin"|"${_h}/scripts") printf '%s' "$_h"; return 0 ;;
+                        "${_hp}/bin"|"${_hp}/scripts") printf '%s' "$_h"; return 0 ;;
                     esac
                 fi
             fi
