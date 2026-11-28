@@ -1620,7 +1620,7 @@ if [ "\$_INPATH" != "1" ] && [ -n "\$_BINDIR" ]; then
     fi
 fi
 case "\$1" in
-    start|cli|profile|monitor|status|doctor|logs|uninstall|update|reinstall)
+    start|cli|local|profile|monitor|status|stop|doctor|logs|uninstall|update|reinstall|version|--version|-V|help|--help|-h)
         _FULL="\$AIRY_HOME/bin/airymaxrt-full"
         if [ "\$1" != "update" ] && [ -s "\$_FULL" ]; then
             exec bash "\$_FULL" "\$@"
