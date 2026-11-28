@@ -117,7 +117,7 @@ inputs:
     # 改名后的独立谱系，console 由库 crate 变回 agentrt-cli 二进制，第二
     # 用户面复活（T6 判红）；本笔保留 tui 6c4146f，其余七腿恢复为 53e9f19
     # 实测通过的取值。tui 未变，AF1 双面判据不因本前推而变。
-    default: '5b59a4a7cc0442dbe6b71cf33671ccf2727b7420'
+    default: '839711cc78ea3e1efe0e8d22636286fa62aca875'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
