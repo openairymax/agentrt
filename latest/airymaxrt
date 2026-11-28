@@ -385,10 +385,10 @@ log debug "==== airymaxrt 启动 ===="
 log debug "配置: AIRYRT_HOME=$AIRYRT_HOME AIRY_HOME=$AIRY_HOME RUNTIME_DIR=$RUNTIME_DIR"
 log debug "配置: GATEWAY_URL=$GATEWAY_URL MODEL_CONFIG=$MODEL_CONFIG AGENT_FILE=$AGENT_FILE"
 
-case ":${LD_LIBRARY_PATH:-}:" in
-    *":$AIRY_HOME/lib:"*) ;;
-    *) export LD_LIBRARY_PATH="$AIRY_HOME/lib:${LD_LIBRARY_PATH:-}" ;;
-esac
+# 自包含库由 daemon 的 RPATH=$ORIGIN/../lib 解析，不再向本进程导出
+# LD_LIBRARY_PATH：该变量会被 python3/curl 等全部子进程继承，令其加载包内
+# 为旧发行版采集的 libsqlite3/libssl/libcurl，造成 ABI 冲突（0.1.21 实机：
+# python SDK 导入失败、agent 不执行）。宿主搜索路径保持系统默认。
 
 syscurl() {
     local ldp="" p
@@ -1181,11 +1181,10 @@ apply_package() {
         chmod 600 "$AIRY_HOME/config/install.env" 2>/dev/null || true
     fi
     if [ -f "$AIRY_HOME/bin/agentrt-env.sh" ] \
-       && ! grep -q 'LD_LIBRARY_PATH' "$AIRY_HOME/bin/agentrt-env.sh" 2>/dev/null; then
-        printf '\nexport LD_LIBRARY_PATH="${AIRY_HOME}/lib:${LD_LIBRARY_PATH:-}"\n' \
-            >> "$AIRY_HOME/bin/agentrt-env.sh"
+       && grep -q '^export LD_LIBRARY_PATH=' "$AIRY_HOME/bin/agentrt-env.sh" 2>/dev/null; then
+        sed_inplace '/^export LD_LIBRARY_PATH=/d' "$AIRY_HOME/bin/agentrt-env.sh"
         chmod 700 "$AIRY_HOME/bin/agentrt-env.sh" 2>/dev/null || true
-        log info "agentrt-env.sh 已补写 LD_LIBRARY_PATH 注入（0.1.6c 自愈）"
+        log info "agentrt-env.sh 已移除 LD_LIBRARY_PATH 注入（0.1.21 收敛）"
     fi
     local _entry="$AIRY_HOME/bin/airymaxrt"
     local _entry_resolved="$_entry"
