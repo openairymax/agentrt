@@ -68,9 +68,22 @@ is_install_home() {
     [ -f "$1/config/install.env" ] || [ -x "$1/bin/airy_cli" ]
 }
 
+# 安装根不得落在 releases/<ver> 之内：版本目录只是安装根的下级物理存储。
+# 启动器经 current 链接解析到物理版本目录后，若把它当根，下一次安装会再
+# 嵌一层 releases/<ver>（真机重现：二次安装后出现
+# ~/.airymaxrt/releases/0.1.21/releases/0.1.21，status 组件路径翻倍）。
+normalize_home() {
+    local _n="${1%/}"
+    while [ "$(basename "$(dirname "${_n}")")" = "releases" ]; do
+        _n="$(dirname "$(dirname "${_n}")")"
+    done
+    printf '%s' "$_n"
+}
+
 discover_install_home() {
     local _h="${AIRY_HOME:-}" _link _real
     if [ -n "$_h" ]; then
+        _h="$(normalize_home "$_h")"
         if is_install_home "$_h"; then printf '%s' "$_h"; return 0; fi
         log_warn "已忽略环境变量 AIRY_HOME=${_h}（非既有安装根，疑似终端残留）" >&2
     fi
@@ -78,7 +91,7 @@ discover_install_home() {
     if [ -n "$_link" ] && command -v readlink >/dev/null 2>&1; then
         _real="$(cd -P "$(dirname "$(resolve_link_chain "$_link")")" 2>/dev/null && pwd || true)"
         if [ -n "$_real" ]; then
-            _h="$(dirname "$_real")"
+            _h="$(normalize_home "$(dirname "$_real")")"
             if is_install_home "$_h"; then printf '%s' "$_h"; return 0; fi
         fi
     fi
@@ -86,9 +99,11 @@ discover_install_home() {
         */*)
             _real="$(cd -P "$(dirname "$0")" 2>/dev/null && pwd || true)"
             if [ -n "$_real" ] && [ -f "${_real}/../config/install.env" ]; then
-                _h="$(sed -n 's/^AIRY_HOME=//p' "${_real}/../config/install.env" 2>/dev/null | head -1)"
-                if is_install_home "$_h" && [ "${_real}" = "$(cd -P "${_h}/bin" 2>/dev/null && pwd || true)" ]; then
-                    printf '%s' "$_h"; return 0
+                _h="$(normalize_home "$(sed -n 's/^AIRY_HOME=//p' "${_real}/../config/install.env" 2>/dev/null | head -1)")"
+                if is_install_home "$_h"; then
+                    case "$_real" in
+                        "${_h}/bin"|"${_h}/scripts") printf '%s' "$_h"; return 0 ;;
+                    esac
                 fi
             fi
             ;;
