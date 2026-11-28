@@ -213,10 +213,11 @@ fi
 cat > "$TMP/homelib.sh" <<'EOS'
 log_warn() { printf '[WARN] %s\n' "$1" >&2; }
 EOS
+extract_fn "$INSTALL" normalize_home       "$TMP/fn_nh"
 extract_fn "$INSTALL" resolve_link_chain    "$TMP/fn_rlc"
 extract_fn "$INSTALL" is_install_home       "$TMP/fn_iih"
 extract_fn "$INSTALL" discover_install_home "$TMP/fn_dih"
-cat "$TMP/homelib.sh" "$TMP/fn_rlc" "$TMP/fn_iih" "$TMP/fn_dih" \
+cat "$TMP/homelib.sh" "$TMP/fn_nh" "$TMP/fn_rlc" "$TMP/fn_iih" "$TMP/fn_dih" \
     > "$TMP/homelib_full.sh"
 
 _CORE_PATH="/usr/bin:/bin"
