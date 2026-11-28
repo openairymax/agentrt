@@ -117,7 +117,7 @@ inputs:
     # 改名后的独立谱系，console 由库 crate 变回 agentrt-cli 二进制，第二
     # 用户面复活（T6 判红）；本笔保留 tui 6c4146f，其余七腿恢复为 53e9f19
     # 实测通过的取值。tui 未变，AF1 双面判据不因本前推而变。
-    default: '1bcb8b695922c4d40276c44a9415a02c56c5012e'
+    default: '5b59a4a7cc0442dbe6b71cf33671ccf2727b7420'
   tools_sha:
     description: 'tools 仓锁定 commit（判据消费：scripts/ops/templates/permission_rules.yaml + quality/gates 基线）'
     required: false
@@ -221,7 +221,7 @@ inputs:
     # RATCHET-WAIVER-JUSTIFY 行；L-9 清单第 4 项改钉现役同主题提交。
     # 旧 pin 的例外文件顶行缺标签、整份不被采信，Gate 41 对 79 个新谱系
     # commit 全量判红；L-9 第 4 项指向复位后已不在祖先链的提交。
-    default: 'c0a26262a2793778b3dd8941f233a820339dca32'
+    default: 'ce055fe125df29c86ab358a4396ae4895ed072e2'
   products_sha:
     description: >-
       products 仓锁定 commit（判据消费与装配输入：gateway_biz 业务面源文件、
