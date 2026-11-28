@@ -68,14 +68,13 @@ jobs:
         if: env.AIRY_COMMIT_BASE != ''
         run: |
           set -euo pipefail
-          git ls-tree -r "$AIRY_COMMIT_BASE" | while read -r meta path; do
-            set -- $meta
-            [ "$1" = "160000" ] || continue
-            sha="$3"
-            git -C "$path" cat-file -e "$sha^{commit}" 2>/dev/null && continue
-            echo "fetch base pin: $path@${sha:0:12}"
-            git -C "$path" fetch -q --depth 1 origin "$sha"
-          done
+          git ls-tree -r "$AIRY_COMMIT_BASE" |
+            while read -r mode kind sha path; do
+              [ "$mode" = "160000" ] || continue
+              git -C "$path" cat-file -e "$sha^{commit}" 2>/dev/null && continue
+              echo "fetch base pin: $path@${sha:0:12}"
+              git -C "$path" fetch -q --depth 1 origin "$sha"
+            done
 
       - name: Test debt (R6) and ledger
         env:
